@@ -458,7 +458,7 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
         });
     }
 
-    let app_config = config::load_app_config(&config_path);
+    let app_config = config::load_app_config(&config_path)?;
 
     if let Some(CliCommand::Runs(runs_args)) = &args.command {
         return Ok(run_runs_command(&app_config, runs_args));
@@ -1013,6 +1013,7 @@ fn orchestration_failure(message: &str) -> ExitCode {
     ExitCode::FAILURE
 }
 
+// r[impl lattice.standalone_effect_authority.hosts.scenario.inspect]
 fn run_authority_command(app_config: &config::AppConfig, args: &AuthorityCommandArgs) -> ExitCode {
     let AuthorityCliCommand::Inspect { workflow_name } = &args.command;
     let result = (|| -> Result<String, String> {

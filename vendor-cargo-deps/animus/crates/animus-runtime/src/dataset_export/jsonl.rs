@@ -1,5 +1,4 @@
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven
-// validation compact while drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -7,7 +6,12 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
+#![allow(
+    compound_condition,
+    excessive_file_length,
+    function_length,
+    non_trait_imports
+)]
 #![allow(
     numeric_units,
     path_segment_repetition,
@@ -15,22 +19,14 @@
     unbounded_collection_growth
 )]
 
-use super::BLAKE3_ALGORITHM;
-use super::BLAKE3_HEX_LENGTH;
-use super::FIELD_MESSAGE;
-use super::FIELD_ROW;
-use super::FIELD_ROW_ID;
-use super::FIELD_SOURCE_SPAN;
-use super::REQUIRED_COUNT;
-use super::ROLE_ASSISTANT;
-use super::ROLE_SYSTEM;
-use super::ROLE_TOOL;
-use super::ROLE_USER;
-use super::data::DatasetChatMessage;
-use super::data::DatasetChatRow;
-use super::data::DatasetDiagnostic;
-use super::data::DatasetDiagnosticKind;
-use super::data::DatasetExportResult;
+use super::{
+    BLAKE3_ALGORITHM, BLAKE3_HEX_LENGTH, FIELD_MESSAGE, FIELD_ROW, FIELD_ROW_ID, FIELD_SOURCE_SPAN,
+    REQUIRED_COUNT, ROLE_ASSISTANT, ROLE_SYSTEM, ROLE_TOOL, ROLE_USER,
+    data::{
+        DatasetChatMessage, DatasetChatRow, DatasetDiagnostic, DatasetDiagnosticKind,
+        DatasetExportResult,
+    },
+};
 
 const JSON_KEY_ALGORITHM: &str = "algorithm";
 const JSON_KEY_CONTENT: &str = "content";
@@ -62,9 +58,17 @@ pub fn render_chat_row_jsonl(row: &DatasetChatRow) -> DatasetExportResult<String
     output.push('{');
     push_json_key(&mut output, JSON_KEY_ROW_ID);
     output.push('{');
-    push_json_string_field(&mut output, JSON_KEY_ALGORITHM, row.row_id.algorithm.as_str());
+    push_json_string_field(
+        &mut output,
+        JSON_KEY_ALGORITHM,
+        row.row_id.algorithm.as_str(),
+    );
     output.push(',');
-    push_json_string_field(&mut output, JSON_KEY_VALUE_HEX, row.row_id.value_hex.as_str());
+    push_json_string_field(
+        &mut output,
+        JSON_KEY_VALUE_HEX,
+        row.row_id.value_hex.as_str(),
+    );
     output.push('}');
     output.push(',');
     push_json_key(&mut output, JSON_KEY_MESSAGES);
@@ -107,7 +111,11 @@ pub fn render_chat_rows_jsonl(rows: &[DatasetChatRow]) -> DatasetExportResult<St
 fn validate_renderable_chat_row(row: &DatasetChatRow) -> DatasetExportResult<()> {
     if row.row_id.algorithm != BLAKE3_ALGORITHM
         || row.row_id.value_hex.len() != BLAKE3_HEX_LENGTH
-        || !row.row_id.value_hex.chars().all(|character| character.is_ascii_hexdigit())
+        || !row
+            .row_id
+            .value_hex
+            .chars()
+            .all(|character| character.is_ascii_hexdigit())
     {
         return Err(vec![DatasetDiagnostic::new(
             DatasetDiagnosticKind::BadChatRow,
@@ -129,11 +137,11 @@ fn validate_renderable_chat_row(row: &DatasetChatRow) -> DatasetExportResult<()>
             "chat row JSONL rendering requires safe role/content messages",
         )]);
     }
-    if row
-        .source_spans
-        .iter()
-        .any(|span| span.trim().is_empty() || contains_private_marker(span) || span.chars().any(char::is_control))
-    {
+    if row.source_spans.iter().any(|span| {
+        span.trim().is_empty()
+            || contains_private_marker(span)
+            || span.chars().any(char::is_control)
+    }) {
         return Err(vec![DatasetDiagnostic::new(
             DatasetDiagnosticKind::Leakage,
             FIELD_SOURCE_SPAN,
@@ -144,8 +152,10 @@ fn validate_renderable_chat_row(row: &DatasetChatRow) -> DatasetExportResult<()>
 }
 
 fn invalid_message(message: &DatasetChatMessage) -> bool {
-    !matches!(message.role.as_str(), ROLE_SYSTEM | ROLE_USER | ROLE_ASSISTANT | ROLE_TOOL)
-        || message.content.trim().is_empty()
+    !matches!(
+        message.role.as_str(),
+        ROLE_SYSTEM | ROLE_USER | ROLE_ASSISTANT | ROLE_TOOL
+    ) || message.content.trim().is_empty()
         || contains_private_marker(message.content.as_str())
 }
 

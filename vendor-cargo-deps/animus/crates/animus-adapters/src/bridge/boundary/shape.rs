@@ -1,20 +1,10 @@
-use super::Collection;
-use super::InteropError;
-use super::MCP_ABILITY_POLICY_FIELD;
-use super::MCP_CAPABILITY_FIELD;
-use super::MCP_MAPPING_DESCRIPTION;
-use super::MCP_MAPPING_GUIDELINES;
-use super::MCP_MAPPING_PROMPT_SNIPPET;
-use super::MCP_RESOURCE_POLICY_FIELD;
-use super::MCP_RESULT_BOUNDS_FIELD;
-use super::MCP_SERVER_LABEL_FIELD;
-use super::MCP_SOURCE_FIELD;
-use super::MCP_TOOL_NAME_FIELD;
-use super::SCHEMA_FIELD;
-use super::Text;
-use super::borrowed_texts;
-use super::required_optional_text;
-use super::text_collection;
+use super::{
+    Collection, InteropError, MCP_ABILITY_POLICY_FIELD, MCP_CAPABILITY_FIELD,
+    MCP_MAPPING_DESCRIPTION, MCP_MAPPING_GUIDELINES, MCP_MAPPING_PROMPT_SNIPPET,
+    MCP_RESOURCE_POLICY_FIELD, MCP_RESULT_BOUNDS_FIELD, MCP_SERVER_LABEL_FIELD, MCP_SOURCE_FIELD,
+    MCP_TOOL_NAME_FIELD, SCHEMA_FIELD, Text, borrowed_texts, required_optional_text,
+    text_collection,
+};
 
 /// Borrowed MCP-to-Animus tool mapping before validation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -63,11 +53,23 @@ impl McpToolMapping {
             server_label: required_optional_text(MCP_SERVER_LABEL_FIELD, draft.server_label)?,
             tool_name: required_optional_text(MCP_TOOL_NAME_FIELD, draft.tool_name)?,
             schema_identity: required_optional_text(SCHEMA_FIELD, draft.schema_identity)?,
-            capability_labels: text_collection(MCP_CAPABILITY_FIELD, draft.capability_labels, true)?,
+            capability_labels: text_collection(
+                MCP_CAPABILITY_FIELD,
+                draft.capability_labels,
+                true,
+            )?,
             source_metadata: required_optional_text(MCP_SOURCE_FIELD, draft.source_metadata)?,
             result_bounds: required_optional_text(MCP_RESULT_BOUNDS_FIELD, draft.result_bounds)?,
-            resource_policy_refs: text_collection(MCP_RESOURCE_POLICY_FIELD, draft.resource_policy_refs, true)?,
-            ability_policy_refs: text_collection(MCP_ABILITY_POLICY_FIELD, draft.ability_policy_refs, true)?,
+            resource_policy_refs: text_collection(
+                MCP_RESOURCE_POLICY_FIELD,
+                draft.resource_policy_refs,
+                true,
+            )?,
+            ability_policy_refs: text_collection(
+                MCP_ABILITY_POLICY_FIELD,
+                draft.ability_policy_refs,
+                true,
+            )?,
         })
     }
 
@@ -77,7 +79,9 @@ impl McpToolMapping {
     ///
     /// Returns [`crate::tool::ContractError`] if the synthesized tool definition
     /// fails the common Animus tool-contract validation path.
-    pub fn to_tool_definition(&self) -> Result<crate::tool::Definition, crate::tool::ContractError> {
+    pub fn to_tool_definition(
+        &self,
+    ) -> Result<crate::tool::Definition, crate::tool::ContractError> {
         let capability_labels = borrowed_texts(&self.capability_labels);
         crate::tool::Definition::validate(&crate::tool::DefinitionDraft {
             name: Some(self.tool_name.as_str()),

@@ -27,7 +27,10 @@ impl<'a> RuntimeMiddlewareStack<'a> {
     /// # Errors
     ///
     /// Returns the first observer error.
-    pub fn observe_event(&mut self, event: &crate::RuntimeEvent) -> Result<(), super::MiddlewareError> {
+    pub fn observe_event(
+        &mut self,
+        event: &crate::RuntimeEvent,
+    ) -> Result<(), super::MiddlewareError> {
         for hook in &mut self.hooks {
             hook.observe(event)?;
         }
@@ -73,14 +76,18 @@ fn run_model(
     hooks: &mut [&mut dyn super::RuntimeMiddleware],
     request: animus_adapters::ModelRequest,
 ) -> MiddlewareOutcome<animus_adapters::ModelRequest> {
-    run_all(request, hooks, |hook, current| hook.before_model_dispatch(current))
+    run_all(request, hooks, |hook, current| {
+        hook.before_model_dispatch(current)
+    })
 }
 
 fn run_tool(
     hooks: &mut [&mut dyn super::RuntimeMiddleware],
     request: animus_adapters::ToolRequest,
 ) -> MiddlewareOutcome<animus_adapters::ToolRequest> {
-    run_all(request, hooks, |hook, current| hook.before_tool_dispatch(current))
+    run_all(request, hooks, |hook, current| {
+        hook.before_tool_dispatch(current)
+    })
 }
 
 fn run_all<Payload, Apply>(
@@ -99,7 +106,9 @@ where
         let hook_label = String::from(hook.label());
         debug_assert!(!hook_label.is_empty());
         match apply(*hook, current.clone()) {
-            Ok(super::HookDecision::Continue { value } | super::HookDecision::Replace { value }) => {
+            Ok(
+                super::HookDecision::Continue { value } | super::HookDecision::Replace { value },
+            ) => {
                 current = value;
             }
             Ok(super::HookDecision::Block { reason }) => {
@@ -112,7 +121,10 @@ where
             }
             Err(error) => {
                 debug_assert!(!error.message().is_empty());
-                return MiddlewareOutcome::Failed { value: current, error };
+                return MiddlewareOutcome::Failed {
+                    value: current,
+                    error,
+                };
             }
         }
     }

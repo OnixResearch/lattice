@@ -1,6 +1,7 @@
 const STATUS_OBSERVATION_KIND_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("status_observation_kind");
-const STATUS_STATE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("semantic_status_state");
+const STATUS_STATE_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("semantic_status_state");
 
 const STATE_IDLE: &str = "idle";
 const STATE_WORKING: &str = "working";
@@ -86,10 +87,12 @@ impl ObservationKind {
             KIND_TRUSTED_LIFECYCLE => Ok(Self::TrustedLifecycle),
             KIND_UNTRUSTED_LIFECYCLE => Ok(Self::UntrustedLifecycle),
             KIND_HEURISTIC_FALLBACK => Ok(Self::HeuristicFallback),
-            other => Err(crate::AdapterContractError::UnsupportedStatusObservationKind {
-                field: STATUS_OBSERVATION_KIND_FIELD.as_str(),
-                value: alloc::string::String::from(other),
-            }),
+            other => Err(
+                crate::AdapterContractError::UnsupportedStatusObservationKind {
+                    field: STATUS_OBSERVATION_KIND_FIELD.as_str(),
+                    value: alloc::string::String::from(other),
+                },
+            ),
         }
     }
 

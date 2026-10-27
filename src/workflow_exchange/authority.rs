@@ -4,7 +4,7 @@
     nested_conditionals,
     non_trait_imports,
     path_segment_repetition,
-    reason = "the closed route authority adapter checks every exact binding field and maps four reviewed ability families"
+    reason = "the closed route authority adapter checks every exact binding field and maps reviewed ability families"
 )]
 
 use crate::engine::effect::authority;
@@ -18,6 +18,7 @@ const FILE_CONTRACT: &str = "lattice-file";
 const NETWORK_CONTRACT: &str = "lattice-network";
 const PROCESS_CONTRACT: &str = "lattice-process";
 const PROTOCOL_CONTRACT: &str = "lattice-role-protocol";
+const AGENT_CONTRACT: &str = "lattice-agent";
 
 #[derive(Debug, Clone)]
 pub struct RouteExactAuthorityProvider {
@@ -137,6 +138,8 @@ fn contract_for_ability(ability: &str) -> Option<&'static str> {
         Some(PROCESS_CONTRACT)
     } else if ability.starts_with("protocol/") {
         Some(PROTOCOL_CONTRACT)
+    } else if ability == "agent/execute" {
+        Some(AGENT_CONTRACT)
     } else {
         None
     }

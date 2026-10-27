@@ -76,6 +76,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 input_bytes: OPERATION_INPUT_BYTES,
                 output_bytes: OPERATION_OUTPUT_BYTES,
                 clear_environment: true,
+                wasm: None,
             },
             RuntimeArtifact {
                 id: "analyzer-runtime".to_string(),
@@ -88,6 +89,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 input_bytes: ANALYZER_INPUT_BYTES,
                 output_bytes: ANALYZER_OUTPUT_BYTES,
                 clear_environment: true,
+                wasm: None,
             },
         ],
         analyzers: vec![AnalyzerManifest {
@@ -132,7 +134,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         admission: AdmissionProfile {
             identity: content_identity(b"lattice.operation-pack-admission.read-only.v1"),
             required_evidence: Vec::new(),
-            allowed_licenses: vec!["MIT".to_string()],
+            allowed_licenses: vec!["AGPL-3.0-or-later".to_string()],
             allowed_capabilities: vec![CapabilityClass::ProcessRead],
         },
         release: ReleaseMetadata {
@@ -142,7 +144,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             superseded_by: None,
             publication_epoch_seconds: None,
         },
-        licenses: vec!["MIT".to_string()],
+        licenses: vec!["AGPL-3.0-or-later".to_string()],
         probe: None,
         required_non_claims: lattice::operation_pack::model::REQUIRED_NON_CLAIMS.map(str::to_string).to_vec(),
     };

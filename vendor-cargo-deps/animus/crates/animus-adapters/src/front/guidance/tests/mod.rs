@@ -1,9 +1,13 @@
 #![allow(unknown_lints)]
-#![allow(ambiguous_params, assertion_density, non_trait_imports, path_segment_repetition)]
-
-use core::num::NonZeroU32;
+#![allow(
+    ambiguous_params,
+    assertion_density,
+    non_trait_imports,
+    path_segment_repetition
+)]
 
 use super::*;
+use core::num::NonZeroU32;
 
 mod assembly;
 mod skills;
@@ -14,9 +18,12 @@ pub(super) const REDACTED_NAME: &str = "redacted-guidance";
 pub(super) const ORIGIN_ROOT: &str = "repo-root-agents";
 pub(super) const ORIGIN_NESTED: &str = "repo-nested-agents";
 pub(super) const ORIGIN_REDACTED: &str = "repo-secret-agents";
-pub(super) const VALID_HASH: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-pub(super) const SECOND_HASH: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-pub(super) const THIRD_HASH: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+pub(super) const VALID_HASH: &str =
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+pub(super) const SECOND_HASH: &str =
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+pub(super) const THIRD_HASH: &str =
+    "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 pub(super) const ROOT_PRECEDENCE: GuidancePrecedence = GuidancePrecedence::new(10);
 pub(super) const NESTED_PRECEDENCE: GuidancePrecedence = GuidancePrecedence::new(20);
 pub(super) const REDACTED_PRECEDENCE: GuidancePrecedence = GuidancePrecedence::new(30);
@@ -47,10 +54,15 @@ pub(super) fn source(
     precedence: GuidancePrecedence,
     origin: &'static str,
 ) -> GuidanceSource {
-    source_with(name, scope, precedence, origin, VALID_HASH, ROOT_UNITS, false)
+    source_with(
+        name, scope, precedence, origin, VALID_HASH, ROOT_UNITS, false,
+    )
 }
 
-#[expect(clippy::too_many_arguments, reason = "fixture mirrors guidance source fields")]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "fixture mirrors guidance source fields"
+)]
 pub(super) fn source_with(
     name: &'static str,
     scope: PromptResourceScope,

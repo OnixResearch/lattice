@@ -447,3 +447,390 @@ r[ucan_token_flow.vendored_source.exact_revision.rejected]
 - GIVEN a branch name, abbreviated object ID, uppercase object ID, malformed value, or unavailable commit
 - WHEN the operator requests exact source parity or import
 - THEN the importer fails before it replaces the vendored snapshot
+
+### Requirement: UCAN dependency cohorts include protocol profile
+
+r[basalt.ucan_token_flow.protocol_profiles.cohort] Basalt MUST bind every reviewed UCAN dependency cohort to an exact protocol-profile ID, UCAN source revision, UCAN support-catalog BLAKE3 identity, and Basalt policy identity.
+
+#### Scenario: Current vendored cohort is inspected
+
+- GIVEN Basalt uses the reviewed compact UCAN snapshot
+- WHEN the dependency cohort is rendered
+- THEN it MUST name `onix-compact-ed25519-v1`
+- AND it MUST NOT claim final UCAN `1.0.0` compatibility
+
+#### Scenario: Cohort fields disagree
+
+- GIVEN a protocol profile, source revision, support catalog, or policy identity does not match a reviewed cohort
+- WHEN cohort admission runs
+- THEN admission MUST fail before token parsing or authority evaluation
+
+### Requirement: Protocol profile selection is explicit
+
+r[basalt.ucan_token_flow.protocol_profiles.selection] Basalt UCAN enforcement inputs and semantics fixtures MUST carry a closed admitted protocol-profile value. Basalt MUST NOT infer a profile from untrusted credential bytes.
+
+#### Scenario: Supported profile is supplied
+
+- GIVEN an enforcement input selects a profile admitted by the current policy and source cohort
+- WHEN adapter selection runs
+- THEN Basalt MUST select only the adapter for that exact profile
+
+#### Scenario: Profile is absent or unknown
+
+- GIVEN the profile is missing, unknown, or unsupported
+- WHEN adapter selection runs
+- THEN Basalt MUST deny before token parsing
+- AND replay admission MUST receive zero calls
+
+### Requirement: Compact enforcement stays profile-bound
+
+r[basalt.ucan_token_flow.protocol_profiles.compact] The current raw compact enforcement adapter MUST accept only the local compact protocol cohort and MUST preserve its existing policy, holder, operation, replay, and live-capability behavior.
+
+#### Scenario: Compact cohort matches
+
+- GIVEN a valid holder-signed compact Invocation and matching Basalt policy select the local compact cohort
+- WHEN raw enforcement runs
+- THEN the existing adapter MAY produce live authority for the exact request
+
+#### Scenario: Final profile reaches compact adapter
+
+- GIVEN an input selects final UCAN `1.0.0` or supplies final-profile bytes to the compact cohort
+- WHEN raw enforcement runs
+- THEN the compact adapter MUST reject the request
+- AND it MUST NOT auto-dispatch another decoder
+
+### Requirement: Verified UCAN facts enter through an application contract
+
+r[basalt.ucan_token_flow.protocol_profiles.adapter_contract] Basalt MUST define an application-owned verified UCAN authority input that binds the protocol profile, source cohort, subject or holder reference, operation mapping inputs, request binding, public token identities, and bounded non-claims. UCAN wire and vendor codec types MUST NOT enter the Basalt authority core.
+
+#### Scenario: Current compact result is mapped
+
+- GIVEN the compact UCAN adapter returns verified authority for an exact request
+- WHEN the adapter projects it into the Basalt input contract
+- THEN the contract MUST preserve the admitted profile and request bindings
+- AND only bounded application authority facts MAY enter the Basalt core
+
+#### Scenario: Caller supplies assertions without UCAN proof
+
+- GIVEN a caller supplies profile, operation, policy, or validity fields without the required UCAN verified value
+- WHEN mapping runs
+- THEN Basalt MUST deny
+- AND caller assertions MUST NOT create authority
+
+### Requirement: Receipts bind protocol cohorts
+
+r[basalt.ucan_token_flow.protocol_profiles.receipt] Basalt UCAN enforcement receipts MUST include and hash the receipt schema, protocol-profile ID, vendored UCAN revision, UCAN support-catalog identity, Basalt policy identity, operation profile, bounded token and request identities, reason, and non-claims.
+
+#### Scenario: Identical profile evaluation repeats
+
+- GIVEN all explicit profile, cohort, policy, request, and backend facts are identical
+- WHEN receipt generation repeats
+- THEN the receipt BLAKE3 identity MUST be identical
+
+#### Scenario: Profile is substituted
+
+- GIVEN all fields are equal except the protocol profile
+- WHEN receipt generation runs
+- THEN the receipt identity MUST differ
+- AND the substituted receipt MUST NOT recreate live authority
+
+### Requirement: Profile tests include cross-profile failures
+
+r[basalt.ucan_token_flow.protocol_profiles.tests] Tests MUST cover accepted compact and future final-profile cohorts plus missing, unknown, stale, unsupported, source-mismatch, policy-mismatch, adapter-substitution, command-mapping, and lossy-conversion failures.
+
+#### Scenario: Cross-profile matrix runs
+
+- GIVEN credentials, verified values, adapters, source cohorts, and policies from both profiles
+- WHEN every mismatched combination is tested
+- THEN each combination MUST fail closed
+- AND denied cases MUST make zero state-consuming replay calls
+
+### Requirement: Basalt retains its authority boundary
+
+r[basalt.ucan_token_flow.protocol_profiles.docs] Documentation MUST state that Basalt owns application policy and action mapping while UCAN owns protocol wire and authority semantics. Profile matching MUST NOT prove key trust, revocation freshness, replay durability, policy completeness, transport security, or effect correctness.
+
+#### Scenario: Operator reads profile support
+
+- GIVEN an allowed Basalt result names a UCAN protocol profile
+- WHEN the operator reads its claim
+- THEN the claim MUST remain limited to the exact reviewed cohort and request
+- AND all external authority and evidence boundaries MUST remain visible
+
+### Requirement: Profile integration passes release checks
+
+r[basalt.ucan_token_flow.protocol_profiles.validation] The change MUST pass policy freshness, vendored source checks, positive and negative adapter tests, receipt checks, formatting, Clippy, release verification, Cairn gates, and the repository Nix check.
+
+#### Scenario: Validation rail completes
+
+- GIVEN profile policy, source cohort, adapters, fixtures, receipts, and documentation are current
+- WHEN the validation rail runs
+- THEN every required check MUST pass or report one exact bounded blocker
+
+### Requirement: Final-profile adoption requires archived upstream evidence
+
+r[basalt.ucan_token_flow.v1_profile.upstream] Basalt MUST admit final UCAN `1.0.0` only from a reviewed vendored source cohort that binds archived UCAN wire and authorization evidence, the exact profile ID, source revision, support-catalog BLAKE3, source manifest, and licenses.
+
+#### Scenario: Upstream evidence is complete
+
+- GIVEN exact archived upstream receipts and the vendored snapshot establish every required final-profile surface
+- WHEN cohort admission runs
+- THEN Basalt MAY admit the final profile for adapter implementation
+
+#### Scenario: Upstream evidence is incomplete
+
+- GIVEN any required receipt is missing, stale, failed, unsupported, untested, mismatched, or malformed
+- WHEN cohort admission runs
+- THEN final-profile adoption MUST remain blocked
+
+### Requirement: Final Invocation facts enter through a separate adapter
+
+r[basalt.ucan_token_flow.v1_profile.adapter] The final-profile adapter MUST consume UCAN's live verified Invocation value and MUST project only bounded application authority facts into Basalt's application-owned input. It MUST NOT parse wire bytes or duplicate UCAN semantics.
+
+#### Scenario: Verified Invocation is mapped
+
+- GIVEN UCAN returns live verified final-profile authority for an exact Invocation
+- WHEN the adapter maps it
+- THEN profile, cohort, subject, executor, command, request, policy, proof, revocation, replay, and public token identity facts MUST remain bound
+
+#### Scenario: Caller supplies assertions
+
+- GIVEN a caller supplies profile, command, policy, proof, revocation, replay, or validity assertions without the UCAN live value
+- WHEN the adapter evaluates them
+- THEN it MUST deny
+- AND assertions MUST NOT create Basalt authority
+
+### Requirement: Final command mapping is closed policy
+
+r[basalt.ucan_token_flow.v1_profile.mapping] Basalt Nickel policy MUST define closed mappings from admitted final-profile commands and complete subject or resource facts to exact actions, contracts, abilities, and operation profiles. Unknown, ambiguous, duplicate, incomplete, or lossy mappings MUST deny.
+
+#### Scenario: Exact command mapping passes
+
+- GIVEN a verified command and complete authority facts match one reviewed mapping
+- WHEN the pure mapping core evaluates them
+- THEN it MUST return the exact configured `EnforcementAction`
+
+#### Scenario: Resource meaning is incomplete
+
+- GIVEN an action requires an external resource owner fact that is absent or not verified
+- WHEN mapping runs
+- THEN it MUST deny before prospective authority is created
+
+### Requirement: Final-profile authority retains ordering
+
+r[basalt.ucan_token_flow.v1_profile.authority] Basalt MUST complete all fallible profile mapping, policy evaluation, authority construction, allocation, and receipt preparation before the composed final replay commit. It MUST NOT call a second replay boundary after UCAN state consumption.
+
+#### Scenario: Basalt policy denies
+
+- GIVEN UCAN preflight facts pass but Basalt mapping or policy denies
+- WHEN enforcement runs
+- THEN final replay MUST receive zero calls
+- AND no live Basalt capability MUST exist
+
+#### Scenario: Replay accepts
+
+- GIVEN UCAN and Basalt preflight facts pass and final replay accepts
+- WHEN live authority is constructed
+- THEN only infallible moves MUST occur afterward
+
+### Requirement: Final-profile tests cover substitutions
+
+r[basalt.ucan_token_flow.v1_profile.tests] Tests MUST cover valid direct and delegated final Invocations plus unknown mapping, incomplete fact, lossy conversion, caller assertion, source mismatch, profile mismatch, policy denial, and compact/final adapter substitution.
+
+#### Scenario: Cross-profile matrix runs
+
+- GIVEN compact and final credentials, live values, adapters, policies, and source cohorts
+- WHEN mismatched combinations are evaluated
+- THEN every mismatch MUST fail closed
+- AND denied cases MUST create no live authority
+
+### Requirement: Final-profile receipts are redacted evidence
+
+r[basalt.ucan_token_flow.v1_profile.receipt] Final-profile receipts MUST bind the Basalt schema, exact UCAN profile and source cohort, support catalog, mapping, policy, operation, bounded token and request identities, reason, and non-claims with BLAKE3. They MUST omit raw credentials, proofs, arguments, metadata, policies, keys, and private identity text.
+
+#### Scenario: Receipt is persisted
+
+- GIVEN final-profile enforcement succeeds or fails
+- WHEN the receipt is serialized
+- THEN it MUST contain no bearer or request payload
+- AND it MUST provide no path to recreate live authority
+
+### Requirement: Final-profile documentation keeps non-claims
+
+r[basalt.ucan_token_flow.v1_profile.docs] Documentation MUST state that UCAN owns wire and authority verification while Basalt owns application mapping and policy. An allow MUST NOT prove key trust, external resource ownership, revocation freshness, replay durability, transport security, policy completeness, effect execution, or effect correctness.
+
+#### Scenario: Operator reads an allow
+
+- GIVEN final-profile Basalt enforcement allows one exact request
+- WHEN the operator reads its supported claim
+- THEN the exact cohort and mapping MUST be visible
+- AND retained caller boundaries MUST remain explicit
+
+### Requirement: Final-profile adoption passes release checks
+
+r[basalt.ucan_token_flow.v1_profile.validation] The change MUST pass upstream evidence checks, vendored source checks, Nickel freshness, positive and negative adapter tests, receipt tests, formatting, Clippy, release verification, Cairn gates, and the repository Nix check.
+
+#### Scenario: Validation completes
+
+- GIVEN source, evidence, policy, adapters, fixtures, receipts, and documentation are current
+- WHEN the validation rail runs
+- THEN every required check MUST pass or report one exact bounded blocker
+
+### Requirement: ucan_token_flow.oidc.versioned_policy
+
+r[ucan_token_flow.oidc.versioned_policy]
+
+Basalt SHALL evaluate OIDC exchange under a typed, versioned Nickel policy that names trusted issuers, audiences, algorithms, claim predicates, freshness, network bounds, cache bounds, Mantle capabilities, and UCAN lifetime limits.
+
+#### Scenario: Policy export is valid
+
+- **GIVEN** an accepted OIDC exchange policy
+- **WHEN** Basalt exports it for runtime use
+- **THEN** the export SHALL be canonical and BLAKE3-identified
+- **AND** it SHALL contain no private key, provider credential, OIDC token, or secret value
+
+#### Scenario: Required policy field is absent
+
+- **GIVEN** a policy without an issuer, audience, algorithm, freshness, claim, capability, or network bound required by its profile
+- **WHEN** the contract validates it
+- **THEN** validation SHALL fail before service startup
+
+### Requirement: ucan_token_flow.oidc.pure_verification
+
+r[ucan_token_flow.oidc.pure_verification]
+
+Basalt SHALL verify OIDC structure, algorithm, key use, signature, issuer, audience, time claims, selected identity claims, and requested capability in a pure core with explicit time and public-key inputs.
+
+#### Scenario: GitHub token satisfies policy
+
+- **GIVEN** a correctly signed token from the configured issuer with the required audience, fresh time claims, accepted repository and workflow claims, and an allowed capability request
+- **WHEN** the core verifies it
+- **THEN** it SHALL return bounded identity facts and an attenuated issuance plan
+
+#### Scenario: One verification condition fails
+
+- **GIVEN** a malformed token, disallowed algorithm, wrong key use, bad signature, wrong issuer or audience, stale time claim, wrong claim type, claim mismatch, or excessive request
+- **WHEN** the core verifies it
+- **THEN** it SHALL return a stable typed rejection
+- **AND** it SHALL NOT produce an issuance plan
+
+### Requirement: ucan_token_flow.oidc.bounded_jwks
+
+r[ucan_token_flow.oidc.bounded_jwks]
+
+Basalt SHALL retrieve OIDC discovery and JWKS documents only from configured HTTPS origins under named transport, redirect, document, key-count, freshness, and refresh bounds.
+
+#### Scenario: Unknown key rotates safely
+
+- **GIVEN** a token with an unknown `kid` and a configured issuer
+- **WHEN** the current key set is still eligible for bounded refresh
+- **THEN** the shell MAY fetch one fresh bounded key set
+- **AND** the core SHALL verify only a policy-allowed candidate key
+
+#### Scenario: Discovery or key retrieval is unsafe
+
+- **GIVEN** an unapproved redirect, issuer mismatch, TLS failure, timeout, oversized document, malformed document, excessive key set, or stale unavailable cache
+- **WHEN** the shell retrieves verification material
+- **THEN** exchange SHALL fail closed
+- **AND** it SHALL NOT use an ambient or unconfigured key
+
+### Requirement: ucan_token_flow.oidc.attenuated_ucan
+
+r[ucan_token_flow.oidc.attenuated_ucan]
+
+Basalt SHALL issue a UCAN only after successful OIDC verification, and the UCAN audience, operations, project, resource scope, and lifetime SHALL NOT exceed policy or verified OIDC validity.
+
+#### Scenario: Allowed build capability is exchanged
+
+- **GIVEN** verified identity facts and a request for an allowed Mantle build resource
+- **WHEN** Basalt issues the UCAN
+- **THEN** the token SHALL target the configured Mantle audience
+- **AND** it SHALL contain only the granted capability scope
+- **AND** it SHALL expire no later than both applicable limits
+
+#### Scenario: Caller requests broader authority
+
+- **GIVEN** a request for an unapproved operation, project, resource, audience, or lifetime
+- **WHEN** attenuation evaluates it
+- **THEN** exchange SHALL reject or reduce it only as the explicit policy defines
+- **AND** it SHALL never silently grant the broader request
+
+### Requirement: ucan_token_flow.oidc.replay_boundary
+
+r[ucan_token_flow.oidc.replay_boundary]
+
+Basalt SHALL bind an exchange to the requested Mantle audience and capability and SHALL apply the configured replay policy before issuance.
+
+#### Scenario: One-time exchange repeats
+
+- **GIVEN** a policy that requires one-time exchange and a replay key already committed for the same public token facts and request
+- **WHEN** the caller repeats exchange
+- **THEN** Basalt SHALL reject the replay
+- **AND** it SHALL NOT issue another UCAN
+
+#### Scenario: Replay storage is unavailable
+
+- **GIVEN** a policy that requires replay prevention and an unavailable replay store
+- **WHEN** exchange reaches replay admission
+- **THEN** exchange SHALL fail closed
+
+### Requirement: ucan_token_flow.oidc.redacted_evidence
+
+r[ucan_token_flow.oidc.redacted_evidence]
+
+Basalt SHALL record bounded exchange decisions without raw OIDC tokens, UCAN bearer tokens, private keys, provider credentials, full JWK sets, or secret-derived hashes.
+
+#### Scenario: Exchange succeeds or fails
+
+- **GIVEN** any terminal exchange outcome
+- **WHEN** Basalt emits evidence
+- **THEN** evidence MAY include policy, issuer profile, selected public subject, requested and granted capability, key identifier, and reason code
+- **AND** it SHALL omit bearer and secret material
+
+### Requirement: Explicit release scratch storage
+r[basalt.ucan_token_flow.process_release_scratch] The release verifier MAY accept `RELEASE_VERIFY_SCRATCH_DIR` as an absolute normalized UTF-8 non-root path. It MUST reject invalid configuration before checks. It SHALL relocate only its five owned scratch paths, preserve distinct target directories, and record actual commands and Cargo targets. The option MUST NOT skip checks or confer filesystem custody. Unset configuration SHALL preserve existing paths.
+
+#### Scenario: Home-backed verification
+- GIVEN an explicit valid scratch directory with available storage
+- WHEN the full verifier runs
+- THEN bootstrap outputs and executions use the same relocated paths and all existing checks remain selected
+
+#### Scenario: Invalid configuration
+- GIVEN an empty, relative, root, control-bearing or non-normalized scratch directory
+- WHEN the verifier starts
+- THEN it rejects before starting checks
+
+### Requirement: Exact process execution grant
+r[basalt.ucan_token_flow.process_execution] Basalt MUST bind process execution to a distinct closed action, contract, ability and exact normalized context resource. It SHALL preserve holder-signature, revocation and final replay checks. A document or deployment grant SHALL NOT substitute for execution authority.
+
+#### Scenario: Exact signed invocation
+- GIVEN an explicit execution policy and a valid holder-signed execution request
+- WHEN current supplied verification services allow that exact request
+- THEN Basalt returns private live authority after exactly one replay commit and runs no process
+
+#### Scenario: Wrong purpose or changed context
+- GIVEN document authority or a signature for another execution context
+- WHEN execution admission runs
+- THEN Basalt denies before replay and exposes no live authority
+
+#### Scenario: Malformed execution resource
+- GIVEN a missing, uppercase, truncated, oversized or non-hex context reference
+- WHEN the pure action binder runs
+- THEN it denies without token parsing or effects
+
+#### Scenario: Revoked or repeated invocation
+- GIVEN revoked credentials or a replayed holder invocation
+- WHEN current verification runs
+- THEN it denies without returning a live grant
+
+### Requirement: Explicit policy activation
+r[basalt.ucan_token_flow.process_policy] Process execution SHALL require a separately selected policy. The packaged default policy and existing operation identities MUST remain unchanged. Receipts SHALL NOT authenticate native inputs or confer effect, custody, durability or promotion guarantees.
+
+#### Scenario: Default policy remains restrictive
+- GIVEN otherwise valid process authority and the packaged default policy
+- WHEN admission runs
+- THEN it denies before replay because execution policy was not selected
+
+#### Scenario: Receipt is persisted
+- GIVEN a successful execution-purpose verification receipt
+- WHEN it is stored or read
+- THEN it cannot construct live authority or prove that any process ran

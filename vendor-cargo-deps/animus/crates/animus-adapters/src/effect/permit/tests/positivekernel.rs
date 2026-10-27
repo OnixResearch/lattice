@@ -91,13 +91,25 @@ fn kernel_receipt_records_hashes_and_redactions_only() {
 
     assert_eq!(receipt.action(), ACTION);
     assert_eq!(receipt.resource_hash().as_str(), HASH);
-    assert_eq!(receipt.authority_status(), crate::AuthorizationStatus::Allowed);
+    assert_eq!(
+        receipt.authority_status(),
+        crate::AuthorizationStatus::Allowed
+    );
     assert_eq!(receipt.mode_outcome(), Outcome::Allow);
-    assert_eq!(receipt.matched_rule_hash().map(crate::SafeHash::as_str), Some(SECOND_HASH));
-    assert_eq!(receipt.repeated_action_status(), RepeatedActionStatus::Coach);
+    assert_eq!(
+        receipt.matched_rule_hash().map(crate::SafeHash::as_str),
+        Some(SECOND_HASH)
+    );
+    assert_eq!(
+        receipt.repeated_action_status(),
+        RepeatedActionStatus::Coach
+    );
     assert_eq!(receipt.prompt_status(), PromptStatus::NotRequired);
     assert_eq!(receipt.final_status(), DecisionStatus::Execute);
-    assert_eq!(receipt.redaction_markers(), &[Text::from(REDACTION), Text::from(SECOND_REDACTION)]);
+    assert_eq!(
+        receipt.redaction_markers(),
+        &[Text::from(REDACTION), Text::from(SECOND_REDACTION)]
+    );
 }
 
 fn standard_mode_resolution() -> ModeDefaultResolution {
@@ -124,7 +136,10 @@ fn trusted_glob_pattern() -> PatternRule {
     .expect("trusted pattern rule should validate")
 }
 
-fn current_allowlist(resource_hash: &crate::SafeHash, policy_hash: &crate::SafeHash) -> SessionAllowlistEntry {
+fn current_allowlist(
+    resource_hash: &crate::SafeHash,
+    policy_hash: &crate::SafeHash,
+) -> SessionAllowlistEntry {
     SessionAllowlistEntry::new(SessionAllowlistEntryDraft {
         action: ACTION,
         resource_hash,

@@ -100,14 +100,15 @@ fn from_tool_items(items: &[steel::SteelVal]) -> Result<Decision, crate::LoopErr
     let argument_pairs = required_argument_pairs(items, TOOL_ARGUMENTS_INDEX)?;
     let allowed_field_names = argument_names(&argument_pairs);
     let argument_drafts = argument_drafts(&argument_pairs);
-    let arguments =
-        animus_adapters::tool::PreparedArguments::prepare(&animus_adapters::tool::ArgumentPreparationRequest {
+    let arguments = animus_adapters::tool::PreparedArguments::prepare(
+        &animus_adapters::tool::ArgumentPreparationRequest {
             current_schema_identity: schema_identity,
             allowed_field_names: allowed_field_names.as_slice(),
             compatibility_rules: &[],
             fields: argument_drafts.as_slice(),
-        })
-        .map_err(|error| tool_contract_error(&error))?;
+        },
+    )
+    .map_err(|error| tool_contract_error(&error))?;
     let mutation_targets = required_string_list(items, TOOL_MUTATION_TARGETS_INDEX)?;
     let mutation_target_refs = string_refs(&mutation_targets);
     let capability_labels = required_string_list(items, TOOL_CAPABILITIES_INDEX)?;
@@ -136,7 +137,9 @@ fn from_respond_items(items: &[steel::SteelVal]) -> Result<Decision, crate::Loop
     })
 }
 
-fn from_completion_candidate_items(items: &[steel::SteelVal]) -> Result<Decision, crate::LoopError> {
+fn from_completion_candidate_items(
+    items: &[steel::SteelVal],
+) -> Result<Decision, crate::LoopError> {
     validate_arity(items, COMPLETION_CANDIDATE_TAG, COMPLETION_CANDIDATE_ARITY)?;
     let request = required_string(items, COMPLETION_REQUEST_INDEX)?;
     let request = animus_adapters::normalized_adapter_field(
@@ -167,7 +170,11 @@ fn list_items(value: steel::SteelVal) -> Result<Vec<steel::SteelVal>, crate::Loo
     }
 }
 
-fn validate_arity(items: &[steel::SteelVal], tag: &'static str, expected: usize) -> Result<(), crate::LoopError> {
+fn validate_arity(
+    items: &[steel::SteelVal],
+    tag: &'static str,
+    expected: usize,
+) -> Result<(), crate::LoopError> {
     let actual = items.len();
     if actual != expected {
         return Err(crate::LoopError::InvalidDecision {
@@ -202,7 +209,10 @@ fn required_string(items: &[steel::SteelVal], index: usize) -> Result<&str, crat
     }
 }
 
-fn required_visible_budget(items: &[steel::SteelVal], index: usize) -> Result<u32, crate::LoopError> {
+fn required_visible_budget(
+    items: &[steel::SteelVal],
+    index: usize,
+) -> Result<u32, crate::LoopError> {
     match items.get(index) {
         Some(steel::SteelVal::IntV(value)) => {
             u32::try_from(*value).map_err(|_error| crate::LoopError::InvalidDecision {
@@ -218,7 +228,10 @@ fn required_visible_budget(items: &[steel::SteelVal], index: usize) -> Result<u3
     }
 }
 
-fn required_string_list(items: &[steel::SteelVal], index: usize) -> Result<Vec<String>, crate::LoopError> {
+fn required_string_list(
+    items: &[steel::SteelVal],
+    index: usize,
+) -> Result<Vec<String>, crate::LoopError> {
     let values = nested_list_items(items, index)?;
     let mut strings = Vec::with_capacity(values.len());
     for (item_index, value) in values.iter().enumerate() {
@@ -226,7 +239,9 @@ fn required_string_list(items: &[steel::SteelVal], index: usize) -> Result<Vec<S
             steel::SteelVal::StringV(text) => strings.push(String::from(text.as_str())),
             other => {
                 return Err(crate::LoopError::InvalidDecision {
-                    reason: format!("expected string in list at index {index}/{item_index}, got {other:?}"),
+                    reason: format!(
+                        "expected string in list at index {index}/{item_index}, got {other:?}"
+                    ),
                 });
             }
         }
@@ -234,7 +249,10 @@ fn required_string_list(items: &[steel::SteelVal], index: usize) -> Result<Vec<S
     Ok(strings)
 }
 
-fn required_argument_pairs(items: &[steel::SteelVal], index: usize) -> Result<Vec<(String, String)>, crate::LoopError> {
+fn required_argument_pairs(
+    items: &[steel::SteelVal],
+    index: usize,
+) -> Result<Vec<(String, String)>, crate::LoopError> {
     let values = nested_list_items(items, index)?;
     let mut pairs = Vec::with_capacity(values.len());
     for (pair_index, value) in values.iter().enumerate() {
@@ -252,7 +270,10 @@ fn required_argument_pairs(items: &[steel::SteelVal], index: usize) -> Result<Ve
     Ok(pairs)
 }
 
-fn nested_list_items(items: &[steel::SteelVal], index: usize) -> Result<Vec<steel::SteelVal>, crate::LoopError> {
+fn nested_list_items(
+    items: &[steel::SteelVal],
+    index: usize,
+) -> Result<Vec<steel::SteelVal>, crate::LoopError> {
     match items.get(index) {
         Some(value) => list_items(value.clone()),
         None => Err(crate::LoopError::InvalidDecision {
@@ -262,10 +283,15 @@ fn nested_list_items(items: &[steel::SteelVal], index: usize) -> Result<Vec<stee
 }
 
 fn argument_names(argument_pairs: &[(String, String)]) -> Vec<&str> {
-    argument_pairs.iter().map(|(name, _value)| name.as_str()).collect()
+    argument_pairs
+        .iter()
+        .map(|(name, _value)| name.as_str())
+        .collect()
 }
 
-fn argument_drafts(argument_pairs: &[(String, String)]) -> Vec<animus_adapters::tool::ArgumentFieldDraft<'_>> {
+fn argument_drafts(
+    argument_pairs: &[(String, String)],
+) -> Vec<animus_adapters::tool::ArgumentFieldDraft<'_>> {
     argument_pairs
         .iter()
         .map(|(name, value)| animus_adapters::tool::ArgumentFieldDraft {
@@ -323,7 +349,11 @@ mod tests {
     #[test]
     fn rejects_legacy_tool_decision_shape() {
         // r[verify agent_harness_runtime.tool_calling_breaking.current_shape.rejects_legacy]
-        let value = steel::list!(steel::SteelVal::SymbolV(TOOL_TAG.into()), TOOL_NAME, LEGACY_TOOL_INPUT);
+        let value = steel::list!(
+            steel::SteelVal::SymbolV(TOOL_TAG.into()),
+            TOOL_NAME,
+            LEGACY_TOOL_INPUT
+        );
         let error = Decision::from_value(value).expect_err("legacy raw tool should fail");
 
         assert!(matches!(error, crate::LoopError::InvalidDecision { .. }));
@@ -331,7 +361,10 @@ mod tests {
 
     #[test]
     fn parses_response_decision() {
-        let value = steel::list!(steel::SteelVal::SymbolV(RESPOND_TAG.into()), RESPONSE_MESSAGE);
+        let value = steel::list!(
+            steel::SteelVal::SymbolV(RESPOND_TAG.into()),
+            RESPONSE_MESSAGE
+        );
         let decision = Decision::from_value(value).expect("response decision should parse");
 
         assert!(matches!(decision, Decision::Respond { .. }));
@@ -339,7 +372,10 @@ mod tests {
 
     #[test]
     fn parses_completion_candidate_decision() {
-        let value = steel::list!(steel::SteelVal::SymbolV(COMPLETION_CANDIDATE_TAG.into()), COMPLETION_REQUEST);
+        let value = steel::list!(
+            steel::SteelVal::SymbolV(COMPLETION_CANDIDATE_TAG.into()),
+            COMPLETION_REQUEST
+        );
         let decision = Decision::from_value(value).expect("candidate decision should parse");
 
         assert!(matches!(
@@ -359,7 +395,8 @@ mod tests {
 
     #[test]
     fn rejects_invalid_shape() {
-        let error = Decision::from_value(steel::SteelVal::BoolV(true)).expect_err("non-list decision should fail");
+        let error = Decision::from_value(steel::SteelVal::BoolV(true))
+            .expect_err("non-list decision should fail");
 
         assert!(matches!(error, crate::LoopError::InvalidDecision { .. }));
     }

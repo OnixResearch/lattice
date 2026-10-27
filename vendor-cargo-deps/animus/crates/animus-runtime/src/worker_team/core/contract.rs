@@ -17,17 +17,24 @@ pub(super) fn validate(input: Input<'_>) -> Result<(), super::super::DelegationF
     validate_authority(input.authority)
 }
 
-fn validate_scope(scope: &super::super::WorkerScope) -> Result<(), super::super::DelegationFailure> {
+fn validate_scope(
+    scope: &super::super::WorkerScope,
+) -> Result<(), super::super::DelegationFailure> {
     super::validate_label(super::super::SCOPE_FIELD, scope.label.as_str())?;
     super::validate_text(super::super::SCOPE_FIELD, scope.summary.as_str())?;
-    super::validate_non_empty_slice(super::super::SCOPE_TARGET_FIELD, scope.allowed_targets.as_slice())?;
+    super::validate_non_empty_slice(
+        super::super::SCOPE_TARGET_FIELD,
+        scope.allowed_targets.as_slice(),
+    )?;
     for target in &scope.allowed_targets {
         super::validate_label(super::super::SCOPE_TARGET_FIELD, target.as_str())?;
     }
     Ok(())
 }
 
-fn validate_budgets(budgets: super::super::WorkerBudgets) -> Result<(), super::super::DelegationFailure> {
+fn validate_budgets(
+    budgets: super::super::WorkerBudgets,
+) -> Result<(), super::super::DelegationFailure> {
     for value in [budgets.turns, budgets.context_items, budgets.tool_calls] {
         if value < super::super::MIN_BUDGET_VALUE {
             return Err(super::super::DelegationFailure::new(
@@ -43,13 +50,21 @@ fn validate_budgets(budgets: super::super::WorkerBudgets) -> Result<(), super::s
 pub(super) fn validate_output_schema(
     schema: &super::super::WorkerOutputSchema,
 ) -> Result<(), super::super::DelegationFailure> {
-    let schema_name = super::validate_label(super::super::OUTPUT_SCHEMA_FIELD, schema.name.as_str())?;
-    super::validate_non_empty_slice(super::super::OUTPUT_SCHEMA_REQUIRED_FIELD, schema.required_fields.as_slice())?;
+    let schema_name =
+        super::validate_label(super::super::OUTPUT_SCHEMA_FIELD, schema.name.as_str())?;
+    super::validate_non_empty_slice(
+        super::super::OUTPUT_SCHEMA_REQUIRED_FIELD,
+        schema.required_fields.as_slice(),
+    )?;
     assert!(!schema_name.is_empty(), "schema name must be validated");
-    assert!(!schema.required_fields.is_empty(), "schema required fields must be non-empty");
+    assert!(
+        !schema.required_fields.is_empty(),
+        "schema required fields must be non-empty"
+    );
     let mut seen = std::collections::BTreeSet::new();
     for field in &schema.required_fields {
-        let field_name = super::validate_label(super::super::OUTPUT_SCHEMA_REQUIRED_FIELD, field.as_str())?;
+        let field_name =
+            super::validate_label(super::super::OUTPUT_SCHEMA_REQUIRED_FIELD, field.as_str())?;
         if !seen.insert(field_name) {
             return Err(super::super::DelegationFailure::new(
                 super::super::FailureKind::MalformedReport,
@@ -61,8 +76,13 @@ pub(super) fn validate_output_schema(
     Ok(())
 }
 
-fn validate_parent_trace(trace: &super::super::ParentTrace) -> Result<(), super::super::DelegationFailure> {
-    super::validate_label(super::super::PARENT_TRACE_FIELD, trace.parent_run_id.as_str())?;
+fn validate_parent_trace(
+    trace: &super::super::ParentTrace,
+) -> Result<(), super::super::DelegationFailure> {
+    super::validate_label(
+        super::super::PARENT_TRACE_FIELD,
+        trace.parent_run_id.as_str(),
+    )?;
     super::validate_label(super::super::PARENT_TRACE_FIELD, trace.turn_id.as_str())?;
     super::text::validate_hash(super::text::HashInput {
         field: super::super::POLICY_HASH_FIELD,
@@ -70,8 +90,13 @@ fn validate_parent_trace(trace: &super::super::ParentTrace) -> Result<(), super:
     })
 }
 
-fn validate_authority(authority: &super::super::WorkerAuthority) -> Result<(), super::super::DelegationFailure> {
-    super::validate_label(super::super::AUTHORITY_FIELD, authority.grant_label.as_str())?;
+fn validate_authority(
+    authority: &super::super::WorkerAuthority,
+) -> Result<(), super::super::DelegationFailure> {
+    super::validate_label(
+        super::super::AUTHORITY_FIELD,
+        authority.grant_label.as_str(),
+    )?;
     if authority.parent_policy_required {
         return Ok(());
     }

@@ -14,22 +14,18 @@ mod policy_model;
 #[cfg(test)]
 mod tests;
 
-pub use authentication::resolve_verified_nostr_subject;
-pub use authentication::verify_nostr_authentication_receipt;
+pub use authentication::{resolve_verified_nostr_subject, verify_nostr_authentication_receipt};
 pub use authentication_model::*;
-pub use composition::NostrAuthorizationEvidence;
-pub use composition::NostrCompositionDecision;
-pub use composition::NostrCompositionReceipt;
-pub use composition::compose_nostr_authorization;
-pub use composition::verify_nostr_composition_receipt;
-pub use identity::nostr_identity_implementation_identity;
-pub use identity::nostr_identity_schema_identity;
-pub use policy::parse_nostr_identity_policy;
-pub use policy::validate_nostr_identity_policy;
+pub use composition::{
+    NostrAuthorizationEvidence, NostrCompositionDecision, NostrCompositionReceipt,
+    compose_nostr_authorization, verify_nostr_composition_receipt,
+};
+pub use identity::{nostr_identity_implementation_identity, nostr_identity_schema_identity};
+pub use policy::{parse_nostr_identity_policy, validate_nostr_identity_policy};
 pub use policy_model::*;
 
 /// Integrated UCAN revision that contains holder admission and Nostr support.
-pub const UCAN_SOURCE_REVISION: &str = "277ab768eb532ac0c715a3bbff2a7dc37a702f11";
+pub const UCAN_SOURCE_REVISION: &str = "3a2aa043068a82663cf72ec05ed5d56a7d65ecd5";
 /// Reviewed source revision that introduced `VerifiedNostrCredential`.
 pub const UCAN_NOSTR_CREDENTIAL_REVISION: &str = "c9d43a7c11dd2fab4d5cb3d100012fa9a2e5b026";
 /// Exact producer contract accepted by the public adapter.

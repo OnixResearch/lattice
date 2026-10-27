@@ -33,6 +33,8 @@ pub enum ContentPartDraft<'a> {
     },
     /// Image content part.
     Image(super::ImagePartDraft<'a>),
+    /// Video content part.
+    Video(super::VideoPartDraft<'a>),
 }
 
 /// Validated provider-neutral content part.
@@ -42,6 +44,8 @@ pub enum ContentPart {
     Text(TextPart),
     /// Image content part.
     Image(super::ImagePart),
+    /// Video content part.
+    Video(super::VideoPart),
 }
 
 impl ContentPart {
@@ -54,6 +58,7 @@ impl ContentPart {
         match draft {
             ContentPartDraft::Text { text } => Ok(Self::Text(TextPart::new(text)?)),
             ContentPartDraft::Image(image) => Ok(Self::Image(super::ImagePart::from_draft(image)?)),
+            ContentPartDraft::Video(video) => Ok(Self::Video(super::VideoPart::from_draft(video)?)),
         }
     }
 
@@ -63,6 +68,7 @@ impl ContentPart {
         match self {
             Self::Text(_part) => super::InputModality::Text,
             Self::Image(_part) => super::InputModality::Image,
+            Self::Video(_part) => super::InputModality::Video,
         }
     }
 
@@ -71,7 +77,16 @@ impl ContentPart {
     pub const fn as_image(&self) -> Option<&super::ImagePart> {
         match self {
             Self::Image(image) => Some(image),
-            Self::Text(_text) => None,
+            Self::Text(_) | Self::Video(_) => None,
+        }
+    }
+
+    /// Returns the video part when this is video.
+    #[must_use]
+    pub const fn as_video(&self) -> Option<&super::VideoPart> {
+        match self {
+            Self::Video(video) => Some(video),
+            Self::Text(_) | Self::Image(_) => None,
         }
     }
 
@@ -80,7 +95,7 @@ impl ContentPart {
     pub const fn as_text(&self) -> Option<&TextPart> {
         match self {
             Self::Text(text) => Some(text),
-            Self::Image(_image) => None,
+            Self::Image(_) | Self::Video(_) => None,
         }
     }
 }

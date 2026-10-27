@@ -53,9 +53,16 @@ impl AdmissionRequest {
             action: draft.action,
             resource: super::normalized(super::RESOURCE_FIELD, draft.resource)?,
             ability: super::normalized(super::ABILITY_FIELD, draft.ability)?,
-            credential: draft.credential.as_ref().map(super::CredentialEvidence::new).transpose()?,
+            credential: draft
+                .credential
+                .as_ref()
+                .map(super::CredentialEvidence::new)
+                .transpose()?,
             caveat: draft.caveat,
-            policy_hash: draft.policy_hash.map(crate::ArtifactHash::new).transpose()?,
+            policy_hash: draft
+                .policy_hash
+                .map(crate::ArtifactHash::new)
+                .transpose()?,
         })
     }
 

@@ -1,4 +1,4 @@
-fn run_analyzers(
+pub(super) fn run_analyzers(
     request: &Request<'_>,
     process: &crate::process::core::RuntimeConfig,
     run_id: u64,

@@ -20,7 +20,10 @@ fn validates_safe_context_and_rejects_leaky_contexts() {
     assert_context_leak(credential, PluginInvocationContextLeak::Credential);
     assert_context_leak(private_path, PluginInvocationContextLeak::FullPrivatePath);
     assert_context_leak(unbounded_log, PluginInvocationContextLeak::UnboundedLog);
-    assert_context_leak(provider_payload, PluginInvocationContextLeak::ProviderPayload);
+    assert_context_leak(
+        provider_payload,
+        PluginInvocationContextLeak::ProviderPayload,
+    );
 }
 
 const CONTEXT_WORKSPACE: ContextField = ContextField::Workspace;
@@ -30,7 +33,10 @@ enum ContextField {
     Workspace,
 }
 
-fn unsafe_context(field: ContextField, value: &'static str) -> PluginInvocationContextDraft<'static> {
+fn unsafe_context(
+    field: ContextField,
+    value: &'static str,
+) -> PluginInvocationContextDraft<'static> {
     let mut draft = safe_context_draft();
     match field {
         ContextField::Workspace => draft.workspace_label = Some(value),
@@ -40,8 +46,11 @@ fn unsafe_context(field: ContextField, value: &'static str) -> PluginInvocationC
 
 fn assert_context_leak(draft: PluginInvocationContextDraft<'_>, leak: PluginInvocationContextLeak) {
     let error = PluginInvocationContext::validate(&draft).expect_err("unsafe context should fail");
-    assert_eq!(error, PluginDescriptorError::UnsafeInvocationContext {
-        field: "invocation_workspace_label",
-        leak,
-    });
+    assert_eq!(
+        error,
+        PluginDescriptorError::UnsafeInvocationContext {
+            field: "invocation_workspace_label",
+            leak,
+        }
+    );
 }

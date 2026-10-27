@@ -18,14 +18,14 @@
       "family_id": "animus.model-runtime-profiles",
       "source": {
         "path": "config/model-runtime-profiles.ncl",
-        "identity": "b3:919eaeef5083b13f76442aacacd0fedd550428d46def550aaa5480be779b6df7",
-        "bytes": 11420
+        "identity": "b3:67eaa62ddbd3325a0e0709c88d0474758bd9a6a56833d4cbb8c2146fca2c760d",
+        "bytes": 11619
       },
       "dependencies": [
         {
           "path": "policy/contracts/primitives.ncl",
-          "identity": "b3:102e0de517da26582d662cfdc87acb45733099fd62b1d805d6e01eaa077744e0",
-          "bytes": 4543
+          "identity": "b3:1243df459c92eee04cef8186c9bf7aab20a60d0115966a902ae563e3ebd496c9",
+          "bytes": 4544
         }
       ],
       "import_paths": [
@@ -37,8 +37,8 @@
       "format": "json",
       "output": {
         "path": "config/generated/model-runtime-profiles.json",
-        "identity": "b3:fa013359b99531763bda8703f52812366f60e6d3b038c90257bd2e69dea73d6d",
-        "bytes": 3862
+        "identity": "b3:421139cdce234313dff2f7ac72c39d4c789adb9ab069528b4f02a092769b4fcf",
+        "bytes": 3978
       },
       "evaluator": {
         "identity": "nixpkgs:nickel",
@@ -55,5 +55,5 @@
       "non_claim": "Nickel export success proves only exact declared input and output identities under the recorded evaluator descriptor; it does not prove deployability, product-policy conformance, evaluator equivalence, build success, or release eligibility"
     }
   ],
-  "manifest_identity": "b3:2207992c25ba1ef99cd9c735ada50d81e1a5fc2f13279f4e26031f980b29dd24"
+  "manifest_identity": "b3:c9ab51eeeb8618ed767768390119b76308b6f8d5755a07fd701df0badc20b290"
 }

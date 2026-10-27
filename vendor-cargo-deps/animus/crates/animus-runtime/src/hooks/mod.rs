@@ -6,45 +6,24 @@ mod lifecycle;
 mod turn;
 
 pub use chain::RuntimeMiddlewareStack;
-pub use lifecycle::LifecycleHookCapability;
-pub use lifecycle::LifecycleHookDefinition;
-pub use lifecycle::LifecycleHookDefinitionDraft;
-pub use lifecycle::LifecycleHookDefinitionSource;
-pub use lifecycle::LifecycleHookEffect;
-pub use lifecycle::LifecycleHookEffectDraft;
-pub use lifecycle::LifecycleHookError;
-pub use lifecycle::LifecycleHookErrorKind;
-pub use lifecycle::LifecycleHookEventKind;
-pub use lifecycle::LifecycleHookFailureClass;
-pub use lifecycle::LifecycleHookInput;
-pub use lifecycle::LifecycleHookInputDraft;
-pub use lifecycle::LifecycleHookInputReportDraft;
-pub use lifecycle::LifecycleHookOutcome;
-pub use lifecycle::LifecycleHookOutcomeClass;
-pub use lifecycle::LifecycleHookOutcomeDraft;
-pub use lifecycle::LifecycleHookOutcomeReportDraft;
-pub use lifecycle::LifecycleHookOutput;
-pub use lifecycle::LifecycleHookOutputDraft;
-pub use lifecycle::LifecycleHookPolicyStatus;
-pub use lifecycle::LifecycleHookRedaction;
-pub use lifecycle::LifecycleHookRequest;
-pub use lifecycle::LifecycleHookRoutePlan;
-pub use lifecycle::LifecycleHookTrustDecision;
-pub use lifecycle::LifecycleHookTrustRecord;
-pub use lifecycle::LifecycleHookTrustRecordDraft;
-pub use lifecycle::LifecycleHookTrustScope;
-pub use lifecycle::LifecycleHookTrustStatus;
-pub use lifecycle::bind_lifecycle_hook_output_to_policy;
-pub use lifecycle::evaluate_lifecycle_hook_trust;
-pub use lifecycle::route_lifecycle_hook_requests;
-pub use turn::Effect as TurnHookEffect;
-pub use turn::Error as TurnHookError;
-pub use turn::ErrorKind as TurnHookErrorKind;
-pub use turn::Event as TurnHookEvent;
-pub use turn::Outcome as TurnHookOutcome;
-pub use turn::State as TurnHookState;
-pub use turn::Transition as TurnHookTransition;
-pub use turn::advance as advance_turn_hooks;
+pub use lifecycle::{
+    LifecycleHookCapability, LifecycleHookDefinition, LifecycleHookDefinitionDraft,
+    LifecycleHookDefinitionSource, LifecycleHookEffect, LifecycleHookEffectDraft,
+    LifecycleHookError, LifecycleHookErrorKind, LifecycleHookEventKind, LifecycleHookFailureClass,
+    LifecycleHookInput, LifecycleHookInputDraft, LifecycleHookInputReportDraft,
+    LifecycleHookOutcome, LifecycleHookOutcomeClass, LifecycleHookOutcomeDraft,
+    LifecycleHookOutcomeReportDraft, LifecycleHookOutput, LifecycleHookOutputDraft,
+    LifecycleHookPolicyStatus, LifecycleHookRedaction, LifecycleHookRequest,
+    LifecycleHookRoutePlan, LifecycleHookTrustDecision, LifecycleHookTrustRecord,
+    LifecycleHookTrustRecordDraft, LifecycleHookTrustScope, LifecycleHookTrustStatus,
+    bind_lifecycle_hook_output_to_policy, evaluate_lifecycle_hook_trust,
+    route_lifecycle_hook_requests,
+};
+pub use turn::{
+    Effect as TurnHookEffect, Error as TurnHookError, ErrorKind as TurnHookErrorKind,
+    Event as TurnHookEvent, Outcome as TurnHookOutcome, State as TurnHookState,
+    Transition as TurnHookTransition, advance as advance_turn_hooks,
+};
 
 const DEFAULT_MIDDLEWARE_LABEL: &str = "runtime_middleware";
 
@@ -84,9 +63,11 @@ impl HookBoundary {
     pub const fn fails_safe(self) -> bool {
         match self {
             Self::Observe => false,
-            Self::ModelDispatch | Self::ToolDispatch | Self::Compaction | Self::Replay | Self::SessionReplacement => {
-                true
-            }
+            Self::ModelDispatch
+            | Self::ToolDispatch
+            | Self::Compaction
+            | Self::Replay
+            | Self::SessionReplacement => true,
         }
     }
 }

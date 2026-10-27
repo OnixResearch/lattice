@@ -336,7 +336,9 @@ pub fn plan_tool_dispatch(request: ToolDispatchPlanRequest<'_>) -> ToolDispatchP
     let parsed = ParsedPolicy::parse(request.policy);
     let definition = find_definition(request.definitions, request.request.name());
     match (select_denial_issue(request, definition, parsed), definition) {
-        (Some(issue), current_definition) => denied_plan(request, current_definition, parsed, issue),
+        (Some(issue), current_definition) => {
+            denied_plan(request, current_definition, parsed, issue)
+        }
         (None, Some(current_definition)) => admitted_plan(request, current_definition, parsed),
         (None, None) => denied_plan(request, None, parsed, ToolDispatchPlanIssue::UnknownTool),
     }
@@ -346,7 +348,9 @@ fn find_definition<'a>(
     definitions: &'a [animus_adapters::tool::Definition],
     tool_name: &str,
 ) -> Option<&'a animus_adapters::tool::Definition> {
-    definitions.iter().find(|definition| definition.name() == tool_name)
+    definitions
+        .iter()
+        .find(|definition| definition.name() == tool_name)
 }
 
 fn select_denial_issue(
@@ -369,16 +373,23 @@ fn select_denial_issue(
         .or_else(|| fallback_issue(request.policy, parsed))
 }
 
-fn definition_issue(definition: &animus_adapters::tool::Definition) -> Option<ToolDispatchPlanIssue> {
+fn definition_issue(
+    definition: &animus_adapters::tool::Definition,
+) -> Option<ToolDispatchPlanIssue> {
     match definition.status() {
         animus_adapters::tool::DefinitionStatus::Active => None,
-        animus_adapters::tool::DefinitionStatus::Inactive => Some(ToolDispatchPlanIssue::InactiveTool),
-        animus_adapters::tool::DefinitionStatus::Untrusted => Some(ToolDispatchPlanIssue::UntrustedTool),
+        animus_adapters::tool::DefinitionStatus::Inactive => {
+            Some(ToolDispatchPlanIssue::InactiveTool)
+        }
+        animus_adapters::tool::DefinitionStatus::Untrusted => {
+            Some(ToolDispatchPlanIssue::UntrustedTool)
+        }
     }
 }
 
 fn request_shape_issue(policy: ToolDispatchPolicyDraft<'_>) -> Option<ToolDispatchPlanIssue> {
-    (policy.request_shape.trim() != TOOL_REQUEST_SHAPE_CURRENT).then_some(ToolDispatchPlanIssue::InvalidRequestShape)
+    (policy.request_shape.trim() != TOOL_REQUEST_SHAPE_CURRENT)
+        .then_some(ToolDispatchPlanIssue::InvalidRequestShape)
 }
 
 fn schema_issue(
@@ -429,15 +440,19 @@ fn capabilities_match_definition(
 }
 
 fn resolves_capability(registry: &crate::RuntimeCapabilityRegistry, label: &str) -> bool {
-    let required = crate::RuntimeCapabilityDescriptor::from_draft(crate::RuntimeCapabilityDescriptorDraft {
-        label,
-        service_kind: crate::RuntimeCapabilityServiceKind::Tool.as_str(),
-        scope: None,
-    });
+    let required =
+        crate::RuntimeCapabilityDescriptor::from_draft(crate::RuntimeCapabilityDescriptorDraft {
+            label,
+            service_kind: crate::RuntimeCapabilityServiceKind::Tool.as_str(),
+            scope: None,
+        });
     let Ok(required) = required else {
         return false;
     };
-    matches!(registry.resolve_exact(&required), crate::RuntimeCapabilityResolution::Resolved { .. })
+    matches!(
+        registry.resolve_exact(&required),
+        crate::RuntimeCapabilityResolution::Resolved { .. }
+    )
 }
 
 fn approval_issue(request: ToolDispatchPlanRequest<'_>) -> Option<ToolDispatchPlanIssue> {
@@ -446,7 +461,9 @@ fn approval_issue(request: ToolDispatchPlanRequest<'_>) -> Option<ToolDispatchPl
         animus_adapters::tool::ApprovalPosture::RequiresApproval => {
             (!request.policy.approval_granted).then_some(ToolDispatchPlanIssue::ApprovalDenied)
         }
-        animus_adapters::tool::ApprovalPosture::Denied => Some(ToolDispatchPlanIssue::ApprovalDenied),
+        animus_adapters::tool::ApprovalPosture::Denied => {
+            Some(ToolDispatchPlanIssue::ApprovalDenied)
+        }
     }
 }
 
@@ -454,10 +471,16 @@ fn parsed_policy_issue(parsed: ParsedPolicy) -> Option<ToolDispatchPlanIssue> {
     if parsed.output_boundary.is_none() {
         return Some(ToolDispatchPlanIssue::MalformedOutputPolicy);
     }
-    if matches!(parsed.cancellation_posture, Some(ToolDispatchCancellationPosture::Cancelled)) {
+    if matches!(
+        parsed.cancellation_posture,
+        Some(ToolDispatchCancellationPosture::Cancelled)
+    ) {
         return Some(ToolDispatchPlanIssue::Cancelled);
     }
-    if matches!(parsed.timeout_posture, Some(ToolDispatchTimeoutPosture::TimedOut)) {
+    if matches!(
+        parsed.timeout_posture,
+        Some(ToolDispatchTimeoutPosture::TimedOut)
+    ) {
         return Some(ToolDispatchPlanIssue::TimedOut);
     }
     None
@@ -466,19 +489,29 @@ fn parsed_policy_issue(parsed: ParsedPolicy) -> Option<ToolDispatchPlanIssue> {
 fn output_boundary_issue(parsed: ParsedPolicy) -> Option<ToolDispatchPlanIssue> {
     match parsed.output_boundary {
         Some(ToolDispatchOutputBoundary::Bounded) => None,
-        Some(ToolDispatchOutputBoundary::UnsafeReference) => Some(ToolDispatchPlanIssue::UnsafeReference),
+        Some(ToolDispatchOutputBoundary::UnsafeReference) => {
+            Some(ToolDispatchPlanIssue::UnsafeReference)
+        }
         Some(ToolDispatchOutputBoundary::Unbounded) => Some(ToolDispatchPlanIssue::UnboundedOutput),
         None => Some(ToolDispatchPlanIssue::MalformedOutputPolicy),
     }
 }
 
 fn mutation_issue(policy: ToolDispatchPolicyDraft<'_>) -> Option<ToolDispatchPlanIssue> {
-    policy.mutation_conflict.then_some(ToolDispatchPlanIssue::MutationConflict)
+    policy
+        .mutation_conflict
+        .then_some(ToolDispatchPlanIssue::MutationConflict)
 }
 
-fn fallback_issue(policy: ToolDispatchPolicyDraft<'_>, parsed: ParsedPolicy) -> Option<ToolDispatchPlanIssue> {
+fn fallback_issue(
+    policy: ToolDispatchPolicyDraft<'_>,
+    parsed: ParsedPolicy,
+) -> Option<ToolDispatchPlanIssue> {
     (policy.fallback_requested == FALLBACK_REQUESTED
-        && matches!(parsed.fallback_policy, Some(ToolDispatchFallbackPolicy::Deny)))
+        && matches!(
+            parsed.fallback_policy,
+            Some(ToolDispatchFallbackPolicy::Deny)
+        ))
     .then_some(ToolDispatchPlanIssue::FallbackDenied)
 }
 
@@ -576,7 +609,9 @@ fn build_plan(input: PlanBuildInput<'_>) -> ToolDispatchPlan {
         status: input.status,
         issue: input.issue,
         tool_name: String::from(input.request.request.name()),
-        definition_source_identity: input.definition.map(|definition| String::from(definition.source_identity())),
+        definition_source_identity: input
+            .definition
+            .map(|definition| String::from(definition.source_identity())),
         request_contract_identity: animus_adapters::TOOL_REQUEST_CONTRACT_IDENTITY,
         dispatch_contract_identity: TOOL_DISPATCH_NEUTRAL_CONTRACT_IDENTITY,
         schema_identity: String::from(input.request.request.schema_identity()),
@@ -624,8 +659,14 @@ mod tests {
     fn admits_current_catalog_backed_call() {
         // r[verify agent_harness_runtime.tool_calling_breaking.dispatch_plan]
         // r[verify agent_harness_runtime.tool_calling_breaking.catalog_admission]
-        let request = request_for(CAPABILITY_READ, animus_adapters::tool::ApprovalPosture::PreApproved);
-        let definition = definition(animus_adapters::tool::DefinitionStatus::Active, CAPABILITY_READ);
+        let request = request_for(
+            CAPABILITY_READ,
+            animus_adapters::tool::ApprovalPosture::PreApproved,
+        );
+        let definition = definition(
+            animus_adapters::tool::DefinitionStatus::Active,
+            CAPABILITY_READ,
+        );
         let registry = registry(CAPABILITY_READ);
         let plan = plan_tool_dispatch(ToolDispatchPlanRequest {
             request: &request,
@@ -641,16 +682,31 @@ mod tests {
         assert_eq!(plan.schema_identity(), SCHEMA_ID);
         assert_eq!(plan.required_capability_labels()[0], CAPABILITY_READ);
         assert_eq!(plan.definition_source_identity(), Some(SOURCE_IDENTITY));
-        assert_eq!(plan.request_contract_identity(), animus_adapters::TOOL_REQUEST_CONTRACT_IDENTITY);
-        assert_eq!(plan.dispatch_contract_identity(), TOOL_DISPATCH_NEUTRAL_CONTRACT_IDENTITY);
+        assert_eq!(
+            plan.request_contract_identity(),
+            animus_adapters::TOOL_REQUEST_CONTRACT_IDENTITY
+        );
+        assert_eq!(
+            plan.dispatch_contract_identity(),
+            TOOL_DISPATCH_NEUTRAL_CONTRACT_IDENTITY
+        );
     }
 
     #[test]
     fn denies_catalog_identity_and_schema_failures() {
         // r[verify agent_harness_runtime.tool_calling_breaking.catalog_admission]
-        let request = request_for(CAPABILITY_READ, animus_adapters::tool::ApprovalPosture::PreApproved);
-        let inactive = definition(animus_adapters::tool::DefinitionStatus::Inactive, CAPABILITY_READ);
-        let untrusted = definition(animus_adapters::tool::DefinitionStatus::Untrusted, CAPABILITY_READ);
+        let request = request_for(
+            CAPABILITY_READ,
+            animus_adapters::tool::ApprovalPosture::PreApproved,
+        );
+        let inactive = definition(
+            animus_adapters::tool::DefinitionStatus::Inactive,
+            CAPABILITY_READ,
+        );
+        let untrusted = definition(
+            animus_adapters::tool::DefinitionStatus::Untrusted,
+            CAPABILITY_READ,
+        );
         let other_schema = other_schema_definition(CAPABILITY_READ);
         let registry = registry(CAPABILITY_READ);
 
@@ -701,8 +757,14 @@ mod tests {
 
     #[test]
     fn denies_executor_availability_failures() {
-        let request = request_for(CAPABILITY_READ, animus_adapters::tool::ApprovalPosture::PreApproved);
-        let active = definition(animus_adapters::tool::DefinitionStatus::Active, CAPABILITY_READ);
+        let request = request_for(
+            CAPABILITY_READ,
+            animus_adapters::tool::ApprovalPosture::PreApproved,
+        );
+        let active = definition(
+            animus_adapters::tool::DefinitionStatus::Active,
+            CAPABILITY_READ,
+        );
         let registry = registry(CAPABILITY_READ);
 
         assert_eq!(request.name(), TOOL_NAME);
@@ -732,14 +794,25 @@ mod tests {
 
     #[test]
     fn denies_capability_resolution_failures() {
-        let request = request_for(CAPABILITY_READ, animus_adapters::tool::ApprovalPosture::PreApproved);
-        let active = definition(animus_adapters::tool::DefinitionStatus::Active, CAPABILITY_READ);
-        let wrong_capability =
-            definition(animus_adapters::tool::DefinitionStatus::Active, crate::DEFAULT_TOOL_CAPABILITY_LABEL);
+        let request = request_for(
+            CAPABILITY_READ,
+            animus_adapters::tool::ApprovalPosture::PreApproved,
+        );
+        let active = definition(
+            animus_adapters::tool::DefinitionStatus::Active,
+            CAPABILITY_READ,
+        );
+        let wrong_capability = definition(
+            animus_adapters::tool::DefinitionStatus::Active,
+            crate::DEFAULT_TOOL_CAPABILITY_LABEL,
+        );
         let registry = registry(CAPABILITY_READ);
         let empty_registry = crate::RuntimeCapabilityRegistry::empty();
 
-        assert_eq!(wrong_capability.capability_labels()[0], crate::DEFAULT_TOOL_CAPABILITY_LABEL);
+        assert_eq!(
+            wrong_capability.capability_labels()[0],
+            crate::DEFAULT_TOOL_CAPABILITY_LABEL
+        );
         assert!(empty_registry.descriptors().is_empty());
         assert_denied(
             ToolDispatchPlanRequest {
@@ -765,13 +838,25 @@ mod tests {
 
     #[test]
     fn denies_approval_failure() {
-        let approval_request = request_for(CAPABILITY_READ, animus_adapters::tool::ApprovalPosture::RequiresApproval);
-        let active = definition(animus_adapters::tool::DefinitionStatus::Active, CAPABILITY_READ);
+        let approval_request = request_for(
+            CAPABILITY_READ,
+            animus_adapters::tool::ApprovalPosture::RequiresApproval,
+        );
+        let active = definition(
+            animus_adapters::tool::DefinitionStatus::Active,
+            CAPABILITY_READ,
+        );
         let registry = registry(CAPABILITY_READ);
 
-        assert_eq!(active.status(), animus_adapters::tool::DefinitionStatus::Active);
+        assert_eq!(
+            active.status(),
+            animus_adapters::tool::DefinitionStatus::Active
+        );
         assert_eq!(registry.descriptors().len(), REGISTRY_DESCRIPTOR_COUNT);
-        assert_eq!(approval_request.approval_posture(), animus_adapters::tool::ApprovalPosture::RequiresApproval);
+        assert_eq!(
+            approval_request.approval_posture(),
+            animus_adapters::tool::ApprovalPosture::RequiresApproval
+        );
         assert_denied(
             ToolDispatchPlanRequest {
                 request: &approval_request,
@@ -787,13 +872,23 @@ mod tests {
     #[test]
     fn denies_default_capability_and_policy_failures() {
         // r[verify agent_harness_runtime.tool_calling_breaking.catalog_admission.exact_capability]
-        let default_request =
-            request_for(crate::DEFAULT_TOOL_CAPABILITY_LABEL, animus_adapters::tool::ApprovalPosture::PreApproved);
-        let default_definition =
-            definition(animus_adapters::tool::DefinitionStatus::Active, crate::DEFAULT_TOOL_CAPABILITY_LABEL);
+        let default_request = request_for(
+            crate::DEFAULT_TOOL_CAPABILITY_LABEL,
+            animus_adapters::tool::ApprovalPosture::PreApproved,
+        );
+        let default_definition = definition(
+            animus_adapters::tool::DefinitionStatus::Active,
+            crate::DEFAULT_TOOL_CAPABILITY_LABEL,
+        );
         let default_registry = registry(crate::DEFAULT_TOOL_CAPABILITY_LABEL);
-        assert_eq!(default_registry.descriptors().len(), REGISTRY_DESCRIPTOR_COUNT);
-        assert_eq!(default_request.required_capability_labels()[0], crate::DEFAULT_TOOL_CAPABILITY_LABEL);
+        assert_eq!(
+            default_registry.descriptors().len(),
+            REGISTRY_DESCRIPTOR_COUNT
+        );
+        assert_eq!(
+            default_request.required_capability_labels()[0],
+            crate::DEFAULT_TOOL_CAPABILITY_LABEL
+        );
         assert_denied(
             ToolDispatchPlanRequest {
                 request: &default_request,
@@ -805,14 +900,23 @@ mod tests {
             ToolDispatchPlanIssue::DeniedCapability,
         );
 
-        let request = request_for(CAPABILITY_READ, animus_adapters::tool::ApprovalPosture::PreApproved);
-        let definition = definition(animus_adapters::tool::DefinitionStatus::Active, CAPABILITY_READ);
+        let request = request_for(
+            CAPABILITY_READ,
+            animus_adapters::tool::ApprovalPosture::PreApproved,
+        );
+        let definition = definition(
+            animus_adapters::tool::DefinitionStatus::Active,
+            CAPABILITY_READ,
+        );
         let registry = registry(CAPABILITY_READ);
         assert_eq!(request.name(), TOOL_NAME);
         assert_eq!(registry.descriptors().len(), REGISTRY_DESCRIPTOR_COUNT);
         let policy_denials = [
             (bad_shape(), ToolDispatchPlanIssue::InvalidRequestShape),
-            (bad_output_policy(), ToolDispatchPlanIssue::MalformedOutputPolicy),
+            (
+                bad_output_policy(),
+                ToolDispatchPlanIssue::MalformedOutputPolicy,
+            ),
             (unsafe_reference(), ToolDispatchPlanIssue::UnsafeReference),
             (unbounded_output(), ToolDispatchPlanIssue::UnboundedOutput),
             (cancelled(), ToolDispatchPlanIssue::Cancelled),
@@ -835,7 +939,10 @@ mod tests {
         }
     }
 
-    fn assert_denied(plan_request: ToolDispatchPlanRequest<'_>, expected_issue: ToolDispatchPlanIssue) {
+    fn assert_denied(
+        plan_request: ToolDispatchPlanRequest<'_>,
+        expected_issue: ToolDispatchPlanIssue,
+    ) {
         let plan = plan_tool_dispatch(plan_request);
 
         assert_eq!(plan.status(), ToolDispatchPlanStatus::Denied);
@@ -851,28 +958,30 @@ mod tests {
             name: Some(ARGUMENT_NAME),
             value: Some(ARGUMENT_VALUE),
         }];
-        let arguments =
-            animus_adapters::tool::PreparedArguments::prepare(&animus_adapters::tool::ArgumentPreparationRequest {
+        let arguments = animus_adapters::tool::PreparedArguments::prepare(
+            &animus_adapters::tool::ArgumentPreparationRequest {
                 current_schema_identity: SCHEMA_ID,
                 allowed_field_names: &[ARGUMENT_NAME],
                 compatibility_rules: &[],
                 fields: &fields,
-            })
-            .expect("arguments should validate");
+            },
+        )
+        .expect("arguments should validate");
         assert_eq!(arguments.schema_identity(), SCHEMA_ID);
         assert_eq!(arguments.fields().len(), ARGUMENT_COUNT);
-        let request = animus_adapters::ToolRequest::from_draft(&animus_adapters::tool::RequestDraft {
-            name: Some(TOOL_NAME),
-            arguments: Some(&arguments),
-            correlation_id: Some(CORRELATION_ID),
-            output_policy: animus_adapters::tool::OutputPolicy {
-                visible_char_budget: VISIBLE_BUDGET,
-            },
-            mutation_targets: &[OTHER_TOOL_NAME],
-            required_capability_labels: &[capability_label],
-            approval_posture: approval_posture.as_str(),
-        })
-        .expect("request should validate");
+        let request =
+            animus_adapters::ToolRequest::from_draft(&animus_adapters::tool::RequestDraft {
+                name: Some(TOOL_NAME),
+                arguments: Some(&arguments),
+                correlation_id: Some(CORRELATION_ID),
+                output_policy: animus_adapters::tool::OutputPolicy {
+                    visible_char_budget: VISIBLE_BUDGET,
+                },
+                mutation_targets: &[OTHER_TOOL_NAME],
+                required_capability_labels: &[capability_label],
+                approval_posture: approval_posture.as_str(),
+            })
+            .expect("request should validate");
         assert_eq!(request.name(), TOOL_NAME);
         assert_eq!(request.correlation_id(), CORRELATION_ID);
         request
@@ -904,7 +1013,9 @@ mod tests {
         })
     }
 
-    fn definition_from_fixture(fixture: DefinitionFixture<'_>) -> animus_adapters::tool::Definition {
+    fn definition_from_fixture(
+        fixture: DefinitionFixture<'_>,
+    ) -> animus_adapters::tool::Definition {
         animus_adapters::tool::Definition::validate(&animus_adapters::tool::DefinitionDraft {
             name: Some(TOOL_NAME),
             label: Some(LABEL),
@@ -922,11 +1033,13 @@ mod tests {
     }
 
     fn registry(label: &str) -> crate::RuntimeCapabilityRegistry {
-        let registry = crate::RuntimeCapabilityRegistry::from_drafts(&[crate::RuntimeCapabilityDescriptorDraft {
-            label,
-            service_kind: crate::RuntimeCapabilityServiceKind::Tool.as_str(),
-            scope: None,
-        }])
+        let registry = crate::RuntimeCapabilityRegistry::from_drafts(&[
+            crate::RuntimeCapabilityDescriptorDraft {
+                label,
+                service_kind: crate::RuntimeCapabilityServiceKind::Tool.as_str(),
+                scope: None,
+            },
+        ])
         .expect("registry should validate");
         assert_eq!(registry.descriptors().len(), REGISTRY_DESCRIPTOR_COUNT);
         assert!(registry.contains_service(crate::RuntimeCapabilityServiceKind::Tool));

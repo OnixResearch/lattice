@@ -81,13 +81,18 @@ impl core::fmt::Display for AdapterContractError {
                 field,
                 max_chars,
                 actual_chars,
-            } => write!(formatter, "{field} must be at most {max_chars} characters; got {actual_chars}"),
-            Self::NulCharacter { field, byte_index } => {
-                write!(formatter, "{field} contains a NUL character at byte index {byte_index}")
-            }
-            Self::UnsupportedRouterValue { field, value } => {
-                write!(formatter, "{field} contains unsupported model-router value {value}")
-            }
+            } => write!(
+                formatter,
+                "{field} must be at most {max_chars} characters; got {actual_chars}"
+            ),
+            Self::NulCharacter { field, byte_index } => write!(
+                formatter,
+                "{field} contains a NUL character at byte index {byte_index}"
+            ),
+            Self::UnsupportedRouterValue { field, value } => write!(
+                formatter,
+                "{field} contains unsupported model-router value {value}"
+            ),
             Self::InvalidEvidenceHash { field, reason } => {
                 write!(formatter, "{field} is invalid: {reason}")
             }
@@ -105,12 +110,18 @@ pub(crate) fn normalized_adapter_field(
         field_name.as_str().chars().count() >= MIN_ADAPTER_FIELD_CHARS,
         "diagnostic field name must be non-empty"
     );
-    assert!(!field_name.as_str().contains(NUL_CHARACTER), "diagnostic field name must not contain NUL");
+    assert!(
+        !field_name.as_str().contains(NUL_CHARACTER),
+        "diagnostic field name must not contain NUL"
+    );
 
     let raw_chars = field_text.chars().count();
     let trimmed_text = field_text.trim();
     let visible_chars = trimmed_text.chars().count();
-    assert!(visible_chars <= raw_chars, "trimmed field character count must fit in raw character count");
+    assert!(
+        visible_chars <= raw_chars,
+        "trimmed field character count must fit in raw character count"
+    );
 
     if visible_chars < MIN_ADAPTER_FIELD_CHARS {
         return Err(AdapterContractError::EmptyField {
@@ -126,8 +137,9 @@ pub(crate) fn normalized_adapter_field(
         });
     }
 
-    if let Some((byte_index, _character)) =
-        field_text.char_indices().find(|(_byte_index, character)| *character == NUL_CHARACTER)
+    if let Some((byte_index, _character)) = field_text
+        .char_indices()
+        .find(|(_byte_index, character)| *character == NUL_CHARACTER)
     {
         return Err(AdapterContractError::NulCharacter {
             field: field_name.as_str(),
@@ -163,8 +175,10 @@ impl SafeHash {
     }
 }
 
-const _: () =
-    assert!(SafeHash::HEX_CHARS > MIN_ADAPTER_FIELD_CHARS, "BLAKE3 hash length must exceed a single character");
+const _: () = assert!(
+    SafeHash::HEX_CHARS > MIN_ADAPTER_FIELD_CHARS,
+    "BLAKE3 hash length must exceed a single character"
+);
 
 fn validate_hash(field: FieldName, value: &str) -> Result<(), AdapterContractError> {
     let field_name = field.as_str();
@@ -172,8 +186,14 @@ fn validate_hash(field: FieldName, value: &str) -> Result<(), AdapterContractErr
         field_name.chars().count() >= MIN_ADAPTER_FIELD_CHARS,
         "hash diagnostic field name must be non-empty"
     );
-    assert!(field_name.starts_with("router_"), "hash diagnostic field name must stay router-scoped");
-    assert!(field_name.ends_with("_hash"), "hash diagnostic field name must identify hash material");
+    assert!(
+        field_name.starts_with("router_"),
+        "hash diagnostic field name must stay router-scoped"
+    );
+    assert!(
+        field_name.ends_with("_hash"),
+        "hash diagnostic field name must identify hash material"
+    );
 
     if value.is_empty() {
         return Err(AdapterContractError::EmptyField { field: field_name });
@@ -184,7 +204,10 @@ fn validate_hash(field: FieldName, value: &str) -> Result<(), AdapterContractErr
             reason: "effect hash must use the configured BLAKE3 hex length",
         });
     }
-    if !value.chars().all(|character| character.is_ascii_hexdigit() && !character.is_ascii_uppercase()) {
+    if !value
+        .chars()
+        .all(|character| character.is_ascii_hexdigit() && !character.is_ascii_uppercase())
+    {
         return Err(AdapterContractError::InvalidEvidenceHash {
             field: field_name,
             reason: "effect hash must contain lowercase hex only",

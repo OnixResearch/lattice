@@ -65,13 +65,19 @@ fn prompt_commits_before_provider_and_final_response_commits_before_completion()
     // r[verify agent_harness_runtime.coding_session_host.functional_core]
     // r[verify agent_harness_runtime.coding_session_host.durable_boundaries]
     let state = state(CodingSessionQueueProfile::Sequential, false);
-    let prompt = reduce_coding_session_command(&state, &CodingSessionCommand::Prompt {
-        run_id: String::from(RUN_ID),
-        entry_id: String::from(USER_ENTRY),
-        input: input(PROMPT),
-    })
+    let prompt = reduce_coding_session_command(
+        &state,
+        &CodingSessionCommand::Prompt {
+            run_id: String::from(RUN_ID),
+            entry_id: String::from(USER_ENTRY),
+            input: input(PROMPT),
+        },
+    )
     .expect("prompt reduction");
-    assert!(matches!(prompt.effect, Some(CodingSessionEffectRequest::Commit(_))));
+    assert!(matches!(
+        prompt.effect,
+        Some(CodingSessionEffectRequest::Commit(_))
+    ));
     assert!(
         !prompt
             .events
@@ -80,11 +86,17 @@ fn prompt_commits_before_provider_and_final_response_commits_before_completion()
     );
 
     let user_commit = commit_pending(&prompt.state);
-    assert!(matches!(user_commit.effect, Some(CodingSessionEffectRequest::Provider(_))));
+    assert!(matches!(
+        user_commit.effect,
+        Some(CodingSessionEffectRequest::Provider(_))
+    ));
     assert_provider_projection_excludes_authority(&user_commit);
 
     let provider = provider_final(&user_commit.state, RESPONSE);
-    assert!(matches!(provider.effect, Some(CodingSessionEffectRequest::Commit(_))));
+    assert!(matches!(
+        provider.effect,
+        Some(CodingSessionEffectRequest::Commit(_))
+    ));
     assert!(
         !provider
             .events
@@ -93,8 +105,14 @@ fn prompt_commits_before_provider_and_final_response_commits_before_completion()
     );
 
     let assistant_commit = commit_pending(&provider.state);
-    assert_eq!(assistant_commit.state.messages().len(), EXPECTED_SINGLE_TURN_MESSAGE_COUNT);
-    assert_eq!(assistant_commit.state.terminal(), Some(CodingSessionTerminalKind::Completed));
+    assert_eq!(
+        assistant_commit.state.messages().len(),
+        EXPECTED_SINGLE_TURN_MESSAGE_COUNT
+    );
+    assert_eq!(
+        assistant_commit.state.terminal(),
+        Some(CodingSessionTerminalKind::Completed)
+    );
     assert!(
         assistant_commit
             .events
@@ -110,8 +128,14 @@ fn prompt_commits_before_provider_and_final_response_commits_before_completion()
 }
 
 fn assert_provider_projection_excludes_authority(transition: &CodingSessionTransition) {
-    assert_eq!(transition.state.messages().len(), EXPECTED_INITIAL_COMMIT_MESSAGE_COUNT);
-    assert_eq!(transition.state.messages()[0].kind(), CodingSessionMessageKind::AuthorityProfileBinding);
+    assert_eq!(
+        transition.state.messages().len(),
+        EXPECTED_INITIAL_COMMIT_MESSAGE_COUNT
+    );
+    assert_eq!(
+        transition.state.messages()[0].kind(),
+        CodingSessionMessageKind::AuthorityProfileBinding
+    );
     let provider_request = match transition.effect.as_ref().expect("provider effect") {
         CodingSessionEffectRequest::Provider(request) => request,
         _other => panic!("expected provider request"),
@@ -129,13 +153,22 @@ fn assert_provider_projection_excludes_authority(transition: &CodingSessionTrans
 fn terminal_receipt_is_bounded_metadata() {
     let completed = completed_session();
     let receipt =
-        project_coding_session_receipt(&completed, CodingSessionSensitiveDraft::default()).expect("safe receipt");
-    assert_eq!(receipt.committed_message_count, EXPECTED_SINGLE_TURN_RECEIPT_MESSAGE_COUNT);
+        project_coding_session_receipt(&completed, CodingSessionSensitiveDraft::default())
+            .expect("safe receipt");
+    assert_eq!(
+        receipt.committed_message_count,
+        EXPECTED_SINGLE_TURN_RECEIPT_MESSAGE_COUNT
+    );
     assert_eq!(receipt.provider_dispatch_count, 1);
-    assert_eq!(receipt.authority_profile_identity, completed.authority_profile().profile_identity());
+    assert_eq!(
+        receipt.authority_profile_identity,
+        completed.authority_profile().profile_identity()
+    );
     assert_eq!(
         receipt.authority_binding_identity,
-        completed.authority_binding_identity().expect("authority binding")
+        completed
+            .authority_binding_identity()
+            .expect("authority binding")
     );
     assert!(!receipt.non_claims.is_empty());
 }
@@ -144,26 +177,44 @@ fn terminal_receipt_is_bounded_metadata() {
 fn completed_session_admits_a_second_durable_turn_without_losing_history() {
     // r[verify agent_harness_runtime.coding_session_host.conformance]
     let completed = completed_session();
-    let second_prompt = reduce_coding_session_command(&completed, &CodingSessionCommand::Prompt {
-        run_id: String::from(OTHER_RUN_ID),
-        entry_id: String::from("entry.user.second"),
-        input: input("second bounded turn"),
-    })
+    let second_prompt = reduce_coding_session_command(
+        &completed,
+        &CodingSessionCommand::Prompt {
+            run_id: String::from(OTHER_RUN_ID),
+            entry_id: String::from("entry.user.second"),
+            input: input("second bounded turn"),
+        },
+    )
     .expect("second prompt");
     let second_user_commit = commit_pending(&second_prompt.state);
-    assert_eq!(second_user_commit.state.messages().len(), EXPECTED_SECOND_TURN_USER_MESSAGES);
-    assert!(matches!(second_user_commit.effect, Some(CodingSessionEffectRequest::Provider(_))));
+    assert_eq!(
+        second_user_commit.state.messages().len(),
+        EXPECTED_SECOND_TURN_USER_MESSAGES
+    );
+    assert!(matches!(
+        second_user_commit.effect,
+        Some(CodingSessionEffectRequest::Provider(_))
+    ));
     let second_final = provider_final(&second_user_commit.state, "second bounded response");
     let completed_second_turn = commit_pending(&second_final.state);
-    assert_eq!(completed_second_turn.state.messages().len(), EXPECTED_SECOND_TURN_MESSAGES);
-    assert_eq!(completed_second_turn.state.terminal(), Some(CodingSessionTerminalKind::Completed));
+    assert_eq!(
+        completed_second_turn.state.messages().len(),
+        EXPECTED_SECOND_TURN_MESSAGES
+    );
+    assert_eq!(
+        completed_second_turn.state.terminal(),
+        Some(CodingSessionTerminalKind::Completed)
+    );
 }
 
 #[test]
 fn tool_call_and_result_each_commit_before_dependent_effect() {
     let user_commit = committed_prompt();
     let provider = provider_tool_call(&user_commit.state);
-    assert!(matches!(provider.effect, Some(CodingSessionEffectRequest::Commit(_))));
+    assert!(matches!(
+        provider.effect,
+        Some(CodingSessionEffectRequest::Commit(_))
+    ));
     assert!(
         !provider
             .events
@@ -172,7 +223,10 @@ fn tool_call_and_result_each_commit_before_dependent_effect() {
     );
 
     let assistant_commit = commit_pending(&provider.state);
-    assert!(matches!(assistant_commit.effect, Some(CodingSessionEffectRequest::Tool(_))));
+    assert!(matches!(
+        assistant_commit.effect,
+        Some(CodingSessionEffectRequest::Tool(_))
+    ));
     assert!(
         assistant_commit
             .events
@@ -181,7 +235,10 @@ fn tool_call_and_result_each_commit_before_dependent_effect() {
     );
 
     let tool = tool_success(&assistant_commit.state);
-    assert!(matches!(tool.effect, Some(CodingSessionEffectRequest::Commit(_))));
+    assert!(matches!(
+        tool.effect,
+        Some(CodingSessionEffectRequest::Commit(_))
+    ));
     assert!(
         !tool
             .events
@@ -190,8 +247,14 @@ fn tool_call_and_result_each_commit_before_dependent_effect() {
     );
 
     let result_commit = commit_pending(&tool.state);
-    assert!(matches!(result_commit.effect, Some(CodingSessionEffectRequest::Provider(_))));
-    assert_eq!(result_commit.state.messages().len(), EXPECTED_TOOL_PRE_FINAL_MESSAGE_COUNT);
+    assert!(matches!(
+        result_commit.effect,
+        Some(CodingSessionEffectRequest::Provider(_))
+    ));
+    assert_eq!(
+        result_commit.state.messages().len(),
+        EXPECTED_TOOL_PRE_FINAL_MESSAGE_COUNT
+    );
     assert!(
         result_commit
             .events
@@ -201,7 +264,10 @@ fn tool_call_and_result_each_commit_before_dependent_effect() {
 
     let final_provider = provider_final(&result_commit.state, RESPONSE);
     let final_commit = commit_pending(&final_provider.state);
-    assert_eq!(final_commit.state.messages().len(), EXPECTED_TOOL_MESSAGE_COUNT);
+    assert_eq!(
+        final_commit.state.messages().len(),
+        EXPECTED_TOOL_MESSAGE_COUNT
+    );
 }
 
 #[test]
@@ -209,22 +275,37 @@ fn initial_commit_and_provider_failures_block_dependent_effects() {
     // r[verify agent_harness_runtime.coding_session_host.durable_boundaries]
     // r[verify agent_harness_runtime.coding_session_host.conformance]
     let initial = state(CodingSessionQueueProfile::Sequential, false);
-    let prompt = reduce_coding_session_command(&initial, &CodingSessionCommand::Prompt {
-        run_id: String::from(RUN_ID),
-        entry_id: String::from(USER_ENTRY),
-        input: input(PROMPT),
-    })
+    let prompt = reduce_coding_session_command(
+        &initial,
+        &CodingSessionCommand::Prompt {
+            run_id: String::from(RUN_ID),
+            entry_id: String::from(USER_ENTRY),
+            input: input(PROMPT),
+        },
+    )
     .expect("prompt transition");
-    let prompt_commit_failed =
-        failed_effect(&prompt.state, CodingSessionEffectService::Persistence, CodingSessionServiceIssue::Failed);
-    assert_blocked(&prompt_commit_failed, CodingSessionIssue::PersistenceFailure);
+    let prompt_commit_failed = failed_effect(
+        &prompt.state,
+        CodingSessionEffectService::Persistence,
+        CodingSessionServiceIssue::Failed,
+    );
+    assert_blocked(
+        &prompt_commit_failed,
+        CodingSessionIssue::PersistenceFailure,
+    );
     assert_eq!(prompt_commit_failed.state.provider_dispatch_count, 0);
 
     let committed = commit_pending(&prompt.state);
-    let provider_failed =
-        failed_effect(&committed.state, CodingSessionEffectService::Provider, CodingSessionServiceIssue::Unavailable);
+    let provider_failed = failed_effect(
+        &committed.state,
+        CodingSessionEffectService::Provider,
+        CodingSessionServiceIssue::Unavailable,
+    );
     assert_blocked(&provider_failed, CodingSessionIssue::ProviderFailure);
-    assert_eq!(provider_failed.state.last_issue(), Some(CodingSessionIssue::ProviderFailure));
+    assert_eq!(
+        provider_failed.state.last_issue(),
+        Some(CodingSessionIssue::ProviderFailure)
+    );
 }
 
 #[test]
@@ -236,12 +317,18 @@ fn tool_and_later_commit_failures_block_dependent_effects() {
         CodingSessionEffectService::Persistence,
         CodingSessionServiceIssue::Failed,
     );
-    assert_blocked(&assistant_commit_failed, CodingSessionIssue::PersistenceFailure);
+    assert_blocked(
+        &assistant_commit_failed,
+        CodingSessionIssue::PersistenceFailure,
+    );
     assert_eq!(assistant_commit_failed.state.tool_dispatch_count, 0);
 
     let tool_dispatch = commit_pending(&assistant_commit.state);
-    let tool_failed =
-        failed_effect(&tool_dispatch.state, CodingSessionEffectService::Tool, CodingSessionServiceIssue::Denied);
+    let tool_failed = failed_effect(
+        &tool_dispatch.state,
+        CodingSessionEffectService::Tool,
+        CodingSessionServiceIssue::Denied,
+    );
     assert_blocked(&tool_failed, CodingSessionIssue::ToolFailure);
 
     let tool_result_commit = tool_success(&tool_dispatch.state);
@@ -251,88 +338,557 @@ fn tool_and_later_commit_failures_block_dependent_effects() {
         CodingSessionEffectService::Persistence,
         CodingSessionServiceIssue::Failed,
     );
-    assert_blocked(&tool_result_commit_failed, CodingSessionIssue::PersistenceFailure);
-    assert_eq!(tool_result_commit_failed.state.provider_dispatch_count, provider_dispatch_count);
+    assert_blocked(
+        &tool_result_commit_failed,
+        CodingSessionIssue::PersistenceFailure,
+    );
+    assert_eq!(
+        tool_result_commit_failed.state.provider_dispatch_count,
+        provider_dispatch_count
+    );
 
     let final_commit = provider_final(&committed.state, RESPONSE);
-    let final_commit_failed =
-        failed_effect(&final_commit.state, CodingSessionEffectService::Persistence, CodingSessionServiceIssue::Failed);
+    let final_commit_failed = failed_effect(
+        &final_commit.state,
+        CodingSessionEffectService::Persistence,
+        CodingSessionServiceIssue::Failed,
+    );
     assert_blocked(&final_commit_failed, CodingSessionIssue::PersistenceFailure);
-    assert_ne!(final_commit_failed.state.terminal(), Some(CodingSessionTerminalKind::Completed));
+    assert_ne!(
+        final_commit_failed.state.terminal(),
+        Some(CodingSessionTerminalKind::Completed)
+    );
 }
 
 #[test]
 fn queue_items_remain_non_transcript_until_durable_injection() {
     // r[verify agent_harness_runtime.coding_session_host.queues]
     let user_commit = committed_prompt();
-    let queued = reduce_coding_session_command(&user_commit.state, &CodingSessionCommand::Steer {
-        item_id: String::from(QUEUE_ITEM),
-        entry_id: String::from(QUEUED_ENTRY),
-        input: input(STEERING_PROMPT),
-    })
+    let queued = reduce_coding_session_command(
+        &user_commit.state,
+        &CodingSessionCommand::Steer {
+            item_id: String::from(QUEUE_ITEM),
+            entry_id: String::from(QUEUED_ENTRY),
+            input: input(STEERING_PROMPT),
+        },
+    )
     .expect("queue steering");
-    assert_eq!(queued.state.messages().len(), EXPECTED_INITIAL_COMMIT_MESSAGE_COUNT);
+    assert_eq!(
+        queued.state.messages().len(),
+        EXPECTED_INITIAL_COMMIT_MESSAGE_COUNT
+    );
     assert_eq!(queued.state.queued_count(), Some(1));
     let removed = edit_and_remove_follow_up(&queued);
 
     let provider = provider_final(&removed.state, RESPONSE);
     let assistant_commit = commit_pending(&provider.state);
-    assert!(matches!(assistant_commit.effect, Some(CodingSessionEffectRequest::Commit(_))));
-    assert_eq!(assistant_commit.state.messages().len(), EXPECTED_SINGLE_TURN_MESSAGE_COUNT);
+    assert!(matches!(
+        assistant_commit.effect,
+        Some(CodingSessionEffectRequest::Commit(_))
+    ));
+    assert_eq!(
+        assistant_commit.state.messages().len(),
+        EXPECTED_SINGLE_TURN_MESSAGE_COUNT
+    );
 
     let queue_commit = commit_pending(&assistant_commit.state);
-    assert_eq!(queue_commit.state.messages().len(), EXPECTED_QUEUE_INJECTED_MESSAGE_COUNT);
+    assert_eq!(
+        queue_commit.state.messages().len(),
+        EXPECTED_QUEUE_INJECTED_MESSAGE_COUNT
+    );
     assert_eq!(queue_commit.state.queued_count(), Some(0));
-    assert!(matches!(queue_commit.effect, Some(CodingSessionEffectRequest::Provider(_))));
+    assert!(matches!(
+        queue_commit.effect,
+        Some(CodingSessionEffectRequest::Provider(_))
+    ));
 }
 
 fn edit_and_remove_follow_up(queued: &CodingSessionTransition) -> CodingSessionTransition {
-    let with_follow_up = reduce_coding_session_command(&queued.state, &CodingSessionCommand::FollowUp {
-        item_id: String::from(QUEUE_ITEM_TWO),
-        entry_id: String::from(QUEUED_ENTRY_TWO),
-        input: input(FOLLOW_UP_PROMPT),
-    })
+    let with_follow_up = reduce_coding_session_command(
+        &queued.state,
+        &CodingSessionCommand::FollowUp {
+            item_id: String::from(QUEUE_ITEM_TWO),
+            entry_id: String::from(QUEUED_ENTRY_TWO),
+            input: input(FOLLOW_UP_PROMPT),
+        },
+    )
     .expect("queue follow-up");
-    let edited = reduce_coding_session_command(&with_follow_up.state, &CodingSessionCommand::EditQueued {
-        item_id: String::from(QUEUE_ITEM_TWO),
-        entry_id: String::from("entry.queued.two.edited"),
-        input: input("edited bounded follow-up"),
-    })
+    let edit_precondition =
+        coding_session_queue_precondition(&with_follow_up.state, QUEUE_ITEM_TWO)
+            .expect("current edit precondition");
+    let edited = reduce_coding_session_command(
+        &with_follow_up.state,
+        &CodingSessionCommand::EditQueued {
+            item_id: String::from(QUEUE_ITEM_TWO),
+            precondition: edit_precondition,
+            input: input("edited bounded follow-up"),
+        },
+    )
     .expect("edit queued follow-up");
-    assert_eq!(edited.state.messages().len(), EXPECTED_INITIAL_COMMIT_MESSAGE_COUNT);
+    assert_eq!(
+        edited.state.messages().len(),
+        EXPECTED_INITIAL_COMMIT_MESSAGE_COUNT
+    );
     assert_eq!(edited.state.active_leaf_id(), queued.state.active_leaf_id());
-    let removed = reduce_coding_session_command(&edited.state, &CodingSessionCommand::RemoveQueued {
-        item_id: String::from(QUEUE_ITEM_TWO),
-    })
+    let remove_precondition = coding_session_queue_precondition(&edited.state, QUEUE_ITEM_TWO)
+        .expect("current remove precondition");
+    let removed = reduce_coding_session_command(
+        &edited.state,
+        &CodingSessionCommand::RemoveQueued {
+            item_id: String::from(QUEUE_ITEM_TWO),
+            precondition: remove_precondition,
+        },
+    )
     .expect("remove queued follow-up");
-    assert_eq!(removed.state.messages().len(), EXPECTED_INITIAL_COMMIT_MESSAGE_COUNT);
+    assert_eq!(
+        removed.state.messages().len(),
+        EXPECTED_INITIAL_COMMIT_MESSAGE_COUNT
+    );
     assert_eq!(removed.state.queued_count(), Some(1));
-    assert_eq!(removed.state.active_leaf_id(), queued.state.active_leaf_id());
+    assert_eq!(
+        removed.state.active_leaf_id(),
+        queued.state.active_leaf_id()
+    );
     removed
+}
+
+#[test]
+fn exact_queue_cas_edit_and_remove_advance_once_without_transcript_mutation() {
+    // r[verify agent_harness_runtime.coding_session_queue_cas.commands.exact]
+    // r[verify agent_harness_runtime.coding_session_queue_cas.reducer.success]
+    // r[verify agent_harness_runtime.coding_session_queue_cas.verification]
+    let committed = committed_prompt();
+    let queued = queue_command(
+        &committed.state,
+        QueueCommandDraft {
+            item_id: QUEUE_ITEM,
+            entry_id: QUEUED_ENTRY,
+            body: STEERING_PROMPT,
+            is_steering: true,
+        },
+    );
+    let edit_precondition =
+        coding_session_queue_precondition(&queued.state, QUEUE_ITEM).expect("edit precondition");
+    let edit_command = CodingSessionCommand::EditQueued {
+        item_id: String::from(QUEUE_ITEM),
+        precondition: edit_precondition.clone(),
+        input: input(FOLLOW_UP_PROMPT),
+    };
+    let edited = reduce_coding_session_command(&queued.state, &edit_command).expect("exact edit");
+    assert_eq!(edited.state.messages(), queued.state.messages());
+    assert_eq!(edited.state.run(), queued.state.run());
+    assert_eq!(edited.state.durable_cursor(), queued.state.durable_cursor());
+    assert_eq!(
+        edited.state.queue_generation(),
+        queued
+            .state
+            .queue_generation()
+            .checked_next()
+            .expect("next generation")
+    );
+    assert!(matches!(
+        edited.events.last(),
+        Some(crate::RuntimeEvent::SessionQueueMutationObserved { mutation })
+            if mutation.status == "accepted"
+                && mutation.operation == CodingSessionQueueMutationOperation::Edit
+    ));
+    let edited_precondition =
+        coding_session_queue_precondition(&edited.state, QUEUE_ITEM).expect("edited precondition");
+    assert_eq!(edited_precondition.entry_id(), QUEUED_ENTRY);
+    assert_eq!(
+        edited_precondition.expected_text_identity(),
+        coding_session_queue_text_identity(FOLLOW_UP_PROMPT)
+    );
+    let edit_receipt = project_coding_session_queue_success_receipt(
+        &queued.state,
+        &edited.state,
+        CodingSessionQueueAcceptedMutation {
+            operation: CodingSessionQueueMutationOperation::Edit,
+            item_id: QUEUE_ITEM,
+            precondition: &edit_precondition,
+        },
+        CodingSessionQueueSensitiveDraft::default(),
+    )
+    .expect("safe edit receipt");
+    assert_eq!(edit_receipt.status, "accepted");
+    assert_eq!(edit_receipt.entry_id, QUEUED_ENTRY);
+
+    let remove_precondition = edited_precondition.clone();
+    let removed = reduce_coding_session_command(
+        &edited.state,
+        &CodingSessionCommand::RemoveQueued {
+            item_id: String::from(QUEUE_ITEM),
+            precondition: remove_precondition.clone(),
+        },
+    )
+    .expect("exact removal");
+    assert_eq!(removed.state.messages(), edited.state.messages());
+    assert_eq!(removed.state.run(), edited.state.run());
+    assert_eq!(
+        removed.state.durable_cursor(),
+        edited.state.durable_cursor()
+    );
+    assert_eq!(removed.state.queued_count(), Some(0));
+    assert_eq!(
+        removed.state.queue_generation(),
+        edited
+            .state
+            .queue_generation()
+            .checked_next()
+            .expect("next generation")
+    );
+    let remove_receipt = project_coding_session_queue_success_receipt(
+        &edited.state,
+        &removed.state,
+        CodingSessionQueueAcceptedMutation {
+            operation: CodingSessionQueueMutationOperation::Remove,
+            item_id: QUEUE_ITEM,
+            precondition: &remove_precondition,
+        },
+        CodingSessionQueueSensitiveDraft::default(),
+    )
+    .expect("safe removal receipt");
+    assert_eq!(remove_receipt.status, "accepted");
+    assert_eq!(
+        remove_receipt.generation_after,
+        Some(removed.state.queue_generation())
+    );
+}
+
+#[test]
+fn stale_queue_cas_commands_return_safe_conflicts_without_mutation() {
+    // r[verify agent_harness_runtime.coding_session_queue_cas.conflicts.text]
+    // r[verify agent_harness_runtime.coding_session_queue_cas.verification]
+    let committed = committed_prompt();
+    let first = queue_command(
+        &committed.state,
+        QueueCommandDraft {
+            item_id: QUEUE_ITEM,
+            entry_id: QUEUED_ENTRY,
+            body: STEERING_PROMPT,
+            is_steering: true,
+        },
+    );
+    let second = queue_command(
+        &first.state,
+        QueueCommandDraft {
+            item_id: QUEUE_ITEM_TWO,
+            entry_id: QUEUED_ENTRY_TWO,
+            body: FOLLOW_UP_PROMPT,
+            is_steering: false,
+        },
+    );
+    let current = coding_session_queue_precondition(&second.state, QUEUE_ITEM_TWO)
+        .expect("current precondition");
+    let conflict_cases = [
+        (
+            CodingSessionQueueMutationPrecondition::new(
+                String::from(QUEUED_ENTRY_TWO),
+                CodingSessionQueueGeneration::new(
+                    current.expected_generation().value().saturating_sub(1),
+                ),
+                current.expected_position(),
+                String::from(current.expected_text_identity()),
+            ),
+            CodingSessionQueueConflictKind::StaleGeneration,
+            QUEUE_ITEM_TWO,
+        ),
+        (
+            CodingSessionQueueMutationPrecondition::new(
+                String::from(QUEUED_ENTRY),
+                current.expected_generation(),
+                current.expected_position(),
+                String::from(current.expected_text_identity()),
+            ),
+            CodingSessionQueueConflictKind::WrongEntry,
+            QUEUE_ITEM_TWO,
+        ),
+        (
+            CodingSessionQueueMutationPrecondition::new(
+                String::from(QUEUED_ENTRY_TWO),
+                current.expected_generation(),
+                0,
+                String::from(current.expected_text_identity()),
+            ),
+            CodingSessionQueueConflictKind::MovedPosition,
+            QUEUE_ITEM_TWO,
+        ),
+        (
+            CodingSessionQueueMutationPrecondition::new(
+                String::from(QUEUED_ENTRY_TWO),
+                current.expected_generation(),
+                current.expected_position(),
+                coding_session_queue_text_identity("stale private text"),
+            ),
+            CodingSessionQueueConflictKind::StaleText,
+            QUEUE_ITEM_TWO,
+        ),
+        (
+            current.clone(),
+            CodingSessionQueueConflictKind::MissingItem,
+            "queue.missing",
+        ),
+    ];
+    for (precondition, expected_kind, item_id) in conflict_cases {
+        let before = second.state.clone();
+        let error = reduce_coding_session_command(
+            &second.state,
+            &CodingSessionCommand::RemoveQueued {
+                item_id: String::from(item_id),
+                precondition,
+            },
+        )
+        .expect_err("stale command must conflict");
+        assert_eq!(error.issue(), CodingSessionIssue::QueueConflict);
+        let conflict = error.queue_conflict_snapshot().expect("safe conflict");
+        assert_eq!(conflict.kind, expected_kind);
+        assert_eq!(second.state, before);
+        let rendered = format!("{conflict:?}");
+        assert!(!rendered.contains(STEERING_PROMPT));
+        assert!(!rendered.contains(FOLLOW_UP_PROMPT));
+        let receipt = project_coding_session_queue_conflict_receipt(
+            conflict,
+            CodingSessionQueueSensitiveDraft::default(),
+        )
+        .expect("safe conflict receipt");
+        assert_eq!(receipt.status, "conflict");
+        assert_eq!(receipt.generation_after, None);
+    }
+}
+
+#[test]
+fn duplicate_and_concurrent_injection_queue_commands_fail_closed() {
+    // r[verify agent_harness_runtime.coding_session_queue_cas.verification]
+    let committed = committed_prompt();
+    let queued = queue_command(
+        &committed.state,
+        QueueCommandDraft {
+            item_id: QUEUE_ITEM,
+            entry_id: QUEUED_ENTRY,
+            body: STEERING_PROMPT,
+            is_steering: true,
+        },
+    );
+    let precondition =
+        coding_session_queue_precondition(&queued.state, QUEUE_ITEM).expect("precondition");
+    let command = CodingSessionCommand::EditQueued {
+        item_id: String::from(QUEUE_ITEM),
+        precondition: precondition.clone(),
+        input: input(FOLLOW_UP_PROMPT),
+    };
+    let edited = reduce_coding_session_command(&queued.state, &command).expect("first edit");
+    let duplicate = reduce_coding_session_command(&edited.state, &command)
+        .expect_err("duplicate command must conflict");
+    assert_eq!(
+        duplicate.queue_conflict_snapshot().expect("conflict").kind,
+        CodingSessionQueueConflictKind::StaleGeneration
+    );
+
+    let provider = provider_final(&queued.state, RESPONSE);
+    let injection_staged = commit_pending(&provider.state);
+    let concurrent = reduce_coding_session_command(
+        &injection_staged.state,
+        &CodingSessionCommand::RemoveQueued {
+            item_id: String::from(QUEUE_ITEM),
+            precondition,
+        },
+    )
+    .expect_err("concurrent injection must invalidate precondition");
+    assert_eq!(
+        concurrent.queue_conflict_snapshot().expect("conflict").kind,
+        CodingSessionQueueConflictKind::StaleGeneration
+    );
+}
+
+#[test]
+fn queue_generation_overflow_is_rejected() {
+    // r[verify agent_harness_runtime.coding_session_queue_cas.verification]
+    let committed = committed_prompt();
+    let queued = queue_command(
+        &committed.state,
+        QueueCommandDraft {
+            item_id: QUEUE_ITEM,
+            entry_id: QUEUED_ENTRY,
+            body: STEERING_PROMPT,
+            is_steering: true,
+        },
+    );
+    let mut overflow_state = queued.state.clone();
+    overflow_state.queue_generation = CodingSessionQueueGeneration::new(u64::MAX);
+    let overflow_precondition = coding_session_queue_precondition(&overflow_state, QUEUE_ITEM)
+        .expect("overflow precondition");
+    let overflow = reduce_coding_session_command(
+        &overflow_state,
+        &CodingSessionCommand::RemoveQueued {
+            item_id: String::from(QUEUE_ITEM),
+            precondition: overflow_precondition,
+        },
+    )
+    .expect_err("generation overflow must fail");
+    assert_eq!(overflow.issue(), CodingSessionIssue::BoundExceeded);
+}
+
+#[test]
+fn unsafe_and_unbound_queue_evidence_is_rejected() {
+    // r[verify agent_harness_runtime.coding_session_queue_cas.evidence.leak]
+    // r[verify agent_harness_runtime.coding_session_queue_cas.verification]
+    let committed = committed_prompt();
+    let queued = queue_command(
+        &committed.state,
+        QueueCommandDraft {
+            item_id: QUEUE_ITEM,
+            entry_id: QUEUED_ENTRY,
+            body: STEERING_PROMPT,
+            is_steering: true,
+        },
+    );
+    let precondition =
+        coding_session_queue_precondition(&queued.state, QUEUE_ITEM).expect("precondition");
+    let edited = reduce_coding_session_command(
+        &queued.state,
+        &CodingSessionCommand::EditQueued {
+            item_id: String::from(QUEUE_ITEM),
+            precondition: precondition.clone(),
+            input: input(FOLLOW_UP_PROMPT),
+        },
+    )
+    .expect("edit");
+    let unsafe_error = project_coding_session_queue_success_receipt(
+        &queued.state,
+        &edited.state,
+        CodingSessionQueueAcceptedMutation {
+            operation: CodingSessionQueueMutationOperation::Edit,
+            item_id: QUEUE_ITEM,
+            precondition: &precondition,
+        },
+        CodingSessionQueueSensitiveDraft {
+            expected: Some(STEERING_PROMPT),
+            ..CodingSessionQueueSensitiveDraft::default()
+        },
+    )
+    .expect_err("private evidence must be rejected");
+    assert_eq!(
+        unsafe_error,
+        CodingSessionQueueReceiptError::UnsafePrivateText
+    );
+    assert!(!unsafe_error.to_string().contains(STEERING_PROMPT));
+
+    let mut forged_state = edited.state.clone();
+    forged_state.messages.clear();
+    let forged_receipt = project_coding_session_queue_success_receipt(
+        &queued.state,
+        &forged_state,
+        CodingSessionQueueAcceptedMutation {
+            operation: CodingSessionQueueMutationOperation::Edit,
+            item_id: QUEUE_ITEM,
+            precondition: &precondition,
+        },
+        CodingSessionQueueSensitiveDraft::default(),
+    )
+    .expect_err("unbound queue evidence must fail");
+    assert_eq!(
+        forged_receipt,
+        CodingSessionQueueReceiptError::InvalidIdentity
+    );
+
+    let stale_precondition = CodingSessionQueueMutationPrecondition::new(
+        String::from(QUEUED_ENTRY),
+        queued.state.queue_generation(),
+        0,
+        coding_session_queue_text_identity("stale expected text"),
+    );
+    let conflict_error = reduce_coding_session_command(
+        &queued.state,
+        &CodingSessionCommand::RemoveQueued {
+            item_id: String::from(QUEUE_ITEM),
+            precondition: stale_precondition,
+        },
+    )
+    .expect_err("stale text must conflict");
+    let sensitive_conflict = CodingSessionQueueSensitiveDraft {
+        current: Some(STEERING_PROMPT),
+        replacement: Some(FOLLOW_UP_PROMPT),
+        ..CodingSessionQueueSensitiveDraft::default()
+    };
+    let sensitive_debug = format!("{sensitive_conflict:?}");
+    assert!(!sensitive_debug.contains(STEERING_PROMPT));
+    assert!(!sensitive_debug.contains(FOLLOW_UP_PROMPT));
+    let unsafe_conflict = project_coding_session_queue_conflict_receipt(
+        conflict_error
+            .queue_conflict_snapshot()
+            .expect("conflict snapshot"),
+        sensitive_conflict,
+    )
+    .expect_err("conflict receipt must reject private text");
+    assert_eq!(
+        unsafe_conflict,
+        CodingSessionQueueReceiptError::UnsafePrivateText
+    );
+    let rendered_error = unsafe_conflict.to_string();
+    assert!(!rendered_error.contains(STEERING_PROMPT));
+    assert!(!rendered_error.contains(FOLLOW_UP_PROMPT));
+}
+
+#[test]
+fn queue_safe_snapshot_maps_frontend_metadata_without_private_identity() {
+    // r[verify agent_harness_runtime.coding_session_queue_cas.verification]
+    // r[verify agent_harness_runtime.coding_session_queue_cas.verification.closeout]
+    let committed = committed_prompt();
+    let queued = queue_command(
+        &committed.state,
+        QueueCommandDraft {
+            item_id: QUEUE_ITEM,
+            entry_id: QUEUED_ENTRY,
+            body: STEERING_PROMPT,
+            is_steering: true,
+        },
+    );
+    let snapshot = project_coding_session_queue_safe_snapshot(&queued.state).expect("snapshot");
+    assert_eq!(snapshot.generation, queued.state.queue_generation());
+    assert_eq!(snapshot.entries.len(), 1);
+    assert_eq!(snapshot.entries[0].entry_id, QUEUED_ENTRY);
+    let rendered = format!("{snapshot:?}");
+    assert!(!rendered.contains(STEERING_PROMPT));
+    assert!(!rendered.contains(coding_session_queue_text_identity(STEERING_PROMPT).as_str()));
 }
 
 #[test]
 fn all_at_once_profile_commits_every_selected_queue_item_before_provider() {
     let user_commit = committed_prompt_with_profile(CodingSessionQueueProfile::AllAtOnce);
-    let first = queue_command(&user_commit.state, QueueCommandDraft {
-        item_id: QUEUE_ITEM,
-        entry_id: QUEUED_ENTRY,
-        body: STEERING_PROMPT,
-        is_steering: true,
-    });
-    let second = queue_command(&first.state, QueueCommandDraft {
-        item_id: QUEUE_ITEM_TWO,
-        entry_id: QUEUED_ENTRY_TWO,
-        body: FOLLOW_UP_PROMPT,
-        is_steering: false,
-    });
+    let first = queue_command(
+        &user_commit.state,
+        QueueCommandDraft {
+            item_id: QUEUE_ITEM,
+            entry_id: QUEUED_ENTRY,
+            body: STEERING_PROMPT,
+            is_steering: true,
+        },
+    );
+    let second = queue_command(
+        &first.state,
+        QueueCommandDraft {
+            item_id: QUEUE_ITEM_TWO,
+            entry_id: QUEUED_ENTRY_TWO,
+            body: FOLLOW_UP_PROMPT,
+            is_steering: false,
+        },
+    );
     let provider = provider_final(&second.state, RESPONSE);
     let assistant_commit = commit_pending(&provider.state);
     let first_queue_commit = commit_pending(&assistant_commit.state);
-    assert!(matches!(first_queue_commit.effect, Some(CodingSessionEffectRequest::Commit(_))));
+    assert!(matches!(
+        first_queue_commit.effect,
+        Some(CodingSessionEffectRequest::Commit(_))
+    ));
     let second_queue_commit = commit_pending(&first_queue_commit.state);
-    assert!(matches!(second_queue_commit.effect, Some(CodingSessionEffectRequest::Provider(_))));
-    assert_eq!(second_queue_commit.state.messages().len(), EXPECTED_ALL_AT_ONCE_MESSAGE_COUNT);
+    assert!(matches!(
+        second_queue_commit.effect,
+        Some(CodingSessionEffectRequest::Provider(_))
+    ));
+    assert_eq!(
+        second_queue_commit.state.messages().len(),
+        EXPECTED_ALL_AT_ONCE_MESSAGE_COUNT
+    );
     assert_eq!(second_queue_commit.state.queued_count(), Some(0));
 }
 
@@ -340,24 +896,33 @@ fn all_at_once_profile_commits_every_selected_queue_item_before_provider() {
 fn overlapping_prompt_and_stale_cancel_preserve_active_state() {
     // r[verify agent_harness_runtime.coding_session_host.single_run]
     let initial = state(CodingSessionQueueProfile::Sequential, false);
-    let started = reduce_coding_session_command(&initial, &CodingSessionCommand::Prompt {
-        run_id: String::from(RUN_ID),
-        entry_id: String::from(USER_ENTRY),
-        input: input(PROMPT),
-    })
+    let started = reduce_coding_session_command(
+        &initial,
+        &CodingSessionCommand::Prompt {
+            run_id: String::from(RUN_ID),
+            entry_id: String::from(USER_ENTRY),
+            input: input(PROMPT),
+        },
+    )
     .expect("start");
-    let overlap_error = reduce_coding_session_command(&started.state, &CodingSessionCommand::Prompt {
-        run_id: String::from(OTHER_RUN_ID),
-        entry_id: String::from("entry.overlap"),
-        input: input("overlap"),
-    })
+    let overlap_error = reduce_coding_session_command(
+        &started.state,
+        &CodingSessionCommand::Prompt {
+            run_id: String::from(OTHER_RUN_ID),
+            entry_id: String::from("entry.overlap"),
+            input: input("overlap"),
+        },
+    )
     .expect_err("overlapping prompt must fail");
     assert_eq!(overlap_error.issue(), CodingSessionIssue::AlreadyRunning);
     assert_eq!(started.state.messages().len(), initial.messages().len());
 
-    let stale_cancel_error = reduce_coding_session_command(&started.state, &CodingSessionCommand::Cancel {
-        run_id: String::from(OTHER_RUN_ID),
-    })
+    let stale_cancel_error = reduce_coding_session_command(
+        &started.state,
+        &CodingSessionCommand::Cancel {
+            run_id: String::from(OTHER_RUN_ID),
+        },
+    )
     .expect_err("stale cancellation must fail");
     assert_eq!(stale_cancel_error.issue(), CodingSessionIssue::StaleRun);
     assert_eq!(started.state.run().expect("active run").run_id(), RUN_ID);
@@ -367,52 +932,77 @@ fn overlapping_prompt_and_stale_cancel_preserve_active_state() {
 fn oversized_and_unexpanded_inputs_preserve_state() {
     let started = committed_prompt();
     let invalid_input_body = "x".repeat(super::data::MAX_MESSAGE_BYTES.saturating_add(1));
-    let input_error = reduce_coding_session_command(&started.state, &CodingSessionCommand::Steer {
-        item_id: String::from(QUEUE_ITEM),
-        entry_id: String::from(QUEUED_ENTRY),
-        input: input(invalid_input_body.as_str()),
-    })
+    let input_error = reduce_coding_session_command(
+        &started.state,
+        &CodingSessionCommand::Steer {
+            item_id: String::from(QUEUE_ITEM),
+            entry_id: String::from(QUEUED_ENTRY),
+            input: input(invalid_input_body.as_str()),
+        },
+    )
     .expect_err("oversized steering input must fail");
     assert_eq!(input_error.issue(), CodingSessionIssue::InvalidInput);
     assert_eq!(started.state.queued_count(), Some(0));
 
     let denied = state(CodingSessionQueueProfile::Sequential, false);
-    let unexpanded_error = reduce_coding_session_command(&denied, &CodingSessionCommand::Prompt {
-        run_id: String::from(RUN_ID),
-        entry_id: String::from(USER_ENTRY),
-        input: CodingSessionInput {
-            body: String::from("/unexpanded-command"),
-            posture: CodingSessionInputPosture::UnexpandedWorkflowCommand,
+    let unexpanded_error = reduce_coding_session_command(
+        &denied,
+        &CodingSessionCommand::Prompt {
+            run_id: String::from(RUN_ID),
+            entry_id: String::from(USER_ENTRY),
+            input: CodingSessionInput {
+                body: String::from("/unexpanded-command"),
+                posture: CodingSessionInputPosture::UnexpandedWorkflowCommand,
+            },
         },
-    })
+    )
     .expect_err("unexpanded command must fail");
-    assert_eq!(unexpanded_error.issue(), CodingSessionIssue::InputNotAdmitted);
+    assert_eq!(
+        unexpanded_error.issue(),
+        CodingSessionIssue::InputNotAdmitted
+    );
     assert!(denied.messages().is_empty());
 }
 
 #[test]
 fn correlated_cancellation_is_advisory_and_late_outcomes_are_stale() {
     let user_commit = committed_prompt();
-    let cancelled = reduce_coding_session_command(&user_commit.state, &CodingSessionCommand::Cancel {
-        run_id: String::from(RUN_ID),
-    })
+    let cancelled = reduce_coding_session_command(
+        &user_commit.state,
+        &CodingSessionCommand::Cancel {
+            run_id: String::from(RUN_ID),
+        },
+    )
     .expect("cancel request");
-    let effect_id = cancelled.effect.as_ref().expect("cancel effect").effect_id();
+    let effect_id = cancelled
+        .effect
+        .as_ref()
+        .expect("cancel effect")
+        .effect_id();
     assert_issue(
-        reduce_coding_session_outcome(&cancelled.state, &CodingSessionEffectOutcome::CancellationObserved {
-            effect_id: String::from(effect_id),
-            run_id: String::from(OTHER_RUN_ID),
-            observed: true,
-        }),
+        reduce_coding_session_outcome(
+            &cancelled.state,
+            &CodingSessionEffectOutcome::CancellationObserved {
+                effect_id: String::from(effect_id),
+                run_id: String::from(OTHER_RUN_ID),
+                observed: true,
+            },
+        ),
         CodingSessionIssue::StaleRun,
     );
-    let observed = reduce_coding_session_outcome(&cancelled.state, &CodingSessionEffectOutcome::CancellationObserved {
-        effect_id: String::from(effect_id),
-        run_id: String::from(RUN_ID),
-        observed: true,
-    })
+    let observed = reduce_coding_session_outcome(
+        &cancelled.state,
+        &CodingSessionEffectOutcome::CancellationObserved {
+            effect_id: String::from(effect_id),
+            run_id: String::from(RUN_ID),
+            observed: true,
+        },
+    )
     .expect("cancel observed");
-    assert_eq!(observed.state.terminal(), Some(CodingSessionTerminalKind::Cancelled));
+    assert_eq!(
+        observed.state.terminal(),
+        Some(CodingSessionTerminalKind::Cancelled)
+    );
     assert!(
         observed
             .events
@@ -420,10 +1010,13 @@ fn correlated_cancellation_is_advisory_and_late_outcomes_are_stale() {
             .any(|event| matches!(event, crate::telemetry::RuntimeEvent::Cancelled { .. }))
     );
     assert_issue(
-        reduce_coding_session_outcome(&observed.state, &CodingSessionEffectOutcome::ProviderSucceeded {
-            effect_id: String::from("stale-effect"),
-            reply: CodingSessionProviderReply::Final(model_response(RESPONSE)),
-        }),
+        reduce_coding_session_outcome(
+            &observed.state,
+            &CodingSessionEffectOutcome::ProviderSucceeded {
+                effect_id: String::from("stale-effect"),
+                reply: CodingSessionProviderReply::Final(model_response(RESPONSE)),
+            },
+        ),
         CodingSessionIssue::StaleEffect,
     );
 }
@@ -431,33 +1024,40 @@ fn correlated_cancellation_is_advisory_and_late_outcomes_are_stale() {
 #[test]
 fn compaction_summary_commits_before_compaction_event() {
     let completed = completed_session();
-    let requested = reduce_coding_session_command(&completed, &CodingSessionCommand::Compact {
-        entry_id: String::from(SUMMARY_ENTRY),
-    })
+    let requested = reduce_coding_session_command(
+        &completed,
+        &CodingSessionCommand::Compact {
+            entry_id: String::from(SUMMARY_ENTRY),
+        },
+    )
     .expect("compaction request");
-    assert!(matches!(requested.effect, Some(CodingSessionEffectRequest::Summarizer(_))));
+    assert!(matches!(
+        requested.effect,
+        Some(CodingSessionEffectRequest::Summarizer(_))
+    ));
     let effect_id = requested.effect.as_ref().expect("effect").effect_id();
-    let summarized =
-        reduce_coding_session_outcome(&requested.state, &CodingSessionEffectOutcome::SummarizerSucceeded {
+    let summarized = reduce_coding_session_outcome(
+        &requested.state,
+        &CodingSessionEffectOutcome::SummarizerSucceeded {
             effect_id: String::from(effect_id),
             entry_id: String::from(SUMMARY_ENTRY),
             summary: String::from(SUMMARY),
-        })
-        .expect("summary outcome");
-    assert!(matches!(summarized.effect, Some(CodingSessionEffectRequest::Commit(_))));
-    assert!(
-        !summarized
-            .events
-            .iter()
-            .any(|event| matches!(event, crate::telemetry::RuntimeEvent::CompactionRequested { .. }))
-    );
+        },
+    )
+    .expect("summary outcome");
+    assert!(matches!(
+        summarized.effect,
+        Some(CodingSessionEffectRequest::Commit(_))
+    ));
+    assert!(!summarized.events.iter().any(|event| matches!(
+        event,
+        crate::telemetry::RuntimeEvent::CompactionRequested { .. }
+    )));
     let committed = commit_pending(&summarized.state);
-    assert!(
-        committed
-            .events
-            .iter()
-            .any(|event| matches!(event, crate::telemetry::RuntimeEvent::CompactionRequested { .. }))
-    );
+    assert!(committed.events.iter().any(|event| matches!(
+        event,
+        crate::telemetry::RuntimeEvent::CompactionRequested { .. }
+    )));
 }
 
 #[test]
@@ -485,26 +1085,36 @@ fn clean_resume_replays_messages_and_repairs_unmatched_tool_without_reexecution(
     })
     .expect("tool call");
     let resume_state = state(CodingSessionQueueProfile::Sequential, true);
-    let requested =
-        reduce_coding_session_command(&resume_state, &CodingSessionCommand::Resume).expect("resume request");
-    let effect_id = requested.effect.as_ref().expect("recovery effect").effect_id();
-    let recovered = reduce_coding_session_outcome(&requested.state, &CodingSessionEffectOutcome::RecoverySucceeded {
-        effect_id: String::from(effect_id),
-        snapshot: CodingSessionRecoverySnapshot {
-            status: CodingSessionRecoveryStatus::Clean,
-            committed_head_hash: String::from(SAFE_HEAD),
-            active_leaf_id: Some(String::from("entry.tool.call")),
-            durable_cursor: THIRD_CURSOR,
-            messages: vec![authority, user, call],
+    let requested = reduce_coding_session_command(&resume_state, &CodingSessionCommand::Resume)
+        .expect("resume request");
+    let effect_id = requested
+        .effect
+        .as_ref()
+        .expect("recovery effect")
+        .effect_id();
+    let recovered = reduce_coding_session_outcome(
+        &requested.state,
+        &CodingSessionEffectOutcome::RecoverySucceeded {
+            effect_id: String::from(effect_id),
+            snapshot: CodingSessionRecoverySnapshot {
+                status: CodingSessionRecoveryStatus::Clean,
+                committed_head_hash: String::from(SAFE_HEAD),
+                active_leaf_id: Some(String::from("entry.tool.call")),
+                durable_cursor: THIRD_CURSOR,
+                messages: vec![authority, user, call],
+            },
         },
-    })
+    )
     .expect("recovery");
     let repair = match recovered.effect.as_ref().expect("repair commit") {
         CodingSessionEffectRequest::Commit(request) => request,
         other => panic!("expected repair commit, got {other:?}"),
     };
     assert_eq!(repair.messages().len(), 1);
-    assert_eq!(repair.messages()[0].kind(), CodingSessionMessageKind::Repair);
+    assert_eq!(
+        repair.messages()[0].kind(),
+        CodingSessionMessageKind::Repair
+    );
     assert!(
         !recovered
             .events
@@ -517,20 +1127,35 @@ fn clean_resume_replays_messages_and_repairs_unmatched_tool_without_reexecution(
 fn explicit_authority_rebind_commits_successor_without_provider_dispatch() {
     // r[verify agent_harness_runtime.session_authority_profile.durable_binding]
     let completed = completed_session();
-    let prior_binding_identity = completed.authority_binding_identity().expect("initial binding").to_string();
+    let prior_binding_identity = completed
+        .authority_binding_identity()
+        .expect("initial binding")
+        .to_string();
     let changed_profile = authority_profile(POLICY_HASH);
-    let requested = reduce_coding_session_command(&completed, &CodingSessionCommand::RebindAuthority {
-        entry_id: String::from("authority.rebind"),
-        profile: changed_profile.clone(),
-        authorization_identity: String::from(SAFE_HEAD),
-    })
+    let requested = reduce_coding_session_command(
+        &completed,
+        &CodingSessionCommand::RebindAuthority {
+            entry_id: String::from("authority.rebind"),
+            profile: changed_profile.clone(),
+            authorization_identity: String::from(SAFE_HEAD),
+        },
+    )
     .expect("rebind request");
-    assert!(matches!(requested.effect, Some(CodingSessionEffectRequest::Commit(_))));
+    assert!(matches!(
+        requested.effect,
+        Some(CodingSessionEffectRequest::Commit(_))
+    ));
     let rebound = commit_pending(&requested.state);
     assert!(rebound.effect.is_none());
     assert_eq!(rebound.state.authority_profile(), &changed_profile);
-    assert_ne!(rebound.state.authority_binding_identity(), Some(prior_binding_identity.as_str()));
-    assert_eq!(rebound.state.provider_dispatch_count, completed.provider_dispatch_count);
+    assert_ne!(
+        rebound.state.authority_binding_identity(),
+        Some(prior_binding_identity.as_str())
+    );
+    assert_eq!(
+        rebound.state.provider_dispatch_count,
+        completed.provider_dispatch_count
+    );
 }
 
 #[test]
@@ -551,7 +1176,10 @@ fn authority_transition_planning_exposes_abandon_and_fork_without_mutation() {
         fork.disposition(),
         crate::session_authority_profile::SessionAuthorityTransitionDisposition::ForkCommitRequired
     );
-    assert_eq!(fork.binding().expect("fork binding").branch_id(), "branch.authority-fork");
+    assert_eq!(
+        fork.binding().expect("fork binding").branch_id(),
+        "branch.authority-fork"
+    );
     let abandon = plan_coding_session_authority_transition(
         &completed,
         completed.authority_profile(),
@@ -571,70 +1199,95 @@ fn resume_blocks_profile_drift_and_legacy_unbound_history_before_effects() {
     let mut drift_config = config(CodingSessionQueueProfile::Sequential, true);
     drift_config.authority_profile = authority_profile(POLICY_HASH);
     let drift_state = new_coding_session_state(drift_config, queue_policy()).expect("drift state");
-    let drift_request =
-        reduce_coding_session_command(&drift_state, &CodingSessionCommand::Resume).expect("drift resume request");
+    let drift_request = reduce_coding_session_command(&drift_state, &CodingSessionCommand::Resume)
+        .expect("drift resume request");
     let drift_effect_id = drift_request.effect.as_ref().expect("recovery").effect_id();
-    let drifted = reduce_coding_session_outcome(&drift_request.state, &CodingSessionEffectOutcome::RecoverySucceeded {
-        effect_id: String::from(drift_effect_id),
-        snapshot: CodingSessionRecoverySnapshot {
-            status: CodingSessionRecoveryStatus::Clean,
-            committed_head_hash: String::from(SAFE_HEAD),
-            active_leaf_id: Some(String::from(USER_ENTRY)),
-            durable_cursor: SECOND_CURSOR,
-            messages: vec![recovered_authority_message(), recovered_user_message()],
+    let drifted = reduce_coding_session_outcome(
+        &drift_request.state,
+        &CodingSessionEffectOutcome::RecoverySucceeded {
+            effect_id: String::from(drift_effect_id),
+            snapshot: CodingSessionRecoverySnapshot {
+                status: CodingSessionRecoveryStatus::Clean,
+                committed_head_hash: String::from(SAFE_HEAD),
+                active_leaf_id: Some(String::from(USER_ENTRY)),
+                durable_cursor: SECOND_CURSOR,
+                messages: vec![recovered_authority_message(), recovered_user_message()],
+            },
         },
-    })
+    )
     .expect("drift blocked transition");
-    assert_eq!(drifted.state.last_issue(), Some(CodingSessionIssue::AuthorityProfileMismatch));
+    assert_eq!(
+        drifted.state.last_issue(),
+        Some(CodingSessionIssue::AuthorityProfileMismatch)
+    );
     assert!(drifted.effect.is_none());
     assert_eq!(drifted.state.provider_dispatch_count, 0);
 
     let legacy_state = state(CodingSessionQueueProfile::Sequential, true);
     let legacy_request =
-        reduce_coding_session_command(&legacy_state, &CodingSessionCommand::Resume).expect("legacy resume request");
-    let legacy_effect_id = legacy_request.effect.as_ref().expect("recovery").effect_id();
-    let legacy = reduce_coding_session_outcome(&legacy_request.state, &CodingSessionEffectOutcome::RecoverySucceeded {
-        effect_id: String::from(legacy_effect_id),
-        snapshot: CodingSessionRecoverySnapshot {
-            status: CodingSessionRecoveryStatus::Empty,
-            committed_head_hash: String::from(CODING_SESSION_EMPTY_HEAD_HASH),
-            active_leaf_id: None,
-            durable_cursor: 0,
-            messages: Vec::new(),
+        reduce_coding_session_command(&legacy_state, &CodingSessionCommand::Resume)
+            .expect("legacy resume request");
+    let legacy_effect_id = legacy_request
+        .effect
+        .as_ref()
+        .expect("recovery")
+        .effect_id();
+    let legacy = reduce_coding_session_outcome(
+        &legacy_request.state,
+        &CodingSessionEffectOutcome::RecoverySucceeded {
+            effect_id: String::from(legacy_effect_id),
+            snapshot: CodingSessionRecoverySnapshot {
+                status: CodingSessionRecoveryStatus::Empty,
+                committed_head_hash: String::from(CODING_SESSION_EMPTY_HEAD_HASH),
+                active_leaf_id: None,
+                durable_cursor: 0,
+                messages: Vec::new(),
+            },
         },
-    })
+    )
     .expect("legacy blocked transition");
-    assert_eq!(legacy.state.last_issue(), Some(CodingSessionIssue::AuthorityProfileUnbound));
+    assert_eq!(
+        legacy.state.last_issue(),
+        Some(CodingSessionIssue::AuthorityProfileUnbound)
+    );
     assert!(legacy.effect.is_none());
 }
 
 #[test]
 fn incomplete_and_stale_leaf_recovery_fail_closed() {
     let resume_state = state(CodingSessionQueueProfile::Sequential, true);
-    let requested =
-        reduce_coding_session_command(&resume_state, &CodingSessionCommand::Resume).expect("resume request");
+    let requested = reduce_coding_session_command(&resume_state, &CodingSessionCommand::Resume)
+        .expect("resume request");
     let effect_id = requested.effect.as_ref().expect("effect").effect_id();
-    let blocked = reduce_coding_session_outcome(&requested.state, &CodingSessionEffectOutcome::RecoverySucceeded {
-        effect_id: String::from(effect_id),
-        snapshot: CodingSessionRecoverySnapshot {
-            status: CodingSessionRecoveryStatus::IncompleteTail,
-            committed_head_hash: String::from(CODING_SESSION_EMPTY_HEAD_HASH),
-            active_leaf_id: None,
-            durable_cursor: 0,
-            messages: Vec::new(),
+    let blocked = reduce_coding_session_outcome(
+        &requested.state,
+        &CodingSessionEffectOutcome::RecoverySucceeded {
+            effect_id: String::from(effect_id),
+            snapshot: CodingSessionRecoverySnapshot {
+                status: CodingSessionRecoveryStatus::IncompleteTail,
+                committed_head_hash: String::from(CODING_SESSION_EMPTY_HEAD_HASH),
+                active_leaf_id: None,
+                durable_cursor: 0,
+                messages: Vec::new(),
+            },
         },
-    })
+    )
     .expect("blocked recovery transition");
-    assert_eq!(blocked.state.terminal(), Some(CodingSessionTerminalKind::Blocked));
+    assert_eq!(
+        blocked.state.terminal(),
+        Some(CodingSessionTerminalKind::Blocked)
+    );
     assert!(blocked.effect.is_none());
 
     let stale_leaf_state = state(CodingSessionQueueProfile::Sequential, true);
-    let stale_leaf_request = reduce_coding_session_command(&stale_leaf_state, &CodingSessionCommand::Resume)
-        .expect("stale leaf resume request");
+    let stale_leaf_request =
+        reduce_coding_session_command(&stale_leaf_state, &CodingSessionCommand::Resume)
+            .expect("stale leaf resume request");
     let stale_leaf_effect = stale_leaf_request.effect.as_ref().expect("recovery effect");
     let recovered_user = recovered_user_message();
-    let stale_leaf_error =
-        reduce_coding_session_outcome(&stale_leaf_request.state, &CodingSessionEffectOutcome::RecoverySucceeded {
+    let stale_leaf_error = reduce_coding_session_outcome(
+        &stale_leaf_request.state,
+        &CodingSessionEffectOutcome::RecoverySucceeded {
             effect_id: String::from(stale_leaf_effect.effect_id()),
             snapshot: CodingSessionRecoverySnapshot {
                 status: CodingSessionRecoveryStatus::Clean,
@@ -643,36 +1296,53 @@ fn incomplete_and_stale_leaf_recovery_fail_closed() {
                 durable_cursor: SECOND_CURSOR,
                 messages: vec![recovered_authority_message(), recovered_user],
             },
-        })
-        .expect_err("stale active leaf must fail recovery");
-    assert_eq!(stale_leaf_error.issue(), CodingSessionIssue::RecoveryBlocked);
-    assert_eq!(stale_leaf_request.state.recovery_posture(), CodingSessionRecoveryPosture::ResumeRequired);
+        },
+    )
+    .expect_err("stale active leaf must fail recovery");
+    assert_eq!(
+        stale_leaf_error.issue(),
+        CodingSessionIssue::RecoveryBlocked
+    );
+    assert_eq!(
+        stale_leaf_request.state.recovery_posture(),
+        CodingSessionRecoveryPosture::ResumeRequired
+    );
 }
 
 #[test]
 fn missing_recovery_timer_and_receipt_leaks_fail_closed() {
     let unavailable_state = state(CodingSessionQueueProfile::Sequential, true);
-    let unavailable_request = reduce_coding_session_command(&unavailable_state, &CodingSessionCommand::Resume)
-        .expect("unavailable recovery request");
+    let unavailable_request =
+        reduce_coding_session_command(&unavailable_state, &CodingSessionCommand::Resume)
+            .expect("unavailable recovery request");
     let unavailable = failed_effect(
         &unavailable_request.state,
         CodingSessionEffectService::Recovery,
         CodingSessionServiceIssue::Unavailable,
     );
-    assert_eq!(unavailable.state.terminal(), Some(CodingSessionTerminalKind::Blocked));
-    assert_eq!(unavailable.state.last_issue(), Some(CodingSessionIssue::PersistenceFailure));
+    assert_eq!(
+        unavailable.state.terminal(),
+        Some(CodingSessionTerminalKind::Blocked)
+    );
+    assert_eq!(
+        unavailable.state.last_issue(),
+        Some(CodingSessionIssue::PersistenceFailure)
+    );
 
     let mut config = config(CodingSessionQueueProfile::Sequential, false);
     config.services.timer = CodingSessionServicePosture::Missing;
-    let timer_error =
-        new_coding_session_state(config, queue_policy()).expect_err("missing timer must reject configuration");
+    let timer_error = new_coding_session_state(config, queue_policy())
+        .expect_err("missing timer must reject configuration");
     assert_eq!(timer_error.issue(), CodingSessionIssue::UnavailableService);
 
     let completed = completed_session();
-    let receipt_error = project_coding_session_receipt(&completed, CodingSessionSensitiveDraft {
-        raw_prompt: Some(PROMPT),
-        ..CodingSessionSensitiveDraft::default()
-    })
+    let receipt_error = project_coding_session_receipt(
+        &completed,
+        CodingSessionSensitiveDraft {
+            raw_prompt: Some(PROMPT),
+            ..CodingSessionSensitiveDraft::default()
+        },
+    )
     .expect_err("private receipt material must be rejected");
     assert_eq!(receipt_error.issue(), CodingSessionIssue::UnsafeReceipt);
 }
@@ -691,13 +1361,18 @@ fn message_wire_round_trips_and_rejects_malformed_version_and_tool_binding() {
     .expect("message");
     let bytes = encode_coding_session_message(&message).expect("encode");
     let decoded =
-        decode_coding_session_message(message.entry_id(), message.parent_id(), bytes.as_slice()).expect("decode");
+        decode_coding_session_message(message.entry_id(), message.parent_id(), bytes.as_slice())
+            .expect("decode");
     assert_eq!(decoded, message);
 
     let mut wrong_version = bytes;
     wrong_version[WIRE_VERSION_INDEX] = UNSUPPORTED_WIRE_VERSION;
     assert_issue(
-        decode_coding_session_message(message.entry_id(), message.parent_id(), wrong_version.as_slice()),
+        decode_coding_session_message(
+            message.entry_id(),
+            message.parent_id(),
+            wrong_version.as_slice(),
+        ),
         CodingSessionIssue::InvalidInput,
     );
     assert!(
@@ -752,12 +1427,16 @@ fn frontend_projection_tracks_shared_commit_queue_tool_cancel_and_terminal_event
             status: crate::RuntimeTerminalKind::Stopped,
         },
     ];
-    let first = events.iter().fold(CodingSessionFrontendState::default(), |state, event| {
-        reduce_coding_session_frontend_event(&state, event)
-    });
-    let second = events.iter().fold(CodingSessionFrontendState::default(), |state, event| {
-        reduce_coding_session_frontend_event(&state, event)
-    });
+    let first = events
+        .iter()
+        .fold(CodingSessionFrontendState::default(), |state, event| {
+            reduce_coding_session_frontend_event(&state, event)
+        });
+    let second = events
+        .iter()
+        .fold(CodingSessionFrontendState::default(), |state, event| {
+            reduce_coding_session_frontend_event(&state, event)
+        });
     assert_eq!(first, second);
     assert_eq!(first.queue_count, 1);
     assert_eq!(first.committed_message_count, 1);
@@ -782,7 +1461,9 @@ fn config(profile: CodingSessionQueueProfile, resume_required: bool) -> CodingSe
     }
 }
 
-fn authority_profile(permission_identity: &str) -> crate::session_authority_profile::SessionRuntimeAuthorityProfile {
+fn authority_profile(
+    permission_identity: &str,
+) -> crate::session_authority_profile::SessionRuntimeAuthorityProfile {
     let classes = crate::session_authority_profile::SessionAuthorityComponentClass::ALL;
     let identities = [
         POLICY_HASH,
@@ -799,10 +1480,12 @@ fn authority_profile(permission_identity: &str) -> crate::session_authority_prof
     let components = classes
         .iter()
         .zip(identities.iter())
-        .map(|(class, identity)| crate::session_authority_profile::SessionAuthorityComponentDraft {
-            class: *class,
-            identity,
-        })
+        .map(
+            |(class, identity)| crate::session_authority_profile::SessionAuthorityComponentDraft {
+                class: *class,
+                identity,
+            },
+        )
         .collect::<Vec<_>>();
     let profile = crate::session_authority_profile::build_session_authority_profile(
         crate::session_authority_profile::SessionAuthorityProfileDraft {
@@ -846,11 +1529,14 @@ fn committed_prompt() -> CodingSessionTransition {
 
 fn committed_prompt_with_profile(profile: CodingSessionQueueProfile) -> CodingSessionTransition {
     let initial = state(profile, false);
-    let prompt = reduce_coding_session_command(&initial, &CodingSessionCommand::Prompt {
-        run_id: String::from(RUN_ID),
-        entry_id: String::from(USER_ENTRY),
-        input: input(PROMPT),
-    })
+    let prompt = reduce_coding_session_command(
+        &initial,
+        &CodingSessionCommand::Prompt {
+            run_id: String::from(RUN_ID),
+            entry_id: String::from(USER_ENTRY),
+            input: input(PROMPT),
+        },
+    )
     .expect("prompt");
     commit_pending(&prompt.state)
 }
@@ -868,16 +1554,22 @@ fn commit_pending(state: &CodingSessionState) -> CodingSessionTransition {
     };
     assert!(!request.messages().is_empty());
     let message_count = u64::try_from(request.messages().len()).expect("message count");
-    let cursor = state.durable_cursor().checked_add(message_count).expect("cursor");
+    let cursor = state
+        .durable_cursor()
+        .checked_add(message_count)
+        .expect("cursor");
     assert!(cursor > state.durable_cursor());
     let head = format!("{cursor:064x}");
-    reduce_coding_session_outcome(state, &CodingSessionEffectOutcome::CommitSucceeded {
-        effect_id: String::from(request.effect_id()),
-        new_head_hash: head,
-        active_leaf_id: String::from(request.proposed_active_leaf_id()),
-        durable_cursor: cursor,
-        synchronized: true,
-    })
+    reduce_coding_session_outcome(
+        state,
+        &CodingSessionEffectOutcome::CommitSucceeded {
+            effect_id: String::from(request.effect_id()),
+            new_head_hash: head,
+            active_leaf_id: String::from(request.proposed_active_leaf_id()),
+            durable_cursor: cursor,
+            synchronized: true,
+        },
+    )
     .expect("commit outcome")
 }
 
@@ -886,10 +1578,13 @@ fn provider_final(state: &CodingSessionState, response: &str) -> CodingSessionTr
         CodingSessionEffectRequest::Provider(request) => request.effect_id(),
         other => panic!("expected provider, got {other:?}"),
     };
-    reduce_coding_session_outcome(state, &CodingSessionEffectOutcome::ProviderSucceeded {
-        effect_id: String::from(effect_id),
-        reply: CodingSessionProviderReply::Final(model_response(response)),
-    })
+    reduce_coding_session_outcome(
+        state,
+        &CodingSessionEffectOutcome::ProviderSucceeded {
+            effect_id: String::from(effect_id),
+            reply: CodingSessionProviderReply::Final(model_response(response)),
+        },
+    )
     .expect("provider outcome")
 }
 
@@ -898,13 +1593,16 @@ fn provider_tool_call(state: &CodingSessionState) -> CodingSessionTransition {
         CodingSessionEffectRequest::Provider(request) => request.effect_id(),
         other => panic!("expected provider, got {other:?}"),
     };
-    reduce_coding_session_outcome(state, &CodingSessionEffectOutcome::ProviderSucceeded {
-        effect_id: String::from(effect_id),
-        reply: CodingSessionProviderReply::ToolCall {
-            assistant_response: model_response(TOOL_ASSISTANT),
-            tool_request: tool_request(),
+    reduce_coding_session_outcome(
+        state,
+        &CodingSessionEffectOutcome::ProviderSucceeded {
+            effect_id: String::from(effect_id),
+            reply: CodingSessionProviderReply::ToolCall {
+                assistant_response: model_response(TOOL_ASSISTANT),
+                tool_request: tool_request(),
+            },
         },
-    })
+    )
     .expect("provider tool outcome")
 }
 
@@ -913,10 +1611,13 @@ fn tool_success(state: &CodingSessionState) -> CodingSessionTransition {
         CodingSessionEffectRequest::Tool(request) => request.effect_id(),
         other => panic!("expected tool, got {other:?}"),
     };
-    reduce_coding_session_outcome(state, &CodingSessionEffectOutcome::ToolSucceeded {
-        effect_id: String::from(effect_id),
-        response: tool_response(),
-    })
+    reduce_coding_session_outcome(
+        state,
+        &CodingSessionEffectOutcome::ToolSucceeded {
+            effect_id: String::from(effect_id),
+            response: tool_response(),
+        },
+    )
     .expect("tool outcome")
 }
 
@@ -934,21 +1635,30 @@ fn failed_effect(
     issue: CodingSessionServiceIssue,
 ) -> CodingSessionTransition {
     let effect_id = String::from(state.pending_effect().expect("pending effect").effect_id());
-    reduce_coding_session_outcome(state, &CodingSessionEffectOutcome::Failed {
-        effect_id,
-        service,
-        issue,
-    })
+    reduce_coding_session_outcome(
+        state,
+        &CodingSessionEffectOutcome::Failed {
+            effect_id,
+            service,
+            issue,
+        },
+    )
     .expect("failed effect transition")
 }
 
 fn assert_blocked(transition: &CodingSessionTransition, issue: CodingSessionIssue) {
-    assert_eq!(transition.state.terminal(), Some(CodingSessionTerminalKind::Blocked));
+    assert_eq!(
+        transition.state.terminal(),
+        Some(CodingSessionTerminalKind::Blocked)
+    );
     assert_eq!(transition.state.last_issue(), Some(issue));
     assert!(transition.effect.is_none());
 }
 
-fn queue_command(state: &CodingSessionState, draft: QueueCommandDraft<'_>) -> CodingSessionTransition {
+fn queue_command(
+    state: &CodingSessionState,
+    draft: QueueCommandDraft<'_>,
+) -> CodingSessionTransition {
     let command = if draft.is_steering {
         CodingSessionCommand::Steer {
             item_id: String::from(draft.item_id),
@@ -970,8 +1680,8 @@ fn model_response(value: &str) -> animus_adapters::ModelResponse {
 }
 
 fn tool_request() -> animus_adapters::ToolRequest {
-    let arguments =
-        animus_adapters::tool::PreparedArguments::prepare(&animus_adapters::tool::ArgumentPreparationRequest {
+    let arguments = animus_adapters::tool::PreparedArguments::prepare(
+        &animus_adapters::tool::ArgumentPreparationRequest {
             current_schema_identity: TOOL_SCHEMA,
             allowed_field_names: &[TOOL_ARGUMENT],
             compatibility_rules: &[],
@@ -979,8 +1689,9 @@ fn tool_request() -> animus_adapters::ToolRequest {
                 name: Some(TOOL_ARGUMENT),
                 value: Some(TOOL_ARGUMENT_VALUE),
             }],
-        })
-        .expect("arguments");
+        },
+    )
+    .expect("arguments");
     assert_eq!(arguments.schema_identity(), TOOL_SCHEMA);
     assert_eq!(arguments.fields().len(), 1);
     animus_adapters::ToolRequest::from_draft(&animus_adapters::tool::RequestDraft {
@@ -1009,8 +1720,8 @@ fn recovered_authority_message() -> CodingSessionMessage {
         },
     )
     .expect("authority binding");
-    let payload =
-        crate::session_authority_profile::encode_session_authority_binding(&binding).expect("authority payload");
+    let payload = crate::session_authority_profile::encode_session_authority_binding(&binding)
+        .expect("authority payload");
     let message = super::core::test_message(super::core::CodingSessionMessageDraft {
         entry_id: AUTHORITY_ENTRY,
         parent_id: None,
@@ -1021,7 +1732,10 @@ fn recovered_authority_message() -> CodingSessionMessage {
         tool_name: None,
     })
     .expect("recovered authority");
-    assert_eq!(message.kind(), CodingSessionMessageKind::AuthorityProfileBinding);
+    assert_eq!(
+        message.kind(),
+        CodingSessionMessageKind::AuthorityProfileBinding
+    );
     assert_eq!(message.parent_id(), None);
     message
 }
@@ -1051,7 +1765,10 @@ fn tool_response() -> animus_adapters::ToolResponse {
         },
     )
     .expect("bounded output");
-    animus_adapters::ToolResponse::from_bounded(bounded, animus_adapters::tool::OutputRedactionClass::Safe)
+    animus_adapters::ToolResponse::from_bounded(
+        bounded,
+        animus_adapters::tool::OutputRedactionClass::Safe,
+    )
 }
 
 fn assert_issue<T>(result: Result<T, CodingSessionError>, expected: CodingSessionIssue) {

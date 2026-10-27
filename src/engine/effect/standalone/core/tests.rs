@@ -98,6 +98,7 @@ fn closed_tuples_include_zero_and_all_reviewed_effect_classes() {
         ("lattice/file", FILE_RESOURCE_PREFIX, "file/read", "lattice-file"),
         ("lattice/file", FILE_RESOURCE_PREFIX, "file/write", "lattice-file"),
         ("lattice/file", FILE_RESOURCE_PREFIX, "file/append", "lattice-file"),
+        ("lattice/agent", AGENT_RESOURCE_PREFIX, "agent/execute", "lattice-agent"),
     ] {
         for node_id in [0, u64::MAX] {
             let mut grant = Grant {

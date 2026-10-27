@@ -6,42 +6,23 @@
     allow(tigerstyle::non_trait_imports, tigerstyle::path_segment_repetition)
 )]
 
-use super::types::BLAKE3_HEX_CHARS;
-use super::types::HASH_SEPARATOR;
-use super::types::MAX_BUDGET_POLICY_COUNT;
-use super::types::MAX_CONTEXT_BUDGET_UNITS;
-use super::types::MAX_PROFILE_COUNT;
-use super::types::MAX_PROFILE_RESOURCE_REFS;
-use super::types::MAX_SAFE_LABEL_CHARS;
-use super::types::MAX_TOOL_CALL_BUDGET;
-use super::types::MAX_TOOL_PARALLELISM;
-use super::types::MAX_TOOLSET_COUNT;
-use super::types::MODEL_RUNTIME_PROFILE_HASH_DOMAIN;
-use super::types::MODEL_RUNTIME_PROFILE_SCHEMA;
-use super::types::ModelNamedResourceReference;
-use super::types::ModelNamedResourceReferenceDraft;
-use super::types::ModelProfileSourceScope;
-use super::types::ModelPromptSourceReference;
-use super::types::ModelPromptSourceReferenceDraft;
-use super::types::ModelRuntimeBinding;
-use super::types::ModelRuntimeBindingDraft;
-use super::types::ModelRuntimeBudgetPolicy;
-use super::types::ModelRuntimeBudgetPolicyDraft;
-use super::types::ModelRuntimeProfile;
-use super::types::ModelRuntimeProfileDraft;
-use super::types::ModelRuntimeProfileError;
-use super::types::ModelRuntimeProfileIssue;
-use super::types::ModelRuntimeProfileSet;
-use super::types::ModelRuntimeProfileSetDraft;
-use super::types::ModelSkillReference;
-use super::types::ModelSkillReferenceDraft;
-use super::types::ModelToolset;
-use super::types::ModelToolsetDraft;
-use super::types::NativeToolCallingMode;
+use super::types::{
+    BLAKE3_HEX_CHARS, HASH_SEPARATOR, MAX_BUDGET_POLICY_COUNT, MAX_CONTEXT_BUDGET_UNITS,
+    MAX_PROFILE_COUNT, MAX_PROFILE_RESOURCE_REFS, MAX_SAFE_LABEL_CHARS, MAX_TOOL_CALL_BUDGET,
+    MAX_TOOL_PARALLELISM, MAX_TOOLSET_COUNT, MODEL_RUNTIME_PROFILE_HASH_DOMAIN,
+    MODEL_RUNTIME_PROFILE_SCHEMA, ModelNamedResourceReference, ModelNamedResourceReferenceDraft,
+    ModelProfileSourceScope, ModelPromptSourceReference, ModelPromptSourceReferenceDraft,
+    ModelRuntimeBinding, ModelRuntimeBindingDraft, ModelRuntimeBudgetPolicy,
+    ModelRuntimeBudgetPolicyDraft, ModelRuntimeProfile, ModelRuntimeProfileDraft,
+    ModelRuntimeProfileError, ModelRuntimeProfileIssue, ModelRuntimeProfileSet,
+    ModelRuntimeProfileSetDraft, ModelSkillReference, ModelSkillReferenceDraft, ModelToolset,
+    ModelToolsetDraft, NativeToolCallingMode,
+};
 
 const FIELD_SCHEMA: &str = "schema";
 const FIELD_PROFILE_SET: &str = "profiles";
 const FIELD_PROFILE_ID: &str = "profile_id";
+const FIELD_DIALECT_ID: &str = "dialect_id";
 const FIELD_PROFILE_BINDING: &str = "binding";
 const FIELD_PROFILE_HASH: &str = "profile_hash";
 const FIELD_POLICY_HASH: &str = "policy_hash";
@@ -67,14 +48,20 @@ impl ModelRuntimeProfileSet {
     /// Returns [`ModelRuntimeProfileError`] for malformed, duplicate, stale, or
     /// dangling configuration.
     // r[impl agent_harness_runtime.model_runtime_profiles.contract]
-    pub fn validate(draft: &ModelRuntimeProfileSetDraft<'_>) -> Result<Self, ModelRuntimeProfileError> {
+    pub fn validate(
+        draft: &ModelRuntimeProfileSetDraft<'_>,
+    ) -> Result<Self, ModelRuntimeProfileError> {
         validate_set_shape(draft)?;
         let budget_policies = validate_budget_policies(draft.budget_policies)?;
         let toolsets = validate_toolsets(draft.toolsets)?;
         let profiles = validate_profiles(draft.profiles)?;
         let explicit_default_profile_id =
             validate_default_profile(draft.explicit_default_profile_id, profiles.as_slice())?;
-        validate_profile_references(profiles.as_slice(), budget_policies.as_slice(), toolsets.as_slice())?;
+        validate_profile_references(
+            profiles.as_slice(),
+            budget_policies.as_slice(),
+            toolsets.as_slice(),
+        )?;
         Ok(Self {
             enablement: draft.enablement,
             explicit_default_profile_id,
@@ -97,7 +84,9 @@ pub fn blake3_model_runtime_profile_identity(
     Ok(profile_content_hash(&profile))
 }
 
-fn validate_set_shape(draft: &ModelRuntimeProfileSetDraft<'_>) -> Result<(), ModelRuntimeProfileError> {
+fn validate_set_shape(
+    draft: &ModelRuntimeProfileSetDraft<'_>,
+) -> Result<(), ModelRuntimeProfileError> {
     if draft.schema != MODEL_RUNTIME_PROFILE_SCHEMA {
         return Err(error(
             ModelRuntimeProfileIssue::InvalidSchema,
@@ -138,7 +127,10 @@ fn validate_budget_policies(
     for draft in drafts {
         let policy_id = safe_label(ModelProfileField(FIELD_BUDGET_POLICY), draft.policy_id)?;
         validate_budget_values(draft)?;
-        if policies.iter().any(|policy: &ModelRuntimeBudgetPolicy| policy.policy_id == policy_id) {
+        if policies
+            .iter()
+            .any(|policy: &ModelRuntimeBudgetPolicy| policy.policy_id == policy_id)
+        {
             return Err(error(
                 ModelRuntimeProfileIssue::DuplicateIdentity,
                 FIELD_BUDGET_POLICY,
@@ -157,7 +149,9 @@ fn validate_budget_policies(
     Ok(policies)
 }
 
-fn validate_budget_values(draft: &ModelRuntimeBudgetPolicyDraft<'_>) -> Result<(), ModelRuntimeProfileError> {
+fn validate_budget_values(
+    draft: &ModelRuntimeBudgetPolicyDraft<'_>,
+) -> Result<(), ModelRuntimeProfileError> {
     let parallel_calls = u32::from(draft.max_parallel_tool_calls);
     let is_budget_valid = draft.max_context_units > u32::default()
         && draft.max_context_units <= MAX_CONTEXT_BUDGET_UNITS
@@ -176,7 +170,9 @@ fn validate_budget_values(draft: &ModelRuntimeBudgetPolicyDraft<'_>) -> Result<(
     Ok(())
 }
 
-fn validate_toolsets(drafts: &[ModelToolsetDraft<'_>]) -> Result<Vec<ModelToolset>, ModelRuntimeProfileError> {
+fn validate_toolsets(
+    drafts: &[ModelToolsetDraft<'_>],
+) -> Result<Vec<ModelToolset>, ModelRuntimeProfileError> {
     let mut toolsets = Vec::with_capacity(drafts.len());
     for draft in drafts {
         let toolset_id = safe_label(ModelProfileField(FIELD_TOOLSET), draft.toolset_id)?;
@@ -188,17 +184,27 @@ fn validate_toolsets(drafts: &[ModelToolsetDraft<'_>]) -> Result<Vec<ModelToolse
             ));
         }
         let tool_names = unique_labels(ModelProfileField(FIELD_TOOLSET), draft.tool_names)?;
-        if toolsets.iter().any(|toolset: &ModelToolset| toolset.toolset_id == toolset_id) {
+        if toolsets
+            .iter()
+            .any(|toolset: &ModelToolset| toolset.toolset_id == toolset_id)
+        {
             return Err(error(
                 ModelRuntimeProfileIssue::DuplicateIdentity,
                 FIELD_TOOLSET,
                 "duplicate toolset identity",
             ));
         }
-        toolsets.push(ModelToolset { toolset_id, tool_names });
+        toolsets.push(ModelToolset {
+            toolset_id,
+            tool_names,
+        });
     }
     assert_eq!(toolsets.len(), drafts.len());
-    assert!(toolsets.iter().all(|toolset| !toolset.toolset_id.is_empty()));
+    assert!(
+        toolsets
+            .iter()
+            .all(|toolset| !toolset.toolset_id.is_empty())
+    );
     Ok(toolsets)
 }
 
@@ -208,14 +214,20 @@ fn validate_profiles(
     let mut profiles = Vec::with_capacity(drafts.len());
     for draft in drafts {
         let profile = validate_profile_fields(draft, true)?;
-        if profiles.iter().any(|candidate: &ModelRuntimeProfile| candidate.profile_id == profile.profile_id) {
+        if profiles
+            .iter()
+            .any(|candidate: &ModelRuntimeProfile| candidate.profile_id == profile.profile_id)
+        {
             return Err(error(
                 ModelRuntimeProfileIssue::DuplicateIdentity,
                 FIELD_PROFILE_ID,
                 "duplicate profile identity",
             ));
         }
-        if profiles.iter().any(|candidate| profile_bindings_overlap(&candidate.binding, &profile.binding)) {
+        if profiles
+            .iter()
+            .any(|candidate| profile_bindings_overlap(&candidate.binding, &profile.binding))
+        {
             return Err(error(
                 ModelRuntimeProfileIssue::DuplicateIdentity,
                 FIELD_PROFILE_BINDING,
@@ -225,7 +237,11 @@ fn validate_profiles(
         profiles.push(profile);
     }
     assert_eq!(profiles.len(), drafts.len());
-    assert!(profiles.iter().all(|profile| !profile.profile_id.is_empty()));
+    assert!(
+        profiles
+            .iter()
+            .all(|profile| !profile.profile_id.is_empty())
+    );
     Ok(profiles)
 }
 
@@ -237,6 +253,7 @@ fn validate_profile_fields(
     validate_project_profile_admission(draft)?;
     let profile = ModelRuntimeProfile {
         profile_id: safe_label(ModelProfileField(FIELD_PROFILE_ID), draft.profile_id)?,
+        dialect_id: safe_label(ModelProfileField(FIELD_DIALECT_ID), draft.dialect_id)?,
         binding: validate_binding(draft.binding)?,
         source_scope: draft.source_scope,
         trust_status: draft.trust_status,
@@ -246,12 +263,21 @@ fn validate_profile_fields(
         prompt_sources: validate_prompt_refs(draft.prompt_sources)?,
         skills: validate_skill_refs(draft.skills)?,
         memory_access_mode: draft.memory_access_mode,
-        memory_policy_hash: lowercase_blake3(ModelProfileField(FIELD_MEMORY_POLICY), draft.memory_policy_hash)?,
+        memory_policy_hash: lowercase_blake3(
+            ModelProfileField(FIELD_MEMORY_POLICY),
+            draft.memory_policy_hash,
+        )?,
         tools: validate_named_refs(ModelProfileField(FIELD_TOOL), draft.tools)?,
         toolsets: validate_named_refs(ModelProfileField(FIELD_TOOLSET_REFERENCE), draft.toolsets)?,
         tool_calling_mode: draft.tool_calling_mode,
-        context_budget_policy: safe_label(ModelProfileField("context_budget_policy"), draft.context_budget_policy)?,
-        tool_budget_policy: safe_label(ModelProfileField("tool_budget_policy"), draft.tool_budget_policy)?,
+        context_budget_policy: safe_label(
+            ModelProfileField("context_budget_policy"),
+            draft.context_budget_policy,
+        )?,
+        tool_budget_policy: safe_label(
+            ModelProfileField("tool_budget_policy"),
+            draft.tool_budget_policy,
+        )?,
         policy_hash: lowercase_blake3(ModelProfileField(FIELD_POLICY_HASH), draft.policy_hash)?,
         profile_hash: if verify_profile_hash {
             lowercase_blake3(ModelProfileField(FIELD_PROFILE_HASH), draft.profile_hash)?
@@ -266,7 +292,9 @@ fn validate_profile_fields(
             return Err(error(
                 ModelRuntimeProfileIssue::StaleProfileIdentity,
                 FIELD_PROFILE_HASH,
-                format!("profile content identity does not match canonical fields; expected {expected_profile_hash}"),
+                format!(
+                    "profile content identity does not match canonical fields; expected {expected_profile_hash}"
+                ),
             ));
         }
     }
@@ -275,7 +303,9 @@ fn validate_profile_fields(
     Ok(profile)
 }
 
-fn validate_profile_collection_bounds(draft: &ModelRuntimeProfileDraft<'_>) -> Result<(), ModelRuntimeProfileError> {
+fn validate_profile_collection_bounds(
+    draft: &ModelRuntimeProfileDraft<'_>,
+) -> Result<(), ModelRuntimeProfileError> {
     for (field, count) in [
         (FIELD_PROMPT_SOURCE, draft.prompt_sources.len()),
         (FIELD_SKILL, draft.skills.len()),
@@ -293,7 +323,9 @@ fn validate_profile_collection_bounds(draft: &ModelRuntimeProfileDraft<'_>) -> R
     Ok(())
 }
 
-fn validate_project_profile_admission(draft: &ModelRuntimeProfileDraft<'_>) -> Result<(), ModelRuntimeProfileError> {
+fn validate_project_profile_admission(
+    draft: &ModelRuntimeProfileDraft<'_>,
+) -> Result<(), ModelRuntimeProfileError> {
     if draft.source_scope == ModelProfileSourceScope::Project && !draft.project_profile_admitted {
         return Err(error(
             ModelRuntimeProfileIssue::UntrustedProfile,
@@ -304,7 +336,9 @@ fn validate_project_profile_admission(draft: &ModelRuntimeProfileDraft<'_>) -> R
     Ok(())
 }
 
-fn validate_binding(draft: ModelRuntimeBindingDraft<'_>) -> Result<ModelRuntimeBinding, ModelRuntimeProfileError> {
+fn validate_binding(
+    draft: ModelRuntimeBindingDraft<'_>,
+) -> Result<ModelRuntimeBinding, ModelRuntimeProfileError> {
     match draft {
         ModelRuntimeBindingDraft::Exact {
             provider_id,
@@ -314,8 +348,13 @@ fn validate_binding(draft: ModelRuntimeBindingDraft<'_>) -> Result<ModelRuntimeB
         } => Ok(ModelRuntimeBinding::Exact {
             provider_id: safe_label(ModelProfileField("provider_id"), provider_id)?,
             model_id: safe_label(ModelProfileField("model_id"), model_id)?,
-            router_role: router_role.map(|role| safe_label(ModelProfileField("router_role"), role)).transpose()?,
-            capability_identity: lowercase_blake3(ModelProfileField("capability_identity"), capability_identity)?,
+            router_role: router_role
+                .map(|role| safe_label(ModelProfileField("router_role"), role))
+                .transpose()?,
+            capability_identity: lowercase_blake3(
+                ModelProfileField("capability_identity"),
+                capability_identity,
+            )?,
         }),
         ModelRuntimeBindingDraft::Default => Ok(ModelRuntimeBinding::Default),
     }
@@ -327,7 +366,10 @@ fn validate_prompt_refs(
     let mut references = Vec::with_capacity(drafts.len());
     for draft in drafts {
         let label = safe_label(ModelProfileField(FIELD_PROMPT_SOURCE), draft.label)?;
-        if references.iter().any(|item: &ModelPromptSourceReference| item.label == label) {
+        if references
+            .iter()
+            .any(|item: &ModelPromptSourceReference| item.label == label)
+        {
             return Err(error(
                 ModelRuntimeProfileIssue::DuplicateIdentity,
                 FIELD_PROMPT_SOURCE,
@@ -340,7 +382,11 @@ fn validate_prompt_refs(
         });
     }
     assert_eq!(references.len(), drafts.len());
-    assert!(references.iter().all(|reference| !reference.label.is_empty()));
+    assert!(
+        references
+            .iter()
+            .all(|reference| !reference.label.is_empty())
+    );
     Ok(references)
 }
 
@@ -350,8 +396,15 @@ fn validate_skill_refs(
     let mut references = Vec::with_capacity(drafts.len());
     for draft in drafts {
         let name = safe_label(ModelProfileField(FIELD_SKILL), draft.name)?;
-        if references.iter().any(|item: &ModelSkillReference| item.name == name) {
-            return Err(error(ModelRuntimeProfileIssue::DuplicateIdentity, FIELD_SKILL, "duplicate skill reference"));
+        if references
+            .iter()
+            .any(|item: &ModelSkillReference| item.name == name)
+        {
+            return Err(error(
+                ModelRuntimeProfileIssue::DuplicateIdentity,
+                FIELD_SKILL,
+                "duplicate skill reference",
+            ));
         }
         references.push(ModelSkillReference {
             name,
@@ -359,7 +412,11 @@ fn validate_skill_refs(
         });
     }
     assert_eq!(references.len(), drafts.len());
-    assert!(references.iter().all(|reference| !reference.name.is_empty()));
+    assert!(
+        references
+            .iter()
+            .all(|reference| !reference.name.is_empty())
+    );
     Ok(references)
 }
 
@@ -370,7 +427,10 @@ fn validate_named_refs(
     let mut references = Vec::with_capacity(drafts.len());
     for draft in drafts {
         let name = safe_label(field, draft.name)?;
-        if references.iter().any(|item: &ModelNamedResourceReference| item.name == name) {
+        if references
+            .iter()
+            .any(|item: &ModelNamedResourceReference| item.name == name)
+        {
             return Err(error(
                 ModelRuntimeProfileIssue::DuplicateIdentity,
                 field.0,
@@ -383,7 +443,11 @@ fn validate_named_refs(
         });
     }
     assert_eq!(references.len(), drafts.len());
-    assert!(references.iter().all(|reference| !reference.name.is_empty()));
+    assert!(
+        references
+            .iter()
+            .all(|reference| !reference.name.is_empty())
+    );
     Ok(references)
 }
 
@@ -405,9 +469,15 @@ fn validate_default_profile(
     profiles: &[ModelRuntimeProfile],
 ) -> Result<Option<String>, ModelRuntimeProfileError> {
     assert!(profiles.len() <= MAX_PROFILE_COUNT);
-    assert!(profiles.iter().all(|profile| !profile.profile_id.is_empty()));
-    let default_profiles =
-        profiles.iter().filter(|profile| matches!(profile.binding, ModelRuntimeBinding::Default)).count();
+    assert!(
+        profiles
+            .iter()
+            .all(|profile| !profile.profile_id.is_empty())
+    );
+    let default_profiles = profiles
+        .iter()
+        .filter(|profile| matches!(profile.binding, ModelRuntimeBinding::Default))
+        .count();
     match default_profile_id {
         None if default_profiles == usize::default() => Ok(None),
         None => Err(error(
@@ -418,7 +488,8 @@ fn validate_default_profile(
         Some(default_id) => {
             let normalized = safe_label(ModelProfileField(FIELD_DEFAULT_PROFILE), default_id)?;
             let matching = profiles.iter().filter(|profile| {
-                profile.profile_id == normalized && matches!(profile.binding, ModelRuntimeBinding::Default)
+                profile.profile_id == normalized
+                    && matches!(profile.binding, ModelRuntimeBinding::Default)
             });
             if default_profiles != 1 || matching.count() != 1 {
                 return Err(error(
@@ -438,8 +509,12 @@ fn validate_profile_references(
     toolsets: &[ModelToolset],
 ) -> Result<(), ModelRuntimeProfileError> {
     for profile in profiles {
-        if !budgets.iter().any(|policy| policy.policy_id == profile.context_budget_policy)
-            || !budgets.iter().any(|policy| policy.policy_id == profile.tool_budget_policy)
+        if !budgets
+            .iter()
+            .any(|policy| policy.policy_id == profile.context_budget_policy)
+            || !budgets
+                .iter()
+                .any(|policy| policy.policy_id == profile.tool_budget_policy)
         {
             return Err(error(
                 ModelRuntimeProfileIssue::MissingReference,
@@ -447,11 +522,11 @@ fn validate_profile_references(
                 "profile references an unknown budget policy",
             ));
         }
-        if profile
-            .toolsets
-            .iter()
-            .any(|reference| !toolsets.iter().any(|toolset| toolset.toolset_id == reference.name))
-        {
+        if profile.toolsets.iter().any(|reference| {
+            !toolsets
+                .iter()
+                .any(|toolset| toolset.toolset_id == reference.name)
+        }) {
             return Err(error(
                 ModelRuntimeProfileIssue::MissingReference,
                 FIELD_TOOLSET_REFERENCE,
@@ -480,7 +555,9 @@ fn profile_bindings_overlap(left: &ModelRuntimeBinding, right: &ModelRuntimeBind
                 router_role: right_role,
                 ..
             },
-        ) => left_provider == right_provider && left_model == right_model && left_role == right_role,
+        ) => {
+            left_provider == right_provider && left_model == right_model && left_role == right_role
+        }
         (ModelRuntimeBinding::Exact { .. }, ModelRuntimeBinding::Default)
         | (ModelRuntimeBinding::Default, ModelRuntimeBinding::Exact { .. }) => false,
     }
@@ -492,6 +569,7 @@ pub(super) fn profile_content_hash(profile: &ModelRuntimeProfile) -> String {
     let mut parts = vec![
         MODEL_RUNTIME_PROFILE_SCHEMA.to_string(),
         profile.profile_id.clone(),
+        profile.dialect_id.clone(),
         binding_material(&profile.binding),
         profile.source_scope.as_str().to_string(),
         profile.trust_status.as_str().to_string(),
@@ -532,7 +610,9 @@ fn binding_material(binding: &ModelRuntimeBinding) -> String {
 }
 
 fn prompt_material(refs: &[ModelPromptSourceReference]) -> Vec<String> {
-    refs.iter().map(|reference| format!("prompt:{}:{}", reference.label, reference.required)).collect()
+    refs.iter()
+        .map(|reference| format!("prompt:{}:{}", reference.label, reference.required))
+        .collect()
 }
 
 fn skill_material(refs: &[ModelSkillReference]) -> Vec<String> {
@@ -542,7 +622,9 @@ fn skill_material(refs: &[ModelSkillReference]) -> Vec<String> {
 }
 
 fn named_material(class: &str, refs: &[ModelNamedResourceReference]) -> Vec<String> {
-    refs.iter().map(|reference| format!("{class}:{}:{}", reference.name, reference.required)).collect()
+    refs.iter()
+        .map(|reference| format!("{class}:{}:{}", reference.name, reference.required))
+        .collect()
 }
 
 pub(super) fn blake3_parts(domain: &str, parts: &[String]) -> String {
@@ -555,10 +637,15 @@ pub(super) fn blake3_parts(domain: &str, parts: &[String]) -> String {
     hasher.finalize().to_hex().to_string()
 }
 
-pub(super) fn safe_label(field: ModelProfileField, value: &str) -> Result<String, ModelRuntimeProfileError> {
+pub(super) fn safe_label(
+    field: ModelProfileField,
+    value: &str,
+) -> Result<String, ModelRuntimeProfileError> {
     let normalized = value.trim();
     let is_character_set_safe = normalized.chars().all(|character| {
-        character.is_ascii_lowercase() || character.is_ascii_digit() || matches!(character, '-' | '_' | '.' | ':')
+        character.is_ascii_lowercase()
+            || character.is_ascii_digit()
+            || matches!(character, '-' | '_' | '.' | ':')
     });
     let is_endpoint_shape_safe = normalized
         .chars()
@@ -588,14 +675,23 @@ pub(super) fn safe_label(field: ModelProfileField, value: &str) -> Result<String
 }
 
 fn unsafe_label_error(field: ModelProfileField) -> ModelRuntimeProfileError {
-    error(ModelRuntimeProfileIssue::UnsafeLabel, field.0, "label must be bounded lowercase ASCII metadata")
+    error(
+        ModelRuntimeProfileIssue::UnsafeLabel,
+        field.0,
+        "label must be bounded lowercase ASCII metadata",
+    )
 }
 
-pub(super) fn lowercase_blake3(field: ModelProfileField, value: &str) -> Result<String, ModelRuntimeProfileError> {
+pub(super) fn lowercase_blake3(
+    field: ModelProfileField,
+    value: &str,
+) -> Result<String, ModelRuntimeProfileError> {
     if value.len() != BLAKE3_HEX_CHARS {
         return Err(invalid_hash_error(field));
     }
-    let is_hash_text_valid = value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
+    let is_hash_text_valid = value
+        .bytes()
+        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
     if !is_hash_text_valid {
         return Err(invalid_hash_error(field));
     }
@@ -605,15 +701,26 @@ pub(super) fn lowercase_blake3(field: ModelProfileField, value: &str) -> Result<
 }
 
 fn invalid_hash_error(field: ModelProfileField) -> ModelRuntimeProfileError {
-    error(ModelRuntimeProfileIssue::InvalidHash, field.0, "identity must be lowercase BLAKE3 hexadecimal")
+    error(
+        ModelRuntimeProfileIssue::InvalidHash,
+        field.0,
+        "identity must be lowercase BLAKE3 hexadecimal",
+    )
 }
 
-fn unique_labels(field: ModelProfileField, values: &[&str]) -> Result<Vec<String>, ModelRuntimeProfileError> {
+fn unique_labels(
+    field: ModelProfileField,
+    values: &[&str],
+) -> Result<Vec<String>, ModelRuntimeProfileError> {
     let mut normalized = Vec::with_capacity(values.len());
     for value in values {
         let label = safe_label(field, value)?;
         if normalized.contains(&label) {
-            return Err(error(ModelRuntimeProfileIssue::DuplicateIdentity, field.0, "duplicate normalized label"));
+            return Err(error(
+                ModelRuntimeProfileIssue::DuplicateIdentity,
+                field.0,
+                "duplicate normalized label",
+            ));
         }
         normalized.push(label);
     }

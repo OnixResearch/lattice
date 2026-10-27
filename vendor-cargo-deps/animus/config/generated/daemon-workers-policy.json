@@ -1,0 +1,58 @@
+{
+  "cohort": "prime-agent-daemon-workers",
+  "current_snapshot_reattach": true,
+  "license": "MIT",
+  "lifecycle_only_containment": true,
+  "live_reattach": true,
+  "max_attachments": 4,
+  "max_receipt_count": 32,
+  "non_claims": [
+    "not-security-sandbox",
+    "not-crash-freedom",
+    "not-arbitrary-host-durability",
+    "not-multi-machine-supervision"
+  ],
+  "receipt_fields": [
+    "policy_identity",
+    "role",
+    "envelope_identity",
+    "attachment_class",
+    "recovery_class",
+    "health_class",
+    "bounded_counts",
+    "non_claims"
+  ],
+  "role_authorities": [
+    {
+      "authorities": [
+        "rendering",
+        "input",
+        "ui_preferences"
+      ],
+      "role": "client"
+    },
+    {
+      "authorities": [
+        "discovery",
+        "routing",
+        "attachments",
+        "worker_health",
+        "catalog_scan"
+      ],
+      "role": "supervisor"
+    },
+    {
+      "authorities": [
+        "session_tree",
+        "queue",
+        "schedules",
+        "kernel_handles",
+        "descendants"
+      ],
+      "role": "worker"
+    }
+  ],
+  "schema": "animus.daemon-workers.v1",
+  "source_revision": "c5991bc853d27754aed345c13ff4d2e05c40f1f4",
+  "stale_snapshot_rejected": true
+}

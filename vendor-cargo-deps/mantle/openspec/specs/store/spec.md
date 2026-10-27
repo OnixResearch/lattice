@@ -1,0 +1,248 @@
+# Store Crate Specification
+
+## Purpose
+
+Defines the `crunch-store` crate: a standalone module owning all
+store operations — service construction, caching, realization, queries,
+and CA mapping persistence.
+## Requirements
+### Requirement: crunch-store crate
+
+The workspace MUST contain a `crunch-store` crate that owns all
+store-level operations. No other crate may directly instantiate
+BlobService, DirectoryService, or PathInfoService implementations.
+
+#### Scenario: Store crate compiles independently
+
+- GIVEN the `crunch-store` crate
+- WHEN `cargo build -p crunch-store` is run
+- THEN it compiles without depending on crunch-eval, crunch-glue,
+  or crunch-build
+
+### Requirement: StoreHandle
+
+The crate MUST provide a `StoreHandle` struct (or trait) that bundles
+access to blob, directory, pathinfo, and optional remote pathinfo
+services. Consumers receive a `StoreHandle` — they do not construct
+or own individual services.
+
+#### Scenario: Builder receives StoreHandle
+
+- GIVEN a `Builder` configured with a `StoreHandle`
+- WHEN the Builder needs to persist a PathInfo
+- THEN it calls `store.put_pathinfo(pi)`, not `self.pathinfo_service.put(pi)`
+
+#### Scenario: StoreHandle constructed from config
+
+- GIVEN a state directory path and optional remote cache URL
+- WHEN `StoreHandle::open(config)` is called
+- THEN blob, directory, pathinfo, and remote services are initialized
+- AND the handle is ready for use
+
+### Requirement: CacheService trait
+
+The crate MUST define a `CacheService` trait for cache checking:
+
+```rust
+#[async_trait]
+pub trait CacheService {
+    async fn check(
+        &self,
+        drv_path: &StorePath<String>,
+        derivation: &Derivation,
+    ) -> Result<Option<CacheHit>, Error>;
+}
+```
+
+The implementation MUST:
+1. Check local PathInfo + castore content probes
+2. Fall back to remote binary cache on local miss
+3. Write-through remote hits to local storage
+4. Skip remote queries for FODs and unresolved CA derivations
+
+#### Scenario: Local cache hit
+
+- GIVEN PathInfo and castore content exist locally
+- WHEN `cache.check()` is called
+- THEN `Some(CacheHit)` is returned with no network call
+
+#### Scenario: Remote substitution
+
+- GIVEN no local PathInfo, but remote narinfo exists
+- WHEN `cache.check()` is called
+- THEN the NAR is fetched, PathInfo persisted locally, `Some(CacheHit)` returned
+
+#### Scenario: Full miss
+
+- GIVEN no local or remote PathInfo
+- WHEN `cache.check()` is called
+- THEN `None` is returned
+
+### Requirement: RealizationService trait
+
+The crate MUST define a `RealizationService` trait for exporting
+castore content to the filesystem:
+
+```rust
+#[async_trait]
+pub trait RealizationService {
+    async fn export(
+        &self,
+        node: &Node,
+        dest: &str,
+    ) -> Result<(), Error>;
+}
+```
+
+The implementation MUST:
+- Write files, directories, and symlinks to disk
+- Handle read-only filesystems gracefully (warn, don't fail)
+- Enforce a depth limit on directory trees
+
+#### Scenario: Export to writable store
+
+- GIVEN a castore node and a writable output directory
+- WHEN `realize.export(node, path)` is called
+- THEN the files appear on disk at the given path
+
+#### Scenario: Export to read-only store
+
+- GIVEN a castore node and a read-only output directory
+- WHEN `realize.export(node, path)` is called
+- THEN a warning is logged and no error is returned
+
+### Requirement: Store query operations
+
+The crate MUST provide functions for:
+- `list()` — stream all PathInfo records
+- `info(path)` — detailed PathInfo for a specific path
+- `verify(path)` — re-compute NAR hash and compare with stored value
+
+These MUST NOT live in the binary crate.
+
+#### Scenario: List from library
+
+- GIVEN a StoreHandle
+- WHEN `store.list()` is called from library code (not CLI)
+- THEN all PathInfo records are streamed
+
+### Requirement: CA mapping persistence
+
+The `CaMappings` struct MUST move to crunch-store. It tracks
+derivation→output path mappings for content-addressed derivations
+across process restarts.
+
+#### Scenario: CA mapping survives restart
+
+- GIVEN a CA derivation built in session 1
+- WHEN session 2 starts and checks cache
+- THEN the CA mapping resolves the final output path without rebuilding
+
+### Requirement: Native closure resolution
+
+The system MUST resolve runtime closures using its own data, not by shelling
+out to `nix-store -qR`.
+
+For each source input that needs closure resolution:
+
+1. Check local `PathInfo` for the `references` field
+2. If not in local `PathInfo`, query remote narinfo data
+3. Walk references transitively until the full closure is collected
+4. If neither source is available:
+   - strict hermetic mode MUST fail before sandbox start,
+   - practical mode MAY mount the declared path only, but it MUST emit a
+     degraded closure audit event.
+
+#### Scenario: Strict mode rejects missing closure data
+
+- GIVEN a strict build that depends on a source input with no local `PathInfo` and no narinfo
+- WHEN closure resolution runs
+- THEN the build fails before sandbox start
+- AND the error identifies the missing closure facts for that source input
+
+#### Scenario: Practical mode records degraded closure data
+
+- GIVEN a practical build that depends on the same source input
+- WHEN closure resolution runs
+- THEN mantle mounts only the declared path
+- AND the build result records a degraded closure audit event
+
+### Requirement: Cycle-safe closure walking
+
+The closure walker MUST detect cycles in the reference graph and
+terminate. Store paths with circular references MUST NOT cause
+infinite loops.
+
+#### Scenario: Circular reference
+
+- GIVEN path A references B and B references A
+- WHEN closure resolution runs for A
+- THEN both A and B are included, and the walk terminates
+
+### Requirement: Closure depth limit
+
+The closure walker MUST enforce a maximum transitive depth (1024).
+Paths beyond this depth MUST be skipped with a warning.
+
+#### Scenario: Deep closure
+
+- GIVEN a path with a transitive closure deeper than 1024
+- WHEN closure resolution runs
+- THEN the first 1024 levels are included
+- AND a warning is logged about the depth limit
+
+### Requirement: Builder service ownership
+
+The `Builder` MUST NOT own BlobService, DirectoryService, or
+PathInfoService directly. It MUST receive a `StoreHandle` and call
+store operations through it.
+
+The `Builder` struct MUST have at most two generic parameters:
+the `BuildService` and the `StoreHandle`. Not four.
+
+#### Scenario: Builder type signature
+
+- GIVEN the Builder struct definition
+- WHEN inspected
+- THEN it has `Builder<BServ, Store>`, not `Builder<BS, DS, BServ, PIS>`
+
+### Requirement: Persistent PathInfo fallback policy is explicit
+
+The store layer MUST treat failure to open persistent `PathInfo` state as an
+explicit execution mode change, not an invisible recovery.
+
+Practical mode MAY continue with in-memory `PathInfo` only if the degraded mode
+is reported to the caller. Strict hermetic mode MUST fail immediately instead of
+falling back to in-memory state.
+
+#### Scenario: Practical mode uses reported in-memory fallback
+
+- GIVEN the persistent `PathInfo` database cannot be opened
+- WHEN a practical build starts
+- THEN mantle may continue with in-memory `PathInfo`
+- AND the build result records a degraded pathinfo audit event
+
+#### Scenario: Strict mode rejects in-memory fallback
+
+- GIVEN the persistent `PathInfo` database cannot be opened
+- WHEN a strict build starts
+- THEN mantle fails before building
+- AND the error says strict mode does not permit in-memory `PathInfo` fallback
+
+### Requirement: Store records SHOULD link PathInfo identities to semantic graph nodes [r[store.semantic-graph-links]]
+
+Mantle store state SHOULD link persisted PathInfo/output identities to semantic graph nodes when graph records are available. Store APIs MUST tolerate missing graph links for legacy entries and return a typed missing-link result rather than failing unrelated store operations.
+
+#### Scenario: Store lookup returns graph link when present [r[store.semantic-graph-links.present]]
+
+- GIVEN a PathInfo entry created by a graph-capable build
+- WHEN a caller requests its graph link
+- THEN the store returns the corresponding output node identity
+
+#### Scenario: Legacy store entry has no graph link [r[store.semantic-graph-links.legacy]]
+
+- GIVEN a legacy PathInfo entry without graph metadata
+- WHEN a caller requests its graph link
+- THEN the store returns a typed missing-link result
+- AND ordinary cache/build reuse remains unaffected
+

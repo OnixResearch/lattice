@@ -43,13 +43,17 @@ pub type AgentDefinitionTrustStatus = crate::actor::TrustStatus;
 
 /// Evaluates an agent-definition activation request.
 #[must_use]
-pub fn activate_agent_definition(request: AgentDefinitionActivationRequest<'_>) -> AgentDefinitionActivation {
+pub fn activate_agent_definition(
+    request: AgentDefinitionActivationRequest<'_>,
+) -> AgentDefinitionActivation {
     crate::actor::activate(request)
 }
 
 /// Discovers agent definitions deterministically from loaded manifests.
 #[must_use]
-pub fn discover_agent_definitions(manifests: &[AgentDefinitionManifest]) -> AgentDefinitionDiscoveryReport {
+pub fn discover_agent_definitions(
+    manifests: &[AgentDefinitionManifest],
+) -> AgentDefinitionDiscoveryReport {
     crate::actor::discover(manifests)
 }
 
@@ -58,6 +62,8 @@ pub fn discover_agent_definitions(manifests: &[AgentDefinitionManifest]) -> Agen
 /// # Errors
 ///
 /// Returns [`AgentDefinitionReceiptLeak`] when unsafe material is present.
-pub fn validate_agent_definition_receipt_text(text: &str) -> Result<(), AgentDefinitionReceiptLeak> {
+pub fn validate_agent_definition_receipt_text(
+    text: &str,
+) -> Result<(), AgentDefinitionReceiptLeak> {
     crate::actor::validate_text(text)
 }

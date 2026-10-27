@@ -1,0 +1,25 @@
+{
+  "cancel_poll_ms": 25,
+  "endpoint_authority": "explicit-capability-root",
+  "endpoint_name": "animus-local-daemon.sock",
+  "max_attachments": 32,
+  "max_events": 4096,
+  "max_frame_bytes": 1048576,
+  "max_workers": 128,
+  "non_claims": [
+    "not-remote-security",
+    "not-security-sandbox",
+    "not-multi-machine-supervision",
+    "not-high-availability",
+    "not-service-manager-integration",
+    "not-production-readiness",
+    "not-release-eligibility"
+  ],
+  "operation_deadline_ms": 30000,
+  "protocol_version": 1,
+  "registry_name": "animus-local-daemon-registry.json",
+  "schema": "animus.local-daemon.v1",
+  "transport": "unix-stream",
+  "worker_binary": "animus-local-daemon-worker",
+  "worker_feature": "live-worker"
+}

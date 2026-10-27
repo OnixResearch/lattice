@@ -2,7 +2,8 @@ use super::*;
 
 const SAFE_MESSAGE: &str = "capability denied";
 const SAFE_CORRELATION: &str = "request-7";
-const SAFE_RECEIPT: &str = "receipt:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const SAFE_RECEIPT: &str =
+    "receipt:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const UNSAFE_MESSAGE: &str = "RAW_PROMPT: summarize private text";
 const BLANK_TEXT: &str = "   ";
 
@@ -23,7 +24,10 @@ fn adapter_call_outcome_accepts_completed_and_failed_envelopes() {
 
     assert!(completed.is_completed());
     assert_eq!(completed.failure_class(), None);
-    assert_eq!(failed.failure_class(), Some(AdapterCallFailureClass::Denied));
+    assert_eq!(
+        failed.failure_class(),
+        Some(AdapterCallFailureClass::Denied)
+    );
     assert_eq!(
         AdapterCallOutcome::<crate::ModelResponse>::contract_identity(),
         ADAPTER_CALL_OUTCOME_CONTRACT_IDENTITY
@@ -57,8 +61,14 @@ fn adapter_call_outcome_rejects_unsafe_or_empty_metadata() {
     )
     .expect_err("empty correlation should fail");
 
-    assert!(matches!(unsafe_metadata, crate::AdapterContractError::UnsupportedStatusState { .. }));
-    assert!(matches!(empty_correlation, crate::AdapterContractError::EmptyField { .. }));
+    assert!(matches!(
+        unsafe_metadata,
+        crate::AdapterContractError::UnsupportedStatusState { .. }
+    ));
+    assert!(matches!(
+        empty_correlation,
+        crate::AdapterContractError::EmptyField { .. }
+    ));
 }
 
 #[test]
@@ -72,5 +82,8 @@ fn failure_classes_map_from_service_outcomes_without_treating_completed_as_failu
         AdapterCallFailureClass::from_outcome_kind(crate::OutcomeKind::MalformedOutput),
         Some(AdapterCallFailureClass::MalformedOutput)
     );
-    assert_eq!(AdapterCallFailureClass::from_outcome_kind(crate::OutcomeKind::Completed), None);
+    assert_eq!(
+        AdapterCallFailureClass::from_outcome_kind(crate::OutcomeKind::Completed),
+        None
+    );
 }

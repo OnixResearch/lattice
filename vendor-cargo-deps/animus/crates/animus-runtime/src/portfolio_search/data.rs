@@ -400,7 +400,11 @@ pub struct PortfolioError {
 impl PortfolioError {
     /// Builds a typed error.
     #[must_use]
-    pub fn new(kind: PortfolioErrorKind, field: impl Into<String>, detail: impl Into<String>) -> Self {
+    pub fn new(
+        kind: PortfolioErrorKind,
+        field: impl Into<String>,
+        detail: impl Into<String>,
+    ) -> Self {
         Self {
             kind,
             field: field.into(),

@@ -71,6 +71,7 @@ impl dispatch::AuthorityFactsProvider for CurrentAuthorityFacts {
             PROCESS_OPERATION => PROCESS_CONTRACT,
             NETWORK_OPERATION => NETWORK_CONTRACT,
             FILE_OPERATION => FILE_CONTRACT,
+            "lattice/agent" => "lattice-agent",
             _ => return Err(dispatch::Error::AuthorityDenied),
         };
         let resource = binding.resource.as_str().to_owned();

@@ -36,7 +36,11 @@ pub(super) fn descriptor(descriptor: &Descriptor) -> alloc::string::String {
     writer.push(SCHEMA);
     writer.push(descriptor.source_id());
     writer.push(descriptor.workspace_id());
-    writer.push(descriptor.parent_workspace_id().unwrap_or(ABSENT_PARENT_LABEL));
+    writer.push(
+        descriptor
+            .parent_workspace_id()
+            .unwrap_or(ABSENT_PARENT_LABEL),
+    );
     for root in descriptor.writable_roots() {
         writer.push(root.as_str());
     }
@@ -73,8 +77,13 @@ pub(in crate::workspace) fn parts(parts: &[&str]) -> alloc::string::String {
     writer.digest()
 }
 
-pub(in crate::workspace) fn capability_labels(capabilities: &[Capability]) -> alloc::vec::Vec<alloc::string::String> {
-    capabilities.iter().map(|capability| alloc::string::String::from(capability.as_str())).collect()
+pub(in crate::workspace) fn capability_labels(
+    capabilities: &[Capability],
+) -> alloc::vec::Vec<alloc::string::String> {
+    capabilities
+        .iter()
+        .map(|capability| alloc::string::String::from(capability.as_str()))
+        .collect()
 }
 
 pub(in crate::workspace) fn count(value: usize) -> u32 {

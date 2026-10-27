@@ -1,0 +1,37 @@
+# Build
+target/
+target
+target-autoresearch*/
+coverage/
+doc/
+__pycache__/
+# Default target directory of the Tiger Style runner when CARGO_TARGET_DIR is unset.
+/.cargo-target/
+# Internal-compiler-error reports rustc writes into its working directory.
+rustc-ice-*.txt
+
+# Nix
+result*
+.direnv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Runtime
+*.redb
+*.sock
+data/
+/store
+vendor-deps/
+autoresearch.config.json
+
+.pi/*
+!.pi/skills/
+/.agent
+
+# Local agent permissions
+.claude/settings.local.json
+.pi/

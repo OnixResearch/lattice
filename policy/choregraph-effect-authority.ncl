@@ -29,6 +29,12 @@ let Policy = {
       resource_prefixes = ["lattice://network/"],
       abilities = ["network/request"],
     },
+    "lattice-agent" = {
+      id = "lattice-agent",
+      description = "Admit one exact Agent request bound to its selected backend and credential policy.",
+      resource_prefixes = ["lattice://agent/"],
+      abilities = ["agent/execute"],
+    },
     "lattice-role-protocol" = {
       id = "lattice-role-protocol",
       description = "Admit one exact projected role-protocol dispatch.",

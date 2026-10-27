@@ -31,7 +31,8 @@ pub(in crate::manifest) fn validate_tools(
     tools::collect_descriptors(drafts, built_in_tool_names, existing_catalog_tool_names)
 }
 
-const ENVIRONMENT_ALLOWLIST_FIELD: crate::validation::FieldName = super::ENVIRONMENT_ALLOWLIST_FIELD;
+const ENVIRONMENT_ALLOWLIST_FIELD: crate::validation::FieldName =
+    super::ENVIRONMENT_ALLOWLIST_FIELD;
 const ENVIRONMENT_VALUE_SEPARATOR: char = super::ENVIRONMENT_VALUE_SEPARATOR;
 const HOME_PATH_PREFIX: char = super::HOME_PATH_PREFIX;
 const LAUNCH_ARGUMENT_FIELD: crate::validation::FieldName = super::LAUNCH_ARGUMENT_FIELD;
@@ -89,7 +90,9 @@ pub(super) fn assert_network_sandbox_combination(
     Ok(())
 }
 
-pub(super) fn validate_toolset_kind(value: Option<&str>) -> Result<super::ToolsetKind, PluginDescriptorError> {
+pub(super) fn validate_toolset_kind(
+    value: Option<&str>,
+) -> Result<super::ToolsetKind, PluginDescriptorError> {
     let normalized = required_text(TOOLSET_KIND_FIELD, value)?;
     match normalized.as_str() {
         TOOLSET_KIND_GENERIC => Ok(super::ToolsetKind::Generic),
@@ -101,7 +104,9 @@ pub(super) fn validate_toolset_kind(value: Option<&str>) -> Result<super::Toolse
     }
 }
 
-pub(super) fn validate_trust_status(value: Option<&str>) -> Result<super::TrustStatus, PluginDescriptorError> {
+pub(super) fn validate_trust_status(
+    value: Option<&str>,
+) -> Result<super::TrustStatus, PluginDescriptorError> {
     let normalized = required_text(TRUST_STATUS_FIELD, value)?;
     match normalized.as_str() {
         TRUST_STATUS_TRUSTED => Ok(super::TrustStatus::Trusted),
@@ -116,7 +121,9 @@ pub(super) fn validate_trust_status(value: Option<&str>) -> Result<super::TrustS
 pub(super) fn validate_provenance(value: Option<&str>) -> Result<Text, PluginDescriptorError> {
     let provenance = required_text(PROVENANCE_FIELD, value)?;
     if provenance.starts_with(super::UNIX_PATH_SEPARATOR)
-        || UNSAFE_PROVENANCE_MARKERS.iter().any(|marker| provenance.contains(marker))
+        || UNSAFE_PROVENANCE_MARKERS
+            .iter()
+            .any(|marker| provenance.contains(marker))
     {
         return Err(PluginDescriptorError::UnsafeProvenance { value: provenance });
     }
@@ -135,7 +142,9 @@ pub(super) fn parse_runtime_kind(value: &str) -> Result<RuntimeKind, PluginDescr
     }
 }
 
-fn parse_working_directory_mode(value: &str) -> Result<WorkingDirectoryMode, PluginDescriptorError> {
+fn parse_working_directory_mode(
+    value: &str,
+) -> Result<WorkingDirectoryMode, PluginDescriptorError> {
     match value {
         WORKING_DIRECTORY_PROJECT_ROOT => Ok(WorkingDirectoryMode::ProjectRoot),
         WORKING_DIRECTORY_MANIFEST_DIRECTORY => Ok(WorkingDirectoryMode::ManifestDirectory),
@@ -216,7 +225,10 @@ pub(super) fn required_text(
     }
 }
 
-fn required_text_value(field_name: crate::validation::FieldName, value: &str) -> Result<Text, PluginDescriptorError> {
+fn required_text_value(
+    field_name: crate::validation::FieldName,
+    value: &str,
+) -> Result<Text, PluginDescriptorError> {
     crate::validation::validate_required_adapter_field(field_name, value).map_err(|reason| {
         PluginDescriptorError::FieldRejected {
             field: field_name.as_str(),
@@ -226,7 +238,10 @@ fn required_text_value(field_name: crate::validation::FieldName, value: &str) ->
     Ok(Text::from(value.trim()))
 }
 
-fn optional_text(field_name: crate::validation::FieldName, value: &str) -> Result<Text, PluginDescriptorError> {
+fn optional_text(
+    field_name: crate::validation::FieldName,
+    value: &str,
+) -> Result<Text, PluginDescriptorError> {
     crate::validation::validate_optional_adapter_field(field_name, value).map_err(|reason| {
         PluginDescriptorError::FieldRejected {
             field: field_name.as_str(),

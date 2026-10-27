@@ -1,5 +1,4 @@
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven
-// validation compact while drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -7,44 +6,31 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
+#![allow(
+    compound_condition,
+    excessive_file_length,
+    function_length,
+    non_trait_imports
+)]
 #![allow(
     numeric_units,
     path_segment_repetition,
     raw_arithmetic_overflow,
     unbounded_collection_growth
 )]
-use super::BLAKE3_ALGORITHM;
-use super::EVAL_FEEDBACK_HASH_DOMAIN;
-use super::FIELD_CANDIDATE;
-use super::FIELD_OUTPUT_FORMAT;
-use super::FIELD_PLAN_SCOPE;
-use super::FIELD_RECEIPT_LEAK;
-use super::FIELD_RECEIPT_REDATION;
-use super::FIELD_RESOURCE_LABELS;
-use super::FIELD_RUN_COUNT;
-use super::FIELD_SAMPLING;
-use super::FIELD_SCAFFOLD_HASH;
-use super::FIELD_TASK_SET;
-use super::FIELD_TOOL_SURFACE_HASH;
-use super::FIELD_TRUST_BOUNDARY_HASH;
-use super::FIELD_VERIFIER_HASH;
-use super::HASH_PART_SEPARATOR;
-use super::data::EvalFeedbackCandidate;
-use super::data::EvalFeedbackDiagnostic;
-use super::data::EvalFeedbackDiagnosticKind;
-use super::data::EvalFeedbackFingerprint;
-use super::data::EvalFeedbackFreshnessDecision;
-use super::data::EvalFeedbackFreshnessPolicy;
-use super::data::EvalFeedbackOutputFormat;
-use super::data::EvalFeedbackPlan;
-use super::data::EvalFeedbackReceipt;
-use super::data::EvalFeedbackReceiptLeak;
-use super::data::EvalFeedbackRedactionState;
-use super::data::EvalFeedbackReviewDecision;
-use super::data::EvalFeedbackReviewOutcome;
-use super::data::EvalFeedbackTaskSetKind;
-use super::data::EvalFeedbackValidationResult;
+use super::{
+    BLAKE3_ALGORITHM, EVAL_FEEDBACK_HASH_DOMAIN, FIELD_CANDIDATE, FIELD_OUTPUT_FORMAT,
+    FIELD_PLAN_SCOPE, FIELD_RECEIPT_LEAK, FIELD_RECEIPT_REDATION, FIELD_RESOURCE_LABELS,
+    FIELD_RUN_COUNT, FIELD_SAMPLING, FIELD_SCAFFOLD_HASH, FIELD_TASK_SET, FIELD_TOOL_SURFACE_HASH,
+    FIELD_TRUST_BOUNDARY_HASH, FIELD_VERIFIER_HASH, HASH_PART_SEPARATOR,
+    data::{
+        EvalFeedbackCandidate, EvalFeedbackDiagnostic, EvalFeedbackDiagnosticKind,
+        EvalFeedbackFingerprint, EvalFeedbackFreshnessDecision, EvalFeedbackFreshnessPolicy,
+        EvalFeedbackOutputFormat, EvalFeedbackPlan, EvalFeedbackReceipt, EvalFeedbackReceiptLeak,
+        EvalFeedbackRedactionState, EvalFeedbackReviewDecision, EvalFeedbackReviewOutcome,
+        EvalFeedbackTaskSetKind, EvalFeedbackValidationResult,
+    },
+};
 
 const MIN_RUN_COUNT: u32 = 1;
 
@@ -76,15 +62,31 @@ pub fn validate_eval_feedback_plan(plan: &EvalFeedbackPlan) -> EvalFeedbackValid
             "offline evaluation plans must use local task sets",
         ));
     }
-    require_text(&plan.scaffold_revision_id, FIELD_SCAFFOLD_HASH, &mut diagnostics);
+    require_text(
+        &plan.scaffold_revision_id,
+        FIELD_SCAFFOLD_HASH,
+        &mut diagnostics,
+    );
     require_hash(&plan.scaffold_hash, FIELD_SCAFFOLD_HASH, &mut diagnostics);
     require_text(&plan.model_route, FIELD_TASK_SET, &mut diagnostics);
     require_text(&plan.verifier.label, FIELD_VERIFIER_HASH, &mut diagnostics);
     require_hash(&plan.verifier.hash, FIELD_VERIFIER_HASH, &mut diagnostics);
-    require_hash(&plan.trust_boundary_hash, FIELD_TRUST_BOUNDARY_HASH, &mut diagnostics);
-    require_hash(&plan.tool_surface_hash, FIELD_TOOL_SURFACE_HASH, &mut diagnostics);
+    require_hash(
+        &plan.trust_boundary_hash,
+        FIELD_TRUST_BOUNDARY_HASH,
+        &mut diagnostics,
+    );
+    require_hash(
+        &plan.tool_surface_hash,
+        FIELD_TOOL_SURFACE_HASH,
+        &mut diagnostics,
+    );
     require_text(&plan.sampling_profile, FIELD_SAMPLING, &mut diagnostics);
-    require_collection(&plan.resource_labels, FIELD_RESOURCE_LABELS, &mut diagnostics);
+    require_collection(
+        &plan.resource_labels,
+        FIELD_RESOURCE_LABELS,
+        &mut diagnostics,
+    );
     if plan.run_count < MIN_RUN_COUNT {
         diagnostics.push(EvalFeedbackDiagnostic::new(
             EvalFeedbackDiagnosticKind::NonPositiveRunCount,
@@ -115,19 +117,49 @@ pub fn validate_eval_feedback_plan(plan: &EvalFeedbackPlan) -> EvalFeedbackValid
 ///
 /// Returns diagnostics when required metadata is missing, hashes are invalid,
 /// redaction is unsafe, or leak classes appear.
-pub fn validate_eval_feedback_receipt(receipt: &EvalFeedbackReceipt) -> EvalFeedbackValidationResult {
+pub fn validate_eval_feedback_receipt(
+    receipt: &EvalFeedbackReceipt,
+) -> EvalFeedbackValidationResult {
     let mut diagnostics = Vec::new();
     require_text(&receipt.model_id, FIELD_TASK_SET, &mut diagnostics);
     require_text(&receipt.model_route, FIELD_TASK_SET, &mut diagnostics);
-    require_hash(&receipt.scaffold_hash, FIELD_SCAFFOLD_HASH, &mut diagnostics);
-    require_hash(&receipt.trust_boundary_hash, FIELD_TRUST_BOUNDARY_HASH, &mut diagnostics);
-    require_hash(&receipt.tool_surface_hash, FIELD_TOOL_SURFACE_HASH, &mut diagnostics);
-    require_hash(&receipt.verifier_hash, FIELD_VERIFIER_HASH, &mut diagnostics);
-    require_text(&receipt.runtime_version_label, FIELD_TASK_SET, &mut diagnostics);
-    require_text(&receipt.context_window_class, FIELD_TASK_SET, &mut diagnostics);
+    require_hash(
+        &receipt.scaffold_hash,
+        FIELD_SCAFFOLD_HASH,
+        &mut diagnostics,
+    );
+    require_hash(
+        &receipt.trust_boundary_hash,
+        FIELD_TRUST_BOUNDARY_HASH,
+        &mut diagnostics,
+    );
+    require_hash(
+        &receipt.tool_surface_hash,
+        FIELD_TOOL_SURFACE_HASH,
+        &mut diagnostics,
+    );
+    require_hash(
+        &receipt.verifier_hash,
+        FIELD_VERIFIER_HASH,
+        &mut diagnostics,
+    );
+    require_text(
+        &receipt.runtime_version_label,
+        FIELD_TASK_SET,
+        &mut diagnostics,
+    );
+    require_text(
+        &receipt.context_window_class,
+        FIELD_TASK_SET,
+        &mut diagnostics,
+    );
     require_text(&receipt.sampling_profile, FIELD_SAMPLING, &mut diagnostics);
     require_collection(&receipt.sampling_labels, FIELD_SAMPLING, &mut diagnostics);
-    require_collection(&receipt.resource_labels, FIELD_RESOURCE_LABELS, &mut diagnostics);
+    require_collection(
+        &receipt.resource_labels,
+        FIELD_RESOURCE_LABELS,
+        &mut diagnostics,
+    );
     if receipt.run_count < MIN_RUN_COUNT {
         diagnostics.push(EvalFeedbackDiagnostic::new(
             EvalFeedbackDiagnosticKind::NonPositiveRunCount,
@@ -157,7 +189,8 @@ pub fn validate_eval_feedback_receipt(receipt: &EvalFeedbackReceipt) -> EvalFeed
 pub fn evaluate_feedback_review(candidate: &EvalFeedbackCandidate) -> EvalFeedbackReviewDecision {
     let mut diagnostics = Vec::new();
     require_candidate_shape(candidate, &mut diagnostics);
-    let approved = candidate.review_outcome == EvalFeedbackReviewOutcome::Approved && diagnostics.is_empty();
+    let approved =
+        candidate.review_outcome == EvalFeedbackReviewOutcome::Approved && diagnostics.is_empty();
     if candidate.review_outcome != EvalFeedbackReviewOutcome::Approved {
         diagnostics.push(EvalFeedbackDiagnostic::new(
             EvalFeedbackDiagnosticKind::ReviewNotAccepted,
@@ -211,13 +244,24 @@ fn leak_detail(leak: EvalFeedbackReceiptLeak) -> &'static str {
     }
 }
 
-fn require_candidate_shape(candidate: &EvalFeedbackCandidate, diagnostics: &mut Vec<EvalFeedbackDiagnostic>) {
+fn require_candidate_shape(
+    candidate: &EvalFeedbackCandidate,
+    diagnostics: &mut Vec<EvalFeedbackDiagnostic>,
+) {
     require_text(&candidate.candidate_id, FIELD_CANDIDATE, diagnostics);
-    require_text(&candidate.scaffold_revision_id, FIELD_CANDIDATE, diagnostics);
+    require_text(
+        &candidate.scaffold_revision_id,
+        FIELD_CANDIDATE,
+        diagnostics,
+    );
     require_hash(&candidate.receipt_hash, FIELD_CANDIDATE, diagnostics);
 }
 
-fn require_collection(values: &[String], field: &str, diagnostics: &mut Vec<EvalFeedbackDiagnostic>) {
+fn require_collection(
+    values: &[String],
+    field: &str,
+    diagnostics: &mut Vec<EvalFeedbackDiagnostic>,
+) {
     if values.is_empty() || values.iter().any(|value| blank(value)) {
         diagnostics.push(EvalFeedbackDiagnostic::new(
             EvalFeedbackDiagnosticKind::EmptyCollection,
@@ -227,7 +271,11 @@ fn require_collection(values: &[String], field: &str, diagnostics: &mut Vec<Eval
     }
 }
 
-fn require_hash(fingerprint: &EvalFeedbackFingerprint, field: &str, diagnostics: &mut Vec<EvalFeedbackDiagnostic>) {
+fn require_hash(
+    fingerprint: &EvalFeedbackFingerprint,
+    field: &str,
+    diagnostics: &mut Vec<EvalFeedbackDiagnostic>,
+) {
     if fingerprint.algorithm != BLAKE3_ALGORITHM || blank(&fingerprint.value_hex) {
         diagnostics.push(EvalFeedbackDiagnostic::new(
             EvalFeedbackDiagnosticKind::InvalidHash,

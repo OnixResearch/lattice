@@ -107,9 +107,15 @@ impl core::fmt::Display for ValidationFailure {
             }
             Self::DuplicateTool { name } => write!(formatter, "declared tool {name} is duplicated"),
             Self::ToolNameCollision { name } => {
-                write!(formatter, "declared tool {name} collides with an existing tool")
+                write!(
+                    formatter,
+                    "declared tool {name} collides with an existing tool"
+                )
             }
-            Self::UnsupportedRole { value } => write!(formatter, "plugin manifest role kind {value} is not supported"),
+            Self::UnsupportedRole { value } => write!(
+                formatter,
+                "plugin manifest role kind {value} is not supported"
+            ),
             Self::DuplicateRole { id } => {
                 write!(formatter, "plugin manifest role {id} is duplicated")
             }
@@ -117,26 +123,40 @@ impl core::fmt::Display for ValidationFailure {
                 write!(formatter, "{field} must be a safe label: {value}")
             }
             Self::InvalidCompatibilityVersion { field, value } => {
-                write!(formatter, "{field} must be a semantic version label: {value}")
+                write!(
+                    formatter,
+                    "{field} must be a semantic version label: {value}"
+                )
             }
-            Self::UnsafeInvocationContext { field, leak } => {
-                write!(formatter, "{field} contains unsafe invocation context data: {}", leak.as_str())
-            }
-            Self::MissingLaunchCommand { runtime_kind } => {
-                write!(formatter, "{} descriptors require a data-only launch command label", runtime_kind.as_str())
-            }
+            Self::UnsafeInvocationContext { field, leak } => write!(
+                formatter,
+                "{field} contains unsafe invocation context data: {}",
+                leak.as_str()
+            ),
+            Self::MissingLaunchCommand { runtime_kind } => write!(
+                formatter,
+                "{} descriptors require a data-only launch command label",
+                runtime_kind.as_str()
+            ),
             Self::AbsoluteWritableRoot { value } => {
                 write!(formatter, "writable root {value} must be project-relative")
             }
             Self::PathEscape { value } => {
-                write!(formatter, "writable root {value} must not escape the project")
+                write!(
+                    formatter,
+                    "writable root {value} must not escape the project"
+                )
             }
             Self::UnsafeProvenance { value } => {
-                write!(formatter, "manifest provenance must be a safe label: {value}")
+                write!(
+                    formatter,
+                    "manifest provenance must be a safe label: {value}"
+                )
             }
-            Self::EnvironmentValueLeak { entry } => {
-                write!(formatter, "environment allowlist entry {entry} must name a variable without a value")
-            }
+            Self::EnvironmentValueLeak { entry } => write!(
+                formatter,
+                "environment allowlist entry {entry} must name a variable without a value"
+            ),
             Self::UnsafeNetworkSandboxCombination { network, sandbox } => write!(
                 formatter,
                 "network policy {} is unsafe with sandbox mode {}",

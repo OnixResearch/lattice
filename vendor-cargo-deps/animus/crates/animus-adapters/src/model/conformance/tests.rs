@@ -1,5 +1,10 @@
 //! Tests for provider projection conformance.
-#![allow(unknown_lints, assertion_density, ambiguous_params, path_segment_repetition)]
+#![allow(
+    unknown_lints,
+    assertion_density,
+    ambiguous_params,
+    path_segment_repetition
+)]
 
 use crate::model::*;
 
@@ -32,8 +37,10 @@ const STREAM_TOOL_ID: &str = "tool-1";
 const INDEX_FEATURE: &str = "json_schema";
 const INDEX_EVIDENCE: &str = "fixture-json-schema";
 const INDEX_REASON: &str = "provider family has no image input";
-const PRESERVED_FEATURE: ProviderProjectionFeatureSupport = ProviderProjectionFeatureSupport::Preserved;
-const UNSUPPORTED_FEATURE: ProviderProjectionFeatureSupport = ProviderProjectionFeatureSupport::Unsupported;
+const PRESERVED_FEATURE: ProviderProjectionFeatureSupport =
+    ProviderProjectionFeatureSupport::Preserved;
+const UNSUPPORTED_FEATURE: ProviderProjectionFeatureSupport =
+    ProviderProjectionFeatureSupport::Unsupported;
 
 #[test]
 fn request_projection_matches_literal_fixtures_for_claimed_families() {
@@ -46,9 +53,11 @@ fn request_projection_matches_literal_fixtures_for_claimed_families() {
         ProviderProjectionFamily::Mock,
     ] {
         let expected = expected_literals(family);
-        let expected_refs: alloc::vec::Vec<_> = expected.iter().map(alloc::string::String::as_str).collect();
-        let projection = assert_provider_request_fixture(&request, full_support(family), &expected_refs)
-            .expect("literal provider projection should match reviewed fixture");
+        let expected_refs: alloc::vec::Vec<_> =
+            expected.iter().map(alloc::string::String::as_str).collect();
+        let projection =
+            assert_provider_request_fixture(&request, full_support(family), &expected_refs)
+                .expect("literal provider projection should match reviewed fixture");
         assert_eq!(projection.family(), family);
         assert_eq!(projection.literal_parts().len(), EXPECTED_LITERAL_COUNT);
     }
@@ -109,7 +118,8 @@ fn request_projection_fails_closed_for_lossy_provider_support() {
             "metadata",
         ),
     ] {
-        let error = project_provider_request_fixture(&request, support).expect_err("lossy support should fail closed");
+        let error = project_provider_request_fixture(&request, support)
+            .expect_err("lossy support should fail closed");
         assert_eq!(error, ProviderProjectionError::LossyProjection { feature });
     }
 }
@@ -135,7 +145,10 @@ fn request_leaks_and_malformed_metadata_fail_before_provider_projection() {
         provenance: &[],
     })
     .expect_err("raw provider payload in request should fail before projection");
-    assert!(matches!(raw_payload_error, CanonicalModelContractError::UnsafeText { .. }));
+    assert!(matches!(
+        raw_payload_error,
+        CanonicalModelContractError::UnsafeText { .. }
+    ));
 
     let text_content = [CanonicalContentPartDraft::Text { text: USER_TEXT }];
     let text_message = [CanonicalModelMessageDraft {
@@ -157,7 +170,10 @@ fn request_leaks_and_malformed_metadata_fail_before_provider_projection() {
         provenance: &unsafe_metadata,
     })
     .expect_err("unsafe metadata should fail before projection");
-    assert!(matches!(metadata_error, CanonicalModelContractError::UnsafeText { .. }));
+    assert!(matches!(
+        metadata_error,
+        CanonicalModelContractError::UnsafeText { .. }
+    ));
 }
 
 #[test]
@@ -169,14 +185,20 @@ fn response_normalization_preserves_supported_semantics() {
     ))
     .expect("text fixture should normalize");
     assert_eq!(text.items()[0].assistant_text(), Some(RESPONSE_TEXT));
-    assert_eq!(text.usage().expect("usage should exist").input_tokens(), INPUT_TOKENS);
+    assert_eq!(
+        text.usage().expect("usage should exist").input_tokens(),
+        INPUT_TOKENS
+    );
 
     let structured = normalize_provider_response_fixture(structured_response_fixture(
         PAYLOAD_LABEL,
         Some(CanonicalFinishReason::Stop.as_str()),
     ))
     .expect("structured fixture should normalize");
-    assert!(matches!(structured.items()[0], CanonicalModelResponseItem::StructuredPayload { .. }));
+    assert!(matches!(
+        structured.items()[0],
+        CanonicalModelResponseItem::StructuredPayload { .. }
+    ));
 
     let tool = normalize_provider_response_fixture(tool_response_fixture(
         TOOL_CALL_ID,
@@ -185,28 +207,40 @@ fn response_normalization_preserves_supported_semantics() {
         Some(CanonicalFinishReason::ToolCall.as_str()),
     ))
     .expect("tool-call fixture should normalize");
-    assert!(matches!(tool.items()[0], CanonicalModelResponseItem::ToolCall { .. }));
+    assert!(matches!(
+        tool.items()[0],
+        CanonicalModelResponseItem::ToolCall { .. }
+    ));
 
     let refusal = normalize_provider_response_fixture(refusal_response_fixture(
         REFUSAL_REASON,
         Some(CanonicalFinishReason::Refusal.as_str()),
     ))
     .expect("refusal fixture should normalize");
-    assert!(matches!(refusal.items()[0], CanonicalModelResponseItem::Refusal { .. }));
+    assert!(matches!(
+        refusal.items()[0],
+        CanonicalModelResponseItem::Refusal { .. }
+    ));
 
     let safety = normalize_provider_response_fixture(ProviderResponseFixtureDraft {
         safety: Some(SAFETY_CATEGORY),
         ..base_response_fixture(Some(CanonicalFinishReason::Safety.as_str()))
     })
     .expect("safety fixture should normalize");
-    assert!(matches!(safety.items()[0], CanonicalModelResponseItem::Safety { .. }));
+    assert!(matches!(
+        safety.items()[0],
+        CanonicalModelResponseItem::Safety { .. }
+    ));
 
     let malformed = normalize_provider_response_fixture(ProviderResponseFixtureDraft {
         malformed_output: Some(MALFORMED_DIAGNOSTIC),
         ..base_response_fixture(Some(CanonicalFinishReason::Malformed.as_str()))
     })
     .expect("malformed fixture should normalize");
-    assert!(matches!(malformed.items()[0], CanonicalModelResponseItem::MalformedOutput { .. }));
+    assert!(matches!(
+        malformed.items()[0],
+        CanonicalModelResponseItem::MalformedOutput { .. }
+    ));
 }
 #[path = "part2.rs"]
 pub mod part2;

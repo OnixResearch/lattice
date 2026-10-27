@@ -34,11 +34,22 @@ impl Rule {
     /// does not prove the intended prefix boundary.
     pub fn validate(draft: &RuleDraft<'_>) -> Result<Self, super::super::Error> {
         let id = super::super::required_text(super::super::RULE_ID_FIELD, draft.id)?;
-        let decision = parse_decision(super::super::required_text(super::super::DECISION_FIELD, draft.decision)?)?;
-        let rationale = super::super::required_text(super::super::RATIONALE_FIELD, draft.rationale)?;
-        let command_prefix = super::argv::validate_words(super::super::PREFIX_FIELD, draft.command_prefix)?;
-        validate_examples_len(super::super::POSITIVE_EXAMPLES_FIELD, draft.positive_examples.len())?;
-        validate_examples_len(super::super::NEGATIVE_EXAMPLES_FIELD, draft.negative_examples.len())?;
+        let decision = parse_decision(super::super::required_text(
+            super::super::DECISION_FIELD,
+            draft.decision,
+        )?)?;
+        let rationale =
+            super::super::required_text(super::super::RATIONALE_FIELD, draft.rationale)?;
+        let command_prefix =
+            super::argv::validate_words(super::super::PREFIX_FIELD, draft.command_prefix)?;
+        validate_examples_len(
+            super::super::POSITIVE_EXAMPLES_FIELD,
+            draft.positive_examples.len(),
+        )?;
+        validate_examples_len(
+            super::super::NEGATIVE_EXAMPLES_FIELD,
+            draft.negative_examples.len(),
+        )?;
         let rule_hash = identity(&id, decision, &rationale, command_prefix.as_slice());
         let rule = Self {
             id,
@@ -82,7 +93,10 @@ impl Rule {
         self.hash.as_str()
     }
 
-    pub(in crate::effect::exec_policy) fn matches_intent(&self, intent: &super::CommandIntent) -> bool {
+    pub(in crate::effect::exec_policy) fn matches_intent(
+        &self,
+        intent: &super::CommandIntent,
+    ) -> bool {
         prefix_matches(self.command_prefix.as_slice(), intent.argv())
     }
 
@@ -132,12 +146,21 @@ fn prefix_matches(prefix: &[super::super::Text], argv: &[super::super::Text]) ->
     if prefix.len() > argv.len() {
         return false;
     }
-    prefix.iter().zip(argv.iter()).all(|(prefix_word, argv_word)| prefix_word == argv_word)
+    prefix
+        .iter()
+        .zip(argv.iter())
+        .all(|(prefix_word, argv_word)| prefix_word == argv_word)
 }
 
-fn validate_examples_len(field: crate::validation::FieldName, len: usize) -> Result<(), super::super::Error> {
+fn validate_examples_len(
+    field: crate::validation::FieldName,
+    len: usize,
+) -> Result<(), super::super::Error> {
     if len == 0 {
-        return Err(crate::AdapterContractError::EmptyCollection { field: field.as_str() }.into());
+        return Err(crate::AdapterContractError::EmptyCollection {
+            field: field.as_str(),
+        }
+        .into());
     }
     if len > super::super::MAX_RULE_EXAMPLES {
         return Err(super::super::Error::TooManyItems {

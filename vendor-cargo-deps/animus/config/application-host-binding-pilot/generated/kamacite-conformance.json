@@ -1,0 +1,50 @@
+{
+  "checked_laws": [
+    "exact-producer-revision-frozen",
+    "exact-producer-binding-matches-manifest-fixture",
+    "canonical-identity-stable",
+    "closed-effect-summary",
+    "exact-cohort",
+    "exactly-one-host",
+    "no-authority-transfer"
+  ],
+  "kamacite": {
+    "application_host_binding_identity": {
+      "algorithm": "blake3",
+      "domain": "application-host-binding",
+      "hex": "b3d6b7cb7d0469c5476d558f06fe3eca926cfd9d6713eced780b69dbde435775"
+    },
+    "golden_receipt_file_blake3": "772ae0695eba41fb05065f46d8dd9522847dcd27dcacecaad8879c3cc1963a12",
+    "golden_receipt_identity": {
+      "algorithm": "blake3",
+      "domain": "receipt",
+      "hex": "1bac624751d47bd89ecba53923eda72f9cf20cdcc31dc01186882abf8da1cbb2"
+    },
+    "manifest_generation_receipt_identity": {
+      "algorithm": "blake3",
+      "domain": "receipt",
+      "hex": "e3186401c10c45701ac3b65183cdf49d17e9ee3064f4b9a006abdfdff87eab5e"
+    },
+    "validator_revision": "b21732a7458b660367f7281c717a5acc3f8c8190"
+  },
+  "non_claims": [
+    "not producer correctness",
+    "not application correctness",
+    "not effect completeness",
+    "not host capability or authorization",
+    "not host behavior",
+    "not sandbox admission",
+    "not provider correctness",
+    "not tool safety",
+    "not runtime correctness or success",
+    "not resource enforcement",
+    "not release eligibility"
+  ],
+  "producer": {
+    "fixture_file_blake3": "19576b01b17ba44a6bc96d5641a557403966bf277e9074a5ec8ba743bc4918bc",
+    "revision": "fdd4eff7180c2134a06b99c2bc78335313688e6e",
+    "source_identity": "75e686e149d9624097ee633562c6ae1529d865c51c7762f810f8d4df61f33bc7"
+  },
+  "schema": "kamacite.animus-application-host-binding-conformance.v1",
+  "verdict": "accepted"
+}

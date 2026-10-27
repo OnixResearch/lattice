@@ -206,10 +206,20 @@ impl WorkflowGraph {
     }
 
     pub fn restore_indexes(&mut self) -> Result<(), GraphError> {
-        self.port_owner.clear();
+        self.restore_indexes_with_allocator_floor(0, 0)
+    }
+
+    /// Reindex typed graph edits without reusing identities retired in this session.
+    /// Invalid ownership or exhausted identities leave indexes and counters unchanged.
+    pub fn restore_indexes_preserving_allocators(&mut self) -> Result<(), GraphError> {
+        self.restore_indexes_with_allocator_floor(self.next_node_identity, self.next_port_identity)
+    }
+
+    fn restore_indexes_with_allocator_floor(&mut self, node_floor: u64, port_floor: u64) -> Result<(), GraphError> {
+        let mut port_owner = HashMap::new();
         for node in self.nodes.values() {
             for port in node.input_ports.iter().chain(&node.output_ports) {
-                if let Some(prior) = self.port_owner.insert(port.id, node.id) {
+                if let Some(prior) = port_owner.insert(port.id, node.id) {
                     return Err(GraphError::InvalidStoredPortOwner {
                         port: port.id,
                         node: prior,
@@ -217,10 +227,13 @@ impl WorkflowGraph {
                 }
             }
         }
-        self.next_node_identity =
+        let next_node_identity =
             next_identity(self.nodes.keys().map(|node_id| node_id.0)).ok_or(GraphError::NodeIdExhausted)?;
-        self.next_port_identity =
-            next_identity(self.port_owner.keys().map(|port_id| port_id.0)).ok_or(GraphError::PortIdExhausted)?;
+        let next_port_identity =
+            next_identity(port_owner.keys().map(|port_id| port_id.0)).ok_or(GraphError::PortIdExhausted)?;
+        self.port_owner = port_owner;
+        self.next_node_identity = node_floor.max(next_node_identity);
+        self.next_port_identity = port_floor.max(next_port_identity);
         Ok(())
     }
 

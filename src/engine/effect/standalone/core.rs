@@ -19,6 +19,7 @@ const START_TRANSITION: &str = "ready->start";
 const PROCESS_RESOURCE_PREFIX: &str = "lattice://process/";
 const NETWORK_RESOURCE_PREFIX: &str = "lattice://network/";
 const FILE_RESOURCE_PREFIX: &str = "lattice://file/";
+const AGENT_RESOURCE_PREFIX: &str = "lattice://agent/";
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -49,6 +50,7 @@ impl Grant {
             ("lattice/shell" | "lattice/operation", "process/execute") => (PROCESS_RESOURCE_PREFIX, "lattice-process"),
             ("lattice/http", "network/request") => (NETWORK_RESOURCE_PREFIX, "lattice-network"),
             ("lattice/file", "file/read" | "file/write" | "file/append") => (FILE_RESOURCE_PREFIX, "lattice-file"),
+            ("lattice/agent", "agent/execute") => (AGENT_RESOURCE_PREFIX, "lattice-agent"),
             _ => return None,
         };
         let suffix = self.resource.strip_prefix(resource_prefix)?;

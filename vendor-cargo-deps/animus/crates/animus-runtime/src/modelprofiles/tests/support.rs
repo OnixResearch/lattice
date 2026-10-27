@@ -1,16 +1,28 @@
 use super::super::*;
 
-pub(super) const POLICY_HASH: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-pub(super) const CAPABILITY_HASH: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-pub(super) const CATALOG_HASH: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
-pub(super) const MEMORY_POLICY_HASH: &str = "9999999999999999999999999999999999999999999999999999999999999999";
-pub(super) const PROMPT_HASH: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
-pub(super) const SKILL_HASH: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
-pub(super) const ALTERNATE_HASH: &str = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
-pub(super) const ZERO_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
+pub(super) const POLICY_HASH: &str =
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+pub(super) const CAPABILITY_HASH: &str =
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+pub(super) const CATALOG_HASH: &str =
+    "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+pub(super) const MEMORY_POLICY_HASH: &str =
+    "9999999999999999999999999999999999999999999999999999999999999999";
+pub(super) const PROMPT_HASH: &str =
+    "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+pub(super) const SKILL_HASH: &str =
+    "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+pub(super) const ALTERNATE_HASH: &str =
+    "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+pub(super) const ZERO_HASH: &str =
+    "0000000000000000000000000000000000000000000000000000000000000000";
 pub(super) const PROVIDER_ID: &str = "mock";
+pub(super) const PROVIDER_TRANSPORT_ID: &str = "mock-responses-v1";
 pub(super) const MODEL_ID: &str = "mock-tools";
+pub(super) const MODEL_DIALECT_ID: &str = "mock-tools-v1";
+pub(super) const ALTERNATE_MODEL_DIALECT_ID: &str = "generic-responses-v1";
 pub(super) const ALTERNATE_PROVIDER_ID: &str = "other";
+pub(super) const ALTERNATE_PROVIDER_TRANSPORT_ID: &str = "other-responses-v1";
 pub(super) const ALTERNATE_MODEL_ID: &str = "other-model";
 pub(super) const ALTERNATE_TARGET_LABEL: &str = "other:other-model";
 pub(super) const ROUTER_ROLE: &str = "balanced";
@@ -25,6 +37,9 @@ pub(super) const EXECUTOR_BINDING: &str = "executor.inspect";
 pub(super) const BUDGET_ID: &str = "standard-budget";
 pub(super) const EXPECTED_TWO: usize = 2;
 pub(super) const HASH_HEX_LENGTH: usize = 64;
+pub(super) const MODULE_FROZEN_HASH: &str =
+    "1212121212121212121212121212121212121212121212121212121212121212";
+pub(super) const MODULE_SOURCE: &str = "(define (proof-search-helper value) value)";
 pub(super) const PROMPT_BUDGET_UNITS: u32 = 64;
 pub(super) const PROFILE_CONTEXT_UNITS: u32 = 1_024;
 pub(super) const TOOL_CALL_LIMIT: u32 = 8;
@@ -38,14 +53,16 @@ pub(super) const MODEL_PRIORITY: u16 = 20;
 const EMPTY_PROMPTS: &[ModelPromptSourceReferenceDraft<'static>] = &[];
 const EMPTY_SKILLS: &[ModelSkillReferenceDraft<'static>] = &[];
 const EMPTY_NAMED_REFS: &[ModelNamedResourceReferenceDraft<'static>] = &[];
-const PROMPT_REFS: &[ModelPromptSourceReferenceDraft<'static>] = &[ModelPromptSourceReferenceDraft {
-    label: MODEL_PROMPT,
-    required: false,
-}];
-const DIRECT_TOOL_REFS: &[ModelNamedResourceReferenceDraft<'static>] = &[ModelNamedResourceReferenceDraft {
-    name: TOOL_NAME,
-    required: true,
-}];
+const PROMPT_REFS: &[ModelPromptSourceReferenceDraft<'static>] =
+    &[ModelPromptSourceReferenceDraft {
+        label: MODEL_PROMPT,
+        required: false,
+    }];
+const DIRECT_TOOL_REFS: &[ModelNamedResourceReferenceDraft<'static>] =
+    &[ModelNamedResourceReferenceDraft {
+        name: TOOL_NAME,
+        required: true,
+    }];
 const SECTION_ORDER: &[animus_adapters::PromptSectionKind] = &[
     animus_adapters::PromptSectionKind::Policy,
     animus_adapters::PromptSectionKind::Context,
@@ -76,7 +93,8 @@ pub(super) fn composition_profile_set(
         DIRECT_TOOL_REFS
     };
     let provisional = composition_profile_draft(mode, &skill_refs, tools, ZERO_HASH);
-    let profile_hash = blake3_model_runtime_profile_identity(&provisional).expect("valid profile hash material");
+    let profile_hash =
+        blake3_model_runtime_profile_identity(&provisional).expect("valid profile hash material");
     let profile = composition_profile_draft(mode, &skill_refs, tools, &profile_hash);
     validate_set(&[profile], None)
 }
@@ -89,6 +107,7 @@ pub(super) fn composition_profile_draft<'a>(
 ) -> ModelRuntimeProfileDraft<'a> {
     ModelRuntimeProfileDraft {
         profile_id: PROFILE_ID,
+        dialect_id: MODEL_DIALECT_ID,
         binding: ModelRuntimeBindingDraft::Exact {
             provider_id: PROVIDER_ID,
             model_id: MODEL_ID,
@@ -132,14 +151,23 @@ pub(super) fn resolver_profile_set() -> ModelRuntimeProfileSet {
     };
     let role_provisional = resolver_profile_draft(ROLE_PROFILE, role_binding, ZERO_HASH);
     let model_provisional = resolver_profile_draft(MODEL_PROFILE, model_binding, ZERO_HASH);
-    let default_provisional = resolver_profile_draft(DEFAULT_PROFILE, ModelRuntimeBindingDraft::Default, ZERO_HASH);
+    let default_provisional = resolver_profile_draft(
+        DEFAULT_PROFILE,
+        ModelRuntimeBindingDraft::Default,
+        ZERO_HASH,
+    );
     let role_hash = blake3_model_runtime_profile_identity(&role_provisional).expect("role hash");
     let model_hash = blake3_model_runtime_profile_identity(&model_provisional).expect("model hash");
-    let default_hash = blake3_model_runtime_profile_identity(&default_provisional).expect("default hash");
+    let default_hash =
+        blake3_model_runtime_profile_identity(&default_provisional).expect("default hash");
     let profiles = [
         resolver_profile_draft(ROLE_PROFILE, role_binding, &role_hash),
         resolver_profile_draft(MODEL_PROFILE, model_binding, &model_hash),
-        resolver_profile_draft(DEFAULT_PROFILE, ModelRuntimeBindingDraft::Default, &default_hash),
+        resolver_profile_draft(
+            DEFAULT_PROFILE,
+            ModelRuntimeBindingDraft::Default,
+            &default_hash,
+        ),
     ];
     validate_set(&profiles, Some(DEFAULT_PROFILE))
 }
@@ -151,6 +179,7 @@ fn resolver_profile_draft<'a>(
 ) -> ModelRuntimeProfileDraft<'a> {
     ModelRuntimeProfileDraft {
         profile_id,
+        dialect_id: MODEL_DIALECT_ID,
         binding,
         source_scope: ModelProfileSourceScope::Host,
         trust_status: ModelProfileTrustStatus::Trusted,
@@ -171,7 +200,10 @@ fn resolver_profile_draft<'a>(
     }
 }
 
-fn validate_set(profiles: &[ModelRuntimeProfileDraft<'_>], default_profile_id: Option<&str>) -> ModelRuntimeProfileSet {
+fn validate_set(
+    profiles: &[ModelRuntimeProfileDraft<'_>],
+    default_profile_id: Option<&str>,
+) -> ModelRuntimeProfileSet {
     validate_set_result(profiles, default_profile_id).expect("valid profile set")
 }
 
@@ -198,13 +230,17 @@ pub(super) fn validate_set_result(
 pub(super) fn target(router_role: Option<&str>) -> ModelRuntimeTargetDraft<'_> {
     ModelRuntimeTargetDraft {
         provider_id: PROVIDER_ID,
+        provider_transport_id: PROVIDER_TRANSPORT_ID,
         model_id: MODEL_ID,
+        model_dialect_id: MODEL_DIALECT_ID,
         router_role,
         capability_identity: CAPABILITY_HASH,
     }
 }
 
-pub(super) fn resolved_composition_profile(set: &ModelRuntimeProfileSet) -> ResolvedModelRuntimeProfile {
+pub(super) fn resolved_composition_profile(
+    set: &ModelRuntimeProfileSet,
+) -> ResolvedModelRuntimeProfile {
     match resolve_model_runtime_profile(set, target(None)).expect("profile resolution") {
         ModelRuntimeProfileResolution::Resolved(resolved) => *resolved,
         ModelRuntimeProfileResolution::CompatibilityDisabled => {
@@ -275,7 +311,9 @@ pub(super) fn skill_manifest(
     .expect("skill manifest")
 }
 
-pub(super) fn loaded_skill_body(manifest: &animus_adapters::SkillManifest) -> animus_adapters::SkillLoadedBody {
+pub(super) fn loaded_skill_body(
+    manifest: &animus_adapters::SkillManifest,
+) -> animus_adapters::SkillLoadedBody {
     let body = [animus_adapters::SkillBodyDraft {
         name: SKILL_NAME,
         content_identity: SKILL_HASH,
@@ -289,6 +327,33 @@ pub(super) fn loaded_skill_body(manifest: &animus_adapters::SkillManifest) -> an
     .selected_body()
     .cloned()
     .expect("trusted matching skill body")
+}
+
+pub(super) fn skill_module_descriptor(
+    manifest_identity: &str,
+) -> animus_adapter_rlm_kernel::SteelSkillModuleDescriptor {
+    let source_identity =
+        animus_adapter_rlm_kernel::steel_skill_module_source_identity(MODULE_SOURCE);
+    animus_adapter_rlm_kernel::SteelSkillModuleDescriptor::validate(
+        &animus_adapter_rlm_kernel::SteelSkillModuleDescriptorDraft {
+            schema: animus_adapter_rlm_kernel::STEEL_SKILL_MODULE_SCHEMA,
+            name: SKILL_NAME,
+            version: "v1",
+            manifest_identity,
+            frozen_source_identity: MODULE_FROZEN_HASH,
+            source_identity: source_identity.as_str(),
+            source: MODULE_SOURCE,
+            exports: &["proof-search-helper"],
+            dependencies: &[],
+            capability_requests: &[],
+            trust: animus_adapter_rlm_kernel::SteelSkillModuleTrust::Trusted,
+            bounds: animus_adapter_rlm_kernel::SteelSkillModuleBounds {
+                source_chars: 1_024,
+                evaluation_fuel: 65_536,
+            },
+        },
+    )
+    .expect("skill module descriptor")
 }
 
 pub(super) fn capability_matrix(tool_calls: bool) -> crate::ProviderModelCapabilityMatrix {
@@ -334,33 +399,38 @@ pub(super) fn memory_policy() -> animus_adapters::OptInMemoryPolicy {
 }
 
 pub(super) fn tool_catalog() -> crate::tool_executor_kit::ToolCatalog {
-    let metadata = animus_adapters::tool::Definition::validate(&animus_adapters::tool::DefinitionDraft {
-        name: Some(TOOL_NAME),
-        label: Some("Inspect context"),
-        description: Some("Read bounded host-supplied context."),
-        parameter_schema_identity: Some("schema:animus.tool.input.context.v1"),
-        prompt_snippet: Some("Inspect bounded context."),
-        prompt_guidelines: PROMPT_GUIDELINES,
-        source_identity: Some("animus.tool.inspect-context.v1"),
-        provenance: Some("host-reviewed"),
-        capability_labels: TOOL_CAPABILITIES,
-        result_metadata_shape: Some("schema:animus.tool.output.context.v1"),
-        status: animus_adapters::tool::DefinitionStatus::Active,
-    })
-    .expect("tool metadata");
-    let output_policy =
-        crate::tool_executor_kit::ToolExecutorOutputPolicy::new(TOOL_VISIBLE_CHARS, TOOL_OUTPUT_BYTES, true)
-            .expect("bounded output policy");
-    let definition =
-        crate::tool_executor_kit::ToolDefinition::from_draft(crate::tool_executor_kit::ToolDefinitionDraft {
+    let metadata =
+        animus_adapters::tool::Definition::validate(&animus_adapters::tool::DefinitionDraft {
+            name: Some(TOOL_NAME),
+            label: Some("Inspect context"),
+            description: Some("Read bounded host-supplied context."),
+            parameter_schema_identity: Some("schema:animus.tool.input.context.v1"),
+            prompt_snippet: Some("Inspect bounded context."),
+            prompt_guidelines: PROMPT_GUIDELINES,
+            source_identity: Some("animus.tool.inspect-context.v1"),
+            provenance: Some("host-reviewed"),
+            capability_labels: TOOL_CAPABILITIES,
+            result_metadata_shape: Some("schema:animus.tool.output.context.v1"),
+            status: animus_adapters::tool::DefinitionStatus::Active,
+        })
+        .expect("tool metadata");
+    let output_policy = crate::tool_executor_kit::ToolExecutorOutputPolicy::new(
+        TOOL_VISIBLE_CHARS,
+        TOOL_OUTPUT_BYTES,
+        true,
+    )
+    .expect("bounded output policy");
+    let definition = crate::tool_executor_kit::ToolDefinition::from_draft(
+        crate::tool_executor_kit::ToolDefinitionDraft {
             metadata,
             executor_binding: EXECUTOR_BINDING,
             argument_names: ARGUMENT_NAMES,
             mutation_posture: crate::tool_executor_kit::ToolMutationPosture::ReadOnly,
             output_policy,
             approval_posture: animus_adapters::tool::ApprovalPosture::PreApproved,
-        })
-        .expect("executor-bound tool");
+        },
+    )
+    .expect("executor-bound tool");
     crate::tool_executor_kit::ToolCatalog::new(vec![definition]).expect("tool catalog")
 }
 
@@ -388,9 +458,10 @@ pub(super) fn ceiling() -> ModelResourceCeiling<'static> {
 }
 
 pub(crate) fn admitted_dispatch_plan() -> crate::ModelDispatchPlan {
-    let request = animus_adapters::ModelRequest::new("bounded test prompt").expect("valid model request");
-    let registry =
-        crate::RuntimeCapabilityRegistry::compatibility_model_tool().expect("compatibility capability registry");
+    let request =
+        animus_adapters::ModelRequest::new("bounded test prompt").expect("valid model request");
+    let registry = crate::RuntimeCapabilityRegistry::compatibility_model_tool()
+        .expect("compatibility capability registry");
     crate::plan_model_dispatch(crate::ModelDispatchPlanRequest {
         request: &request,
         required_capability: crate::RuntimeCapabilityDescriptorDraft::default_model(),
@@ -450,8 +521,17 @@ pub(crate) fn role_composed_plan(
 ) -> Result<crate::agent_roles::AgentRoleBoundModelPlan, crate::agent_roles::AgentRoleError> {
     let output_contracts = [profile.output_contract()];
     let budget_policies = [profile.budget_policy_ref()];
-    let workspace_scopes = profile.workspace_scopes().iter().map(String::as_str).collect::<Vec<_>>();
-    role_composed_plan_with_admission(profile, &output_contracts, &budget_policies, workspace_scopes.as_slice())
+    let workspace_scopes = profile
+        .workspace_scopes()
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    role_composed_plan_with_admission(
+        profile,
+        &output_contracts,
+        &budget_policies,
+        workspace_scopes.as_slice(),
+    )
 }
 
 pub(crate) fn role_composed_plan_with_admission(
@@ -460,8 +540,10 @@ pub(crate) fn role_composed_plan_with_admission(
     admitted_budget_policies: &[&str],
     admitted_workspace_scopes: &[&str],
 ) -> Result<crate::agent_roles::AgentRoleBoundModelPlan, crate::agent_roles::AgentRoleError> {
-    let set =
-        composition_profile_set(NativeToolCallingMode::CapabilityRequired, ModelSkillResourcePosture::MetadataOnly);
+    let set = composition_profile_set(
+        NativeToolCallingMode::CapabilityRequired,
+        ModelSkillResourcePosture::MetadataOnly,
+    );
     let resolved = resolved_composition_profile(&set);
     let prompts = prompt_sources();
     let prompt_policy = prompt_policy();
@@ -481,29 +563,31 @@ pub(crate) fn role_composed_plan_with_admission(
     let capabilities = capability_matrix(true);
     let capability_decision = capability_decision();
     let ceilings = [ceiling()];
-    crate::agent_roles::compose_agent_role_model_plan(crate::agent_roles::AgentRoleModelCompositionInput {
-        profile,
-        model: ModelInvocationCompositionInput {
-            resolved: &resolved,
-            capabilities: &capabilities,
-            capability_decision: &capability_decision,
-            prompt_sources: &prompts,
-            prompt_policy: &prompt_policy,
-            skills: &skill_resources,
-            memory_policy: Some(&memory_policy),
-            tool_catalog: &catalog,
-            executor_bindings: &executors,
-            tool_catalog_identity: CATALOG_HASH,
-            authority: ModelInvocationAuthority {
-                ceilings: &ceilings,
-                approved_tools: &[],
-                policy_hash: POLICY_HASH,
+    crate::agent_roles::compose_agent_role_model_plan(
+        crate::agent_roles::AgentRoleModelCompositionInput {
+            profile,
+            model: ModelInvocationCompositionInput {
+                resolved: &resolved,
+                capabilities: &capabilities,
+                capability_decision: &capability_decision,
+                prompt_sources: &prompts,
+                prompt_policy: &prompt_policy,
+                skills: &skill_resources,
+                memory_policy: Some(&memory_policy),
+                tool_catalog: &catalog,
+                executor_bindings: &executors,
+                tool_catalog_identity: CATALOG_HASH,
+                authority: ModelInvocationAuthority {
+                    ceilings: &ceilings,
+                    approved_tools: &[],
+                    policy_hash: POLICY_HASH,
+                },
             },
+            admitted_output_contracts,
+            admitted_budget_policies,
+            admitted_workspace_scopes,
         },
-        admitted_output_contracts,
-        admitted_budget_policies,
-        admitted_workspace_scopes,
-    })
+    )
 }
 
 pub(crate) fn tool_call_draft(plan: &ModelInvocationPlan) -> ModelToolCallBindingDraft<'_> {

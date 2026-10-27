@@ -1,0 +1,63 @@
+{
+  "allow_submodules": false,
+  "allow_symlinks": false,
+  "ambient_discovery": false,
+  "automatic_activation": false,
+  "bounds": {
+    "file_bytes_max": 65536,
+    "file_count_max": 256,
+    "path_depth_max": 12,
+    "process_timeout_ms": 30000,
+    "stderr_bytes_max": 4096,
+    "stdout_bytes_max": 4096,
+    "total_bytes_max": 1048576
+  },
+  "bounds_profile": "skill-tree-standard-v1",
+  "canonicalization_profile": "skill-tree-blake3-v1",
+  "diagnostics": [
+    "unsafe-metadata",
+    "invalid-identity",
+    "invalid-revision",
+    "invalid-bounds",
+    "policy-mismatch",
+    "host-facts-denied",
+    "stale-observation",
+    "duplicate-asset",
+    "source-collision",
+    "frozen-mismatch",
+    "candidate-conflict",
+    "promotion-drift",
+    "automatic-activation",
+    "mutation-denied",
+    "unsupported-claim"
+  ],
+  "entry_types": [
+    "regular-file",
+    "directory"
+  ],
+  "modes": [
+    "frozen",
+    "tracked-candidate"
+  ],
+  "non_claims": [
+    "source-authenticity",
+    "authorship",
+    "review-quality",
+    "script-safety",
+    "runtime-authority",
+    "host-confinement",
+    "release-eligibility"
+  ],
+  "policy_name": "animus-skill-source-lifecycle-v1",
+  "schema_version": 1,
+  "source_kinds": [
+    "git",
+    "radicle",
+    "archive",
+    "filesystem"
+  ],
+  "transitions": [
+    "tracked-to-inactive-candidate",
+    "reviewed-candidate-to-frozen"
+  ]
+}

@@ -327,7 +327,9 @@ impl MessageQueuePolicy {
     /// Returns whether the source is admitted by this policy.
     #[must_use]
     pub fn admits_source(&self, source: &str) -> bool {
-        self.allowed_sources.iter().any(|allowed| allowed.as_str() == source)
+        self.allowed_sources
+            .iter()
+            .any(|allowed| allowed.as_str() == source)
     }
 }
 
@@ -373,7 +375,10 @@ impl QueuedMessage {
         validate_message_admission(draft.safety, draft.budget)?;
         Ok(Self {
             item_id: normalize_safe_metadata(super::FIELD_ITEM_ID, draft.item_id)?,
-            active_work_id: normalize_safe_metadata(super::FIELD_ACTIVE_WORK_ID, draft.active_work_id)?,
+            active_work_id: normalize_safe_metadata(
+                super::FIELD_ACTIVE_WORK_ID,
+                draft.active_work_id,
+            )?,
             source: normalize_safe_metadata(super::FIELD_SOURCE, draft.source)?,
             body_hash: validate_hash_metadata(super::FIELD_BODY_HASH, draft.body_hash)?,
             safety: draft.safety,
@@ -424,7 +429,10 @@ impl QueuedMessage {
         self.policy_hash.as_str()
     }
 
-    pub(crate) fn with_replacement(&self, draft: MessageEditDraft<'_>) -> Result<Self, super::MessageQueueError> {
+    pub(crate) fn with_replacement(
+        &self,
+        draft: MessageEditDraft<'_>,
+    ) -> Result<Self, super::MessageQueueError> {
         validate_message_admission(draft.safety, draft.budget)?;
         Ok(Self {
             item_id: self.item_id.clone(),
@@ -816,10 +824,16 @@ impl RedirectionPayload {
     /// Returns [`super::MessageQueueError`] when identities or hashes are unsafe.
     pub fn new(draft: RedirectionPayloadDraft<'_>) -> Result<Self, super::MessageQueueError> {
         Ok(Self {
-            active_work_id: normalize_safe_metadata(super::FIELD_ACTIVE_WORK_ID, draft.active_work_id)?,
+            active_work_id: normalize_safe_metadata(
+                super::FIELD_ACTIVE_WORK_ID,
+                draft.active_work_id,
+            )?,
             source: normalize_safe_metadata(super::FIELD_SOURCE, draft.source)?,
             target_hash: validate_hash_metadata(super::FIELD_REDIRECTION_HASH, draft.target_hash)?,
-            instruction_hash: validate_hash_metadata(super::FIELD_REDIRECTION_HASH, draft.instruction_hash)?,
+            instruction_hash: validate_hash_metadata(
+                super::FIELD_REDIRECTION_HASH,
+                draft.instruction_hash,
+            )?,
         })
     }
 
@@ -857,7 +871,10 @@ pub struct CancellationRequest {
 }
 
 impl CancellationRequest {
-    pub(crate) fn new(active_work_id: &str, source: &str) -> Result<Self, super::MessageQueueError> {
+    pub(crate) fn new(
+        active_work_id: &str,
+        source: &str,
+    ) -> Result<Self, super::MessageQueueError> {
         Ok(Self {
             active_work_id: normalize_safe_metadata(super::FIELD_ACTIVE_WORK_ID, active_work_id)?,
             source: normalize_safe_metadata(super::FIELD_SOURCE, source)?,
@@ -892,7 +909,10 @@ pub struct PauseRequest {
 }
 
 impl PauseRequest {
-    pub(crate) fn new(active_work_id: &str, source: &str) -> Result<Self, super::MessageQueueError> {
+    pub(crate) fn new(
+        active_work_id: &str,
+        source: &str,
+    ) -> Result<Self, super::MessageQueueError> {
         Ok(Self {
             active_work_id: normalize_safe_metadata(super::FIELD_ACTIVE_WORK_ID, active_work_id)?,
             source: normalize_safe_metadata(super::FIELD_SOURCE, source)?,
@@ -1009,7 +1029,10 @@ pub struct InterruptSignalDraft<'a> {
     pub redirection: Option<RedirectionPayloadDraft<'a>>,
 }
 
-pub(crate) fn normalize_safe_metadata(field: &'static str, value: &str) -> Result<String, super::MessageQueueError> {
+pub(crate) fn normalize_safe_metadata(
+    field: &'static str,
+    value: &str,
+) -> Result<String, super::MessageQueueError> {
     debug_assert!(!field.is_empty());
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -1036,12 +1059,17 @@ pub(crate) fn normalize_safe_metadata(field: &'static str, value: &str) -> Resul
     Ok(String::from(trimmed))
 }
 
-pub(crate) fn validate_hash_metadata(field: &'static str, value: &str) -> Result<String, super::MessageQueueError> {
+pub(crate) fn validate_hash_metadata(
+    field: &'static str,
+    value: &str,
+) -> Result<String, super::MessageQueueError> {
     let trimmed = value.trim();
     if trimmed == super::EMPTY_HASH_MARKER {
         return Ok(String::from(trimmed));
     }
-    if trimmed.len() != super::HASH_HEX_LENGTH || !trimmed.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+    if trimmed.len() != super::HASH_HEX_LENGTH
+        || !trimmed.bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
         return Err(super::MessageQueueError::new(
             super::MessageQueueErrorKind::InvalidHash,
             field,
@@ -1059,7 +1087,10 @@ pub(crate) fn leak_marker(value: &str) -> Option<&'static str> {
         .map(|marker| marker.marker)
 }
 
-fn validate_policy_bounds(max_items: u32, allowed_sources: &[&str]) -> Result<(), super::MessageQueueError> {
+fn validate_policy_bounds(
+    max_items: u32,
+    allowed_sources: &[&str],
+) -> Result<(), super::MessageQueueError> {
     if max_items < super::MIN_MAX_QUEUE_ITEMS {
         return Err(super::MessageQueueError::new(
             super::MessageQueueErrorKind::InvalidPolicy,
@@ -1081,9 +1112,13 @@ fn validate_policy_bounds(max_items: u32, allowed_sources: &[&str]) -> Result<()
             "too many source labels in policy",
         ));
     }
-    assert!(max_items >= super::MIN_MAX_QUEUE_ITEMS, "validated queue policy must admit a positive item bound");
     assert!(
-        (super::MIN_POLICY_SOURCE_COUNT..=super::MAX_POLICY_SOURCE_COUNT).contains(&allowed_sources.len()),
+        max_items >= super::MIN_MAX_QUEUE_ITEMS,
+        "validated queue policy must admit a positive item bound"
+    );
+    assert!(
+        (super::MIN_POLICY_SOURCE_COUNT..=super::MAX_POLICY_SOURCE_COUNT)
+            .contains(&allowed_sources.len()),
         "validated queue policy source count must stay bounded"
     );
     Ok(())

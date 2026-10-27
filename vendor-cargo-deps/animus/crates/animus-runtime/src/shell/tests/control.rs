@@ -2,15 +2,19 @@ const RUN_ID: &str = "run.runtime-control";
 const EXPECTED_MODEL_CHECKPOINT_COUNT: usize = 3;
 
 struct ScriptedWaiter {
-    outcomes:
-        std::collections::VecDeque<Result<animus_adapters::AgentControlPermit, animus_adapters::AgentControlWaitError>>,
+    outcomes: std::collections::VecDeque<
+        Result<animus_adapters::AgentControlPermit, animus_adapters::AgentControlWaitError>,
+    >,
     checkpoints: Vec<animus_adapters::AgentControlCheckpointKind>,
 }
 
 impl ScriptedWaiter {
     fn new(
         outcomes: impl IntoIterator<
-            Item = Result<animus_adapters::AgentControlPermit, animus_adapters::AgentControlWaitError>,
+            Item = Result<
+                animus_adapters::AgentControlPermit,
+                animus_adapters::AgentControlWaitError,
+            >,
         >,
     ) -> Self {
         Self {
@@ -26,7 +30,9 @@ impl animus_adapters::AgentControlWait for ScriptedWaiter {
         checkpoint: &animus_adapters::AgentControlCheckpoint,
     ) -> Result<animus_adapters::AgentControlPermit, animus_adapters::AgentControlWaitError> {
         self.checkpoints.push(checkpoint.kind());
-        self.outcomes.pop_front().unwrap_or(Ok(animus_adapters::AgentControlPermit::Continue))
+        self.outcomes
+            .pop_front()
+            .unwrap_or(Ok(animus_adapters::AgentControlPermit::Continue))
     }
 }
 
@@ -41,7 +47,8 @@ fn injected_control_gates_fabric_and_model_dispatch() {
         Ok(animus_adapters::AgentControlPermit::Continue),
         Ok(animus_adapters::AgentControlPermit::Continue),
     ]);
-    let adapters = super::super::RuntimeAdapters::new(&mut model, &mut tool).with_agent_control(run_id(), &mut waiter);
+    let adapters = super::super::RuntimeAdapters::new(&mut model, &mut tool)
+        .with_agent_control(run_id(), &mut waiter);
     let run_result = super::super::run_with_steel_program(
         super::support::MODEL_THEN_RESPOND_PROGRAM,
         &super::support::runtime_input(),
@@ -49,14 +56,20 @@ fn injected_control_gates_fabric_and_model_dispatch() {
         adapters,
     );
 
-    assert!(matches!(run_result.status(), crate::RuntimeStatus::FinalResponse { .. }));
+    assert!(matches!(
+        run_result.status(),
+        crate::RuntimeStatus::FinalResponse { .. }
+    ));
     assert_eq!(model.calls, super::support::EXPECTED_ADAPTER_CALLS);
     assert_eq!(waiter.checkpoints.len(), EXPECTED_MODEL_CHECKPOINT_COUNT);
-    assert_eq!(waiter.checkpoints.as_slice(), &[
-        animus_adapters::AgentControlCheckpointKind::BeforeFabric,
-        animus_adapters::AgentControlCheckpointKind::BeforeModel,
-        animus_adapters::AgentControlCheckpointKind::BeforeFabric,
-    ]);
+    assert_eq!(
+        waiter.checkpoints.as_slice(),
+        &[
+            animus_adapters::AgentControlCheckpointKind::BeforeFabric,
+            animus_adapters::AgentControlCheckpointKind::BeforeModel,
+            animus_adapters::AgentControlCheckpointKind::BeforeFabric,
+        ]
+    );
 }
 
 #[test]
@@ -66,7 +79,8 @@ fn cancellation_stops_before_fabric_or_adapter_dispatch() {
     let mut model = super::support::ModelStub::ok();
     let mut tool = super::support::ToolStub::ok();
     let mut waiter = ScriptedWaiter::new([Ok(animus_adapters::AgentControlPermit::Cancel)]);
-    let adapters = super::super::RuntimeAdapters::new(&mut model, &mut tool).with_agent_control(run_id(), &mut waiter);
+    let adapters = super::super::RuntimeAdapters::new(&mut model, &mut tool)
+        .with_agent_control(run_id(), &mut waiter);
     let run_result = super::super::run_with_steel_program(
         super::support::MODEL_THEN_RESPOND_PROGRAM,
         &super::support::runtime_input(),
@@ -89,7 +103,8 @@ fn control_failure_stops_without_implicit_running_fallback() {
     let mut model = super::support::ModelStub::ok();
     let mut tool = super::support::ToolStub::ok();
     let mut waiter = ScriptedWaiter::new([Err(animus_adapters::AgentControlWaitError::Closed)]);
-    let adapters = super::super::RuntimeAdapters::new(&mut model, &mut tool).with_agent_control(run_id(), &mut waiter);
+    let adapters = super::super::RuntimeAdapters::new(&mut model, &mut tool)
+        .with_agent_control(run_id(), &mut waiter);
     let run_result = super::super::run_with_steel_program(
         super::support::MODEL_THEN_RESPOND_PROGRAM,
         &super::support::runtime_input(),

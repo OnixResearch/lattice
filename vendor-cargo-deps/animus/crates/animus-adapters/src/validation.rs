@@ -118,30 +118,48 @@ impl core::fmt::Display for AdapterContractError {
                 field,
                 max_chars,
                 actual_chars,
-            } => write!(formatter, "{field} must be at most {max_chars} characters; got {actual_chars}"),
-            Self::NulCharacter { field, byte_index } => {
-                write!(formatter, "{field} contains a NUL character at byte index {byte_index}")
-            }
+            } => write!(
+                formatter,
+                "{field} must be at most {max_chars} characters; got {actual_chars}"
+            ),
+            Self::NulCharacter { field, byte_index } => write!(
+                formatter,
+                "{field} contains a NUL character at byte index {byte_index}"
+            ),
             Self::UnsupportedStatusState { field, value } => {
-                write!(formatter, "{field} contains unsupported status state {value}")
+                write!(
+                    formatter,
+                    "{field} contains unsupported status state {value}"
+                )
             }
-            Self::UnsupportedStatusObservationKind { field, value } => {
-                write!(formatter, "{field} contains unsupported status observation kind {value}")
-            }
-            Self::UnsupportedSessionReferenceKind { field, value } => {
-                write!(formatter, "{field} contains unsupported session reference kind {value}")
-            }
+            Self::UnsupportedStatusObservationKind { field, value } => write!(
+                formatter,
+                "{field} contains unsupported status observation kind {value}"
+            ),
+            Self::UnsupportedSessionReferenceKind { field, value } => write!(
+                formatter,
+                "{field} contains unsupported session reference kind {value}"
+            ),
             Self::InvalidEvidenceHash { field, reason } => {
                 write!(formatter, "{field} is invalid: {reason}")
             }
             Self::UnsupportedWorkspaceValue { field, value } => {
-                write!(formatter, "{field} contains unsupported workspace value {value}")
+                write!(
+                    formatter,
+                    "{field} contains unsupported workspace value {value}"
+                )
             }
             Self::UnsupportedDataspaceValue { field, value } => {
-                write!(formatter, "{field} contains unsupported dataspace value {value}")
+                write!(
+                    formatter,
+                    "{field} contains unsupported dataspace value {value}"
+                )
             }
             Self::UnsupportedRouterValue { field, value } => {
-                write!(formatter, "{field} contains unsupported model-router value {value}")
+                write!(
+                    formatter,
+                    "{field} contains unsupported model-router value {value}"
+                )
             }
         }
     }
@@ -151,10 +169,16 @@ pub(crate) fn validate_required_adapter_field(
     field_name: FieldName,
     field_text: &str,
 ) -> Result<(), AdapterContractError> {
-    assert!(!field_name.as_str().is_empty(), "field name must not be empty");
+    assert!(
+        !field_name.as_str().is_empty(),
+        "field name must not be empty"
+    );
     let raw_chars = field_text.chars().count();
     let visible_chars = field_text.trim().chars().count();
-    assert!(visible_chars <= raw_chars, "trimmed field character count must fit in raw character count");
+    assert!(
+        visible_chars <= raw_chars,
+        "trimmed field character count must fit in raw character count"
+    );
 
     if visible_chars < MIN_ADAPTER_FIELD_CHARS {
         return Err(AdapterContractError::EmptyField {
@@ -184,8 +208,14 @@ pub fn normalized_adapter_field(
     validate_required_adapter_field(field_name, field_text)?;
     let normalized = field_text.trim();
     let normalized_chars = normalized.chars().count();
-    assert!(normalized_chars >= MIN_ADAPTER_FIELD_CHARS, "normalized required field must not be empty");
-    assert!(normalized_chars <= MAX_ADAPTER_FIELD_CHARS, "normalized required field must fit adapter limit");
+    assert!(
+        normalized_chars >= MIN_ADAPTER_FIELD_CHARS,
+        "normalized required field must not be empty"
+    );
+    assert!(
+        normalized_chars <= MAX_ADAPTER_FIELD_CHARS,
+        "normalized required field must fit adapter limit"
+    );
     Ok(alloc::string::String::from(normalized))
 }
 
@@ -193,10 +223,16 @@ pub(crate) fn validate_optional_adapter_field(
     field_name: FieldName,
     field_text: &str,
 ) -> Result<(), AdapterContractError> {
-    assert!(!field_name.as_str().is_empty(), "field name must not be empty");
+    assert!(
+        !field_name.as_str().is_empty(),
+        "field name must not be empty"
+    );
     let byte_len = field_text.len();
     let actual_chars = field_text.chars().count();
-    assert!(actual_chars <= byte_len, "field character count must fit in byte length");
+    assert!(
+        actual_chars <= byte_len,
+        "field character count must fit in byte length"
+    );
 
     if actual_chars > MAX_ADAPTER_FIELD_CHARS {
         return Err(AdapterContractError::FieldTooLong {
@@ -206,8 +242,9 @@ pub(crate) fn validate_optional_adapter_field(
         });
     }
 
-    if let Some((byte_index, _character)) =
-        field_text.char_indices().find(|(_byte_index, character)| *character == NUL_CHARACTER)
+    if let Some((byte_index, _character)) = field_text
+        .char_indices()
+        .find(|(_byte_index, character)| *character == NUL_CHARACTER)
     {
         return Err(AdapterContractError::NulCharacter {
             field: field_name.as_str(),

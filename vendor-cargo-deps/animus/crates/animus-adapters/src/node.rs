@@ -8,19 +8,30 @@
 #![cfg_attr(animus_octet, allow(tigerstyle::path_segment_repetition))]
 
 const NODE_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("node_id");
-const GATEWAY_PROFILE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("gateway_profile_id");
-const PLATFORM_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("node_platform_family");
-const SCOPE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("node_approved_scope");
-const TOKEN_CLASS_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("node_token_identity_class");
-const CWD_LABEL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("node_cwd_label");
+const GATEWAY_PROFILE_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("gateway_profile_id");
+const PLATFORM_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("node_platform_family");
+const SCOPE_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("node_approved_scope");
+const TOKEN_CLASS_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("node_token_identity_class");
+const CWD_LABEL_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("node_cwd_label");
 const RAW_COMMAND_LABEL_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("node_raw_command_label");
-const SESSION_LABEL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("node_session_label");
-const AGENT_LABEL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("node_agent_label");
-const APPROVAL_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("node_approval_id");
-const APPROVAL_SUMMARY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("node_approval_summary");
-const RESULT_SUMMARY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("node_result_summary");
-const RECEIPT_SUMMARY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("node_receipt_summary");
+const SESSION_LABEL_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("node_session_label");
+const AGENT_LABEL_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("node_agent_label");
+const APPROVAL_ID_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("node_approval_id");
+const APPROVAL_SUMMARY_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("node_approval_summary");
+const RESULT_SUMMARY_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("node_result_summary");
+const RECEIPT_SUMMARY_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("node_receipt_summary");
 
 /// Minimum accepted host timeout in milliseconds.
 pub const MIN_TIMEOUT_MILLIS: u64 = 1;
@@ -100,8 +111,7 @@ pub enum Error {
     IdempotencyCommandMismatch,
     /// Idempotency metadata was for another parameter identity.
     IdempotencyParamsMismatch,
-    /// Text contained a raw prompt, provider payload, credential, path, command, or unbounded
-    /// output marker.
+    /// Text contained a raw prompt, provider payload, credential, path, command, or unbounded output marker.
     UnsafePayload {
         /// Field that contained unsafe text.
         field: &'static str,
@@ -430,7 +440,10 @@ impl NodeAdvertisement {
             capabilities: draft.capabilities.to_vec(),
             commands: draft.commands.to_vec(),
             permissions: draft.permissions.to_vec(),
-            metadata_pin: draft.metadata_pin.map(|metadata| MetadataPin::new(&metadata)).transpose()?,
+            metadata_pin: draft
+                .metadata_pin
+                .map(|metadata| MetadataPin::new(&metadata))
+                .transpose()?,
         })
     }
 
@@ -573,7 +586,10 @@ impl PairingDescriptor {
 ///
 /// Panics if node/pairing identity or metadata-pin post-conditions are violated
 /// after validation.
-pub fn validate_node_pairing(node: &NodeAdvertisement, pairing: Option<&PairingDescriptor>) -> Result<(), Error> {
+pub fn validate_node_pairing(
+    node: &NodeAdvertisement,
+    pairing: Option<&PairingDescriptor>,
+) -> Result<(), Error> {
     let Some(pairing) = pairing else {
         return Err(Error::UnpairedNode);
     };
@@ -837,7 +853,11 @@ impl NodeApproval {
     /// # Errors
     ///
     /// Returns [`Error`] when approval is denied, unsafe, or bound to another request.
-    pub fn new(draft: &NodeApprovalDraft<'_>, request_node_id: &str, request_command: Command) -> Result<Self, Error> {
+    pub fn new(
+        draft: &NodeApprovalDraft<'_>,
+        request_node_id: &str,
+        request_command: Command,
+    ) -> Result<Self, Error> {
         if draft.posture != ApprovalPosture::Approved {
             return Err(Error::ApprovalDenied);
         }
@@ -990,7 +1010,9 @@ impl NodeInvocationPlan {
 ///
 /// Panics if post-validation invariants for injected service state or command
 /// allowlisting are violated.
-pub fn plan_node_invocation(draft: &NodeInvocationPlanDraft<'_>) -> Result<NodeInvocationPlan, Error> {
+pub fn plan_node_invocation(
+    draft: &NodeInvocationPlanDraft<'_>,
+) -> Result<NodeInvocationPlan, Error> {
     validate_node_pairing(draft.node, draft.pairing)?;
     validate_service_state(draft.service_state)?;
     assert_eq!(draft.service_state, NodeServiceState::Injected);
@@ -1004,14 +1026,23 @@ pub fn plan_node_invocation(draft: &NodeInvocationPlanDraft<'_>) -> Result<NodeI
         }
     }
     let params_hash = crate::ArtifactHash::new(draft.params_hash)?;
-    let idempotency = NodeIdempotency::new(&draft.idempotency, draft.node.node_id(), draft.command, &params_hash)?;
+    let idempotency = NodeIdempotency::new(
+        &draft.idempotency,
+        draft.node.node_id(),
+        draft.command,
+        &params_hash,
+    )?;
     let exec_plan = match draft.exec_plan {
         Some(exec_plan) => Some(NodeExecPlan::new(&exec_plan)?),
         None if draft.command.is_high_impact() => return Err(Error::MissingExecPlan),
         None => None,
     };
     let approval = match draft.approval {
-        Some(approval) => Some(NodeApproval::new(&approval, draft.node.node_id(), draft.command)?),
+        Some(approval) => Some(NodeApproval::new(
+            &approval,
+            draft.node.node_id(),
+            draft.command,
+        )?),
         None if draft.command.is_high_impact() => return Err(Error::MissingApproval),
         None => None,
     };
@@ -1112,7 +1143,10 @@ impl NodeResultEnvelope {
             node_id,
             command: draft.command,
             status: draft.status,
-            result_hash: draft.result_hash.map(crate::ArtifactHash::new).transpose()?,
+            result_hash: draft
+                .result_hash
+                .map(crate::ArtifactHash::new)
+                .transpose()?,
             summary: safe_text(RESULT_SUMMARY_FIELD, draft.summary)?,
         })
     }
@@ -1239,11 +1273,17 @@ fn require_non_empty(field_name: crate::validation::FieldName, len: usize) -> Re
     Ok(())
 }
 
-fn required_text(field_name: crate::validation::FieldName, value: &str) -> Result<alloc::string::String, Error> {
+fn required_text(
+    field_name: crate::validation::FieldName,
+    value: &str,
+) -> Result<alloc::string::String, Error> {
     crate::validation::normalized_adapter_field(field_name, value).map_err(Error::from)
 }
 
-fn safe_text(field_name: crate::validation::FieldName, value: &str) -> Result<alloc::string::String, Error> {
+fn safe_text(
+    field_name: crate::validation::FieldName,
+    value: &str,
+) -> Result<alloc::string::String, Error> {
     let normalized = required_text(field_name, value)?;
     reject_unsafe_text(field_name, normalized.as_str())?;
     Ok(normalized)
@@ -1253,7 +1293,10 @@ fn collect_texts(
     field_name: crate::validation::FieldName,
     values: &[&str],
 ) -> Result<alloc::vec::Vec<alloc::string::String>, Error> {
-    values.iter().map(|value| required_text(field_name, value)).collect()
+    values
+        .iter()
+        .map(|value| required_text(field_name, value))
+        .collect()
 }
 
 fn reject_unsafe_text(field_name: crate::validation::FieldName, value: &str) -> Result<(), Error> {
@@ -1318,13 +1361,16 @@ mod tests {
             approval: Some(approval(Command::SystemRun)),
         })
         .expect("node invocation plan should validate");
-        let result = NodeResultEnvelope::new(&plan, &NodeResultDraft {
-            node_id: NODE_ID,
-            command: Command::SystemRun,
-            status: NodeResultStatus::Completed,
-            result_hash: Some(HASH_D),
-            summary: SAFE_SUMMARY,
-        })
+        let result = NodeResultEnvelope::new(
+            &plan,
+            &NodeResultDraft {
+                node_id: NODE_ID,
+                command: Command::SystemRun,
+                status: NodeResultStatus::Completed,
+                result_hash: Some(HASH_D),
+                summary: SAFE_SUMMARY,
+            },
+        )
         .expect("node result should validate");
         let receipt = NodeInvocationReceipt::new(&NodeInvocationReceiptDraft {
             node_id: NODE_ID,
@@ -1367,7 +1413,10 @@ mod tests {
         .expect("pairing with drifted pin should parse");
 
         assert_eq!(validate_node_pairing(&node, None), Err(Error::UnpairedNode));
-        assert_eq!(validate_node_pairing(&node, Some(&drifted_pairing)), Err(Error::MetadataDrift));
+        assert_eq!(
+            validate_node_pairing(&node, Some(&drifted_pairing)),
+            Err(Error::MetadataDrift)
+        );
         assert_eq!(
             plan_node_invocation(&base_plan(
                 &node,
@@ -1449,13 +1498,16 @@ mod tests {
             BasePlanOptions::new(Some(PermissionClaim::Shell), NodeServiceState::Injected),
         ))
         .expect("system.run should plan");
-        let malformed_result = NodeResultEnvelope::new(&safe_plan, &NodeResultDraft {
-            node_id: NODE_ID,
-            command: Command::SystemRun,
-            status: NodeResultStatus::Completed,
-            result_hash: None,
-            summary: SAFE_SUMMARY,
-        })
+        let malformed_result = NodeResultEnvelope::new(
+            &safe_plan,
+            &NodeResultDraft {
+                node_id: NODE_ID,
+                command: Command::SystemRun,
+                status: NodeResultStatus::Completed,
+                result_hash: None,
+                summary: SAFE_SUMMARY,
+            },
+        )
         .expect_err("completed result without hash should be malformed");
         let unsafe_receipt = NodeInvocationReceipt::new(&NodeInvocationReceiptDraft {
             node_id: NODE_ID,
@@ -1529,7 +1581,10 @@ mod tests {
         }
     }
 
-    const fn idempotency(command: Command, params_hash: &'static str) -> NodeIdempotencyDraft<'static> {
+    const fn idempotency(
+        command: Command,
+        params_hash: &'static str,
+    ) -> NodeIdempotencyDraft<'static> {
         NodeIdempotencyDraft {
             key_hash: HASH_A,
             node_id: NODE_ID,
@@ -1545,7 +1600,10 @@ mod tests {
     }
 
     impl BasePlanOptions {
-        const fn new(required_permission: Option<PermissionClaim>, service_state: NodeServiceState) -> Self {
+        const fn new(
+            required_permission: Option<PermissionClaim>,
+            service_state: NodeServiceState,
+        ) -> Self {
             Self {
                 required_permission,
                 service_state,

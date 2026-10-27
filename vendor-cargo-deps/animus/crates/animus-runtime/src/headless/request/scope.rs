@@ -12,7 +12,10 @@ impl RunIdentity {
     ///
     /// Returns [`super::super::AutomationError`] when both session and workspace
     /// identities are empty.
-    pub fn validate(session_id: &str, workspace_id: &str) -> Result<Self, super::super::AutomationError> {
+    pub fn validate(
+        session_id: &str,
+        workspace_id: &str,
+    ) -> Result<Self, super::super::AutomationError> {
         let session_id = super::super::optional_text(super::super::OptionalTextField {
             field: super::super::SESSION_ID_FIELD,
             value: Some(session_id),

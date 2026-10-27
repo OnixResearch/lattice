@@ -2,8 +2,7 @@
 // r[impl agent_harness_runtime.authoritative_completion.pass_only]
 // r[impl agent_harness_runtime.authoritative_completion.receipt_gate]
 // r[impl agent_harness_runtime.authoritative_completion.feedback]
-// Typed diagnostics replace panics for untrusted inputs; the compatibility API keeps reviewed
-// public names and bounded mutable sinks.
+// Typed diagnostics replace panics for untrusted inputs; the compatibility API keeps reviewed public names and bounded mutable sinks.
 #![allow(unknown_lints)]
 #![cfg_attr(
     animus_octet,
@@ -17,30 +16,19 @@
         tigerstyle::unbounded_collection_growth
     )
 )]
-use std::collections::BTreeMap;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
-use super::AgentCheckDiagnostic;
-use super::AgentCheckDiagnosticCode;
-use super::AgentCheckExecutionDraft;
-use super::AgentCheckSelection;
-use super::AuthoritativeCompletionCandidate;
-use super::AuthoritativeCompletionCandidateDraft;
-use super::AuthoritativeCompletionOutcome;
-use super::AuthoritativeCompletionReceipt;
-use super::CAIRN_COMPLETION_SCHEMA;
-use super::CairnCompletionSummaryDraft;
-use super::CheckStatus;
-use super::CompletionCandidateSource;
-use super::ExecutionEvidenceReport;
 use super::selection::cairn_command_hash;
-use super::validation::DiagnosticContext;
-use super::validation::diagnostic;
-use super::validation::hash_parts;
-use super::validation::is_hash;
-use super::validation::is_safe_argv;
-use super::validation::is_safe_identifier;
-use super::validation::is_safe_path;
+use super::validation::{
+    DiagnosticContext, diagnostic, hash_parts, is_hash, is_safe_argv, is_safe_identifier,
+    is_safe_path,
+};
+use super::{
+    AgentCheckDiagnostic, AgentCheckDiagnosticCode, AgentCheckExecutionDraft, AgentCheckSelection,
+    AuthoritativeCompletionCandidate, AuthoritativeCompletionCandidateDraft,
+    AuthoritativeCompletionOutcome, AuthoritativeCompletionReceipt, CAIRN_COMPLETION_SCHEMA,
+    CairnCompletionSummaryDraft, CheckStatus, CompletionCandidateSource, ExecutionEvidenceReport,
+};
 
 const TYPED_COMPLETION_REQUEST: &str = "completion-request";
 const STEEL_COMPATIBILITY_REQUEST: &str = "COMPLETE";
@@ -91,7 +79,10 @@ pub fn admit_completion_candidate(
         CompletionCandidateSource::Typed => TYPED_COMPLETION_REQUEST,
         CompletionCandidateSource::SteelCompatibility => STEEL_COMPATIBILITY_REQUEST,
     };
-    if draft.request != expected || !is_safe_identifier(draft.work_id) || !is_hash(draft.subject_hash) {
+    if draft.request != expected
+        || !is_safe_identifier(draft.work_id)
+        || !is_hash(draft.subject_hash)
+    {
         return Err(Box::new(diagnostic(
             AgentCheckDiagnosticCode::CandidateInvalid,
             DiagnosticContext::NONE,
@@ -104,12 +95,15 @@ pub fn admit_completion_candidate(
         CompletionCandidateSource::SteelCompatibility => "steel-compatibility",
     };
     let work_id_hash = blake3::hash(draft.work_id.as_bytes()).to_hex().to_string();
-    let candidate_hash = hash_parts("animus.authoritative-completion.candidate.v1", [
-        source,
-        draft.request,
-        work_id_hash.as_str(),
-        draft.subject_hash,
-    ]);
+    let candidate_hash = hash_parts(
+        "animus.authoritative-completion.candidate.v1",
+        [
+            source,
+            draft.request,
+            work_id_hash.as_str(),
+            draft.subject_hash,
+        ],
+    );
     Ok(AuthoritativeCompletionCandidate {
         source: draft.source,
         request: draft.request.to_string(),
@@ -135,7 +129,10 @@ pub fn admit_execution_results(
     let mut base_passed = BTreeSet::new();
     let mut statuses = BTreeMap::new();
     for check in &selection.required_checks {
-        let rows = by_id.get(check.check_id.as_str()).cloned().unwrap_or_default();
+        let rows = by_id
+            .get(check.check_id.as_str())
+            .cloned()
+            .unwrap_or_default();
         if rows.is_empty() {
             statuses.insert(check.check_id.clone(), CheckStatus::Unknown);
             diagnostics.push(diagnostic(
@@ -177,7 +174,10 @@ pub fn admit_execution_results(
         if !base_passed.contains(&check.check_id) {
             continue;
         }
-        let prerequisites_pass = check.prerequisites.iter().all(|prerequisite| base_passed.contains(prerequisite));
+        let prerequisites_pass = check
+            .prerequisites
+            .iter()
+            .all(|prerequisite| base_passed.contains(prerequisite));
         if prerequisites_pass {
             passed_checks.push(check.check_id.clone());
         } else {
@@ -191,8 +191,10 @@ pub fn admit_execution_results(
         }
     }
     passed_checks.sort();
-    let mut non_passing_checks =
-        statuses.into_iter().filter(|(check_id, _)| !passed_checks.contains(check_id)).collect::<Vec<_>>();
+    let mut non_passing_checks = statuses
+        .into_iter()
+        .filter(|(check_id, _)| !passed_checks.contains(check_id))
+        .collect::<Vec<_>>();
     non_passing_checks.sort_by(|left, right| left.0.cmp(&right.0));
     diagnostics.sort_by(|left, right| {
         (left.code(), left.check_id(), left.diagnostic_id()).cmp(&(
@@ -217,7 +219,10 @@ fn index_execution_results<'slice, 'draft>(
 ) -> BTreeMap<String, Vec<&'slice AgentCheckExecutionDraft<'draft>>> {
     let mut by_id = BTreeMap::new();
     for result in results {
-        by_id.entry(result.check_id.to_string()).or_insert_with(Vec::new).push(result);
+        by_id
+            .entry(result.check_id.to_string())
+            .or_insert_with(Vec::new)
+            .push(result);
         if !required.contains_key(result.check_id) {
             diagnostics.push(result_diagnostic(
                 AgentCheckDiagnosticCode::UnknownResult,
@@ -294,7 +299,11 @@ fn validate_result(
     result: &AgentCheckExecutionDraft<'_>,
     diagnostics: &mut Vec<AgentCheckDiagnostic>,
 ) {
-    let command = result.command.iter().map(|value| (*value).to_string()).collect::<Vec<_>>();
+    let command = result
+        .command
+        .iter()
+        .map(|value| (*value).to_string())
+        .collect::<Vec<_>>();
     let command_matches = command == check.command
         && result.command_hash == check.command_hash
         && result.command_hash == cairn_command_hash(command.as_slice());
@@ -315,39 +324,78 @@ fn validate_result(
     ]
     .iter()
     .all(|value| is_hash(value));
-    let output_bounded = result.stdout_bytes <= MAX_OUTPUT_BYTES && result.stderr_bytes <= MAX_OUTPUT_BYTES;
-    let artifacts_safe = result.artifacts.iter().all(|artifact| is_safe_path(artifact.path) && is_hash(artifact.hash));
-    let diagnostic_safe =
-        result.diagnostic.as_ref().is_none_or(|value| producer_diagnostic_is_safe(value, result.command));
+    let output_bounded =
+        result.stdout_bytes <= MAX_OUTPUT_BYTES && result.stderr_bytes <= MAX_OUTPUT_BYTES;
+    let artifacts_safe = result
+        .artifacts
+        .iter()
+        .all(|artifact| is_safe_path(artifact.path) && is_hash(artifact.hash));
+    let diagnostic_safe = result
+        .diagnostic
+        .as_ref()
+        .is_none_or(|value| producer_diagnostic_is_safe(value, result.command));
     let passing_facts = !result.status.is_passing()
         || (result.exit_code == Some(ZERO_EXIT_CODE)
             && result.signal.is_none()
             && !result.timed_out
             && result.cleanup_complete);
     for (matches, summary) in [
-        (command_matches, "execution command identity differs from selection"),
-        (identities_match, "execution result identity is stale or mismatched"),
-        (hashes_valid, "execution result contains a malformed BLAKE3 identity"),
-        (output_bounded, "execution output counts exceed the finite bound"),
-        (artifacts_safe, "execution result contains an unsafe artifact reference"),
-        (diagnostic_safe, "execution result contains unsafe diagnostic metadata"),
-        (passing_facts, "passed status contradicts process or cleanup facts"),
+        (
+            command_matches,
+            "execution command identity differs from selection",
+        ),
+        (
+            identities_match,
+            "execution result identity is stale or mismatched",
+        ),
+        (
+            hashes_valid,
+            "execution result contains a malformed BLAKE3 identity",
+        ),
+        (
+            output_bounded,
+            "execution output counts exceed the finite bound",
+        ),
+        (
+            artifacts_safe,
+            "execution result contains an unsafe artifact reference",
+        ),
+        (
+            diagnostic_safe,
+            "execution result contains unsafe diagnostic metadata",
+        ),
+        (
+            passing_facts,
+            "passed status contradicts process or cleanup facts",
+        ),
     ] {
         if !matches {
-            diagnostics.push(result_diagnostic(AgentCheckDiagnosticCode::ResultMismatch, result, Some(check), summary));
+            diagnostics.push(result_diagnostic(
+                AgentCheckDiagnosticCode::ResultMismatch,
+                result,
+                Some(check),
+                summary,
+            ));
         }
     }
 }
 
-fn producer_diagnostic_is_safe(value: &super::AgentCheckDiagnosticDraft<'_>, command: &[&str]) -> bool {
+fn producer_diagnostic_is_safe(
+    value: &super::AgentCheckDiagnosticDraft<'_>,
+    command: &[&str],
+) -> bool {
     let summary_lower = value.summary.to_ascii_lowercase();
     let source_safe = value.source.is_none_or(|source| {
-        is_safe_path(source.path) && source.line >= ONE_BASED_MINIMUM && source.column >= ONE_BASED_MINIMUM
+        is_safe_path(source.path)
+            && source.line >= ONE_BASED_MINIMUM
+            && source.column >= ONE_BASED_MINIMUM
     });
     is_safe_identifier(value.remediation_label)
         && !value.summary.is_empty()
         && value.summary.chars().count() <= MAX_DIAGNOSTIC_CHARS
-        && !UNSAFE_METADATA_MARKERS.iter().any(|marker| summary_lower.contains(marker))
+        && !UNSAFE_METADATA_MARKERS
+            .iter()
+            .any(|marker| summary_lower.contains(marker))
         && value.reproduction_argv == command
         && is_safe_argv(value.reproduction_argv)
         && value.working_root == "<repository-root>"
@@ -360,7 +408,10 @@ fn result_diagnostic(
     required: Option<&super::CairnRequiredCheck>,
     summary: &str,
 ) -> AgentCheckDiagnostic {
-    let argv = required.map_or_else(|| result.command.to_vec(), |check| command_refs(check.command.as_slice()));
+    let argv = required.map_or_else(
+        || result.command.to_vec(),
+        |check| command_refs(check.command.as_slice()),
+    );
     let mut value = diagnostic(
         code,
         DiagnosticContext::for_check(result.check_id, Some(result.status)),
@@ -378,12 +429,18 @@ fn result_diagnostic(
         .filter(|artifact| is_safe_path(artifact.path) && is_hash(artifact.hash))
         .map(|artifact| artifact.path.to_string())
         .collect();
-    if let Some(producer) =
-        result.diagnostic.as_ref().filter(|producer| producer_diagnostic_is_safe(producer, result.command))
+    if let Some(producer) = result
+        .diagnostic
+        .as_ref()
+        .filter(|producer| producer_diagnostic_is_safe(producer, result.command))
     {
         value.remediation_label = producer.remediation_label.to_string();
         value.summary = producer.summary.to_string();
-        value.reproduction_argv = producer.reproduction_argv.iter().map(|argument| (*argument).to_string()).collect();
+        value.reproduction_argv = producer
+            .reproduction_argv
+            .iter()
+            .map(|argument| (*argument).to_string())
+            .collect();
         if let Some(source) = producer.source {
             value.source_path = Some(source.path.to_string());
             value.source_line = Some(source.line);
@@ -399,11 +456,26 @@ fn validate_cairn_summary(
     summary: &CairnCompletionSummaryDraft<'_>,
     blockers: &mut Vec<AgentCheckDiagnostic>,
 ) {
-    let expected_checks =
-        selection.required_checks.iter().map(|check| check.check_id.as_str()).collect::<BTreeSet<_>>();
-    let required_checks = summary.required_checks.iter().copied().collect::<BTreeSet<_>>();
-    let passed_checks = summary.passed_checks.iter().copied().collect::<BTreeSet<_>>();
-    let local_passed = evidence.passed_checks.iter().map(String::as_str).collect::<BTreeSet<_>>();
+    let expected_checks = selection
+        .required_checks
+        .iter()
+        .map(|check| check.check_id.as_str())
+        .collect::<BTreeSet<_>>();
+    let required_checks = summary
+        .required_checks
+        .iter()
+        .copied()
+        .collect::<BTreeSet<_>>();
+    let passed_checks = summary
+        .passed_checks
+        .iter()
+        .copied()
+        .collect::<BTreeSet<_>>();
+    let local_passed = evidence
+        .passed_checks
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
     let identities_match = summary.repository_id == selection.repository_id
         && summary.registry_id == selection.registry_id
         && summary.registry_hash == selection.registry_hash
@@ -439,28 +511,38 @@ fn completion_receipt(
     evidence: &ExecutionEvidenceReport,
     cairn: &CairnCompletionSummaryDraft<'_>,
 ) -> AuthoritativeCompletionReceipt {
-    let mut required_checks = selection.required_checks.iter().map(|check| check.check_id.clone()).collect::<Vec<_>>();
+    let mut required_checks = selection
+        .required_checks
+        .iter()
+        .map(|check| check.check_id.clone())
+        .collect::<Vec<_>>();
     required_checks.sort();
     let mut passed_checks = evidence.passed_checks.clone();
     passed_checks.sort();
-    let non_claims = COMPLETION_NON_CLAIMS.iter().map(|value| (*value).to_string()).collect::<Vec<_>>();
+    let non_claims = COMPLETION_NON_CLAIMS
+        .iter()
+        .map(|value| (*value).to_string())
+        .collect::<Vec<_>>();
     let required_check_text = required_checks.join(",");
     let passed_check_text = passed_checks.join(",");
     let non_claim_text = COMPLETION_NON_CLAIMS.join("|");
-    let receipt_hash = hash_parts(COMPLETION_RECEIPT_SCHEMA, [
-        candidate.candidate_hash.as_str(),
-        selection.repository_id.as_str(),
-        selection.registry_id.as_str(),
-        selection.registry_hash.as_str(),
-        selection.selection_hash.as_str(),
-        selection.policy_hash.as_str(),
-        selection.final_subject_hash.as_str(),
-        evidence.evidence_hash.as_str(),
-        cairn.receipt_hash,
-        required_check_text.as_str(),
-        passed_check_text.as_str(),
-        non_claim_text.as_str(),
-    ]);
+    let receipt_hash = hash_parts(
+        COMPLETION_RECEIPT_SCHEMA,
+        [
+            candidate.candidate_hash.as_str(),
+            selection.repository_id.as_str(),
+            selection.registry_id.as_str(),
+            selection.registry_hash.as_str(),
+            selection.selection_hash.as_str(),
+            selection.policy_hash.as_str(),
+            selection.final_subject_hash.as_str(),
+            evidence.evidence_hash.as_str(),
+            cairn.receipt_hash,
+            required_check_text.as_str(),
+            passed_check_text.as_str(),
+            non_claim_text.as_str(),
+        ],
+    );
     AuthoritativeCompletionReceipt {
         schema: COMPLETION_RECEIPT_SCHEMA.to_string(),
         candidate_hash: candidate.candidate_hash.clone(),
@@ -494,7 +576,10 @@ fn execution_evidence_hash(results: &[AgentCheckExecutionDraft<'_>]) -> String {
         })
         .collect::<Vec<_>>();
     rows.sort();
-    hash_parts("animus.authoritative-completion.execution-evidence.v1", rows.iter().map(String::as_str))
+    hash_parts(
+        "animus.authoritative-completion.execution-evidence.v1",
+        rows.iter().map(String::as_str),
+    )
 }
 
 fn command_refs(command: &[String]) -> Vec<&str> {

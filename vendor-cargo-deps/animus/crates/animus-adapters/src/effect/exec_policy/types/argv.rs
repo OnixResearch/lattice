@@ -24,14 +24,20 @@ impl CommandIntent {
         Ok(Self::from_valid_words(argv))
     }
 
-    pub(in crate::effect::exec_policy) fn from_valid_words(argv: super::super::Collection<super::super::Text>) -> Self {
+    pub(in crate::effect::exec_policy) fn from_valid_words(
+        argv: super::super::Collection<super::super::Text>,
+    ) -> Self {
         assert!(!argv.is_empty(), "validated command argv must not be empty");
-        assert!(argv.len() <= super::super::MAX_COMMAND_WORDS, "validated command argv must fit policy bound");
+        assert!(
+            argv.len() <= super::super::MAX_COMMAND_WORDS,
+            "validated command argv must fit policy bound"
+        );
         let mut refs = alloc::vec::Vec::with_capacity(argv.len());
         for word in &argv {
             refs.push(word.as_str());
         }
-        let fingerprint = super::super::hash_parts(super::super::COMMAND_HASH_KIND, refs.as_slice());
+        let fingerprint =
+            super::super::hash_parts(super::super::COMMAND_HASH_KIND, refs.as_slice());
         Self { argv, fingerprint }
     }
 
@@ -50,7 +56,10 @@ impl CommandIntent {
     /// Returns the executable or wrapper word.
     #[must_use]
     pub fn program(&self) -> &str {
-        self.argv.first().map_or(super::super::NO_MATCHING_RULE_ID, super::super::Text::as_str)
+        self.argv.first().map_or(
+            super::super::NO_MATCHING_RULE_ID,
+            super::super::Text::as_str,
+        )
     }
 }
 
@@ -60,7 +69,10 @@ pub(super) fn validate_words(
 ) -> Result<super::super::Collection<super::super::Text>, super::super::Error> {
     assert!(!field.as_str().is_empty(), "field name must not be empty");
     if words.is_empty() {
-        return Err(crate::AdapterContractError::EmptyCollection { field: field.as_str() }.into());
+        return Err(crate::AdapterContractError::EmptyCollection {
+            field: field.as_str(),
+        }
+        .into());
     }
     if words.len() > super::super::MAX_COMMAND_WORDS {
         return Err(super::super::Error::TooManyItems {
@@ -69,7 +81,10 @@ pub(super) fn validate_words(
             actual_items: words.len(),
         });
     }
-    assert!(words.len() <= super::super::MAX_COMMAND_WORDS, "command word bound is enforced");
+    assert!(
+        words.len() <= super::super::MAX_COMMAND_WORDS,
+        "command word bound is enforced"
+    );
     let mut normalized = super::super::Collection::with_capacity(words.len());
     for word in words {
         normalized.push(super::super::normalized_text(field, word)?);

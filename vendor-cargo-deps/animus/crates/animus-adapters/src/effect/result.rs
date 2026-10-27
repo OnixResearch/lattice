@@ -216,5 +216,9 @@ impl<T> ServiceOutcome<T> {
 }
 
 fn assert_specific_outcome(receipt: &super::Receipt, expected: OutcomeKind) {
-    assert_eq!(receipt.outcome(), expected, "service outcome must match receipt outcome");
+    assert_eq!(
+        receipt.outcome(),
+        expected,
+        "service outcome must match receipt outcome"
+    );
 }

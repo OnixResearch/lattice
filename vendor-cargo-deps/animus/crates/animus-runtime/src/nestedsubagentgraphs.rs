@@ -30,8 +30,7 @@
     clippy::struct_excessive_bools
 )]
 
-use std::collections::BTreeMap;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 const HASH_DOMAIN: &str = "animus.nested-subagent-graphs.v1";
 const HASH_SEPARATOR: &str = "|";
@@ -220,7 +219,10 @@ pub fn validate_nested_subagent_graph(graph: &NestedSubagentGraph) -> NestedGrap
     let mut issues = Vec::new();
     validate_label(graph.graph_label.as_str(), &mut issues);
     if graph.policy.max_depth < MIN_DEPTH {
-        issues.push(issue(NestedGraphIssueKind::OverDepth, graph.graph_label.as_str()));
+        issues.push(issue(
+            NestedGraphIssueKind::OverDepth,
+            graph.graph_label.as_str(),
+        ));
     }
     let node_ids = collect_node_ids(graph, &mut issues);
     validate_nodes(graph, &mut issues);
@@ -238,7 +240,9 @@ pub fn validate_nested_subagent_graph(graph: &NestedSubagentGraph) -> NestedGrap
     }
 }
 
-pub fn rollup_nested_subagent_graph(graph: &NestedSubagentGraph) -> NestedGraphResult<NestedGraphRollup> {
+pub fn rollup_nested_subagent_graph(
+    graph: &NestedSubagentGraph,
+) -> NestedGraphResult<NestedGraphRollup> {
     let report = validate_nested_subagent_graph(graph);
     if !report.valid {
         return Err(report.issues);
@@ -259,7 +263,11 @@ pub fn rollup_nested_subagent_graph(graph: &NestedSubagentGraph) -> NestedGraphR
         NestedTerminalStatus::Failed
     } else if !cancelled_nodes.is_empty() {
         NestedTerminalStatus::Cancelled
-    } else if graph.nodes.iter().all(|node| node.terminal_status == NestedTerminalStatus::Succeeded) {
+    } else if graph
+        .nodes
+        .iter()
+        .all(|node| node.terminal_status == NestedTerminalStatus::Succeeded)
+    {
         NestedTerminalStatus::Succeeded
     } else {
         NestedTerminalStatus::Pending
@@ -276,7 +284,11 @@ pub fn rollup_nested_subagent_graph(graph: &NestedSubagentGraph) -> NestedGraphR
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect(),
-        mutation_intent_count: graph.nodes.iter().filter(|node| node.mutation_authority).count(),
+        mutation_intent_count: graph
+            .nodes
+            .iter()
+            .filter(|node| node.mutation_authority)
+            .count(),
     })
 }
 
@@ -313,17 +325,29 @@ pub fn project_nested_graph_receipt(
 pub fn validate_nested_graph_receipt(receipt: &NestedGraphReceipt) -> NestedGraphResult<()> {
     let mut issues = Vec::new();
     if receipt.schema != RECEIPT_SCHEMA {
-        issues.push(issue(NestedGraphIssueKind::EmptyField, receipt.schema.as_str()));
+        issues.push(issue(
+            NestedGraphIssueKind::EmptyField,
+            receipt.schema.as_str(),
+        ));
     }
     validate_label(receipt.graph_label.as_str(), &mut issues);
     validate_hash(receipt.graph_hash.as_str(), &mut issues);
     validate_hash(receipt.receipt_hash.as_str(), &mut issues);
     if !receipt.redacted {
-        issues.push(issue(NestedGraphIssueKind::ReceiptLeak, receipt.graph_label.as_str()));
+        issues.push(issue(
+            NestedGraphIssueKind::ReceiptLeak,
+            receipt.graph_label.as_str(),
+        ));
     }
     if let Some(marker) = &receipt.leak_marker {
-        if UNSAFE_MARKERS.iter().any(|unsafe_marker| marker.contains(unsafe_marker)) {
-            issues.push(issue(NestedGraphIssueKind::ReceiptLeak, receipt.graph_label.as_str()));
+        if UNSAFE_MARKERS
+            .iter()
+            .any(|unsafe_marker| marker.contains(unsafe_marker))
+        {
+            issues.push(issue(
+                NestedGraphIssueKind::ReceiptLeak,
+                receipt.graph_label.as_str(),
+            ));
         }
     }
     result_from_issues(issues, ())
@@ -339,11 +363,17 @@ pub fn nested_graph_hash(label: &str, bytes: &[u8]) -> String {
     hasher.finalize().to_hex().to_string()
 }
 
-fn collect_node_ids(graph: &NestedSubagentGraph, issues: &mut Vec<NestedGraphIssue>) -> BTreeSet<String> {
+fn collect_node_ids(
+    graph: &NestedSubagentGraph,
+    issues: &mut Vec<NestedGraphIssue>,
+) -> BTreeSet<String> {
     let mut ids = BTreeSet::new();
     for node in &graph.nodes {
         if !ids.insert(node.node_id.clone()) {
-            issues.push(issue(NestedGraphIssueKind::DuplicateNode, node.node_id.as_str()));
+            issues.push(issue(
+                NestedGraphIssueKind::DuplicateNode,
+                node.node_id.as_str(),
+            ));
         }
     }
     ids
@@ -365,13 +395,20 @@ fn validate_nodes(graph: &NestedSubagentGraph, issues: &mut Vec<NestedGraphIssue
             validate_label(capability.as_str(), issues);
         }
         if node.depth > graph.policy.max_depth {
-            issues.push(issue(NestedGraphIssueKind::OverDepth, node.node_id.as_str()));
+            issues.push(issue(
+                NestedGraphIssueKind::OverDepth,
+                node.node_id.as_str(),
+            ));
         }
         validate_budget(&node.budget, node.node_id.as_str(), issues);
     }
 }
 
-fn validate_edges(graph: &NestedSubagentGraph, node_ids: &BTreeSet<String>, issues: &mut Vec<NestedGraphIssue>) {
+fn validate_edges(
+    graph: &NestedSubagentGraph,
+    node_ids: &BTreeSet<String>,
+    issues: &mut Vec<NestedGraphIssue>,
+) {
     for edge in &graph.edges {
         validate_label(edge.parent_id.as_str(), issues);
         validate_label(edge.child_id.as_str(), issues);
@@ -379,17 +416,31 @@ fn validate_edges(graph: &NestedSubagentGraph, node_ids: &BTreeSet<String>, issu
         if let Some(receipt_hash) = &edge.host_admission_receipt_hash {
             validate_hash(receipt_hash.as_str(), issues);
         } else if graph.policy.require_host_admission {
-            issues.push(issue(NestedGraphIssueKind::MissingHostAdmission, edge.child_id.as_str()));
+            issues.push(issue(
+                NestedGraphIssueKind::MissingHostAdmission,
+                edge.child_id.as_str(),
+            ));
         }
         if edge.parent_id == edge.child_id {
             issues.push(issue(NestedGraphIssueKind::Cycle, edge.child_id.as_str()));
         }
-        if !node_ids.contains(edge.parent_id.as_str()) || !node_ids.contains(edge.child_id.as_str()) {
-            issues.push(issue(NestedGraphIssueKind::UnknownNode, edge.child_id.as_str()));
+        if !node_ids.contains(edge.parent_id.as_str()) || !node_ids.contains(edge.child_id.as_str())
+        {
+            issues.push(issue(
+                NestedGraphIssueKind::UnknownNode,
+                edge.child_id.as_str(),
+            ));
         }
-        if let Some(child) = graph.nodes.iter().find(|node| node.node_id == edge.child_id) {
+        if let Some(child) = graph
+            .nodes
+            .iter()
+            .find(|node| node.node_id == edge.child_id)
+        {
             if child.parent_id.as_deref() != Some(edge.parent_id.as_str()) {
-                issues.push(issue(NestedGraphIssueKind::ParentChildMismatch, edge.child_id.as_str()));
+                issues.push(issue(
+                    NestedGraphIssueKind::ParentChildMismatch,
+                    edge.child_id.as_str(),
+                ));
             }
             let expected_depth = graph
                 .nodes
@@ -397,16 +448,26 @@ fn validate_edges(graph: &NestedSubagentGraph, node_ids: &BTreeSet<String>, issu
                 .find(|node| node.node_id == edge.parent_id)
                 .map_or(ROOT_DEPTH, |parent| parent.depth.saturating_add(MIN_DEPTH));
             if child.depth != expected_depth {
-                issues.push(issue(NestedGraphIssueKind::StaleLineage, edge.child_id.as_str()));
+                issues.push(issue(
+                    NestedGraphIssueKind::StaleLineage,
+                    edge.child_id.as_str(),
+                ));
             }
         }
     }
 }
 
 fn validate_roots(graph: &NestedSubagentGraph, issues: &mut Vec<NestedGraphIssue>) {
-    let roots = graph.nodes.iter().filter(|node| node.parent_id.is_none() && node.depth == ROOT_DEPTH).count();
+    let roots = graph
+        .nodes
+        .iter()
+        .filter(|node| node.parent_id.is_none() && node.depth == ROOT_DEPTH)
+        .count();
     if roots != EXPECTED_ROOT_COUNT {
-        issues.push(issue(NestedGraphIssueKind::AmbiguousRoot, graph.graph_label.as_str()));
+        issues.push(issue(
+            NestedGraphIssueKind::AmbiguousRoot,
+            graph.graph_label.as_str(),
+        ));
     }
 }
 
@@ -421,29 +482,53 @@ fn collect_cycles(graph: &NestedSubagentGraph, issues: &mut Vec<NestedGraphIssue
 }
 
 fn validate_monotonicity(graph: &NestedSubagentGraph, issues: &mut Vec<NestedGraphIssue>) {
-    let by_id = graph.nodes.iter().map(|node| (node.node_id.as_str(), node)).collect::<BTreeMap<_, _>>();
+    let by_id = graph
+        .nodes
+        .iter()
+        .map(|node| (node.node_id.as_str(), node))
+        .collect::<BTreeMap<_, _>>();
     for edge in &graph.edges {
-        let (Some(parent), Some(child)) = (by_id.get(edge.parent_id.as_str()), by_id.get(edge.child_id.as_str()))
-        else {
+        let (Some(parent), Some(child)) = (
+            by_id.get(edge.parent_id.as_str()),
+            by_id.get(edge.child_id.as_str()),
+        ) else {
             continue;
         };
         if !child.capabilities.is_subset(&parent.capabilities) {
-            issues.push(issue(NestedGraphIssueKind::AuthorityWidening, child.node_id.as_str()));
+            issues.push(issue(
+                NestedGraphIssueKind::AuthorityWidening,
+                child.node_id.as_str(),
+            ));
         }
         if child.workspace_scope != parent.workspace_scope {
-            issues.push(issue(NestedGraphIssueKind::AuthorityWidening, child.node_id.as_str()));
+            issues.push(issue(
+                NestedGraphIssueKind::AuthorityWidening,
+                child.node_id.as_str(),
+            ));
         }
         if child.workspace_authority > parent.workspace_authority {
-            issues.push(issue(NestedGraphIssueKind::AuthorityWidening, child.node_id.as_str()));
+            issues.push(issue(
+                NestedGraphIssueKind::AuthorityWidening,
+                child.node_id.as_str(),
+            ));
         }
         if child.mutation_authority && !parent.mutation_authority {
-            issues.push(issue(NestedGraphIssueKind::AuthorityWidening, child.node_id.as_str()));
+            issues.push(issue(
+                NestedGraphIssueKind::AuthorityWidening,
+                child.node_id.as_str(),
+            ));
         }
         if child.model_ceiling != parent.model_ceiling {
-            issues.push(issue(NestedGraphIssueKind::AuthorityWidening, child.node_id.as_str()));
+            issues.push(issue(
+                NestedGraphIssueKind::AuthorityWidening,
+                child.node_id.as_str(),
+            ));
         }
         if budget_widens(&parent.budget, &child.budget) {
-            issues.push(issue(NestedGraphIssueKind::BudgetInflation, child.node_id.as_str()));
+            issues.push(issue(
+                NestedGraphIssueKind::BudgetInflation,
+                child.node_id.as_str(),
+            ));
         }
     }
 }
@@ -470,36 +555,57 @@ fn budget_widens(parent: &NestedBudget, child: &NestedBudget) -> bool {
 fn incoming_parents(graph: &NestedSubagentGraph) -> BTreeMap<String, BTreeSet<String>> {
     let mut incoming = BTreeMap::new();
     for edge in &graph.edges {
-        incoming.entry(edge.child_id.clone()).or_insert_with(BTreeSet::new).insert(edge.parent_id.clone());
+        incoming
+            .entry(edge.child_id.clone())
+            .or_insert_with(BTreeSet::new)
+            .insert(edge.parent_id.clone());
     }
     incoming
 }
 
-fn has_cycle(node: &str, incoming: &BTreeMap<String, BTreeSet<String>>, visiting: &mut BTreeSet<String>) -> bool {
+fn has_cycle(
+    node: &str,
+    incoming: &BTreeMap<String, BTreeSet<String>>,
+    visiting: &mut BTreeSet<String>,
+) -> bool {
     if !visiting.insert(node.to_owned()) {
         return true;
     }
-    let found = incoming
-        .get(node)
-        .is_some_and(|parents| parents.iter().any(|parent| has_cycle(parent.as_str(), incoming, visiting)));
+    let found = incoming.get(node).is_some_and(|parents| {
+        parents
+            .iter()
+            .any(|parent| has_cycle(parent.as_str(), incoming, visiting))
+    });
     visiting.remove(node);
     found
 }
 
 fn node_path(graph: &NestedSubagentGraph, node_id: &str) -> String {
-    let by_id = graph.nodes.iter().map(|node| (node.node_id.as_str(), node)).collect::<BTreeMap<_, _>>();
+    let by_id = graph
+        .nodes
+        .iter()
+        .map(|node| (node.node_id.as_str(), node))
+        .collect::<BTreeMap<_, _>>();
     let mut path = Vec::new();
     let mut cursor = Some(node_id);
     while let Some(current) = cursor {
         path.push(current.to_owned());
-        cursor = by_id.get(current).and_then(|node| node.parent_id.as_deref());
+        cursor = by_id
+            .get(current)
+            .and_then(|node| node.parent_id.as_deref());
     }
     path.reverse();
     path.join("/")
 }
 
 fn sorted_node_ids(graph: &NestedSubagentGraph) -> Vec<String> {
-    graph.nodes.iter().map(|node| node.node_id.clone()).collect::<BTreeSet<_>>().into_iter().collect()
+    graph
+        .nodes
+        .iter()
+        .map(|node| node.node_id.clone())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
 }
 
 fn canonical_graph(graph: &NestedSubagentGraph) -> String {
@@ -570,7 +676,11 @@ fn issue_codes(issues: &[NestedGraphIssue]) -> Vec<String> {
 }
 
 fn result_from_issues<T>(issues: Vec<NestedGraphIssue>, value: T) -> NestedGraphResult<T> {
-    if issues.is_empty() { Ok(value) } else { Err(issues) }
+    if issues.is_empty() {
+        Ok(value)
+    } else {
+        Err(issues)
+    }
 }
 
 #[cfg(test)]
@@ -668,8 +778,16 @@ mod tests {
         ]);
         graph.edges = vec![
             edge(ROOT, CHILD, None),
-            edge(CHILD, GRANDCHILD, Some(nested_graph_hash("receipt", RECEIPT_BYTES))),
-            edge(GRANDCHILD, ROOT, Some(nested_graph_hash("receipt", RECEIPT_BYTES))),
+            edge(
+                CHILD,
+                GRANDCHILD,
+                Some(nested_graph_hash("receipt", RECEIPT_BYTES)),
+            ),
+            edge(
+                GRANDCHILD,
+                ROOT,
+                Some(nested_graph_hash("receipt", RECEIPT_BYTES)),
+            ),
         ];
         graph.nodes[1].mutation_authority = true;
         graph.nodes[1].workspace_authority = WorkspaceAuthority::WriteIntent;
@@ -678,11 +796,31 @@ mod tests {
         let report = validate_nested_subagent_graph(&graph);
 
         assert!(!report.valid);
-        assert!(report.issue_codes.contains(&NestedGraphIssueKind::Cycle.code().to_owned()));
-        assert!(report.issue_codes.contains(&NestedGraphIssueKind::OverDepth.code().to_owned()));
-        assert!(report.issue_codes.contains(&NestedGraphIssueKind::MissingHostAdmission.code().to_owned()));
-        assert!(report.issue_codes.contains(&NestedGraphIssueKind::AuthorityWidening.code().to_owned()));
-        assert!(report.issue_codes.contains(&NestedGraphIssueKind::BudgetInflation.code().to_owned()));
+        assert!(
+            report
+                .issue_codes
+                .contains(&NestedGraphIssueKind::Cycle.code().to_owned())
+        );
+        assert!(
+            report
+                .issue_codes
+                .contains(&NestedGraphIssueKind::OverDepth.code().to_owned())
+        );
+        assert!(
+            report
+                .issue_codes
+                .contains(&NestedGraphIssueKind::MissingHostAdmission.code().to_owned())
+        );
+        assert!(
+            report
+                .issue_codes
+                .contains(&NestedGraphIssueKind::AuthorityWidening.code().to_owned())
+        );
+        assert!(
+            report
+                .issue_codes
+                .contains(&NestedGraphIssueKind::BudgetInflation.code().to_owned())
+        );
     }
 
     #[test]
@@ -706,14 +844,22 @@ mod tests {
             }),
         ]);
         let service = require_nested_graph_host_service(&graph).expect_err("host required");
-        assert!(service.iter().any(|issue| issue.kind == NestedGraphIssueKind::MissingHostService));
+        assert!(
+            service
+                .iter()
+                .any(|issue| issue.kind == NestedGraphIssueKind::MissingHostService)
+        );
 
         let report = validate_nested_subagent_graph(&graph);
         let mut receipt = project_nested_graph_receipt(&graph, &report);
         receipt.redacted = false;
         receipt.leak_marker = Some("RAW_TRANSCRIPT:secret".to_owned());
         let issues = validate_nested_graph_receipt(&receipt).expect_err("receipt leak");
-        assert!(issues.iter().any(|issue| issue.kind == NestedGraphIssueKind::ReceiptLeak));
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.kind == NestedGraphIssueKind::ReceiptLeak)
+        );
     }
 
     fn graph_with_nodes(nodes: Vec<NestedSubagentNode>) -> NestedSubagentGraph {
@@ -721,7 +867,11 @@ mod tests {
             .iter()
             .filter_map(|node| {
                 node.parent_id.as_ref().map(|parent| {
-                    edge(parent.as_str(), node.node_id.as_str(), Some(nested_graph_hash("receipt", RECEIPT_BYTES)))
+                    edge(
+                        parent.as_str(),
+                        node.node_id.as_str(),
+                        Some(nested_graph_hash("receipt", RECEIPT_BYTES)),
+                    )
                 })
             })
             .collect();
@@ -762,7 +912,10 @@ mod tests {
         NestedSubagentEdge {
             parent_id: parent.to_owned(),
             child_id: child.to_owned(),
-            ancestry_proof_hash: nested_graph_hash("ancestry", format!("{parent}->{child}").as_bytes()),
+            ancestry_proof_hash: nested_graph_hash(
+                "ancestry",
+                format!("{parent}->{child}").as_bytes(),
+            ),
             host_admission_receipt_hash: receipt,
             edge_kind: NestedEdgeKind::ReviewDelegation,
         }

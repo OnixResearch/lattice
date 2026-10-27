@@ -86,7 +86,9 @@ fn option_binding(value: Option<&str>) -> String {
 
 fn validate_required_text(field: FieldName, value: &str) -> Result<(), crate::LoopError> {
     if value.trim().is_empty() {
-        return Err(crate::LoopError::EmptyInput { field: field.as_str() });
+        return Err(crate::LoopError::EmptyInput {
+            field: field.as_str(),
+        });
     }
 
     Ok(())
@@ -103,8 +105,8 @@ mod tests {
 
     #[test]
     fn accepts_valid_inputs() {
-        let input =
-            Input::new(VALID_SUMMARY, Some(MODEL_MESSAGE), Some(TOOL_OUTPUT)).expect("valid input should parse");
+        let input = Input::new(VALID_SUMMARY, Some(MODEL_MESSAGE), Some(TOOL_OUTPUT))
+            .expect("valid input should parse");
 
         assert_eq!(input.summary(), VALID_SUMMARY);
         assert_eq!(input.last_model_message(), Some(MODEL_MESSAGE));
@@ -113,7 +115,8 @@ mod tests {
 
     #[test]
     fn builds_from_core_state() {
-        let intent = animus_core::Intent::new("build reliable systems").expect("valid intent should parse");
+        let intent =
+            animus_core::Intent::new("build reliable systems").expect("valid intent should parse");
         let state = animus_core::AnimusState::new(intent);
         let input = Input::from_state(&state);
 

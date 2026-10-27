@@ -1,0 +1,20 @@
+name: hardened-wasmtime-runtime
+repository: rad://z3hRCegTsS8jpJVgxYfb9psEzxHpG
+revision: 1d642fa5cba7ce8a6d8f127f28ec6d8505842378
+paths:
+- .cairn
+- .gitignore
+- AGENTS.md
+- Cargo.lock
+- Cargo.toml
+- LICENSE
+- README.md
+- cairn-policy
+- config
+- crates
+- docs
+- dylint.toml
+- fixtures
+- flake.lock
+- flake.nix
+- rust-toolchain.toml

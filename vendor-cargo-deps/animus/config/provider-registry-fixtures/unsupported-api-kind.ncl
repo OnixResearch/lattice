@@ -24,6 +24,7 @@ let schema = import "../provider-registry.ncl" in
             roles = ['user, 'assistant],
             content_parts = ['text],
             tool_calls = false,
+            tool_capabilities = [],
             structured_outputs = [],
             stream_channels = [],
             reasoning_controls = ['none],

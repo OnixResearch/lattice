@@ -31,12 +31,14 @@ impl RollbackConfirmationStatus {
     /// # Errors
     /// Returns [`super::CheckpointError`] when the value is empty, malformed, or unknown.
     pub fn parse(value: &str) -> Result<Self, super::CheckpointError> {
-        super::core::parse_enum(super::CHECKPOINT_CONFIRMATION_FIELD, value, |normalized| match normalized {
-            CONFIRMATION_APPROVED => Some(Self::Approved),
-            CONFIRMATION_DENIED => Some(Self::Denied),
-            CONFIRMATION_MISSING => Some(Self::Missing),
-            CONFIRMATION_NOT_REQUIRED => Some(Self::NotRequired),
-            _ => None,
+        super::core::parse_enum(super::CHECKPOINT_CONFIRMATION_FIELD, value, |normalized| {
+            match normalized {
+                CONFIRMATION_APPROVED => Some(Self::Approved),
+                CONFIRMATION_DENIED => Some(Self::Denied),
+                CONFIRMATION_MISSING => Some(Self::Missing),
+                CONFIRMATION_NOT_REQUIRED => Some(Self::NotRequired),
+                _ => None,
+            }
         })
     }
 
@@ -66,10 +68,12 @@ impl MutationProtection {
     /// # Errors
     /// Returns [`super::CheckpointError`] when the value is empty, malformed, or unknown.
     pub fn parse(value: &str) -> Result<Self, super::CheckpointError> {
-        super::core::parse_enum(super::CHECKPOINT_MUTATION_FIELD, value, |normalized| match normalized {
-            MUTATION_PROTECTED => Some(Self::Protected),
-            MUTATION_UNPROTECTED => Some(Self::Unprotected),
-            _ => None,
+        super::core::parse_enum(super::CHECKPOINT_MUTATION_FIELD, value, |normalized| {
+            match normalized {
+                MUTATION_PROTECTED => Some(Self::Protected),
+                MUTATION_UNPROTECTED => Some(Self::Unprotected),
+                _ => None,
+            }
         })
     }
 
@@ -99,12 +103,16 @@ impl CheckpointPolicy {
     /// # Errors
     /// Returns [`super::CheckpointError`] when the value is empty, malformed, or unknown.
     pub fn parse(value: &str) -> Result<Self, super::CheckpointError> {
-        super::core::parse_enum(super::CHECKPOINT_POLICY_FIELD, value, |normalized| match normalized {
-            POLICY_DISABLED => Some(Self::Disabled),
-            POLICY_BEST_EFFORT => Some(Self::BestEffort),
-            POLICY_STRICT => Some(Self::Strict),
-            _ => None,
-        })
+        super::core::parse_enum(
+            super::CHECKPOINT_POLICY_FIELD,
+            value,
+            |normalized| match normalized {
+                POLICY_DISABLED => Some(Self::Disabled),
+                POLICY_BEST_EFFORT => Some(Self::BestEffort),
+                POLICY_STRICT => Some(Self::Strict),
+                _ => None,
+            },
+        )
     }
 
     /// Returns the stable policy label.
@@ -138,13 +146,15 @@ impl CheckpointServiceState {
     /// # Errors
     /// Returns [`super::CheckpointError`] when the value is empty, malformed, or unknown.
     pub fn parse(value: &str) -> Result<Self, super::CheckpointError> {
-        super::core::parse_enum(super::CHECKPOINT_SERVICE_FIELD, value, |normalized| match normalized {
-            SERVICE_INJECTED => Some(Self::Injected),
-            SERVICE_MISSING => Some(Self::Missing),
-            SERVICE_UNAVAILABLE => Some(Self::Unavailable),
-            SERVICE_DENIED => Some(Self::Denied),
-            SERVICE_UNSUPPORTED => Some(Self::Unsupported),
-            _ => None,
+        super::core::parse_enum(super::CHECKPOINT_SERVICE_FIELD, value, |normalized| {
+            match normalized {
+                SERVICE_INJECTED => Some(Self::Injected),
+                SERVICE_MISSING => Some(Self::Missing),
+                SERVICE_UNAVAILABLE => Some(Self::Unavailable),
+                SERVICE_DENIED => Some(Self::Denied),
+                SERVICE_UNSUPPORTED => Some(Self::Unsupported),
+                _ => None,
+            }
         })
     }
 

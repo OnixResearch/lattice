@@ -18,6 +18,11 @@ pub enum Error {
         /// Unsupported media type value after normalization.
         value: alloc::string::String,
     },
+    /// The video media type is not in the admitted set.
+    UnsupportedVideoMediaType {
+        /// Unsupported normalized value.
+        value: alloc::string::String,
+    },
     /// A BLAKE3 content identity was malformed.
     InvalidContentHash {
         /// Field name.
@@ -32,12 +37,36 @@ pub enum Error {
         /// Actual descriptor byte count.
         actual_bytes: u64,
     },
+    /// The video descriptor exceeded an accepted byte budget.
+    VideoTooLarge {
+        /// Maximum accepted bytes.
+        max_bytes: u64,
+        /// Actual byte count.
+        actual_bytes: u64,
+    },
     /// Optional dimensions were invalid.
     InvalidDimensions {
         /// Invalid width in pixels.
         width_px: Option<u32>,
         /// Invalid height in pixels.
         height_px: Option<u32>,
+    },
+    /// Declared video duration was invalid.
+    InvalidVideoDuration {
+        /// Invalid duration.
+        duration_ms: u64,
+    },
+    /// Declared video frame rate was invalid.
+    InvalidVideoFrameRate {
+        /// Invalid milli-hertz value.
+        frame_rate_millihz: u32,
+    },
+    /// Prompt media policy was internally invalid.
+    InvalidMediaPolicy,
+    /// Two video drafts used the same content identity.
+    DuplicateVideoIdentity {
+        /// Duplicate BLAKE3 identity.
+        content_hash: alloc::string::String,
     },
     /// No content parts were supplied for prompt assembly.
     EmptyParts,
@@ -55,10 +84,21 @@ pub enum Error {
     },
     /// Image parts required an injected image payload service, but none was supplied.
     MissingImageService,
+    /// Video parts required an injected video payload service, but none was supplied.
+    MissingVideoService,
     /// Image request serialization tried to use a lossy generic conversion.
     LossyGenericConversion,
-    /// Image request serialization required a live provider call.
+    /// Image or video fixture serialization required a live provider call.
     LiveProviderCallRequired,
+    /// Host reported an expired video handle.
+    ExpiredVideoHandle,
+    /// Provider projection cannot represent admitted video intent.
+    UnrepresentableVideoField {
+        /// Exact field or ordering class.
+        field: &'static str,
+    },
+    /// Injected video service rejected an oversized upload.
+    VideoUploadTooLarge,
     /// The injected image service returned an invalid safe handle.
     InvalidImageHandle {
         /// Field name.
@@ -68,6 +108,18 @@ pub enum Error {
     },
     /// The injected image service returned a handle for a different image descriptor.
     MismatchedImageHandle {
+        /// Field name that differed.
+        field: &'static str,
+    },
+    /// The injected video service returned an invalid safe handle.
+    InvalidVideoHandle {
+        /// Field name.
+        field: &'static str,
+        /// Leak or mismatch class.
+        reason: UnsafeContentReason,
+    },
+    /// The injected video service returned a handle for different media.
+    MismatchedVideoHandle {
         /// Field name that differed.
         field: &'static str,
     },
@@ -96,4 +148,8 @@ pub enum UnsafeContentReason {
     ProviderPayload,
     /// Unbounded payload material was present.
     UnboundedPayload,
+    /// A remote URL was present where only an approved handle is allowed.
+    RemoteUrl,
+    /// Frame or audio body material was present.
+    MediaBody,
 }

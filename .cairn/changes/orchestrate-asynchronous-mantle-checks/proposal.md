@@ -29,7 +29,7 @@ An asynchronous Check Run flow avoids holding a CI process open for long builds.
 
 - `adopt-animus-secretspec-sops-providers`, after the Animus prerequisite is archived at an immutable revision.
 - Basalt `exchange-oidc-for-ucan-capabilities` at an immutable validated revision.
-- Mantle `add-nix-remote-service-gateway` at an immutable validated revision.
+- Mantle `serve-private-asynchronous-build-api` at an immutable validated revision for the authenticated private Build API. The broader `add-nix-remote-service-gateway` remains a separate prerequisite for any Nix-compatible or public gateway claim and is not completed by this consumer.
 - The accepted Valence build-service evidence profile.
 
 ## Impact

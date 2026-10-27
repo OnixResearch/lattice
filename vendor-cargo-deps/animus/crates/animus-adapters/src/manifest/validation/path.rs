@@ -52,7 +52,9 @@ fn has_windows_drive(path: &str) -> bool {
 
 fn escapes_workspace(path: &str) -> bool {
     path.starts_with(super::HOME_PATH_PREFIX)
-        || path.split(is_separator).any(|segment| segment == super::PATH_ESCAPE_SEGMENT)
+        || path
+            .split(is_separator)
+            .any(|segment| segment == super::PATH_ESCAPE_SEGMENT)
 }
 
 fn is_separator(character: char) -> bool {

@@ -1,0 +1,140 @@
+{
+  "binding": {
+    "adapter_cohort_identity": {
+      "algorithm": "blake3",
+      "domain": "adapter",
+      "hex": "3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    "alternative_host_profile_identities": [],
+    "application_identity": {
+      "algorithm": "blake3",
+      "domain": "target-artifact",
+      "hex": "5fd77e6bf7e3a618faf48a8a16c398126797a5245011f0d06dd40f45513b9cb1"
+    },
+    "compatibility_identity": {
+      "algorithm": "blake3",
+      "domain": "evidence-chain",
+      "hex": "0ec64025422e00a28a2bfdb45f43b8fcd590ec1a4d3325bc07dae71d7ea0dbcb"
+    },
+    "effect_operation_identities": [
+      {
+        "algorithm": "blake3",
+        "domain": "effect-operation",
+        "hex": "7fa2709c205ccfa8c4b8773ab97396193a5130a2e42b2f94916802b04e07f5f8"
+      },
+      {
+        "algorithm": "blake3",
+        "domain": "effect-operation",
+        "hex": "c598d03de53f54b01e8bc368840e6394e5cc3334b4e1be118f563ddfb8cfba2a"
+      }
+    ],
+    "effect_summary_closed": true,
+    "effect_summary_identity": {
+      "algorithm": "blake3",
+      "domain": "algebraic-effect",
+      "hex": "64471a04261cbb5f5d9e9b3df5ba9f2454145535355601760e779d2f6b0a46ac"
+    },
+    "entrypoint_identity": {
+      "algorithm": "blake3",
+      "domain": "target-artifact",
+      "hex": "bb661c376f2a83ceedd730d404de471dfcc5abd6f75f9f4a42a95b8afd9a0d42"
+    },
+    "expected_adapter_cohort_identity": {
+      "algorithm": "blake3",
+      "domain": "adapter",
+      "hex": "3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    "expected_host_profile_identity": {
+      "algorithm": "blake3",
+      "domain": "evaluator",
+      "hex": "53a1955677292245ccd4ccc6c0c3a7f3bcd9431f4ac0d6f1a7f9fb7ca1ac5070"
+    },
+    "expected_resource_profile_identity": {
+      "algorithm": "blake3",
+      "domain": "adapter",
+      "hex": "876e8e3aedf280155e40378e5ba1add80ca30a7a0931f9a9c972b898694619f2"
+    },
+    "fallback_host_profile_identity": null,
+    "host_profile_identity": {
+      "algorithm": "blake3",
+      "domain": "evaluator",
+      "hex": "53a1955677292245ccd4ccc6c0c3a7f3bcd9431f4ac0d6f1a7f9fb7ca1ac5070"
+    },
+    "input_schema_identity": {
+      "algorithm": "blake3",
+      "domain": "adapter",
+      "hex": "33df3bb18d797392d6421016a76ca9970321dc4d62dda749815a06547419db49"
+    },
+    "kind": "application-host-binding",
+    "metadata": {
+      "aliases": [],
+      "display_name": null,
+      "documentation": null,
+      "path": null,
+      "source_span": null
+    },
+    "non_claims": [
+      "not effect completeness",
+      "not application correctness",
+      "not host capability or authorization",
+      "not host behavior",
+      "not sandbox admission",
+      "not provider correctness",
+      "not tool safety",
+      "not runtime success",
+      "not runtime correctness",
+      "not resource enforcement",
+      "not release eligibility"
+    ],
+    "output_schema_identity": {
+      "algorithm": "blake3",
+      "domain": "adapter",
+      "hex": "f3f6e96b49daecc77fd98bd5434fe34ab23f39d226b506bdfd551ed773b2e81f"
+    },
+    "policy_identity": {
+      "algorithm": "blake3",
+      "domain": "adapter",
+      "hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "resource_profile_identity": {
+      "algorithm": "blake3",
+      "domain": "adapter",
+      "hex": "876e8e3aedf280155e40378e5ba1add80ca30a7a0931f9a9c972b898694619f2"
+    },
+    "schema_version": "kamacite.application-host-binding.v1",
+    "semantic_claims": []
+  },
+  "kamacite_revision": "b21732a7458b660367f7281c717a5acc3f8c8190",
+  "non_claims": [
+    "producer fixture does not prove producer correctness",
+    "producer fixture does not grant host capability or authorization",
+    "producer fixture does not prove runtime success or release eligibility"
+  ],
+  "producer": "animus",
+  "producer_revision": "fdd4eff7180c2134a06b99c2bc78335313688e6e",
+  "schema": "animus.application-host-binding-producer.v1",
+  "source_identity": "75e686e149d9624097ee633562c6ae1529d865c51c7762f810f8d4df61f33bc7",
+  "source_identity_algorithm": "blake3-of-ordered-b3sum-lines-v1",
+  "source_manifest": [
+    {
+      "blake3": "a0c9bd74591b42bfada9a3c1e1a63e436f2f355f62f13d5134de2206323ba49a",
+      "path": "crates/animus-runtime/src/applicationbinding/core.rs"
+    },
+    {
+      "blake3": "437bf8d31fabccca54b503b1939cc9e56486ac097f93cdfa94edf216cadd5027",
+      "path": "crates/animus-runtime/src/applicationbinding/data.rs"
+    },
+    {
+      "blake3": "cb9aa1cc0f3d53f6ac16f770a5ea3a27e8f7d4351811f79b619a406b3c11cf4f",
+      "path": "crates/animus-runtime/src/applicationbinding/mod.rs"
+    },
+    {
+      "blake3": "339baed1d5854d3840c3b26415a02a1cca33e46833a1fb4a3115d9629611172e",
+      "path": "config/application-host-binding-pilot/profile.ncl"
+    },
+    {
+      "blake3": "52ca72193a1f2e9668e0ceae3c85c16b34817dcab3d0b90532115e78d52d8e35",
+      "path": "config/application-host-binding-pilot/generated/animus-binding.json"
+    }
+  ]
+}

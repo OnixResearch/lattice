@@ -1,0 +1,268 @@
+# crunch project manifest contract.
+#
+# Validates the structure of crunch-project.ncl files.
+# Users import this contract and apply it to their manifest record.
+
+# Nickel record contracts may carry at most one field without a definition, so
+# shapes with several required fields are expressed as a record type, or as an
+# open defaults contract followed by the shape check for the required fields.
+let { Shape, .. } = import "contracts.ncl" in
+
+let HashAlgo = [| 'sha256, 'sha512, 'blake3 |] in
+
+let HashSpec = {
+  algo | HashAlgo | default = 'sha256,
+  expected | String | optional,
+} in
+
+let GitReference = {
+  ref_type : [| 'branch, 'tag, 'rev |],
+  ref_value : String,
+} in
+
+let FileInput = {
+  type | force = "file",
+  url | String,
+} in
+
+let TarballInput = {
+  type | force = "tarball",
+  url | String,
+} in
+
+let GitInput = {
+  type | force = "git",
+  repository | String,
+  reference | GitReference | default = { ref_type = 'branch, ref_value = "main" },
+} in
+
+let InputFetchPolicy = std.contract.from_validator (fun value =>
+  if value == "generation-material" || value == "build-fetch-action" || value == "imported-source-required" then
+    'Ok
+  else
+    'Error { message = "fetch_policy must be one of generation-material, build-fetch-action, imported-source-required" }
+) in
+
+let InputRetentionPolicy = std.contract.from_validator (fun value =>
+  if std.is_record value then
+    if std.record.has_field "mode" value then
+      let mode = value.mode in
+      if mode == "untracked" || mode == "current" then
+        'Ok
+      else if mode == "recent-generations" then
+        if std.record.has_field "generations" value then 'Ok
+        else 'Error { message = "retention recent-generations policy must have a generations field" }
+      else
+        'Error { message = "retention mode must be untracked, current, or recent-generations" }
+    else
+      'Error { message = "retention policy must have a mode field" }
+  else
+    'Error { message = "retention policy must be a record" }
+) in
+
+let FreshnessProbe = std.contract.from_validator (fun value =>
+  if std.is_record value then
+    if std.record.has_field "type" value then
+      let t = value.type in
+      if t == "git-ref" || t == "http-text" || t == "http-json" || t == "local-file" || t == "local-directory" || t == "command" then
+        'Ok
+      else
+        'Error { message = "freshness probe type must be git-ref, http-text, http-json, local-file, local-directory, or command" }
+    else
+      'Error { message = "freshness probe must have a 'type' field" }
+  else
+    'Error { message = "freshness probe must be a record" }
+) in
+
+let InputTrustPolicy = std.contract.from_validator (fun value =>
+  if std.is_record value then
+    if std.record.has_field "verifier" value then
+      if value.verifier == "ed25519-detached" then
+        if std.record.has_field "signatures" value then
+          if std.record.has_field "trusted_public_keys" value then
+            'Ok
+          else
+            'Error { message = "trust policy must declare trusted_public_keys" }
+        else
+          'Error { message = "trust policy must declare signatures" }
+      else
+        'Error { message = "trust verifier must be ed25519-detached" }
+    else
+      'Error { message = "trust policy must have a verifier field" }
+  else
+    'Error { message = "trust policy must be a record" }
+) in
+
+let InputKind = std.contract.from_validator (fun value =>
+  if std.is_record value then
+    if std.record.has_field "type" value then
+      let t = value.type in
+      if t == "file" || t == "tarball" || t == "git" then
+        'Ok
+      else
+        'Error { message = "input type must be 'file', 'tarball', or 'git', got: %{t}" }
+    else
+      'Error { message = "input record must have a 'type' field" }
+  else
+    'Error { message = "input must be a record" }
+) in
+
+let ManifestInputDefaults = {
+  hash | HashSpec | default = {},
+  frozen | Bool | default = false,
+  mirrors | Array String | default = [],
+  patches | Array String | default = [],
+  fetch_policy | InputFetchPolicy | default = "generation-material",
+  retention | InputRetentionPolicy | optional,
+  freshness | FreshnessProbe | optional,
+  trust | InputTrustPolicy | optional,
+  ..
+} in
+let ManifestInputRequired = {
+  name : String,
+  kind : InputKind,
+} in
+let ManifestInput = std.contract.Sequence [
+  ManifestInputDefaults,
+  Shape [
+    "hash",
+    "frozen",
+    "mirrors",
+    "patches",
+    "fetch_policy",
+    "retention",
+    "freshness",
+    "trust",
+  ] ManifestInputRequired,
+] in
+
+let PatchSource = std.contract.from_validator (fun value =>
+  if std.is_record value then
+    if std.record.has_field "type" value then
+      let t = value.type in
+      if t == "local" then
+        if std.record.has_field "path" value then 'Ok
+        else 'Error { message = "local patch must have a 'path' field" }
+      else if t == "remote" then
+        if std.record.has_field "url" value then 'Ok
+        else 'Error { message = "remote patch must have a 'url' field" }
+      else
+        'Error { message = "patch type must be 'local' or 'remote', got: %{t}" }
+    else
+      'Error { message = "patch must have a 'type' field" }
+  else
+    'Error { message = "patch must be a record" }
+) in
+
+let PatchDefDefaults = {
+  trust | InputTrustPolicy | optional,
+  ..
+} in
+let PatchDefRequired = {
+  name : String,
+  source : PatchSource,
+} in
+let PatchDef = std.contract.Sequence [
+  PatchDefDefaults,
+  Shape [ "trust" ] PatchDefRequired,
+] in
+
+let ShellProfile = {
+  build_inputs | Array String | default = [],
+  env | { _ : String } | default = {},
+  path_entries | Array String | default = [],
+  hook | String | optional,
+  derivation | Dyn | optional,
+} in
+
+let ShellProfiles = {
+  _ : ShellProfile
+} in
+
+let GeneratedFileMaterialization = std.contract.from_validator (fun value =>
+  if value == "copy" || value == "symlink" then
+    'Ok
+  else
+    'Error { message = "generated file materialization must be copy or symlink" }
+) in
+
+let GeneratedFileContent = std.contract.from_validator (fun value =>
+  if std.is_record value then
+    if std.record.has_field "type" value then
+      if value.type == "inline" || value.type == "nickel-export" then 'Ok
+      else 'Error { message = "generated file content type must be inline or nickel-export" }
+    else
+      'Error { message = "generated file content must have a type field" }
+  else
+    'Error { message = "generated file content must be a record" }
+) in
+
+let GeneratedFileContractDefaults = {
+  required_json_fields | Array String | default = [],
+  ..
+} in
+let GeneratedFileContractRequired = {
+  identity : String,
+} in
+let GeneratedFileContract = std.contract.Sequence [
+  GeneratedFileContractDefaults,
+  Shape [ "required_json_fields" ] GeneratedFileContractRequired,
+] in
+
+let GeneratedFileDefaults = {
+  materialization | GeneratedFileMaterialization | default = "copy",
+  contract | GeneratedFileContract | optional,
+  ..
+} in
+let GeneratedFileRequired = {
+  name : String,
+  target : String,
+  content : GeneratedFileContent,
+} in
+let GeneratedFile = std.contract.Sequence [
+  GeneratedFileDefaults,
+  Shape [ "materialization", "contract" ] GeneratedFileRequired,
+] in
+
+let HashAlgoContract = HashAlgo in
+let HashSpecContract = HashSpec in
+let GitReferenceContract = GitReference in
+let ManifestInputContract = ManifestInput in
+let InputFetchPolicyContract = InputFetchPolicy in
+let InputRetentionPolicyContract = InputRetentionPolicy in
+let FreshnessProbeContract = FreshnessProbe in
+let InputTrustPolicyContract = InputTrustPolicy in
+let PatchDefContract = PatchDef in
+let ShellProfileContract = ShellProfile in
+let ShellProfilesContract = ShellProfiles in
+let GeneratedFileContractValue = GeneratedFile in
+let GeneratedFileContentContract = GeneratedFileContent in
+let GeneratedFileContractShape = GeneratedFileContract in
+
+# The top-level project manifest contract.
+{
+  ProjectManifest = {
+    version | String | default = "1.0.0",
+    inputs | Array ManifestInput | default = [],
+    patches | Array PatchDef | default = [],
+    retention | InputRetentionPolicy | default = { mode = "untracked" },
+    shells | ShellProfiles | default = {},
+    files | Array GeneratedFile | default = [],
+  },
+
+  # Re-export sub-contracts for external use.
+  HashAlgo = HashAlgoContract,
+  HashSpec = HashSpecContract,
+  GitReference = GitReferenceContract,
+  ManifestInput = ManifestInputContract,
+  InputFetchPolicy = InputFetchPolicyContract,
+  InputRetentionPolicy = InputRetentionPolicyContract,
+  FreshnessProbe = FreshnessProbeContract,
+  InputTrustPolicy = InputTrustPolicyContract,
+  PatchDef = PatchDefContract,
+  ShellProfile = ShellProfileContract,
+  ShellProfiles = ShellProfilesContract,
+  GeneratedFile = GeneratedFileContractValue,
+  GeneratedFileContent = GeneratedFileContentContract,
+  GeneratedFileContract = GeneratedFileContractShape,
+}

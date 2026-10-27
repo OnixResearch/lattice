@@ -1,36 +1,18 @@
 #![cfg_attr(animus_octet, allow(tigerstyle::non_trait_imports))]
 
-use std::collections::BTreeMap;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
-use super::BLAKE3_ALGORITHM;
-use super::BLAKE3_HEX_LENGTH;
-use super::MAX_REFERENCE_COUNT;
-use super::MAX_SAFE_LABEL_CHARS;
-use super::PORTFOLIO_HASH_DOMAIN;
-use super::REQUIRED_COUNT;
-use super::data::ApproachRecord;
-use super::data::ApproachState;
-use super::data::AuditOutcome;
-use super::data::GapStrength;
-use super::data::PortfolioAudit;
-use super::data::PortfolioAuditFinding;
-use super::data::PortfolioAuditRisk;
-use super::data::PortfolioBlocker;
-use super::data::PortfolioBlockerClass;
-use super::data::PortfolioContract;
-use super::data::PortfolioDispatch;
-use super::data::PortfolioError;
-use super::data::PortfolioErrorKind;
-use super::data::PortfolioFingerprint;
-use super::data::PortfolioPhase;
-use super::data::PortfolioReceipt;
-use super::data::PortfolioResult;
-use super::data::PortfolioState;
-use super::data::PortfolioUsage;
-use super::data::PortfolioValidationReceipt;
-use super::data::PortfolioValidationStatus;
-use super::data::ReopenNovelty;
+use super::{
+    BLAKE3_ALGORITHM, BLAKE3_HEX_LENGTH, MAX_REFERENCE_COUNT, MAX_SAFE_LABEL_CHARS,
+    PORTFOLIO_HASH_DOMAIN, REQUIRED_COUNT,
+    data::{
+        ApproachRecord, ApproachState, AuditOutcome, GapStrength, PortfolioAudit,
+        PortfolioAuditFinding, PortfolioAuditRisk, PortfolioBlocker, PortfolioBlockerClass,
+        PortfolioContract, PortfolioDispatch, PortfolioError, PortfolioErrorKind,
+        PortfolioFingerprint, PortfolioPhase, PortfolioReceipt, PortfolioResult, PortfolioState,
+        PortfolioUsage, PortfolioValidationReceipt, PortfolioValidationStatus, ReopenNovelty,
+    },
+};
 
 #[derive(Clone, Copy)]
 struct ErrorField(&'static str);
@@ -88,10 +70,14 @@ pub fn portfolio_contract_fingerprint(contract: &PortfolioContract) -> Portfolio
     hash_fingerprint(&mut hasher, &contract.source_policy);
     hash_fingerprint(&mut hasher, &contract.validator_policy);
     hash_part(&mut hasher, &contract.budget.rounds.to_le_bytes());
-    hash_part(&mut hasher, &contract.budget.approach_capacity.to_le_bytes());
+    hash_part(
+        &mut hasher,
+        &contract.budget.approach_capacity.to_le_bytes(),
+    );
     hash_part(&mut hasher, &contract.budget.tool_calls.to_le_bytes());
     hash_part(&mut hasher, &contract.budget.tokens.to_le_bytes());
-    let fingerprint = PortfolioFingerprint::new(BLAKE3_ALGORITHM, hasher.finalize().to_hex().to_string());
+    let fingerprint =
+        PortfolioFingerprint::new(BLAKE3_ALGORITHM, hasher.finalize().to_hex().to_string());
     debug_assert_eq!(fingerprint.algorithm, BLAKE3_ALGORITHM);
     debug_assert_eq!(fingerprint.value_hex.len(), BLAKE3_HEX_LENGTH);
     fingerprint
@@ -99,7 +85,10 @@ pub fn portfolio_contract_fingerprint(contract: &PortfolioContract) -> Portfolio
 
 /// Computes the selected candidate and audit evidence identity.
 #[must_use]
-pub fn portfolio_evidence_fingerprint(approach: &ApproachRecord, audit: &PortfolioAudit) -> PortfolioFingerprint {
+pub fn portfolio_evidence_fingerprint(
+    approach: &ApproachRecord,
+    audit: &PortfolioAudit,
+) -> PortfolioFingerprint {
     let mut hasher = portfolio_hasher("evidence");
     hash_part(&mut hasher, approach.approach_id.as_bytes());
     hash_fingerprint(&mut hasher, &approach.mechanism);
@@ -129,7 +118,9 @@ pub fn validate_portfolio_contract(contract: &PortfolioContract) -> PortfolioRes
     validate_fingerprint(&contract.validator_policy)?;
     require_safe_text_collection(&contract.completion_evidence, FIELD_CONTRACT, true)?;
     require_safe_text_collection(&contract.false_completion_cases, FIELD_CONTRACT, true)?;
-    if contract.required_audit_risks.is_empty() || contract.required_audit_risks.len() > MAX_REFERENCE_COUNT {
+    if contract.required_audit_risks.is_empty()
+        || contract.required_audit_risks.len() > MAX_REFERENCE_COUNT
+    {
         return Err(error(
             PortfolioErrorKind::InvalidContract,
             FIELD_CONTRACT,
@@ -156,7 +147,11 @@ pub fn validate_portfolio_contract(contract: &PortfolioContract) -> PortfolioRes
     .into_iter()
     .all(|is_positive| is_positive);
     if !is_budget_positive {
-        return Err(error(PortfolioErrorKind::BudgetInvalid, FIELD_BUDGET, "portfolio limits must all be positive"));
+        return Err(error(
+            PortfolioErrorKind::BudgetInvalid,
+            FIELD_BUDGET,
+            "portfolio limits must all be positive",
+        ));
     }
     debug_assert!(!risks.is_empty());
     debug_assert_eq!(risks.len(), contract.required_audit_risks.len());
@@ -201,12 +196,18 @@ pub fn begin_independent_exploration(state: &PortfolioState) -> PortfolioResult<
 ///
 /// Returns a typed error for unsafe metadata, early cross-pollination, unknown
 /// references, invalid requests, or budget overflow.
-pub fn validate_portfolio_dispatch(state: &PortfolioState, dispatch: &PortfolioDispatch) -> PortfolioResult<()> {
+pub fn validate_portfolio_dispatch(
+    state: &PortfolioState,
+    dispatch: &PortfolioDispatch,
+) -> PortfolioResult<()> {
     validate_state(state)?;
-    require_phase(state, &[
-        PortfolioPhase::IndependentExploration,
-        PortfolioPhase::TargetedRedirection,
-    ])?;
+    require_phase(
+        state,
+        &[
+            PortfolioPhase::IndependentExploration,
+            PortfolioPhase::TargetedRedirection,
+        ],
+    )?;
     require_safe_text(&dispatch.dispatch_id, FIELD_DISPATCH)?;
     require_safe_text(&dispatch.family_hint, FIELD_DISPATCH)?;
     require_safe_text_collection(&dispatch.disclosed_approach_ids, FIELD_DISPATCH, false)?;
@@ -217,7 +218,9 @@ pub fn validate_portfolio_dispatch(state: &PortfolioState, dispatch: &PortfolioD
             "portfolio dispatch requires a positive token request",
         ));
     }
-    if state.phase == PortfolioPhase::IndependentExploration && !dispatch.disclosed_approach_ids.is_empty() {
+    if state.phase == PortfolioPhase::IndependentExploration
+        && !dispatch.disclosed_approach_ids.is_empty()
+    {
         return Err(error(
             PortfolioErrorKind::CrossPollination,
             FIELD_DISPATCH,
@@ -328,12 +331,18 @@ pub fn validate_approach_record(approach: &ApproachRecord) -> PortfolioResult<()
 ///
 /// Returns a typed error for phase violations, duplicate IDs or mechanisms,
 /// malformed route state, or approach-budget exhaustion.
-pub fn register_approach(state: &PortfolioState, approach: ApproachRecord) -> PortfolioResult<PortfolioState> {
+pub fn register_approach(
+    state: &PortfolioState,
+    approach: ApproachRecord,
+) -> PortfolioResult<PortfolioState> {
     validate_state(state)?;
-    require_phase(state, &[
-        PortfolioPhase::IndependentExploration,
-        PortfolioPhase::TargetedRedirection,
-    ])?;
+    require_phase(
+        state,
+        &[
+            PortfolioPhase::IndependentExploration,
+            PortfolioPhase::TargetedRedirection,
+        ],
+    )?;
     validate_approach_record(&approach)?;
     if !is_registration_state_admitted(state.phase, approach.state) {
         return Err(error(
@@ -386,10 +395,13 @@ pub fn register_approach(state: &PortfolioState, approach: ApproachRecord) -> Po
 /// Returns a typed error for an illegal phase or empty registry.
 pub fn begin_synthesis(state: &PortfolioState) -> PortfolioResult<PortfolioState> {
     validate_state(state)?;
-    require_phase(state, &[
-        PortfolioPhase::IndependentExploration,
-        PortfolioPhase::TargetedRedirection,
-    ])?;
+    require_phase(
+        state,
+        &[
+            PortfolioPhase::IndependentExploration,
+            PortfolioPhase::TargetedRedirection,
+        ],
+    )?;
     if state.approaches.is_empty() {
         return Err(error(
             PortfolioErrorKind::MissingApproach,
@@ -405,7 +417,11 @@ pub fn begin_synthesis(state: &PortfolioState) -> PortfolioResult<PortfolioState
     }
     next.phase = PortfolioPhase::Synthesis;
     debug_assert_eq!(next.phase, PortfolioPhase::Synthesis);
-    debug_assert!(next.approaches.values().all(|approach| approach.state != ApproachState::Independent));
+    debug_assert!(
+        next.approaches
+            .values()
+            .all(|approach| approach.state != ApproachState::Independent)
+    );
     Ok(next)
 }
 
@@ -466,18 +482,28 @@ pub fn block_approach(
     blocker: PortfolioBlocker,
 ) -> PortfolioResult<PortfolioState> {
     validate_state(state)?;
-    require_phase(state, &[
-        PortfolioPhase::IndependentExploration,
-        PortfolioPhase::Synthesis,
-        PortfolioPhase::TargetedRedirection,
-    ])?;
+    require_phase(
+        state,
+        &[
+            PortfolioPhase::IndependentExploration,
+            PortfolioPhase::Synthesis,
+            PortfolioPhase::TargetedRedirection,
+        ],
+    )?;
     require_safe_text(approach_id, FIELD_APPROACH)?;
     validate_blocker(&blocker)?;
     validate_gap_blocker(gap_strength, blocker.class)?;
     let Some(current) = state.approaches.get(approach_id) else {
-        return Err(error(PortfolioErrorKind::MissingApproach, FIELD_APPROACH, "cannot block an unknown approach"));
+        return Err(error(
+            PortfolioErrorKind::MissingApproach,
+            FIELD_APPROACH,
+            "cannot block an unknown approach",
+        ));
     };
-    if matches!(current.state, ApproachState::Audit | ApproachState::Validated) {
+    if matches!(
+        current.state,
+        ApproachState::Audit | ApproachState::Validated
+    ) {
         return Err(error(
             PortfolioErrorKind::InvalidApproach,
             FIELD_APPROACH,
@@ -485,7 +511,10 @@ pub fn block_approach(
         ));
     }
     let mut next = state.clone();
-    let approach = next.approaches.get_mut(approach_id).ok_or_else(missing_approach_after_validation)?;
+    let approach = next
+        .approaches
+        .get_mut(approach_id)
+        .ok_or_else(missing_approach_after_validation)?;
     approach.gap_strength = gap_strength;
     approach.state = if blocker.class == PortfolioBlockerClass::Contradiction {
         ApproachState::Falsified
@@ -526,7 +555,11 @@ pub fn reopen_approach(
         ));
     }
     let Some(current) = state.approaches.get(approach_id) else {
-        return Err(error(PortfolioErrorKind::MissingApproach, FIELD_APPROACH, "cannot reopen an unknown approach"));
+        return Err(error(
+            PortfolioErrorKind::MissingApproach,
+            FIELD_APPROACH,
+            "cannot reopen an unknown approach",
+        ));
     };
     if current.state != ApproachState::Blocked {
         return Err(error(
@@ -535,16 +568,26 @@ pub fn reopen_approach(
             "only a blocked approach can be reopened",
         ));
     }
-    let (is_new_mechanism, is_new_evidence) = validate_reopen_novelty(state, approach_id, current, novelty)?;
+    let (is_new_mechanism, is_new_evidence) =
+        validate_reopen_novelty(state, approach_id, current, novelty)?;
     let mut next = state.clone();
-    let approach = next.approaches.get_mut(approach_id).ok_or_else(missing_approach_after_validation)?;
+    let approach = next
+        .approaches
+        .get_mut(approach_id)
+        .ok_or_else(missing_approach_after_validation)?;
     if is_new_mechanism {
-        approach.mechanism = novelty.mechanism.clone().ok_or_else(missing_novelty_after_validation)?;
+        approach.mechanism = novelty
+            .mechanism
+            .clone()
+            .ok_or_else(missing_novelty_after_validation)?;
     }
     if is_new_evidence {
-        approach
-            .evidence_refs
-            .push(novelty.evidence_ref.clone().ok_or_else(missing_novelty_after_validation)?);
+        approach.evidence_refs.push(
+            novelty
+                .evidence_ref
+                .clone()
+                .ok_or_else(missing_novelty_after_validation)?,
+        );
     }
     approach.gap_strength = GapStrength::Simpler;
     approach.state = ApproachState::Active;
@@ -580,8 +623,11 @@ fn validate_reopen_novelty(
     };
     let is_new_evidence = if let Some(evidence_ref) = &novelty.evidence_ref {
         require_safe_text(evidence_ref, FIELD_APPROACH)?;
-        let is_repeated_blocker_evidence =
-            current.blocker.as_ref().and_then(|blocker| blocker.evidence_ref.as_ref()) == Some(evidence_ref);
+        let is_repeated_blocker_evidence = current
+            .blocker
+            .as_ref()
+            .and_then(|blocker| blocker.evidence_ref.as_ref())
+            == Some(evidence_ref);
         !current.evidence_refs.contains(evidence_ref) && !is_repeated_blocker_evidence
     } else {
         false
@@ -604,12 +650,25 @@ fn validate_reopen_novelty(
 ///
 /// Returns a typed error for phase, missing route, ineligible state or gap, or
 /// absent route evidence.
-pub fn begin_adversarial_audit(state: &PortfolioState, approach_id: &str) -> PortfolioResult<PortfolioState> {
+pub fn begin_adversarial_audit(
+    state: &PortfolioState,
+    approach_id: &str,
+) -> PortfolioResult<PortfolioState> {
     validate_state(state)?;
-    require_phase(state, &[PortfolioPhase::Synthesis, PortfolioPhase::TargetedRedirection])?;
+    require_phase(
+        state,
+        &[
+            PortfolioPhase::Synthesis,
+            PortfolioPhase::TargetedRedirection,
+        ],
+    )?;
     require_safe_text(approach_id, FIELD_APPROACH)?;
     let Some(candidate) = state.approaches.get(approach_id) else {
-        return Err(error(PortfolioErrorKind::MissingApproach, FIELD_APPROACH, "cannot audit an unknown approach"));
+        return Err(error(
+            PortfolioErrorKind::MissingApproach,
+            FIELD_APPROACH,
+            "cannot audit an unknown approach",
+        ));
     };
     if candidate.state != ApproachState::Active {
         return Err(error(
@@ -633,7 +692,10 @@ pub fn begin_adversarial_audit(state: &PortfolioState, approach_id: &str) -> Por
         ));
     }
     let mut next = state.clone();
-    let selected = next.approaches.get_mut(approach_id).ok_or_else(missing_approach_after_validation)?;
+    let selected = next
+        .approaches
+        .get_mut(approach_id)
+        .ok_or_else(missing_approach_after_validation)?;
     selected.state = ApproachState::Audit;
     next.phase = PortfolioPhase::AdversarialAudit;
     next.selected_approach = Some(approach_id.to_string());
@@ -649,7 +711,10 @@ pub fn begin_adversarial_audit(state: &PortfolioState, approach_id: &str) -> Por
 ///
 /// Returns a typed error for phase, candidate mismatch, missing risk classes,
 /// key/finding mismatch, or unsafe evidence metadata.
-pub fn record_adversarial_audit(state: &PortfolioState, audit: &PortfolioAudit) -> PortfolioResult<PortfolioState> {
+pub fn record_adversarial_audit(
+    state: &PortfolioState,
+    audit: &PortfolioAudit,
+) -> PortfolioResult<PortfolioState> {
     validate_state(state)?;
     require_phase(state, &[PortfolioPhase::AdversarialAudit])?;
     require_safe_text(&audit.approach_id, FIELD_AUDIT)?;
@@ -661,14 +726,21 @@ pub fn record_adversarial_audit(state: &PortfolioState, audit: &PortfolioAudit) 
         ));
     }
     if audit.findings.len() > MAX_REFERENCE_COUNT {
-        return Err(error(PortfolioErrorKind::AuditIncomplete, FIELD_AUDIT, "audit exceeds the bounded finding count"));
+        return Err(error(
+            PortfolioErrorKind::AuditIncomplete,
+            FIELD_AUDIT,
+            "audit exceeds the bounded finding count",
+        ));
     }
     for required in &state.contract.required_audit_risks {
         if !audit.findings.contains_key(required) {
             return Err(error(
                 PortfolioErrorKind::AuditIncomplete,
                 FIELD_AUDIT,
-                format!("audit is missing required risk `{}`", audit_risk_label(required)),
+                format!(
+                    "audit is missing required risk `{}`",
+                    audit_risk_label(required)
+                ),
             ));
         }
     }
@@ -711,14 +783,20 @@ pub fn begin_validation(state: &PortfolioState) -> PortfolioResult<PortfolioStat
             return Err(error(
                 PortfolioErrorKind::AuditIncomplete,
                 FIELD_AUDIT,
-                format!("validation is missing required risk `{}`", audit_risk_label(required)),
+                format!(
+                    "validation is missing required risk `{}`",
+                    audit_risk_label(required)
+                ),
             ));
         };
         if finding.outcome != AuditOutcome::Pass {
             return Err(error(
                 PortfolioErrorKind::AuditFailed,
                 FIELD_AUDIT,
-                format!("required audit risk `{}` did not pass", audit_risk_label(required)),
+                format!(
+                    "required audit risk `{}` did not pass",
+                    audit_risk_label(required)
+                ),
             ));
         }
     }
@@ -791,7 +869,10 @@ pub fn validate_portfolio_result(
     };
     validate_audited_candidate_receipt(candidate, audit, receipt)?;
     let mut next = state.clone();
-    let selected = next.approaches.get_mut(&receipt.approach_id).ok_or_else(missing_approach_after_validation)?;
+    let selected = next
+        .approaches
+        .get_mut(&receipt.approach_id)
+        .ok_or_else(missing_approach_after_validation)?;
     selected.state = ApproachState::Validated;
     next.phase = PortfolioPhase::Validated;
     next.validation_receipt = Some(receipt.clone());
@@ -842,8 +923,11 @@ pub fn is_portfolio_budget_exhausted(state: &PortfolioState) -> bool {
 pub fn exhaust_portfolio(state: &PortfolioState) -> PortfolioResult<PortfolioState> {
     validate_state(state)?;
     reject_terminal(state)?;
-    let is_every_route_terminal =
-        !state.approaches.is_empty() && state.approaches.values().all(|approach| is_terminal_approach(approach.state));
+    let is_every_route_terminal = !state.approaches.is_empty()
+        && state
+            .approaches
+            .values()
+            .all(|approach| is_terminal_approach(approach.state));
     if !is_portfolio_budget_exhausted(state) && !is_every_route_terminal {
         return Err(error(
             PortfolioErrorKind::BudgetInvalid,
@@ -866,7 +950,10 @@ pub fn exhaust_portfolio(state: &PortfolioState) -> PortfolioResult<PortfolioSta
 ///
 /// Returns a typed error for invalid state, terminal state, unsafe metadata, or
 /// an approach-only blocker class.
-pub fn block_portfolio(state: &PortfolioState, blocker: PortfolioBlocker) -> PortfolioResult<PortfolioState> {
+pub fn block_portfolio(
+    state: &PortfolioState,
+    blocker: PortfolioBlocker,
+) -> PortfolioResult<PortfolioState> {
     validate_state(state)?;
     reject_terminal(state)?;
     validate_blocker(&blocker)?;
@@ -907,11 +994,16 @@ pub fn project_portfolio_receipt(state: &PortfolioState) -> PortfolioResult<Port
             "portfolio receipts require a terminal phase",
         ));
     }
-    let selected = state.selected_approach.as_ref().and_then(|approach_id| state.approaches.get(approach_id));
+    let selected = state
+        .selected_approach
+        .as_ref()
+        .and_then(|approach_id| state.approaches.get(approach_id));
     let contract = portfolio_contract_fingerprint(&state.contract);
     let selected_approach = selected.map(|approach| approach.approach_id.clone());
     let selected_mechanism = selected.map(|approach| approach.mechanism.clone());
-    let evidence_refs = selected.map(|approach| approach.evidence_refs.clone()).unwrap_or_default();
+    let evidence_refs = selected
+        .map(|approach| approach.evidence_refs.clone())
+        .unwrap_or_default();
     let blocker = if state.phase == PortfolioPhase::Blocked {
         state.terminal_blocker.clone()
     } else {
@@ -1038,7 +1130,10 @@ fn validate_receipt_terminal_fields(receipt: &PortfolioReceipt) -> PortfolioResu
         }
     }
     debug_assert!(receipt.phase.is_terminal());
-    debug_assert_eq!(receipt.selected_approach.is_some(), receipt.selected_mechanism.is_some());
+    debug_assert_eq!(
+        receipt.selected_approach.is_some(),
+        receipt.selected_mechanism.is_some()
+    );
     Ok(())
 }
 
@@ -1124,7 +1219,12 @@ fn validate_state_registry(state: &PortfolioState) -> PortfolioResult<()> {
         }
     }
     debug_assert_eq!(state.usage.approaches, registry_count);
-    debug_assert!(state.approaches.iter().all(|(approach_id, approach)| approach_id == &approach.approach_id));
+    debug_assert!(
+        state
+            .approaches
+            .iter()
+            .all(|(approach_id, approach)| approach_id == &approach.approach_id)
+    );
     Ok(())
 }
 
@@ -1171,7 +1271,9 @@ fn validate_state_phase_fields(state: &PortfolioState) -> PortfolioResult<()> {
 
 fn has_required_phase_selection(state: &PortfolioState) -> bool {
     match state.phase {
-        PortfolioPhase::AdversarialAudit | PortfolioPhase::Validation => state.selected_approach.is_some(),
+        PortfolioPhase::AdversarialAudit | PortfolioPhase::Validation => {
+            state.selected_approach.is_some()
+        }
         PortfolioPhase::Framing
         | PortfolioPhase::IndependentExploration
         | PortfolioPhase::Synthesis
@@ -1184,7 +1286,9 @@ fn has_required_phase_selection(state: &PortfolioState) -> bool {
 
 fn has_required_terminal_fields(state: &PortfolioState) -> bool {
     match state.phase {
-        PortfolioPhase::Validated => state.selected_approach.is_some() && state.validation_receipt.is_some(),
+        PortfolioPhase::Validated => {
+            state.selected_approach.is_some() && state.validation_receipt.is_some()
+        }
         PortfolioPhase::Blocked => state.terminal_blocker.is_some(),
         PortfolioPhase::Framing
         | PortfolioPhase::IndependentExploration
@@ -1197,7 +1301,10 @@ fn has_required_terminal_fields(state: &PortfolioState) -> bool {
 }
 
 fn validate_approach_blocker_invariant(approach: &ApproachRecord) -> PortfolioResult<()> {
-    let is_blocker_required = matches!(approach.state, ApproachState::Blocked | ApproachState::Falsified);
+    let is_blocker_required = matches!(
+        approach.state,
+        ApproachState::Blocked | ApproachState::Falsified
+    );
     if is_blocker_required != approach.blocker.is_some() {
         return Err(error(
             PortfolioErrorKind::InvalidApproach,
@@ -1250,7 +1357,10 @@ fn validate_approach_blocker_invariant(approach: &ApproachRecord) -> PortfolioRe
     Ok(())
 }
 
-fn require_exact_gap_blocker(approach: &ApproachRecord, expected: PortfolioBlockerClass) -> PortfolioResult<()> {
+fn require_exact_gap_blocker(
+    approach: &ApproachRecord,
+    expected: PortfolioBlockerClass,
+) -> PortfolioResult<()> {
     if approach.state != ApproachState::Blocked
         || approach.blocker.as_ref().map(|blocker| blocker.class) != Some(expected)
     {
@@ -1263,7 +1373,10 @@ fn require_exact_gap_blocker(approach: &ApproachRecord, expected: PortfolioBlock
     Ok(())
 }
 
-fn validate_gap_blocker(gap_strength: GapStrength, blocker_class: PortfolioBlockerClass) -> PortfolioResult<()> {
+fn validate_gap_blocker(
+    gap_strength: GapStrength,
+    blocker_class: PortfolioBlockerClass,
+) -> PortfolioResult<()> {
     if !is_gap_blocker_matching(gap_strength, blocker_class) {
         return Err(error(
             PortfolioErrorKind::BlockerMismatch,
@@ -1274,7 +1387,10 @@ fn validate_gap_blocker(gap_strength: GapStrength, blocker_class: PortfolioBlock
     Ok(())
 }
 
-fn is_gap_blocker_matching(gap_strength: GapStrength, blocker_class: PortfolioBlockerClass) -> bool {
+fn is_gap_blocker_matching(
+    gap_strength: GapStrength,
+    blocker_class: PortfolioBlockerClass,
+) -> bool {
     match gap_strength {
         GapStrength::Simpler => !matches!(
             blocker_class,
@@ -1312,7 +1428,10 @@ fn validate_audit_risk(risk: &PortfolioAuditRisk) -> PortfolioResult<()> {
 
 fn validate_fingerprint(fingerprint: &PortfolioFingerprint) -> PortfolioResult<()> {
     let is_valid_hex = fingerprint.value_hex.len() == BLAKE3_HEX_LENGTH
-        && fingerprint.value_hex.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
+        && fingerprint
+            .value_hex
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
     if fingerprint.algorithm != BLAKE3_ALGORITHM || !is_valid_hex {
         return Err(error(
             PortfolioErrorKind::InvalidFingerprint,
@@ -1325,7 +1444,10 @@ fn validate_fingerprint(fingerprint: &PortfolioFingerprint) -> PortfolioResult<(
 
 fn require_safe_text(text: &str, field: ErrorField) -> PortfolioResult<()> {
     let character_count_chars = text.chars().count();
-    if text.trim().is_empty() || character_count_chars > MAX_SAFE_LABEL_CHARS || text.chars().any(char::is_control) {
+    if text.trim().is_empty()
+        || character_count_chars > MAX_SAFE_LABEL_CHARS
+        || text.chars().any(char::is_control)
+    {
         return Err(error(
             PortfolioErrorKind::UnsafeMetadata,
             field,
@@ -1352,7 +1474,11 @@ fn require_safe_text(text: &str, field: ErrorField) -> PortfolioResult<()> {
     Ok(())
 }
 
-fn require_safe_text_collection(values: &[String], field: ErrorField, require_non_empty: bool) -> PortfolioResult<()> {
+fn require_safe_text_collection(
+    values: &[String],
+    field: ErrorField,
+    require_non_empty: bool,
+) -> PortfolioResult<()> {
     if values.len() > MAX_REFERENCE_COUNT || (require_non_empty && values.is_empty()) {
         return Err(error(
             PortfolioErrorKind::UnsafeMetadata,
@@ -1416,12 +1542,19 @@ fn find_mechanism_owner<'a>(
     })
 }
 
-const fn is_registration_state_admitted(phase: PortfolioPhase, approach_state: ApproachState) -> bool {
+const fn is_registration_state_admitted(
+    phase: PortfolioPhase,
+    approach_state: ApproachState,
+) -> bool {
     match phase {
-        PortfolioPhase::IndependentExploration => {
-            matches!(approach_state, ApproachState::Independent | ApproachState::Blocked)
-        }
-        PortfolioPhase::TargetedRedirection => matches!(approach_state, ApproachState::Active | ApproachState::Blocked),
+        PortfolioPhase::IndependentExploration => matches!(
+            approach_state,
+            ApproachState::Independent | ApproachState::Blocked
+        ),
+        PortfolioPhase::TargetedRedirection => matches!(
+            approach_state,
+            ApproachState::Active | ApproachState::Blocked
+        ),
         PortfolioPhase::Framing
         | PortfolioPhase::Synthesis
         | PortfolioPhase::AdversarialAudit
@@ -1433,23 +1566,43 @@ const fn is_registration_state_admitted(phase: PortfolioPhase, approach_state: A
 }
 
 const fn is_live_approach(state: ApproachState) -> bool {
-    matches!(state, ApproachState::Independent | ApproachState::Active | ApproachState::Audit)
+    matches!(
+        state,
+        ApproachState::Independent | ApproachState::Active | ApproachState::Audit
+    )
 }
 
 const fn is_terminal_approach(state: ApproachState) -> bool {
-    matches!(state, ApproachState::Blocked | ApproachState::Falsified | ApproachState::Validated)
+    matches!(
+        state,
+        ApproachState::Blocked | ApproachState::Falsified | ApproachState::Validated
+    )
 }
 
 fn checked_add_u32(addends: CheckedAdd<u32>, field: ErrorField) -> PortfolioResult<u32> {
-    addends.current.checked_add(addends.increment).ok_or_else(|| {
-        error(PortfolioErrorKind::BudgetExceeded, field, "portfolio counter overflowed its integer representation")
-    })
+    addends
+        .current
+        .checked_add(addends.increment)
+        .ok_or_else(|| {
+            error(
+                PortfolioErrorKind::BudgetExceeded,
+                field,
+                "portfolio counter overflowed its integer representation",
+            )
+        })
 }
 
 fn checked_add_u64(addends: CheckedAdd<u64>, field: ErrorField) -> PortfolioResult<u64> {
-    addends.current.checked_add(addends.increment).ok_or_else(|| {
-        error(PortfolioErrorKind::BudgetExceeded, field, "portfolio counter overflowed its integer representation")
-    })
+    addends
+        .current
+        .checked_add(addends.increment)
+        .ok_or_else(|| {
+            error(
+                PortfolioErrorKind::BudgetExceeded,
+                field,
+                "portfolio counter overflowed its integer representation",
+            )
+        })
 }
 
 fn missing_approach_after_validation() -> PortfolioError {
@@ -1567,7 +1720,9 @@ struct PortfolioReceiptFingerprintInput<'a> {
     blocker: Option<&'a PortfolioBlocker>,
 }
 
-fn portfolio_receipt_fingerprint(input: &PortfolioReceiptFingerprintInput<'_>) -> PortfolioFingerprint {
+fn portfolio_receipt_fingerprint(
+    input: &PortfolioReceiptFingerprintInput<'_>,
+) -> PortfolioFingerprint {
     let mut hasher = portfolio_hasher("receipt");
     hash_fingerprint(&mut hasher, input.contract);
     hash_part(&mut hasher, phase_label(input.phase).as_bytes());
@@ -1587,7 +1742,10 @@ fn portfolio_receipt_fingerprint(input: &PortfolioReceiptFingerprintInput<'_>) -
     }
     hash_text_collection(&mut hasher, input.evidence_refs);
     if let Some(exact_blocker) = input.blocker {
-        hash_part(&mut hasher, blocker_class_label(exact_blocker.class).as_bytes());
+        hash_part(
+            &mut hasher,
+            blocker_class_label(exact_blocker.class).as_bytes(),
+        );
         hash_part(&mut hasher, exact_blocker.detail.as_bytes());
         if let Some(evidence_ref) = &exact_blocker.evidence_ref {
             hash_part(&mut hasher, evidence_ref.as_bytes());
@@ -1595,7 +1753,8 @@ fn portfolio_receipt_fingerprint(input: &PortfolioReceiptFingerprintInput<'_>) -
     } else {
         hash_part(&mut hasher, b"no-terminal-blocker");
     }
-    let fingerprint = PortfolioFingerprint::new(BLAKE3_ALGORITHM, hasher.finalize().to_hex().to_string());
+    let fingerprint =
+        PortfolioFingerprint::new(BLAKE3_ALGORITHM, hasher.finalize().to_hex().to_string());
     debug_assert_eq!(fingerprint.algorithm, BLAKE3_ALGORITHM);
     debug_assert_eq!(fingerprint.value_hex.len(), BLAKE3_HEX_LENGTH);
     fingerprint

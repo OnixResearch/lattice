@@ -20,10 +20,11 @@
         "router_role": ""
       },
       "context_budget_policy": "standard-budget",
+      "dialect_id": "mock-text-v1",
       "memory_access_mode": "disabled",
       "memory_policy_hash": "9999999999999999999999999999999999999999999999999999999999999999",
       "policy_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "profile_hash": "dba2fff3a916d9b631208f1dae89c7e30591add42e33c0568223432a4fb97428",
+      "profile_hash": "ad975d519178913e933730c88e13935629cc2a4d4ab49d771c616e711efa252a",
       "profile_id": "mock-standard",
       "project_profile_admitted": false,
       "prompt_mode_ref": "standard",
@@ -51,10 +52,11 @@
         "router_role": "balanced"
       },
       "context_budget_policy": "standard-budget",
+      "dialect_id": "mock-text-v1",
       "memory_access_mode": "read_only",
       "memory_policy_hash": "9999999999999999999999999999999999999999999999999999999999999999",
       "policy_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "profile_hash": "6c55a406c8b9e0855adcf189156bcf1b8e49c6ec03402b2d45d52f46a920c91f",
+      "profile_hash": "31d6c27efddea3f6b9b0973fe52e24ec44560b7a093f4aac60200878552b2f30",
       "profile_id": "mock-balanced",
       "project_profile_admitted": false,
       "prompt_mode_ref": "standard",
@@ -91,10 +93,11 @@
         "router_role": ""
       },
       "context_budget_policy": "standard-budget",
+      "dialect_id": "generic-responses-v1",
       "memory_access_mode": "disabled",
       "memory_policy_hash": "9999999999999999999999999999999999999999999999999999999999999999",
       "policy_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "profile_hash": "afbe344c0f904052774b59c2cf1419de8c5ae445470a04d89a7300acdd48726b",
+      "profile_hash": "24fdac2e38776b01b3bf6088b3a070b960156ae9e0f472b0ff98938d5129ec56",
       "profile_id": "compat-default",
       "project_profile_admitted": false,
       "prompt_mode_ref": "standard",
@@ -113,7 +116,7 @@
       "trust_status": "trusted"
     }
   ],
-  "schema": "animus.model-runtime-profiles.v1",
+  "schema": "animus.model-runtime-profiles.v2",
   "toolsets": [
     {
       "tool_names": [

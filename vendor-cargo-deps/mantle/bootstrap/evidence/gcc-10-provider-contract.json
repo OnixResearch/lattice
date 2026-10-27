@@ -1,0 +1,20 @@
+{
+  "schema": "mantle-gcc10-provider-contract-v1",
+  "derivation": "bootstrap/gcc-10.ncl",
+  "status": "contract-only",
+  "required_markers": [
+    "GCC47=$(find_input gcc-4.7.4-musl-gcc40-v1)",
+    "HOST_CC=\"$TOOLBIN/gcc47\"",
+    "HOST_CXX=\"$TOOLBIN/gxx47\"",
+    "--enable-languages=c,c++",
+    "make -j\"$JOB_COUNT\" all-gcc",
+    "make -j\"$JOB_COUNT\" all-target-libgcc",
+    "make -j\"$JOB_COUNT\" install-gcc",
+    "make -j\"$JOB_COUNT\" install-target-libgcc",
+    "test -x \"$out/libexec/gcc/$TARGET/$OUTPUT_GCC_VERSION/cc1plus\"",
+    "ERROR: GCC 10 accepted malformed C",
+    "ERROR: GCC 10 accepted malformed C++",
+    "RELOCATED_GCC=\"$WORK/relocated-gcc10\""
+  ],
+  "parity_effect": "evidence-backed partial; does not prove native/full GCC 10 correctness"
+}

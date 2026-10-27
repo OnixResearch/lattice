@@ -1,27 +1,13 @@
 #![allow(unknown_lints)]
 #![cfg_attr(animus_octet, allow(tigerstyle::excessive_file_length))]
 
-use super::DESCRIPTOR_ID_FIELD;
-use super::MAX_MEMORY_CONFIDENCE_PERCENT;
-use super::MAX_MEMORY_DESCRIPTORS;
-use super::MEMORY_CATEGORY_FIELD;
-use super::MEMORY_EVIDENCE_FIELD;
-use super::MEMORY_SOURCE_FIELD;
-use super::MemoryAdmissionStatus;
-use super::MemoryAvailabilityStatus;
-use super::MemoryConfidence;
-use super::MemoryError;
-use super::MemoryFreshness;
-use super::MemoryInjectionBudget;
-use super::MemoryReceiptLeak;
-use super::MemoryRedactionClass;
-use super::MemoryTrustScope;
-use super::NonZeroU32;
-use super::String;
-use super::Vec;
-use super::memory_leak;
-use super::normalize;
-use super::reject_expired_descriptor;
+use super::{
+    DESCRIPTOR_ID_FIELD, MAX_MEMORY_CONFIDENCE_PERCENT, MAX_MEMORY_DESCRIPTORS,
+    MEMORY_CATEGORY_FIELD, MEMORY_EVIDENCE_FIELD, MEMORY_SOURCE_FIELD, MemoryAdmissionStatus,
+    MemoryAvailabilityStatus, MemoryConfidence, MemoryError, MemoryFreshness,
+    MemoryInjectionBudget, MemoryReceiptLeak, MemoryRedactionClass, MemoryTrustScope, NonZeroU32,
+    String, Vec, memory_leak, normalize, reject_expired_descriptor,
+};
 
 const MEMORY_ADAPTER_LABEL_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("memory_adapter_label");
@@ -33,7 +19,8 @@ const MEMORY_EXPIRATION_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("memory_expiration_label");
 const MEMORY_SUPERSESSION_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("memory_supersession_id");
-const MEMORY_QUERY_LABEL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("memory_query_label");
+const MEMORY_QUERY_LABEL_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("memory_query_label");
 const ZERO_MEMORY_UNITS: u32 = 0;
 const RANK_OFFSET: u32 = 1;
 const RANK_OFFSET_INDEX: usize = 1;
@@ -238,7 +225,9 @@ pub enum MemoryAdapterOperationAvailability {
 /// Panics if callers provide more required roles or adapters than the memory adapter bound.
 #[must_use]
 // r[impl agent_harness_runtime.memory_adapters.family.missing]
-pub fn evaluate_memory_adapter_operation(input: MemoryAdapterOperationInput<'_>) -> MemoryAdapterOperationAvailability {
+pub fn evaluate_memory_adapter_operation(
+    input: MemoryAdapterOperationInput<'_>,
+) -> MemoryAdapterOperationAvailability {
     assert!(input.required_roles.len() <= MAX_MEMORY_ADAPTERS);
     assert!(input.adapters.len() <= MAX_MEMORY_ADAPTERS);
     if !input.enabled {
@@ -247,14 +236,27 @@ pub fn evaluate_memory_adapter_operation(input: MemoryAdapterOperationInput<'_>)
         };
     }
     for required_role in input.required_roles {
-        let Some(adapter) = input.adapters.iter().find(|adapter| adapter.role() == *required_role) else {
-            return MemoryAdapterOperationAvailability::Unavailable { role: *required_role };
+        let Some(adapter) = input
+            .adapters
+            .iter()
+            .find(|adapter| adapter.role() == *required_role)
+        else {
+            return MemoryAdapterOperationAvailability::Unavailable {
+                role: *required_role,
+            };
         };
         if adapter.availability() != MemoryAvailabilityStatus::Available {
-            return MemoryAdapterOperationAvailability::Unavailable { role: *required_role };
+            return MemoryAdapterOperationAvailability::Unavailable {
+                role: *required_role,
+            };
         }
-        if !adapter.capabilities().contains(&role_capability(*required_role)) {
-            return MemoryAdapterOperationAvailability::Unsupported { role: *required_role };
+        if !adapter
+            .capabilities()
+            .contains(&role_capability(*required_role))
+        {
+            return MemoryAdapterOperationAvailability::Unsupported {
+                role: *required_role,
+            };
         }
     }
     MemoryAdapterOperationAvailability::Ready
@@ -360,7 +362,9 @@ impl MemoryRecordCategory {
 /// Maps existing generic record kinds into the category-aware taxonomy.
 #[must_use]
 // r[impl agent_harness_runtime.memory_taxonomy.compatibility]
-pub const fn memory_category_for_generic_kind(kind: GenericMemoryRecordKind) -> MemoryRecordCategory {
+pub const fn memory_category_for_generic_kind(
+    kind: GenericMemoryRecordKind,
+) -> MemoryRecordCategory {
     match kind {
         GenericMemoryRecordKind::Instruction => MemoryRecordCategory::Instruction,
         GenericMemoryRecordKind::Fact => MemoryRecordCategory::Fact,
@@ -440,26 +444,35 @@ impl MemoryRecordEnvelope {
     ///
     /// # Errors
     ///
-    /// Returns [`MemoryError`] when required metadata is missing, malformed, unsafe, expired, or
-    /// unbudgeted.
+    /// Returns [`MemoryError`] when required metadata is missing, malformed, unsafe, expired, or unbudgeted.
     // r[impl agent_harness_runtime.memory_adapters.record_envelope]
     // r[impl agent_harness_runtime.memory_taxonomy.record_categories]
     pub fn validate(draft: &MemoryRecordEnvelopeDraft<'_>) -> Result<Self, MemoryError> {
         let id = normalize(DESCRIPTOR_ID_FIELD, draft.id)?;
         reject_record_leaks(draft)?;
-        let category =
-            memory_record_category(id.as_str(), draft.kind, draft.category_label, draft.require_explicit_category)?;
-        let scope = draft.scope.ok_or_else(|| MemoryError::MissingRecordScope { record_id: id.clone() })?;
+        let category = memory_record_category(
+            id.as_str(),
+            draft.kind,
+            draft.category_label,
+            draft.require_explicit_category,
+        )?;
+        let scope = draft.scope.ok_or_else(|| MemoryError::MissingRecordScope {
+            record_id: id.clone(),
+        })?;
         let evidence_handle = draft
             .evidence_handle
-            .ok_or_else(|| MemoryError::MissingEvidence { record_id: id.clone() })
+            .ok_or_else(|| MemoryError::MissingEvidence {
+                record_id: id.clone(),
+            })
             .and_then(|value| normalize(MEMORY_EVIDENCE_FIELD, value))?;
         reject_expired_descriptor(&id, draft.freshness)?;
         let confidence = MemoryConfidence::new(draft.confidence_percent)?;
-        let body_hash = crate::artifact::Hash::new(draft.body_hash).map_err(MemoryError::InvalidHash)?;
-        let budget_units = NonZeroU32::new(draft.budget_units).ok_or_else(|| MemoryError::ZeroBudgetUnits {
-            descriptor_id: id.clone(),
-        })?;
+        let body_hash =
+            crate::artifact::Hash::new(draft.body_hash).map_err(MemoryError::InvalidHash)?;
+        let budget_units =
+            NonZeroU32::new(draft.budget_units).ok_or_else(|| MemoryError::ZeroBudgetUnits {
+                descriptor_id: id.clone(),
+            })?;
         Ok(Self {
             id,
             kind: draft.kind,
@@ -475,7 +488,10 @@ impl MemoryRecordEnvelope {
             budget_units,
             expiration_label: normalize_optional(MEMORY_EXPIRATION_FIELD, draft.expiration_label)?,
             supersedes_id: normalize_optional(MEMORY_SUPERSESSION_FIELD, draft.supersedes_id)?,
-            superseded_by_id: normalize_optional(MEMORY_SUPERSESSION_FIELD, draft.superseded_by_id)?,
+            superseded_by_id: normalize_optional(
+                MEMORY_SUPERSESSION_FIELD,
+                draft.superseded_by_id,
+            )?,
             conflict_group: normalize_optional(MEMORY_CONFLICT_GROUP_FIELD, draft.conflict_group)?,
         })
     }
@@ -705,9 +721,10 @@ impl MemoryRouteCandidate {
     pub fn validate(draft: &MemoryRouteCandidateDraft<'_>) -> Result<Self, MemoryError> {
         reject_route_candidate_leaks(draft)?;
         let route_id = normalize(DESCRIPTOR_ID_FIELD, draft.route_id)?;
-        let budget_units = NonZeroU32::new(draft.budget_units).ok_or_else(|| MemoryError::ZeroBudgetUnits {
-            descriptor_id: route_id.clone(),
-        })?;
+        let budget_units =
+            NonZeroU32::new(draft.budget_units).ok_or_else(|| MemoryError::ZeroBudgetUnits {
+                descriptor_id: route_id.clone(),
+            })?;
         Ok(Self {
             route_id,
             adapter_label: normalize(MEMORY_ADAPTER_LABEL_FIELD, draft.adapter_label)?,
@@ -971,7 +988,8 @@ impl MemoryRouteReceipt {
         reject_route_receipt_leaks(draft)?;
         Ok(Self {
             route_label: normalize(MEMORY_QUERY_LABEL_FIELD, draft.route_label)?,
-            policy_hash: crate::artifact::Hash::new(draft.policy_hash).map_err(MemoryError::InvalidHash)?,
+            policy_hash: crate::artifact::Hash::new(draft.policy_hash)
+                .map_err(MemoryError::InvalidHash)?,
             selected_count: draft.selected_count,
             skipped_count: draft.skipped_count,
         })
@@ -1012,9 +1030,12 @@ impl MemoryRouteReceipt {
 ///
 /// Panics only if internal route bounds or validated budget invariants are violated.
 // r[impl agent_harness_runtime.memory_routing.pure_planner]
-pub fn plan_memory_routes(input: MemoryRoutePlanningInput<'_>) -> Result<MemoryRoutePlan, MemoryError> {
+pub fn plan_memory_routes(
+    input: MemoryRoutePlanningInput<'_>,
+) -> Result<MemoryRoutePlan, MemoryError> {
     normalize(MEMORY_QUERY_LABEL_FIELD, input.policy.route_label)?;
-    let policy_hash = crate::artifact::Hash::new(input.policy.policy_hash).map_err(MemoryError::InvalidHash)?;
+    let policy_hash =
+        crate::artifact::Hash::new(input.policy.policy_hash).map_err(MemoryError::InvalidHash)?;
     assert!(input.policy.budget.units().get() > ZERO_MEMORY_UNITS);
     if input.candidates.len() > MAX_MEMORY_DESCRIPTORS {
         return Err(MemoryError::TooManyItems {
@@ -1122,7 +1143,10 @@ fn skipped_route(status: MemoryRouteOutcomeStatus) -> MemoryRouteDecision {
     }
 }
 
-fn compare_memory_route_candidates(left: &MemoryRouteCandidate, right: &MemoryRouteCandidate) -> core::cmp::Ordering {
+fn compare_memory_route_candidates(
+    left: &MemoryRouteCandidate,
+    right: &MemoryRouteCandidate,
+) -> core::cmp::Ordering {
     right
         .confidence()
         .cmp(&left.confidence())
@@ -1186,7 +1210,9 @@ impl MemoryEvaluationFixture {
         reject_evaluation_fixture_leaks(draft)?;
         let fixture_id = normalize(DESCRIPTOR_ID_FIELD, draft.fixture_id)?;
         if draft.expected_record_ids.is_empty() {
-            return Err(MemoryError::MissingEvidence { record_id: fixture_id });
+            return Err(MemoryError::MissingEvidence {
+                record_id: fixture_id,
+            });
         }
         if draft.expected_record_ids.len() > MAX_MEMORY_DESCRIPTORS {
             return Err(MemoryError::TooManyItems {
@@ -1203,7 +1229,8 @@ impl MemoryEvaluationFixture {
             category: draft.category,
             abstention_expected: draft.abstention_expected,
             answer_use_label: normalize(MEMORY_EVIDENCE_FIELD, draft.answer_use_label)?,
-            evidence_hash: crate::artifact::Hash::new(draft.evidence_hash).map_err(MemoryError::InvalidHash)?,
+            evidence_hash: crate::artifact::Hash::new(draft.evidence_hash)
+                .map_err(MemoryError::InvalidHash)?,
         })
     }
 
@@ -1382,8 +1409,10 @@ impl MemoryEvaluationBaseline {
     pub fn validate(draft: &MemoryEvaluationBaselineDraft<'_>) -> Result<Self, MemoryError> {
         Ok(Self {
             baseline_label: normalize(MEMORY_QUERY_LABEL_FIELD, draft.baseline_label)?,
-            policy_hash: crate::artifact::Hash::new(draft.policy_hash).map_err(MemoryError::InvalidHash)?,
-            evidence_hash: crate::artifact::Hash::new(draft.evidence_hash).map_err(MemoryError::InvalidHash)?,
+            policy_hash: crate::artifact::Hash::new(draft.policy_hash)
+                .map_err(MemoryError::InvalidHash)?,
+            evidence_hash: crate::artifact::Hash::new(draft.evidence_hash)
+                .map_err(MemoryError::InvalidHash)?,
             no_memory: draft.no_memory,
         })
     }
@@ -1523,16 +1552,19 @@ impl MemoryExternalBenchmarkImport {
     pub fn validate(draft: &MemoryExternalBenchmarkImportDraft<'_>) -> Result<Self, MemoryError> {
         reject_external_import_leaks(draft)?;
         let run_label = normalize(MEMORY_QUERY_LABEL_FIELD, draft.run_label)?;
-        let case_count = NonZeroU32::new(draft.case_count).ok_or_else(|| MemoryError::ZeroBudgetUnits {
-            descriptor_id: run_label.clone(),
-        })?;
+        let case_count =
+            NonZeroU32::new(draft.case_count).ok_or_else(|| MemoryError::ZeroBudgetUnits {
+                descriptor_id: run_label.clone(),
+            })?;
         Ok(Self {
             benchmark_family: normalize(MEMORY_ADAPTER_LABEL_FIELD, draft.benchmark_family)?,
             run_label,
             metric_label: normalize(MEMORY_EVIDENCE_FIELD, draft.metric_label)?,
             case_count: case_count.get(),
-            policy_hash: crate::artifact::Hash::new(draft.policy_hash).map_err(MemoryError::InvalidHash)?,
-            evidence_hash: crate::artifact::Hash::new(draft.evidence_hash).map_err(MemoryError::InvalidHash)?,
+            policy_hash: crate::artifact::Hash::new(draft.policy_hash)
+                .map_err(MemoryError::InvalidHash)?,
+            evidence_hash: crate::artifact::Hash::new(draft.evidence_hash)
+                .map_err(MemoryError::InvalidHash)?,
         })
     }
 
@@ -1602,7 +1634,8 @@ pub fn reduce_memory_evaluation_metrics(
     let mut answer_used_count = u32::default();
     for observed in input.observed {
         normalize(DESCRIPTOR_ID_FIELD, observed.record_id)?;
-        let is_expected = contains_record_id(input.fixture.expected_record_ids(), observed.record_id);
+        let is_expected =
+            contains_record_id(input.fixture.expected_record_ids(), observed.record_id);
         if is_expected {
             relevant_hit_count = relevant_hit_count.saturating_add(RANK_OFFSET);
         }
@@ -1633,7 +1666,8 @@ pub fn reduce_memory_evaluation_metrics(
             numerator_count: relevant_hit_count,
             denominator_count: expected_count,
         }),
-        abstention_correct: input.fixture.abstention_expected() == (answer_used_count == u32::default()),
+        abstention_correct: input.fixture.abstention_expected()
+            == (answer_used_count == u32::default()),
     })
 }
 
@@ -1712,7 +1746,8 @@ impl MemoryRetrievalQualityPolicy {
         let error_label = policy_label.clone();
         Ok(Self {
             policy_label,
-            policy_hash: crate::artifact::Hash::new(draft.policy_hash).map_err(MemoryError::InvalidHash)?,
+            policy_hash: crate::artifact::Hash::new(draft.policy_hash)
+                .map_err(MemoryError::InvalidHash)?,
             prioritize_manual_pins: draft.prioritize_manual_pins,
             category_priority: draft.category_priority.to_vec(),
             diversity_group_limit: NonZeroU32::new(draft.diversity_group_limit).ok_or(
@@ -1801,7 +1836,8 @@ impl MemoryRerankEvidence {
         }
         Ok(Self {
             record_id: normalize(DESCRIPTOR_ID_FIELD, draft.record_id)?,
-            policy_hash: crate::artifact::Hash::new(draft.policy_hash).map_err(MemoryError::InvalidHash)?,
+            policy_hash: crate::artifact::Hash::new(draft.policy_hash)
+                .map_err(MemoryError::InvalidHash)?,
             reason_label: normalize(MEMORY_EVIDENCE_FIELD, draft.reason_label)?,
             score: MemoryConfidence::new(draft.score_percent)?,
         })
@@ -2010,8 +2046,7 @@ impl MemoryRetrievalPlan {
     }
 }
 
-/// Plans memory retrieval without contacting stores, embedding services, providers, files, clocks,
-/// or networks.
+/// Plans memory retrieval without contacting stores, embedding services, providers, files, clocks, or networks.
 ///
 /// # Errors
 ///
@@ -2021,7 +2056,9 @@ impl MemoryRetrievalPlan {
 ///
 /// Panics only if internal memory bounds or validated budget invariants are violated.
 // r[impl agent_harness_runtime.memory_adapters.retrieval_plan]
-pub fn plan_memory_retrieval(input: MemoryRetrievalInput<'_>) -> Result<MemoryRetrievalPlan, MemoryError> {
+pub fn plan_memory_retrieval(
+    input: MemoryRetrievalInput<'_>,
+) -> Result<MemoryRetrievalPlan, MemoryError> {
     normalize(MEMORY_QUERY_LABEL_FIELD, input.policy.query_label)?;
     assert!(MAX_MEMORY_DESCRIPTORS > usize::default());
     assert!(input.policy.budget.units().get() > ZERO_MEMORY_UNITS);
@@ -2033,7 +2070,8 @@ pub fn plan_memory_retrieval(input: MemoryRetrievalInput<'_>) -> Result<MemoryRe
         });
     }
     assert!(input.candidates.len() <= MAX_MEMORY_DESCRIPTORS);
-    let mut ordered: Vec<&MemoryRetrievalCandidate<'_>> = Vec::with_capacity(input.candidates.len());
+    let mut ordered: Vec<&MemoryRetrievalCandidate<'_>> =
+        Vec::with_capacity(input.candidates.len());
     for candidate in input.candidates {
         normalize(MEMORY_ADAPTER_LABEL_FIELD, candidate.backend_label)?;
         MemoryConfidence::new(candidate.relevance_percent)?;
@@ -2077,16 +2115,27 @@ pub fn plan_memory_retrieval_with_quality(
     }
     assert!(input.candidates.len() <= MAX_MEMORY_DESCRIPTORS);
     assert!(input.rerank_evidence.len() <= MAX_MEMORY_DESCRIPTORS);
-    let mut ordered: Vec<&MemoryRetrievalCandidate<'_>> = Vec::with_capacity(input.candidates.len());
+    let mut ordered: Vec<&MemoryRetrievalCandidate<'_>> =
+        Vec::with_capacity(input.candidates.len());
     for candidate in input.candidates {
         normalize(MEMORY_ADAPTER_LABEL_FIELD, candidate.backend_label)?;
         MemoryConfidence::new(candidate.relevance_percent)?;
         ordered.push(candidate);
     }
     ordered.sort_by(|left, right| {
-        compare_quality_retrieval_candidates(left, right, input.quality_policy, input.rerank_evidence)
+        compare_quality_retrieval_candidates(
+            left,
+            right,
+            input.quality_policy,
+            input.rerank_evidence,
+        )
     });
-    build_memory_retrieval_plan(ordered.as_slice(), &input.retrieval_policy, Some(input.quality_policy), true)
+    build_memory_retrieval_plan(
+        ordered.as_slice(),
+        &input.retrieval_policy,
+        Some(input.quality_policy),
+        true,
+    )
 }
 
 fn build_memory_retrieval_plan(
@@ -2112,7 +2161,12 @@ fn build_memory_retrieval_plan(
                 group_counts: group_counts.as_slice(),
             })
         } else {
-            memory_retrieval_decision(candidate, policy, consumed_units, conflict_groups.as_slice())
+            memory_retrieval_decision(
+                candidate,
+                policy,
+                consumed_units,
+                conflict_groups.as_slice(),
+            )
         };
         if decision.status == MemoryRetrievalOutcomeStatus::Selected {
             selected_count = selected_count.saturating_add(RANK_OFFSET);
@@ -2177,7 +2231,9 @@ struct MemoryQualityRetrievalDecisionInput<'a> {
     group_counts: &'a [(String, u32)],
 }
 
-fn memory_quality_retrieval_decision(input: MemoryQualityRetrievalDecisionInput<'_>) -> MemoryRetrievalDecision {
+fn memory_quality_retrieval_decision(
+    input: MemoryQualityRetrievalDecisionInput<'_>,
+) -> MemoryRetrievalDecision {
     let record = input.candidate.record;
     if let Some(status) = common_retrieval_skip(record, input.policy) {
         return skipped_retrieval(status);
@@ -2236,7 +2292,9 @@ struct MemoryRetrievalOutcomeInput<'a> {
     consumed_units: u32,
 }
 
-fn memory_retrieval_outcome(input: MemoryRetrievalOutcomeInput<'_>) -> Result<MemoryRetrievalOutcome, MemoryError> {
+fn memory_retrieval_outcome(
+    input: MemoryRetrievalOutcomeInput<'_>,
+) -> Result<MemoryRetrievalOutcome, MemoryError> {
     let relevance = MemoryConfidence::new(input.candidate.relevance_percent)?;
     Ok(MemoryRetrievalOutcome {
         record_id: String::from(input.candidate.record.id()),
@@ -2314,19 +2372,26 @@ fn rerank_score(
     rerank_evidence
         .iter()
         .find(|evidence| {
-            evidence.record_id() == candidate.record.id() && evidence.policy_hash() == quality.policy_hash()
+            evidence.record_id() == candidate.record.id()
+                && evidence.policy_hash() == quality.policy_hash()
         })
         .map_or(u8::default(), |evidence| evidence.score().percent())
 }
 
-fn manual_pin_score(candidate: &MemoryRetrievalCandidate<'_>, quality: &MemoryRetrievalQualityPolicy) -> u8 {
+fn manual_pin_score(
+    candidate: &MemoryRetrievalCandidate<'_>,
+    quality: &MemoryRetrievalQualityPolicy,
+) -> u8 {
     if quality.prioritize_manual_pins() && candidate.match_reason == MemoryMatchReason::ManualPin {
         return MAX_MEMORY_CONFIDENCE_PERCENT;
     }
     u8::default()
 }
 
-fn category_priority(category: MemoryRecordCategory, quality: &MemoryRetrievalQualityPolicy) -> usize {
+fn category_priority(
+    category: MemoryRecordCategory,
+    quality: &MemoryRetrievalQualityPolicy,
+) -> usize {
     quality
         .category_priority()
         .iter()
@@ -2358,7 +2423,11 @@ impl MemoryDiversityGroupCounts {
     }
 
     fn increment(&mut self, group: &str) {
-        if let Some((_, count)) = self.entries.iter_mut().find(|(candidate, _)| candidate == group) {
+        if let Some((_, count)) = self
+            .entries
+            .iter_mut()
+            .find(|(candidate, _)| candidate == group)
+        {
             *count = count.saturating_add(RANK_OFFSET);
             return;
         }
@@ -2374,9 +2443,11 @@ fn memory_record_category(
 ) -> Result<MemoryRecordCategory, MemoryError> {
     if let Some(label) = category_label {
         let normalized = normalize(MEMORY_CATEGORY_FIELD, label)?;
-        return MemoryRecordCategory::from_label(normalized.as_str()).ok_or_else(|| MemoryError::UnsupportedCategory {
-            record_id: String::from(record_id),
-            category_label: normalized,
+        return MemoryRecordCategory::from_label(normalized.as_str()).ok_or_else(|| {
+            MemoryError::UnsupportedCategory {
+                record_id: String::from(record_id),
+                category_label: normalized,
+            }
         });
     }
     if require_explicit_category {
@@ -2395,12 +2466,18 @@ fn role_capability(role: GenericMemoryAdapterRole) -> GenericMemoryAdapterCapabi
     match role {
         GenericMemoryAdapterRole::SourceImport => GenericMemoryAdapterCapability::SourceImport,
         GenericMemoryAdapterRole::DurableStore => GenericMemoryAdapterCapability::DurableStore,
-        GenericMemoryAdapterRole::RetrievalSearch => GenericMemoryAdapterCapability::RetrievalSearch,
+        GenericMemoryAdapterRole::RetrievalSearch => {
+            GenericMemoryAdapterCapability::RetrievalSearch
+        }
         GenericMemoryAdapterRole::Extraction => GenericMemoryAdapterCapability::Extraction,
-        GenericMemoryAdapterRole::EmbeddingSearchSupport => GenericMemoryAdapterCapability::EmbeddingSearch,
+        GenericMemoryAdapterRole::EmbeddingSearchSupport => {
+            GenericMemoryAdapterCapability::EmbeddingSearch
+        }
         GenericMemoryAdapterRole::Admission => GenericMemoryAdapterCapability::AdmissionReview,
         GenericMemoryAdapterRole::UpdateDelete => GenericMemoryAdapterCapability::UpdateDelete,
-        GenericMemoryAdapterRole::InstructionSource => GenericMemoryAdapterCapability::InstructionSource,
+        GenericMemoryAdapterRole::InstructionSource => {
+            GenericMemoryAdapterCapability::InstructionSource
+        }
     }
 }
 
@@ -2445,7 +2522,9 @@ fn reject_route_receipt_leaks(draft: &MemoryRouteReceiptDraft<'_>) -> Result<(),
     Ok(())
 }
 
-fn reject_evaluation_fixture_leaks(draft: &MemoryEvaluationFixtureDraft<'_>) -> Result<(), MemoryError> {
+fn reject_evaluation_fixture_leaks(
+    draft: &MemoryEvaluationFixtureDraft<'_>,
+) -> Result<(), MemoryError> {
     if draft.raw_prompt_text.is_some() || draft.raw_memory_body.is_some() {
         return Err(memory_leak(MemoryReceiptLeak::RawMemoryBody));
     }
@@ -2461,7 +2540,9 @@ fn reject_evaluation_fixture_leaks(draft: &MemoryEvaluationFixtureDraft<'_>) -> 
     Ok(())
 }
 
-fn reject_external_import_leaks(draft: &MemoryExternalBenchmarkImportDraft<'_>) -> Result<(), MemoryError> {
+fn reject_external_import_leaks(
+    draft: &MemoryExternalBenchmarkImportDraft<'_>,
+) -> Result<(), MemoryError> {
     if draft.raw_conversation.is_some() || draft.raw_judge_prompt.is_some() {
         return Err(memory_leak(MemoryReceiptLeak::RawMemoryBody));
     }
@@ -2509,6 +2590,9 @@ fn percent(input: PercentInput) -> u32 {
     input.numerator_count.saturating_mul(PERCENT_SCALE) / denominator_units
 }
 
-fn normalize_optional(field: crate::validation::FieldName, value: Option<&str>) -> Result<Option<String>, MemoryError> {
+fn normalize_optional(
+    field: crate::validation::FieldName,
+    value: Option<&str>,
+) -> Result<Option<String>, MemoryError> {
     value.map(|inner| normalize(field, inner)).transpose()
 }

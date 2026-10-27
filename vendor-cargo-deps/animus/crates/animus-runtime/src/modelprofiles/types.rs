@@ -1,11 +1,11 @@
 //! Typed in-memory contracts for per-model runtime profiles.
 
 /// Current model runtime profile-set schema identity.
-pub const MODEL_RUNTIME_PROFILE_SCHEMA: &str = "animus.model-runtime-profiles.v1";
+pub const MODEL_RUNTIME_PROFILE_SCHEMA: &str = "animus.model-runtime-profiles.v2";
 /// Domain separator for profile content identities.
-pub const MODEL_RUNTIME_PROFILE_HASH_DOMAIN: &str = "animus.model-runtime-profile.v1";
+pub const MODEL_RUNTIME_PROFILE_HASH_DOMAIN: &str = "animus.model-runtime-profile.v2";
 /// Domain separator for profile resolution identities.
-pub const MODEL_RUNTIME_RESOLUTION_HASH_DOMAIN: &str = "animus.model-runtime-resolution.v1";
+pub const MODEL_RUNTIME_RESOLUTION_HASH_DOMAIN: &str = "animus.model-runtime-resolution.v2";
 /// Domain separator for invocation plan identities.
 pub const MODEL_INVOCATION_PLAN_HASH_DOMAIN: &str = "animus.model-invocation-plan.v1";
 /// Domain separator for invocation receipt identities.
@@ -380,6 +380,8 @@ impl ModelNamedResourceReference {
 pub struct ModelRuntimeProfileDraft<'a> {
     /// Stable profile ID.
     pub profile_id: &'a str,
+    /// Exact versioned model-facing dialect ID.
+    pub dialect_id: &'a str,
     /// Exact or explicit-default binding.
     pub binding: ModelRuntimeBindingDraft<'a>,
     /// Source scope.
@@ -420,6 +422,7 @@ pub struct ModelRuntimeProfileDraft<'a> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModelRuntimeProfile {
     pub(super) profile_id: String,
+    pub(super) dialect_id: String,
     pub(super) binding: ModelRuntimeBinding,
     pub(super) source_scope: ModelProfileSourceScope,
     pub(super) trust_status: ModelProfileTrustStatus,
@@ -444,6 +447,12 @@ impl ModelRuntimeProfile {
     #[must_use]
     pub fn profile_id(&self) -> &str {
         self.profile_id.as_str()
+    }
+
+    /// Returns the exact versioned model-facing dialect ID.
+    #[must_use]
+    pub fn dialect_id(&self) -> &str {
+        self.dialect_id.as_str()
     }
 
     /// Returns the exact or explicit-default binding.
@@ -611,10 +620,14 @@ impl ModelRuntimeProfileSet {
 /// Selected model target supplied to the pure resolver.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ModelRuntimeTargetDraft<'a> {
-    /// Exact provider ID.
+    /// Exact provider account or service ID.
     pub provider_id: &'a str,
+    /// Exact versioned provider-transport ID.
+    pub provider_transport_id: &'a str,
     /// Exact model ID.
     pub model_id: &'a str,
+    /// Exact versioned model-facing dialect ID.
+    pub model_dialect_id: &'a str,
     /// Optional exact router role.
     pub router_role: Option<&'a str>,
     /// Current BLAKE3 model-capability identity.
@@ -625,7 +638,9 @@ pub struct ModelRuntimeTargetDraft<'a> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModelRuntimeTarget {
     pub(super) provider_id: String,
+    pub(super) provider_transport_id: String,
     pub(super) model_id: String,
+    pub(super) model_dialect_id: String,
     pub(super) router_role: Option<String>,
     pub(super) capability_identity: String,
     pub(super) target_hash: String,
@@ -638,10 +653,22 @@ impl ModelRuntimeTarget {
         self.provider_id.as_str()
     }
 
+    /// Returns the exact versioned provider-transport ID.
+    #[must_use]
+    pub fn provider_transport_id(&self) -> &str {
+        self.provider_transport_id.as_str()
+    }
+
     /// Returns the exact model ID.
     #[must_use]
     pub fn model_id(&self) -> &str {
         self.model_id.as_str()
+    }
+
+    /// Returns the exact versioned model-facing dialect ID.
+    #[must_use]
+    pub fn model_dialect_id(&self) -> &str {
+        self.model_dialect_id.as_str()
     }
 
     /// Returns the optional exact router role.
@@ -805,7 +832,11 @@ pub struct ModelRuntimeProfileError {
 }
 
 impl ModelRuntimeProfileError {
-    pub(super) fn new(issue: ModelRuntimeProfileIssue, field: &'static str, detail: impl Into<String>) -> Self {
+    pub(super) fn new(
+        issue: ModelRuntimeProfileIssue,
+        field: &'static str,
+        detail: impl Into<String>,
+    ) -> Self {
         Self {
             issue,
             field,
@@ -834,6 +865,10 @@ impl ModelRuntimeProfileError {
 
 impl core::fmt::Display for ModelRuntimeProfileError {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(formatter, "{}: {} ({:?})", self.field, self.detail, self.issue)
+        write!(
+            formatter,
+            "{}: {} ({:?})",
+            self.field, self.detail, self.issue
+        )
     }
 }

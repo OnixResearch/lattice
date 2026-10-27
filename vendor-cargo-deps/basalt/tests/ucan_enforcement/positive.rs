@@ -16,7 +16,10 @@ fn direct_holder_invocation_returns_live_exact_request_authority() {
     )
     .expect("valid direct holder invocation must pass");
 
-    assert_eq!(std::ptr::from_ref(live.request()), std::ptr::from_ref(&request));
+    assert_eq!(
+        std::ptr::from_ref(live.request()),
+        std::ptr::from_ref(&request)
+    );
     assert!(live.receipt().is_allowed());
     assert_eq!(live.holder_authorization().resource(), DOCUMENT_RESOURCE);
     assert_eq!(replay.calls.get(), FIRST_CALL);
@@ -40,6 +43,9 @@ fn delegated_holder_invocation_returns_live_authority() {
     .expect("valid delegated holder invocation must pass");
 
     assert!(live.receipt().is_allowed());
-    assert_eq!(live.holder_authorization().ability(), DOCUMENT_WRITE_ABILITY);
+    assert_eq!(
+        live.holder_authorization().ability(),
+        DOCUMENT_WRITE_ABILITY
+    );
     assert_eq!(replay.calls.get(), FIRST_CALL);
 }

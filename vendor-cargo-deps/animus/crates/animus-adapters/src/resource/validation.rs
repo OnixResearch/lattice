@@ -1,31 +1,11 @@
-use super::CONTENT_IDENTITY_FIELD;
-use super::CONTEXT_GUIDANCE_KIND_LABEL;
-use super::DESCRIPTION_FIELD;
-use super::Descriptor;
-use super::Draft;
-use super::Error;
-use super::GLOBAL_SCOPE_LABEL;
-use super::HOST_RESOURCE_KIND_LABEL;
-use super::HOST_SCOPE_LABEL;
-use super::KIND_FIELD;
-use super::Kind;
-use super::MAX_DESCRIPTION_CHARS;
-use super::NAME_FIELD;
-use super::NAME_SEPARATOR_DASH;
-use super::NAME_SEPARATOR_UNDERSCORE;
-use super::PROJECT_SCOPE_LABEL;
-use super::PROMPT_TEMPLATE_KIND_LABEL;
-use super::PROVENANCE_FIELD;
-use super::SCOPE_FIELD;
-use super::SESSION_SCOPE_LABEL;
-use super::SKILL_KIND_LABEL;
-use super::Scope;
-use super::TRUST_FIELD;
-use super::TRUSTED_LABEL;
-use super::Text;
-use super::TrustStatus;
-use super::UNSAFE_PROVENANCE_MARKERS;
-use super::UNTRUSTED_LABEL;
+use super::{
+    CONTENT_IDENTITY_FIELD, CONTEXT_GUIDANCE_KIND_LABEL, DESCRIPTION_FIELD, Descriptor, Draft,
+    Error, GLOBAL_SCOPE_LABEL, HOST_RESOURCE_KIND_LABEL, HOST_SCOPE_LABEL, KIND_FIELD, Kind,
+    MAX_DESCRIPTION_CHARS, NAME_FIELD, NAME_SEPARATOR_DASH, NAME_SEPARATOR_UNDERSCORE,
+    PROJECT_SCOPE_LABEL, PROMPT_TEMPLATE_KIND_LABEL, PROVENANCE_FIELD, SCOPE_FIELD,
+    SESSION_SCOPE_LABEL, SKILL_KIND_LABEL, Scope, TRUST_FIELD, TRUSTED_LABEL, Text, TrustStatus,
+    UNSAFE_PROVENANCE_MARKERS, UNTRUSTED_LABEL,
+};
 
 impl Descriptor {
     /// Validates host-supplied resource fields as typed data only.
@@ -44,8 +24,14 @@ impl Descriptor {
         let content_identity = required_content_identity(draft.content_identity)?;
 
         assert!(!name.is_empty(), "validated descriptor has a name");
-        assert!(description.chars().count() <= MAX_DESCRIPTION_CHARS, "validated resource summary stays bounded");
-        assert!(!provenance.is_empty(), "validated descriptor has safe provenance");
+        assert!(
+            description.chars().count() <= MAX_DESCRIPTION_CHARS,
+            "validated resource summary stays bounded"
+        );
+        assert!(
+            !provenance.is_empty(),
+            "validated descriptor has safe provenance"
+        );
         assert_eq!(
             content_identity.as_str().len(),
             crate::artifact::BLAKE3_HASH_HEX_CHARS,
@@ -136,10 +122,15 @@ fn required_provenance(value: Option<&str>) -> Result<Text, Error> {
     Ok(provenance)
 }
 
-pub(super) fn required_text(field: crate::validation::FieldName, value: Option<&str>) -> Result<Text, Error> {
+pub(super) fn required_text(
+    field: crate::validation::FieldName,
+    value: Option<&str>,
+) -> Result<Text, Error> {
     match value {
         Some(raw) => crate::validation::normalized_adapter_field(field, raw).map_err(Into::into),
-        None => Err(Error::MissingField { field: field.as_str() }),
+        None => Err(Error::MissingField {
+            field: field.as_str(),
+        }),
     }
 }
 
@@ -154,12 +145,11 @@ fn content_identity_error(error: &crate::artifact::Error) -> Error {
             field: CONTENT_IDENTITY_FIELD.as_str(),
             reason,
         },
-        crate::artifact::Error::PayloadTooLong { .. } | crate::artifact::Error::PayloadContainsNul { .. } => {
-            Error::InvalidContentIdentity {
-                field: CONTENT_IDENTITY_FIELD.as_str(),
-                reason: "resource content identity must be lowercase BLAKE3 hex",
-            }
-        }
+        crate::artifact::Error::PayloadTooLong { .. }
+        | crate::artifact::Error::PayloadContainsNul { .. } => Error::InvalidContentIdentity {
+            field: CONTENT_IDENTITY_FIELD.as_str(),
+            reason: "resource content identity must be lowercase BLAKE3 hex",
+        },
     }
 }
 
@@ -183,7 +173,8 @@ fn valid_name(value: &str) -> bool {
     let mut is_previous_separator = false;
     let mut has_visible_character = false;
     for character in value.chars() {
-        let is_name_separator = character == NAME_SEPARATOR_DASH || character == NAME_SEPARATOR_UNDERSCORE;
+        let is_name_separator =
+            character == NAME_SEPARATOR_DASH || character == NAME_SEPARATOR_UNDERSCORE;
         if is_name_separator {
             if !has_visible_character || is_previous_separator {
                 return false;
@@ -205,5 +196,7 @@ fn valid_provenance(value: &str) -> bool {
     if value.starts_with('/') {
         return false;
     }
-    !UNSAFE_PROVENANCE_MARKERS.iter().any(|marker| value.contains(marker))
+    !UNSAFE_PROVENANCE_MARKERS
+        .iter()
+        .any(|marker| value.contains(marker))
 }

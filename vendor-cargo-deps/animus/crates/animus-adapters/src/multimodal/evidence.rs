@@ -47,10 +47,10 @@ impl ImageReceipt {
     ///
     /// # Errors
     ///
-    /// Returns [`super::Error`] when receipt fields contain raw bytes, base64/data URLs, paths,
-    /// credentials, or provider payloads.
+    /// Returns [`super::Error`] when receipt fields contain raw bytes, base64/data URLs, paths, credentials, or provider payloads.
     pub fn validate(draft: &ImageReceiptDraft<'_>) -> Result<Self, super::Error> {
-        let safe_label = super::check::normalized_safe_text(super::SAFE_LABEL_FIELD, draft.safe_label)?;
+        let safe_label =
+            super::check::normalized_safe_text(super::SAFE_LABEL_FIELD, draft.safe_label)?;
         let media_type = super::ImageMediaType::parse(draft.media_type)?;
         super::check::validate_byte_count(super::check::ByteLimitInput {
             byte_count: draft.byte_count,
@@ -62,9 +62,12 @@ impl ImageReceipt {
             .adapter_class
             .map(|raw| super::check::normalized_safe_text(super::ADAPTER_CLASS_FIELD, raw))
             .transpose()?;
-        let redaction_marker =
-            super::check::normalized_safe_text(super::REDACTION_MARKER_FIELD, draft.redaction_marker)?;
-        let metadata_fragments = super::check::validate_receipt_fragments(draft.metadata_fragments)?;
+        let redaction_marker = super::check::normalized_safe_text(
+            super::REDACTION_MARKER_FIELD,
+            draft.redaction_marker,
+        )?;
+        let metadata_fragments =
+            super::check::validate_receipt_fragments(draft.metadata_fragments)?;
         let receipt_hash = image_receipt_hash(ImageReceiptHashParts {
             status: draft.status,
             safe_label: safe_label.as_str(),

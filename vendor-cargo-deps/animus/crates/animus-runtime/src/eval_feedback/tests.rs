@@ -1,5 +1,4 @@
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven
-// validation compact while drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -7,7 +6,12 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
+#![allow(
+    compound_condition,
+    excessive_file_length,
+    function_length,
+    non_trait_imports
+)]
 #![allow(
     numeric_units,
     path_segment_repetition,
@@ -62,20 +66,20 @@ fn plan_validation_accepts_local_plan_and_rejects_scope_failures() {
             .any(|diagnostic| { diagnostic.kind == EvalFeedbackDiagnosticKind::RemoteTaskSet })
     );
     assert!(diagnostics.iter().any(|diagnostic| {
-        diagnostic.kind == EvalFeedbackDiagnosticKind::InvalidHash && diagnostic.field == FIELD_SCAFFOLD_HASH
+        diagnostic.kind == EvalFeedbackDiagnosticKind::InvalidHash
+            && diagnostic.field == FIELD_SCAFFOLD_HASH
     }));
     assert!(diagnostics.iter().any(|diagnostic| {
-        diagnostic.kind == EvalFeedbackDiagnosticKind::InvalidHash && diagnostic.field == FIELD_VERIFIER_HASH
+        diagnostic.kind == EvalFeedbackDiagnosticKind::InvalidHash
+            && diagnostic.field == FIELD_VERIFIER_HASH
+    }));
+    assert!(diagnostics.iter().any(|diagnostic| {
+        diagnostic.kind == EvalFeedbackDiagnosticKind::UnsupportedOutputFormat
     }));
     assert!(
-        diagnostics
-            .iter()
-            .any(|diagnostic| { diagnostic.kind == EvalFeedbackDiagnosticKind::UnsupportedOutputFormat })
-    );
-    assert!(
-        diagnostics
-            .iter()
-            .any(|diagnostic| { diagnostic.kind == EvalFeedbackDiagnosticKind::NonPositiveRunCount })
+        diagnostics.iter().any(|diagnostic| {
+            diagnostic.kind == EvalFeedbackDiagnosticKind::NonPositiveRunCount
+        })
     );
     assert_eq!(
         diagnostics
@@ -106,7 +110,11 @@ fn receipt_validation_rejects_transcript_and_sensitive_leaks() {
     );
     let diagnostics = validate_eval_feedback_receipt(&leaking).expect_err("receipt leak");
 
-    assert!(diagnostics.iter().any(|diagnostic| { diagnostic.kind == EvalFeedbackDiagnosticKind::ReceiptLeak }));
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| { diagnostic.kind == EvalFeedbackDiagnosticKind::ReceiptLeak })
+    );
     assert!(
         diagnostics
             .iter()
@@ -135,12 +143,9 @@ fn feedback_review_never_auto_activates_or_changes_policy() {
         assert!(!decision.can_request_scaffold_admission);
         assert!(!decision.activates_scaffold);
         assert!(!decision.changes_runtime_selection_policy);
-        assert!(
-            decision
-                .diagnostics
-                .iter()
-                .any(|diagnostic| { diagnostic.kind == EvalFeedbackDiagnosticKind::ReviewNotAccepted })
-        );
+        assert!(decision.diagnostics.iter().any(|diagnostic| {
+            diagnostic.kind == EvalFeedbackDiagnosticKind::ReviewNotAccepted
+        }));
     }
 }
 
@@ -149,13 +154,19 @@ fn freshness_detects_exact_match_stale_and_reduced_weight_evidence() {
     // r[verify agent_harness_runtime.ornith_eval_feedback.freshness.stale]
     let receipt = receipt(Vec::new(), EvalFeedbackRedactionState::Redacted);
     let current = policy(&receipt, false);
-    assert_eq!(classify_eval_feedback_freshness(&receipt, &current), EvalFeedbackFreshnessDecision::Current);
+    assert_eq!(
+        classify_eval_feedback_freshness(&receipt, &current),
+        EvalFeedbackFreshnessDecision::Current
+    );
 
     let stale_policy = EvalFeedbackFreshnessPolicy {
         scaffold_hash: fp("changed-scaffold"),
         ..current.clone()
     };
-    assert_eq!(classify_eval_feedback_freshness(&receipt, &stale_policy), EvalFeedbackFreshnessDecision::Stale);
+    assert_eq!(
+        classify_eval_feedback_freshness(&receipt, &stale_policy),
+        EvalFeedbackFreshnessDecision::Stale
+    );
 
     let reduced_policy = EvalFeedbackFreshnessPolicy {
         verifier_hash: fp("changed-verifier"),
@@ -228,7 +239,10 @@ fn plan() -> EvalFeedbackPlan {
     }
 }
 
-fn policy(receipt: &EvalFeedbackReceipt, reduce_weight_on_mismatch: bool) -> EvalFeedbackFreshnessPolicy {
+fn policy(
+    receipt: &EvalFeedbackReceipt,
+    reduce_weight_on_mismatch: bool,
+) -> EvalFeedbackFreshnessPolicy {
     EvalFeedbackFreshnessPolicy {
         model_route: receipt.model_route.clone(),
         scaffold_hash: receipt.scaffold_hash.clone(),
@@ -241,7 +255,10 @@ fn policy(receipt: &EvalFeedbackReceipt, reduce_weight_on_mismatch: bool) -> Eva
     }
 }
 
-fn receipt(leaks: Vec<EvalFeedbackReceiptLeak>, redaction_state: EvalFeedbackRedactionState) -> EvalFeedbackReceipt {
+fn receipt(
+    leaks: Vec<EvalFeedbackReceiptLeak>,
+    redaction_state: EvalFeedbackRedactionState,
+) -> EvalFeedbackReceipt {
     EvalFeedbackReceipt {
         model_id: MODEL_ID.to_string(),
         model_route: MODEL_ROUTE.to_string(),

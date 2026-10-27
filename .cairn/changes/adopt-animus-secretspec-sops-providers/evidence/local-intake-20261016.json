@@ -1,0 +1,94 @@
+{
+  "schema": "lattice.animus-local-intake-observation.v1",
+  "observed_on": "2026-10-16",
+  "status": "local-immutable-intake-verified-consumer-integration-blocked",
+  "maintenance_owner": "Lattice dependency intake and credential runtime maintainers",
+  "immediate_outcome": "The reviewed repository-owned importer supplies the previously missing Animus SecretSpec host manifest and records exact cohort provenance.",
+  "durable_capability": "Repeatable exact-revision Animus snapshot normalization and explicit SDK/host license, feature and archive identity metadata.",
+  "source": {
+    "revision": "51d2683776ab73d4fd36d3d9e6ced2beadf9793d",
+    "archive_blake3": "5f59a2b900095aec757bad5b5542d844e92eac2a0bd818e110d70927611ddb46",
+    "archive_command": ["git", "-c", "tar.umask=0000", "archive", "--format=tar", "51d2683776ab73d4fd36d3d9e6ced2beadf9793d"],
+    "archive_digest_command": ["b3sum"],
+    "archive_command_exit": 0,
+    "acquisition_scope": "Existing local immutable Git object imported through scripts/sync_animus.rs; not fresh anonymous acquisition."
+  },
+  "files_blake3": {
+    "Cargo.toml": "00cd3ebd11c8e1b51ed0af3fc5815413c92103ed48d2f13f122a57ad9f551983",
+    "Cargo.lock": "9b187c6203f3b6074dcf2bc6b3087540360947e41cf1b68cf2600565a0b79ee9",
+    "scripts/sync_animus.rs": "788999f54b1601ae514fd9d0806e37bd1aa8619fd78147c5e2b78ebf889e9f88",
+    "vendor-cargo-deps/animus/source.ncl": "6172808b9b66223119a3eef62c610d02bc3e70291c18d5c4fbd260854394aa7a",
+    "vendor-cargo-deps/animus/Cargo.toml": "0c131ebe0908aa63dd19d7c4eded636c551660e84a78f01acb6320e2b44d208a",
+    "vendor-cargo-deps/animus/crates/animus-std-secretspec/Cargo.toml": "9e229fc577f390ba65aba5983be0604a9810a2967fe14e68e2a73c9a510d1854",
+    "vendor-cargo-deps/animus/config/generated/secret-resolution-policy.json": "638874d5602a7aab7dfcd9e5c317ff52f3d44dd7afb0d45e6a218138ae1e643f",
+    "src/github_ci/mod.rs": "1ff3c81bf9f44748575d87d755f24c5d469c47832f5d08ea7f8283f6f1b83715",
+    "src/tui/app.rs": "ad3d34ae650d289a3d5c56d42824aa3b1cb5e8dbd830fd59474637584e3dfd7a"
+  },
+  "toolchain": {
+    "rust_bin": "/nix/store/6vrrjl1mckj4g5pj9p5d8minyr0mfhqg-rust-minimal-1.99.0-nightly-2026-07-17/bin",
+    "nickel": "/nix/store/ck3a4k9az87z5rjwgy8nmpcs34xp9cc5-nickel-lang-rev-fixup-1.17.0/bin/nickel"
+  },
+  "native_import": {
+    "compile_argv": ["rustc", "--edition=2024", "scripts/sync_animus.rs", "-o", "/tmp/lattice-sync-animus-20261016"],
+    "argv": ["/tmp/lattice-sync-animus-20261016", "/home/brittonr/git/OnixResearch/animus", "vendor-cargo-deps/animus"],
+    "exit": 0,
+    "stdout": "synced Animus revision 51d2683776ab73d4fd36d3d9e6ced2beadf9793d into vendor-cargo-deps/animus"
+  },
+  "normalization_regressions": {
+    "compile_argv": ["rustc", "--edition=2024", "--test", "scripts/sync_animus.rs", "-o", "/tmp/lattice-sync-animus-tests-20261016"],
+    "argv": ["/tmp/lattice-sync-animus-tests-20261016"],
+    "exit": 0,
+    "passed": ["host_control_normalization_rejects_an_unknown_manifest_shape", "normalization_rejects_missing_or_misplaced_host_control_dependencies", "host_control_normalization_is_reproducible"],
+    "format_argv": ["rustfmt", "--check", "scripts/sync_animus.rs"],
+    "format_exit": 0,
+    "removed_incidental_tests": "Deleted the source-text wiring test and literal-content assertions rather than repinning implementation spelling."
+  },
+  "typed_provenance_export": {
+    "argv": ["nickel", "export", "--format", "json", "vendor-cargo-deps/animus/source.ncl"],
+    "exit": 0,
+    "secretspec_version": "0.17.0",
+    "secretspec_revision": "a8794e46ec9664a0e1a3869cc3105d0853937e48",
+    "secretspec_license": "Apache-2.0",
+    "secretspec_host_license": "AGPL-3.0-or-later",
+    "secretspec_default_features": false,
+    "secretspec_features": ["sops"],
+    "bounded_exec_revision": "29dac88ecded94457572db3fdfaaaab95fa91525",
+    "bounded_exec_license": "AGPL-3.0-or-later"
+  },
+  "lock_resolution": {
+    "command": ["cargo", "update", "--offline", "-p", "proc-macro-crate@2.0.2", "--precise", "2.0.0"],
+    "exit": 0,
+    "reason": "proc-macro-crate 2.0.2 pins toml_datetime to 0.6.3; the imported Animus session toml 0.8.23 requires ^0.6.11. Version 2.0.0 remains within Bolero's ^2 constraint and resolves toml_datetime 0.6.11 without moving the Animus or SecretSpec revisions."
+  },
+  "dependency_graph_observations": {
+    "default_argv": ["cargo", "tree", "--offline", "--no-default-features", "--edges", "normal", "--prefix", "none", "--format", "{p}"],
+    "default_exit": 0,
+    "default_animus_host_present": false,
+    "existing_registry_sdk_inverse_argv": ["cargo", "tree", "--locked", "--offline", "--no-default-features", "--invert", "secretspec"],
+    "existing_registry_sdk_inverse_exit": 0,
+    "existing_registry_sdk_path": ["lattice", "basalt", "secretspec 0.17.0 (registry)"],
+    "optional_argv": ["cargo", "metadata", "--locked", "--offline", "--format-version", "1", "--features", "animus-secretspec"],
+    "optional_exit": 0,
+    "exact_git_sdk_source": "git+https://github.com/cachix/secretspec.git?rev=a8794e46ec9664a0e1a3869cc3105d0853937e48#a8794e46ec9664a0e1a3869cc3105d0853937e48",
+    "exact_git_sdk_enabled_features": ["sops"],
+    "separate_registry_sdk_enabled_features": [],
+    "pure_core_normal_dependency_walk": {
+      "method": "Traverse resolve.nodes deps whose dep_kinds include normal, starting from each named workspace core.",
+      "budget-ledger-core": {"credential_host_or_sdk_dependencies": []},
+      "lattice-core": {"credential_host_or_sdk_dependencies": []},
+      "lattice-compose-binding": {"credential_host_or_sdk_dependencies": []},
+      "lattice-workflow-contract": {"credential_host_or_sdk_dependencies": []}
+    }
+  },
+  "consumer_attempt_after_initial_intake": {
+    "argv": ["cargo", "test", "--locked", "--offline", "--lib"],
+    "exit": 101,
+    "errors": 24,
+    "observed_failures": ["Missing github_ci module declaration", "Unadmitted Tile protocol/SDK dependencies", "Unadmitted hardened Wasmtime runtime/shell and Mantle verifier dependencies", "Missing exact component runtime revision binding", "Missing TUI node_kind_provider import"],
+    "subsequent_repairs": ["Declared the six existing github_ci modules without feature guards", "Added the TUI validation module import", "Declared existing registry base64 0.22.1 use for CI modules"],
+    "consumer_rerun_after_repairs": false,
+    "reason_not_rerun": "Remaining exact producer-source dependencies are not admitted; no repeated check merely to confirm the known prerequisite failure."
+  },
+  "remaining_prerequisites": ["Admit exact immutable Tile/HWR/Mantle/Basalt producer cohorts and component runtime revision together", "Complete owning locked Nix and source-hosting gates", "Prove exact anonymous Artifact and other required source acquisition", "Exercise the actual feature, Agent authority, cleanup, CLI, TUI, async receiver, determinism and final public-build paths"],
+  "non_claims": ["Local source import is not anonymous acquisition or hosting admission", "Dependency graph resolution is not compilation or provider execution", "Normalization regressions are not whole-consumer acceptance", "No source override, proposed API copy, disabled security rail or feature guard was used to bypass a prerequisite", "No release, publication, visibility or lifecycle completion is granted"]
+}

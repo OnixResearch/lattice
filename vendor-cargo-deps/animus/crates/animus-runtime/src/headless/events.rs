@@ -3,13 +3,10 @@ mod order;
 mod projection;
 mod taxonomy;
 
-pub use body::EventPayloadSummary;
-pub use body::summarize_event_payload;
+pub use body::{EventPayloadSummary, summarize_event_payload};
 pub use order::EventSequence;
-pub use projection::EventProjection;
-pub use projection::project_event;
-pub use taxonomy::AutomationEventKind;
-pub use taxonomy::EventRedaction;
+pub use projection::{EventProjection, project_event};
+pub use taxonomy::{AutomationEventKind, EventRedaction};
 
 /// Borrowed automation event fields before validation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

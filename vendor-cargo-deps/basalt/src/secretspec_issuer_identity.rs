@@ -19,7 +19,8 @@ pub const ISSUER_RESOLUTION_SCHEMA: &str = "basalt.oidc-exchange.issuer-key-reso
 /// Schema for the typed issuer-key resolution result.
 pub const ISSUER_RESOLUTION_RESULT_SCHEMA: &str = "basalt.oidc-exchange.issuer-key-result.v1";
 /// Schema for the release verifier's issuer-key receipt.
-pub const ISSUER_RELEASE_RECEIPT_SCHEMA: &str = "basalt.oidc-exchange.issuer-key-release-receipt.v1";
+pub const ISSUER_RELEASE_RECEIPT_SCHEMA: &str =
+    "basalt.oidc-exchange.issuer-key-release-receipt.v1";
 
 /// Claim boundaries carried by every issuer-key resolution result.
 pub const REQUIRED_ISSUER_NON_CLAIMS: [&str; 6] = [

@@ -21,9 +21,7 @@
 )]
 
 use crate::artifact::Hash;
-use crate::validation::AdapterContractError;
-use crate::validation::FieldName;
-use crate::validation::{self};
+use crate::validation::{self, AdapterContractError, FieldName};
 
 const OUTPUT_REF_FIELD: FieldName = FieldName::new("output_guard_ref");
 const OUTPUT_TEXT_FIELD: FieldName = FieldName::new("output_guard_text_summary");
@@ -452,16 +450,25 @@ impl OutputGuardReceipt {
 ///
 /// # Errors
 ///
-/// Returns [`OutputGuardDiagnostic`] when safe metadata, counts, annotations, or hashes are
-/// invalid.
-pub fn validate_output_assessment(draft: &OutputAssessmentDraft<'_>) -> OutputResult<OutputAssessment> {
+/// Returns [`OutputGuardDiagnostic`] when safe metadata, counts, annotations, or hashes are invalid.
+pub fn validate_output_assessment(
+    draft: &OutputAssessmentDraft<'_>,
+) -> OutputResult<OutputAssessment> {
     validate_bounds(draft.byte_count, draft.line_count)?;
     validate_collection_limit("output_guard_flags", draft.flags.len(), MAX_FLAGS)?;
-    validate_collection_limit("output_guard_annotations", draft.annotations.len(), MAX_ANNOTATIONS)?;
+    validate_collection_limit(
+        "output_guard_annotations",
+        draft.annotations.len(),
+        MAX_ANNOTATIONS,
+    )?;
     let output_ref = safe_text(OUTPUT_REF_FIELD, draft.output_ref, None)?;
     let mut annotations = Collection::with_capacity(draft.annotations.len());
     for annotation in draft.annotations {
-        annotations.push(safe_text(ANNOTATION_FIELD, annotation, Some(output_ref.as_str()))?);
+        annotations.push(safe_text(
+            ANNOTATION_FIELD,
+            annotation,
+            Some(output_ref.as_str()),
+        )?);
     }
     Ok(OutputAssessment {
         output_ref,
@@ -480,8 +487,7 @@ pub fn validate_output_assessment(draft: &OutputAssessmentDraft<'_>) -> OutputRe
 ///
 /// # Errors
 ///
-/// Returns [`OutputGuardDiagnostic`] when the summary or reference exceeds bounds or hash
-/// validation fails.
+/// Returns [`OutputGuardDiagnostic`] when the summary or reference exceeds bounds or hash validation fails.
 pub fn scan_output_summary(draft: &OutputScanInputDraft<'_>) -> OutputResult<OutputAssessment> {
     validate_bounds(draft.byte_count, draft.line_count)?;
     let output_ref = safe_text(OUTPUT_REF_FIELD, draft.output_ref, None)?;
@@ -545,11 +551,16 @@ pub fn merge_output_assessments(
         }
         merged.risk = core::cmp::max(merged.risk(), classifier.risk());
     }
-    if deterministic.flags().contains(&OutputDetectorFlag::CredentialLeak) {
+    if deterministic
+        .flags()
+        .contains(&OutputDetectorFlag::CredentialLeak)
+    {
         merged.redaction = match deterministic.redaction() {
             OutputRedactionState::Applied => OutputRedactionState::Applied,
             OutputRedactionState::Denied => OutputRedactionState::Denied,
-            OutputRedactionState::Required | OutputRedactionState::NoneRequired => OutputRedactionState::Required,
+            OutputRedactionState::Required | OutputRedactionState::NoneRequired => {
+                OutputRedactionState::Required
+            }
         };
     }
     merged.tier = OutputDetectorTier::Merged;
@@ -567,9 +578,15 @@ pub fn plan_output_projection(
     bounded_text: &str,
 ) -> OutputResult<OutputProjectionPlan> {
     let visible_text = bounded_scan_text(bounded_text)?;
-    let deny = assessment.flags().contains(&OutputDetectorFlag::PromptInjection)
-        || assessment.flags().contains(&OutputDetectorFlag::EncodedPayload)
-        || assessment.flags().contains(&OutputDetectorFlag::UnsafeReference)
+    let deny = assessment
+        .flags()
+        .contains(&OutputDetectorFlag::PromptInjection)
+        || assessment
+            .flags()
+            .contains(&OutputDetectorFlag::EncodedPayload)
+        || assessment
+            .flags()
+            .contains(&OutputDetectorFlag::UnsafeReference)
         || assessment.flags().contains(&OutputDetectorFlag::OverBudget);
     if deny || policy == OutputProjectionPolicy::DenySensitive {
         return Ok(OutputProjectionPlan {
@@ -584,7 +601,10 @@ pub fn plan_output_projection(
             )),
         });
     }
-    if assessment.flags().contains(&OutputDetectorFlag::CredentialLeak) {
+    if assessment
+        .flags()
+        .contains(&OutputDetectorFlag::CredentialLeak)
+    {
         if policy != OutputProjectionPolicy::AllowRedacted {
             return Ok(OutputProjectionPlan {
                 status: OutputProjectionStatus::Deny,
@@ -620,7 +640,9 @@ pub fn plan_output_projection(
 /// # Errors
 ///
 /// Returns [`OutputGuardDiagnostic`] when receipt metadata leaks raw output or unsafe references.
-pub fn validate_output_guard_receipt(draft: &OutputGuardReceiptDraft<'_>) -> OutputResult<OutputGuardReceipt> {
+pub fn validate_output_guard_receipt(
+    draft: &OutputGuardReceiptDraft<'_>,
+) -> OutputResult<OutputGuardReceipt> {
     validate_bounds(draft.byte_count, MAX_OUTPUT_LINES)?;
     validate_collection_limit("output_guard_receipt_flags", draft.flags.len(), MAX_FLAGS)?;
     let output_ref = safe_text(OUTPUT_REF_FIELD, draft.output_ref, None)?;
@@ -663,7 +685,11 @@ fn contains_any(text: &str, markers: &[&str]) -> bool {
 
 fn validate_bounds(byte_count: usize, line_count: usize) -> OutputResult<()> {
     if byte_count > MAX_OUTPUT_BYTES || line_count > MAX_OUTPUT_LINES {
-        return Err(diagnostic(OutputGuardDiagnosticCode::OverBudget, None, "output summary exceeds guard bounds"));
+        return Err(diagnostic(
+            OutputGuardDiagnosticCode::OverBudget,
+            None,
+            "output summary exceeds guard bounds",
+        ));
     }
     Ok(())
 }
@@ -680,17 +706,26 @@ fn validate_collection_limit(field: &'static str, len: usize, max: usize) -> Out
 }
 
 fn bounded_scan_text(value: &str) -> OutputResult<Text> {
-    validation::validate_required_adapter_field(OUTPUT_TEXT_FIELD, value).map_err(|error| map_adapter_error(&error))?;
+    validation::validate_required_adapter_field(OUTPUT_TEXT_FIELD, value)
+        .map_err(|error| map_adapter_error(&error))?;
     if value.chars().count() > MAX_OUTPUT_SUMMARY_CHARS {
-        return Err(diagnostic(OutputGuardDiagnosticCode::FieldTooLong, None, OUTPUT_TEXT_FIELD.as_str()));
+        return Err(diagnostic(
+            OutputGuardDiagnosticCode::FieldTooLong,
+            None,
+            OUTPUT_TEXT_FIELD.as_str(),
+        ));
     }
     Ok(Text::from(value.trim()))
 }
 
 fn safe_text(field: FieldName, value: &str, output_ref: Option<&str>) -> OutputResult<Text> {
-    let normalized = validation::normalized_adapter_field(field, value).map_err(|error| map_adapter_error(&error))?;
+    let normalized = validation::normalized_adapter_field(field, value)
+        .map_err(|error| map_adapter_error(&error))?;
     let lower = normalized.to_ascii_lowercase();
-    if UNSAFE_REFERENCE_MARKERS.iter().any(|marker| lower.contains(marker)) {
+    if UNSAFE_REFERENCE_MARKERS
+        .iter()
+        .any(|marker| lower.contains(marker))
+    {
         return Err(diagnostic(
             OutputGuardDiagnosticCode::UnsafeMetadata,
             output_ref,
@@ -701,18 +736,23 @@ fn safe_text(field: FieldName, value: &str, output_ref: Option<&str>) -> OutputR
 }
 
 fn safe_hash(value: &str) -> OutputResult<Text> {
-    let normalized =
-        validation::normalized_adapter_field(HASH_FIELD, value).map_err(|error| map_adapter_error(&error))?;
+    let normalized = validation::normalized_adapter_field(HASH_FIELD, value)
+        .map_err(|error| map_adapter_error(&error))?;
     if Hash::new(&normalized).is_ok() {
         Ok(normalized)
     } else {
-        Err(diagnostic(OutputGuardDiagnosticCode::InvalidHash, None, HASH_FIELD.as_str()))
+        Err(diagnostic(
+            OutputGuardDiagnosticCode::InvalidHash,
+            None,
+            HASH_FIELD.as_str(),
+        ))
     }
 }
 
 fn map_adapter_error(error: &AdapterContractError) -> OutputGuardDiagnostic {
     match error {
-        AdapterContractError::EmptyField { field } | AdapterContractError::EmptyCollection { field } => {
+        AdapterContractError::EmptyField { field }
+        | AdapterContractError::EmptyCollection { field } => {
             diagnostic(OutputGuardDiagnosticCode::EmptyField, None, field)
         }
         AdapterContractError::FieldTooLong { field, .. } => {
@@ -735,7 +775,11 @@ fn map_adapter_error(error: &AdapterContractError) -> OutputGuardDiagnostic {
     }
 }
 
-fn diagnostic(code: OutputGuardDiagnosticCode, output_ref: Option<&str>, message: &str) -> OutputGuardDiagnostic {
+fn diagnostic(
+    code: OutputGuardDiagnosticCode,
+    output_ref: Option<&str>,
+    message: &str,
+) -> OutputGuardDiagnostic {
     OutputGuardDiagnostic {
         code,
         output_ref: output_ref.map(Text::from),
@@ -787,8 +831,12 @@ mod tests {
             tier: OutputDetectorTier::Deterministic,
         })
         .unwrap();
-        let projection =
-            plan_output_projection(&assessment, OutputProjectionPolicy::AllowCleanOnly, CLEAN_TEXT).unwrap();
+        let projection = plan_output_projection(
+            &assessment,
+            OutputProjectionPolicy::AllowCleanOnly,
+            CLEAN_TEXT,
+        )
+        .unwrap();
 
         assert_eq!(assessment.risk(), OutputRiskLevel::Low);
         assert!(assessment.flags().is_empty());
@@ -811,8 +859,16 @@ mod tests {
         })
         .expect_err("over-budget summaries fail closed");
 
-        assert!(injection.flags().contains(&OutputDetectorFlag::PromptInjection));
-        assert!(encoded.flags().contains(&OutputDetectorFlag::EncodedPayload));
+        assert!(
+            injection
+                .flags()
+                .contains(&OutputDetectorFlag::PromptInjection)
+        );
+        assert!(
+            encoded
+                .flags()
+                .contains(&OutputDetectorFlag::EncodedPayload)
+        );
         assert!(url.flags().contains(&OutputDetectorFlag::AdversarialUrl));
         assert_eq!(over_budget.code(), OutputGuardDiagnosticCode::OverBudget);
     }
@@ -835,8 +891,12 @@ mod tests {
         })
         .unwrap();
         let merged = merge_output_assessments(&deterministic, Some(&classifier));
-        let projection =
-            plan_output_projection(&merged, OutputProjectionPolicy::AllowRedacted, CREDENTIAL_TEXT).unwrap();
+        let projection = plan_output_projection(
+            &merged,
+            OutputProjectionPolicy::AllowRedacted,
+            CREDENTIAL_TEXT,
+        )
+        .unwrap();
 
         assert!(merged.flags().contains(&OutputDetectorFlag::CredentialLeak));
         assert_eq!(merged.redaction(), OutputRedactionState::Required);
@@ -860,8 +920,12 @@ mod tests {
         })
         .expect_err("unsafe refs fail validation");
         let credential = scan(CREDENTIAL_TEXT);
-        let denied =
-            plan_output_projection(&credential, OutputProjectionPolicy::AllowCleanOnly, CREDENTIAL_TEXT).unwrap();
+        let denied = plan_output_projection(
+            &credential,
+            OutputProjectionPolicy::AllowCleanOnly,
+            CREDENTIAL_TEXT,
+        )
+        .unwrap();
 
         assert_eq!(unsafe_ref.code(), OutputGuardDiagnosticCode::UnsafeMetadata);
         assert_eq!(denied.status(), OutputProjectionStatus::Deny);

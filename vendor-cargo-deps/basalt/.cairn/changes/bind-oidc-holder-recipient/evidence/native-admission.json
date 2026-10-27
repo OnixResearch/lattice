@@ -1,0 +1,508 @@
+{
+  "base_revision": "4c5c9e919b4573a7865559db2dc98a99c0c58144",
+  "ucan_revision": "3a2aa043068a82663cf72ec05ed5d56a7d65ecd5",
+  "records": [
+    {
+      "command": [
+        "cairn",
+        "validate",
+        "--root",
+        "."
+      ],
+      "exit": 0,
+      "result": {
+        "change_issues": [],
+        "changes": 1,
+        "cross_repo_dependencies": [],
+        "cross_repo_evidence_issues": [],
+        "findings": [],
+        "issues": [],
+        "layout": "cairn",
+        "policy": "cairn-default",
+        "policy_selection": {
+          "blake3": "7a67802377005c18ebded42899e7f564f5d87087b6c14ca70464b35886f340a9",
+          "installation_receipt": false,
+          "locator": "cairn-policy/generated/cairn-policy.json",
+          "source": "legacy_default"
+        },
+        "profile_issues": [],
+        "receipt_hash": "784117fed2655b747cb78285bc59bdff5b89703798abe010ccaab7c834cad423",
+        "resolution": {
+          "diagnostics": [],
+          "locator_consulted": false,
+          "registry_lookup": "local_locator_only",
+          "selected": {
+            "project_identity": null,
+            "root": ".",
+            "source": "explicit_root",
+            "store_id": null,
+            "store_identity": null
+          },
+          "valid": true
+        },
+        "spec_findings": [],
+        "spec_issues": [],
+        "spec_substance": [
+          {
+            "path": "./.cairn/changes/bind-oidc-holder-recipient/specs/ucan-token-flow/spec.md",
+            "requirement_blocks": 2,
+            "scenario_blocks": 3,
+            "substantive_requirement_blocks": 2
+          },
+          {
+            "path": "./.cairn/specs/contract-backends/spec.md",
+            "requirement_blocks": 28,
+            "scenario_blocks": 37,
+            "substantive_requirement_blocks": 28
+          },
+          {
+            "path": "./.cairn/specs/crate-consumability/spec.md",
+            "requirement_blocks": 47,
+            "scenario_blocks": 53,
+            "substantive_requirement_blocks": 47
+          },
+          {
+            "path": "./.cairn/specs/durable-authority-adoption/spec.md",
+            "requirement_blocks": 7,
+            "scenario_blocks": 14,
+            "substantive_requirement_blocks": 7
+          },
+          {
+            "path": "./.cairn/specs/holder-observation/spec.md",
+            "requirement_blocks": 3,
+            "scenario_blocks": 5,
+            "substantive_requirement_blocks": 3
+          },
+          {
+            "path": "./.cairn/specs/mantle-authority/spec.md",
+            "requirement_blocks": 3,
+            "scenario_blocks": 5,
+            "substantive_requirement_blocks": 3
+          },
+          {
+            "path": "./.cairn/specs/nickel-toolchain/spec.md",
+            "requirement_blocks": 5,
+            "scenario_blocks": 7,
+            "substantive_requirement_blocks": 5
+          },
+          {
+            "path": "./.cairn/specs/nostr-identity-bindings/spec.md",
+            "requirement_blocks": 7,
+            "scenario_blocks": 13,
+            "substantive_requirement_blocks": 7
+          },
+          {
+            "path": "./.cairn/specs/peer-auth-policy/spec.md",
+            "requirement_blocks": 6,
+            "scenario_blocks": 10,
+            "substantive_requirement_blocks": 6
+          },
+          {
+            "path": "./.cairn/specs/policy-authoring-contracts/spec.md",
+            "requirement_blocks": 7,
+            "scenario_blocks": 7,
+            "substantive_requirement_blocks": 7
+          },
+          {
+            "path": "./.cairn/specs/policy-evaluation-cache/spec.md",
+            "requirement_blocks": 6,
+            "scenario_blocks": 10,
+            "substantive_requirement_blocks": 6
+          },
+          {
+            "path": "./.cairn/specs/test-hardening/spec.md",
+            "requirement_blocks": 3,
+            "scenario_blocks": 3,
+            "substantive_requirement_blocks": 3
+          },
+          {
+            "path": "./.cairn/specs/ucan-token-flow/spec.md",
+            "requirement_blocks": 55,
+            "scenario_blocks": 97,
+            "substantive_requirement_blocks": 55
+          }
+        ],
+        "specs_validated": 13,
+        "substance": [
+          {
+            "checkbox_tasks": 0,
+            "kind": "design",
+            "malformed_dependency_markers": 0,
+            "path": "./.cairn/changes/bind-oidc-holder-recipient/design.md",
+            "requirement_blocks": 0,
+            "scenario_blocks": 0,
+            "substantive_lines": 8,
+            "substantive_requirement_blocks": 0,
+            "substantive_tasks": 0,
+            "task_done": 0,
+            "task_in_progress": 0,
+            "task_todo": 0
+          },
+          {
+            "checkbox_tasks": 0,
+            "kind": "proposal",
+            "malformed_dependency_markers": 0,
+            "path": "./.cairn/changes/bind-oidc-holder-recipient/proposal.md",
+            "requirement_blocks": 0,
+            "scenario_blocks": 0,
+            "substantive_lines": 7,
+            "substantive_requirement_blocks": 0,
+            "substantive_tasks": 0,
+            "task_done": 0,
+            "task_in_progress": 0,
+            "task_todo": 0
+          },
+          {
+            "checkbox_tasks": 0,
+            "kind": "delta_spec",
+            "malformed_dependency_markers": 0,
+            "path": "./.cairn/changes/bind-oidc-holder-recipient/specs/ucan-token-flow/spec.md",
+            "requirement_blocks": 2,
+            "scenario_blocks": 3,
+            "substantive_lines": 12,
+            "substantive_requirement_blocks": 2,
+            "substantive_tasks": 0,
+            "task_done": 0,
+            "task_in_progress": 0,
+            "task_todo": 0
+          },
+          {
+            "checkbox_tasks": 3,
+            "kind": "tasks",
+            "malformed_dependency_markers": 0,
+            "path": "./.cairn/changes/bind-oidc-holder-recipient/tasks.md",
+            "requirement_blocks": 0,
+            "scenario_blocks": 0,
+            "substantive_lines": 4,
+            "substantive_requirement_blocks": 0,
+            "substantive_tasks": 3,
+            "task_done": 2,
+            "task_in_progress": 0,
+            "task_todo": 1
+          }
+        ],
+        "substance_findings": [],
+        "substance_issues": [],
+        "valid": true,
+        "workflow_profiles": [
+          {
+            "acceptance_ids": [],
+            "non_claims": [
+              "workflow state proves only the selected policy graph and observed structural artifact facts",
+              "workflow instructions do not prove artifact truth, review quality, or implementation correctness",
+              "workflow state does not satisfy proposal, design, tasks, sync, archive, evidence, or release gates",
+              "workflow commands are read-only and do not create, edit, delete, or approve lifecycle artifacts"
+            ],
+            "profile_identity_hash": "a2cc3362627a5a0f3e4b7c2268d21eb8d8c0dfe8b38e955b20b8857a558616f3",
+            "review_receipt_hashes": [],
+            "spec_effect": "delta",
+            "workflow_profile": "spec-driven",
+            "workflow_profile_compatibility_fallback": false,
+            "workflow_profile_source": "change_create",
+            "workflow_profile_version": 1
+          }
+        ]
+      },
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cairn",
+        "gate",
+        "proposal",
+        "bind-oidc-holder-recipient",
+        "--root",
+        "."
+      ],
+      "exit": 0,
+      "result": {
+        "acceptance_ids": [],
+        "change": "bind-oidc-holder-recipient",
+        "evidence_summary": {
+          "docs_only": 0,
+          "fixture": 0,
+          "formal": 0,
+          "mode": "advisory",
+          "model": 0,
+          "probe": 0,
+          "property": 0
+        },
+        "input_hash": "f7e9d922acf5fb810f6637684448fe53d80753993762fe4c6b16a6ee8568ae9d",
+        "issues": [],
+        "layout": "cairn",
+        "non_claims": [
+          "workflow state proves only the selected policy graph and observed structural artifact facts",
+          "workflow instructions do not prove artifact truth, review quality, or implementation correctness",
+          "workflow state does not satisfy proposal, design, tasks, sync, archive, evidence, or release gates",
+          "workflow commands are read-only and do not create, edit, delete, or approve lifecycle artifacts"
+        ],
+        "policy": "cairn-default",
+        "policy_hash": "c8276321e0e82c524e09ad9357fa48a9d38ac8590263ee6f79c51a328dc6037d",
+        "policy_selection": {
+          "blake3": "7a67802377005c18ebded42899e7f564f5d87087b6c14ca70464b35886f340a9",
+          "installation_receipt": false,
+          "locator": "cairn-policy/generated/cairn-policy.json",
+          "source": "legacy_default"
+        },
+        "probe_evidence": null,
+        "profile_identity_hash": "a2cc3362627a5a0f3e4b7c2268d21eb8d8c0dfe8b38e955b20b8857a558616f3",
+        "receipt_hash": "3810416dc705779c488167fd1d11d1d577429d7aeaf58160c47c09c26df0fed9",
+        "review_receipt_hashes": [],
+        "spec_effect": "delta",
+        "stage": "proposal",
+        "substance": [
+          {
+            "checkbox_tasks": 0,
+            "kind": "proposal",
+            "malformed_dependency_markers": 0,
+            "path": "./.cairn/changes/bind-oidc-holder-recipient/proposal.md",
+            "requirement_blocks": 0,
+            "scenario_blocks": 0,
+            "substantive_lines": 7,
+            "substantive_requirement_blocks": 0,
+            "substantive_tasks": 0,
+            "task_done": 0,
+            "task_in_progress": 0,
+            "task_todo": 0
+          }
+        ],
+        "task_ordering": null,
+        "valid": true,
+        "verdict": "PASS",
+        "workflow_profile": "spec-driven",
+        "workflow_profile_compatibility_fallback": false,
+        "workflow_profile_source": "change_create",
+        "workflow_profile_version": 1
+      },
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cairn",
+        "gate",
+        "design",
+        "bind-oidc-holder-recipient",
+        "--root",
+        "."
+      ],
+      "exit": 0,
+      "result": {
+        "acceptance_ids": [],
+        "change": "bind-oidc-holder-recipient",
+        "evidence_summary": {
+          "docs_only": 0,
+          "fixture": 0,
+          "formal": 0,
+          "mode": "advisory",
+          "model": 0,
+          "probe": 0,
+          "property": 0
+        },
+        "input_hash": "fc1bd69b8f4bd56029f662e32ff64ba1bbdce96d2dab7572aac1a67ad3b922ac",
+        "issues": [],
+        "layout": "cairn",
+        "non_claims": [
+          "workflow state proves only the selected policy graph and observed structural artifact facts",
+          "workflow instructions do not prove artifact truth, review quality, or implementation correctness",
+          "workflow state does not satisfy proposal, design, tasks, sync, archive, evidence, or release gates",
+          "workflow commands are read-only and do not create, edit, delete, or approve lifecycle artifacts"
+        ],
+        "policy": "cairn-default",
+        "policy_hash": "c8276321e0e82c524e09ad9357fa48a9d38ac8590263ee6f79c51a328dc6037d",
+        "policy_selection": {
+          "blake3": "7a67802377005c18ebded42899e7f564f5d87087b6c14ca70464b35886f340a9",
+          "installation_receipt": false,
+          "locator": "cairn-policy/generated/cairn-policy.json",
+          "source": "legacy_default"
+        },
+        "probe_evidence": null,
+        "profile_identity_hash": "a2cc3362627a5a0f3e4b7c2268d21eb8d8c0dfe8b38e955b20b8857a558616f3",
+        "receipt_hash": "184555eac730e1442738cd4b788d008915e0e485c8007c5a73d3bbf943bca0bc",
+        "review_receipt_hashes": [],
+        "spec_effect": "delta",
+        "stage": "design",
+        "substance": [
+          {
+            "checkbox_tasks": 0,
+            "kind": "design",
+            "malformed_dependency_markers": 0,
+            "path": "./.cairn/changes/bind-oidc-holder-recipient/design.md",
+            "requirement_blocks": 0,
+            "scenario_blocks": 0,
+            "substantive_lines": 8,
+            "substantive_requirement_blocks": 0,
+            "substantive_tasks": 0,
+            "task_done": 0,
+            "task_in_progress": 0,
+            "task_todo": 0
+          },
+          {
+            "checkbox_tasks": 0,
+            "kind": "proposal",
+            "malformed_dependency_markers": 0,
+            "path": "./.cairn/changes/bind-oidc-holder-recipient/proposal.md",
+            "requirement_blocks": 0,
+            "scenario_blocks": 0,
+            "substantive_lines": 7,
+            "substantive_requirement_blocks": 0,
+            "substantive_tasks": 0,
+            "task_done": 0,
+            "task_in_progress": 0,
+            "task_todo": 0
+          },
+          {
+            "checkbox_tasks": 0,
+            "kind": "delta_spec",
+            "malformed_dependency_markers": 0,
+            "path": "./.cairn/changes/bind-oidc-holder-recipient/specs/ucan-token-flow/spec.md",
+            "requirement_blocks": 2,
+            "scenario_blocks": 3,
+            "substantive_lines": 12,
+            "substantive_requirement_blocks": 2,
+            "substantive_tasks": 0,
+            "task_done": 0,
+            "task_in_progress": 0,
+            "task_todo": 0
+          }
+        ],
+        "task_ordering": null,
+        "valid": true,
+        "verdict": "PASS",
+        "workflow_profile": "spec-driven",
+        "workflow_profile_compatibility_fallback": false,
+        "workflow_profile_source": "change_create",
+        "workflow_profile_version": 1
+      },
+      "stderr": ""
+    },
+    {
+      "command": [
+        "cairn",
+        "gate",
+        "tasks",
+        "bind-oidc-holder-recipient",
+        "--root",
+        "."
+      ],
+      "exit": 0,
+      "result": {
+        "acceptance_ids": [],
+        "change": "bind-oidc-holder-recipient",
+        "evidence_summary": {
+          "docs_only": 0,
+          "fixture": 0,
+          "formal": 0,
+          "mode": "advisory",
+          "model": 0,
+          "probe": 0,
+          "property": 0
+        },
+        "input_hash": "67ee72107d3a302b680608be0c9b379576ece844c79657429915d87004b7da58",
+        "issues": [],
+        "layout": "cairn",
+        "non_claims": [
+          "workflow state proves only the selected policy graph and observed structural artifact facts",
+          "workflow instructions do not prove artifact truth, review quality, or implementation correctness",
+          "workflow state does not satisfy proposal, design, tasks, sync, archive, evidence, or release gates",
+          "workflow commands are read-only and do not create, edit, delete, or approve lifecycle artifacts"
+        ],
+        "policy": "cairn-default",
+        "policy_hash": "c8276321e0e82c524e09ad9357fa48a9d38ac8590263ee6f79c51a328dc6037d",
+        "policy_selection": {
+          "blake3": "7a67802377005c18ebded42899e7f564f5d87087b6c14ca70464b35886f340a9",
+          "installation_receipt": false,
+          "locator": "cairn-policy/generated/cairn-policy.json",
+          "source": "legacy_default"
+        },
+        "probe_evidence": {
+          "declarations_present": false,
+          "probes": []
+        },
+        "profile_identity_hash": "a2cc3362627a5a0f3e4b7c2268d21eb8d8c0dfe8b38e955b20b8857a558616f3",
+        "receipt_hash": "14d24adcda9c65e1aa22ca2c9ea12c273fe97efaa30b2752df6c7cee792609a2",
+        "review_receipt_hashes": [],
+        "spec_effect": "delta",
+        "stage": "tasks",
+        "substance": [
+          {
+            "checkbox_tasks": 0,
+            "kind": "design",
+            "malformed_dependency_markers": 0,
+            "path": "./.cairn/changes/bind-oidc-holder-recipient/design.md",
+            "requirement_blocks": 0,
+            "scenario_blocks": 0,
+            "substantive_lines": 8,
+            "substantive_requirement_blocks": 0,
+            "substantive_tasks": 0,
+            "task_done": 0,
+            "task_in_progress": 0,
+            "task_todo": 0
+          },
+          {
+            "checkbox_tasks": 0,
+            "kind": "proposal",
+            "malformed_dependency_markers": 0,
+            "path": "./.cairn/changes/bind-oidc-holder-recipient/proposal.md",
+            "requirement_blocks": 0,
+            "scenario_blocks": 0,
+            "substantive_lines": 7,
+            "substantive_requirement_blocks": 0,
+            "substantive_tasks": 0,
+            "task_done": 0,
+            "task_in_progress": 0,
+            "task_todo": 0
+          },
+          {
+            "checkbox_tasks": 0,
+            "kind": "delta_spec",
+            "malformed_dependency_markers": 0,
+            "path": "./.cairn/changes/bind-oidc-holder-recipient/specs/ucan-token-flow/spec.md",
+            "requirement_blocks": 2,
+            "scenario_blocks": 3,
+            "substantive_lines": 12,
+            "substantive_requirement_blocks": 2,
+            "substantive_tasks": 0,
+            "task_done": 0,
+            "task_in_progress": 0,
+            "task_todo": 0
+          },
+          {
+            "checkbox_tasks": 3,
+            "kind": "tasks",
+            "malformed_dependency_markers": 0,
+            "path": "./.cairn/changes/bind-oidc-holder-recipient/tasks.md",
+            "requirement_blocks": 0,
+            "scenario_blocks": 0,
+            "substantive_lines": 4,
+            "substantive_requirement_blocks": 0,
+            "substantive_tasks": 3,
+            "task_done": 2,
+            "task_in_progress": 0,
+            "task_todo": 1
+          }
+        ],
+        "task_ordering": {
+          "active": false,
+          "edges": [],
+          "issues": [],
+          "nodes": [],
+          "order": [],
+          "ready_tasks": [],
+          "valid": true
+        },
+        "valid": true,
+        "verdict": "PASS",
+        "workflow_profile": "spec-driven",
+        "workflow_profile_compatibility_fallback": false,
+        "workflow_profile_source": "change_create",
+        "workflow_profile_version": 1
+      },
+      "stderr": ""
+    }
+  ],
+  "runtime_verification": "Authored producer tests not executed; integrated Lattice owner will run affected producer/consumer paths. Structural admission does not establish runtime correctness.",
+  "publication": false,
+  "lifecycle_acceptance": false,
+  "archive": false,
+  "production_activation": false
+}

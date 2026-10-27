@@ -27,6 +27,23 @@ fn required_license_and_source_inventory_is_admitted() {
 }
 
 #[test]
+fn missing_holder_observation_sources_are_rejected() {
+    for missing in [
+        "src/token/holder_invocation/recheck.rs",
+        "crates/ucan-core/src/holder_invocation/recheck.rs",
+        "docs/holder-authorization-recheck.md",
+    ] {
+        let entries = REQUIRED_SNAPSHOT_PATHS
+            .iter()
+            .filter(|path| **path != missing)
+            .map(|path| entry(path))
+            .collect::<Vec<_>>();
+        let error = validate_required_entries(&entries).expect_err("missing observation source must fail");
+        assert!(error.contains(missing));
+    }
+}
+
+#[test]
 fn missing_license_is_rejected() {
     let entries = REQUIRED_SNAPSHOT_PATHS
         .iter()

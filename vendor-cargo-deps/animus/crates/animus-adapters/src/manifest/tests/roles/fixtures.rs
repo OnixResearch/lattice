@@ -4,7 +4,8 @@ use super::super::support::*;
 pub(super) fn descriptor_with_drafts(role_drafts: &[PluginRoleDraft<'_>]) -> PluginDescriptor {
     let mut draft = safe_stdio_draft();
     draft.declared_roles = role_drafts;
-    PluginDescriptor::validate(&draft, BUILT_IN_TOOLS, CATALOG_TOOLS).expect("descriptor with roles should validate")
+    PluginDescriptor::validate(&draft, BUILT_IN_TOOLS, CATALOG_TOOLS)
+        .expect("descriptor with roles should validate")
 }
 
 pub(super) fn role_with_title(title: Option<&'static str>) -> PluginRoleDraft<'static> {
@@ -46,7 +47,9 @@ pub(super) fn role_with_dispatch(
     }
 }
 
-pub(super) fn role_with_compatibility(compatibility: PluginCompatibilityDraft<'static>) -> PluginRoleDraft<'static> {
+pub(super) fn role_with_compatibility(
+    compatibility: PluginCompatibilityDraft<'static>,
+) -> PluginRoleDraft<'static> {
     PluginRoleDraft {
         compatibility,
         ..role_with_title(Some(ROLE_TITLE))
@@ -130,7 +133,10 @@ pub(super) const ENABLED_BUT_DENIED: RegistryPolicyState = RegistryPolicyState {
     policy_allows: false,
 };
 
-#[expect(clippy::too_many_arguments, reason = "fixture mirrors registry request fields")]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "fixture mirrors registry request fields"
+)]
 pub(super) fn registry_request<'a>(
     operation: PluginRegistryOperationKind,
     entrypoint_id: Option<&'a str>,
@@ -152,19 +158,15 @@ pub(super) fn registry_request<'a>(
 
 pub(super) fn assert_blocked_with(plan: &PluginRegistryPlan, kind: PluginDiagnosticKind) {
     assert_eq!(plan.status(), PluginRegistryPlanStatus::Blocked);
-    assert!(
-        plan.diagnostics().iter().any(|diagnostic| {
-            diagnostic.kind() == kind && diagnostic.severity() == PluginDiagnosticSeverity::Failure
-        })
-    );
+    assert!(plan.diagnostics().iter().any(|diagnostic| {
+        diagnostic.kind() == kind && diagnostic.severity() == PluginDiagnosticSeverity::Failure
+    }));
     assert!(plan.command_label().is_none());
 }
 
 pub(super) fn assert_warning_with(plan: &PluginRegistryPlan, kind: PluginDiagnosticKind) {
     assert_eq!(plan.status(), PluginRegistryPlanStatus::Warning);
-    assert!(
-        plan.diagnostics().iter().any(|diagnostic| {
-            diagnostic.kind() == kind && diagnostic.severity() == PluginDiagnosticSeverity::Warning
-        })
-    );
+    assert!(plan.diagnostics().iter().any(|diagnostic| {
+        diagnostic.kind() == kind && diagnostic.severity() == PluginDiagnosticSeverity::Warning
+    }));
 }

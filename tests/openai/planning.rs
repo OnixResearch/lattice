@@ -3,7 +3,7 @@ use super::*;
 // r[verify n8nclone.workflow_execution.agent_nodes.openai_compatible.scenario.plan]
 #[test]
 fn typed_nickel_example_loads_native_runtime_routes() {
-    let config = load_app_config(Path::new(CONFIG_EXAMPLE_PATH));
+    let config = load_app_config(Path::new(CONFIG_EXAMPLE_PATH)).expect("OpenAI app config imports");
 
     assert!(config.agent_runtime.runtimes.is_empty());
     assert_eq!(config.agent_runtime.openai_compatible.len(), CONFIGURED_RUNTIME_COUNT);

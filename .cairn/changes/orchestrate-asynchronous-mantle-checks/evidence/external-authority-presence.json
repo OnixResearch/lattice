@@ -1,0 +1,21 @@
+{
+  "schema": "lattice.github-ci.external-authority-presence.v1",
+  "observation": "Presence-only evaluation in the current worker environment; no variable values were displayed or retained.",
+  "documented_environment": {
+    "GITHUB_ACTIONS": false,
+    "ACTIONS_ID_TOKEN_REQUEST_URL": false,
+    "ACTIONS_ID_TOKEN_REQUEST_TOKEN": false
+  },
+  "required_independently_provisioned_external_prerequisites": [
+    "A separately provisioned private GitHub test repository and authorized workflow/commit/check target.",
+    "An actual GitHub Actions job with id-token: write supplying the documented request endpoint and transient request token for the exact approved Basalt audience.",
+    "A real accepted SecretSpec-backed GitHub Check Runs credential declaration and authorized provider resolution context.",
+    "An owning-operator-deployed authenticated Mantle service with pinned producer identity/key, allowed service/project/holder, durable replay/signing state, concrete inputs, real worker/store/import authority and authorized public evidence links.",
+    "Observed private-repository and report-only recovery, duplicates, cancellation and credential-redaction evidence before required-status admission."
+  ],
+  "non_claims": [
+    "This does not attempt OIDC acquisition, access a private repository, resolve a provider value, perform a GitHub mutation, deploy a service or grant authority.",
+    "Presence checks do not prove any external permission or configuration absent from other environments.",
+    "Local signed receiver/coordinator/worker evidence and offline cryptographic conformance do not satisfy these external rollout stages."
+  ]
+}

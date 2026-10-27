@@ -5,12 +5,12 @@
 //! It validates a license-consumption receipt without granting legal advice, an
 //! alternate license, or a compatibility exception.
 
-use serde::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-pub use crate::license_consumption_identity::LICENSE_CONSUMPTION_FIXTURE_SCHEMA;
-pub use crate::license_consumption_identity::LICENSE_CONSUMPTION_RECEIPT_SCHEMA;
-pub use crate::license_consumption_identity::LICENSE_CONSUMPTION_RELEASE_RECEIPT_SCHEMA;
+pub use crate::license_consumption_identity::{
+    LICENSE_CONSUMPTION_FIXTURE_SCHEMA, LICENSE_CONSUMPTION_RECEIPT_SCHEMA,
+    LICENSE_CONSUMPTION_RELEASE_RECEIPT_SCHEMA,
+};
 
 const MAXIMUM_FIELD_BYTES: usize = 4_096;
 const MAXIMUM_STABLE_ID_BYTES: usize = 128;
@@ -96,7 +96,9 @@ impl LicenseConsumptionIssue {
 /// This is a pure deterministic decision. It performs no I/O and supplies no
 /// legal advice or license exception.
 #[must_use]
-pub fn validate_license_consumption(receipt: &LicenseConsumptionReceipt) -> LicenseConsumptionVerdict {
+pub fn validate_license_consumption(
+    receipt: &LicenseConsumptionReceipt,
+) -> LicenseConsumptionVerdict {
     let mut issues: Vec<LicenseConsumptionIssue> = Vec::new();
 
     check_exact(
@@ -156,31 +158,70 @@ pub fn license_non_claim_statement() -> String {
     NON_CLAIM_MESSAGE.to_owned()
 }
 
-fn check_exact(issues: &mut Vec<LicenseConsumptionIssue>, actual: &str, expected: &str, code: &str, message: &str) {
+fn check_exact(
+    issues: &mut Vec<LicenseConsumptionIssue>,
+    actual: &str,
+    expected: &str,
+    code: &str,
+    message: &str,
+) {
     if actual != expected {
-        issues.push(LicenseConsumptionIssue::new(code.to_owned(), message.to_owned()));
+        issues.push(LicenseConsumptionIssue::new(
+            code.to_owned(),
+            message.to_owned(),
+        ));
     }
 }
 
-fn check_stable_id(issues: &mut Vec<LicenseConsumptionIssue>, value: &str, code: &str, message: &str) {
+fn check_stable_id(
+    issues: &mut Vec<LicenseConsumptionIssue>,
+    value: &str,
+    code: &str,
+    message: &str,
+) {
     if value.is_empty() || value.len() > MAXIMUM_STABLE_ID_BYTES {
-        issues.push(LicenseConsumptionIssue::new(code.to_owned(), message.to_owned()));
+        issues.push(LicenseConsumptionIssue::new(
+            code.to_owned(),
+            message.to_owned(),
+        ));
     }
 }
 
-fn check_bounded_non_empty(issues: &mut Vec<LicenseConsumptionIssue>, value: &str, code: &str, message: &str) {
+fn check_bounded_non_empty(
+    issues: &mut Vec<LicenseConsumptionIssue>,
+    value: &str,
+    code: &str,
+    message: &str,
+) {
     if value.is_empty() || value.len() > MAXIMUM_FIELD_BYTES {
-        issues.push(LicenseConsumptionIssue::new(code.to_owned(), message.to_owned()));
+        issues.push(LicenseConsumptionIssue::new(
+            code.to_owned(),
+            message.to_owned(),
+        ));
     }
 }
 
-fn check_revision(issues: &mut Vec<LicenseConsumptionIssue>, value: &str, code: &str, message: &str) {
-    if value.is_empty() || value.len() > MAXIMUM_REVISION_BYTES || value != REQUIRED_LICENSE_METADATA_REVISION {
-        issues.push(LicenseConsumptionIssue::new(code.to_owned(), message.to_owned()));
+fn check_revision(
+    issues: &mut Vec<LicenseConsumptionIssue>,
+    value: &str,
+    code: &str,
+    message: &str,
+) {
+    if value.is_empty()
+        || value.len() > MAXIMUM_REVISION_BYTES
+        || value != REQUIRED_LICENSE_METADATA_REVISION
+    {
+        issues.push(LicenseConsumptionIssue::new(
+            code.to_owned(),
+            message.to_owned(),
+        ));
     }
 }
 
-fn check_review_action(issues: &mut Vec<LicenseConsumptionIssue>, review_action: LicenseReviewAction) {
+fn check_review_action(
+    issues: &mut Vec<LicenseConsumptionIssue>,
+    review_action: LicenseReviewAction,
+) {
     if review_action != LicenseReviewAction::Acknowledged {
         issues.push(LicenseConsumptionIssue::new(
             "license-consumption.review".to_owned(),
@@ -207,10 +248,10 @@ fn check_non_claims(issues: &mut Vec<LicenseConsumptionIssue>, non_claims: &[Str
 
 #[cfg(test)]
 mod tests {
-    use super::LicenseConsumptionReceipt;
-    use super::LicenseReviewAction;
-    use super::REQUIRED_LICENSE_CONSUMPTION_NON_CLAIMS;
-    use super::validate_license_consumption;
+    use super::{
+        LicenseConsumptionReceipt, LicenseReviewAction, REQUIRED_LICENSE_CONSUMPTION_NON_CLAIMS,
+        validate_license_consumption,
+    };
 
     fn receipt() -> LicenseConsumptionReceipt {
         LicenseConsumptionReceipt {
@@ -221,7 +262,9 @@ mod tests {
             license_expression: "AGPL-3.0-or-later".to_owned(),
             license_metadata_revision: super::REQUIRED_LICENSE_METADATA_REVISION.to_owned(),
             review_action: LicenseReviewAction::Acknowledged,
-            non_claims: REQUIRED_LICENSE_CONSUMPTION_NON_CLAIMS.map(str::to_owned).to_vec(),
+            non_claims: REQUIRED_LICENSE_CONSUMPTION_NON_CLAIMS
+                .map(str::to_owned)
+                .to_vec(),
         }
     }
 
@@ -229,7 +272,10 @@ mod tests {
     fn acknowledged_consumption_passes() {
         let verdict = validate_license_consumption(&receipt());
         assert!(verdict.accepted);
-        assert_eq!(verdict.supported_claim.as_deref(), Some("intentional-license-review"));
+        assert_eq!(
+            verdict.supported_claim.as_deref(),
+            Some("intentional-license-review")
+        );
         assert!(verdict.issues.is_empty());
     }
 
@@ -239,7 +285,12 @@ mod tests {
         case.review_action = LicenseReviewAction::Deferred;
         let verdict = validate_license_consumption(&case);
         assert!(!verdict.accepted);
-        assert!(verdict.issues.iter().any(|i| i.code == "license-consumption.review"));
+        assert!(
+            verdict
+                .issues
+                .iter()
+                .any(|i| i.code == "license-consumption.review")
+        );
     }
 
     #[test]
@@ -248,7 +299,12 @@ mod tests {
         case.artifact_identity = "ucan-nickel-contracts".to_owned();
         let verdict = validate_license_consumption(&case);
         assert!(!verdict.accepted);
-        assert!(verdict.issues.iter().any(|i| i.code == "license-consumption.artifact-identity"));
+        assert!(
+            verdict
+                .issues
+                .iter()
+                .any(|i| i.code == "license-consumption.artifact-identity")
+        );
     }
 
     #[test]
@@ -257,7 +313,12 @@ mod tests {
         case.license_expression = "MIT".to_owned();
         let verdict = validate_license_consumption(&case);
         assert!(!verdict.accepted);
-        assert!(verdict.issues.iter().any(|i| i.code == "license-consumption.license-expression"));
+        assert!(
+            verdict
+                .issues
+                .iter()
+                .any(|i| i.code == "license-consumption.license-expression")
+        );
     }
 
     #[test]
@@ -266,7 +327,12 @@ mod tests {
         case.license_metadata_revision = "2024-01-01-license-metadata-v1".to_owned();
         let verdict = validate_license_consumption(&case);
         assert!(!verdict.accepted);
-        assert!(verdict.issues.iter().any(|i| i.code == "license-consumption.license-metadata"));
+        assert!(
+            verdict
+                .issues
+                .iter()
+                .any(|i| i.code == "license-consumption.license-metadata")
+        );
     }
 
     #[test]
@@ -275,7 +341,12 @@ mod tests {
         case.non_claims.pop();
         let verdict = validate_license_consumption(&case);
         assert!(!verdict.accepted);
-        assert!(verdict.issues.iter().any(|i| i.code == "license-consumption.non-claims"));
+        assert!(
+            verdict
+                .issues
+                .iter()
+                .any(|i| i.code == "license-consumption.non-claims")
+        );
     }
 
     #[test]

@@ -1,58 +1,57 @@
 //! Provider-neutral multimodal model input descriptors.
 
 mod body;
-mod capability;
 mod check;
 mod compose;
 mod descriptor;
 mod evidence;
 mod fault;
+mod inputgate;
 mod kinds;
+mod motion;
 #[cfg(test)]
 mod tests;
 mod transport;
 mod wire;
 
-pub use body::ContentPart;
-pub use body::ContentPartDraft;
-pub use body::TextPart;
-pub use capability::DispatchPlan;
-pub use capability::ModelInputCapabilities;
-pub use capability::ModelInputCapabilitiesDraft;
-pub use capability::prepare_dispatch;
-pub use compose::ImageOutcome;
-pub use compose::ImageOutcomeStatus;
-pub use compose::PromptAssembly;
-pub use compose::PromptAssemblyPolicy;
-pub use compose::assemble_prompt_parts;
-pub use descriptor::ImageMetadata;
-pub use descriptor::ImageMetadataDraft;
-pub use descriptor::ImagePart;
-pub use descriptor::ImagePartDraft;
-pub use evidence::ImageReceipt;
-pub use evidence::ImageReceiptDraft;
-pub use fault::Error;
-pub use fault::UnsafeContentReason;
-pub use kinds::ImageDetailPreference;
-pub use kinds::ImageMediaType;
-pub use kinds::ImageSourceTrust;
-pub use kinds::InputModality;
-pub use transport::ImagePayloadError;
-pub use transport::ImagePayloadHandle;
-pub use transport::ImagePayloadHandleDraft;
-pub use transport::ImagePayloadHandleKind;
-pub use transport::ImagePayloadService;
-pub use wire::ProviderNativePart;
-pub use wire::ProviderNativeRequest;
-pub use wire::ProviderSerializationMode;
-pub use wire::ProviderSerializationPolicy;
-pub use wire::ProviderSerializationPolicyDraft;
-pub use wire::serialize_provider_native_fixture;
+pub use body::{ContentPart, ContentPartDraft, TextPart};
+pub use compose::{
+    ImageOutcome, ImageOutcomeStatus, PromptAssembly, PromptAssemblyPolicy, assemble_prompt_parts,
+};
+pub use descriptor::{ImageMetadata, ImageMetadataDraft, ImagePart, ImagePartDraft};
+pub use evidence::{ImageReceipt, ImageReceiptDraft};
+pub use fault::{Error, UnsafeContentReason};
+pub use inputgate::{
+    DispatchPlan, ModelInputCapabilities, ModelInputCapabilitiesDraft, VideoCapabilityOutcome,
+    VideoCapabilityPolicy, VideoInputCapabilities, VideoInputCapabilitiesDraft, prepare_dispatch,
+    prepare_dispatch_with_video_policy,
+};
+pub use kinds::{ImageDetailPreference, ImageMediaType, ImageSourceTrust, InputModality};
+pub use motion::{
+    DEFAULT_AGGREGATE_MEDIA_BYTE_BUDGET, DEFAULT_PROMPT_VIDEO_BYTE_BUDGET,
+    DEFAULT_PROMPT_VIDEO_COUNT, MAX_VIDEO_BYTE_COUNT, MAX_VIDEO_DURATION_MS, VideoDetailPreference,
+    VideoLossClass, VideoMediaType, VideoMetadata, VideoMetadataDraft, VideoOutcome,
+    VideoOutcomeStatus, VideoPart, VideoPartDraft, VideoPayloadError, VideoPayloadHandle,
+    VideoPayloadHandleDraft, VideoPayloadHandleKind, VideoPayloadService, VideoReceipt,
+    VideoReceiptDraft, VideoSourceTrust,
+};
+pub use transport::{
+    ImagePayloadError, ImagePayloadHandle, ImagePayloadHandleDraft, ImagePayloadHandleKind,
+    ImagePayloadService,
+};
+pub use wire::{
+    ProviderNativePart, ProviderNativeRequest, ProviderProjectionSupport,
+    ProviderSerializationMode, ProviderSerializationPolicy, ProviderSerializationPolicyDraft,
+    ProviderVideoProjection, serialize_provider_native_fixture,
+    serialize_provider_native_video_fixture,
+};
 
-pub(super) const SAFE_LABEL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("image_safe_label");
+pub(super) const SAFE_LABEL_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("image_safe_label");
 pub(super) const TEXT_PART_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("multimodal_text_part");
-pub(super) const MEDIA_TYPE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("image_media_type");
+pub(super) const MEDIA_TYPE_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("image_media_type");
 pub(super) const CONTENT_HASH_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("image_content_hash");
 pub(super) const SOURCE_HINT_FIELD: crate::validation::FieldName =
@@ -63,8 +62,10 @@ pub(super) const REDACTION_MARKER_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("image_redaction_marker");
 pub(super) const PROVIDER_LABEL_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("provider_label");
-pub(super) const MODEL_LABEL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("model_label");
-pub(super) const HANDLE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("image_payload_handle");
+pub(super) const MODEL_LABEL_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("model_label");
+pub(super) const HANDLE_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("image_payload_handle");
 pub(super) const METADATA_FRAGMENT_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("image_receipt_metadata");
 pub(super) const BLAKE3_HEX_CHARS: usize = blake3::OUT_LEN.saturating_mul(HEX_CHARS_PER_BYTE);
@@ -87,5 +88,6 @@ pub const MAX_IMAGE_BYTE_COUNT: u64 = mib_to_bytes(DEFAULT_IMAGE_MIB_LIMIT);
 pub const DEFAULT_PROMPT_IMAGE_BYTE_BUDGET: u64 = mib_to_bytes(DEFAULT_PROMPT_IMAGE_MIB_LIMIT);
 
 const fn mib_to_bytes(mib: u64) -> u64 {
-    mib.saturating_mul(KIB_PER_MIB).saturating_mul(BYTES_PER_KIB)
+    mib.saturating_mul(KIB_PER_MIB)
+        .saturating_mul(BYTES_PER_KIB)
 }

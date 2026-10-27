@@ -20,10 +20,14 @@ const CORRELATION_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("router_execution_correlation");
 const MODEL_LABEL_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("router_execution_model_label");
-const RECIPE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("router_execution_recipe_id");
-const REDACTION_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("router_execution_redaction");
-const CONTRACT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("router_execution_contract");
-const SUMMARY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("router_execution_summary");
+const RECIPE_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("router_execution_recipe_id");
+const REDACTION_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("router_execution_redaction");
+const CONTRACT_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("router_execution_contract");
+const SUMMARY_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("router_execution_summary");
 const HASH_SEPARATOR: &str = "\u{1f}";
 const RAW_PROMPT_MARKER: &str = "RAW_PROMPT:";
 const PROVIDER_PAYLOAD_MARKER: &str = "PROVIDER_PAYLOAD:";
@@ -120,12 +124,20 @@ impl core::fmt::Display for RouterExecutionError {
             Self::Contract(error) => write!(formatter, "router execution contract error: {error}"),
             Self::MissingService => formatter.write_str("router execution service is missing"),
             Self::ServiceDenied => formatter.write_str("router execution service was denied"),
-            Self::ServiceUnavailable => formatter.write_str("router execution service is unavailable"),
-            Self::UnauthorizedCandidate => formatter.write_str("router candidate is not plan-authorized"),
-            Self::ParallelismExceeded => formatter.write_str("router execution parallelism exceeded bounds"),
+            Self::ServiceUnavailable => {
+                formatter.write_str("router execution service is unavailable")
+            }
+            Self::UnauthorizedCandidate => {
+                formatter.write_str("router candidate is not plan-authorized")
+            }
+            Self::ParallelismExceeded => {
+                formatter.write_str("router execution parallelism exceeded bounds")
+            }
             Self::ImpossibleQuorum => formatter.write_str("router execution quorum is impossible"),
             Self::BudgetExceeded => formatter.write_str("router execution budget was exceeded"),
-            Self::ProviderBypassDenied => formatter.write_str("provider-side fallback bypass was denied"),
+            Self::ProviderBypassDenied => {
+                formatter.write_str("provider-side fallback bypass was denied")
+            }
             Self::FallbackDenied => formatter.write_str("router fallback was denied"),
             Self::SchemaMismatch => formatter.write_str("router execution schema mismatch"),
             Self::MalformedOutcome => formatter.write_str("router execution outcome is malformed"),
@@ -136,7 +148,10 @@ impl core::fmt::Display for RouterExecutionError {
                 field,
                 max_items,
                 actual_items,
-            } => write!(formatter, "{field} must contain at most {max_items} items; got {actual_items}"),
+            } => write!(
+                formatter,
+                "{field} must contain at most {max_items} items; got {actual_items}"
+            ),
         }
     }
 }
@@ -276,11 +291,12 @@ pub fn authorize_router_role_fanout(
     requested_candidates: &[&str],
     requested_parallelism: u32,
 ) -> Result<RouterRoleDispatch, RouterExecutionError> {
-    if requested_parallelism < MIN_DISPATCH_COUNT || requested_parallelism > step.parallelism_cap() {
+    if requested_parallelism < MIN_DISPATCH_COUNT || requested_parallelism > step.parallelism_cap()
+    {
         return Err(RouterExecutionError::ParallelismExceeded);
     }
-    let requested_len =
-        u32::try_from(requested_candidates.len()).map_err(|_error| RouterExecutionError::ParallelismExceeded)?;
+    let requested_len = u32::try_from(requested_candidates.len())
+        .map_err(|_error| RouterExecutionError::ParallelismExceeded)?;
     if requested_len > requested_parallelism {
         return Err(RouterExecutionError::ParallelismExceeded);
     }
@@ -292,7 +308,11 @@ pub fn authorize_router_role_fanout(
     let mut candidate_labels = Vec::with_capacity(requested_candidates.len());
     for candidate in requested_candidates {
         let safe_candidate = safe_text(MODEL_LABEL_FIELD, candidate)?;
-        if !step.candidate_labels().iter().any(|allowed| allowed == &safe_candidate) {
+        if !step
+            .candidate_labels()
+            .iter()
+            .any(|allowed| allowed == &safe_candidate)
+        {
             return Err(RouterExecutionError::UnauthorizedCandidate);
         }
         candidate_labels.push(safe_candidate);
@@ -347,8 +367,13 @@ impl RouterExecutionDispatchRequest {
         }
         let mut role_dispatches = Vec::with_capacity(input.plan.role_steps().len());
         for step in input.plan.role_steps() {
-            let candidate_refs: Vec<&str> = step.candidate_labels().iter().map(String::as_str).collect();
-            let dispatch = authorize_router_role_fanout(step, candidate_refs.as_slice(), step.parallelism_cap())?;
+            let candidate_refs: Vec<&str> =
+                step.candidate_labels().iter().map(String::as_str).collect();
+            let dispatch = authorize_router_role_fanout(
+                step,
+                candidate_refs.as_slice(),
+                step.parallelism_cap(),
+            )?;
             if dispatch.parallelism_cap() > input.ledger.remaining_parallelism() {
                 return Err(RouterExecutionError::ParallelismExceeded);
             }
@@ -676,7 +701,12 @@ pub fn evaluate_router_execution_fallback(
     }
     let safe_model = safe_text(MODEL_LABEL_FIELD, input.failed_model)?;
     let failure = crate::router::StepFailure::new(safe_model.as_str(), input.repairable);
-    Ok(crate::router::evaluate_fallback(&failure, input.ledger, input.chain, input.policy))
+    Ok(crate::router::evaluate_fallback(
+        &failure,
+        input.ledger,
+        input.chain,
+        input.policy,
+    ))
 }
 
 /// Borrowed input used to build a safe execution receipt.
@@ -902,7 +932,8 @@ impl RouterExecutionOutcome {
             .iter()
             .filter(|outcome| outcome.status() == RouterStepOutcomeStatus::Success)
             .count();
-        let success_count = u32::try_from(success_count).map_err(|_error| RouterExecutionError::MalformedOutcome)?;
+        let success_count = u32::try_from(success_count)
+            .map_err(|_error| RouterExecutionError::MalformedOutcome)?;
         if success_count != input.receipt.success_count() {
             return Err(RouterExecutionError::MalformedOutcome);
         }
@@ -1005,9 +1036,11 @@ pub fn validate_router_execution_receipt_text(text: &str) -> Result<(), RouterEx
 fn total_candidate_count(dispatches: &[RouterRoleDispatch]) -> Result<u32, RouterExecutionError> {
     let mut total = 0_u32;
     for dispatch in dispatches {
-        let count =
-            u32::try_from(dispatch.candidate_labels().len()).map_err(|_error| RouterExecutionError::BudgetExceeded)?;
-        total = total.checked_add(count).ok_or(RouterExecutionError::BudgetExceeded)?;
+        let count = u32::try_from(dispatch.candidate_labels().len())
+            .map_err(|_error| RouterExecutionError::BudgetExceeded)?;
+        total = total
+            .checked_add(count)
+            .ok_or(RouterExecutionError::BudgetExceeded)?;
     }
     Ok(total)
 }
@@ -1023,17 +1056,26 @@ fn validate_redaction_count(actual_items: usize) -> Result<(), RouterExecutionEr
     Ok(())
 }
 
-fn safe_text(field: crate::validation::FieldName, value: &str) -> Result<String, RouterExecutionError> {
+fn safe_text(
+    field: crate::validation::FieldName,
+    value: &str,
+) -> Result<String, RouterExecutionError> {
     let normalized = crate::validation::normalized_adapter_field(field, value)?;
     reject_unsafe_text(field, normalized.as_str())?;
     Ok(normalized)
 }
 
-fn safe_text_list(field: crate::validation::FieldName, values: &[&str]) -> Result<Vec<String>, RouterExecutionError> {
+fn safe_text_list(
+    field: crate::validation::FieldName,
+    values: &[&str],
+) -> Result<Vec<String>, RouterExecutionError> {
     values.iter().map(|value| safe_text(field, value)).collect()
 }
 
-fn reject_unsafe_text(field: crate::validation::FieldName, value: &str) -> Result<(), RouterExecutionError> {
+fn reject_unsafe_text(
+    field: crate::validation::FieldName,
+    value: &str,
+) -> Result<(), RouterExecutionError> {
     for marker in UNSAFE_RECEIPT_MARKERS {
         if contains_unsafe_marker(value, marker) {
             return Err(RouterExecutionError::UnsafeReceipt {
@@ -1055,9 +1097,8 @@ fn contains_unsafe_marker(value: &str, marker: &'static str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use alloc::vec;
-
     use super::*;
+    use alloc::vec;
 
     const RECIPE_SINGLE: &str = "recipe:single";
     const RECIPE_REMOM: &str = "recipe:remom";
@@ -1104,11 +1145,21 @@ mod tests {
             &mut self,
             request: &RouterExecutionDispatchRequest,
         ) -> Result<RouterExecutionOutcome, RouterExecutionError> {
-            self.calls = self.calls.checked_add(1).expect("fixture calls remain bounded");
+            self.calls = self
+                .calls
+                .checked_add(1)
+                .expect("fixture calls remain bounded");
             let mut outcomes = Vec::with_capacity(request.role_dispatches().len());
             for dispatch in request.role_dispatches() {
-                let first = dispatch.candidate_labels().first().expect("validated dispatch has candidates");
-                outcomes.push(step_outcome(dispatch.role(), first.as_str(), RouterStepOutcomeStatus::Success)?);
+                let first = dispatch
+                    .candidate_labels()
+                    .first()
+                    .expect("validated dispatch has candidates");
+                outcomes.push(step_outcome(
+                    dispatch.role(),
+                    first.as_str(),
+                    RouterStepOutcomeStatus::Success,
+                )?);
             }
             let receipt = execution_receipt(request, RouterExecutionStatus::Completed, &outcomes)?;
             RouterExecutionOutcome::new(RouterExecutionOutcomeInput {
@@ -1140,10 +1191,14 @@ mod tests {
         })
         .expect("dispatch request should validate");
         assert_eq!(request.role_dispatches().len(), EXPECTED_TWO_ITEMS);
-        assert_eq!(request.output_contract(), crate::router::OutputContract::Json);
+        assert_eq!(
+            request.output_contract(),
+            crate::router::OutputContract::Json
+        );
 
         let mut executor = FixtureExecutor::default();
-        let outcome = execute_router_plan(Some(&mut executor), &request).expect("fixture executor should complete");
+        let outcome = execute_router_plan(Some(&mut executor), &request)
+            .expect("fixture executor should complete");
         assert_eq!(outcome.status(), RouterExecutionStatus::Completed);
         assert_eq!(outcome.receipt().quorum(), crate::router::QuorumClass::Met);
         assert_eq!(executor.calls, 1);
@@ -1157,9 +1212,15 @@ mod tests {
             provider_bypass_claimed: false,
         })
         .expect("fallback evaluation should pass");
-        assert!(matches!(fallback, crate::router::FallbackDecision::FallbackTo(_)));
+        assert!(matches!(
+            fallback,
+            crate::router::FallbackDecision::FallbackTo(_)
+        ));
         assert!(
-            validate_router_execution_receipt_text("recipe=remom status=completed redactions=prompt_omitted").is_ok()
+            validate_router_execution_receipt_text(
+                "recipe=remom status=completed redactions=prompt_omitted"
+            )
+            .is_ok()
         );
     }
 
@@ -1174,14 +1235,14 @@ mod tests {
         let mut denied = FailingExecutor {
             error: RouterExecutionError::ServiceDenied,
         };
-        let denied_error =
-            execute_router_plan(Some(&mut denied), &request).expect_err("denied service should fail closed");
+        let denied_error = execute_router_plan(Some(&mut denied), &request)
+            .expect_err("denied service should fail closed");
         assert_eq!(denied_error, RouterExecutionError::ServiceDenied);
         let mut unavailable = FailingExecutor {
             error: RouterExecutionError::ServiceUnavailable,
         };
-        let unavailable_error =
-            execute_router_plan(Some(&mut unavailable), &request).expect_err("unavailable service should fail closed");
+        let unavailable_error = execute_router_plan(Some(&mut unavailable), &request)
+            .expect_err("unavailable service should fail closed");
         assert_eq!(unavailable_error, RouterExecutionError::ServiceUnavailable);
     }
 
@@ -1193,14 +1254,20 @@ mod tests {
         let plan = remom_plan(QUORUM_TWO);
         let ledger = crate::router::BudgetLedger::from(plan.bounds());
         let first_step = plan.role_steps().first().expect("plan has a role step");
-        let ambient = authorize_router_role_fanout(first_step, &["model:ambient", MODEL_WORKER_A], MAX_PARALLELISM_TWO)
-            .expect_err("ambient candidate should fail");
+        let ambient = authorize_router_role_fanout(
+            first_step,
+            &["model:ambient", MODEL_WORKER_A],
+            MAX_PARALLELISM_TWO,
+        )
+        .expect_err("ambient candidate should fail");
         assert_eq!(ambient, RouterExecutionError::UnauthorizedCandidate);
-        let over_parallel = authorize_router_role_fanout(first_step, &[MODEL_WORKER_A, MODEL_WORKER_B], QUORUM_ONE)
-            .expect_err("over-parallel fan-out should fail");
+        let over_parallel =
+            authorize_router_role_fanout(first_step, &[MODEL_WORKER_A, MODEL_WORKER_B], QUORUM_ONE)
+                .expect_err("over-parallel fan-out should fail");
         assert_eq!(over_parallel, RouterExecutionError::ParallelismExceeded);
-        let impossible_quorum = authorize_router_role_fanout(first_step, &[MODEL_WORKER_A], QUORUM_TWO)
-            .expect_err("single candidate cannot satisfy quorum two");
+        let impossible_quorum =
+            authorize_router_role_fanout(first_step, &[MODEL_WORKER_A], QUORUM_TWO)
+                .expect_err("single candidate cannot satisfy quorum two");
         assert_eq!(impossible_quorum, RouterExecutionError::ImpossibleQuorum);
 
         let bypass = evaluate_router_execution_fallback(&RouterFallbackEvaluationInput {
@@ -1285,8 +1352,8 @@ mod tests {
             fallback_eligibility: "eligible",
         })
         .expect("signals should project");
-        let selected =
-            crate::router::select_recipe(&signals, &recipes, &catalog, &budget).expect("recipe should select");
+        let selected = crate::router::select_recipe(&signals, &recipes, &catalog, &budget)
+            .expect("recipe should select");
         crate::router::materialize_execution_plan(&selected, &catalog, &budget)
             .expect("execution plan should materialize")
     }
@@ -1321,7 +1388,12 @@ mod tests {
     }
 
     #[cfg_attr(animus_octet, allow(tigerstyle::ambiguous_params))]
-    fn catalog_entry(label: &str, backend: &str, role: &str, local: bool) -> crate::router::CatalogEntry {
+    fn catalog_entry(
+        label: &str,
+        backend: &str,
+        role: &str,
+        local: bool,
+    ) -> crate::router::CatalogEntry {
         crate::router::CatalogEntry::new(crate::router::CatalogEntryDraft {
             label,
             backend,
@@ -1359,10 +1431,17 @@ mod tests {
     ) -> Result<RouterExecutionReceipt, RouterExecutionError> {
         assert!(!request.selected_models().is_empty());
         assert!(outcomes.len() <= request.role_dispatches().len());
-        let selected: Vec<&str> = request.selected_models().iter().map(String::as_str).collect();
-        let success_count =
-            outcomes.iter().filter(|outcome| outcome.status() == RouterStepOutcomeStatus::Success).count();
-        let success_count = u32::try_from(success_count).map_err(|_error| RouterExecutionError::MalformedOutcome)?;
+        let selected: Vec<&str> = request
+            .selected_models()
+            .iter()
+            .map(String::as_str)
+            .collect();
+        let success_count = outcomes
+            .iter()
+            .filter(|outcome| outcome.status() == RouterStepOutcomeStatus::Success)
+            .count();
+        let success_count = u32::try_from(success_count)
+            .map_err(|_error| RouterExecutionError::MalformedOutcome)?;
         RouterExecutionReceipt::new(&RouterExecutionReceiptDraft {
             contract_identity: ROUTER_EXECUTION_RECEIPT_CONTRACT_IDENTITY,
             recipe_id: request.recipe_id(),

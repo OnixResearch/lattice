@@ -1,0 +1,26 @@
+{
+  "schema": "mantle-cairn-release-handoff-input-v2",
+  "authentication": {
+    "schema": "mantle.cairn-authentication-dependency.v1",
+    "change_name": "authenticate-stack-provenance-inputs",
+    "cairn_revision": "f4a1f8df0d430c1b9431358a388ac1d3c1a823ec",
+    "archive_manifest_blake3": "40ea9765488bd02e362f70d5c9c498932544c80f2231a70f9b5c3ef81cd7df83",
+    "archive_mutation_receipt_blake3": "8a4250a7db47dd4c013467d65e5667af188aa66599a1b89df6788ef067598fa9",
+    "archive_receipt_path": "../positive/cairn-authentication.json",
+    "archive_receipt_digest_blake3": "bf33d82555c7bd3afcbc7adac743782327a5d08e536266f0dfda97d6fe342edf"
+  },
+  "rows": [
+    {
+      "artifact_id": "wrong-role-schema",
+      "role": "cairn-release-readiness-receipt",
+      "schema_id": "cairn.archive-index.v1",
+      "artifact_path": "../positive/readiness.json",
+      "artifact_digest_blake3": "676837c4ac63497e7462b4834b6453e8110d0e40ee8647284b058af0a630fd41",
+      "cairn_policy_path": "../positive/policy.ncl",
+      "cairn_policy_digest_blake3": "2a33db77b40e8e03424c27a1367b020a93ec0a5bfe04998f25389ee0c9a5531a",
+      "release_readiness_id": "mantle-fixture-ready",
+      "covers": ["mantle.release_provenance.cairn_evidence_handoff.production_wiring"],
+      "non_claims": ["not release correctness"]
+    }
+  ]
+}

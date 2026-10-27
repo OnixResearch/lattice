@@ -1,0 +1,44 @@
+{
+  "schema_id": "hwr.fixture-manifest.v1",
+  "schema_version": 1,
+  "source_revision": {
+    "repository": "aspen",
+    "branch": "molten",
+    "profile": "docs/wasm-component-runtime/generated/profile.json",
+    "profile_id": "molten.wasm.component.v1"
+  },
+  "frozen_negative_profile_fixtures": [
+    {
+      "path": "fixtures/aspen/negative/ambient-wasi.ncl",
+      "expected_class": "profile_denied",
+      "reason": "ambient WASI filesystem import is not admitted"
+    },
+    {
+      "path": "fixtures/aspen/negative/stale-cohort.ncl",
+      "expected_class": "profile_denied",
+      "reason": "cohort identity does not match the current profile"
+    },
+    {
+      "path": "fixtures/aspen/negative/nondeterministic-growth.ncl",
+      "expected_class": "profile_denied",
+      "reason": "unbounded memory or table growth breaks the fixed-growth policy"
+    },
+    {
+      "path": "fixtures/aspen/negative/incomplete-cohort.ncl",
+      "expected_class": "profile_denied",
+      "reason": "profile omits a required feature fact"
+    }
+  ],
+  "required_extraction_fixture_classes": [
+    { "class": "compile", "phase": 3, "description": "component and core-Wasm compilation success and failure" },
+    { "class": "invocation", "phase": 3, "description": "bounded guest invocation success with consumed-resource observations" },
+    { "class": "limit", "phase": 3, "description": "fuel, stack, memory, table, instance, input, and output exhaustion" },
+    { "class": "trap", "phase": 3, "description": "unreachable and other traps normalized to stable classes" },
+    { "class": "import", "phase": 3, "description": "undeclared import, WASI absence, and capability mismatch denial" },
+    { "class": "pointer", "phase": 3, "description": "guest pointer, length, overflow, and out-of-range memory exchange" }
+  ],
+  "non_claims": [
+    "a frozen manifest proves fixture intent, not extraction correctness",
+    "expected classes name policy outcomes and do not prove sandboxing strength"
+  ]
+}

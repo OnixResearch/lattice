@@ -6,9 +6,12 @@ mod tests;
 pub(crate) mod types;
 pub(crate) mod validate;
 
-pub(crate) const MODEL_CALL_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("model_call_id");
-pub(crate) const BODY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("model_stream_body");
-pub(crate) const TOOL_CALL_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("tool_call_id");
+pub(crate) const MODEL_CALL_ID_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("model_call_id");
+pub(crate) const BODY_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("model_stream_body");
+pub(crate) const TOOL_CALL_ID_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("tool_call_id");
 pub(crate) const FAILURE_REASON_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("model_stream_failure_reason");
 pub(crate) const CANCELLATION_REASON_FIELD: crate::validation::FieldName =
@@ -41,7 +44,8 @@ pub(crate) const KIND_FINISH: &str = "finish";
 pub(crate) const KIND_CANCELLED: &str = "cancelled";
 pub(crate) const KIND_FAILURE: &str = "failure";
 pub(crate) const MALFORMED_EMPTY_CHUNKS: &str = "stream fixture chunks must not be empty";
-pub(crate) const MALFORMED_TRUNCATED_RECORD: &str = "stream fixture ended before a record separator";
+pub(crate) const MALFORMED_TRUNCATED_RECORD: &str =
+    "stream fixture ended before a record separator";
 pub(crate) const MALFORMED_FIELD_COUNT: &str = "stream fixture record has the wrong field count";
 pub(crate) const MALFORMED_RECORD_KIND: &str = "stream fixture record kind is unsupported";
 pub(crate) const MALFORMED_ORDER: &str = "stream fixture order is not a valid integer";

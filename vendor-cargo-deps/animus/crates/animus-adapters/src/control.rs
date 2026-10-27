@@ -38,7 +38,10 @@ impl core::fmt::Display for AgentControlIdentityError {
                 field,
                 max_bytes,
                 actual_bytes,
-            } => write!(formatter, "{field} must be at most {max_bytes} bytes; got {actual_bytes}"),
+            } => write!(
+                formatter,
+                "{field} must be at most {max_bytes} bytes; got {actual_bytes}"
+            ),
             Self::UnsupportedCharacter { field } => {
                 write!(formatter, "{field} contains an unsupported character")
             }
@@ -469,9 +472,14 @@ mod tests {
         // r[verify agent_harness_runtime.agent_control.evidence.safe]
         let run_id = AgentControlRunId::new(RUN_ID).expect("run id must validate");
         let command_id = AgentControlCommandId::new(COMMAND_ID).expect("command id must validate");
-        let command =
-            AgentControlCommand::new(run_id.clone(), command_id.clone(), INITIAL_REVISION, AgentControlAction::Pause);
-        let checkpoint = AgentControlCheckpoint::new(run_id.clone(), AgentControlCheckpointKind::BeforeModel);
+        let command = AgentControlCommand::new(
+            run_id.clone(),
+            command_id.clone(),
+            INITIAL_REVISION,
+            AgentControlAction::Pause,
+        );
+        let checkpoint =
+            AgentControlCheckpoint::new(run_id.clone(), AgentControlCheckpointKind::BeforeModel);
         let event = AgentControlEvent::from_command(
             &command,
             INITIAL_REVISION,
@@ -491,7 +499,10 @@ mod tests {
         // r[verify agent_harness_runtime.agent_control.verification.negative]
         let oversized_bytes = "x".repeat(MAX_AGENT_CONTROL_ID_BYTES.saturating_add(1));
 
-        assert!(matches!(AgentControlRunId::new(""), Err(AgentControlIdentityError::Empty { .. })));
+        assert!(matches!(
+            AgentControlRunId::new(""),
+            Err(AgentControlIdentityError::Empty { .. })
+        ));
         assert!(matches!(
             AgentControlCommandId::new(oversized_bytes.as_str()),
             Err(AgentControlIdentityError::TooLong { .. })

@@ -1,16 +1,22 @@
 type Text = alloc::string::String;
 type Collection<T> = alloc::vec::Vec<T>;
 
-const DISCOVERY_QUERY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("tool_discovery_query");
-const DETAIL_TOOL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("tool_discovery_detail_tool");
-const PLAN_BATCH_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("tool_plan_batch_id");
-const PLAN_STEP_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("tool_plan_step_id");
+const DISCOVERY_QUERY_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("tool_discovery_query");
+const DETAIL_TOOL_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("tool_discovery_detail_tool");
+const PLAN_BATCH_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("tool_plan_batch_id");
+const PLAN_STEP_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("tool_plan_step_id");
 const PLAN_DEPENDENCY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("tool_plan_dependency_id");
-const PLAN_BINDING_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("tool_plan_binding_id");
+const PLAN_BINDING_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("tool_plan_binding_id");
 const PLAN_TARGET_ARGUMENT_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("tool_plan_target_argument");
-const PLAN_FABRIC_KIND_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("tool_plan_fabric_kind");
+const PLAN_FABRIC_KIND_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("tool_plan_fabric_kind");
 const PLAN_FABRIC_PROFILE_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("tool_plan_fabric_profile");
 const PLAN_FABRIC_POLICY_FIELD: crate::validation::FieldName =
@@ -216,7 +222,9 @@ impl DiscoverySet {
     }
 
     fn contains_tool(&self, tool_name: &str) -> bool {
-        self.summaries.iter().any(|summary| summary.tool_name() == tool_name)
+        self.summaries
+            .iter()
+            .any(|summary| summary.tool_name() == tool_name)
     }
 }
 
@@ -260,7 +268,8 @@ pub fn discover_tools(
     assert!(draft.ceilings.max_details <= MAX_DISCOVERY_ITEMS);
 
     let query_label = super::required_text(DISCOVERY_QUERY_FIELD, draft.query_label)?;
-    let capability_filter = collect_optional_labels(super::CAPABILITY_FIELD, draft.required_capability_labels)?;
+    let capability_filter =
+        collect_optional_labels(super::CAPABILITY_FIELD, draft.required_capability_labels)?;
     let detail_names = collect_unique_labels(DETAIL_TOOL_FIELD, draft.detail_tool_names)?;
     let summaries = discovery_summaries(definitions, &capability_filter, draft.ceilings);
     let details = discovery_details(&summaries, definitions, &detail_names)?;
@@ -457,7 +466,9 @@ impl PlanFabricAdmission {
 ///
 /// Panics if the admitted host-action list exceeds bounds after collection, or if fabric status
 /// and issue classification diverge after pure admission.
-pub fn admit_plan_fabric(draft: &PlanFabricDraft<'_>) -> Result<PlanFabricAdmission, super::ContractError> {
+pub fn admit_plan_fabric(
+    draft: &PlanFabricDraft<'_>,
+) -> Result<PlanFabricAdmission, super::ContractError> {
     let kind_label = optional_text(PLAN_FABRIC_KIND_FIELD, draft.kind)?;
     let kind = kind_label.as_deref().and_then(parse_fabric_kind);
     let profile = optional_text(PLAN_FABRIC_PROFILE_FIELD, draft.profile_identity)?;
@@ -481,7 +492,10 @@ pub fn admit_plan_fabric(draft: &PlanFabricDraft<'_>) -> Result<PlanFabricAdmiss
         PlanFabricStatus::Denied
     };
     assert!(actions.len() <= MAX_DISCOVERY_ITEMS);
-    assert_eq!(status == PlanFabricStatus::Admitted, issue == PlanFabricIssue::None);
+    assert_eq!(
+        status == PlanFabricStatus::Admitted,
+        issue == PlanFabricIssue::None
+    );
     Ok(PlanFabricAdmission {
         status,
         issue,
@@ -900,7 +914,10 @@ impl Plan {
 ///
 /// Panics if the validated plan step count drifts outside the admitted non-empty bounded range.
 /// This indicates an internal validation contract violation after admission.
-pub fn admit_plan(draft: &PlanDraft<'_>, context: PlanAdmissionContext<'_>) -> Result<Plan, super::ContractError> {
+pub fn admit_plan(
+    draft: &PlanDraft<'_>,
+    context: PlanAdmissionContext<'_>,
+) -> Result<Plan, super::ContractError> {
     validate_plan_inputs(draft, context)?;
     assert!(draft.steps.len() >= MIN_TOOL_PLANNING_ITEMS);
     assert!(draft.steps.len() <= MAX_PLAN_STEPS);
@@ -1083,14 +1100,18 @@ fn collect_unique_labels(
     if labels.len() == values.len() {
         return Ok(labels);
     }
-    Err(super::ContractError::DuplicatePlanningReference { field: field.as_str() })
+    Err(super::ContractError::DuplicatePlanningReference {
+        field: field.as_str(),
+    })
 }
 
 fn optional_text(
     field: crate::validation::FieldName,
     value: Option<&str>,
 ) -> Result<Option<Text>, super::ContractError> {
-    value.map(|raw| super::required_text_value(field, raw)).transpose()
+    value
+        .map(|raw| super::required_text_value(field, raw))
+        .transpose()
 }
 
 fn discovery_summaries(
@@ -1120,12 +1141,13 @@ fn discovery_details(
     assert_eq!(details.len(), 0);
     assert!(details.capacity() >= detail_names.len());
     for detail_name in detail_names {
-        let summary = summaries.iter().find(|candidate| candidate.tool_name() == detail_name).ok_or_else(|| {
-            super::ContractError::UnknownPlanningReference {
+        let summary = summaries
+            .iter()
+            .find(|candidate| candidate.tool_name() == detail_name)
+            .ok_or_else(|| super::ContractError::UnknownPlanningReference {
                 field: DETAIL_TOOL_FIELD.as_str(),
                 reference: detail_name.clone(),
-            }
-        })?;
+            })?;
         let definition = find_definition(definitions, detail_name).ok_or_else(|| {
             super::ContractError::UnknownPlanningReference {
                 field: DETAIL_TOOL_FIELD.as_str(),
@@ -1139,9 +1161,12 @@ fn discovery_details(
 
 fn definition_is_discoverable(definition: &super::Definition, capability_filter: &[Text]) -> bool {
     definition.status() == super::DefinitionStatus::Active
-        && capability_filter
-            .iter()
-            .all(|label| definition.capability_labels().iter().any(|current| current == label))
+        && capability_filter.iter().all(|label| {
+            definition
+                .capability_labels()
+                .iter()
+                .any(|current| current == label)
+        })
 }
 
 fn summary_from_definition(definition: &super::Definition) -> DiscoverySummary {
@@ -1155,7 +1180,10 @@ fn summary_from_definition(definition: &super::Definition) -> DiscoverySummary {
     }
 }
 
-fn detail_from_definition(summary: &DiscoverySummary, definition: &super::Definition) -> DiscoveryDetail {
+fn detail_from_definition(
+    summary: &DiscoverySummary,
+    definition: &super::Definition,
+) -> DiscoveryDetail {
     DiscoveryDetail {
         summary: summary.clone(),
         description: Text::from(definition.description()),
@@ -1163,9 +1191,16 @@ fn detail_from_definition(summary: &DiscoverySummary, definition: &super::Defini
     }
 }
 
-fn discovery_identity(query_label: &str, summaries: &[DiscoverySummary], details: &[DiscoveryDetail]) -> Text {
+fn discovery_identity(
+    query_label: &str,
+    summaries: &[DiscoverySummary],
+    details: &[DiscoveryDetail],
+) -> Text {
     let mut parts = Collection::with_capacity(
-        summaries.len().saturating_add(details.len()).saturating_add(MIN_TOOL_PLANNING_ITEMS),
+        summaries
+            .len()
+            .saturating_add(details.len())
+            .saturating_add(MIN_TOOL_PLANNING_ITEMS),
     );
     parts.push(query_label);
     for summary in summaries {
@@ -1188,11 +1223,16 @@ struct DiscoveryReceiptInput<'a> {
     details: &'a [DiscoveryDetail],
 }
 
-fn discovery_receipt(input: DiscoveryReceiptInput<'_>) -> Result<crate::SafeReceipt, crate::SafeReceiptError> {
+fn discovery_receipt(
+    input: DiscoveryReceiptInput<'_>,
+) -> Result<crate::SafeReceipt, crate::SafeReceiptError> {
     assert!(input.summaries.len() <= MAX_DISCOVERY_ITEMS);
     assert!(input.details.len() <= MAX_DISCOVERY_ITEMS);
     let counts = [
-        crate::BoundedCountDraft::new(COUNT_DISCOVERY_SUMMARIES, usize_to_u32(input.summaries.len())),
+        crate::BoundedCountDraft::new(
+            COUNT_DISCOVERY_SUMMARIES,
+            usize_to_u32(input.summaries.len()),
+        ),
         crate::BoundedCountDraft::new(COUNT_DISCOVERY_DETAILS, usize_to_u32(input.details.len())),
     ];
     let labels = [
@@ -1258,7 +1298,11 @@ fn fabric_issue(input: &FabricIssueInput<'_>) -> PlanFabricIssue {
     if input.actions.is_empty() {
         return PlanFabricIssue::MissingHostAction;
     }
-    if input.actions.iter().any(|action| !is_allowed_fabric_action(action)) {
+    if input
+        .actions
+        .iter()
+        .any(|action| !is_allowed_fabric_action(action))
+    {
         return PlanFabricIssue::UnsupportedHostAction;
     }
     if input.receipt != Some(RECEIPT_POSTURE_SAFE) {
@@ -1283,7 +1327,10 @@ fn parse_batch_policy(value: &str) -> Result<PlanBatchPolicy, super::ContractErr
     }
 }
 
-fn validate_plan_inputs(draft: &PlanDraft<'_>, context: PlanAdmissionContext<'_>) -> Result<(), super::ContractError> {
+fn validate_plan_inputs(
+    draft: &PlanDraft<'_>,
+    context: PlanAdmissionContext<'_>,
+) -> Result<(), super::ContractError> {
     validate_bound(BoundCheck {
         field: PLAN_STEP_FIELD,
         value: draft.steps.len(),
@@ -1305,7 +1352,9 @@ struct PlanStepAdmissionInput<'a> {
     prior_steps: &'a [PlanStepAdmission],
 }
 
-fn admit_plan_step(input: &PlanStepAdmissionInput<'_>) -> Result<PlanStepAdmission, super::ContractError> {
+fn admit_plan_step(
+    input: &PlanStepAdmissionInput<'_>,
+) -> Result<PlanStepAdmission, super::ContractError> {
     let step = input.step;
     validate_max_count(MaxCountCheck {
         field: PLAN_DEPENDENCY_FIELD,
@@ -1381,7 +1430,10 @@ fn step_issue(input: &StepIssueInput<'_>) -> PlanIssue {
 }
 
 fn duplicate_step_issue(step_id: &str, prior_steps: &[PlanStepAdmission]) -> Option<PlanIssue> {
-    prior_steps.iter().any(|prior| prior.step_id() == step_id).then_some(PlanIssue::DuplicateStep)
+    prior_steps
+        .iter()
+        .any(|prior| prior.step_id() == step_id)
+        .then_some(PlanIssue::DuplicateStep)
 }
 
 fn fabric_issue_for_plan(fabric: &PlanFabricAdmission) -> Option<PlanIssue> {
@@ -1391,7 +1443,11 @@ fn fabric_issue_for_plan(fabric: &PlanFabricAdmission) -> Option<PlanIssue> {
 fn dependency_issue(dependencies: &[Text], prior_steps: &[PlanStepAdmission]) -> Option<PlanIssue> {
     dependencies
         .iter()
-        .any(|dependency| !prior_steps.iter().any(|prior| prior.step_id() == dependency))
+        .any(|dependency| {
+            !prior_steps
+                .iter()
+                .any(|prior| prior.step_id() == dependency)
+        })
         .then_some(PlanIssue::UnknownDependency)
 }
 
@@ -1408,13 +1464,19 @@ fn definition_issue(definition: Option<&super::Definition>) -> Option<PlanIssue>
     }
 }
 
-fn schema_issue(request: &super::Request, definition: Option<&super::Definition>) -> Option<PlanIssue> {
+fn schema_issue(
+    request: &super::Request,
+    definition: Option<&super::Definition>,
+) -> Option<PlanIssue> {
     definition
         .filter(|current| current.parameter_schema_identity() != request.schema_identity())
         .map(|_current| PlanIssue::SchemaMismatch)
 }
 
-fn capability_issue(request: &super::Request, definition: Option<&super::Definition>) -> Option<PlanIssue> {
+fn capability_issue(
+    request: &super::Request,
+    definition: Option<&super::Definition>,
+) -> Option<PlanIssue> {
     definition
         .filter(|current| {
             request
@@ -1426,11 +1488,16 @@ fn capability_issue(request: &super::Request, definition: Option<&super::Definit
 }
 
 fn approval_issue(request: &super::Request) -> Option<PlanIssue> {
-    matches!(request.approval_posture(), super::ApprovalPosture::Denied).then_some(PlanIssue::ApprovalDenied)
+    matches!(request.approval_posture(), super::ApprovalPosture::Denied)
+        .then_some(PlanIssue::ApprovalDenied)
 }
 
 fn cancellation_issue(step: &PlanStepDraft<'_>) -> Option<PlanIssue> {
-    matches!(step.cancellation_posture, PlanCancellationPosture::Cancelled).then_some(PlanIssue::Cancelled)
+    matches!(
+        step.cancellation_posture,
+        PlanCancellationPosture::Cancelled
+    )
+    .then_some(PlanIssue::Cancelled)
 }
 
 fn timeout_issue(step: &PlanStepDraft<'_>) -> Option<PlanIssue> {
@@ -1438,7 +1505,10 @@ fn timeout_issue(step: &PlanStepDraft<'_>) -> Option<PlanIssue> {
 }
 
 fn intermediate_issue(bindings: &[PlanIntermediateBinding]) -> Option<PlanIssue> {
-    bindings.iter().any(|binding| !binding_is_safe(binding)).then_some(PlanIssue::UnsafeIntermediate)
+    bindings
+        .iter()
+        .any(|binding| !binding_is_safe(binding))
+        .then_some(PlanIssue::UnsafeIntermediate)
 }
 
 fn mutation_issue(
@@ -1452,12 +1522,19 @@ fn mutation_issue(
     request
         .mutation_targets()
         .iter()
-        .any(|target| prior_steps.iter().any(|prior| prior_has_target(prior, target)))
+        .any(|target| {
+            prior_steps
+                .iter()
+                .any(|prior| prior_has_target(prior, target))
+        })
         .then_some(PlanIssue::MutationConflict)
 }
 
 fn prior_has_target(prior: &PlanStepAdmission, target: &str) -> bool {
-    prior.mutation_targets().iter().any(|prior_target| prior_target == target)
+    prior
+        .mutation_targets()
+        .iter()
+        .any(|prior_target| prior_target == target)
 }
 
 fn validate_bindings(
@@ -1487,7 +1564,10 @@ fn validate_binding(
     let source_step_id = super::required_text(PLAN_DEPENDENCY_FIELD, draft.source_step_id)?;
     assert!(!binding_id.is_empty());
     assert!(!source_step_id.is_empty());
-    if !prior_steps.iter().any(|prior| prior.step_id() == source_step_id) {
+    if !prior_steps
+        .iter()
+        .any(|prior| prior.step_id() == source_step_id)
+    {
         return Err(super::ContractError::UnknownPlanningReference {
             field: PLAN_DEPENDENCY_FIELD.as_str(),
             reference: source_step_id,
@@ -1524,17 +1604,26 @@ const fn binding_is_safe(binding: &PlanIntermediateBinding) -> bool {
     !matches!(
         (binding.value_kind, binding.use_kind),
         (
-            PlanIntermediateKind::Secret | PlanIntermediateKind::Oversized | PlanIntermediateKind::Unsupported,
+            PlanIntermediateKind::Secret
+                | PlanIntermediateKind::Oversized
+                | PlanIntermediateKind::Unsupported,
             _,
         ) | (
-            PlanIntermediateKind::Binary | PlanIntermediateKind::Image | PlanIntermediateKind::SafeHandle,
+            PlanIntermediateKind::Binary
+                | PlanIntermediateKind::Image
+                | PlanIntermediateKind::SafeHandle,
             PlanIntermediateUse::ArgumentText,
         )
     )
 }
 
-fn find_definition<'a>(definitions: &'a [super::Definition], tool_name: &str) -> Option<&'a super::Definition> {
-    definitions.iter().find(|definition| definition.name() == tool_name)
+fn find_definition<'a>(
+    definitions: &'a [super::Definition],
+    tool_name: &str,
+) -> Option<&'a super::Definition> {
+    definitions
+        .iter()
+        .find(|definition| definition.name() == tool_name)
 }
 
 fn status_for_issue(issue: PlanIssue) -> PlanStatus {
@@ -1573,7 +1662,8 @@ fn plan_identity(
 }
 
 fn receipt_labels<'a>(draft: &'a PlanReceiptDraft<'a>) -> Collection<&'a str> {
-    let mut labels = Collection::with_capacity(draft.diagnostics.len().saturating_add(MAX_PLAN_BINDINGS));
+    let mut labels =
+        Collection::with_capacity(draft.diagnostics.len().saturating_add(MAX_PLAN_BINDINGS));
     labels.push(TOOL_PLAN_RECEIPT_CONTRACT_IDENTITY);
     labels.push(draft.plan.batch_id());
     labels.push(draft.plan.plan_identity());
@@ -1601,7 +1691,10 @@ fn receipt_issue(issue: PlanIssue) -> crate::ReceiptIssueCode {
 }
 
 fn binding_count(plan: &Plan) -> usize {
-    plan.steps().iter().map(|step| step.intermediate_bindings().len()).sum()
+    plan.steps()
+        .iter()
+        .map(|step| step.intermediate_bindings().len())
+        .sum()
 }
 
 fn u32_to_usize(value: u32) -> Result<usize, super::ContractError> {

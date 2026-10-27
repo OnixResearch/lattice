@@ -1,0 +1,49 @@
+{
+  "schema": "lattice.github-ci.prerequisite-admission.v1",
+  "root": "/home/brittonr/git/OnixResearch/lattice",
+  "tool": "/nix/store/kp30jr43dplxzlrgmkq3f3q380mvdgks-cairn-0.1.0/bin/cairn",
+  "command_cwd": "/tmp",
+  "policy": "cairn-policy/generated/cairn-policy.json",
+  "policy_hash": "a88e98316e48fb6e54901fd7a88dd890c86d1ab7c830098084fe5dfaa70d1a4a",
+  "change": "orchestrate-asynchronous-mantle-checks",
+  "decision": "Consume the separately admitted authenticated private Mantle Build API; do not claim acceptance of the broader active Nix/public gateway or the external GitHub rollout stages.",
+  "observed_validation": {
+    "command": "cairn validate --root /home/brittonr/git/OnixResearch/lattice --policy /home/brittonr/git/OnixResearch/lattice/cairn-policy/generated/cairn-policy.json",
+    "valid": true,
+    "changes": 8,
+    "specs_validated": 39,
+    "issues": [],
+    "findings": []
+  },
+  "observed_gates": [
+    {
+      "stage": "proposal",
+      "verdict": "PASS",
+      "issues": [],
+      "input_hash": "42965598c864bc2efaa911261d8a09cc7f61b99dbdc1510d89d627117e5c3eb1",
+      "receipt_hash": "079c09a8799147f62f248d5a3870f058c2aee9885f520c61b1cf3329da147f4f"
+    },
+    {
+      "stage": "design",
+      "verdict": "PASS",
+      "issues": [],
+      "input_hash": "ebbc127b3a91692c9d6f4623c7878ee06bcc3692555f26ab35119e07b23a6523",
+      "receipt_hash": "b01acd080d368cabc59584422ab2b862d1040605a71eef12c2f33f9686d0c717"
+    },
+    {
+      "stage": "tasks",
+      "verdict": "PASS",
+      "issues": [],
+      "input_hash": "0eff116073558a71646b601a363b37179b3d53401e1f55a94f181eada85b69e5",
+      "receipt_hash": "c4c0e73dc3bf15e1a41a54fcaeabd9626d873ca7b96c035bc0a4b375265a8c73",
+      "task_done": 0,
+      "task_todo": 31
+    }
+  ],
+  "gate_command_template": "cairn gate STAGE orchestrate-asynchronous-mantle-checks --root /home/brittonr/git/OnixResearch/lattice --policy /home/brittonr/git/OnixResearch/lattice/cairn-policy/generated/cairn-policy.json",
+  "non_claims": [
+    "These are observed native structural lifecycle admission results, not implementation or runtime verification.",
+    "No task completion, producer archive, source publication, anonymous closure, service deployment, live GitHub/OIDC behavior, private-repository stage, report-only stage, required-status eligibility, or release readiness is established.",
+    "The parent retains final integration, immutable source admission and all runtime closeout gates."
+  ]
+}

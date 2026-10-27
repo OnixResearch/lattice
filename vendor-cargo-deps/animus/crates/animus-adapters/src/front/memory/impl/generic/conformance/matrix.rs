@@ -1,21 +1,16 @@
 #![allow(unknown_lints)]
 #![cfg_attr(animus_octet, allow(tigerstyle::excessive_file_length))]
 
-use super::GenericMemoryAdapterCapability;
-use super::GenericMemoryAdapterRole;
-use super::MEMORY_SOURCE_FIELD;
-use super::MemoryError;
-use super::MemoryOperationStatus;
-use super::MemoryReceiptLeak;
-use super::MemoryRetrievalOutcomeStatus;
-use super::String;
-use super::Vec;
-use super::memory_leak;
-use super::normalize;
+use super::{
+    GenericMemoryAdapterCapability, GenericMemoryAdapterRole, MEMORY_SOURCE_FIELD, MemoryError,
+    MemoryOperationStatus, MemoryReceiptLeak, MemoryRetrievalOutcomeStatus, String, Vec,
+    memory_leak, normalize,
+};
 
 const MEMORY_ADAPTER_OWNER_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("memory_adapter_owner");
-const MEMORY_REASON_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("memory_reason_label");
+const MEMORY_REASON_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("memory_reason_label");
 const MEMORY_CONFORMANCE_CASE_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("memory_conformance_case");
 const MEMORY_CONFORMANCE_EVIDENCE_FIELD: crate::validation::FieldName =
@@ -111,10 +106,11 @@ impl MemoryConformanceMatrixRow {
     ///
     /// # Errors
     ///
-    /// Returns [`MemoryConformanceError`] when owner, capability, positive, negative, evidence, or
-    /// not-applicable metadata is missing.
+    /// Returns [`MemoryConformanceError`] when owner, capability, positive, negative, evidence, or not-applicable metadata is missing.
     // r[impl agent_harness_runtime.memory_conformance.matrix]
-    pub fn validate(draft: &MemoryConformanceMatrixRowDraft<'_>) -> Result<Self, MemoryConformanceError> {
+    pub fn validate(
+        draft: &MemoryConformanceMatrixRowDraft<'_>,
+    ) -> Result<Self, MemoryConformanceError> {
         if draft.capabilities.is_empty() {
             return Err(MemoryConformanceError::MissingCapability {
                 family: draft.backend_family,
@@ -155,9 +151,18 @@ impl MemoryConformanceMatrixRow {
                 capabilities: draft.capabilities.to_vec(),
                 owner_label,
                 applicability: Some(normalize(MEMORY_REASON_FIELD, reason)?),
-                positive_case: normalize_optional(MEMORY_CONFORMANCE_CASE_FIELD, draft.positive_case)?,
-                negative_case: normalize_optional(MEMORY_CONFORMANCE_CASE_FIELD, draft.negative_case)?,
-                safe_evidence_label: normalize_optional(MEMORY_CONFORMANCE_EVIDENCE_FIELD, draft.safe_evidence_label)?,
+                positive_case: normalize_optional(
+                    MEMORY_CONFORMANCE_CASE_FIELD,
+                    draft.positive_case,
+                )?,
+                negative_case: normalize_optional(
+                    MEMORY_CONFORMANCE_CASE_FIELD,
+                    draft.negative_case,
+                )?,
+                safe_evidence_label: normalize_optional(
+                    MEMORY_CONFORMANCE_EVIDENCE_FIELD,
+                    draft.safe_evidence_label,
+                )?,
             }),
         }
     }
@@ -251,20 +256,32 @@ impl core::fmt::Display for MemoryConformanceError {
         match self {
             Self::Memory { source } => write!(formatter, "{source}"),
             Self::MissingCapability { family } => {
-                write!(formatter, "{} conformance row lacks capability", family.as_str())
+                write!(
+                    formatter,
+                    "{} conformance row lacks capability",
+                    family.as_str()
+                )
             }
-            Self::MissingPositiveCase { family } => {
-                write!(formatter, "{} conformance row lacks a positive case", family.as_str())
-            }
-            Self::MissingNegativeCase { family } => {
-                write!(formatter, "{} conformance row lacks a negative case", family.as_str())
-            }
-            Self::MissingEvidence { family } => {
-                write!(formatter, "{} conformance row lacks safe evidence", family.as_str())
-            }
-            Self::UnsafeSuccessClaim { family } => {
-                write!(formatter, "{} failure fixture claimed a successful memory operation", family.as_str())
-            }
+            Self::MissingPositiveCase { family } => write!(
+                formatter,
+                "{} conformance row lacks a positive case",
+                family.as_str()
+            ),
+            Self::MissingNegativeCase { family } => write!(
+                formatter,
+                "{} conformance row lacks a negative case",
+                family.as_str()
+            ),
+            Self::MissingEvidence { family } => write!(
+                formatter,
+                "{} conformance row lacks safe evidence",
+                family.as_str()
+            ),
+            Self::UnsafeSuccessClaim { family } => write!(
+                formatter,
+                "{} failure fixture claimed a successful memory operation",
+                family.as_str()
+            ),
         }
     }
 }
@@ -402,8 +419,14 @@ pub fn evaluate_null_memory_backend(input: MemoryNullBackendInput) -> MemoryNull
     } else {
         MemoryRequiredRuleState::Inactive
     };
-    assert!(matches!(status, MemoryOperationStatus::Unavailable | MemoryOperationStatus::Unsupported));
-    assert!(matches!(required_rules, MemoryRequiredRuleState::Active | MemoryRequiredRuleState::Inactive));
+    assert!(matches!(
+        status,
+        MemoryOperationStatus::Unavailable | MemoryOperationStatus::Unsupported
+    ));
+    assert!(matches!(
+        required_rules,
+        MemoryRequiredRuleState::Active | MemoryRequiredRuleState::Inactive
+    ));
     MemoryNullBackendPlan {
         status,
         storage: MemoryNullSideEffectState::NotPlanned,
@@ -456,7 +479,8 @@ impl MemoryFilesystemEvidence {
         assert!(draft.full_path.is_none());
         assert!(draft.raw_memory_body.is_none());
         let source_label = normalize(MEMORY_SOURCE_FIELD, draft.source_label)?;
-        let body_hash = crate::artifact::Hash::new(draft.body_hash).map_err(MemoryError::InvalidHash)?;
+        let body_hash =
+            crate::artifact::Hash::new(draft.body_hash).map_err(MemoryError::InvalidHash)?;
         assert!(!source_label.is_empty());
         assert!(!body_hash.as_str().is_empty());
         Ok(Self {
@@ -518,7 +542,9 @@ impl MemorySemanticBackendFallbackPlan {
 /// Plans semantic backend failure behavior without ambient keyword/provider/network/index fallback.
 #[must_use]
 // r[impl agent_harness_runtime.memory_conformance.semantic_backend]
-pub fn plan_semantic_backend_fallback(input: MemorySemanticBackendFallbackInput) -> MemorySemanticBackendFallbackPlan {
+pub fn plan_semantic_backend_fallback(
+    input: MemorySemanticBackendFallbackInput,
+) -> MemorySemanticBackendFallbackPlan {
     MemorySemanticBackendFallbackPlan {
         status: input.status,
         ambient_fallback_attempted: false,
@@ -565,7 +591,9 @@ impl MemoryRemoteBackendFailure {
     ///
     /// Panics only if failure-status or redaction invariants are violated after validation.
     // r[impl agent_harness_runtime.memory_conformance.remote_backend]
-    pub fn validate(draft: &MemoryRemoteBackendFailureDraft<'_>) -> Result<Self, MemoryConformanceError> {
+    pub fn validate(
+        draft: &MemoryRemoteBackendFailureDraft<'_>,
+    ) -> Result<Self, MemoryConformanceError> {
         if draft.status == MemoryOperationStatus::Complete {
             return Err(MemoryConformanceError::UnsafeSuccessClaim {
                 family: MemoryBackendFamily::McpRemote,
@@ -662,7 +690,9 @@ impl MemoryFailureClass {
 /// Maps retrieval outcomes into the shared memory failure taxonomy.
 #[must_use]
 // r[impl agent_harness_runtime.memory_conformance.failure_taxonomy]
-pub const fn memory_failure_for_retrieval_status(status: MemoryRetrievalOutcomeStatus) -> Option<MemoryFailureClass> {
+pub const fn memory_failure_for_retrieval_status(
+    status: MemoryRetrievalOutcomeStatus,
+) -> Option<MemoryFailureClass> {
     match status {
         MemoryRetrievalOutcomeStatus::Selected => None,
         MemoryRetrievalOutcomeStatus::SkippedScope | MemoryRetrievalOutcomeStatus::Denied => {
@@ -672,28 +702,36 @@ pub const fn memory_failure_for_retrieval_status(status: MemoryRetrievalOutcomeS
             Some(MemoryFailureClass::Stale)
         }
         MemoryRetrievalOutcomeStatus::Redacted => Some(MemoryFailureClass::Redacted),
-        MemoryRetrievalOutcomeStatus::Conflicting | MemoryRetrievalOutcomeStatus::DiversityDuplicate => {
-            Some(MemoryFailureClass::Conflicting)
-        }
+        MemoryRetrievalOutcomeStatus::Conflicting
+        | MemoryRetrievalOutcomeStatus::DiversityDuplicate => Some(MemoryFailureClass::Conflicting),
         MemoryRetrievalOutcomeStatus::OverBudget => Some(MemoryFailureClass::OverBudget),
     }
 }
 
 /// Maps operation statuses into the shared memory failure taxonomy.
 #[must_use]
-pub const fn memory_failure_for_operation_status(status: MemoryOperationStatus) -> Option<MemoryFailureClass> {
+pub const fn memory_failure_for_operation_status(
+    status: MemoryOperationStatus,
+) -> Option<MemoryFailureClass> {
     match status {
         MemoryOperationStatus::Complete => None,
-        MemoryOperationStatus::Denied | MemoryOperationStatus::Rejected => Some(MemoryFailureClass::Denied),
+        MemoryOperationStatus::Denied | MemoryOperationStatus::Rejected => {
+            Some(MemoryFailureClass::Denied)
+        }
         MemoryOperationStatus::Unavailable | MemoryOperationStatus::Unsupported => {
             Some(MemoryFailureClass::Unavailable)
         }
         MemoryOperationStatus::TimedOut => Some(MemoryFailureClass::TimedOut),
-        MemoryOperationStatus::Partial | MemoryOperationStatus::Stale => Some(MemoryFailureClass::Stale),
+        MemoryOperationStatus::Partial | MemoryOperationStatus::Stale => {
+            Some(MemoryFailureClass::Stale)
+        }
     }
 }
 
-fn normalize_optional(field: crate::validation::FieldName, value: Option<&str>) -> Result<Option<String>, MemoryError> {
+fn normalize_optional(
+    field: crate::validation::FieldName,
+    value: Option<&str>,
+) -> Result<Option<String>, MemoryError> {
     value.map(|inner| normalize(field, inner)).transpose()
 }
 
@@ -711,9 +749,15 @@ fn required_conformance_label(
 ) -> Result<String, MemoryConformanceError> {
     let Some(value) = value else {
         return Err(match field {
-            MemoryConformanceMissingField::Positive => MemoryConformanceError::MissingPositiveCase { family },
-            MemoryConformanceMissingField::Negative => MemoryConformanceError::MissingNegativeCase { family },
-            MemoryConformanceMissingField::Evidence => MemoryConformanceError::MissingEvidence { family },
+            MemoryConformanceMissingField::Positive => {
+                MemoryConformanceError::MissingPositiveCase { family }
+            }
+            MemoryConformanceMissingField::Negative => {
+                MemoryConformanceError::MissingNegativeCase { family }
+            }
+            MemoryConformanceMissingField::Evidence => {
+                MemoryConformanceError::MissingEvidence { family }
+            }
         });
     };
     let field_name = match field {

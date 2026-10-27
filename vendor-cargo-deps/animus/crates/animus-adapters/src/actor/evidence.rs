@@ -61,11 +61,17 @@ impl Receipt {
             source_scope: draft.source_scope,
             trust_status: draft.trust_status,
             admission_status: draft.admission_status,
-            capability_ceilings: super::optional_label_set(super::CAPABILITY_FIELD, draft.capability_ceilings)?,
+            capability_ceilings: super::optional_label_set(
+                super::CAPABILITY_FIELD,
+                draft.capability_ceilings,
+            )?,
             selected_model_role: selected_model_role(draft.selected_model_role)?,
             manifest_hash: draft.manifest_hash.clone(),
             policy_hash: draft.policy_hash.clone(),
-            redaction_markers: super::required_label_set(super::REDACTION_MARKER_FIELD, draft.redaction_markers)?,
+            redaction_markers: super::required_label_set(
+                super::REDACTION_MARKER_FIELD,
+                draft.redaction_markers,
+            )?,
         })
     }
 
@@ -146,8 +152,14 @@ pub enum ReceiptLeak {
 /// Returns [`ReceiptLeak`] when the rendered receipt includes a known unsafe
 /// prompt, path, credential, provider-payload, or memory-body marker.
 pub fn validate_text(text: &str) -> Result<(), ReceiptLeak> {
-    assert!(text.len() >= text.chars().count(), "text length bounds chars");
-    assert!(!RAW_PROMPT_RECEIPT_MARKER.is_empty(), "receipt leak markers must not be empty");
+    assert!(
+        text.len() >= text.chars().count(),
+        "text length bounds chars"
+    );
+    assert!(
+        !RAW_PROMPT_RECEIPT_MARKER.is_empty(),
+        "receipt leak markers must not be empty"
+    );
     if has_prompt_leak(text) {
         return Err(ReceiptLeak::RawPromptBody);
     }
@@ -167,7 +179,9 @@ pub fn validate_text(text: &str) -> Result<(), ReceiptLeak> {
 }
 
 fn selected_model_role(value: Option<&str>) -> Result<Option<super::Text>, super::Error> {
-    value.map(|actual| super::required_text_value(super::MODEL_FIELD, actual)).transpose()
+    value
+        .map(|actual| super::required_text_value(super::MODEL_FIELD, actual))
+        .transpose()
 }
 
 fn has_prompt_leak(text: &str) -> bool {

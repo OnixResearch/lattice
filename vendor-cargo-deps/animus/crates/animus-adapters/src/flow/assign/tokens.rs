@@ -1,9 +1,7 @@
-use super::Collection;
-use super::SAFE_TEMPLATE_BUILTINS;
-use super::TEMPLATE_CLOSE;
-use super::TEMPLATE_OPEN;
-use super::TEMPLATE_VARIABLE_FIELD;
-use super::Text;
+use super::{
+    Collection, SAFE_TEMPLATE_BUILTINS, TEMPLATE_CLOSE, TEMPLATE_OPEN, TEMPLATE_VARIABLE_FIELD,
+    Text,
+};
 
 pub(super) fn collect_template_variables(
     template: &str,
@@ -34,23 +32,34 @@ pub(super) fn validate_template_variables(
     variables: &[Text],
 ) -> Result<(), super::super::RecipeWorkflowError> {
     assert!(
-        workflow.parameters().iter().all(|parameter| !parameter.name().is_empty()),
+        workflow
+            .parameters()
+            .iter()
+            .all(|parameter| !parameter.name().is_empty()),
         "workflow parameter names must be validated"
     );
-    assert!(variables.iter().all(|variable| !variable.is_empty()), "template variables must be validated");
+    assert!(
+        variables.iter().all(|variable| !variable.is_empty()),
+        "template variables must be validated"
+    );
     for variable in variables {
         if is_safe_builtin(variable.as_str()) {
             continue;
         }
         if find_parameter(workflow.parameters(), variable.as_str()).is_none() {
-            return Err(super::super::RecipeWorkflowError::UndeclaredTemplateVariable {
-                variable: variable.clone(),
-            });
+            return Err(
+                super::super::RecipeWorkflowError::UndeclaredTemplateVariable {
+                    variable: variable.clone(),
+                },
+            );
         }
     }
 
     for parameter in workflow.parameters() {
-        if !variables.iter().any(|variable| variable.as_str() == parameter.name()) {
+        if !variables
+            .iter()
+            .any(|variable| variable.as_str() == parameter.name())
+        {
             return Err(super::super::RecipeWorkflowError::UnusedParameter {
                 parameter: Text::from(parameter.name()),
             });

@@ -17,8 +17,7 @@ pub fn materialize_execution_plan(
 ///
 /// # Errors
 ///
-/// Returns [`super::ExecutionPlanError`] when selected roles, quorum, budget, rotation, or fallback
-/// constraints fail.
+/// Returns [`super::ExecutionPlanError`] when selected roles, quorum, budget, rotation, or fallback constraints fail.
 pub fn materialize_execution_plan_with_rotation(
     selected: &crate::SelectedPlan,
     catalog: &[crate::CatalogEntry],
@@ -37,7 +36,8 @@ fn materialize_execution_plan_inner(
     let roles = super::super::plan::roles_for_family(selected.family());
     validate_plan_constraints(selected, roles.len())?;
     let (role_steps, route_labels) = build_role_steps(selected, catalog, budget, roles)?;
-    let fallback_chain = super::super::plan::build_fallback_chain(selected, catalog, budget, &route_labels)?;
+    let fallback_chain =
+        super::super::plan::build_fallback_chain(selected, catalog, budget, &route_labels)?;
     let (fallback_chain, fallback_decision) = rotate_fallback_chain(fallback_chain, rotation)?;
     let mut rotation_decisions = selected.rotation_decisions().to_vec();
     if let Some(decision) = fallback_decision {
@@ -57,8 +57,14 @@ fn validate_plan_constraints(
     roles_len: usize,
 ) -> Result<(), super::ExecutionPlanError> {
     assert!(roles_len > 0, "role mapping must exist");
-    assert!(selected.bounds().max_candidates() > crate::limit::ZERO_COUNT, "candidate cap must be positive");
-    assert!(selected.bounds().max_parallelism() > crate::limit::ZERO_COUNT, "parallelism cap must be positive");
+    assert!(
+        selected.bounds().max_candidates() > crate::limit::ZERO_COUNT,
+        "candidate cap must be positive"
+    );
+    assert!(
+        selected.bounds().max_parallelism() > crate::limit::ZERO_COUNT,
+        "parallelism cap must be positive"
+    );
 
     if selected.bounds().min_success_quorum() == crate::limit::ZERO_COUNT {
         return Err(super::ExecutionPlanError::ZeroQuorum);
@@ -80,7 +86,8 @@ fn validate_plan_constraints(
 fn rotate_fallback_chain(
     chain: super::FallbackChain,
     rotation: Option<&crate::RouterRotationSnapshot>,
-) -> Result<(super::FallbackChain, Option<crate::RouterRotationDecision>), super::ExecutionPlanError> {
+) -> Result<(super::FallbackChain, Option<crate::RouterRotationDecision>), super::ExecutionPlanError>
+{
     let Some(snapshot) = rotation else {
         return Ok((chain, None));
     };
@@ -103,7 +110,11 @@ fn rotate_chain_to_label(
     chain: &super::FallbackChain,
     selected_label: &str,
 ) -> Result<super::FallbackChain, super::ExecutionPlanError> {
-    let Some(start_index) = chain.steps().iter().position(|step| step.model_label() == selected_label) else {
+    let Some(start_index) = chain
+        .steps()
+        .iter()
+        .position(|step| step.model_label() == selected_label)
+    else {
         return Err(super::ExecutionPlanError::FallbackModelNotEligible);
     };
     let mut steps = alloc::vec::Vec::with_capacity(chain.steps().len());
@@ -117,7 +128,9 @@ fn execution_error_from_rotation(error: &crate::RouterRotationError) -> super::E
         crate::RouterRotationError::StaleCursor
         | crate::RouterRotationError::NoEligibleCandidates
         | crate::RouterRotationError::Contract(_)
-        | crate::RouterRotationError::ReceiptLeak(_) => super::ExecutionPlanError::FallbackModelNotEligible,
+        | crate::RouterRotationError::ReceiptLeak(_) => {
+            super::ExecutionPlanError::FallbackModelNotEligible
+        }
     }
 }
 
@@ -126,10 +139,22 @@ fn build_role_steps(
     catalog: &[crate::CatalogEntry],
     budget: &crate::Budget,
     roles: &[crate::Role],
-) -> Result<(alloc::vec::Vec<super::RoleStep>, alloc::vec::Vec<alloc::string::String>), super::ExecutionPlanError> {
+) -> Result<
+    (
+        alloc::vec::Vec<super::RoleStep>,
+        alloc::vec::Vec<alloc::string::String>,
+    ),
+    super::ExecutionPlanError,
+> {
     assert!(!roles.is_empty(), "role mapping must exist");
-    assert!(selected.bounds().max_candidates() > crate::limit::ZERO_COUNT, "candidate cap must be positive");
-    assert!(selected.bounds().max_parallelism() > crate::limit::ZERO_COUNT, "parallelism cap must be positive");
+    assert!(
+        selected.bounds().max_candidates() > crate::limit::ZERO_COUNT,
+        "candidate cap must be positive"
+    );
+    assert!(
+        selected.bounds().max_parallelism() > crate::limit::ZERO_COUNT,
+        "parallelism cap must be positive"
+    );
     let mut role_steps = alloc::vec::Vec::with_capacity(roles.len());
     let mut route_labels = alloc::vec::Vec::with_capacity(roles.len());
     for (index, role) in roles.iter().copied().enumerate() {
@@ -137,13 +162,15 @@ fn build_role_steps(
             Some(label) => label.as_str(),
             None => return Err(super::ExecutionPlanError::MissingRoleMapping),
         };
-        let candidate_labels = super::super::plan::collect_role_candidates(super::super::plan::RoleCandidateRequest {
-            selected,
-            selected_label,
-            role,
-            catalog,
-            budget,
-        })?;
+        let candidate_labels = super::super::plan::collect_role_candidates(
+            super::super::plan::RoleCandidateRequest {
+                selected,
+                selected_label,
+                role,
+                catalog,
+                budget,
+            },
+        )?;
         let quorum = selected.bounds().min_success_quorum();
         let Ok(quorum_index) = usize::try_from(quorum) else {
             return Err(super::ExecutionPlanError::ImpossibleQuorum);

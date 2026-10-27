@@ -7,12 +7,33 @@ fn sandbox_escalation_event_records_allow_prompt_and_forbid_outcomes() {
     let prompt_event = event_for(&command(&["nix", "build"]), rules.as_slice());
     let forbid_event = event_for(&command(&["rm", "-rf", "target"]), rules.as_slice());
 
-    assert_eq!(allow_event.kind(), crate::RuntimeEventKind::SandboxEscalation);
-    assert_eq!(prompt_event.kind(), crate::RuntimeEventKind::SandboxEscalation);
-    assert_eq!(forbid_event.kind(), crate::RuntimeEventKind::SandboxEscalation);
-    assert_sandbox_event(&allow_event, animus_adapters::ExecPolicyDecision::Allow, ALLOW_CARGO_ID);
-    assert_sandbox_event(&prompt_event, animus_adapters::ExecPolicyDecision::Prompt, PROMPT_NIX_ID);
-    assert_sandbox_event(&forbid_event, animus_adapters::ExecPolicyDecision::Forbid, FORBID_RM_ID);
+    assert_eq!(
+        allow_event.kind(),
+        crate::RuntimeEventKind::SandboxEscalation
+    );
+    assert_eq!(
+        prompt_event.kind(),
+        crate::RuntimeEventKind::SandboxEscalation
+    );
+    assert_eq!(
+        forbid_event.kind(),
+        crate::RuntimeEventKind::SandboxEscalation
+    );
+    assert_sandbox_event(
+        &allow_event,
+        animus_adapters::ExecPolicyDecision::Allow,
+        ALLOW_CARGO_ID,
+    );
+    assert_sandbox_event(
+        &prompt_event,
+        animus_adapters::ExecPolicyDecision::Prompt,
+        PROMPT_NIX_ID,
+    );
+    assert_sandbox_event(
+        &forbid_event,
+        animus_adapters::ExecPolicyDecision::Forbid,
+        FORBID_RM_ID,
+    );
 }
 
 #[test]

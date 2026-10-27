@@ -272,9 +272,8 @@
           pkgs.lib.hasPrefix "${sourceRoot}/policy/" (toString path)
           || pkgs.lib.hasPrefix "${sourceRoot}/contracts/" (toString path)
           || pkgs.lib.hasPrefix "${sourceRoot}/profiles/" (toString path)
-          || toString path == "${sourceRoot}/vendor-cargo-deps/basalt/contracts/generated/policy.json"
-          || toString path == "${sourceRoot}/vendor-cargo-deps/basalt/SOURCE"
-          || toString path == "${sourceRoot}/vendor-cargo-deps/basalt/NORMALIZATION.md";
+          || pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/basalt/contracts/" (toString path)
+          || toString path == "${sourceRoot}/vendor-cargo-deps/basalt/SOURCE";
         isWorkflowTemplateAssetPath =
           path: pkgs.lib.hasPrefix "${sourceRoot}/builtins/workflow-templates/" (toString path);
         isAgentEvaluationAssetPath =
@@ -287,12 +286,13 @@
           pkgs.lib.hasInfix "/crates/lattice-workflow-contract/" (toString path)
           && (
             pkgs.lib.hasInfix "/fixtures/" (toString path)
-            || builtins.baseNameOf path == "LICENSE"
+            || builtins.elem (builtins.baseNameOf path) [ "LICENSE" "LICENSE-MIT-HISTORICAL" ]
             || builtins.baseNameOf path == "rustfmt.toml"
           );
         isIdentityAuditAssetPath =
           path:
           toString path == "${sourceRoot}/README.md"
+          || toString path == "${sourceRoot}/LICENSE"
           || toString path == "${sourceRoot}/flake.nix"
           || toString path == "${sourceRoot}/flake.lock"
           || pkgs.lib.hasPrefix "${sourceRoot}/scripts/" (toString path)
@@ -303,7 +303,8 @@
           src = ./.;
           filter =
             path: type:
-            !pkgs.lib.hasPrefix "${sourceRoot}/target/" (toString path)
+            toString path != "${sourceRoot}/target"
+            && !pkgs.lib.hasPrefix "${sourceRoot}/target/" (toString path)
             && (
               craneLib.filterCargoSources path type
               || isSourceFixturePath path

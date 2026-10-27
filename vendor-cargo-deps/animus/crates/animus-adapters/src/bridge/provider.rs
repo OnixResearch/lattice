@@ -1,14 +1,7 @@
-use super::AcpPermissionMode;
-use super::AcpSessionCorrelation;
-use super::AcpToolPassThroughPolicy;
-use super::Collection;
-use super::ID_FIELD;
-use super::InteropError;
-use super::LIMITATION_FIELD;
-use super::PROFILE_FIELD;
-use super::Text;
-use super::required_text;
-use super::text_collection;
+use super::{
+    AcpPermissionMode, AcpSessionCorrelation, AcpToolPassThroughPolicy, Collection, ID_FIELD,
+    InteropError, LIMITATION_FIELD, PROFILE_FIELD, Text, required_text, text_collection,
+};
 
 /// Untrusted ACP provider descriptor.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -64,7 +57,8 @@ impl AcpDescriptor {
         }
         let session_correlation = AcpSessionCorrelation::parse(draft.session_correlation)?;
         let notes = text_collection(LIMITATION_FIELD, draft.known_limitations, false)?;
-        let tool_pass_through_policy = AcpToolPassThroughPolicy::parse(draft.tool_pass_through_policy)?;
+        let tool_pass_through_policy =
+            AcpToolPassThroughPolicy::parse(draft.tool_pass_through_policy)?;
         Ok(Self {
             identity,
             model_profile,

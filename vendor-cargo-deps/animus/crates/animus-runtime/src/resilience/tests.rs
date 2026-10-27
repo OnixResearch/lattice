@@ -39,7 +39,10 @@ fn generated_policy_revalidates_with_canonical_identity() {
 
     assert_eq!(policy.policy_hash(), POLICY_HASH);
     assert_eq!(policy.max_attempts(), FINAL_ATTEMPT_COUNT);
-    assert_eq!(policy.delay_schedule_ms(), &[ZERO_DELAY_MS, FIRST_BACKOFF_MS, 1_000]);
+    assert_eq!(
+        policy.delay_schedule_ms(),
+        &[ZERO_DELAY_MS, FIRST_BACKOFF_MS, 1_000]
+    );
     assert_eq!(provider_retry_policy_content_hash(&policy), POLICY_HASH);
 }
 
@@ -52,22 +55,31 @@ fn stale_policy_duplicate_mapping_and_invalid_schedule_fail_closed() {
     let mut schedule = policy_input();
     schedule.delay_schedule_ms = vec![ZERO_DELAY_MS];
     let mut decreasing_schedule = policy_input();
-    decreasing_schedule.delay_schedule_ms = vec![SECOND_BACKOFF_MS, FIRST_BACKOFF_MS, ZERO_DELAY_MS];
+    decreasing_schedule.delay_schedule_ms =
+        vec![SECOND_BACKOFF_MS, FIRST_BACKOFF_MS, ZERO_DELAY_MS];
 
     assert_eq!(
-        validate_provider_retry_policy(&stale).expect_err("stale policy").issue(),
+        validate_provider_retry_policy(&stale)
+            .expect_err("stale policy")
+            .issue(),
         ProviderRetryIssue::StalePolicy
     );
     assert_eq!(
-        validate_provider_retry_policy(&duplicate).expect_err("duplicate mapping").issue(),
+        validate_provider_retry_policy(&duplicate)
+            .expect_err("duplicate mapping")
+            .issue(),
         ProviderRetryIssue::InvalidMapping
     );
     assert_eq!(
-        validate_provider_retry_policy(&schedule).expect_err("invalid schedule").issue(),
+        validate_provider_retry_policy(&schedule)
+            .expect_err("invalid schedule")
+            .issue(),
         ProviderRetryIssue::InvalidSchedule
     );
     assert_eq!(
-        validate_provider_retry_policy(&decreasing_schedule).expect_err("decreasing schedule").issue(),
+        validate_provider_retry_policy(&decreasing_schedule)
+            .expect_err("decreasing schedule")
+            .issue(),
         ProviderRetryIssue::InvalidSchedule
     );
 }
@@ -83,7 +95,9 @@ fn attempt_delay_and_invocation_bounds_fail_closed() {
 
     for invalid in [zero_attempts, excessive_attempts, excessive_policy] {
         assert_eq!(
-            validate_provider_retry_policy(&invalid).expect_err("invalid policy bounds").issue(),
+            validate_provider_retry_policy(&invalid)
+                .expect_err("invalid policy bounds")
+                .issue(),
             ProviderRetryIssue::InvalidSchedule
         );
     }
@@ -136,15 +150,21 @@ fn transient_retry_uses_zero_delay_then_exact_dispatch() {
     // r[verify agent_harness_runtime.tau_provider_retry.events]
     let policy = policy();
     let invocation = invocation(&policy);
-    let decision = decision(&policy, &invocation, &invocation, DecisionState {
-        completed_attempt_count: FIRST_ATTEMPT_COUNT,
-        stream_state: ProviderRetryStreamState::TransportStarted,
-        cancellation: ProviderRetryCancellation::None,
-        native_class: "network-reset",
-    });
+    let decision = decision(
+        &policy,
+        &invocation,
+        &invocation,
+        DecisionState {
+            completed_attempt_count: FIRST_ATTEMPT_COUNT,
+            stream_state: ProviderRetryStreamState::TransportStarted,
+            cancellation: ProviderRetryCancellation::None,
+            native_class: "network-reset",
+        },
+    );
     let wait = plan_provider_retry_wait(&decision).expect("timer wait plan");
     let timer = timer_observation(&decision, ProviderRetryTimerOutcome::Completed);
-    let evaluation = evaluate_provider_retry_timer(&decision, wait.state(), &timer).expect("timer evaluation");
+    let evaluation =
+        evaluate_provider_retry_timer(&decision, wait.state(), &timer).expect("timer evaluation");
     let gate = evaluation.gate();
     let scheduled = project_provider_retry_decision_event(&decision);
     let ready = project_provider_retry_timer_event(&decision, gate);
@@ -155,35 +175,50 @@ fn transient_retry_uses_zero_delay_then_exact_dispatch() {
         ProviderRetryCancellation::None,
     );
     let dispatch = gate.request().expect("dispatch request");
-    let advanced = advance_provider_retry_attempt(&threaded_state, dispatch).expect("attempt advances once");
-    let duplicate_advance =
-        advance_provider_retry_attempt(&advanced, dispatch).expect_err("same dispatch cannot advance twice");
+    let advanced =
+        advance_provider_retry_attempt(&threaded_state, dispatch).expect("attempt advances once");
+    let duplicate_advance = advance_provider_retry_attempt(&advanced, dispatch)
+        .expect_err("same dispatch cannot advance twice");
 
     assert_eq!(decision.status(), ProviderRetryDecisionStatus::Retry);
     assert_eq!(decision.delay_ms(), Some(ZERO_DELAY_MS));
     assert_eq!(wait.request().next_attempt_count, SECOND_ATTEMPT_COUNT);
     assert!(wait.request().cancellation_required);
     assert_eq!(gate.status(), ProviderRetryDispatchGateStatus::Ready);
-    assert_eq!(evaluation.state().status(), ProviderRetryWaitStatus::Completed);
+    assert_eq!(
+        evaluation.state().status(),
+        ProviderRetryWaitStatus::Completed
+    );
     assert_eq!(advanced.completed_attempt_count, SECOND_ATTEMPT_COUNT);
     assert_eq!(duplicate_advance.issue(), ProviderRetryIssue::InvalidInput);
-    assert_eq!(gate.request().expect("dispatch").exact_plan_hash(), invocation.exact_plan_hash());
-    assert_eq!([scheduled.status, ready.status], [
-        ProviderRetryProgressStatus::Scheduled,
-        ProviderRetryProgressStatus::DispatchReady,
-    ]);
+    assert_eq!(
+        gate.request().expect("dispatch").exact_plan_hash(),
+        invocation.exact_plan_hash()
+    );
+    assert_eq!(
+        [scheduled.status, ready.status],
+        [
+            ProviderRetryProgressStatus::Scheduled,
+            ProviderRetryProgressStatus::DispatchReady,
+        ]
+    );
 }
 
 #[test]
 fn retry_schedule_advances_with_named_attempt_bounds() {
     let policy = policy();
     let invocation = invocation(&policy);
-    let decision = decision(&policy, &invocation, &invocation, DecisionState {
-        completed_attempt_count: SECOND_ATTEMPT_COUNT,
-        stream_state: ProviderRetryStreamState::TransportStarted,
-        cancellation: ProviderRetryCancellation::None,
-        native_class: "service-down",
-    });
+    let decision = decision(
+        &policy,
+        &invocation,
+        &invocation,
+        DecisionState {
+            completed_attempt_count: SECOND_ATTEMPT_COUNT,
+            stream_state: ProviderRetryStreamState::TransportStarted,
+            cancellation: ProviderRetryCancellation::None,
+            native_class: "service-down",
+        },
+    );
 
     assert_eq!(decision.status(), ProviderRetryDecisionStatus::Retry);
     assert_eq!(decision.next_attempt_count(), Some(THIRD_ATTEMPT_COUNT));
@@ -210,12 +245,17 @@ fn permanent_and_unknown_failures_never_retry() {
     ];
 
     for native_class in native_classes {
-        let decision = decision(&policy, &invocation, &invocation, DecisionState {
-            completed_attempt_count: FIRST_ATTEMPT_COUNT,
-            stream_state: ProviderRetryStreamState::TransportStarted,
-            cancellation: ProviderRetryCancellation::None,
-            native_class,
-        });
+        let decision = decision(
+            &policy,
+            &invocation,
+            &invocation,
+            DecisionState {
+                completed_attempt_count: FIRST_ATTEMPT_COUNT,
+                stream_state: ProviderRetryStreamState::TransportStarted,
+                cancellation: ProviderRetryCancellation::None,
+                native_class,
+            },
+        );
         assert_eq!(decision.status(), ProviderRetryDecisionStatus::Terminal);
         assert!(plan_provider_retry_wait(&decision).is_err());
     }
@@ -250,13 +290,21 @@ fn every_exact_identity_change_requires_recomposition() {
 
     for input in inputs {
         let next = validate_invocation_with_fresh_hash(input, &policy);
-        let decision = decision(&policy, &current, &next, DecisionState {
-            completed_attempt_count: FIRST_ATTEMPT_COUNT,
-            stream_state: ProviderRetryStreamState::TransportStarted,
-            cancellation: ProviderRetryCancellation::None,
-            native_class: "network-reset",
-        });
-        assert_eq!(decision.status(), ProviderRetryDecisionStatus::RecompositionRequired);
+        let decision = decision(
+            &policy,
+            &current,
+            &next,
+            DecisionState {
+                completed_attempt_count: FIRST_ATTEMPT_COUNT,
+                stream_state: ProviderRetryStreamState::TransportStarted,
+                cancellation: ProviderRetryCancellation::None,
+                native_class: "network-reset",
+            },
+        );
+        assert_eq!(
+            decision.status(),
+            ProviderRetryDecisionStatus::RecompositionRequired
+        );
         assert!(plan_provider_retry_wait(&decision).is_err());
     }
 }
@@ -279,13 +327,21 @@ fn semantic_stream_frames_make_transient_failure_terminal() {
             ProviderRetryStreamState::TransportStarted,
             ProviderRetryStreamObservation::Semantic(frame),
         );
-        let decision = decision(&policy, &invocation, &invocation, DecisionState {
-            completed_attempt_count: FIRST_ATTEMPT_COUNT,
-            stream_state,
-            cancellation: ProviderRetryCancellation::None,
-            native_class: "network-reset",
-        });
-        assert_eq!(decision.status(), ProviderRetryDecisionStatus::PostCommitTerminal);
+        let decision = decision(
+            &policy,
+            &invocation,
+            &invocation,
+            DecisionState {
+                completed_attempt_count: FIRST_ATTEMPT_COUNT,
+                stream_state,
+                cancellation: ProviderRetryCancellation::None,
+                native_class: "network-reset",
+            },
+        );
+        assert_eq!(
+            decision.status(),
+            ProviderRetryDecisionStatus::PostCommitTerminal
+        );
         assert!(plan_provider_retry_wait(&decision).is_err());
     }
 }
@@ -296,30 +352,47 @@ fn fragmented_transport_before_semantic_frame_remains_retryable() {
         ProviderRetryStreamState::NotStarted,
         ProviderRetryStreamObservation::TransportStarted,
     );
-    let unchanged = observe_provider_retry_model_frame(started, animus_adapters::ModelStreamFrameKind::Failure);
-    let committed = observe_provider_retry_model_frame(unchanged, animus_adapters::ModelStreamFrameKind::ToolCallDelta);
+    let unchanged =
+        observe_provider_retry_model_frame(started, animus_adapters::ModelStreamFrameKind::Failure);
+    let committed = observe_provider_retry_model_frame(
+        unchanged,
+        animus_adapters::ModelStreamFrameKind::ToolCallDelta,
+    );
 
     assert_eq!(started, ProviderRetryStreamState::TransportStarted);
     assert_eq!(unchanged, ProviderRetryStreamState::TransportStarted);
-    assert_eq!(committed, ProviderRetryStreamState::Committed(ProviderRetrySemanticFrame::ToolCall));
+    assert_eq!(
+        committed,
+        ProviderRetryStreamState::Committed(ProviderRetrySemanticFrame::ToolCall)
+    );
 }
 
 #[test]
 fn attempt_exhaustion_and_cancellation_stop_dispatch() {
     let policy = policy();
     let invocation = invocation(&policy);
-    let exhausted = decision(&policy, &invocation, &invocation, DecisionState {
-        completed_attempt_count: FINAL_ATTEMPT_COUNT,
-        stream_state: ProviderRetryStreamState::TransportStarted,
-        cancellation: ProviderRetryCancellation::None,
-        native_class: "timeout",
-    });
-    let cancelled = decision(&policy, &invocation, &invocation, DecisionState {
-        completed_attempt_count: FIRST_ATTEMPT_COUNT,
-        stream_state: ProviderRetryStreamState::TransportStarted,
-        cancellation: ProviderRetryCancellation::Requested,
-        native_class: "timeout",
-    });
+    let exhausted = decision(
+        &policy,
+        &invocation,
+        &invocation,
+        DecisionState {
+            completed_attempt_count: FINAL_ATTEMPT_COUNT,
+            stream_state: ProviderRetryStreamState::TransportStarted,
+            cancellation: ProviderRetryCancellation::None,
+            native_class: "timeout",
+        },
+    );
+    let cancelled = decision(
+        &policy,
+        &invocation,
+        &invocation,
+        DecisionState {
+            completed_attempt_count: FIRST_ATTEMPT_COUNT,
+            stream_state: ProviderRetryStreamState::TransportStarted,
+            cancellation: ProviderRetryCancellation::Requested,
+            native_class: "timeout",
+        },
+    );
 
     assert_eq!(exhausted.status(), ProviderRetryDecisionStatus::Exhausted);
     assert_eq!(cancelled.status(), ProviderRetryDecisionStatus::Cancelled);
@@ -331,35 +404,57 @@ fn attempt_exhaustion_and_cancellation_stop_dispatch() {
 fn timer_cancellation_failure_and_stale_correlation_block_dispatch() {
     let policy = policy();
     let invocation = invocation(&policy);
-    let decision = decision(&policy, &invocation, &invocation, DecisionState {
-        completed_attempt_count: FIRST_ATTEMPT_COUNT,
-        stream_state: ProviderRetryStreamState::TransportStarted,
-        cancellation: ProviderRetryCancellation::None,
-        native_class: "rate-limit",
-    });
+    let decision = decision(
+        &policy,
+        &invocation,
+        &invocation,
+        DecisionState {
+            completed_attempt_count: FIRST_ATTEMPT_COUNT,
+            stream_state: ProviderRetryStreamState::TransportStarted,
+            cancellation: ProviderRetryCancellation::None,
+            native_class: "rate-limit",
+        },
+    );
     let outcomes = [
-        (ProviderRetryTimerOutcome::Cancelled, ProviderRetryDispatchGateStatus::Cancelled),
-        (ProviderRetryTimerOutcome::TimedOut, ProviderRetryDispatchGateStatus::BlockedTimer),
-        (ProviderRetryTimerOutcome::Unavailable, ProviderRetryDispatchGateStatus::BlockedTimer),
-        (ProviderRetryTimerOutcome::Failed, ProviderRetryDispatchGateStatus::BlockedTimer),
+        (
+            ProviderRetryTimerOutcome::Cancelled,
+            ProviderRetryDispatchGateStatus::Cancelled,
+        ),
+        (
+            ProviderRetryTimerOutcome::TimedOut,
+            ProviderRetryDispatchGateStatus::BlockedTimer,
+        ),
+        (
+            ProviderRetryTimerOutcome::Unavailable,
+            ProviderRetryDispatchGateStatus::BlockedTimer,
+        ),
+        (
+            ProviderRetryTimerOutcome::Failed,
+            ProviderRetryDispatchGateStatus::BlockedTimer,
+        ),
     ];
     for (outcome, expected) in outcomes {
         let wait = plan_provider_retry_wait(&decision).expect("wait plan");
         let timer = timer_observation(&decision, outcome);
-        let evaluation = evaluate_provider_retry_timer(&decision, wait.state(), &timer).expect("timer outcome");
+        let evaluation =
+            evaluate_provider_retry_timer(&decision, wait.state(), &timer).expect("timer outcome");
         assert_eq!(evaluation.gate().status(), expected);
         assert!(evaluation.gate().request().is_none());
     }
     let wait = plan_provider_retry_wait(&decision).expect("wait plan");
     let mut stale = timer_observation(&decision, ProviderRetryTimerOutcome::Completed);
     stale.next_attempt_count = FINAL_ATTEMPT_COUNT;
-    let evaluation = evaluate_provider_retry_timer(&decision, wait.state(), &stale).expect("stale timer");
-    assert_eq!(evaluation.gate().status(), ProviderRetryDispatchGateStatus::BlockedStale);
+    let evaluation =
+        evaluate_provider_retry_timer(&decision, wait.state(), &stale).expect("stale timer");
+    assert_eq!(
+        evaluation.gate().status(),
+        ProviderRetryDispatchGateStatus::BlockedStale
+    );
     assert!(evaluation.gate().request().is_none());
     let mut malformed = timer_observation(&decision, ProviderRetryTimerOutcome::Completed);
     malformed.decision_hash = "BAD".to_string();
-    let error =
-        evaluate_provider_retry_timer(&decision, wait.state(), &malformed).expect_err("malformed timer identity");
+    let error = evaluate_provider_retry_timer(&decision, wait.state(), &malformed)
+        .expect_err("malformed timer identity");
     assert_eq!(error.issue(), ProviderRetryIssue::InvalidInput);
 }
 
@@ -367,27 +462,40 @@ fn timer_cancellation_failure_and_stale_correlation_block_dispatch() {
 fn cancellation_and_completion_races_close_threaded_wait_state() {
     let policy = policy();
     let invocation = invocation(&policy);
-    let decision = decision(&policy, &invocation, &invocation, DecisionState {
-        completed_attempt_count: FIRST_ATTEMPT_COUNT,
-        stream_state: ProviderRetryStreamState::TransportStarted,
-        cancellation: ProviderRetryCancellation::None,
-        native_class: "rate-limit",
-    });
+    let decision = decision(
+        &policy,
+        &invocation,
+        &invocation,
+        DecisionState {
+            completed_attempt_count: FIRST_ATTEMPT_COUNT,
+            stream_state: ProviderRetryStreamState::TransportStarted,
+            cancellation: ProviderRetryCancellation::None,
+            native_class: "rate-limit",
+        },
+    );
     let wait = plan_provider_retry_wait(&decision).expect("wait plan");
     let cancelled = timer_observation(&decision, ProviderRetryTimerOutcome::Cancelled);
-    let cancelled_evaluation =
-        evaluate_provider_retry_timer(&decision, wait.state(), &cancelled).expect("cancelled timer");
+    let cancelled_evaluation = evaluate_provider_retry_timer(&decision, wait.state(), &cancelled)
+        .expect("cancelled timer");
     let completed = timer_observation(&decision, ProviderRetryTimerOutcome::Completed);
-    let after_cancel = evaluate_provider_retry_timer(&decision, cancelled_evaluation.state(), &completed)
-        .expect("closed cancellation state");
-    let completed_evaluation =
-        evaluate_provider_retry_timer(&decision, wait.state(), &completed).expect("completed timer");
-    let duplicate_completion = evaluate_provider_retry_timer(&decision, completed_evaluation.state(), &completed)
-        .expect("closed completion state");
+    let after_cancel =
+        evaluate_provider_retry_timer(&decision, cancelled_evaluation.state(), &completed)
+            .expect("closed cancellation state");
+    let completed_evaluation = evaluate_provider_retry_timer(&decision, wait.state(), &completed)
+        .expect("completed timer");
+    let duplicate_completion =
+        evaluate_provider_retry_timer(&decision, completed_evaluation.state(), &completed)
+            .expect("closed completion state");
 
-    assert_eq!(after_cancel.gate().status(), ProviderRetryDispatchGateStatus::Cancelled);
+    assert_eq!(
+        after_cancel.gate().status(),
+        ProviderRetryDispatchGateStatus::Cancelled
+    );
     assert!(after_cancel.gate().request().is_none());
-    assert_eq!(duplicate_completion.gate().status(), ProviderRetryDispatchGateStatus::BlockedStale);
+    assert_eq!(
+        duplicate_completion.gate().status(),
+        ProviderRetryDispatchGateStatus::BlockedStale
+    );
     assert!(duplicate_completion.gate().request().is_none());
 }
 
@@ -477,18 +585,26 @@ fn receipt_attempt_and_reason_bounds_fail_closed() {
 fn progress_events_are_metadata_only_and_never_assistant_messages() {
     let policy = policy();
     let invocation = invocation(&policy);
-    let decision = decision(&policy, &invocation, &invocation, DecisionState {
-        completed_attempt_count: FIRST_ATTEMPT_COUNT,
-        stream_state: ProviderRetryStreamState::TransportStarted,
-        cancellation: ProviderRetryCancellation::None,
-        native_class: "rate-limit",
-    });
+    let decision = decision(
+        &policy,
+        &invocation,
+        &invocation,
+        DecisionState {
+            completed_attempt_count: FIRST_ATTEMPT_COUNT,
+            stream_state: ProviderRetryStreamState::TransportStarted,
+            cancellation: ProviderRetryCancellation::None,
+            native_class: "rate-limit",
+        },
+    );
     let event = project_provider_retry_decision_event(&decision);
     let rendered = format!("{event:?}");
 
     assert_eq!(event.run_id, RUN_ID);
     assert_eq!(event.reason, ProviderRetryFailureClass::RateLimited);
-    assert_eq!(validate_provider_retry_progress_event(event.clone()).expect("valid progress event"), event);
+    assert_eq!(
+        validate_provider_retry_progress_event(event.clone()).expect("valid progress event"),
+        event
+    );
     let mut malformed_event = event.clone();
     malformed_event.run_id = String::from(PRIVATE_BODY);
     assert_eq!(
@@ -500,12 +616,18 @@ fn progress_events_are_metadata_only_and_never_assistant_messages() {
     let runtime_event = crate::RuntimeEvent::ProviderRetryProgress {
         progress: event.clone(),
     };
-    let projected =
-        crate::map_runtime_events_to_headless(std::slice::from_ref(&runtime_event)).expect("headless retry event");
+    let projected = crate::map_runtime_events_to_headless(std::slice::from_ref(&runtime_event))
+        .expect("headless retry event");
 
     assert_eq!(event.delay_ms, Some(ZERO_DELAY_MS));
-    assert_eq!(runtime_event.kind(), crate::RuntimeEventKind::ProviderRetryProgress);
-    assert_eq!(projected[FIRST_EVENT_INDEX].kind(), crate::RuntimeEventKind::ProviderRetryProgress);
+    assert_eq!(
+        runtime_event.kind(),
+        crate::RuntimeEventKind::ProviderRetryProgress
+    );
+    assert_eq!(
+        projected[FIRST_EVENT_INDEX].kind(),
+        crate::RuntimeEventKind::ProviderRetryProgress
+    );
     let summary = projected[FIRST_EVENT_INDEX].summary();
     assert!(summary.contains("scheduled"));
     assert!(summary.contains("attempt=2/4"));
@@ -608,12 +730,14 @@ fn policy_input() -> ProviderRetryPolicyInput {
             ("unsupported", "unsupported_feature"),
         ]
         .into_iter()
-        .map(|(native_class, canonical_class)| ProviderRetryMappingInput {
-            provider_family: PROVIDER_ID.to_string(),
-            mapping_version: "v1".to_string(),
-            native_class: native_class.to_string(),
-            canonical_class: canonical_class.to_string(),
-        })
+        .map(
+            |(native_class, canonical_class)| ProviderRetryMappingInput {
+                provider_family: PROVIDER_ID.to_string(),
+                mapping_version: "v1".to_string(),
+                native_class: native_class.to_string(),
+                canonical_class: canonical_class.to_string(),
+            },
+        )
         .collect(),
         policy_hash: POLICY_HASH.to_string(),
     }
@@ -690,7 +814,12 @@ fn decision(
     next: &ProviderRetryInvocation,
     input: DecisionState<'_>,
 ) -> ProviderRetryDecision {
-    let state = attempt_state(current, input.completed_attempt_count, input.stream_state, input.cancellation);
+    let state = attempt_state(
+        current,
+        input.completed_attempt_count,
+        input.stream_state,
+        input.cancellation,
+    );
     let failure = observation(input.native_class);
     plan_provider_retry(ProviderRetryPlanInput {
         policy,

@@ -1,0 +1,26 @@
+{
+  "allow_bounded_rebuild": true,
+  "maximum_event_count": 256,
+  "maximum_projected_bytes": 1048576,
+  "non_claims": [
+    "not-transcript-truth",
+    "not-transport-delivery",
+    "not-durable-storage",
+    "not-conversation-continuity"
+  ],
+  "omitted_classes": [
+    "live_only_delta"
+  ],
+  "policy_id": "animus.session-event-replay.default.v1",
+  "redaction_profile_id": "metadata-only-v1",
+  "replayable_classes": [
+    "durable_semantic",
+    "metadata_observation"
+  ],
+  "schema": "animus.session-event-replay.v1",
+  "terminal_outcomes": [
+    "completed",
+    "cancelled",
+    "failed"
+  ]
+}

@@ -40,6 +40,9 @@ const EXPECTED_COMPLETED_NODE_COUNT: usize = 4;
 struct ExampleAgentAdapter;
 
 impl AgentAdapter for ExampleAgentAdapter {
+    fn execution_identity(&self, _request: &lattice::agent_node::AgentRequest) -> Result<String, AgentError> {
+        Ok("test/image-agent/v1".to_owned())
+    }
     fn execute(
         &self,
         request: &lattice::agent_node::AgentRequest,

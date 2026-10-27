@@ -1,11 +1,19 @@
 use crate::support::*;
 
 fn target_request(action: EnforcementAction) -> EnforcementRequest {
-    EnforcementRequest::new(action.contract_id(), action.resource_prefix().to_owned() + "target/abc", action.ability())
+    EnforcementRequest::new(
+        action.contract_id(),
+        action.resource_prefix().to_owned() + "target/abc",
+        action.ability(),
+    )
 }
 
 fn state_sync_request(action: EnforcementAction) -> EnforcementRequest {
-    EnforcementRequest::new(action.contract_id(), action.resource_prefix().to_owned() + "publish/abc", action.ability())
+    EnforcementRequest::new(
+        action.contract_id(),
+        action.resource_prefix().to_owned() + "publish/abc",
+        action.ability(),
+    )
 }
 
 #[test]
@@ -18,10 +26,16 @@ fn all_onixos_actions_have_distinct_reviewed_bindings() {
         EnforcementAction::OnixosStateSyncDelete,
         EnforcementAction::OnixosStateSyncAdmin,
     ];
-    let profiles = actions.iter().map(|action| action.operation_profile_id()).collect::<Vec<_>>();
+    let profiles = actions
+        .iter()
+        .map(|action| action.operation_profile_id())
+        .collect::<Vec<_>>();
     for (index, left) in profiles.iter().enumerate() {
         for right in &profiles[index + 1..] {
-            assert_ne!(left, right, "each target action must map to a distinct profile");
+            assert_ne!(
+                left, right,
+                "each target action must map to a distinct profile"
+            );
         }
     }
     // Each action binds its exact request without a generic action constructor.
@@ -31,7 +45,8 @@ fn all_onixos_actions_have_distinct_reviewed_bindings() {
         } else {
             target_request(action)
         };
-        let binding = bind_enforcement_action(action, &request).expect("exact target request must bind");
+        let binding =
+            bind_enforcement_action(action, &request).expect("exact target request must bind");
         assert_eq!(binding.profile(), action.operation_profile_id());
         assert_eq!(request.contract(), action.contract_id());
         assert_eq!(request.ability(), action.ability());
@@ -53,7 +68,11 @@ fn onixos_action_substitutions_fail_before_replay() {
         assert_eq!(
             bind_enforcement_action(
                 EnforcementAction::DocumentWrite,
-                &EnforcementRequest::new(wrong_contract.contract(), wrong_contract.resource(), action.ability(),),
+                &EnforcementRequest::new(
+                    wrong_contract.contract(),
+                    wrong_contract.resource(),
+                    action.ability(),
+                ),
             ),
             Err(UcanEnforcementReason::OperationMismatch),
             "wrong contract must fail: {action:?}"
@@ -70,7 +89,11 @@ fn onixos_action_substitutions_fail_before_replay() {
             "wrong ability must fail: {action:?}"
         );
         // Resource outside the reviewed prefix must fail closed.
-        let outside_prefix = EnforcementRequest::new(action.contract_id(), "did:key:z6Mkother/abc", action.ability());
+        let outside_prefix = EnforcementRequest::new(
+            action.contract_id(),
+            "did:key:z6Mkother/abc",
+            action.ability(),
+        );
         assert_eq!(
             bind_enforcement_action(action, &outside_prefix),
             Err(UcanEnforcementReason::ScopeDenied),

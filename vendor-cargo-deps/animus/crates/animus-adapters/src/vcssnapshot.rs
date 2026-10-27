@@ -18,9 +18,7 @@
 )]
 
 use crate::artifact::Hash;
-use crate::validation::AdapterContractError;
-use crate::validation::FieldName;
-use crate::validation::{self};
+use crate::validation::{self, AdapterContractError, FieldName};
 
 const SNAPSHOT_ID_FIELD: FieldName = FieldName::new("snapshot_id");
 const WORKSPACE_LABEL_FIELD: FieldName = FieldName::new("snapshot_workspace_label");
@@ -649,7 +647,11 @@ impl SnapshotReceipt {
 /// content lists, or changed-count overflow.
 pub fn validate_snapshot_record(draft: &SnapshotRecordDraft<'_>) -> SnapshotResult<SnapshotRecord> {
     validate_count(draft.changed_artifact_count)?;
-    validate_non_empty_bound("snapshot_content_hashes", draft.content_hashes.len(), MAX_CONTENT_HASHES)?;
+    validate_non_empty_bound(
+        "snapshot_content_hashes",
+        draft.content_hashes.len(),
+        MAX_CONTENT_HASHES,
+    )?;
     let snapshot_id = safe_text(SNAPSHOT_ID_FIELD, draft.snapshot_id, None)?;
     let parent_snapshot_id = draft
         .parent_snapshot_id
@@ -681,7 +683,9 @@ pub fn validate_snapshot_record(draft: &SnapshotRecordDraft<'_>) -> SnapshotResu
 ///
 /// Returns [`SnapshotDiagnostic`] when the supplied record list is empty, exceeds bounds, or any
 /// record fails snapshot validation.
-pub fn validate_snapshot_lineage(drafts: &[SnapshotRecordDraft<'_>]) -> SnapshotResult<SnapshotLineage> {
+pub fn validate_snapshot_lineage(
+    drafts: &[SnapshotRecordDraft<'_>],
+) -> SnapshotResult<SnapshotLineage> {
     validate_non_empty_bound("snapshot_records", drafts.len(), MAX_SNAPSHOT_RECORDS)?;
     let mut records = Collection::with_capacity(drafts.len());
     for draft in drafts {
@@ -690,7 +694,10 @@ pub fn validate_snapshot_lineage(drafts: &[SnapshotRecordDraft<'_>]) -> Snapshot
     let mut diagnostics = Collection::new();
     for record in &records {
         if let Some(parent) = record.parent_snapshot_id() {
-            if !records.iter().any(|candidate| candidate.snapshot_id() == parent) {
+            if !records
+                .iter()
+                .any(|candidate| candidate.snapshot_id() == parent)
+            {
                 diagnostics.push(diagnostic(
                     SnapshotDiagnosticCode::UnknownSnapshot,
                     Some(record.snapshot_id()),
@@ -699,7 +706,10 @@ pub fn validate_snapshot_lineage(drafts: &[SnapshotRecordDraft<'_>]) -> Snapshot
             }
         }
     }
-    Ok(SnapshotLineage { records, diagnostics })
+    Ok(SnapshotLineage {
+        records,
+        diagnostics,
+    })
 }
 
 /// Plans a snapshot operation without mutating the backend.
@@ -709,7 +719,9 @@ pub fn plan_snapshot_operation(
     draft: &SnapshotOperationPlanDraft<'_>,
     service_status: SnapshotServiceStatus,
 ) -> SnapshotOperationPlan {
-    if service_status == SnapshotServiceStatus::Missing || service_status == SnapshotServiceStatus::Unavailable {
+    if service_status == SnapshotServiceStatus::Missing
+        || service_status == SnapshotServiceStatus::Unavailable
+    {
         return rejected_plan(SnapshotRejection {
             operation: draft.operation,
             status: SnapshotPlanStatus::ServiceUnavailable,
@@ -733,7 +745,11 @@ pub fn plan_snapshot_operation(
             return rejected_from_error(draft.operation, SnapshotPlanStatus::Rejected, error);
         }
     };
-    let Some(record) = lineage.records().iter().find(|item| item.snapshot_id() == target) else {
+    let Some(record) = lineage
+        .records()
+        .iter()
+        .find(|item| item.snapshot_id() == target)
+    else {
         return rejected_plan(SnapshotRejection {
             operation: draft.operation,
             status: SnapshotPlanStatus::Rejected,
@@ -784,7 +800,11 @@ pub fn plan_snapshot_operation(
             }
         }
     }
-    let capability = match safe_text(CAPABILITY_LABEL_FIELD, draft.required_capability, Some(target.as_str())) {
+    let capability = match safe_text(
+        CAPABILITY_LABEL_FIELD,
+        draft.required_capability,
+        Some(target.as_str()),
+    ) {
         Ok(value) => value,
         Err(error) => {
             return rejected_from_error(draft.operation, SnapshotPlanStatus::Rejected, error);
@@ -801,7 +821,10 @@ pub fn plan_snapshot_operation(
 
 /// Plans automatic snapshot policy and reports no claim when service or policy is absent.
 #[must_use]
-pub fn plan_snapshot_policy(service_status: SnapshotServiceStatus, policy_enabled: bool) -> SnapshotPolicyPlan {
+pub fn plan_snapshot_policy(
+    service_status: SnapshotServiceStatus,
+    policy_enabled: bool,
+) -> SnapshotPolicyPlan {
     if !policy_enabled || service_status != SnapshotServiceStatus::Available {
         return SnapshotPolicyPlan {
             status: SnapshotPolicyPlanStatus::NoSnapshotClaim,
@@ -826,11 +849,16 @@ pub fn plan_snapshot_policy(service_status: SnapshotServiceStatus, policy_enable
 ///
 /// Returns [`SnapshotDiagnostic`] when receipt metadata leaks raw diffs, file
 /// bodies, command lines, paths, provider payloads, credentials, or unsafe refs.
-pub fn validate_snapshot_receipt(draft: &SnapshotReceiptDraft<'_>) -> SnapshotResult<SnapshotReceipt> {
+pub fn validate_snapshot_receipt(
+    draft: &SnapshotReceiptDraft<'_>,
+) -> SnapshotResult<SnapshotReceipt> {
     validate_count(draft.changed_artifact_count)?;
     let status = safe_text(RECEIPT_STATUS_FIELD, draft.status, None)?;
     let freshness_class = safe_text(RECEIPT_STATUS_FIELD, draft.freshness_class, None)?;
-    let issue_code = draft.issue_code.map(|issue| safe_text(RECEIPT_ISSUE_FIELD, issue, None)).transpose()?;
+    let issue_code = draft
+        .issue_code
+        .map(|issue| safe_text(RECEIPT_ISSUE_FIELD, issue, None))
+        .transpose()?;
     Ok(SnapshotReceipt {
         operation: draft.operation,
         status,
@@ -846,7 +874,9 @@ pub fn validate_snapshot_receipt(draft: &SnapshotReceiptDraft<'_>) -> SnapshotRe
     })
 }
 
-fn validate_freshness_proof(draft: &SnapshotFreshnessProofDraft<'_>) -> SnapshotResult<SnapshotFreshnessProof> {
+fn validate_freshness_proof(
+    draft: &SnapshotFreshnessProofDraft<'_>,
+) -> SnapshotResult<SnapshotFreshnessProof> {
     let snapshot_id = safe_text(SNAPSHOT_ID_FIELD, draft.snapshot_id, None)?;
     Ok(SnapshotFreshnessProof {
         snapshot_id,
@@ -887,9 +917,13 @@ fn validate_non_empty_bound(field: &'static str, len: usize, max: usize) -> Snap
 }
 
 fn safe_text(field: FieldName, value: &str, snapshot_id: Option<&str>) -> SnapshotResult<Text> {
-    let normalized = validation::normalized_adapter_field(field, value).map_err(|error| map_adapter_error(&error))?;
+    let normalized = validation::normalized_adapter_field(field, value)
+        .map_err(|error| map_adapter_error(&error))?;
     let lower = normalized.to_ascii_lowercase();
-    if UNSAFE_SNAPSHOT_MARKERS.iter().any(|marker| lower.contains(marker)) {
+    if UNSAFE_SNAPSHOT_MARKERS
+        .iter()
+        .any(|marker| lower.contains(marker))
+    {
         return Err(diagnostic(
             SnapshotDiagnosticCode::UnsafeMetadata,
             snapshot_id,
@@ -900,12 +934,16 @@ fn safe_text(field: FieldName, value: &str, snapshot_id: Option<&str>) -> Snapsh
 }
 
 fn safe_hash(value: &str) -> SnapshotResult<Text> {
-    let normalized =
-        validation::normalized_adapter_field(HASH_FIELD, value).map_err(|error| map_adapter_error(&error))?;
+    let normalized = validation::normalized_adapter_field(HASH_FIELD, value)
+        .map_err(|error| map_adapter_error(&error))?;
     if Hash::new(&normalized).is_ok() {
         Ok(normalized)
     } else {
-        Err(diagnostic(SnapshotDiagnosticCode::InvalidHash, None, HASH_FIELD.as_str()))
+        Err(diagnostic(
+            SnapshotDiagnosticCode::InvalidHash,
+            None,
+            HASH_FIELD.as_str(),
+        ))
     }
 }
 
@@ -928,7 +966,11 @@ fn rejected_plan(rejection: SnapshotRejection<'_>) -> SnapshotOperationPlan {
         operation: rejection.operation,
         target_snapshot_id: None,
         required_capability: None,
-        diagnostic: Some(diagnostic(rejection.code, rejection.snapshot_id, rejection.message)),
+        diagnostic: Some(diagnostic(
+            rejection.code,
+            rejection.snapshot_id,
+            rejection.message,
+        )),
     }
 }
 
@@ -948,7 +990,9 @@ fn rejected_from_error(
 
 fn map_adapter_error(error: &AdapterContractError) -> SnapshotDiagnostic {
     match error {
-        AdapterContractError::EmptyField { field } => diagnostic(SnapshotDiagnosticCode::EmptyField, None, field),
+        AdapterContractError::EmptyField { field } => {
+            diagnostic(SnapshotDiagnosticCode::EmptyField, None, field)
+        }
         AdapterContractError::FieldTooLong { field, .. } => {
             diagnostic(SnapshotDiagnosticCode::FieldTooLong, None, field)
         }
@@ -972,7 +1016,11 @@ fn map_adapter_error(error: &AdapterContractError) -> SnapshotDiagnostic {
     }
 }
 
-fn diagnostic(code: SnapshotDiagnosticCode, snapshot_id: Option<&str>, message: &str) -> SnapshotDiagnostic {
+fn diagnostic(
+    code: SnapshotDiagnosticCode,
+    snapshot_id: Option<&str>,
+    message: &str,
+) -> SnapshotDiagnostic {
     SnapshotDiagnostic {
         code,
         snapshot_id: snapshot_id.map(Text::from),
@@ -1023,7 +1071,12 @@ mod tests {
     fn lineage() -> SnapshotLineage {
         validate_snapshot_lineage(&[
             record(SnapshotBackendKind::Jj, SNAPSHOT_ONE, None, HASH_A),
-            record(SnapshotBackendKind::Git, SNAPSHOT_TWO, Some(SNAPSHOT_ONE), HASH_A),
+            record(
+                SnapshotBackendKind::Git,
+                SNAPSHOT_TWO,
+                Some(SNAPSHOT_ONE),
+                HASH_A,
+            ),
         ])
         .unwrap()
     }
@@ -1046,7 +1099,10 @@ mod tests {
         assert_eq!(lineage.records().len(), 2);
         assert_eq!(lineage.records()[0].backend(), SnapshotBackendKind::Jj);
         assert_eq!(lineage.records()[1].backend(), SnapshotBackendKind::Git);
-        assert_eq!(lineage.records()[1].parent_snapshot_id(), Some(SNAPSHOT_ONE));
+        assert_eq!(
+            lineage.records()[1].parent_snapshot_id(),
+            Some(SNAPSHOT_ONE)
+        );
         assert!(lineage.diagnostics().is_empty());
         assert!(PROHIBITED_VCS_SNAPSHOT_EFFECTS.contains(&"autocommit"));
     }
@@ -1102,7 +1158,10 @@ mod tests {
         );
 
         assert_eq!(confirmed.status(), SnapshotPlanStatus::Ready);
-        assert_eq!(missing_confirmation.status(), SnapshotPlanStatus::ConfirmationRequired);
+        assert_eq!(
+            missing_confirmation.status(),
+            SnapshotPlanStatus::ConfirmationRequired
+        );
         assert_eq!(stale.status(), SnapshotPlanStatus::StaleSnapshot);
     }
 
@@ -1145,7 +1204,10 @@ mod tests {
         );
 
         assert_eq!(rejected.status(), SnapshotPlanStatus::Rejected);
-        assert_eq!(rejected.diagnostic().unwrap().code(), SnapshotDiagnosticCode::UnsafeMetadata);
+        assert_eq!(
+            rejected.diagnostic().unwrap().code(),
+            SnapshotDiagnosticCode::UnsafeMetadata
+        );
     }
 
     #[test]

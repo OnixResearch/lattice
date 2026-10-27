@@ -1,19 +1,8 @@
-use super::COMMAND_FIELD;
-use super::Collection;
-use super::ENDPOINT_FIELD;
-use super::HashInput;
-use super::ID_FIELD;
-use super::InteropError;
-use super::InteropOperationKind;
-use super::MIN_COUNT;
-use super::REDACTION_FIELD;
-use super::SESSION_FIELD;
-use super::STATUS_FIELD;
-use super::Text;
-use super::hash_parts;
-use super::required_text;
-use super::text_collection;
-use super::validate_hash;
+use super::{
+    COMMAND_FIELD, Collection, ENDPOINT_FIELD, HashInput, ID_FIELD, InteropError,
+    InteropOperationKind, MIN_COUNT, REDACTION_FIELD, SESSION_FIELD, STATUS_FIELD, Text,
+    hash_parts, required_text, text_collection, validate_hash,
+};
 
 /// Untrusted safe interop receipt metadata.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -133,7 +133,12 @@ impl Finding {
         disposition: Disposition,
         evidence_hash: &str,
     ) -> Self {
-        let id = super::hash_parts(&[super::HASH_SCHEMA, "finding", category.as_str(), evidence_hash]);
+        let id = super::hash_parts(&[
+            super::HASH_SCHEMA,
+            "finding",
+            category.as_str(),
+            evidence_hash,
+        ]);
         Self {
             id,
             category,
@@ -208,7 +213,10 @@ impl Report {
     /// [`super::scan_review_input`] for completed deterministic reports.
     #[must_use]
     pub fn unavailable(status: ScannerStatus) -> Self {
-        assert!(!status.is_complete(), "unavailable scan report must not use complete status");
+        assert!(
+            !status.is_complete(),
+            "unavailable scan report must not use complete status"
+        );
         Self {
             status,
             findings: super::Collection::new(),

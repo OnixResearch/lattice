@@ -1,5 +1,24 @@
-revision: bb8fb5f4a763f532df96b6e65407163ac668834e
-archive-blake3: 1492cc103aab54c9b5f9400b74cbbc623f3a8ab924197a9d4f47275876019e85
-ucan-revision: 277ab768eb532ac0c715a3bbff2a7dc37a702f11
-source: git@github.com:OnixResearch/basalt.git
-owner-grant: OnixResearch-owned source authorized for Lattice reuse
+name: basalt
+repository: ssh://git@github.com/OnixResearch/basalt.git
+revision: b34d6ac27ad396530fb799e79223acf71112ee0f
+paths:
+- .cairn
+- .cargo
+- .github
+- .gitignore
+- Cargo.lock
+- Cargo.toml
+- LICENSE
+- README.md
+- cairn-policy
+- contracts
+- docs
+- examples
+- flake.lock
+- flake.nix
+- research
+- rust-toolchain.toml
+- src
+- tests
+- tools
+- vendor

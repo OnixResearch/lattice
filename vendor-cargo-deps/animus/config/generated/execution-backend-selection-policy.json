@@ -1,0 +1,107 @@
+{
+  "class_policies": [
+    {
+      "admitted_requirements": [
+        "wasm_component",
+        "no_filesystem",
+        "read_only_filesystem",
+        "network_denied",
+        "in_process",
+        "no_terminal",
+        "no_peripheral",
+        "ephemeral",
+        "mediated_isolation"
+      ],
+      "class": "EmbeddedComponent"
+    },
+    {
+      "admitted_requirements": [
+        "wasm_component",
+        "native_binary",
+        "script_runtime",
+        "no_filesystem",
+        "read_only_filesystem",
+        "writable_workspace",
+        "network_denied",
+        "network_allowlisted",
+        "single_process",
+        "process_tree",
+        "no_terminal",
+        "pseudoterminal",
+        "no_peripheral",
+        "ephemeral",
+        "durable_workspace",
+        "guarded_process_isolation"
+      ],
+      "class": "GuardedLocalProcess"
+    },
+    {
+      "admitted_requirements": [
+        "wasm_component",
+        "native_binary",
+        "script_runtime",
+        "no_filesystem",
+        "read_only_filesystem",
+        "writable_workspace",
+        "network_denied",
+        "network_allowlisted",
+        "in_process",
+        "single_process",
+        "process_tree",
+        "no_terminal",
+        "pseudoterminal",
+        "no_peripheral",
+        "browser",
+        "host_device",
+        "ephemeral",
+        "durable_workspace",
+        "mediated_isolation",
+        "guarded_process_isolation",
+        "host_isolation"
+      ],
+      "class": "IsolatedHost"
+    },
+    {
+      "admitted_requirements": [
+        "wasm_component",
+        "native_binary",
+        "script_runtime",
+        "no_filesystem",
+        "read_only_filesystem",
+        "writable_workspace",
+        "network_denied",
+        "network_allowlisted",
+        "in_process",
+        "single_process",
+        "process_tree",
+        "no_terminal",
+        "pseudoterminal",
+        "no_peripheral",
+        "browser",
+        "host_device",
+        "ephemeral",
+        "durable_workspace",
+        "mediated_isolation",
+        "guarded_process_isolation",
+        "host_isolation"
+      ],
+      "class": "ExternalMachine"
+    }
+  ],
+  "deny_silent_fallback": true,
+  "non_claims": [
+    "not-backend-availability",
+    "not-sandbox-enforcement",
+    "not-work-completion",
+    "not-output-correctness"
+  ],
+  "policy_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "preference_order": [
+    "EmbeddedComponent",
+    "GuardedLocalProcess",
+    "IsolatedHost",
+    "ExternalMachine"
+  ],
+  "receipt_redaction": "metadata-only-v1",
+  "schema": "animus.execution-backend-selection.v1"
+}

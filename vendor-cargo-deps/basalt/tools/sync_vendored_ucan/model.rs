@@ -1,6 +1,6 @@
 use std::path::Path;
 
-pub(crate) const SOURCE_REVISION: &str = "277ab768eb532ac0c715a3bbff2a7dc37a702f11";
+pub(crate) const SOURCE_REVISION: &str = "3a2aa043068a82663cf72ec05ed5d56a7d65ecd5";
 pub(crate) const SNAPSHOT_SCHEMA: &str = "basalt.vendored-ucan.snapshot.v1";
 pub(crate) const DESTINATION_DIRECTORY: &str = "vendor/ucan";
 pub(crate) const REVISION_FILE: &str = "vendor/ucan-revision.txt";
@@ -37,6 +37,7 @@ pub(crate) const SOURCE_SELECTION: &[&str] = &[
     "docs/licensing.md",
     "docs/production-readiness.json",
     "docs/production-readiness.md",
+    "docs/holder-authorization-recheck.md",
     "docs/verified-boundaries.md",
     "src",
     "crates/ucan-core",
@@ -53,6 +54,9 @@ pub(crate) const REQUIRED_SNAPSHOT_PATHS: &[&str] = &[
     "src/lib.rs",
     "src/token.rs",
     "src/token/holder_invocation.rs",
+    "src/token/holder_invocation/recheck.rs",
+    "crates/ucan-core/src/holder_invocation/recheck.rs",
+    "docs/holder-authorization-recheck.md",
     "crates/ucan-core/Cargo.toml",
     "crates/ucan-core/LICENSE",
     "crates/ucan-core/src/lib.rs",

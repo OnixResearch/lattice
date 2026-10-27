@@ -7,11 +7,10 @@
 //! library core, UCAN validation, Nickel/Steel backend DTOs, and packaged
 //! policy helpers never depend on this module or open ambient paths.
 
-use std::fmt;
-use std::path::Path;
-
 use cap_std::ambient_authority;
 use cap_std::fs::Dir;
+use std::fmt;
+use std::path::Path;
 
 /// A capability root opened around an operator-declared policy input directory.
 pub struct PolicyRoot {
@@ -61,7 +60,8 @@ impl PolicyRoot {
     ///
     /// Returns [`FsError::OpenRoot`] when the declared root cannot be opened.
     pub fn open<P: AsRef<Path>>(root: P) -> Result<Self, FsError> {
-        let dir = Dir::open_ambient_dir(root.as_ref(), ambient_authority()).map_err(|_| FsError::OpenRoot)?;
+        let dir = Dir::open_ambient_dir(root.as_ref(), ambient_authority())
+            .map_err(|_| FsError::OpenRoot)?;
         Ok(Self { dir })
     }
 
@@ -84,7 +84,8 @@ impl OutputRoot {
     ///
     /// Returns [`FsError::OpenRoot`] when the declared root cannot be opened.
     pub fn open<P: AsRef<Path>>(root: P) -> Result<Self, FsError> {
-        let dir = Dir::open_ambient_dir(root.as_ref(), ambient_authority()).map_err(|_| FsError::OpenRoot)?;
+        let dir = Dir::open_ambient_dir(root.as_ref(), ambient_authority())
+            .map_err(|_| FsError::OpenRoot)?;
         Ok(Self { dir })
     }
 
@@ -96,7 +97,9 @@ impl OutputRoot {
     /// absolute, or [`FsError::Write`] when the write fails inside the root.
     pub fn write(&self, relative: &str, contents: &str) -> Result<(), FsError> {
         let path = safe_relative(relative)?;
-        self.dir.write(path, contents.as_bytes()).map_err(|_| FsError::Write)
+        self.dir
+            .write(path, contents.as_bytes())
+            .map_err(|_| FsError::Write)
     }
 }
 
@@ -117,7 +120,10 @@ fn safe_relative(relative: &str) -> Result<&Path, FsError> {
             depth -= 1;
         } else if matches!(component, std::path::Component::Normal(_)) {
             depth += 1;
-        } else if matches!(component, std::path::Component::Prefix(_) | std::path::Component::RootDir) {
+        } else if matches!(
+            component,
+            std::path::Component::Prefix(_) | std::path::Component::RootDir
+        ) {
             return Err(FsError::InvalidPath);
         }
     }
@@ -126,16 +132,16 @@ fn safe_relative(relative: &str) -> Result<&Path, FsError> {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-
     use super::*;
+    use std::fs;
 
     fn unique_dir(name: &str) -> std::path::PathBuf {
         let nanos = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("clock after epoch")
             .as_nanos();
-        let dir = std::env::temp_dir().join(format!("basalt-cap-{name}-{}_{nanos}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("basalt-cap-{name}-{}_{nanos}", std::process::id()));
         fs::create_dir_all(&dir).expect("fixture dir should create");
         dir
     }
@@ -146,7 +152,10 @@ mod tests {
         fs::write(dir.join("policy.json"), "{}").expect("policy fixture should write");
 
         let root = PolicyRoot::open(&dir).expect("root should open");
-        assert_eq!(root.read_policy("policy.json").expect("read inside root"), "{}");
+        assert_eq!(
+            root.read_policy("policy.json").expect("read inside root"),
+            "{}"
+        );
 
         fs::remove_dir_all(&dir).expect("fixture dir should clean up");
     }
@@ -156,8 +165,14 @@ mod tests {
         let dir = unique_dir("traversal");
         let root = PolicyRoot::open(&dir).expect("root should open");
 
-        assert_eq!(root.read_policy("../outside.json"), Err(FsError::InvalidPath));
-        assert_eq!(root.read_policy("a/../../outside.json"), Err(FsError::InvalidPath));
+        assert_eq!(
+            root.read_policy("../outside.json"),
+            Err(FsError::InvalidPath)
+        );
+        assert_eq!(
+            root.read_policy("a/../../outside.json"),
+            Err(FsError::InvalidPath)
+        );
 
         fs::remove_dir_all(&dir).expect("fixture dir should clean up");
     }
@@ -195,7 +210,8 @@ mod tests {
         let dir = unique_dir("write-ok");
         let root = OutputRoot::open(&dir).expect("root should open");
 
-        root.write("receipt.json", r#"{"ok":true}"#).expect("write inside root");
+        root.write("receipt.json", r#"{"ok":true}"#)
+            .expect("write inside root");
         let contents = fs::read_to_string(dir.join("receipt.json")).expect("written file readable");
         assert_eq!(contents, r#"{"ok":true}"#);
 

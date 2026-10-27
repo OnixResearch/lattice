@@ -106,6 +106,7 @@ const PROOF_REFERENCE_DIGEST_LEN: usize = blake3::OUT_LEN;
 const DEFAULT_MAX_PROOF_DEPTH: usize = 16;
 const DEFAULT_MAX_PROOF_COUNT: usize = 64;
 const DEFAULT_MAX_COMPACT_TOKEN_BYTES: usize = 64 * 1024;
+const ZERO_CLOCK_SKEW_TOLERANCE_SECONDS: u64 = 0;
 pub const ED25519_SECRET_KEY_BYTES: usize = verified_logic::ucan_signature::SECRET_KEY_LEN;
 pub const ED25519_PUBLIC_KEY_BYTES: usize = verified_logic::ucan_signature::PUBLIC_KEY_LEN;
 pub const ED25519_SIGNATURE_BYTES: usize = verified_logic::ucan_signature::SIGNATURE_LEN;
@@ -383,10 +384,25 @@ impl std::error::Error for KeyResolverError {}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProofStoreError {
-    MissingProof { reference: ProofReference },
-    Stale { reference: ProofReference, message: String },
-    Malformed { reference: ProofReference, message: String },
-    Backend { reference: ProofReference, message: String },
+    MissingProof {
+        reference: ProofReference,
+    },
+    Stale {
+        reference: ProofReference,
+        message: String,
+    },
+    Malformed {
+        reference: ProofReference,
+        message: String,
+    },
+    Backend {
+        reference: ProofReference,
+        message: String,
+    },
+    ReferenceMismatch {
+        expected: ProofReference,
+        actual: ProofReference,
+    },
 }
 
 impl fmt::Display for ProofStoreError {
@@ -401,6 +417,9 @@ impl fmt::Display for ProofStoreError {
             }
             Self::Backend { reference, message } => {
                 write!(formatter, "backend failed resolving proof {reference}: {message}")
+            }
+            Self::ReferenceMismatch { expected, actual } => {
+                write!(formatter, "resolved proof token {actual} does not match requested reference {expected}")
             }
         }
     }
@@ -813,7 +832,37 @@ impl CapabilitySet {
     ///
     /// Returns [`TokenError`] when core claim validation rejects the collection.
     pub fn new(capabilities: Vec<CapabilityDocument>) -> TokenResult<Self> {
-        let inputs = capability_inputs(capabilities.as_slice());
+        // All caveat input holders live in this block and are dropped after
+        // core claim validation, so no verification or issuance self-check
+        // allocation is leaked.
+        let caveat_holders: Vec<Vec<ucan_core::token::CaveatInput<'_>>> = capabilities
+            .iter()
+            .map(|capability| {
+                capability
+                    .caveats
+                    .iter()
+                    .map(|caveat| {
+                        ucan_core::token::CaveatInput::new(
+                            caveat.domain.as_str(),
+                            caveat.caveat_type.as_str(),
+                            caveat.key.as_str(),
+                            caveat.payload.as_slice(),
+                        )
+                    })
+                    .collect()
+            })
+            .collect();
+        let inputs: Vec<ucan_core::token::CapabilityInput<'_>> = capabilities
+            .iter()
+            .zip(caveat_holders.iter())
+            .map(|(capability, holders)| {
+                ucan_core::token::CapabilityInput::with_caveats(
+                    capability.resource.as_str(),
+                    capability.ability.as_str(),
+                    holders.as_slice(),
+                )
+            })
+            .collect();
         let empty_proofs: [ucan_core::token::ProofReferenceInput<'_>; 0] = [];
         let input = ucan_core::token::ClaimsInput {
             issuer_did: Some("did:key:z6Mkissuer"),
@@ -1405,6 +1454,16 @@ impl ProofToken<'_> {
 }
 
 /// Synchronous shell-owned proof store used by verification.
+///
+/// # Reference-binding contract
+///
+/// The token returned for a requested reference MUST be the token whose
+/// bounded-compact BLAKE3 digest equals that reference. `resolve_proof` MAY
+/// return `Ok` only for a matching token. The shell enforces the binding: it
+/// recomputes the digest of every returned token and rejects a mismatch with a
+/// deterministic [`ProofStoreError::ReferenceMismatch`] before the token is
+/// used in delegation evaluation. The built-in [`ProofCollection`] selects
+/// tokens by digest equality, so it satisfies the binding by construction.
 pub trait ProofStore {
     /// Resolve a compact proof token by its proof reference.
     ///
@@ -1413,6 +1472,9 @@ pub trait ProofStore {
     /// Returns [`ProofStoreError`] when the proof is missing, stale, malformed,
     /// or the store backend fails. The returned value must borrow secure storage
     /// or own a zeroizing compact token.
+    ///
+    /// The returned token must match the requested reference by digest. The
+    /// shell recomputes the digest and enforces the mismatch rejection.
     fn resolve_proof<'a>(&'a self, reference: &ProofReference) -> std::result::Result<ProofToken<'a>, ProofStoreError>;
 }
 
@@ -1585,6 +1647,7 @@ pub struct VerificationLimits {
     proof_depth_limit: usize,
     proof_count_limit: usize,
     compact_token_byte_limit: usize,
+    clock_skew_tolerance_seconds: u64,
 }
 
 impl VerificationLimits {
@@ -1594,7 +1657,32 @@ impl VerificationLimits {
             proof_depth_limit: max_proof_depth,
             proof_count_limit: max_proof_count,
             compact_token_byte_limit: max_compact_token_bytes,
+            clock_skew_tolerance_seconds: crate::verified::DEFAULT_CLOCK_SKEW_SECONDS,
         }
+    }
+
+    /// Build strict zero-tolerance limits with the default resource bounds.
+    #[must_use]
+    pub const fn strict() -> Self {
+        Self {
+            proof_depth_limit: DEFAULT_MAX_PROOF_DEPTH,
+            proof_count_limit: DEFAULT_MAX_PROOF_COUNT,
+            compact_token_byte_limit: DEFAULT_MAX_COMPACT_TOKEN_BYTES,
+            clock_skew_tolerance_seconds: ZERO_CLOCK_SKEW_TOLERANCE_SECONDS,
+        }
+    }
+
+    /// Select a clock-skew tolerance in seconds for this verification.
+    #[must_use]
+    pub const fn with_clock_skew_tolerance_seconds(mut self, seconds: u64) -> Self {
+        self.clock_skew_tolerance_seconds = seconds;
+        self
+    }
+
+    /// Return the clock-skew tolerance in seconds used by every gate.
+    #[must_use]
+    pub const fn clock_skew_tolerance_seconds(self) -> u64 {
+        self.clock_skew_tolerance_seconds
     }
 
     #[must_use]
@@ -2438,6 +2526,16 @@ impl VerifiedToken {
         &self.proofs
     }
 
+    /// Nominal protocol profile that produced this verified token.
+    ///
+    /// The three-part compact Ed25519 token is always bound to the local
+    /// `onix-compact-ed25519-v1` profile. It is never labeled as final UCAN
+    /// `1.0.0`.
+    #[must_use]
+    pub const fn protocol_profile(&self) -> crate::protocol_profile::ProtocolProfileId {
+        crate::protocol_profile::ProtocolProfileId::OnixCompactEd25519V1
+    }
+
     #[must_use]
     pub const fn effective_delegation(&self) -> &EffectiveDelegation {
         &self.effective
@@ -3040,7 +3138,7 @@ where
     V: RevocationChecker + ?Sized,
 {
     let token = signed.token;
-    validate_envelope_for_token(&token, time)?;
+    validate_envelope_for_token(&token, time, limits)?;
     let issuer = IssuerDid::new(token.claims.issuer_did().to_owned())?;
     let audience = AudienceDid::new(token.claims.audience_did().to_owned())?;
     let capabilities = claims_capability_set(&token.claims)?;
@@ -3166,6 +3264,7 @@ where
         };
         let proof_text = proof.as_str();
         enforce_compact_token_size(proof_text, limits)?;
+        bind_proof_to_reference(proof_text, reference)?;
         let parent = verify_compact_token_with_traversal(
             proof_text,
             time,
@@ -3179,6 +3278,19 @@ where
         parents.push(parent);
     }
     Ok(parents)
+}
+
+fn bind_proof_to_reference(token: &str, requested: &ProofReference) -> TokenResult<()> {
+    let actual = proof_reference_for_bounded_token(token);
+    if actual.as_bytes() != requested.as_bytes() {
+        return Err(TokenError::ProofStore {
+            source: ProofStoreError::ReferenceMismatch {
+                expected: requested.clone(),
+                actual,
+            },
+        });
+    }
+    Ok(())
 }
 
 fn verify_child_is_linked_to_parent_audience(child_issuer: &IssuerDid, parents: &[VerifiedToken]) -> TokenResult<()> {
@@ -3392,7 +3504,7 @@ fn verify_live_dag_proof_transcript(
         resource: target_capability.resource.clone(),
         ability: target_capability.ability.clone(),
         now_seconds: time.as_unix_seconds(),
-        tolerance_seconds: 0,
+        tolerance_seconds: limits.clock_skew_tolerance_seconds(),
     };
     let bridge_transcript = VerifiedProofTraversalDagTranscript {
         entries: transcript.entries.clone(),
@@ -3455,9 +3567,13 @@ fn direct_proof_references(
     Ok(ProofReferences::from_references(references))
 }
 
-fn validate_envelope_for_token(token: &StructurallyValidToken<'_>, time: VerificationTime) -> TokenResult<()> {
+fn validate_envelope_for_token(
+    token: &StructurallyValidToken<'_>,
+    time: VerificationTime,
+    limits: VerificationLimits,
+) -> TokenResult<()> {
     let envelope = token_envelope(token)?;
-    validate_token_envelope(&envelope, true, time.as_unix_seconds())
+    validate_token_envelope(&envelope, true, time.as_unix_seconds(), limits.clock_skew_tolerance_seconds())
         .map_err(|error| map_envelope_error(error, token.claims.issuer_did()))
 }
 
@@ -4252,31 +4368,6 @@ fn proof_reference_inputs(references: &[Vec<u8>]) -> Vec<ucan_core::token::Proof
         .collect()
 }
 
-fn capability_inputs(capabilities: &[CapabilityDocument]) -> Vec<ucan_core::token::CapabilityInput<'_>> {
-    capabilities
-        .iter()
-        .map(|capability| {
-            let caveats: Vec<ucan_core::token::CaveatInput<'_>> = capability
-                .caveats
-                .iter()
-                .map(|caveat| {
-                    ucan_core::token::CaveatInput::new(
-                        caveat.domain.as_str(),
-                        caveat.caveat_type.as_str(),
-                        caveat.key.as_str(),
-                        caveat.payload.as_slice(),
-                    )
-                })
-                .collect();
-            ucan_core::token::CapabilityInput::with_caveats(
-                capability.resource.as_str(),
-                capability.ability.as_str(),
-                caveats.leak(),
-            )
-        })
-        .collect()
-}
-
 fn copy_secret_key(bytes: &[u8]) -> TokenResult<[u8; ED25519_SECRET_KEY_BYTES]> {
     bytes.try_into().map_err(|_| TokenError::InvalidSecretKeyLength { actual: bytes.len() })
 }
@@ -4287,7 +4378,53 @@ fn copy_public_key(bytes: &[u8]) -> TokenResult<[u8; ED25519_PUBLIC_KEY_BYTES]> 
 
 #[cfg(test)]
 mod tests {
+    use std::alloc::GlobalAlloc;
+    use std::alloc::Layout;
     use std::cell::RefCell;
+    use std::sync::atomic::AtomicIsize;
+    use std::sync::atomic::Ordering;
+
+    static LIVE_ALLOCATED_BYTES: AtomicIsize = AtomicIsize::new(0);
+
+    struct CountingAllocator;
+
+    #[
+        allow(
+            unsafe_code, // test-only wrapper around the system allocator for leak accounting
+            clippy::cast_possible_wrap // usize layout sizes are far below isize::MAX on 64-bit test hosts
+        )
+    ]
+    unsafe impl GlobalAlloc for CountingAllocator {
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            LIVE_ALLOCATED_BYTES.fetch_add(layout.size() as isize, Ordering::Relaxed);
+            // SAFETY: delegated to the system allocator with a validated layout.
+            unsafe { std::alloc::System.alloc(layout) }
+        }
+
+        unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+            LIVE_ALLOCATED_BYTES.fetch_sub(layout.size() as isize, Ordering::Relaxed);
+            // SAFETY: delegated to the system allocator with the matching layout.
+            unsafe { std::alloc::System.dealloc(ptr, layout) }
+        }
+
+        unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+            let new_layout = Layout::from_size_align(new_size, layout.align()).unwrap_or(layout);
+            let new_ptr = unsafe { std::alloc::System.alloc(new_layout) };
+            if new_ptr.is_null() {
+                return new_ptr;
+            }
+            let copy_len = usize::min(layout.size(), new_size);
+            unsafe {
+                std::ptr::copy_nonoverlapping(ptr, new_ptr, copy_len);
+                std::alloc::System.dealloc(ptr, layout);
+            }
+            LIVE_ALLOCATED_BYTES.fetch_add((new_size as isize) - (layout.size() as isize), Ordering::Relaxed);
+            new_ptr
+        }
+    }
+
+    #[global_allocator]
+    static TEST_ALLOCATOR: CountingAllocator = CountingAllocator;
     use std::collections::HashSet;
     use std::io::Write as _;
 
@@ -5550,6 +5687,27 @@ mod tests {
     }
 
     #[test]
+    fn verified_token_reports_local_compact_protocol_profile() {
+        let verified = verified_child_token();
+        let profile = verified.protocol_profile();
+        assert_eq!(profile.as_str(), crate::protocol_profile::ONIX_COMPACT_ED25519_V1);
+        assert_ne!(profile.as_str(), crate::protocol_profile::UCAN_WG_1_0_0);
+    }
+
+    #[test]
+    fn dagcbor_style_input_fails_compact_parse_without_dispatch() {
+        let issuer_key = signing_key(ISSUER_SECRET_BYTE);
+        let context = verification_context(vec![&issuer_key], ProofCollection::empty(), VERIFICATION_TIME_SECONDS);
+        for dagcbor_style in ["", "cid:v1:dag-cbor:Qm....", "header.payload"] {
+            let result = super::verify_compact_token_str(dagcbor_style, &context);
+            assert!(
+                result.is_err(),
+                "UCAN 1.0.0-style input {dagcbor_style:?} must fail the compact parser without profile dispatch"
+            );
+        }
+    }
+
+    #[test]
     fn multi_parent_delegation_emits_verified_dag_proof_transcript() {
         let storage_parent_key = signing_key(ISSUER_SECRET_BYTE);
         let audit_parent_key = signing_key(OTHER_SECRET_BYTE);
@@ -5803,6 +5961,308 @@ mod tests {
         assert!(matches!(error, TokenError::Temporal { .. }));
     }
 
+    const BOUNDARY_ISSUER_BYTE: u8 = 23;
+    const BOUNDARY_AUDIENCE_BYTE: u8 = 29;
+    const BOUNDARY_NOT_BEFORE_SECONDS: u64 = 1_000;
+    const BOUNDARY_EXPIRES_AT_SECONDS: u64 = 1_200;
+    const CLOCK_SKEW_GRACE_SECONDS: u64 = crate::verified::DEFAULT_CLOCK_SKEW_SECONDS;
+
+    fn boundary_scope_token() -> CompactToken {
+        let key = signing_key(BOUNDARY_ISSUER_BYTE);
+        let audience = signing_key(BOUNDARY_AUDIENCE_BYTE).issuer().expect("audience should derive");
+        let request = IssueRequest::new(
+            key,
+            AudienceDid::from(audience),
+            capabilities("did:key:z6Mkresource", "store/*"),
+            ProofCollection::empty().into(),
+            TokenTimeBounds::new(BOUNDARY_NOT_BEFORE_SECONDS, BOUNDARY_EXPIRES_AT_SECONDS)
+                .expect("bounds should validate"),
+        );
+        issue_token(&request).expect("token should issue")
+    }
+
+    fn boundary_scope_keys() -> KeyResolutionContext {
+        KeyResolutionContext::new(vec![
+            Ed25519VerificationKey::from_signing_key(&signing_key(BOUNDARY_ISSUER_BYTE)).expect("key should derive"),
+        ])
+    }
+
+    #[test]
+    fn clock_skew_default_grace_admits_documented_boundaries() {
+        let token = boundary_scope_token();
+        let keys = boundary_scope_keys();
+        for at in [
+            BOUNDARY_NOT_BEFORE_SECONDS - 1,
+            BOUNDARY_NOT_BEFORE_SECONDS,
+            BOUNDARY_EXPIRES_AT_SECONDS,
+            BOUNDARY_EXPIRES_AT_SECONDS + CLOCK_SKEW_GRACE_SECONDS,
+        ] {
+            let result = super::verify_compact_token_with_resolvers(
+                &token,
+                VerificationTime::from_unix_seconds(at),
+                &keys,
+                &ProofCollection::empty(),
+                VerificationLimits::default(),
+            );
+            assert!(result.is_ok(), "default surface must admit the in-grace boundary time {at}");
+        }
+    }
+
+    #[test]
+    fn clock_skew_out_of_grace_reports_temporal_error() {
+        let token = boundary_scope_token();
+        let keys = boundary_scope_keys();
+        for at in [
+            BOUNDARY_NOT_BEFORE_SECONDS - CLOCK_SKEW_GRACE_SECONDS - 1,
+            BOUNDARY_EXPIRES_AT_SECONDS + CLOCK_SKEW_GRACE_SECONDS + 1,
+        ] {
+            let error = super::verify_compact_token_with_resolvers(
+                &token,
+                VerificationTime::from_unix_seconds(at),
+                &keys,
+                &ProofCollection::empty(),
+                VerificationLimits::default(),
+            )
+            .expect_err("out-of-grace time must be rejected");
+            assert!(
+                matches!(error, TokenError::Temporal { .. }),
+                "boundary time {at} must fail as a temporal error, got {error:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn clock_skew_strict_opt_in_rejects_in_grace_token() {
+        let token = boundary_scope_token();
+        let keys = boundary_scope_keys();
+        let at = BOUNDARY_EXPIRES_AT_SECONDS + 50;
+
+        let default_result = super::verify_compact_token_with_resolvers(
+            &token,
+            VerificationTime::from_unix_seconds(at),
+            &keys,
+            &ProofCollection::empty(),
+            VerificationLimits::default(),
+        );
+        assert!(default_result.is_ok(), "default surface must remain lenient at {at}");
+
+        let strict_error = super::verify_compact_token_with_resolvers(
+            &token,
+            VerificationTime::from_unix_seconds(at),
+            &keys,
+            &ProofCollection::empty(),
+            VerificationLimits::strict(),
+        )
+        .expect_err("strict surface must reject an in-grace token");
+        assert!(matches!(strict_error, TokenError::Temporal { .. }));
+    }
+
+    const LEAK_REGRESSION_ISSUER_BYTE: u8 = 31;
+    const LEAK_REGRESSION_AUDIENCE_BYTE: u8 = 37;
+    const LARGE_CAVEAT_PAYLOAD_BYTES: usize = 4_096;
+    const REPEATED_VERIFICATION_COUNT: usize = 4_096;
+    const REPEATED_MULTI_PARENT_VERIFICATION_COUNT: usize = 1_024;
+    const REPEATED_ISSUANCE_COUNT: usize = 1_024;
+    const MAX_RETAINED_GROWTH_BYTES: isize = 64 * 1024;
+
+    fn retained_allocator_bytes() -> isize {
+        LIVE_ALLOCATED_BYTES.load(Ordering::Relaxed)
+    }
+
+    fn assert_repeated_verification_retains_bounded_memory(
+        label: &str,
+        token: &CompactToken,
+        context: &VerificationContext,
+        repetitions: usize,
+    ) {
+        for _ in 0..3 {
+            verify_compact_token(token, context).expect("token should verify");
+        }
+        let before = retained_allocator_bytes();
+        for _ in 0..repetitions {
+            verify_compact_token(token, context).expect("token should verify");
+        }
+        let growth = retained_allocator_bytes() - before;
+        assert!(
+            growth <= MAX_RETAINED_GROWTH_BYTES,
+            "{label}: retained memory grew {growth} bytes across {repetitions} verifications; the leak-free bound is {MAX_RETAINED_GROWTH_BYTES}"
+        );
+    }
+
+    #[test]
+    fn repeated_caveated_verification_retains_bounded_memory() {
+        let issuer_key = signing_key(LEAK_REGRESSION_ISSUER_BYTE);
+        let audience = signing_key(LEAK_REGRESSION_AUDIENCE_BYTE).issuer().expect("audience should derive");
+        let token = issue_token(&issue_request_with_caveat(
+            &issuer_key,
+            AudienceDid::from(audience),
+            ProofCollection::empty(),
+            caveat("rate", "limit", "quota", &[b'x'; LARGE_CAVEAT_PAYLOAD_BYTES]),
+        ))
+        .expect("caveated token should issue");
+        let context = VerificationContext::new(
+            VerificationTime::from_unix_seconds(VERIFICATION_TIME_SECONDS),
+            KeyResolutionContext::new(vec![
+                Ed25519VerificationKey::from_signing_key(&issuer_key).expect("key should derive"),
+            ]),
+            ProofCollection::empty(),
+        );
+
+        assert_repeated_verification_retains_bounded_memory(
+            "caveated verification",
+            &token,
+            &context,
+            REPEATED_VERIFICATION_COUNT,
+        );
+    }
+
+    #[test]
+    fn repeated_caveat_free_verification_retains_bounded_memory() {
+        let issuer_key = signing_key(LEAK_REGRESSION_ISSUER_BYTE);
+        let audience = signing_key(LEAK_REGRESSION_AUDIENCE_BYTE).issuer().expect("audience should derive");
+        let token = issue_token(&issue_request(&issuer_key, AudienceDid::from(audience), ProofCollection::empty()))
+            .expect("token should issue");
+        let context = VerificationContext::new(
+            VerificationTime::from_unix_seconds(VERIFICATION_TIME_SECONDS),
+            KeyResolutionContext::new(vec![
+                Ed25519VerificationKey::from_signing_key(&issuer_key).expect("key should derive"),
+            ]),
+            ProofCollection::empty(),
+        );
+
+        assert_repeated_verification_retains_bounded_memory(
+            "caveat-free verification",
+            &token,
+            &context,
+            REPEATED_VERIFICATION_COUNT,
+        );
+    }
+
+    #[test]
+    fn repeated_single_parent_traversal_retains_bounded_memory() {
+        let parent_key = signing_key(LEAK_REGRESSION_ISSUER_BYTE);
+        let child_key = signing_key(LEAK_REGRESSION_AUDIENCE_BYTE);
+        let child_issuer = child_key.issuer().expect("child issuer should derive");
+        let shared_caveat = caveat("rate", "limit", "quota", &[b'x'; LARGE_CAVEAT_PAYLOAD_BYTES]);
+        let parent = issue_token(&issue_request_with_caveat(
+            &parent_key,
+            AudienceDid::from(child_issuer),
+            ProofCollection::empty(),
+            shared_caveat.clone(),
+        ))
+        .expect("parent should issue");
+        let child = issue_token(&child_request_with_caveat(&child_key, parent.clone(), shared_caveat))
+            .expect("child should issue");
+        let context = verification_context(
+            vec![&parent_key, &child_key],
+            ProofCollection::from_tokens(vec![parent]),
+            VERIFICATION_TIME_SECONDS,
+        );
+
+        assert_repeated_verification_retains_bounded_memory(
+            "single-parent traversal",
+            &child,
+            &context,
+            REPEATED_VERIFICATION_COUNT,
+        );
+    }
+
+    #[test]
+    fn repeated_multi_parent_traversal_retains_bounded_memory() {
+        let storage_parent_key = signing_key(LEAK_REGRESSION_ISSUER_BYTE);
+        let audit_parent_key = signing_key(LEAK_REGRESSION_AUDIENCE_BYTE);
+        let child_key = signing_key(CHILD_SECRET_BYTE);
+        let child_issuer = child_key.issuer().expect("child issuer should derive");
+        let shared_caveat = caveat("rate", "limit", "quota", &[b'x'; LARGE_CAVEAT_PAYLOAD_BYTES]);
+        let storage_parent = issue_token(&issue_request_with_caveat(
+            &storage_parent_key,
+            AudienceDid::from(child_issuer.clone()),
+            ProofCollection::empty(),
+            shared_caveat.clone(),
+        ))
+        .expect("first parent should issue");
+        let audit_parent = issue_token(&issue_request_with_caveat(
+            &audit_parent_key,
+            AudienceDid::from(child_issuer),
+            ProofCollection::empty(),
+            shared_caveat.clone(),
+        ))
+        .expect("second parent should issue");
+        let child = issue_token(&IssueRequest::new(
+            child_key.clone(),
+            AudienceDid::from(signing_key(OTHER_SECRET_BYTE).issuer().expect("audience should derive")),
+            CapabilitySet::new(vec![
+                CapabilityDocument::with_caveats(
+                    "did:key:z6Mkresource/photos".to_owned(),
+                    "store/add".to_owned(),
+                    vec![shared_caveat],
+                )
+                .expect("capability with caveat should validate"),
+            ])
+            .expect("capability set should validate"),
+            ProofCollection::from_tokens(vec![storage_parent.clone(), audit_parent.clone()]).into(),
+            TokenTimeBounds::new(CHILD_NOT_BEFORE_SECONDS, CHILD_EXPIRES_AT_SECONDS)
+                .expect("child bounds should validate"),
+        ))
+        .expect("child should issue");
+        let context = verification_context(
+            vec![&storage_parent_key, &audit_parent_key, &child_key],
+            ProofCollection::from_tokens(vec![storage_parent, audit_parent]),
+            VERIFICATION_TIME_SECONDS,
+        );
+
+        assert_repeated_verification_retains_bounded_memory(
+            "multi-parent traversal",
+            &child,
+            &context,
+            REPEATED_MULTI_PARENT_VERIFICATION_COUNT,
+        );
+    }
+
+    #[test]
+    fn repeated_caveated_issuance_retains_bounded_memory() {
+        let signed_issuer = in_memory_signer(LEAK_REGRESSION_ISSUER_BYTE);
+        let signed_audience_key = in_memory_signer(LEAK_REGRESSION_AUDIENCE_BYTE);
+        let auditor_did = AudienceDid::from(signed_audience_key.issuer().expect("audience should derive"));
+        let caps =
+            CapabilitySet::new(vec![
+                CapabilityDocument::with_caveats("did:key:z6Mkresource".to_owned(), "store/*".to_owned(), vec![
+                    caveat("rate", "limit", "quota", &[b'x'; LARGE_CAVEAT_PAYLOAD_BYTES]),
+                ])
+                .expect("capability with caveat should validate"),
+            ])
+            .expect("capability set should validate");
+        let mut last_token_reference = None;
+        for _ in 0..3 {
+            let token = super::issue_token_with_signer(
+                &signed_issuer,
+                &auditor_did,
+                &caps,
+                &super::ProofReferences::empty(),
+                token_time_bounds(),
+            )
+            .expect("token should issue");
+            last_token_reference = Some(proof_reference(&token));
+        }
+        let before = retained_allocator_bytes();
+        for _ in 0..REPEATED_ISSUANCE_COUNT {
+            let token = super::issue_token_with_signer(
+                &signed_issuer,
+                &auditor_did,
+                &caps,
+                &super::ProofReferences::empty(),
+                token_time_bounds(),
+            )
+            .expect("token should issue");
+            last_token_reference = Some(proof_reference(&token));
+        }
+        let growth = retained_allocator_bytes() - before;
+        assert!(
+            growth <= MAX_RETAINED_GROWTH_BYTES,
+            "caveated issuance: retained memory grew {growth} bytes across {REPEATED_ISSUANCE_COUNT} issuances; the leak-free bound is {MAX_RETAINED_GROWTH_BYTES}"
+        );
+        assert!(last_token_reference.is_some());
+    }
     #[test]
     fn self_delegation_is_rejected_directly_and_in_chain() {
         let key = signing_key(ISSUER_SECRET_BYTE);
@@ -6149,14 +6609,14 @@ mod tests {
     }
 
     #[test]
-    fn proof_store_cycle_is_rejected_by_trail_detection() {
+    fn substituting_proof_store_is_rejected_as_reference_mismatch() {
         let parent_key = signing_key(ISSUER_SECRET_BYTE);
         let child_key = signing_key(CHILD_SECRET_BYTE);
         let child_issuer = child_key.issuer().expect("child issuer should derive");
         let parent =
             issue_token(&issue_request(&parent_key, AudienceDid::from(child_issuer), ProofCollection::empty()))
                 .expect("parent should issue");
-        let child = issue_token(&child_request(&child_key, parent)).expect("child should issue");
+        let child = issue_token(&child_request(&child_key, parent.clone())).expect("child should issue");
         let keys = KeyResolutionContext::new(
             [&parent_key, &child_key]
                 .into_iter()
@@ -6164,7 +6624,7 @@ mod tests {
                 .collect::<Result<Vec<_>, _>>()
                 .expect("keys should derive"),
         );
-        let store = CyclicProofStore { token: child.clone() };
+        let store = SubstitutingProofStore { token: child.clone() };
         let error = super::verify_compact_token_with_resolvers(
             &child,
             VerificationTime::from_unix_seconds(VERIFICATION_TIME_SECONDS),
@@ -6172,9 +6632,59 @@ mod tests {
             &store,
             VerificationLimits::default(),
         )
-        .expect_err("proof cycle should fail");
+        .expect_err("a substituted proof token must fail the reference binding");
 
-        assert!(matches!(error, TokenError::ProofChain { .. }));
+        match error {
+            TokenError::ProofStore {
+                source: ProofStoreError::ReferenceMismatch { expected, actual },
+            } => {
+                assert_eq!(expected.as_bytes(), proof_reference(&parent).as_bytes());
+                assert_eq!(actual.as_bytes(), proof_reference(&child).as_bytes());
+            }
+            other => panic!("substitution must fail with ReferenceMismatch, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn reference_respecting_store_verifies_child_chain() {
+        let parent_key = signing_key(ISSUER_SECRET_BYTE);
+        let child_key = signing_key(CHILD_SECRET_BYTE);
+        let child_issuer = child_key.issuer().expect("child issuer should derive");
+        let parent =
+            issue_token(&issue_request(&parent_key, AudienceDid::from(child_issuer), ProofCollection::empty()))
+                .expect("parent should issue");
+        let child = issue_token(&child_request(&child_key, parent.clone())).expect("child should issue");
+        let keys = KeyResolutionContext::new(
+            [&parent_key, &child_key]
+                .into_iter()
+                .map(Ed25519VerificationKey::from_signing_key)
+                .collect::<Result<Vec<_>, _>>()
+                .expect("keys should derive"),
+        );
+        let store = ReferenceRespectingProofStore { token: parent };
+        let verified = super::verify_compact_token_with_resolvers(
+            &child,
+            VerificationTime::from_unix_seconds(VERIFICATION_TIME_SECONDS),
+            &keys,
+            &store,
+            VerificationLimits::default(),
+        )
+        .expect("a correctly resolved proof must verify");
+
+        assert_eq!(verified.issuer().as_str(), child_key.issuer().expect("child issuer should derive").as_str());
+    }
+
+    #[test]
+    fn reject_cycle_contains_repeated_proof_reference() {
+        let issuer_key = signing_key(ISSUER_SECRET_BYTE);
+        let audience = signing_key(AUDIENCE_SECRET_BYTE).issuer().expect("audience should derive");
+        let token = issue_token(&issue_request(&issuer_key, AudienceDid::from(audience), ProofCollection::empty()))
+            .expect("token should issue");
+        let reference = proof_reference(&token);
+        let token_text = token.as_str();
+
+        assert!(super::reject_cycle(token_text, &[reference]).is_err());
+        assert!(super::reject_cycle(token_text, &[]).is_ok());
     }
 
     const BACKEND_FAILURE_MESSAGE: &str = "backend unavailable";
@@ -6287,16 +6797,35 @@ mod tests {
         }
     }
 
-    struct CyclicProofStore {
+    struct SubstitutingProofStore {
         token: CompactToken,
     }
 
-    impl ProofStore for CyclicProofStore {
+    impl ProofStore for SubstitutingProofStore {
         fn resolve_proof<'a>(
             &'a self,
             _reference: &ProofReference,
         ) -> std::result::Result<ProofToken<'a>, ProofStoreError> {
             Ok(ProofToken::Borrowed(&self.token))
+        }
+    }
+
+    struct ReferenceRespectingProofStore {
+        token: CompactToken,
+    }
+
+    impl ProofStore for ReferenceRespectingProofStore {
+        fn resolve_proof<'a>(
+            &'a self,
+            reference: &ProofReference,
+        ) -> std::result::Result<ProofToken<'a>, ProofStoreError> {
+            if proof_reference(&self.token).as_bytes() == reference.as_bytes() {
+                Ok(ProofToken::Borrowed(&self.token))
+            } else {
+                Err(ProofStoreError::MissingProof {
+                    reference: reference.clone(),
+                })
+            }
         }
     }
 

@@ -4,59 +4,31 @@ pub(crate) mod evaluate;
 pub(crate) mod fixtures;
 pub(crate) mod services;
 
-pub(crate) use basalt::CapabilityGrant;
-pub(crate) use basalt::EnforcementRequest;
 pub(crate) use basalt::authority_core::default_authority_policy_ref;
-pub(crate) use basalt::default_policy;
-pub(crate) use basalt::ucan::AudienceDid;
-pub(crate) use basalt::ucan::CapabilityDocument;
-pub(crate) use basalt::ucan::CapabilitySet;
-pub(crate) use basalt::ucan::CaveatDecision;
-pub(crate) use basalt::ucan::CaveatDocument;
-pub(crate) use basalt::ucan::CaveatIdentifier;
-pub(crate) use basalt::ucan::CaveatPolicy;
-pub(crate) use basalt::ucan::CaveatPolicySet;
-pub(crate) use basalt::ucan::CompactToken;
-pub(crate) use basalt::ucan::ED25519_SECRET_KEY_BYTES;
-pub(crate) use basalt::ucan::Ed25519InMemorySigner;
-pub(crate) use basalt::ucan::Ed25519PublicKey;
-pub(crate) use basalt::ucan::HolderInvocationLimits;
-pub(crate) use basalt::ucan::HolderInvocationNonce;
-pub(crate) use basalt::ucan::HolderInvocationReplayAdmission;
-pub(crate) use basalt::ucan::HolderInvocationReplayCandidate;
-pub(crate) use basalt::ucan::HolderInvocationReplayError;
-pub(crate) use basalt::ucan::HolderInvocationSigningRequest;
-pub(crate) use basalt::ucan::IssuerDid;
-pub(crate) use basalt::ucan::KeyResolutionContext;
-pub(crate) use basalt::ucan::KeyResolver;
-pub(crate) use basalt::ucan::KeyResolverError;
-pub(crate) use basalt::ucan::NoRevocations;
-pub(crate) use basalt::ucan::OperationBinding;
-pub(crate) use basalt::ucan::OperationProfileId;
-pub(crate) use basalt::ucan::ProofCollection;
-pub(crate) use basalt::ucan::ProofReferences;
-pub(crate) use basalt::ucan::ProofStore;
-pub(crate) use basalt::ucan::RevocationChecker;
-pub(crate) use basalt::ucan::RevocationList;
-pub(crate) use basalt::ucan::SignerSignature;
-pub(crate) use basalt::ucan::TokenSigner;
-pub(crate) use basalt::ucan::TokenTimeBounds;
-pub(crate) use basalt::ucan::VerificationLimits;
-pub(crate) use basalt::ucan::VerificationTime;
+#[cfg(feature = "durable-authority")]
+pub(crate) use basalt::durable_authority::{
+    BasaltDurableAuthority, DurableAuthorityVerificationInputs,
+};
 pub(crate) use basalt::ucan::core::holder_invocation::HOLDER_INVOCATION_DIGEST_BYTES;
-pub(crate) use basalt::ucan::issue_token_with_signer;
-pub(crate) use basalt::ucan::proof_reference;
-pub(crate) use basalt::ucan::sign_holder_invocation;
 pub(crate) use basalt::ucan::token::DenyUnknownCaveats;
-pub(crate) use basalt::ucan_enforcement::EnforcementAction;
-pub(crate) use basalt::ucan_enforcement::LiveUcanEnforcement;
-pub(crate) use basalt::ucan_enforcement::UcanEnforcementBoundaries;
-pub(crate) use basalt::ucan_enforcement::UcanEnforcementFailure;
-pub(crate) use basalt::ucan_enforcement::UcanEnforcementReason;
-pub(crate) use basalt::ucan_enforcement::UcanEnforcementReceipt;
-pub(crate) use basalt::ucan_enforcement::UcanEnforcementRequest;
-pub(crate) use basalt::ucan_enforcement::bind_enforcement_action;
-pub(crate) use basalt::ucan_enforcement::verify_ucan_enforcement_request;
+pub(crate) use basalt::ucan::{
+    AudienceDid, CapabilityDocument, CapabilitySet, CaveatDecision, CaveatDocument,
+    CaveatIdentifier, CaveatPolicy, CaveatPolicySet, CompactToken, ED25519_SECRET_KEY_BYTES,
+    Ed25519InMemorySigner, Ed25519PublicKey, HolderInvocationLimits, HolderInvocationNonce,
+    HolderInvocationReplayAdmission, HolderInvocationReplayCandidate, HolderInvocationReplayError,
+    HolderInvocationSigningRequest, IssuerDid, KeyResolutionContext, KeyResolver, KeyResolverError,
+    NoRevocations, OperationBinding, OperationProfileId, ProofCollection, ProofReferences,
+    ProofStore, RevocationChecker, RevocationList, SignerSignature, TokenSigner, TokenTimeBounds,
+    VerificationLimits, VerificationTime, issue_token_with_signer, proof_reference,
+    sign_holder_invocation,
+};
+pub(crate) use basalt::ucan_enforcement::{
+    EnforcementAction, LiveUcanEnforcement, UcanEnforcementBoundaries, UcanEnforcementFailure,
+    UcanEnforcementReason, UcanEnforcementReceipt, UcanEnforcementRequest, bind_enforcement_action,
+    verify_ucan_enforcement_request,
+};
+pub(crate) use basalt::ucan_profile::BasaltUcanProtocolProfile;
+pub(crate) use basalt::{CapabilityGrant, EnforcementRequest, default_policy};
 pub(crate) use evaluate::*;
 pub(crate) use fixtures::*;
 pub(crate) use services::*;

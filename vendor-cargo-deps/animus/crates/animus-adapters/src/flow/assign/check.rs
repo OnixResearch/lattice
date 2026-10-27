@@ -1,6 +1,4 @@
-use super::RecipeParameterInput;
-use super::RecipeParameterInputKind;
-use super::Text;
+use super::{RecipeParameterInput, RecipeParameterInputKind, Text};
 
 pub(super) fn validate_input_for_parameter(
     parameter: &super::super::field::RecipeParameter,
@@ -33,6 +31,9 @@ pub(super) fn validate_input_for_parameter(
     Ok(())
 }
 
-pub(super) fn find_input<'a>(inputs: &'a [RecipeParameterInput], name: &str) -> Option<&'a RecipeParameterInput> {
+pub(super) fn find_input<'a>(
+    inputs: &'a [RecipeParameterInput],
+    name: &str,
+) -> Option<&'a RecipeParameterInput> {
     inputs.iter().find(|input| input.name() == name)
 }

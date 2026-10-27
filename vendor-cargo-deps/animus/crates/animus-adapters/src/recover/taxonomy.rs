@@ -2,6 +2,7 @@ const BACKEND_JJ: &str = "jj";
 const BACKEND_GIT: &str = "git";
 const BACKEND_MEMORY: &str = "in_memory";
 const BACKEND_WORKSPACE_ISOLATION: &str = "workspace_isolation";
+const BACKEND_OTHER: &str = "other";
 const BACKEND_UNSUPPORTED: &str = "unsupported";
 const OPERATION_CREATE: &str = "create";
 const OPERATION_LIST: &str = "list";
@@ -36,6 +37,8 @@ pub enum CheckpointBackendKind {
     InMemory,
     /// Workspace-isolation backend.
     WorkspaceIsolation,
+    /// Other host-owned VCS or checkpoint backend.
+    Other,
     /// Unsupported backend placeholder.
     Unsupported,
 }
@@ -45,13 +48,16 @@ impl CheckpointBackendKind {
     /// # Errors
     /// Returns [`super::CheckpointError`] when the value is empty, malformed, or unknown.
     pub fn parse(value: &str) -> Result<Self, super::CheckpointError> {
-        super::core::parse_enum(super::CHECKPOINT_BACKEND_FIELD, value, |normalized| match normalized {
-            BACKEND_JJ => Some(Self::Jj),
-            BACKEND_GIT => Some(Self::Git),
-            BACKEND_MEMORY => Some(Self::InMemory),
-            BACKEND_WORKSPACE_ISOLATION => Some(Self::WorkspaceIsolation),
-            BACKEND_UNSUPPORTED => Some(Self::Unsupported),
-            _ => None,
+        super::core::parse_enum(super::CHECKPOINT_BACKEND_FIELD, value, |normalized| {
+            match normalized {
+                BACKEND_JJ => Some(Self::Jj),
+                BACKEND_GIT => Some(Self::Git),
+                BACKEND_MEMORY => Some(Self::InMemory),
+                BACKEND_WORKSPACE_ISOLATION => Some(Self::WorkspaceIsolation),
+                BACKEND_OTHER => Some(Self::Other),
+                BACKEND_UNSUPPORTED => Some(Self::Unsupported),
+                _ => None,
+            }
         })
     }
 
@@ -63,6 +69,7 @@ impl CheckpointBackendKind {
             Self::Git => BACKEND_GIT,
             Self::InMemory => BACKEND_MEMORY,
             Self::WorkspaceIsolation => BACKEND_WORKSPACE_ISOLATION,
+            Self::Other => BACKEND_OTHER,
             Self::Unsupported => BACKEND_UNSUPPORTED,
         }
     }
@@ -88,13 +95,15 @@ impl CheckpointOperation {
     /// # Errors
     /// Returns [`super::CheckpointError`] when the value is empty, malformed, or unknown.
     pub fn parse(value: &str) -> Result<Self, super::CheckpointError> {
-        super::core::parse_enum(super::CHECKPOINT_OPERATION_FIELD, value, |normalized| match normalized {
-            OPERATION_CREATE => Some(Self::Create),
-            OPERATION_LIST => Some(Self::List),
-            OPERATION_INSPECT => Some(Self::Inspect),
-            OPERATION_ROLLBACK => Some(Self::Rollback),
-            OPERATION_CLEANUP => Some(Self::Cleanup),
-            _ => None,
+        super::core::parse_enum(super::CHECKPOINT_OPERATION_FIELD, value, |normalized| {
+            match normalized {
+                OPERATION_CREATE => Some(Self::Create),
+                OPERATION_LIST => Some(Self::List),
+                OPERATION_INSPECT => Some(Self::Inspect),
+                OPERATION_ROLLBACK => Some(Self::Rollback),
+                OPERATION_CLEANUP => Some(Self::Cleanup),
+                _ => None,
+            }
         })
     }
 
@@ -135,16 +144,20 @@ impl CheckpointStatus {
     /// # Errors
     /// Returns [`super::CheckpointError`] when the value is empty, malformed, or unknown.
     pub fn parse(value: &str) -> Result<Self, super::CheckpointError> {
-        super::core::parse_enum(super::CHECKPOINT_STATUS_FIELD, value, |normalized| match normalized {
-            STATUS_CREATED => Some(Self::Created),
-            STATUS_LISTED => Some(Self::Listed),
-            STATUS_INSPECTED => Some(Self::Inspected),
-            STATUS_ROLLED_BACK => Some(Self::RolledBack),
-            STATUS_BLOCKED => Some(Self::Blocked),
-            STATUS_FAILED => Some(Self::Failed),
-            STATUS_UNSUPPORTED => Some(Self::Unsupported),
-            _ => None,
-        })
+        super::core::parse_enum(
+            super::CHECKPOINT_STATUS_FIELD,
+            value,
+            |normalized| match normalized {
+                STATUS_CREATED => Some(Self::Created),
+                STATUS_LISTED => Some(Self::Listed),
+                STATUS_INSPECTED => Some(Self::Inspected),
+                STATUS_ROLLED_BACK => Some(Self::RolledBack),
+                STATUS_BLOCKED => Some(Self::Blocked),
+                STATUS_FAILED => Some(Self::Failed),
+                STATUS_UNSUPPORTED => Some(Self::Unsupported),
+                _ => None,
+            },
+        )
     }
 
     /// Returns the stable status label.
@@ -190,17 +203,19 @@ impl CheckpointFailureClass {
     /// # Errors
     /// Returns [`super::CheckpointError`] when the value is empty, malformed, or unknown.
     pub fn parse(value: &str) -> Result<Self, super::CheckpointError> {
-        super::core::parse_enum(super::CHECKPOINT_FAILURE_FIELD, value, |normalized| match normalized {
-            FAILURE_NONE => Some(Self::None),
-            FAILURE_MISSING_SERVICE => Some(Self::MissingService),
-            FAILURE_UNAVAILABLE => Some(Self::Unavailable),
-            FAILURE_DENIED => Some(Self::Denied),
-            FAILURE_UNSUPPORTED_OPERATION => Some(Self::UnsupportedOperation),
-            FAILURE_UNCONFIRMED_ROLLBACK => Some(Self::UnconfirmedRollback),
-            FAILURE_STALE_WORKSPACE => Some(Self::StaleWorkspace),
-            FAILURE_INVALID_METADATA => Some(Self::InvalidMetadata),
-            FAILURE_RECEIPT_LEAK => Some(Self::ReceiptLeak),
-            _ => None,
+        super::core::parse_enum(super::CHECKPOINT_FAILURE_FIELD, value, |normalized| {
+            match normalized {
+                FAILURE_NONE => Some(Self::None),
+                FAILURE_MISSING_SERVICE => Some(Self::MissingService),
+                FAILURE_UNAVAILABLE => Some(Self::Unavailable),
+                FAILURE_DENIED => Some(Self::Denied),
+                FAILURE_UNSUPPORTED_OPERATION => Some(Self::UnsupportedOperation),
+                FAILURE_UNCONFIRMED_ROLLBACK => Some(Self::UnconfirmedRollback),
+                FAILURE_STALE_WORKSPACE => Some(Self::StaleWorkspace),
+                FAILURE_INVALID_METADATA => Some(Self::InvalidMetadata),
+                FAILURE_RECEIPT_LEAK => Some(Self::ReceiptLeak),
+                _ => None,
+            }
         })
     }
 

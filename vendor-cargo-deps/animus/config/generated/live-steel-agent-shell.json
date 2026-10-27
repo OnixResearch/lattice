@@ -1,0 +1,125 @@
+{
+  "admitted_child_profiles": [
+    "focused-child"
+  ],
+  "admitted_operations": [
+    "context_read",
+    "subagent"
+  ],
+  "application_id": "animus-live-steel-agent",
+  "authority": {
+    "authorization_identity": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "component_identity": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "generation": 1,
+    "operation_identity": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "resource_identity": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "route_binding_identity": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "route_scope_identity": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "bounds": {
+    "max_allocation_bytes": 4194304,
+    "max_bindings": 64,
+    "max_bridge_evaluation_fuel": 1000000,
+    "max_bridge_nesting": 4,
+    "max_bridge_wall_time_ms": 300000,
+    "max_child_depth": 2,
+    "max_child_fan_out": 4,
+    "max_child_result_chars": 16384,
+    "max_child_status_checks": 8,
+    "max_child_tokens": 32000,
+    "max_child_wall_time_ms": 300000,
+    "max_context_bytes": 4096,
+    "max_context_lines": 64,
+    "max_cumulative_host_result_chars": 131072,
+    "max_definitions": 128,
+    "max_environment_chars": 65536,
+    "max_evaluation_fuel": 100000,
+    "max_file_read_bytes": 4096,
+    "max_host_calls_per_cell": 16,
+    "max_host_request_chars": 16384,
+    "max_host_result_chars": 32768,
+    "max_output_tokens": 64,
+    "max_provider_response_bytes": 65536,
+    "max_queue_items": 8,
+    "max_recursion_depth": 64,
+    "max_source_chars": 4096,
+    "max_tool_result_chars": 4096,
+    "provider_timeout_ms": 30000
+  },
+  "branch_id": "branch.main",
+  "command_profiles": [],
+  "components": {
+    "child_service": "animus-std:ConcreteChildSessionService",
+    "coding_session": "animus-std:CodingSessionHost",
+    "control": "animus-live-steel-agent:ExplicitRunControl",
+    "durable_store": "animus-std:durable-session-store",
+    "event_sink": "animus-live-steel-agent:MetadataEventSink",
+    "provider": "animus-std-openai:reqwest-tool-stream",
+    "receipt_sink": "animus-live-steel-agent:RunReceipt",
+    "resumable_bridge": "animus-runtime:execute_bridged_cell",
+    "rlm_executor": "animus-std-rlm-host:RlmHostExecutor",
+    "skill_loader": "animus-steel:load_skill_modules",
+    "steel_kernel": "animus-steel:SteelRlmKernel"
+  },
+  "evidence": {
+    "non_claims": [
+      "provider_correctness",
+      "tool_correctness",
+      "task_success",
+      "sandboxing",
+      "daemon_readiness",
+      "terminal_readiness",
+      "production_readiness",
+      "release_eligibility"
+    ],
+    "policy": "metadata-only",
+    "redaction_marker": "prompt-provider-tool-steel-host-child-credential-and-path-content-omitted"
+  },
+  "provider": {
+    "credential_reference": "brokered:injected-openai-api-key",
+    "endpoint_identity": "openai-responses",
+    "endpoint_url": "https://api.openai.com/v1/responses",
+    "model_id": "gpt-5-mini",
+    "provider_id": "openai",
+    "reasoning_effort": "low",
+    "tool_name": "steel_repl",
+    "tool_schema": "animus.steel-repl.v1"
+  },
+  "schema": "animus.live-steel-agent-shell.v1",
+  "selected_skills": [
+    {
+      "capabilities": [],
+      "exports": [
+        "live-shell-add-two"
+      ],
+      "frozen_source_identity": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "manifest_identity": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "max_evaluation_fuel": 1024,
+      "max_source_chars": 128,
+      "name": "live-shell-arithmetic",
+      "source_identity": "6ef8723a0b0594885ef0a0f49d8a58827e58b0166746b370f1505c8a5afe31cc",
+      "version": "v1"
+    }
+  ],
+  "services": {
+    "child": "child-service.live-steel-agent",
+    "context": "context-service.explicit-map",
+    "control": "control-service.explicit-cancellation",
+    "events": "event-service.metadata-only",
+    "receipts": "receipt-service.metadata-only"
+  },
+  "session_identity": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "store": {
+    "capability_label": "capability.live-steel-agent-store-root",
+    "durability": "sync_all_each_commit",
+    "kernel_journal": "live-kernel.log",
+    "kernel_lock": "live-kernel.lock",
+    "locking": "exclusive_create_new",
+    "privacy": "replay_private",
+    "session_journal": "live-session.log",
+    "session_lock": "live-session.lock"
+  },
+  "tool_bindings": [
+    "steel_repl:animus.steel-repl.v1"
+  ]
+}

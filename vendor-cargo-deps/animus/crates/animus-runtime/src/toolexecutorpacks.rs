@@ -262,7 +262,10 @@ pub fn run_fake_executor(
         issues.push(ExecutorIssue::UnboundedOutput);
     }
     if let Some(reference) = &output.unsafe_reference {
-        if UNSAFE_MARKERS.iter().any(|marker| reference.contains(marker)) {
+        if UNSAFE_MARKERS
+            .iter()
+            .any(|marker| reference.contains(marker))
+        {
             issues.push(ExecutorIssue::UnsafeReference);
         }
     }
@@ -363,7 +366,11 @@ fn append_result(result: ExecutorResult<()>, issues: &mut Vec<ExecutorIssue>) {
 
 fn result_from_issues<T>(issues: Vec<ExecutorIssue>, value: T) -> ExecutorResult<T> {
     let issues = sorted_issues(issues);
-    if issues.is_empty() { Ok(value) } else { Err(issues) }
+    if issues.is_empty() {
+        Ok(value)
+    } else {
+        Err(issues)
+    }
 }
 
 fn sorted_issues(mut issues: Vec<ExecutorIssue>) -> Vec<ExecutorIssue> {
@@ -406,7 +413,10 @@ mod tests {
         // r[verify agent_harness_runtime.tool_executor_packs.descriptor]
         // r[verify agent_harness_runtime.tool_executor_packs.admission]
         // r[verify agent_harness_runtime.tool_executor_packs.fake_executors]
-        let request = request(Some(pack(ToolApprovalState::Approved, ExecutorReadiness::Ready)));
+        let request = request(Some(pack(
+            ToolApprovalState::Approved,
+            ExecutorReadiness::Ready,
+        )));
         let output = FakeExecutorOutput {
             output_summary: OUTPUT_SUMMARY.to_owned(),
             output_bytes: OUTPUT_BYTES,
@@ -427,31 +437,70 @@ mod tests {
         // r[verify agent_harness_runtime.tool_executor_packs.receipts]
         // r[verify agent_harness_runtime.tool_executor_packs.verification]
         let mut missing = request(None);
-        assert!(admit_tool_dispatch(&missing).expect_err("missing").contains(&ExecutorIssue::MissingExecutor));
+        assert!(
+            admit_tool_dispatch(&missing)
+                .expect_err("missing")
+                .contains(&ExecutorIssue::MissingExecutor)
+        );
 
         missing.pack = Some(pack(ToolApprovalState::Approved, ExecutorReadiness::Ready));
         missing.requested_capability = "tool.write".to_owned();
-        assert!(admit_tool_dispatch(&missing).expect_err("capability").contains(&ExecutorIssue::CapabilityGap));
+        assert!(
+            admit_tool_dispatch(&missing)
+                .expect_err("capability")
+                .contains(&ExecutorIssue::CapabilityGap)
+        );
 
-        let denied = request(Some(pack(ToolApprovalState::Denied, ExecutorReadiness::Ready)));
-        assert!(admit_tool_dispatch(&denied).expect_err("approval").contains(&ExecutorIssue::DeniedApproval));
+        let denied = request(Some(pack(
+            ToolApprovalState::Denied,
+            ExecutorReadiness::Ready,
+        )));
+        assert!(
+            admit_tool_dispatch(&denied)
+                .expect_err("approval")
+                .contains(&ExecutorIssue::DeniedApproval)
+        );
 
-        let mut mutating = request(Some(pack(ToolApprovalState::Approved, ExecutorReadiness::Ready)));
+        let mut mutating = request(Some(pack(
+            ToolApprovalState::Approved,
+            ExecutorReadiness::Ready,
+        )));
         mutating.mutating = true;
-        assert!(admit_tool_dispatch(&mutating).expect_err("mutation").contains(&ExecutorIssue::MutationConflict));
+        assert!(
+            admit_tool_dispatch(&mutating)
+                .expect_err("mutation")
+                .contains(&ExecutorIssue::MutationConflict)
+        );
     }
 
     #[test]
     fn fake_executor_rejects_malformed_unbounded_timeout_cancel_and_leaks() {
         // r[verify agent_harness_runtime.tool_executor_packs.receipts.unsafe_reference]
         // r[verify agent_harness_runtime.tool_executor_packs.docs]
-        let timed_out = request(Some(pack(ToolApprovalState::Approved, ExecutorReadiness::TimedOut)));
-        assert!(admit_tool_dispatch(&timed_out).expect_err("timeout").contains(&ExecutorIssue::TimedOut));
+        let timed_out = request(Some(pack(
+            ToolApprovalState::Approved,
+            ExecutorReadiness::TimedOut,
+        )));
+        assert!(
+            admit_tool_dispatch(&timed_out)
+                .expect_err("timeout")
+                .contains(&ExecutorIssue::TimedOut)
+        );
 
-        let cancelled = request(Some(pack(ToolApprovalState::Approved, ExecutorReadiness::Cancelled)));
-        assert!(admit_tool_dispatch(&cancelled).expect_err("cancelled").contains(&ExecutorIssue::Cancelled));
+        let cancelled = request(Some(pack(
+            ToolApprovalState::Approved,
+            ExecutorReadiness::Cancelled,
+        )));
+        assert!(
+            admit_tool_dispatch(&cancelled)
+                .expect_err("cancelled")
+                .contains(&ExecutorIssue::Cancelled)
+        );
 
-        let request = request(Some(pack(ToolApprovalState::Approved, ExecutorReadiness::Ready)));
+        let request = request(Some(pack(
+            ToolApprovalState::Approved,
+            ExecutorReadiness::Ready,
+        )));
         let bad = FakeExecutorOutput {
             output_summary: "RAW_TOOL_OUTPUT:body".to_owned(),
             output_bytes: MAX_OUTPUT_BYTES + MIN_COUNT,
@@ -476,7 +525,11 @@ mod tests {
             receipt_hash: String::new(),
         };
         receipt.receipt_hash = receipt_hash(&receipt);
-        assert!(validate_executor_receipt(&receipt).expect_err("receipt leak").contains(&ExecutorIssue::ReceiptLeak));
+        assert!(
+            validate_executor_receipt(&receipt)
+                .expect_err("receipt leak")
+                .contains(&ExecutorIssue::ReceiptLeak)
+        );
     }
 
     fn definition() -> ToolDefinitionMetadata {

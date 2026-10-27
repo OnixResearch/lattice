@@ -197,7 +197,10 @@ pub fn validate_session_record(record: &SafeSessionRecord) -> PersistenceResult<
         issues.push(PersistenceIssue::UnsafeRecord);
     }
     if let Some(marker) = &record.leak_marker {
-        if UNSAFE_MARKERS.iter().any(|unsafe_marker| marker.contains(unsafe_marker)) {
+        if UNSAFE_MARKERS
+            .iter()
+            .any(|unsafe_marker| marker.contains(unsafe_marker))
+        {
             issues.push(PersistenceIssue::LeakRejected);
         }
     }
@@ -232,7 +235,9 @@ pub fn replay_fake_session(
     admit_persistence(admission)?;
     let filtered = records_for_scope(admission, state)?;
     validate_replay_sequence(&filtered)?;
-    let terminal_status = filtered.last().map_or(SessionRecordStatus::Active, |record| record.status_class);
+    let terminal_status = filtered
+        .last()
+        .map_or(SessionRecordStatus::Active, |record| record.status_class);
     Ok(ReplaySummary {
         session_id: admission.session_id.clone(),
         branch_id: admission.branch_id.clone(),
@@ -568,8 +573,12 @@ pub fn plan_ledger_replay(
         return Err(vec![LedgerSessionIssue::ReplayGap]);
     }
 
-    let sequence_start = projections.first().map_or(FIRST_LEDGER_SEQUENCE, |projection| projection.sequence);
-    let sequence_end = projections.last().map_or(sequence_start, |projection| projection.sequence);
+    let sequence_start = projections
+        .first()
+        .map_or(FIRST_LEDGER_SEQUENCE, |projection| projection.sequence);
+    let sequence_end = projections
+        .last()
+        .map_or(sequence_start, |projection| projection.sequence);
     let receipt = LedgerSessionReceiptDraft {
         schema_version: LEDGER_RECEIPT_SCHEMA_VERSION,
         session_label: request.identity.session_label.clone(),
@@ -604,7 +613,9 @@ pub fn plan_session_restore(
     if request.replay.branch.conflicting {
         return Err(vec![LedgerSessionIssue::ConflictingBranch]);
     }
-    if request.require_current_snapshot && request.replay.branch.freshness != LedgerFreshnessClass::Current {
+    if request.require_current_snapshot
+        && request.replay.branch.freshness != LedgerFreshnessClass::Current
+    {
         return Err(vec![LedgerSessionIssue::StaleSnapshot]);
     }
     let has_snapshot = entries.iter().any(|entry| {
@@ -620,7 +631,9 @@ pub fn plan_session_restore(
     plan_ledger_replay(&request.replay, entries)
 }
 
-pub fn validate_ledger_session_receipt(draft: &LedgerSessionReceiptDraft) -> LedgerSessionResult<LedgerSessionReceipt> {
+pub fn validate_ledger_session_receipt(
+    draft: &LedgerSessionReceiptDraft,
+) -> LedgerSessionResult<LedgerSessionReceipt> {
     let mut issues = Vec::new();
     if draft.schema_version != LEDGER_RECEIPT_SCHEMA_VERSION {
         issues.push(LedgerSessionIssue::SchemaMismatch);
@@ -632,13 +645,21 @@ pub fn validate_ledger_session_receipt(draft: &LedgerSessionReceiptDraft) -> Led
     if draft.sequence_start < FIRST_LEDGER_SEQUENCE || draft.sequence_start > draft.sequence_end {
         issues.push(LedgerSessionIssue::MalformedSequenceRange);
     }
-    if !draft.non_claims.iter().any(|claim| claim == NO_DEFAULT_STORE_NON_CLAIM) {
+    if !draft
+        .non_claims
+        .iter()
+        .any(|claim| claim == NO_DEFAULT_STORE_NON_CLAIM)
+    {
         issues.push(LedgerSessionIssue::MissingNonClaim);
     }
     for non_claim in &draft.non_claims {
         validate_ledger_label(non_claim.as_str(), &mut issues);
     }
-    if draft.leak_marker.as_ref().is_some_and(|marker| contains_unsafe_marker(marker.as_str())) {
+    if draft
+        .leak_marker
+        .as_ref()
+        .is_some_and(|marker| contains_unsafe_marker(marker.as_str()))
+    {
         issues.push(LedgerSessionIssue::LeakRejected);
     }
     ledger_result_from_issues(issues, draft.clone())
@@ -667,7 +688,10 @@ fn validate_ledger_replay_request(request: &LedgerReplayRequest) -> LedgerSessio
     ledger_result_from_issues(issues, ())
 }
 
-fn validate_ledger_store(store: Option<&LedgerSessionStoreDescriptor>, issues: &mut Vec<LedgerSessionIssue>) {
+fn validate_ledger_store(
+    store: Option<&LedgerSessionStoreDescriptor>,
+    issues: &mut Vec<LedgerSessionIssue>,
+) {
     match store {
         None => issues.push(LedgerSessionIssue::MissingService),
         Some(descriptor) => {
@@ -736,7 +760,8 @@ fn scoped_ledger_entries<'a>(
     let mut scoped = entries
         .iter()
         .filter(|entry| {
-            entry.session_label == request.identity.session_label && entry.branch_label == request.branch.branch_label
+            entry.session_label == request.identity.session_label
+                && entry.branch_label == request.branch.branch_label
         })
         .collect::<Vec<_>>();
     if scoped.is_empty() {
@@ -766,11 +791,16 @@ fn omitted_entry(entry: &LedgerEntry, reason: LedgerOmissionReason) -> LedgerOmi
 
 fn entry_has_unsafe_material(entry: &LedgerEntry) -> bool {
     contains_unsafe_marker(entry.safe_summary.as_str())
-        || entry.unsafe_material.as_ref().is_some_and(|value| contains_unsafe_marker(value.as_str()))
+        || entry
+            .unsafe_material
+            .as_ref()
+            .is_some_and(|value| contains_unsafe_marker(value.as_str()))
 }
 
 fn contains_unsafe_marker(value: &str) -> bool {
-    UNSAFE_MARKERS.iter().any(|unsafe_marker| value.contains(unsafe_marker))
+    UNSAFE_MARKERS
+        .iter()
+        .any(|unsafe_marker| value.contains(unsafe_marker))
 }
 
 fn projections_hash_input(projections: &[LedgerContextProjection]) -> String {
@@ -797,10 +827,17 @@ fn validate_ledger_hash(value: &str, issues: &mut Vec<LedgerSessionIssue>) {
     }
 }
 
-fn ledger_result_from_issues<T>(mut issues: Vec<LedgerSessionIssue>, value: T) -> LedgerSessionResult<T> {
+fn ledger_result_from_issues<T>(
+    mut issues: Vec<LedgerSessionIssue>,
+    value: T,
+) -> LedgerSessionResult<T> {
     issues.sort_by_key(|issue| issue.code());
     issues.dedup();
-    if issues.is_empty() { Ok(value) } else { Err(issues) }
+    if issues.is_empty() {
+        Ok(value)
+    } else {
+        Err(issues)
+    }
 }
 
 fn validate_store(store: &SessionStoreDescriptor, issues: &mut Vec<PersistenceIssue>) {
@@ -820,7 +857,10 @@ fn validate_store(store: &SessionStoreDescriptor, issues: &mut Vec<PersistenceIs
 }
 
 fn matches_store_state(admission: &PersistenceAdmission, state: PersistenceServiceState) -> bool {
-    admission.store.as_ref().is_some_and(|store| store.service_state == state)
+    admission
+        .store
+        .as_ref()
+        .is_some_and(|store| store.service_state == state)
 }
 
 fn records_for_scope<'a>(
@@ -831,7 +871,9 @@ fn records_for_scope<'a>(
     let records = state
         .records
         .iter()
-        .filter(|record| record.session_id == admission.session_id && record.branch_id == admission.branch_id)
+        .filter(|record| {
+            record.session_id == admission.session_id && record.branch_id == admission.branch_id
+        })
         .collect::<Vec<_>>();
     if records.is_empty() {
         return Err(vec![PersistenceIssue::ReplayGap]);
@@ -852,7 +894,11 @@ fn validate_replay_sequence(records: &[&SafeSessionRecord]) -> PersistenceResult
 }
 
 fn state_hash(records: &[&SafeSessionRecord]) -> String {
-    let canonical = records.iter().map(|record| record.record_hash.as_str()).collect::<Vec<_>>().join(HASH_SEPARATOR);
+    let canonical = records
+        .iter()
+        .map(|record| record.record_hash.as_str())
+        .collect::<Vec<_>>()
+        .join(HASH_SEPARATOR);
     session_record_hash("state", canonical.as_bytes())
 }
 
@@ -875,7 +921,11 @@ fn validate_hash(value: &str, issues: &mut Vec<PersistenceIssue>) {
 fn result_from_issues<T>(mut issues: Vec<PersistenceIssue>, value: T) -> PersistenceResult<T> {
     issues.sort_by_key(|issue| issue.code());
     issues.dedup();
-    if issues.is_empty() { Ok(value) } else { Err(issues) }
+    if issues.is_empty() {
+        Ok(value)
+    } else {
+        Err(issues)
+    }
 }
 
 #[cfg(test)]
@@ -912,7 +962,12 @@ mod tests {
             records: Vec::new(),
             tombstoned: false,
         };
-        let first = record(FIRST_SEQUENCE, SessionRecordStatus::Active, FIRST_RECORD_BYTES, None);
+        let first = record(
+            FIRST_SEQUENCE,
+            SessionRecordStatus::Active,
+            FIRST_RECORD_BYTES,
+            None,
+        );
         let second = record(
             SECOND_SEQUENCE,
             SessionRecordStatus::Snapshot,
@@ -930,11 +985,15 @@ mod tests {
         let state = append_fake_record(&admission_request, &state, second).expect("second append");
         let state = append_fake_record(&admission_request, &state, third).expect("third append");
         let replay = replay_fake_session(&admission_request, &state).expect("replay");
-        let restored = restore_fake_snapshot(&admission_request, &state, SECOND_SEQUENCE).expect("restore");
+        let restored =
+            restore_fake_snapshot(&admission_request, &state, SECOND_SEQUENCE).expect("restore");
         let compacted = compact_fake_records(&admission_request, &state).expect("compact");
         let tombstoned = tombstone_fake_session(&admission_request, &state).expect("tombstone");
 
-        assert_eq!(replay.record_count, usize::try_from(THIRD_SEQUENCE).expect("fits"));
+        assert_eq!(
+            replay.record_count,
+            usize::try_from(THIRD_SEQUENCE).expect("fits")
+        );
         assert_eq!(replay.terminal_status, SessionRecordStatus::Compacted);
         assert_eq!(restored.session_id, SESSION_ID);
         assert_eq!(compacted.input_records, replay.record_count);
@@ -947,7 +1006,10 @@ mod tests {
         // r[verify agent_harness_runtime.session_persistence_adapter.safe_records]
         let mut missing = admission(PersistenceServiceState::Available);
         missing.store = None;
-        assert_eq!(admit_persistence(&missing), Err(vec![PersistenceIssue::MissingStore]));
+        assert_eq!(
+            admit_persistence(&missing),
+            Err(vec![PersistenceIssue::MissingStore])
+        );
 
         let global = PersistenceAdmission {
             store: Some(SessionStoreDescriptor {
@@ -966,9 +1028,18 @@ mod tests {
 
         let unsafe_record = SafeSessionRecord {
             leak_marker: Some("RAW_PROMPT:secret".to_owned()),
-            ..record(FIRST_SEQUENCE, SessionRecordStatus::Active, FIRST_RECORD_BYTES, None)
+            ..record(
+                FIRST_SEQUENCE,
+                SessionRecordStatus::Active,
+                FIRST_RECORD_BYTES,
+                None,
+            )
         };
-        assert!(validate_session_record(&unsafe_record).expect_err("leak").contains(&PersistenceIssue::LeakRejected));
+        assert!(
+            validate_session_record(&unsafe_record)
+                .expect_err("leak")
+                .contains(&PersistenceIssue::LeakRejected)
+        );
     }
 
     #[test]
@@ -985,7 +1056,10 @@ mod tests {
             )],
             tombstoned: false,
         };
-        assert_eq!(replay_fake_session(&admission_request, &gap_state), Err(vec![PersistenceIssue::ReplayGap]));
+        assert_eq!(
+            replay_fake_session(&admission_request, &gap_state),
+            Err(vec![PersistenceIssue::ReplayGap])
+        );
         let no_snapshot_state = FakeSessionState {
             records: vec![record(
                 FIRST_SEQUENCE,
@@ -1007,15 +1081,28 @@ mod tests {
                 records: Vec::new(),
                 tombstoned: false,
             },
-            record(FIRST_SEQUENCE, SessionRecordStatus::Active, FIRST_RECORD_BYTES, None),
+            record(
+                FIRST_SEQUENCE,
+                SessionRecordStatus::Active,
+                FIRST_RECORD_BYTES,
+                None,
+            ),
         );
-        assert!(append_result.expect_err("partial write").contains(&PersistenceIssue::PartialWrite));
+        assert!(
+            append_result
+                .expect_err("partial write")
+                .contains(&PersistenceIssue::PartialWrite)
+        );
 
         let stale = PersistenceAdmission {
             minimum_snapshot_sequence: EMPTY_COUNT.into(),
             ..admission(PersistenceServiceState::Available)
         };
-        assert!(admit_persistence(&stale).expect_err("stale").contains(&PersistenceIssue::StaleSnapshot));
+        assert!(
+            admit_persistence(&stale)
+                .expect_err("stale")
+                .contains(&PersistenceIssue::StaleSnapshot)
+        );
     }
 
     #[test]
@@ -1042,9 +1129,24 @@ mod tests {
         assert_eq!(replay.omitted.len(), EXPECTED_LEDGER_OMITTED_COUNT);
         assert_eq!(restore.branch_label, BRANCH_ID);
         assert_eq!(receipt.included_count, replay.projections.len());
-        assert!(replay.omitted.iter().any(|entry| entry.reason == LedgerOmissionReason::Stale));
-        assert!(replay.omitted.iter().any(|entry| entry.reason == LedgerOmissionReason::PrivateReference));
-        assert!(replay.omitted.iter().any(|entry| entry.reason == LedgerOmissionReason::UnsafeMaterial));
+        assert!(
+            replay
+                .omitted
+                .iter()
+                .any(|entry| entry.reason == LedgerOmissionReason::Stale)
+        );
+        assert!(
+            replay
+                .omitted
+                .iter()
+                .any(|entry| entry.reason == LedgerOmissionReason::PrivateReference)
+        );
+        assert!(
+            replay
+                .omitted
+                .iter()
+                .any(|entry| entry.reason == LedgerOmissionReason::UnsafeMaterial)
+        );
     }
 
     #[test]
@@ -1054,7 +1156,10 @@ mod tests {
         let entries = ledger_entries();
         let mut missing = ledger_request(LedgerSessionServiceStatus::Available);
         missing.store = None;
-        assert_eq!(plan_ledger_replay(&missing, &entries), Err(vec![LedgerSessionIssue::MissingService]));
+        assert_eq!(
+            plan_ledger_replay(&missing, &entries),
+            Err(vec![LedgerSessionIssue::MissingService])
+        );
 
         let mut ambient = ledger_request(LedgerSessionServiceStatus::Available);
         ambient.store = Some(LedgerSessionStoreDescriptor {
@@ -1070,7 +1175,10 @@ mod tests {
         let mut malformed_entries = ledger_entries();
         malformed_entries.remove(1);
         assert_eq!(
-            plan_ledger_replay(&ledger_request(LedgerSessionServiceStatus::Available), &malformed_entries),
+            plan_ledger_replay(
+                &ledger_request(LedgerSessionServiceStatus::Available),
+                &malformed_entries
+            ),
             Err(vec![LedgerSessionIssue::MalformedSequenceRange])
         );
 
@@ -1101,7 +1209,10 @@ mod tests {
             target_sequence: SECOND_SEQUENCE,
             require_current_snapshot: true,
         };
-        assert_eq!(plan_session_restore(&stale, &entries), Err(vec![LedgerSessionIssue::StaleSnapshot]));
+        assert_eq!(
+            plan_session_restore(&stale, &entries),
+            Err(vec![LedgerSessionIssue::StaleSnapshot])
+        );
 
         let conflicting = SessionRestoreRequest {
             replay: LedgerReplayRequest {
@@ -1114,7 +1225,10 @@ mod tests {
             target_sequence: SECOND_SEQUENCE,
             require_current_snapshot: true,
         };
-        assert_eq!(plan_session_restore(&conflicting, &entries), Err(vec![LedgerSessionIssue::ConflictingBranch]));
+        assert_eq!(
+            plan_session_restore(&conflicting, &entries),
+            Err(vec![LedgerSessionIssue::ConflictingBranch])
+        );
     }
 
     fn ledger_request(status: LedgerSessionServiceStatus) -> LedgerReplayRequest {

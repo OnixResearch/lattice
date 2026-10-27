@@ -1,0 +1,16 @@
+{
+  "source": {
+    "producer_revision": "5e703953840bff72a91fec3e928682e9efb607ab",
+    "daemon_identity": "b3:1111111111111111111111111111111111111111111111111111111111111111",
+    "session_id": 1,
+    "pane_id": 1,
+    "workspace_revision": 1
+  },
+  "workflow_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "trigger": { "kind": "lifecycle", "state": "running" },
+  "capability_context": {
+    "identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "metadata_binding_allowed": true
+  },
+  "activation_identity": "b3:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+}

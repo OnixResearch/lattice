@@ -94,7 +94,11 @@ impl HostRequest {
     /// # Errors
     ///
     /// Returns [`crate::Error`] when the target or replacement is malformed.
-    pub fn file_edit(target: &str, replacement: &str, max_replacement_chars: u32) -> Result<Self, crate::Error> {
+    pub fn file_edit(
+        target: &str,
+        replacement: &str,
+        max_replacement_chars: u32,
+    ) -> Result<Self, crate::Error> {
         Ok(Self::FileEdit {
             target: crate::required_text("target", target, MAX_TARGET_CHARS)?,
             replacement: crate::required_text("replacement", replacement, max_replacement_chars)?,
@@ -154,11 +158,17 @@ impl HostRequest {
     pub fn character_count(&self) -> u32 {
         let count = match self {
             Self::FileRead { target } => target.chars().count(),
-            Self::FileEdit { target, replacement } => {
-                target.chars().count().saturating_add(replacement.chars().count())
-            }
+            Self::FileEdit {
+                target,
+                replacement,
+            } => target
+                .chars()
+                .count()
+                .saturating_add(replacement.chars().count()),
             Self::Shell { command } => command.chars().count(),
-            Self::Tool { name, payload } => name.chars().count().saturating_add(payload.chars().count()),
+            Self::Tool { name, payload } => {
+                name.chars().count().saturating_add(payload.chars().count())
+            }
             Self::Subagent(request) => request.character_count(),
             Self::ContextRead { key } => key.chars().count(),
             Self::KernelClear => 0,

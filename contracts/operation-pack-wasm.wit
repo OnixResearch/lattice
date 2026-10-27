@@ -1,0 +1,9 @@
+package lattice:operation-pack@1.0.0;
+
+interface methods {
+  invoke: func(method: string, input: list<u8>) -> list<u8>;
+}
+
+world operation {
+  export methods;
+}

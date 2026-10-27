@@ -54,7 +54,10 @@ pub trait AdapterService {
     /// # Errors
     ///
     /// Returns [`Self::Error`] when the host adapter cannot satisfy the subscription.
-    fn subscribe(&mut self, subscription: &Subscription) -> Result<alloc::vec::Vec<Assertion>, Self::Error>;
+    fn subscribe(
+        &mut self,
+        subscription: &Subscription,
+    ) -> Result<alloc::vec::Vec<Assertion>, Self::Error>;
 
     /// Receives one host orchestration event such as cancellation or expiry.
     ///
@@ -70,9 +73,11 @@ fn parse_value<T>(
     parser: impl FnOnce(&str) -> Option<T>,
 ) -> Result<T, crate::AdapterContractError> {
     let normalized = crate::validation::normalized_adapter_field(field_name, value)?;
-    parser(normalized.as_str()).ok_or_else(|| crate::AdapterContractError::UnsupportedDataspaceValue {
-        field: field_name.as_str(),
-        value: normalized,
+    parser(normalized.as_str()).ok_or_else(|| {
+        crate::AdapterContractError::UnsupportedDataspaceValue {
+            field: field_name.as_str(),
+            value: normalized,
+        }
     })
 }
 
@@ -80,5 +85,7 @@ fn optional_field(
     field_name: crate::validation::FieldName,
     value: Option<&str>,
 ) -> Result<Option<alloc::string::String>, crate::AdapterContractError> {
-    value.map(|text| crate::validation::normalized_adapter_field(field_name, text)).transpose()
+    value
+        .map(|text| crate::validation::normalized_adapter_field(field_name, text))
+        .transpose()
 }

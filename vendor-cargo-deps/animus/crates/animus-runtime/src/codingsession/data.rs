@@ -6,7 +6,8 @@ pub const CODING_SESSION_RECEIPT_SCHEMA: &str = "animus.coding-session-receipt.v
 pub const CODING_SESSION_EFFECT_HASH_DOMAIN: &str = "animus.coding-session-effect.v1";
 pub const CODING_SESSION_MESSAGE_HASH_DOMAIN: &str = "animus.coding-session-message.v1";
 pub const CODING_SESSION_RECEIPT_HASH_DOMAIN: &str = "animus.coding-session-receipt.v1";
-pub const CODING_SESSION_EMPTY_HEAD_HASH: &str = crate::durable_session_store::DURABLE_SESSION_EMPTY_HEAD_HASH;
+pub const CODING_SESSION_EMPTY_HEAD_HASH: &str =
+    crate::durable_session_store::DURABLE_SESSION_EMPTY_HEAD_HASH;
 
 pub(super) const MAX_SAFE_ID_BYTES: usize = 128;
 pub(super) const MAX_MESSAGE_BYTES: usize = 8_192;
@@ -23,7 +24,8 @@ pub(super) const MESSAGE_KIND_BRANCH_MOVE_CODE: u8 = 7;
 pub(super) const MESSAGE_KIND_AUTHORITY_PROFILE_BINDING_CODE: u8 = 8;
 pub(super) const MESSAGE_WIRE_PREFIX_BYTES: usize = 8;
 pub(super) const HASH_SEPARATOR: &[u8] = b"\x1f";
-pub(super) const REDACTION_MARKER: &str = "prompt-provider-tool-store-and-capability-bodies-omitted";
+pub(super) const REDACTION_MARKER: &str =
+    "prompt-provider-tool-store-and-capability-bodies-omitted";
 pub(super) const NON_CLAIMS: &[&str] = &[
     "fake-backed session evidence does not prove live-provider quality",
     "session evidence does not prove concrete product-tool behavior",
@@ -302,6 +304,220 @@ pub(super) struct CodingSessionQueuedBody {
     pub(super) body_hash: String,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
+pub struct CodingSessionQueueGeneration(u64);
+
+impl CodingSessionQueueGeneration {
+    #[must_use]
+    pub const fn new(value: u64) -> Self {
+        Self(value)
+    }
+
+    #[must_use]
+    pub const fn value(self) -> u64 {
+        self.0
+    }
+
+    #[must_use]
+    pub const fn checked_next(self) -> Option<Self> {
+        match self.0.checked_add(1) {
+            Some(value) => Some(Self(value)),
+            None => None,
+        }
+    }
+}
+
+#[derive(Clone, Eq, PartialEq)]
+pub struct CodingSessionQueueMutationPrecondition {
+    entry_id: String,
+    expected_generation: CodingSessionQueueGeneration,
+    expected_position: u32,
+    expected_text_identity: String,
+}
+
+impl CodingSessionQueueMutationPrecondition {
+    #[must_use]
+    pub fn new(
+        entry_id: String,
+        expected_generation: CodingSessionQueueGeneration,
+        expected_position: u32,
+        expected_text_identity: String,
+    ) -> Self {
+        Self {
+            entry_id,
+            expected_generation,
+            expected_position,
+            expected_text_identity,
+        }
+    }
+
+    #[must_use]
+    pub fn entry_id(&self) -> &str {
+        self.entry_id.as_str()
+    }
+
+    #[must_use]
+    pub const fn expected_generation(&self) -> CodingSessionQueueGeneration {
+        self.expected_generation
+    }
+
+    #[must_use]
+    pub const fn expected_position(&self) -> u32 {
+        self.expected_position
+    }
+
+    #[must_use]
+    pub fn expected_text_identity(&self) -> &str {
+        self.expected_text_identity.as_str()
+    }
+}
+
+impl core::fmt::Debug for CodingSessionQueueMutationPrecondition {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter
+            .debug_struct("CodingSessionQueueMutationPrecondition")
+            .field("entry_id", &self.entry_id)
+            .field("expected_generation", &self.expected_generation)
+            .field("expected_position", &self.expected_position)
+            .field("expected_text_identity", &"<private>")
+            .finish()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CodingSessionQueueSafeEntry {
+    pub item_id: String,
+    pub entry_id: String,
+    pub position: u32,
+    pub behavior: CodingSessionQueueBehavior,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CodingSessionQueueSafeSnapshot {
+    pub generation: CodingSessionQueueGeneration,
+    pub queue_identity: String,
+    pub entries: Vec<CodingSessionQueueSafeEntry>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CodingSessionQueueMutationOperation {
+    Edit,
+    Remove,
+}
+
+impl CodingSessionQueueMutationOperation {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Edit => "edit",
+            Self::Remove => "remove",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CodingSessionQueueConflictKind {
+    MissingItem,
+    WrongEntry,
+    MovedPosition,
+    StaleGeneration,
+    StaleText,
+}
+
+impl CodingSessionQueueConflictKind {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::MissingItem => "missing_item",
+            Self::WrongEntry => "wrong_entry",
+            Self::MovedPosition => "moved_position",
+            Self::StaleGeneration => "stale_generation",
+            Self::StaleText => "stale_text",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CodingSessionQueueConflict {
+    pub operation: CodingSessionQueueMutationOperation,
+    pub item_id: String,
+    pub entry_id: String,
+    pub kind: CodingSessionQueueConflictKind,
+    pub snapshot: CodingSessionQueueSafeSnapshot,
+    pub redaction_marker: &'static str,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CodingSessionQueueMutationEvent {
+    pub operation: CodingSessionQueueMutationOperation,
+    pub status: &'static str,
+    pub item_id: String,
+    pub entry_id: String,
+    pub position: Option<u32>,
+    pub generation: CodingSessionQueueGeneration,
+    pub queue_identity: String,
+    pub conflict: Option<CodingSessionQueueConflictKind>,
+    pub redaction_marker: &'static str,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CodingSessionQueueMutationReceipt {
+    pub schema: &'static str,
+    pub operation: CodingSessionQueueMutationOperation,
+    pub status: &'static str,
+    pub item_id: String,
+    pub entry_id: String,
+    pub position: Option<u32>,
+    pub generation_before: CodingSessionQueueGeneration,
+    pub generation_after: Option<CodingSessionQueueGeneration>,
+    pub queue_identity: String,
+    pub conflict: Option<CodingSessionQueueConflictKind>,
+    pub redaction_marker: &'static str,
+    pub receipt_hash: String,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct CodingSessionQueueAcceptedMutation<'a> {
+    pub operation: CodingSessionQueueMutationOperation,
+    pub item_id: &'a str,
+    pub precondition: &'a CodingSessionQueueMutationPrecondition,
+}
+
+#[derive(Clone, Copy, Default, Eq, PartialEq)]
+pub struct CodingSessionQueueSensitiveDraft<'a> {
+    pub current: Option<&'a str>,
+    pub expected: Option<&'a str>,
+    pub replacement: Option<&'a str>,
+}
+
+impl core::fmt::Debug for CodingSessionQueueSensitiveDraft<'_> {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter
+            .debug_struct("CodingSessionQueueSensitiveDraft")
+            .field("current", &self.current.map(|_value| "<private>"))
+            .field("expected", &self.expected.map(|_value| "<private>"))
+            .field("replacement", &self.replacement.map(|_value| "<private>"))
+            .finish()
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CodingSessionQueueReceiptError {
+    UnsafePrivateText,
+    InvalidIdentity,
+}
+
+impl core::fmt::Display for CodingSessionQueueReceiptError {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::UnsafePrivateText => formatter.write_str("queue receipt rejected private text"),
+            Self::InvalidIdentity => formatter.write_str("queue receipt rejected identity"),
+        }
+    }
+}
+
+impl std::error::Error for CodingSessionQueueReceiptError {}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CodingSessionTerminalKind {
     Completed,
@@ -342,11 +558,12 @@ pub enum CodingSessionCommand {
     },
     EditQueued {
         item_id: String,
-        entry_id: String,
+        precondition: CodingSessionQueueMutationPrecondition,
         input: CodingSessionInput,
     },
     RemoveQueued {
         item_id: String,
+        precondition: CodingSessionQueueMutationPrecondition,
     },
     Cancel {
         run_id: String,
@@ -432,7 +649,24 @@ impl CodingSessionCommitRequest {
 
     #[must_use]
     pub fn proposed_active_leaf_id(&self) -> &str {
-        self.messages.last().map_or("", CodingSessionMessage::entry_id)
+        self.messages
+            .last()
+            .map_or("", CodingSessionMessage::entry_id)
+    }
+
+    /// Returns the exact tool response whose commit precedes provider continuation.
+    #[must_use]
+    pub const fn tool_response_after_commit(&self) -> Option<&animus_adapters::ToolResponse> {
+        match &self.after_commit {
+            CodingSessionAfterCommit::ContinueProvider { tool_response } => Some(tool_response),
+            CodingSessionAfterCommit::DispatchProvider
+            | CodingSessionAfterCommit::DispatchTool { .. }
+            | CodingSessionAfterCommit::Complete { .. }
+            | CodingSessionAfterCommit::InjectNextOrProvider
+            | CodingSessionAfterCommit::RecoveryReady
+            | CodingSessionAfterCommit::CompactionReady
+            | CodingSessionAfterCommit::AuthorityRebound => None,
+        }
     }
 }
 
@@ -440,6 +674,11 @@ impl CodingSessionCommitRequest {
 pub struct CodingSessionProviderRequest {
     pub(super) effect_id: String,
     pub(super) run_id: String,
+    pub(super) session_id: String,
+    pub(super) branch_id: String,
+    pub(super) active_leaf_id: String,
+    pub(super) durable_head_hash: String,
+    pub(super) request_sequence: u64,
     pub(super) request: animus_adapters::ModelRequest,
 }
 
@@ -452,6 +691,31 @@ impl CodingSessionProviderRequest {
     #[must_use]
     pub fn run_id(&self) -> &str {
         self.run_id.as_str()
+    }
+
+    #[must_use]
+    pub fn session_id(&self) -> &str {
+        self.session_id.as_str()
+    }
+
+    #[must_use]
+    pub fn branch_id(&self) -> &str {
+        self.branch_id.as_str()
+    }
+
+    #[must_use]
+    pub fn active_leaf_id(&self) -> &str {
+        self.active_leaf_id.as_str()
+    }
+
+    #[must_use]
+    pub fn durable_head_hash(&self) -> &str {
+        self.durable_head_hash.as_str()
+    }
+
+    #[must_use]
+    pub const fn request_sequence(&self) -> u64 {
+        self.request_sequence
     }
 
     #[must_use]
@@ -723,6 +987,7 @@ pub enum CodingSessionIssue {
     BusyInputRequiresQueue,
     InvalidState,
     QueueRejected,
+    QueueConflict,
     StaleEffect,
     PersistenceFailure,
     ProviderFailure,
@@ -742,11 +1007,24 @@ pub enum CodingSessionIssue {
 pub struct CodingSessionError {
     issue: CodingSessionIssue,
     field: &'static str,
+    queue_conflict: Option<Box<CodingSessionQueueConflict>>,
 }
 
 impl CodingSessionError {
     pub(super) const fn new(issue: CodingSessionIssue, field: &'static str) -> Self {
-        Self { issue, field }
+        Self {
+            issue,
+            field,
+            queue_conflict: None,
+        }
+    }
+
+    pub(super) fn queue_conflict(conflict: CodingSessionQueueConflict) -> Self {
+        Self {
+            issue: CodingSessionIssue::QueueConflict,
+            field: "queue",
+            queue_conflict: Some(Box::new(conflict)),
+        }
     }
 
     #[must_use]
@@ -757,6 +1035,11 @@ impl CodingSessionError {
     #[must_use]
     pub const fn field(&self) -> &'static str {
         self.field
+    }
+
+    #[must_use]
+    pub fn queue_conflict_snapshot(&self) -> Option<&CodingSessionQueueConflict> {
+        self.queue_conflict.as_deref()
     }
 }
 
@@ -775,6 +1058,7 @@ pub struct CodingSessionState {
     pub(super) run: Option<CodingSessionRun>,
     pub(super) queue: Option<crate::mailbox::MessageQueueState>,
     pub(super) queued_bodies: Vec<CodingSessionQueuedBody>,
+    pub(super) queue_generation: CodingSessionQueueGeneration,
     pub(super) messages: Vec<CodingSessionMessage>,
     pub(super) active_leaf_id: Option<String>,
     pub(super) durable_head_hash: String,
@@ -833,7 +1117,9 @@ impl CodingSessionState {
     }
 
     #[must_use]
-    pub const fn authority_profile(&self) -> &crate::session_authority_profile::SessionRuntimeAuthorityProfile {
+    pub const fn authority_profile(
+        &self,
+    ) -> &crate::session_authority_profile::SessionRuntimeAuthorityProfile {
         &self.config.authority_profile
     }
 
@@ -871,6 +1157,11 @@ impl CodingSessionState {
     pub fn queued_count(&self) -> Option<u32> {
         u32::try_from(self.queued_bodies.len()).ok()
     }
+
+    #[must_use]
+    pub const fn queue_generation(&self) -> CodingSessionQueueGeneration {
+        self.queue_generation
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -885,6 +1176,10 @@ pub struct CodingSessionFrontendState {
     pub lifecycle_status: String,
     pub committed_message_count: u32,
     pub queue_count: u32,
+    pub queue_generation: CodingSessionQueueGeneration,
+    pub queue_identity: Option<String>,
+    pub queue_mutation_status: Option<String>,
+    pub queue_conflict: Option<CodingSessionQueueConflictKind>,
     pub active_tool_correlation: Option<String>,
     pub cancellation_observed: bool,
     pub terminal_status: Option<String>,
@@ -896,6 +1191,10 @@ impl Default for CodingSessionFrontendState {
             lifecycle_status: String::from("idle"),
             committed_message_count: 0,
             queue_count: 0,
+            queue_generation: CodingSessionQueueGeneration::default(),
+            queue_identity: None,
+            queue_mutation_status: None,
+            queue_conflict: None,
             active_tool_correlation: None,
             cancellation_observed: false,
             terminal_status: None,

@@ -84,9 +84,11 @@ impl core::fmt::Display for Error {
             Self::InvalidField { error } => {
                 write!(formatter, "invalid model stream field: {error}")
             }
-            Self::InvalidOrder { value } => {
-                write!(formatter, "model stream order must be at least {}; got {value}", super::MIN_ORDER)
-            }
+            Self::InvalidOrder { value } => write!(
+                formatter,
+                "model stream order must be at least {}; got {value}",
+                super::MIN_ORDER
+            ),
             Self::MissingBody { kind } => {
                 write!(formatter, "{} frame requires a body", kind.as_str())
             }
@@ -96,32 +98,43 @@ impl core::fmt::Display for Error {
             Self::MissingToolCallId => {
                 write!(formatter, "tool-call stream frame requires a tool id")
             }
-            Self::UnexpectedToolCallId { kind } => {
-                write!(formatter, "{} frame does not accept a tool-call identifier", kind.as_str())
-            }
+            Self::UnexpectedToolCallId { kind } => write!(
+                formatter,
+                "{} frame does not accept a tool-call identifier",
+                kind.as_str()
+            ),
             Self::MissingUsage => write!(formatter, "usage stream frame requires usage metadata"),
-            Self::UnexpectedUsage { kind } => {
-                write!(formatter, "{} frame does not accept usage metadata", kind.as_str())
-            }
-            Self::ThoughtVisibilityLeak => {
-                write!(formatter, "thought stream frames must not be assistant-visible by default")
-            }
+            Self::UnexpectedUsage { kind } => write!(
+                formatter,
+                "{} frame does not accept usage metadata",
+                kind.as_str()
+            ),
+            Self::ThoughtVisibilityLeak => write!(
+                formatter,
+                "thought stream frames must not be assistant-visible by default"
+            ),
             Self::EmptyStream => write!(formatter, "model stream must contain at least one frame"),
-            Self::MixedModelCall { expected, actual } => {
-                write!(formatter, "model stream mixed call ids: expected {expected}, got {actual}")
-            }
-            Self::OutOfOrderFrame { previous, next } => {
-                write!(formatter, "model stream order must increase: previous {previous}, next {next}")
-            }
+            Self::MixedModelCall { expected, actual } => write!(
+                formatter,
+                "model stream mixed call ids: expected {expected}, got {actual}"
+            ),
+            Self::OutOfOrderFrame { previous, next } => write!(
+                formatter,
+                "model stream order must increase: previous {previous}, next {next}"
+            ),
             Self::MissingTerminalFrame => {
                 write!(formatter, "model stream is missing a terminal frame")
             }
-            Self::TerminalFrameNotLast { kind } => {
-                write!(formatter, "terminal {} frame must be the last stream frame", kind.as_str())
-            }
-            Self::TerminalFrameNotFinish { kind } => {
-                write!(formatter, "final response assembly requires finish, got {}", kind.as_str())
-            }
+            Self::TerminalFrameNotLast { kind } => write!(
+                formatter,
+                "terminal {} frame must be the last stream frame",
+                kind.as_str()
+            ),
+            Self::TerminalFrameNotFinish { kind } => write!(
+                formatter,
+                "final response assembly requires finish, got {}",
+                kind.as_str()
+            ),
             Self::MalformedFixture { reason } => {
                 write!(formatter, "malformed stream fixture: {reason}")
             }

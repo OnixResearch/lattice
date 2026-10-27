@@ -1,0 +1,89 @@
+[package]
+name = "snix-store"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+anyhow = "1.0.86"
+async-compression = { version = "0.4.12", features = [
+  "tokio",
+  "bzip2",
+  "gzip",
+  "xz",
+  "zstd",
+] }
+async-stream = "0.3.5"
+blake3 = { version = "=1.8.5", features = ["rayon", "std"] }
+bstr = "1.10.0"
+bytes = { version = "1.7.1", features = ["serde"] }
+clap = { version = "4.5.16", features = ["derive", "env"] }
+count-write = "0.1.0"
+data-encoding = "2.6.0"
+ed25519 = "2.2.3"
+ed25519-dalek = "2.1.1"
+futures = "0.3.30"
+irpc = { version = "0.13", default-features = false, features = ["derive"] }
+nix-compat = { path = "../nix-compat", features = ["async", "serde"] }
+pin-project-lite = "0.2.14"
+postcard = { version = "1", default-features = false, features = ["use-std"] }
+serde = { version = "1.0.209", features = ["derive"] }
+serde_bytes = "0.11"
+serde_json = "1.0"
+serde_with = { version = "3.9.0", default-features = false, features = ["macros"] }
+serde_qs = "0.12.0"
+sha1 = "0.10.6"
+sha2 = "0.10.8"
+md-5 = "0.10.6"
+thiserror = "2.0"
+tokio = { version = "1.39.3", features = [
+  "fs",
+  "macros",
+  "net",
+  "rt",
+  "rt-multi-thread",
+] }
+tokio-stream = { version = "0.1.15", features = ["fs"] }
+tokio-util = { version = "0.7.11", features = ["io", "io-util", "compat"] }
+
+snix-castore = { path = "../snix-castore" }
+url = { version = "2.5.2", features = ["serde"] }
+walkdir = "2.5.0"
+reqwest = { version = "0.13.1", default-features = true, features = ["stream"] }
+reqwest-middleware = { version = "0.5.0", default-features = false }
+lru = "0.16.3"
+parking_lot = "0.12.3"
+snix-tracing = { path = "../snix-tracing", features = ["clap", "reqwest"] }
+tracing = "0.1.40"
+tracing-indicatif = "0.3.7"
+hyper-util = "0.1.7"
+toml = { version = "0.8.19", optional = true }
+redb = { version = "3.1.1", features = ["logging"] }
+mimalloc = "0.1.43"
+bigtable_rs = { version = "0.2.18", optional = true }
+auto_impl = "1.2.0"
+async-trait = "0.1"
+
+[build-dependencies]
+
+[dev-dependencies]
+async-process = "2.2.4"
+fuse-backend-rs = "=0.12.0"
+rstest = { version = "0.26.1", default-features = false }
+rstest_reuse = "0.7.0"
+tempfile = "3.12.0"
+tokio-retry = "0.3.0"
+hex-literal = "0.4.1"
+
+[features]
+default = []
+cloud = ["dep:bigtable_rs", "snix-castore/cloud"]
+fuse = ["snix-castore/fuse"]
+
+virtiofs = ["snix-castore/virtiofs"]
+xp-composition-cli = [
+  "toml",
+  "snix-castore/xp-composition-url-refs",
+  "snix-castore/xp-composition-cli",
+]
+integration = []

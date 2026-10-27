@@ -1,8 +1,4 @@
-use super::Collection;
-use super::FIELD_NAME_FIELD;
-use super::RecipeResponseFieldKind;
-use super::RecipeResponseSchema;
-use super::Text;
+use super::{Collection, FIELD_NAME_FIELD, RecipeResponseFieldKind, RecipeResponseSchema, Text};
 
 /// Untrusted observed final output facts.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -97,26 +93,39 @@ pub fn validate_recipe_output(
     schema: &RecipeResponseSchema,
     output: &RecipeOutputDraft<'_>,
 ) -> Result<RecipeAutomationOutcome, super::super::RecipeWorkflowError> {
-    assert!(!schema.required_fields().is_empty(), "schemas require output fields");
     assert!(
-        schema.required_fields().iter().all(|field| !field.name().is_empty()),
+        !schema.required_fields().is_empty(),
+        "schemas require output fields"
+    );
+    assert!(
+        schema
+            .required_fields()
+            .iter()
+            .all(|field| !field.name().is_empty()),
         "schema field names must be validated"
     );
     let observed = collect_output_fields(output.fields)?;
-    assert!(observed.len() <= output.fields.len(), "deduplicated output fields never exceed observed fields");
+    assert!(
+        observed.len() <= output.fields.len(),
+        "deduplicated output fields never exceed observed fields"
+    );
     for required in schema.required_fields() {
         match find_field(observed.as_slice(), required.name()) {
             None => {
-                return Ok(RecipeAutomationOutcome::failure(RecipeOutputFailure::MissingField {
-                    field: Text::from(required.name()),
-                }));
+                return Ok(RecipeAutomationOutcome::failure(
+                    RecipeOutputFailure::MissingField {
+                        field: Text::from(required.name()),
+                    },
+                ));
             }
             Some(actual) if actual.kind != required.kind() => {
-                return Ok(RecipeAutomationOutcome::failure(RecipeOutputFailure::KindMismatch {
-                    field: Text::from(required.name()),
-                    expected: required.kind(),
-                    actual: actual.kind,
-                }));
+                return Ok(RecipeAutomationOutcome::failure(
+                    RecipeOutputFailure::KindMismatch {
+                        field: Text::from(required.name()),
+                        expected: required.kind(),
+                        actual: actual.kind,
+                    },
+                ));
             }
             Some(_actual) => {}
         }

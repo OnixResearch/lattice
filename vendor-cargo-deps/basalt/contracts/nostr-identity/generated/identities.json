@@ -1,12 +1,12 @@
 {
-  "schema": "basalt.nostr-identity-producer-identities.v1",
-  "ucan_source_revision": "277ab768eb532ac0c715a3bbff2a7dc37a702f11",
-  "ucan_nostr_credential_revision": "c9d43a7c11dd2fab4d5cb3d100012fa9a2e5b026",
-  "credential_contract": "ucan-nostr::VerifiedNostrCredential@c9d43a7c11dd2fab4d5cb3d100012fa9a2e5b026",
-  "policy_schema": "basalt.nostr-identity-policy.v1",
   "authentication_receipt_schema": "basalt.nostr-authentication-receipt.v1",
   "composition_receipt_schema": "basalt.nostr-composition-receipt.v1",
+  "credential_contract": "ucan-nostr::VerifiedNostrCredential@c9d43a7c11dd2fab4d5cb3d100012fa9a2e5b026",
+  "policy_blake3": "9f5df806b5fac55a35a63f58c86e4218de1414141c20c999cbd140ea3c0556a2",
+  "policy_schema": "basalt.nostr-identity-policy.v1",
+  "producer_implementation_blake3": "bdb5cb4641de3ddd9005521f4f6396ea94d44e446fa7a031a12ffaec30f9a6d2",
   "producer_schema_blake3": "45824d99ae765e885f085ef2c8c8294343415af8e5489c35509c3e255476e258",
-  "producer_implementation_blake3": "ced0ffcfe006a48ffd8f2b856ad0da9641a03a24e6ebda3877163c398252897c",
-  "policy_blake3": "9f5df806b5fac55a35a63f58c86e4218de1414141c20c999cbd140ea3c0556a2"
+  "schema": "basalt.nostr-identity-producer-identities.v1",
+  "ucan_nostr_credential_revision": "c9d43a7c11dd2fab4d5cb3d100012fa9a2e5b026",
+  "ucan_source_revision": "3a2aa043068a82663cf72ec05ed5d56a7d65ecd5"
 }

@@ -1,15 +1,25 @@
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 
 const MAX_BINDING_NAME_CHARS: u32 = 128;
 const EVALUATION_IDENTITY_DOMAIN: &str = "animus.rlm-kernel-evaluation.v1";
 
 /// One named prompt-context value retained across kernel turns.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct ContextBinding {
     name: String,
     value: String,
     value_hash: String,
+}
+
+impl core::fmt::Debug for ContextBinding {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter
+            .debug_struct("ContextBinding")
+            .field("name", &self.name)
+            .field("value", &"<private>")
+            .field("value_hash", &self.value_hash)
+            .finish()
+    }
 }
 
 impl ContextBinding {
@@ -52,7 +62,10 @@ impl ContextBinding {
     }
 
     fn character_count(&self) -> usize {
-        self.name.chars().count().saturating_add(self.value.chars().count())
+        self.name
+            .chars()
+            .count()
+            .saturating_add(self.value.chars().count())
     }
 }
 
@@ -219,7 +232,10 @@ pub fn bind_prompt_context(
         });
     }
     for binding in incoming {
-        match next.bindings.binary_search_by(|candidate| candidate.name.cmp(&binding.name)) {
+        match next
+            .bindings
+            .binary_search_by(|candidate| candidate.name.cmp(&binding.name))
+        {
             Ok(index) => next.bindings[index] = binding,
             Err(index) => next.bindings.insert(index, binding),
         }
@@ -250,15 +266,27 @@ pub fn plan_evaluation(
     request: &EvaluationRequest<'_>,
     policy: &crate::RlmKernelPolicy,
 ) -> Result<EvaluationPlan, crate::Error> {
-    let source = crate::required_text("evaluation_source", request.source, policy.bounds().max_source_chars)?;
+    let source = crate::required_text(
+        "evaluation_source",
+        request.source,
+        policy.bounds().max_source_chars,
+    )?;
     let bounds = policy.bounds();
-    crate::ensure_at_most("evaluation_fuel", request.metrics.fuel, bounds.max_evaluation_fuel)?;
+    crate::ensure_at_most(
+        "evaluation_fuel",
+        request.metrics.fuel,
+        bounds.max_evaluation_fuel,
+    )?;
     crate::ensure_at_most(
         "recursion_depth",
         u64::from(request.metrics.recursion_depth),
         u64::from(bounds.max_recursion_depth),
     )?;
-    crate::ensure_at_most("allocation_bytes", request.metrics.allocation_bytes, bounds.max_allocation_bytes)?;
+    crate::ensure_at_most(
+        "allocation_bytes",
+        request.metrics.allocation_bytes,
+        bounds.max_allocation_bytes,
+    )?;
     let next_definition_count = current.definitions.len().saturating_add(1);
     crate::ensure_at_most(
         "environment_definitions",
@@ -296,7 +324,8 @@ pub fn commit_evaluation(
 ) -> Result<EnvironmentState, crate::Error> {
     if plan.prior_generation != current.generation
         || plan.policy_identity != policy.identity()
-        || plan.projected_environment_chars != current.retained_chars.saturating_add(plan.source_chars)
+        || plan.projected_environment_chars
+            != current.retained_chars.saturating_add(plan.source_chars)
     {
         return Err(crate::Error::InconsistentReceipt);
     }
@@ -395,7 +424,8 @@ pub fn plan_compaction(
     if request.clear_kernel && request.cause != CompactionCause::ExplicitHostClear {
         return Err(crate::Error::ImplicitKernelClearDenied);
     }
-    let explicit_clear = request.clear_kernel && request.cause == CompactionCause::ExplicitHostClear;
+    let explicit_clear =
+        request.clear_kernel && request.cause == CompactionCause::ExplicitHostClear;
     Ok(KernelCompactionPlan {
         prior_generation: current.generation,
         binding_count: crate::usize_to_u32(current.bindings.len()),
@@ -406,12 +436,12 @@ pub fn plan_compaction(
 }
 
 fn retained_char_count(state: &EnvironmentState) -> u32 {
-    let binding_chars =
-        state.bindings.iter().fold(0usize, |total, binding| total.saturating_add(binding.character_count()));
-    let definition_chars = state
-        .definitions
-        .iter()
-        .fold(0u32, |total, definition| total.saturating_add(definition.source_chars));
+    let binding_chars = state.bindings.iter().fold(0usize, |total, binding| {
+        total.saturating_add(binding.character_count())
+    });
+    let definition_chars = state.definitions.iter().fold(0u32, |total, definition| {
+        total.saturating_add(definition.source_chars)
+    });
     crate::usize_to_u32(binding_chars).saturating_add(definition_chars)
 }
 
@@ -423,5 +453,7 @@ fn is_safe_identifier(value: &str) -> bool {
     if !(first.is_ascii_alphabetic() || matches!(first, '_' | '-' | '?' | '!')) {
         return false;
     }
-    chars.all(|character| character.is_ascii_alphanumeric() || matches!(character, '_' | '-' | '?' | '!' | '/'))
+    chars.all(|character| {
+        character.is_ascii_alphanumeric() || matches!(character, '_' | '-' | '?' | '!' | '/')
+    })
 }

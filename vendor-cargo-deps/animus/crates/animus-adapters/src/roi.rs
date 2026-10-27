@@ -17,9 +17,7 @@
 )]
 
 use crate::artifact::Hash;
-use crate::validation::AdapterContractError;
-use crate::validation::FieldName;
-use crate::validation::{self};
+use crate::validation::{self, AdapterContractError, FieldName};
 
 const REQUEST_ID_FIELD: FieldName = FieldName::new("roi_request_id");
 const FOCUS_FIELD: FieldName = FieldName::new("roi_focus");
@@ -607,7 +605,11 @@ pub fn parse_roi_action_label(label: &str) -> RoiResult<RoiRecommendedAction> {
         DELEGATE_LABEL => Ok(RoiRecommendedAction::Delegate),
         DISMISS_LABEL => Ok(RoiRecommendedAction::Dismiss),
         NO_OP_LABEL => Ok(RoiRecommendedAction::NoOp),
-        _ => Err(diagnostic(RoiDiagnosticCode::UnsupportedAction, None, "unsupported ROI action")),
+        _ => Err(diagnostic(
+            RoiDiagnosticCode::UnsupportedAction,
+            None,
+            "unsupported ROI action",
+        )),
     }
 }
 
@@ -617,30 +619,62 @@ pub fn parse_roi_action_label(label: &str) -> RoiResult<RoiRecommendedAction> {
 ///
 /// Returns [`RoiDiagnostic`] when required fields are missing, text/evidence is
 /// unsafe, score dimensions are invalid, or action labels are unsupported.
-pub fn validate_roi_report(draft: &RoiRecommendationReportDraft<'_>) -> RoiResult<RoiRecommendationReport> {
+pub fn validate_roi_report(
+    draft: &RoiRecommendationReportDraft<'_>,
+) -> RoiResult<RoiRecommendationReport> {
     let request_id = safe_text(REQUEST_ID_FIELD, draft.request_id, None)?;
-    let focus = safe_bounded_text(FOCUS_FIELD, draft.focus, MAX_TEXT_CHARS, Some(request_id.as_str()))?;
-    let best_next_step =
-        safe_bounded_text(BEST_NEXT_STEP_FIELD, draft.best_next_step, MAX_TEXT_CHARS, Some(request_id.as_str()))?;
+    let focus = safe_bounded_text(
+        FOCUS_FIELD,
+        draft.focus,
+        MAX_TEXT_CHARS,
+        Some(request_id.as_str()),
+    )?;
+    let best_next_step = safe_bounded_text(
+        BEST_NEXT_STEP_FIELD,
+        draft.best_next_step,
+        MAX_TEXT_CHARS,
+        Some(request_id.as_str()),
+    )?;
     let score = validate_score(draft.score)?;
-    let first_actions =
-        validate_text_list("roi_first_actions", draft.first_actions, MAX_FIRST_ACTIONS, Some(request_id.as_str()))?;
+    let first_actions = validate_text_list(
+        "roi_first_actions",
+        draft.first_actions,
+        MAX_FIRST_ACTIONS,
+        Some(request_id.as_str()),
+    )?;
     validate_collection_limit("roi_runner_ups", draft.runner_ups.len(), MAX_RUNNER_UPS)?;
     let mut runner_ups = Collection::with_capacity(draft.runner_ups.len());
     for runner in draft.runner_ups {
         runner_ups.push(validate_runner_up(runner, request_id.as_str())?);
     }
-    let lifecycle_status =
-        safe_bounded_text(LIFECYCLE_STATUS_FIELD, draft.lifecycle_status, MAX_TEXT_CHARS, Some(request_id.as_str()))?;
+    let lifecycle_status = safe_bounded_text(
+        LIFECYCLE_STATUS_FIELD,
+        draft.lifecycle_status,
+        MAX_TEXT_CHARS,
+        Some(request_id.as_str()),
+    )?;
     let recommended_action = parse_roi_action_label(draft.recommended_action)?;
-    let reason = safe_bounded_text(REASON_FIELD, draft.reason, MAX_REASON_CHARS, Some(request_id.as_str()))?;
-    validate_collection_limit("roi_missing_context", draft.missing_context.len(), MAX_MISSING_CONTEXT)?;
+    let reason = safe_bounded_text(
+        REASON_FIELD,
+        draft.reason,
+        MAX_REASON_CHARS,
+        Some(request_id.as_str()),
+    )?;
+    validate_collection_limit(
+        "roi_missing_context",
+        draft.missing_context.len(),
+        MAX_MISSING_CONTEXT,
+    )?;
     let mut missing_context = Collection::with_capacity(draft.missing_context.len());
     for item in draft.missing_context {
         missing_context.push(validate_missing_context(item, request_id.as_str())?);
     }
-    let evidence_labels =
-        validate_text_list("roi_evidence_labels", draft.evidence_labels, MAX_EVIDENCE_REFS, Some(request_id.as_str()))?;
+    let evidence_labels = validate_text_list(
+        "roi_evidence_labels",
+        draft.evidence_labels,
+        MAX_EVIDENCE_REFS,
+        Some(request_id.as_str()),
+    )?;
     let evidence_hashes = validate_hashes(draft.evidence_hashes)?;
 
     Ok(RoiRecommendationReport {
@@ -690,7 +724,11 @@ pub fn admit_roi_action(
         return RoiActionAdmission {
             status: RoiActionAdmissionStatus::ServiceUnavailable,
             descriptor: None,
-            diagnostic: Some(diagnostic(RoiDiagnosticCode::ServiceUnavailable, None, "ROI host service unavailable")),
+            diagnostic: Some(diagnostic(
+                RoiDiagnosticCode::ServiceUnavailable,
+                None,
+                "ROI host service unavailable",
+            )),
         };
     }
     if !host_policy_allows {
@@ -740,7 +778,11 @@ pub fn plan_roi_workflow(service_status: RoiHostServiceStatus) -> RoiWorkflowPla
 /// hash is malformed.
 pub fn validate_roi_receipt(draft: &RoiReceiptDraft<'_>) -> RoiResult<RoiReceipt> {
     let request_id = safe_text(REQUEST_ID_FIELD, draft.request_id, None)?;
-    let status = safe_text(RECEIPT_STATUS_FIELD, draft.status, Some(request_id.as_str()))?;
+    let status = safe_text(
+        RECEIPT_STATUS_FIELD,
+        draft.status,
+        Some(request_id.as_str()),
+    )?;
     let report_hash = safe_hash(draft.report_hash)?;
     let issue_code = draft
         .issue_code
@@ -771,22 +813,39 @@ fn validate_score(score: RoiScoreInputDraft) -> RoiResult<RoiScoreInput> {
 
 fn validate_runner_up(draft: &RoiRunnerUpDraft<'_>, request_id: &str) -> RoiResult<RoiRunnerUp> {
     Ok(RoiRunnerUp {
-        label: safe_bounded_text(RUNNER_UP_FIELD, draft.label, MAX_TEXT_CHARS, Some(request_id))?,
+        label: safe_bounded_text(
+            RUNNER_UP_FIELD,
+            draft.label,
+            MAX_TEXT_CHARS,
+            Some(request_id),
+        )?,
         reason: safe_bounded_text(REASON_FIELD, draft.reason, MAX_TEXT_CHARS, Some(request_id))?,
         score: validate_score(draft.score)?,
     })
 }
 
-fn validate_missing_context(draft: &RoiMissingContextDraft<'_>, request_id: &str) -> RoiResult<RoiMissingContext> {
+fn validate_missing_context(
+    draft: &RoiMissingContextDraft<'_>,
+    request_id: &str,
+) -> RoiResult<RoiMissingContext> {
     Ok(RoiMissingContext {
-        label: safe_bounded_text(MISSING_CONTEXT_FIELD, draft.label, MAX_TEXT_CHARS, Some(request_id))?,
+        label: safe_bounded_text(
+            MISSING_CONTEXT_FIELD,
+            draft.label,
+            MAX_TEXT_CHARS,
+            Some(request_id),
+        )?,
         blocking: draft.blocking,
     })
 }
 
 fn validate_score_value(value: u8) -> RoiResult<()> {
     if !(MIN_SCORE..=MAX_SCORE).contains(&value) {
-        return Err(diagnostic(RoiDiagnosticCode::InvalidScore, None, "ROI score outside range"));
+        return Err(diagnostic(
+            RoiDiagnosticCode::InvalidScore,
+            None,
+            "ROI score outside range",
+        ));
     }
     Ok(())
 }
@@ -800,7 +859,12 @@ fn validate_text_list(
     validate_non_empty_bound(field, values.len(), max_len)?;
     let mut result = Collection::with_capacity(values.len());
     for value in values {
-        result.push(safe_bounded_text(EVIDENCE_LABEL_FIELD, value, MAX_TEXT_CHARS, request_id)?);
+        result.push(safe_bounded_text(
+            EVIDENCE_LABEL_FIELD,
+            value,
+            MAX_TEXT_CHARS,
+            request_id,
+        )?);
     }
     Ok(result)
 }
@@ -836,18 +900,31 @@ fn validate_collection_limit(field: &'static str, len: usize, max: usize) -> Roi
     Ok(())
 }
 
-fn safe_bounded_text(field: FieldName, value: &str, max_chars: usize, subject_id: Option<&str>) -> RoiResult<Text> {
+fn safe_bounded_text(
+    field: FieldName,
+    value: &str,
+    max_chars: usize,
+    subject_id: Option<&str>,
+) -> RoiResult<Text> {
     let text = safe_text(field, value, subject_id)?;
     if text.chars().count() > max_chars {
-        return Err(diagnostic(RoiDiagnosticCode::FieldTooLong, subject_id, field.as_str()));
+        return Err(diagnostic(
+            RoiDiagnosticCode::FieldTooLong,
+            subject_id,
+            field.as_str(),
+        ));
     }
     Ok(text)
 }
 
 fn safe_text(field: FieldName, value: &str, subject_id: Option<&str>) -> RoiResult<Text> {
-    let normalized = validation::normalized_adapter_field(field, value).map_err(|error| map_adapter_error(&error))?;
+    let normalized = validation::normalized_adapter_field(field, value)
+        .map_err(|error| map_adapter_error(&error))?;
     let lower = normalized.to_ascii_lowercase();
-    if UNSAFE_ROI_MARKERS.iter().any(|marker| lower.contains(marker)) {
+    if UNSAFE_ROI_MARKERS
+        .iter()
+        .any(|marker| lower.contains(marker))
+    {
         return Err(diagnostic(
             RoiDiagnosticCode::UnsafeEvidence,
             subject_id,
@@ -858,24 +935,36 @@ fn safe_text(field: FieldName, value: &str, subject_id: Option<&str>) -> RoiResu
 }
 
 fn safe_hash(value: &str) -> RoiResult<Text> {
-    let normalized =
-        validation::normalized_adapter_field(HASH_FIELD, value).map_err(|error| map_adapter_error(&error))?;
+    let normalized = validation::normalized_adapter_field(HASH_FIELD, value)
+        .map_err(|error| map_adapter_error(&error))?;
     if Hash::new(&normalized).is_ok() {
         Ok(normalized)
     } else {
-        Err(diagnostic(RoiDiagnosticCode::InvalidHash, None, HASH_FIELD.as_str()))
+        Err(diagnostic(
+            RoiDiagnosticCode::InvalidHash,
+            None,
+            HASH_FIELD.as_str(),
+        ))
     }
 }
 
 fn map_adapter_error(error: &AdapterContractError) -> RoiDiagnostic {
     match error {
-        AdapterContractError::EmptyField { field } => diagnostic(RoiDiagnosticCode::EmptyField, None, field),
-        AdapterContractError::FieldTooLong { field, .. } => diagnostic(RoiDiagnosticCode::FieldTooLong, None, field),
-        AdapterContractError::NulCharacter { field, .. } => diagnostic(RoiDiagnosticCode::NulCharacter, None, field),
+        AdapterContractError::EmptyField { field } => {
+            diagnostic(RoiDiagnosticCode::EmptyField, None, field)
+        }
+        AdapterContractError::FieldTooLong { field, .. } => {
+            diagnostic(RoiDiagnosticCode::FieldTooLong, None, field)
+        }
+        AdapterContractError::NulCharacter { field, .. } => {
+            diagnostic(RoiDiagnosticCode::NulCharacter, None, field)
+        }
         AdapterContractError::InvalidEvidenceHash { field, .. } => {
             diagnostic(RoiDiagnosticCode::InvalidHash, None, field)
         }
-        AdapterContractError::EmptyCollection { field } => diagnostic(RoiDiagnosticCode::EmptyCollection, None, field),
+        AdapterContractError::EmptyCollection { field } => {
+            diagnostic(RoiDiagnosticCode::EmptyCollection, None, field)
+        }
         AdapterContractError::UnsupportedStatusState { field, .. }
         | AdapterContractError::UnsupportedStatusObservationKind { field, .. }
         | AdapterContractError::UnsupportedSessionReferenceKind { field, .. }
@@ -965,7 +1054,10 @@ mod tests {
 
         assert_eq!(report.request_id(), REQUEST_ID);
         assert_eq!(report.best_next_step(), BEST_NEXT_STEP);
-        assert_eq!(report.recommended_action(), RoiRecommendedAction::LifecycleFirst);
+        assert_eq!(
+            report.recommended_action(),
+            RoiRecommendedAction::LifecycleFirst
+        );
         assert_eq!(report.runner_ups().len(), 1);
         assert_eq!(report.missing_context().len(), 1);
         assert_eq!(workflow.status(), RoiWorkflowStatus::ServiceUnavailable);
@@ -994,7 +1086,8 @@ mod tests {
             ..report_draft(BEGIN_NOW_LABEL)
         })
         .expect_err("out-of-range score must fail");
-        let unknown_action = parse_roi_action_label("auto-implement").expect_err("unknown action labels must fail");
+        let unknown_action =
+            parse_roi_action_label("auto-implement").expect_err("unknown action labels must fail");
 
         assert_eq!(unsafe_error.code(), RoiDiagnosticCode::UnsafeEvidence);
         assert_eq!(missing_error.code(), RoiDiagnosticCode::EmptyField);
@@ -1013,8 +1106,14 @@ mod tests {
         let admitted = admit_roi_action(&descriptor, RoiHostServiceStatus::Available, true);
 
         assert_eq!(descriptor.action(), RoiRecommendedAction::LifecycleFirst);
-        assert_eq!(descriptor.lifecycle_route(), RoiLifecycleRouteKind::LifecycleFirst);
-        assert_eq!(missing.status(), RoiActionAdmissionStatus::ServiceUnavailable);
+        assert_eq!(
+            descriptor.lifecycle_route(),
+            RoiLifecycleRouteKind::LifecycleFirst
+        );
+        assert_eq!(
+            missing.status(),
+            RoiActionAdmissionStatus::ServiceUnavailable
+        );
         assert_eq!(denied.status(), RoiActionAdmissionStatus::PolicyDenied);
         assert_eq!(admitted.status(), RoiActionAdmissionStatus::Admitted);
     }

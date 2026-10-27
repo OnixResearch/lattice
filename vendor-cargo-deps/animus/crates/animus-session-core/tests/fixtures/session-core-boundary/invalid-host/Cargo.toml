@@ -1,0 +1,8 @@
+[package]
+name = "animus-session-core-boundary-invalid-host"
+version = "0.0.0"
+edition = "2024"
+
+[dependencies]
+animus-adapters = { path = "../../../../animus-adapters" }
+reqwest = "0.12"

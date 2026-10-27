@@ -1,0 +1,1915 @@
+//! Imperative shell for portable remote-failure debug bundles.
+//!
+//! Pure validation, canonicalization, replay, comparison, and retention
+//! decisions live in `crunch_build::distributed::remote_failure_debug`.
+//!
+//! r[impl operator_diagnostics.remote_failure_debug_bundle]
+//! r[impl operator_diagnostics.remote_failure_replay]
+//! r[impl remote_builds.failure_debug_capture]
+
+#[cfg(target_os = "linux")]
+use std::ffi::CString;
+use std::fs;
+use std::fs::File;
+use std::io::Read;
+use std::io::Write;
+#[cfg(target_os = "linux")]
+use std::os::unix::ffi::OsStrExt;
+#[cfg(unix)]
+use std::os::unix::fs::OpenOptionsExt;
+use std::path::Path;
+use std::path::PathBuf;
+
+use crunch_build::distributed::RemoteFailureCaptureObservation;
+use crunch_build::distributed::RemoteFailureCaptureObservedKind;
+use crunch_build::distributed::RemoteFailureCapturedArtifact;
+use crunch_build::distributed::RemoteFailureCapturedArtifactManifest;
+use crunch_build::distributed::RemoteFailureDebugBundle;
+use crunch_build::distributed::RemoteFailureDebugBundleFacts;
+use crunch_build::distributed::RemoteFailureDebugDigest;
+use crunch_build::distributed::RemoteFailureDebugPhase;
+use crunch_build::distributed::RemoteFailureDebugPolicy;
+use crunch_build::distributed::RemoteFailureDebugReasonCode;
+use crunch_build::distributed::RemoteFailureDebugRef;
+use crunch_build::distributed::RemoteFailureImmutableLogRef;
+use crunch_build::distributed::RemoteFailureInspectSummary;
+use crunch_build::distributed::RemoteFailureReplayAvailability;
+use crunch_build::distributed::RemoteFailureReplayPlan;
+use crunch_build::distributed::RemoteFailureRetentionRecord;
+use crunch_build::distributed::RemoteFailureWorkspaceMode;
+use crunch_build::distributed::admit_remote_failure_capture_observations;
+use crunch_build::distributed::inspect_remote_failure_debug_bundle;
+use crunch_build::distributed::plan_remote_failure_capture;
+use crunch_build::distributed::plan_remote_failure_replay;
+use crunch_build::distributed::plan_remote_failure_retention;
+use crunch_build::distributed::remote_failure_capture_object_digest;
+use crunch_build::distributed::remote_failure_debug_ref;
+use crunch_build::distributed::seal_remote_failure_captured_artifact_manifest;
+use crunch_build::distributed::seal_remote_failure_debug_bundle;
+use crunch_build::distributed::validate_remote_failure_debug_bundle;
+use serde::Deserialize;
+use serde::Serialize;
+
+use crate::release_capability::ReleaseCapabilityRoot;
+use crate::release_capability::ReleaseRootKind;
+use crate::release_capability::ValidatedReleasePath;
+use crate::remote_build::ConcreteBuildRequest;
+use crate::remote_build::RemoteAttemptLogControlSummary;
+use crate::remote_build::RemoteProductionAttemptBinding;
+
+pub const REMOTE_FAILURE_DEBUG_STORE_DIR: &str = "remote-failure-debug";
+const BUNDLES_DIR: &str = "bundles";
+const OBJECTS_DIR: &str = "objects";
+const CAPTURE_CAS_DIR: &str = "capture-cas";
+const LEASES_DIR: &str = "leases";
+const MANIFEST_FILE: &str = "manifest.json";
+const POLICY_FILE: &str = "policy.json";
+const OBJECT_EXTENSION: &str = "json";
+const CAPTURE_EXTENSION: &str = "bin";
+const OBJECT_ENVELOPE_SCHEMA: &str = "mantle-remote-failure-debug-object-v1";
+const LEASE_SCHEMA: &str = "mantle-remote-failure-debug-lease-v1";
+const STAGE_PREFIX: &str = ".mantle-remote-failure-stage-";
+const MAX_BUNDLE_DIRECTORY_ENTRIES: usize = 256;
+const MAX_OBJECT_FILE_BYTES: u64 = crunch_build::distributed::MAX_REMOTE_FAILURE_OBJECT_BYTES;
+const MAX_MANIFEST_FILE_BYTES: u64 = crunch_build::distributed::MAX_REMOTE_FAILURE_METADATA_BYTES;
+const MAX_POLICY_FILE_BYTES: u64 = 131_072;
+const MAX_LEASE_FILE_BYTES: u64 = 4_096;
+const MAX_LEASES_PER_BUNDLE: usize = 64;
+const MAX_REMOTE_WORKER_STATE_DIRS: usize = 64;
+const RANDOM_BYTES: usize = 16;
+const MAX_REPLAY_ACTION_JSON_NODES: usize = 65_536;
+const TEMP_CREATE_ATTEMPTS_MAX: u32 = 16;
+const BOUNDED_READ_PROBE_BYTES: u64 = 1;
+const BOUNDED_READ_PROBE_CAPACITY: usize = 1;
+const SECRET_KEY_MARKERS: &[&str] = &[
+    "password",
+    "secret",
+    "token",
+    "credential",
+    "access_key",
+    "api_key",
+    "private_key",
+    "private-key",
+];
+const SECRET_TEXT_MARKERS: &[&str] = &[
+    "bearer ",
+    "token=",
+    "secret=",
+    "begin private key",
+    "begin openssh private key",
+];
+#[cfg(unix)]
+const PRIVATE_FILE_MODE: u32 = 0o600;
+#[cfg(unix)]
+const PRIVATE_DIR_MODE: u32 = 0o700;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemoteFailureDebugSourceFacts {
+    pub request: ConcreteBuildRequest,
+    pub attempt: RemoteProductionAttemptBinding,
+    pub immutable_log: Option<RemoteAttemptLogControlSummary>,
+    pub route_class: String,
+    pub worker_capability_classes: Vec<String>,
+    pub sandbox_policy_class: String,
+    pub network_policy_class: String,
+    pub transfer_status_class: String,
+    pub admission_status_class: String,
+    pub workspace_mode: RemoteFailureWorkspaceMode,
+    pub failure_phase: RemoteFailureDebugPhase,
+    pub failure_reason_code: String,
+    pub cleanup_status_code: String,
+    pub created_unix_s: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemoteFailureDebugPublishRequest<'a> {
+    pub state_dir: &'a Path,
+    pub capture_root: Option<&'a Path>,
+    pub facts: RemoteFailureDebugSourceFacts,
+    pub policy: RemoteFailureDebugPolicy,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RemoteFailureDebugPublishOutcome {
+    pub bundle_ref: String,
+    pub bundle_blake3: RemoteFailureDebugDigest,
+    pub capture_outcome_code: String,
+    pub cleanup_status_code: String,
+    pub immutable_log_available: bool,
+    pub non_claim: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RemoteFailureDebugObjectEnvelope {
+    schema: String,
+    kind: String,
+    payload: serde_json::Value,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RemoteFailureRouteObject {
+    route_class: String,
+    job_id: String,
+    attempt_id: String,
+    fence_generation: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RemoteFailureWorkerObject {
+    capability_classes: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RemoteFailureInputObject {
+    input_refs: Vec<String>,
+    source_input_refs: Vec<String>,
+    upload_bytes: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RemoteFailureClassObject {
+    class: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RemoteFailureRedactedActionObject {
+    reason_code: String,
+    request_blake3: RemoteFailureDebugDigest,
+    expected_output_count: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RemoteFailureLeaseRecord {
+    schema: String,
+    bundle_blake3: RemoteFailureDebugDigest,
+    expires_unix_s: u64,
+}
+
+#[derive(Debug)]
+pub struct RemoteFailureDebugLease {
+    path: PathBuf,
+}
+
+impl Drop for RemoteFailureDebugLease {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RemoteFailureDebugRetentionReport {
+    pub preserved_count: u32,
+    pub deleted_count: u32,
+    pub failed_deletions: Vec<String>,
+}
+
+#[derive(Debug)]
+struct BundleStage {
+    stage_path: PathBuf,
+    final_path: PathBuf,
+}
+
+pub fn publish_remote_failure_debug_bundle(
+    request: RemoteFailureDebugPublishRequest<'_>,
+) -> Result<RemoteFailureDebugPublishOutcome, String> {
+    request.policy.validate().map_err(reason)?;
+    let bundles_root = request.state_dir.join(REMOTE_FAILURE_DEBUG_STORE_DIR).join(BUNDLES_DIR);
+    ensure_private_directory(&bundles_root)?;
+    let stage = create_bundle_stage(&bundles_root)?;
+    let result = assemble_bundle_stage(&stage, &request);
+    match result {
+        Ok((bundle, capture_outcome_code)) => commit_bundle_stage(stage, bundle, capture_outcome_code),
+        Err(error) => {
+            let cleanup = fs::remove_dir_all(&stage.stage_path);
+            if let Err(cleanup_error) = cleanup {
+                return Err(format!("{error}; remote-failure-stage-cleanup-failed: {cleanup_error}"));
+            }
+            Err(error)
+        }
+    }
+}
+
+pub fn load_and_validate_remote_failure_debug_bundle(
+    bundle_dir: &Path,
+) -> Result<(RemoteFailureDebugBundle, RemoteFailureDebugPolicy), String> {
+    require_real_directory(bundle_dir, "bundle")?;
+    let policy: RemoteFailureDebugPolicy =
+        read_bounded_json(&bundle_dir.join(POLICY_FILE), MAX_POLICY_FILE_BYTES, "policy")?;
+    policy.validate().map_err(reason)?;
+    let bundle: RemoteFailureDebugBundle =
+        read_bounded_json(&bundle_dir.join(MANIFEST_FILE), MAX_MANIFEST_FILE_BYTES, "manifest")?;
+    validate_remote_failure_debug_bundle(&bundle, &policy).map_err(reason)?;
+    validate_bundle_object_refs(bundle_dir, &bundle, &policy)?;
+    validate_capture_manifest_and_objects(bundle_dir, &bundle, &policy)?;
+    Ok((bundle, policy))
+}
+
+pub fn inspect_remote_failure_debug_bundle_from_disk(bundle_dir: &Path) -> Result<RemoteFailureInspectSummary, String> {
+    let (bundle, policy) = load_and_validate_remote_failure_debug_bundle(bundle_dir)?;
+    inspect_remote_failure_debug_bundle(&bundle, &policy).map_err(reason)
+}
+
+pub fn plan_remote_failure_replay_from_disk(bundle_dir: &Path) -> Result<RemoteFailureReplayPlan, String> {
+    let (bundle, policy) = load_and_validate_remote_failure_debug_bundle(bundle_dir)?;
+    let available_refs = collect_available_object_refs(bundle_dir, &bundle)?;
+    plan_remote_failure_replay(&bundle, &policy, &RemoteFailureReplayAvailability {
+        available_refs,
+        current_policy_allows_replay: policy.replay_enabled,
+    })
+    .map_err(reason)
+}
+
+pub fn load_remote_failure_replay_request(bundle_dir: &Path) -> Result<ConcreteBuildRequest, String> {
+    let (bundle, policy) = load_and_validate_remote_failure_debug_bundle(bundle_dir)?;
+    let plan = plan_remote_failure_replay_from_disk(bundle_dir)?;
+    if !plan.executable {
+        return Err(format!("remote-failure-replay-blocked:{}", plan.blockers.join(",")));
+    }
+    let envelope = read_object_envelope(bundle_dir, &bundle.action_ref, &policy)?;
+    if envelope.kind != "action-request" {
+        return Err("remote-failure-action-object-kind-mismatch".to_string());
+    }
+    let mut replay: ConcreteBuildRequest = serde_json::from_value(envelope.payload)
+        .map_err(|error| format!("remote-failure-action-object-invalid: {error}"))?;
+    replay.production_attempt = None;
+    replay.transfer_policy = None;
+    replay.failure_replay = None;
+    validate_replay_request_matches_bundle(&replay, &bundle)?;
+    Ok(replay)
+}
+
+// Public lease API preserves the established timestamp/duration ordering used
+// by the CLI and tests; units are explicit in both parameter names.
+#[allow(
+    tigerstyle::ambiguous_params,
+    reason = "public compatibility boundary uses explicit unix-second and duration-second names"
+)]
+pub fn acquire_remote_failure_debug_lease(
+    bundle_dir: &Path,
+    now_unix_s: u64,
+    lease_duration_secs: u64,
+) -> Result<RemoteFailureDebugLease, String> {
+    let (bundle, _) = load_and_validate_remote_failure_debug_bundle(bundle_dir)?;
+    if lease_duration_secs == 0 {
+        return Err("remote-failure-lease-duration-zero".to_string());
+    }
+    let expires_unix_s = now_unix_s
+        .checked_add(lease_duration_secs)
+        .ok_or_else(|| "remote-failure-lease-expiry-overflow".to_string())?;
+    let leases = bundle_dir.join(LEASES_DIR);
+    ensure_private_directory(&leases)?;
+    if count_directory_entries_bounded(&leases, MAX_LEASES_PER_BUNDLE)? >= MAX_LEASES_PER_BUNDLE {
+        return Err("remote-failure-lease-limit-exceeded".to_string());
+    }
+    let path = leases.join(format!("{}.json", random_hex()?));
+    let record = RemoteFailureLeaseRecord {
+        schema: LEASE_SCHEMA.to_string(),
+        bundle_blake3: bundle.bundle_blake3,
+        expires_unix_s,
+    };
+    write_new_private_file(&path, &serde_json::to_vec(&record).map_err(|error| error.to_string())?)?;
+    debug_assert!(expires_unix_s > now_unix_s);
+    debug_assert!(path.starts_with(&leases));
+    Ok(RemoteFailureDebugLease { path })
+}
+
+pub fn retain_remote_failure_debug_bundles(
+    state_dir: &Path,
+    now_unix_s: u64,
+) -> Result<RemoteFailureDebugRetentionReport, String> {
+    let bundles_root = state_dir.join(REMOTE_FAILURE_DEBUG_STORE_DIR).join(BUNDLES_DIR);
+    if !bundles_root.exists() {
+        return Ok(RemoteFailureDebugRetentionReport {
+            preserved_count: 0,
+            deleted_count: 0,
+            failed_deletions: Vec::new(),
+        });
+    }
+    require_real_directory(&bundles_root, "bundles-root")?;
+    let entries = collect_bundle_directories(&bundles_root)?;
+    let mut records = Vec::with_capacity(entries.len());
+    for entry in &entries {
+        let (bundle, _) = load_and_validate_remote_failure_debug_bundle(entry)?;
+        records.push(RemoteFailureRetentionRecord {
+            bundle_blake3: bundle.bundle_blake3,
+            expires_unix_s: bundle.expires_unix_s,
+            active_lease: bundle_has_active_lease(entry, now_unix_s)?,
+            ordinary_build_output: false,
+        });
+    }
+    let record_count = records.len();
+    let plan = plan_remote_failure_retention(records, now_unix_s).map_err(reason)?;
+    let mut failed_deletions = Vec::with_capacity(plan.delete.len());
+    let mut deleted_count = 0_u32;
+    for digest in &plan.delete {
+        let path = bundles_root.join(digest.as_str());
+        match fs::remove_dir_all(&path) {
+            Ok(()) => deleted_count = deleted_count.saturating_add(1),
+            Err(error) => failed_deletions.push(format!("delete-failed:{error}")),
+        }
+    }
+    let preserved_count = u32::try_from(plan.preserve.len()).map_err(|_| "remote-failure-preserve-count-overflow")?;
+    debug_assert!(plan.preserve.len() <= record_count);
+    debug_assert!(failed_deletions.len() <= plan.delete.len());
+    Ok(RemoteFailureDebugRetentionReport {
+        preserved_count,
+        deleted_count,
+        failed_deletions,
+    })
+}
+
+struct BundleObjectRefs {
+    action: RemoteFailureDebugRef,
+    route: RemoteFailureDebugRef,
+    worker_capability: RemoteFailureDebugRef,
+    input_manifest: RemoteFailureDebugRef,
+    sandbox_policy: RemoteFailureDebugRef,
+    network_policy: RemoteFailureDebugRef,
+    transfer: Option<RemoteFailureDebugRef>,
+    admission: Option<RemoteFailureDebugRef>,
+}
+
+fn assemble_bundle_stage(
+    stage: &BundleStage,
+    request: &RemoteFailureDebugPublishRequest<'_>,
+) -> Result<(RemoteFailureDebugBundle, String), String> {
+    ensure_private_directory(&stage.stage_path.join(OBJECTS_DIR))?;
+    ensure_private_directory(&stage.stage_path.join(CAPTURE_CAS_DIR))?;
+    let object_refs = write_bundle_object_refs(stage, request)?;
+    let (captured_artifact_manifest_ref, capture_outcome_code) = capture_failed_artifacts(stage, request)?;
+    let immutable_log = request.facts.immutable_log.as_ref().map(immutable_log_ref_from_summary).transpose()?;
+    let expires_unix_s = request
+        .facts
+        .created_unix_s
+        .checked_add(request.policy.retention_secs)
+        .ok_or_else(|| "remote-failure-expiry-overflow".to_string())?;
+    let facts = assemble_bundle_facts(BundleFactsInput {
+        request,
+        refs: object_refs,
+        immutable_log,
+        captured_artifact_manifest_ref,
+        capture_outcome_code: capture_outcome_code.clone(),
+        expires_unix_s,
+    });
+    let bundle = seal_remote_failure_debug_bundle(facts, &request.policy).map_err(reason)?;
+    write_bundle_documents(stage, request, &bundle)?;
+    debug_assert!(stage.stage_path.join(POLICY_FILE).is_file());
+    debug_assert!(stage.stage_path.join(MANIFEST_FILE).is_file());
+    Ok((bundle, capture_outcome_code))
+}
+
+fn write_bundle_object_refs(
+    stage: &BundleStage,
+    request: &RemoteFailureDebugPublishRequest<'_>,
+) -> Result<BundleObjectRefs, String> {
+    let action = write_replay_action_object(&stage.stage_path, &request.facts.request, &request.policy)?;
+    let route = write_json_object(
+        &stage.stage_path,
+        "route-assignment",
+        &RemoteFailureRouteObject {
+            route_class: request.facts.route_class.clone(),
+            job_id: request.facts.attempt.job_id.as_str().to_string(),
+            attempt_id: request.facts.attempt.attempt_id.as_str().to_string(),
+            fence_generation: request.facts.attempt.fence_generation.get(),
+        },
+        &request.policy,
+    )?;
+    let worker_capability = write_worker_capability_object(stage, request)?;
+    let input_manifest = write_json_object(
+        &stage.stage_path,
+        "declared-inputs",
+        &RemoteFailureInputObject {
+            input_refs: sorted_unique(request.facts.request.input_refs.clone()),
+            source_input_refs: sorted_unique(request.facts.request.source_input_refs.clone()),
+            upload_bytes: request.facts.request.upload_bytes,
+        },
+        &request.policy,
+    )?;
+    let sandbox_policy = write_class_object(ClassObjectInput {
+        stage_path: &stage.stage_path,
+        kind: "sandbox-policy",
+        class: &request.facts.sandbox_policy_class,
+        policy: &request.policy,
+    })?;
+    let network_policy = write_class_object(ClassObjectInput {
+        stage_path: &stage.stage_path,
+        kind: "network-policy",
+        class: &request.facts.network_policy_class,
+        policy: &request.policy,
+    })?;
+    let transfer = optional_class_object(ClassObjectInput {
+        stage_path: &stage.stage_path,
+        kind: "transfer-state",
+        class: &request.facts.transfer_status_class,
+        policy: &request.policy,
+    })?;
+    let admission = optional_class_object(ClassObjectInput {
+        stage_path: &stage.stage_path,
+        kind: "admission-state",
+        class: &request.facts.admission_status_class,
+        policy: &request.policy,
+    })?;
+    debug_assert!(!action.kind.is_empty());
+    debug_assert!(!route.kind.is_empty());
+    Ok(BundleObjectRefs {
+        action,
+        route,
+        worker_capability,
+        input_manifest,
+        sandbox_policy,
+        network_policy,
+        transfer,
+        admission,
+    })
+}
+
+struct BundleFactsInput<'a> {
+    request: &'a RemoteFailureDebugPublishRequest<'a>,
+    refs: BundleObjectRefs,
+    immutable_log: Option<RemoteFailureImmutableLogRef>,
+    captured_artifact_manifest_ref: Option<RemoteFailureDebugRef>,
+    capture_outcome_code: String,
+    expires_unix_s: u64,
+}
+
+fn write_worker_capability_object(
+    stage: &BundleStage,
+    request: &RemoteFailureDebugPublishRequest<'_>,
+) -> Result<RemoteFailureDebugRef, String> {
+    let mut capabilities = request.facts.worker_capability_classes.clone();
+    capabilities.sort();
+    capabilities.dedup();
+    write_json_object(
+        &stage.stage_path,
+        "worker-capabilities",
+        &RemoteFailureWorkerObject {
+            capability_classes: capabilities,
+        },
+        &request.policy,
+    )
+}
+
+fn assemble_bundle_facts(input: BundleFactsInput<'_>) -> RemoteFailureDebugBundleFacts {
+    let BundleFactsInput {
+        request,
+        refs,
+        immutable_log,
+        captured_artifact_manifest_ref,
+        capture_outcome_code,
+        expires_unix_s,
+    } = input;
+    debug_assert!(expires_unix_s >= request.facts.created_unix_s);
+    debug_assert!(!capture_outcome_code.is_empty());
+    RemoteFailureDebugBundleFacts {
+        action_ref: refs.action,
+        route_ref: refs.route,
+        worker_capability_ref: refs.worker_capability,
+        input_manifest_ref: refs.input_manifest,
+        sandbox_policy_ref: refs.sandbox_policy,
+        network_policy_ref: refs.network_policy,
+        immutable_log,
+        transfer_ref: refs.transfer,
+        admission_ref: refs.admission,
+        captured_artifact_manifest_ref,
+        original_job_id: request.facts.attempt.job_id.clone(),
+        original_attempt_id: request.facts.attempt.attempt_id.clone(),
+        original_fence_generation: request.facts.attempt.fence_generation,
+        workspace_mode: request.facts.workspace_mode,
+        failure_phase: request.facts.failure_phase,
+        failure_reason_code: request.facts.failure_reason_code.clone(),
+        capture_outcome_code,
+        cleanup_status_code: request.facts.cleanup_status_code.clone(),
+        created_unix_s: request.facts.created_unix_s,
+        expires_unix_s,
+        non_claims: Vec::new(),
+    }
+}
+
+fn write_bundle_documents(
+    stage: &BundleStage,
+    request: &RemoteFailureDebugPublishRequest<'_>,
+    bundle: &RemoteFailureDebugBundle,
+) -> Result<(), String> {
+    write_new_private_file(
+        &stage.stage_path.join(POLICY_FILE),
+        &serde_json::to_vec(&request.policy)
+            .map_err(|error| format!("remote-failure-policy-serialize-failed:{error}"))?,
+    )?;
+    write_new_private_file(
+        &stage.stage_path.join(MANIFEST_FILE),
+        &serde_json::to_vec(bundle).map_err(|error| format!("remote-failure-manifest-serialize-failed:{error}"))?,
+    )?;
+    sync_directory(&stage.stage_path)
+}
+
+fn commit_bundle_stage(
+    mut stage: BundleStage,
+    bundle: RemoteFailureDebugBundle,
+    capture_outcome_code: String,
+) -> Result<RemoteFailureDebugPublishOutcome, String> {
+    let final_parent = stage
+        .final_path
+        .parent()
+        .ok_or_else(|| "remote-failure-final-parent-missing".to_string())?
+        .to_path_buf();
+    stage.final_path = final_parent.join(bundle.bundle_blake3.as_str());
+    match rename_no_replace(&stage.stage_path, &stage.final_path) {
+        Ok(()) => sync_directory(&final_parent)?,
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            fs::remove_dir_all(&stage.stage_path)
+                .map_err(|cleanup| format!("remote-failure-idempotent-stage-cleanup-failed:{cleanup}"))?;
+            let (existing, _) = load_and_validate_remote_failure_debug_bundle(&stage.final_path)?;
+            if existing != bundle {
+                return Err("remote-failure-no-clobber-conflict".to_string());
+            }
+        }
+        Err(error) => {
+            if let Err(cleanup_error) = fs::remove_dir_all(&stage.stage_path) {
+                return Err(format!(
+                    "remote-failure-bundle-publish-failed:{error}; stage-cleanup-failed:{cleanup_error}"
+                ));
+            }
+            return Err(format!("remote-failure-bundle-publish-failed:{error}"));
+        }
+    }
+    debug_assert!(stage.final_path.starts_with(&final_parent));
+    debug_assert!(!bundle.bundle_blake3.as_str().is_empty());
+    Ok(RemoteFailureDebugPublishOutcome {
+        bundle_ref: format!("remote-failure-debug:{}", bundle.bundle_blake3.as_str()),
+        bundle_blake3: bundle.bundle_blake3,
+        capture_outcome_code,
+        cleanup_status_code: bundle.cleanup_status_code,
+        immutable_log_available: bundle.immutable_log.is_some(),
+        non_claim: crunch_build::distributed::REMOTE_FAILURE_DEBUG_NON_CLAIM.to_string(),
+    })
+}
+
+fn capture_failed_artifacts(
+    stage: &BundleStage,
+    request: &RemoteFailureDebugPublishRequest<'_>,
+) -> Result<(Option<RemoteFailureDebugRef>, String), String> {
+    let capture_requests = plan_remote_failure_capture(&request.policy.capture).map_err(reason)?;
+    if capture_requests.is_empty() {
+        return Ok((None, "metadata-only".to_string()));
+    }
+    let Some(capture_root) = request.capture_root else {
+        return Ok((None, "capture-root-unavailable".to_string()));
+    };
+    require_real_directory(capture_root, "capture-root")?;
+    let observations = observe_capture_requests(capture_root, &capture_requests)?;
+    let admission = admit_remote_failure_capture_observations(&capture_requests, observations, &request.policy.capture)
+        .map_err(reason)?;
+    if admission.accepted_paths.is_empty() {
+        return Ok((None, "capture-rejected".to_string()));
+    }
+    let mut artifacts = Vec::with_capacity(admission.accepted_paths.len());
+    for relative_path in &admission.accepted_paths {
+        let bytes = read_capture_file_nofollow(capture_root, relative_path, request.policy.capture.file_bytes_max)?;
+        let object_blake3 = remote_failure_capture_object_digest(&bytes);
+        let object_path = stage
+            .stage_path
+            .join(CAPTURE_CAS_DIR)
+            .join(object_blake3.as_str())
+            .with_extension(CAPTURE_EXTENSION);
+        write_new_private_file(&object_path, &bytes)?;
+        artifacts.push(RemoteFailureCapturedArtifact {
+            relative_path: relative_path.clone(),
+            sensitivity: request.policy.capture.sensitivity,
+            byte_count: u64::try_from(bytes.len()).map_err(|_| "remote-failure-capture-size-overflow".to_string())?,
+            object_blake3,
+        });
+    }
+    let manifest =
+        seal_remote_failure_captured_artifact_manifest(artifacts, &request.policy.capture).map_err(reason)?;
+    debug_assert_eq!(manifest.artifacts.len(), admission.accepted_paths.len());
+    debug_assert!(!manifest.artifacts.is_empty());
+    let manifest_ref = write_json_object(&stage.stage_path, "captured-artifact-manifest", &manifest, &request.policy)?;
+    Ok((Some(manifest_ref), "captured".to_string()))
+}
+
+fn observe_capture_requests(
+    root: &Path,
+    requests: &[crunch_build::distributed::RemoteFailureCaptureRequest],
+) -> Result<Vec<RemoteFailureCaptureObservation>, String> {
+    let root = open_capture_root(root)?;
+    let mut observations = Vec::with_capacity(requests.len());
+    for request in requests {
+        let relative = validated_capture_path(&request.relative_path)?;
+        let metadata = root
+            .dir()
+            .symlink_metadata(relative.as_str())
+            .map_err(|error| format!("remote-failure-capture-metadata-failed:{error}"))?;
+        observations.push(RemoteFailureCaptureObservation {
+            relative_path: request.relative_path.clone(),
+            kind: observed_kind(&metadata),
+            byte_count: metadata.len(),
+        });
+    }
+    Ok(observations)
+}
+
+fn read_capture_file_nofollow(root: &Path, relative_path: &str, bytes_max: u64) -> Result<Vec<u8>, String> {
+    let root = open_capture_root(root)?;
+    let relative = validated_capture_path(relative_path)?;
+    let observed = root
+        .dir()
+        .symlink_metadata(relative.as_str())
+        .map_err(|error| format!("remote-failure-capture-metadata-failed:{error}"))?;
+    if observed.file_type().is_symlink() || !observed.is_file() {
+        return Err("remote-failure-capture-not-regular-file".to_string());
+    }
+    if observed.len() > bytes_max {
+        return Err("remote-failure-capture-too-large".to_string());
+    }
+    let mut file = root
+        .open_file_read_nofollow(&relative)
+        .map_err(|error| format!("remote-failure-capture-open-no-follow-failed:{error}"))?;
+    let opened = file.metadata().map_err(|error| format!("remote-failure-capture-opened-metadata-failed:{error}"))?;
+    if !opened.is_file() || opened.len() != observed.len() {
+        return Err("remote-failure-capture-type-or-size-drift".to_string());
+    }
+    let read_limit_bytes = bytes_max
+        .checked_add(BOUNDED_READ_PROBE_BYTES)
+        .ok_or_else(|| "remote-failure-capture-read-limit-overflow".to_string())?;
+    let capacity_bytes =
+        usize::try_from(opened.len()).map_err(|_| "remote-failure-capture-capacity-overflow".to_string())?;
+    let mut bytes = Vec::with_capacity(capacity_bytes);
+    Read::by_ref(&mut file)
+        .take(read_limit_bytes)
+        .read_to_end(&mut bytes)
+        .map_err(|error| format!("remote-failure-capture-read-failed:{error}"))?;
+    if u64::try_from(bytes.len()).map_err(|_| "remote-failure-capture-size-overflow".to_string())? > bytes_max {
+        return Err("remote-failure-capture-too-large".to_string());
+    }
+    let probed_capacity_bytes = capacity_bytes.saturating_add(BOUNDED_READ_PROBE_CAPACITY);
+    debug_assert!(bytes.len() <= probed_capacity_bytes);
+    debug_assert!(bytes.capacity() >= bytes.len());
+    Ok(bytes)
+}
+
+fn open_capture_root(root: &Path) -> Result<ReleaseCapabilityRoot, String> {
+    ReleaseCapabilityRoot::open_ambient_nofollow(ReleaseRootKind::RemoteFailureCapture, root)
+        .map_err(|error| format!("remote-failure-capture-root-open-no-follow-failed:{error}"))
+}
+
+fn validated_capture_path(relative_path: &str) -> Result<ValidatedReleasePath, String> {
+    ValidatedReleasePath::new(relative_path).map_err(|error| format!("remote-failure-capture-path-invalid:{error:?}"))
+}
+
+fn observed_kind(metadata: &cap_std::fs::Metadata) -> RemoteFailureCaptureObservedKind {
+    let file_type = metadata.file_type();
+    if file_type.is_file() {
+        return RemoteFailureCaptureObservedKind::RegularFile;
+    }
+    if file_type.is_dir() {
+        return RemoteFailureCaptureObservedKind::Directory;
+    }
+    if file_type.is_symlink() {
+        return RemoteFailureCaptureObservedKind::Symlink;
+    }
+    RemoteFailureCaptureObservedKind::Unsupported
+}
+
+fn immutable_log_ref_from_summary(
+    summary: &RemoteAttemptLogControlSummary,
+) -> Result<RemoteFailureImmutableLogRef, String> {
+    Ok(RemoteFailureImmutableLogRef {
+        scope: summary.scope.clone(),
+        manifest_blake3: summary.manifest_blake3.clone(),
+        retained_start_cursor: summary.retained_start_cursor,
+        next_cursor: summary.next_cursor,
+        head_record_blake3: summary.head_record_blake3.clone(),
+        head_segment_blake3: summary.head_segment_blake3.clone(),
+        truncated: summary.truncated,
+    })
+}
+
+struct ClassObjectInput<'a> {
+    stage_path: &'a Path,
+    kind: &'a str,
+    class: &'a str,
+    policy: &'a RemoteFailureDebugPolicy,
+}
+
+fn write_class_object(input: ClassObjectInput<'_>) -> Result<RemoteFailureDebugRef, String> {
+    write_json_object(
+        input.stage_path,
+        input.kind,
+        &RemoteFailureClassObject {
+            class: input.class.to_string(),
+        },
+        input.policy,
+    )
+}
+
+fn optional_class_object(input: ClassObjectInput<'_>) -> Result<Option<RemoteFailureDebugRef>, String> {
+    if input.class == "not-available" {
+        return Ok(None);
+    }
+    write_class_object(input).map(Some)
+}
+
+fn write_replay_action_object(
+    stage_path: &Path,
+    request: &ConcreteBuildRequest,
+    policy: &RemoteFailureDebugPolicy,
+) -> Result<RemoteFailureDebugRef, String> {
+    if !request_contains_secret_material(request)? {
+        return write_json_object(stage_path, "action-request", request, policy);
+    }
+    let request_bytes =
+        serde_json::to_vec(request).map_err(|error| format!("remote-failure-action-serialize-failed:{error}"))?;
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"mantle-remote-failure-redacted-action-v1\0");
+    hasher.update(&request_bytes);
+    let request_blake3 = RemoteFailureDebugDigest::new(hasher.finalize().to_hex().to_string()).map_err(reason)?;
+    let expected_output_count = u32::try_from(request.expected_outputs.len())
+        .map_err(|_| "remote-failure-action-output-count-overflow".to_string())?;
+    debug_assert!(!request_bytes.is_empty());
+    debug_assert_eq!(usize::try_from(expected_output_count).ok(), Some(request.expected_outputs.len()));
+    write_json_object(
+        stage_path,
+        "action-request-redacted",
+        &RemoteFailureRedactedActionObject {
+            reason_code: "secret-bearing-action-redacted".to_string(),
+            request_blake3,
+            expected_output_count,
+        },
+        policy,
+    )
+}
+
+fn request_contains_secret_material(request: &ConcreteBuildRequest) -> Result<bool, String> {
+    let value = serde_json::to_value(request).map_err(|error| format!("remote-failure-action-value-failed:{error}"))?;
+    let mut visited = 0_usize;
+    if json_contains_secret_material(&value, &mut visited)? {
+        return Ok(true);
+    }
+    let nested = match &request.payload {
+        crate::remote_build::RemoteConcreteBuildPayload::Derivation { drv_json, .. } => drv_json,
+        crate::remote_build::RemoteConcreteBuildPayload::Action { spec_json, .. } => spec_json,
+    };
+    let nested_value = serde_json::from_str::<serde_json::Value>(nested)
+        .map_err(|error| format!("remote-failure-action-nested-json-invalid:{error}"))?;
+    json_contains_secret_material(&nested_value, &mut visited)
+}
+
+fn json_contains_secret_material(value: &serde_json::Value, visited: &mut usize) -> Result<bool, String> {
+    let mut pending = vec![value];
+    while let Some(current) = pending.pop() {
+        if *visited >= MAX_REPLAY_ACTION_JSON_NODES {
+            return Err("remote-failure-action-node-limit-exceeded".to_string());
+        }
+        *visited = visited.saturating_add(1);
+        match current {
+            serde_json::Value::Object(fields) => {
+                for (key, value) in fields {
+                    let normalized_key = key.to_ascii_lowercase();
+                    if object_field_has_secret(&normalized_key, value) {
+                        return Ok(true);
+                    }
+                    pending.push(value);
+                }
+            }
+            serde_json::Value::Array(values) => pending.extend(values),
+            serde_json::Value::String(text) => {
+                if text_has_secret(text) {
+                    return Ok(true);
+                }
+            }
+            serde_json::Value::Null | serde_json::Value::Bool(_) | serde_json::Value::Number(_) => {}
+        }
+    }
+    debug_assert!(*visited <= MAX_REPLAY_ACTION_JSON_NODES);
+    debug_assert!(pending.is_empty());
+    Ok(false)
+}
+
+fn object_field_has_secret(normalized_key: &str, value: &serde_json::Value) -> bool {
+    if normalized_key == "env" {
+        return value.as_object().is_some_and(|environment| !environment.is_empty());
+    }
+    for marker in SECRET_KEY_MARKERS {
+        if normalized_key.contains(marker) {
+            return true;
+        }
+    }
+    false
+}
+
+fn text_has_secret(text: &str) -> bool {
+    let normalized_text = text.to_ascii_lowercase();
+    for marker in SECRET_TEXT_MARKERS {
+        if normalized_text.contains(marker) {
+            return true;
+        }
+    }
+    false
+}
+
+fn write_json_object(
+    stage_path: &Path,
+    kind: &str,
+    payload: &impl Serialize,
+    policy: &RemoteFailureDebugPolicy,
+) -> Result<RemoteFailureDebugRef, String> {
+    let payload =
+        serde_json::to_value(payload).map_err(|error| format!("remote-failure-object-value-failed:{error}"))?;
+    let envelope = RemoteFailureDebugObjectEnvelope {
+        schema: OBJECT_ENVELOPE_SCHEMA.to_string(),
+        kind: kind.to_string(),
+        payload,
+    };
+    let bytes =
+        serde_json::to_vec(&envelope).map_err(|error| format!("remote-failure-object-serialize-failed:{error}"))?;
+    let reference = remote_failure_debug_ref(kind, &bytes, policy).map_err(reason)?;
+    let path = stage_path.join(OBJECTS_DIR).join(reference.digest_blake3.as_str()).with_extension(OBJECT_EXTENSION);
+    write_new_private_file(&path, &bytes)?;
+    Ok(reference)
+}
+
+fn read_object_envelope(
+    bundle_dir: &Path,
+    reference: &RemoteFailureDebugRef,
+    policy: &RemoteFailureDebugPolicy,
+) -> Result<RemoteFailureDebugObjectEnvelope, String> {
+    let path = object_path(bundle_dir, reference);
+    let bytes = read_bounded_bytes(&path, policy.object_bytes_max, "object")?;
+    let observed = remote_failure_debug_ref(reference.kind.clone(), &bytes, policy).map_err(reason)?;
+    if observed != *reference {
+        return Err("remote-failure-object-identity-mismatch".to_string());
+    }
+    let envelope: RemoteFailureDebugObjectEnvelope =
+        serde_json::from_slice(&bytes).map_err(|error| format!("remote-failure-object-parse-failed:{error}"))?;
+    if envelope.schema != OBJECT_ENVELOPE_SCHEMA || envelope.kind != reference.kind {
+        return Err("remote-failure-object-envelope-mismatch".to_string());
+    }
+    Ok(envelope)
+}
+
+fn validate_bundle_object_refs(
+    bundle_dir: &Path,
+    bundle: &RemoteFailureDebugBundle,
+    policy: &RemoteFailureDebugPolicy,
+) -> Result<(), String> {
+    for reference in required_and_optional_refs(bundle) {
+        read_object_envelope(bundle_dir, reference, policy)?;
+    }
+    Ok(())
+}
+
+fn validate_capture_manifest_and_objects(
+    bundle_dir: &Path,
+    bundle: &RemoteFailureDebugBundle,
+    policy: &RemoteFailureDebugPolicy,
+) -> Result<(), String> {
+    let Some(reference) = &bundle.captured_artifact_manifest_ref else {
+        return Ok(());
+    };
+    let envelope = read_object_envelope(bundle_dir, reference, policy)?;
+    let manifest: RemoteFailureCapturedArtifactManifest = serde_json::from_value(envelope.payload)
+        .map_err(|error| format!("remote-failure-capture-manifest-invalid:{error}"))?;
+    let resealed =
+        seal_remote_failure_captured_artifact_manifest(manifest.artifacts.clone(), &policy.capture).map_err(reason)?;
+    if resealed != manifest {
+        return Err("remote-failure-capture-manifest-identity-mismatch".to_string());
+    }
+    for artifact in &manifest.artifacts {
+        let path = bundle_dir
+            .join(CAPTURE_CAS_DIR)
+            .join(artifact.object_blake3.as_str())
+            .with_extension(CAPTURE_EXTENSION);
+        let bytes = read_bounded_bytes(&path, policy.capture.file_bytes_max, "capture-object")?;
+        if remote_failure_capture_object_digest(&bytes) != artifact.object_blake3 {
+            return Err("remote-failure-capture-object-identity-mismatch".to_string());
+        }
+    }
+    debug_assert_eq!(resealed, manifest);
+    debug_assert!(manifest.artifacts.len() <= manifest.artifacts.capacity());
+    Ok(())
+}
+
+fn collect_available_object_refs(
+    bundle_dir: &Path,
+    bundle: &RemoteFailureDebugBundle,
+) -> Result<std::collections::BTreeSet<RemoteFailureDebugDigest>, String> {
+    let mut available = std::collections::BTreeSet::new();
+    for reference in required_and_optional_refs(bundle) {
+        if reference.kind == "action-request-redacted" {
+            continue;
+        }
+        if object_path(bundle_dir, reference).is_file() {
+            available.insert(reference.digest_blake3.clone());
+        }
+    }
+    Ok(available)
+}
+
+fn required_and_optional_refs(bundle: &RemoteFailureDebugBundle) -> Vec<&RemoteFailureDebugRef> {
+    let mut refs = vec![
+        &bundle.action_ref,
+        &bundle.route_ref,
+        &bundle.worker_capability_ref,
+        &bundle.input_manifest_ref,
+        &bundle.sandbox_policy_ref,
+        &bundle.network_policy_ref,
+    ];
+    refs.extend(bundle.transfer_ref.iter());
+    refs.extend(bundle.admission_ref.iter());
+    refs.extend(bundle.captured_artifact_manifest_ref.iter());
+    refs
+}
+
+fn object_path(bundle_dir: &Path, reference: &RemoteFailureDebugRef) -> PathBuf {
+    bundle_dir.join(OBJECTS_DIR).join(reference.digest_blake3.as_str()).with_extension(OBJECT_EXTENSION)
+}
+
+fn validate_replay_request_matches_bundle(
+    request: &ConcreteBuildRequest,
+    bundle: &RemoteFailureDebugBundle,
+) -> Result<(), String> {
+    if request.production_attempt.is_some() || request.transfer_policy.is_some() || request.failure_replay.is_some() {
+        return Err("remote-failure-replay-stale-authority-present".to_string());
+    }
+    if request.request_id.is_empty() || bundle.original_fence_generation.get() == 0 {
+        return Err("remote-failure-replay-request-invalid".to_string());
+    }
+    Ok(())
+}
+
+fn create_bundle_stage(bundles_root: &Path) -> Result<BundleStage, String> {
+    for _ in 0..TEMP_CREATE_ATTEMPTS_MAX {
+        let stage_path = bundles_root.join(format!("{STAGE_PREFIX}{}", random_hex()?));
+        match fs::create_dir(&stage_path) {
+            Ok(()) => {
+                set_private_directory_mode(&stage_path)?;
+                return Ok(BundleStage {
+                    stage_path,
+                    final_path: bundles_root.join("pending"),
+                });
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(error) => return Err(format!("remote-failure-stage-create-failed:{error}")),
+        }
+    }
+    Err("remote-failure-stage-create-attempts-exhausted".to_string())
+}
+
+fn collect_bundle_directories(root: &Path) -> Result<Vec<PathBuf>, String> {
+    let mut paths = Vec::with_capacity(crunch_build::distributed::MAX_REMOTE_FAILURE_RETENTION_RECORDS);
+    for entry in fs::read_dir(root).map_err(|error| format!("remote-failure-bundles-read-failed:{error}"))? {
+        let entry = entry.map_err(|error| format!("remote-failure-bundle-entry-failed:{error}"))?;
+        if paths.len() >= crunch_build::distributed::MAX_REMOTE_FAILURE_RETENTION_RECORDS {
+            return Err("remote-failure-bundle-count-limit-exceeded".to_string());
+        }
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else {
+            continue;
+        };
+        if name.starts_with(STAGE_PREFIX) {
+            continue;
+        }
+        let path = entry.path();
+        let metadata =
+            fs::symlink_metadata(&path).map_err(|error| format!("remote-failure-bundle-metadata-failed:{error}"))?;
+        if metadata.is_dir() && !metadata.file_type().is_symlink() {
+            paths.push(path);
+        }
+    }
+    paths.sort();
+    debug_assert!(paths.len() <= crunch_build::distributed::MAX_REMOTE_FAILURE_RETENTION_RECORDS);
+    debug_assert!(paths.capacity() >= paths.len());
+    Ok(paths)
+}
+
+fn bundle_has_active_lease(bundle_dir: &Path, now_unix_s: u64) -> Result<bool, String> {
+    let leases = bundle_dir.join(LEASES_DIR);
+    if !leases.exists() {
+        return Ok(false);
+    }
+    require_real_directory(&leases, "leases")?;
+    let entries = fs::read_dir(&leases).map_err(|error| format!("remote-failure-leases-read-failed:{error}"))?;
+    for (index, entry) in entries.enumerate() {
+        if index >= MAX_LEASES_PER_BUNDLE {
+            return Err("remote-failure-lease-limit-exceeded".to_string());
+        }
+        let path = entry.map_err(|error| format!("remote-failure-lease-entry-failed:{error}"))?.path();
+        let lease: RemoteFailureLeaseRecord = read_bounded_json(&path, MAX_LEASE_FILE_BYTES, "lease")?;
+        if lease.schema == LEASE_SCHEMA && lease.expires_unix_s > now_unix_s {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn sorted_unique(mut values: Vec<String>) -> Vec<String> {
+    values.sort();
+    values.dedup();
+    values
+}
+
+fn count_directory_entries_bounded(path: &Path, limit: usize) -> Result<usize, String> {
+    let mut count = 0_usize;
+    for entry in fs::read_dir(path).map_err(|error| format!("remote-failure-directory-read-failed:{error}"))? {
+        entry.map_err(|error| format!("remote-failure-directory-entry-failed:{error}"))?;
+        count = count.saturating_add(1);
+        if count > limit {
+            return Err("remote-failure-directory-entry-limit-exceeded".to_string());
+        }
+    }
+    Ok(count)
+}
+
+fn require_real_directory(path: &Path, kind: &str) -> Result<(), String> {
+    let metadata =
+        fs::symlink_metadata(path).map_err(|error| format!("remote-failure-{kind}-metadata-failed:{error}"))?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err(format!("remote-failure-{kind}-not-real-directory"));
+    }
+    if count_directory_entries_bounded(path, MAX_BUNDLE_DIRECTORY_ENTRIES).is_err() && kind == "bundle" {
+        return Err("remote-failure-bundle-entry-limit-exceeded".to_string());
+    }
+    Ok(())
+}
+
+fn ensure_private_directory(path: &Path) -> Result<(), String> {
+    fs::create_dir_all(path).map_err(|error| format!("remote-failure-directory-create-failed:{error}"))?;
+    require_real_directory(path, "directory")?;
+    set_private_directory_mode(path)?;
+    sync_directory(path)
+}
+
+#[cfg(unix)]
+fn set_private_directory_mode(path: &Path) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+    fs::set_permissions(path, fs::Permissions::from_mode(PRIVATE_DIR_MODE))
+        .map_err(|error| format!("remote-failure-directory-mode-failed:{error}"))
+}
+
+#[cfg(not(unix))]
+fn set_private_directory_mode(_path: &Path) -> Result<(), String> {
+    Ok(())
+}
+
+fn write_new_private_file(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    if u64::try_from(bytes.len()).map_err(|_| "remote-failure-write-size-overflow")? > MAX_OBJECT_FILE_BYTES {
+        return Err("remote-failure-write-size-limit-exceeded".to_string());
+    }
+    let mut file = create_new_private_file(path)?;
+    file.write_all(bytes).map_err(|error| format!("remote-failure-file-write-failed:{error}"))?;
+    file.sync_all().map_err(|error| format!("remote-failure-file-sync-failed:{error}"))?;
+    sync_directory(path.parent().ok_or_else(|| "remote-failure-file-parent-missing".to_string())?)
+}
+
+#[cfg(unix)]
+fn create_new_private_file(path: &Path) -> Result<File, String> {
+    fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(PRIVATE_FILE_MODE)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path)
+        .map_err(|error| format!("remote-failure-file-create-failed:{error}"))
+}
+
+#[cfg(not(unix))]
+fn create_new_private_file(_path: &Path) -> Result<File, String> {
+    Err("remote-failure-secure-file-create-unsupported".to_string())
+}
+
+fn read_bounded_json<T: serde::de::DeserializeOwned>(path: &Path, bytes_max: u64, kind: &str) -> Result<T, String> {
+    let bytes = read_bounded_bytes(path, bytes_max, kind)?;
+    serde_json::from_slice(&bytes).map_err(|error| format!("remote-failure-{kind}-parse-failed:{error}"))
+}
+
+fn read_bounded_bytes(path: &Path, bytes_max: u64, kind: &str) -> Result<Vec<u8>, String> {
+    let metadata =
+        fs::symlink_metadata(path).map_err(|error| format!("remote-failure-{kind}-metadata-failed:{error}"))?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return Err(format!("remote-failure-{kind}-not-regular-file"));
+    }
+    if metadata.len() > bytes_max {
+        return Err(format!("remote-failure-{kind}-too-large"));
+    }
+    let mut file = open_regular_no_follow(path, kind)?;
+    let opened = file.metadata().map_err(|error| format!("remote-failure-{kind}-opened-metadata-failed:{error}"))?;
+    if !opened.is_file() || opened.len() != metadata.len() {
+        return Err(format!("remote-failure-{kind}-type-or-size-drift"));
+    }
+    let read_limit_bytes = bytes_max
+        .checked_add(BOUNDED_READ_PROBE_BYTES)
+        .ok_or_else(|| format!("remote-failure-{kind}-read-limit-overflow"))?;
+    let capacity_bytes =
+        usize::try_from(opened.len()).map_err(|_| format!("remote-failure-{kind}-capacity-overflow"))?;
+    let mut bytes = Vec::with_capacity(capacity_bytes);
+    Read::by_ref(&mut file)
+        .take(read_limit_bytes)
+        .read_to_end(&mut bytes)
+        .map_err(|error| format!("remote-failure-{kind}-read-failed:{error}"))?;
+    if u64::try_from(bytes.len()).map_err(|_| format!("remote-failure-{kind}-size-overflow"))? > bytes_max {
+        return Err(format!("remote-failure-{kind}-too-large"));
+    }
+    let probed_capacity_bytes = capacity_bytes.saturating_add(BOUNDED_READ_PROBE_CAPACITY);
+    debug_assert!(bytes.len() <= probed_capacity_bytes);
+    debug_assert!(bytes.capacity() >= bytes.len());
+    Ok(bytes)
+}
+
+#[cfg(unix)]
+fn open_regular_no_follow(path: &Path, kind: &str) -> Result<File, String> {
+    fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC | libc::O_NONBLOCK)
+        .open(path)
+        .map_err(|error| format!("remote-failure-{kind}-open-no-follow-failed:{error}"))
+}
+
+#[cfg(not(unix))]
+fn open_regular_no_follow(_path: &Path, kind: &str) -> Result<File, String> {
+    Err(format!("remote-failure-{kind}-secure-read-unsupported"))
+}
+
+#[cfg(target_os = "linux")]
+fn rename_no_replace(source: &Path, destination: &Path) -> std::io::Result<()> {
+    let source = CString::new(source.as_os_str().as_bytes())
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidInput, "remote failure source contains NUL"))?;
+    let destination = CString::new(destination.as_os_str().as_bytes()).map_err(|_| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, "remote failure destination contains NUL")
+    })?;
+    crate::linux_rename::rename_no_replace(libc::AT_FDCWD, &source, libc::AT_FDCWD, &destination)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn rename_no_replace(_source: &Path, _destination: &Path) -> std::io::Result<()> {
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Unsupported,
+        "atomic no-replace remote failure publication is unsupported",
+    ))
+}
+
+#[cfg(unix)]
+fn sync_directory(path: &Path) -> Result<(), String> {
+    let directory = fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+        .open(path)
+        .map_err(|error| format!("remote-failure-directory-open-failed:{error}"))?;
+    directory.sync_all().map_err(|error| format!("remote-failure-directory-sync-failed:{error}"))
+}
+
+#[cfg(not(unix))]
+fn sync_directory(_path: &Path) -> Result<(), String> {
+    Ok(())
+}
+
+fn random_hex() -> Result<String, String> {
+    let mut bytes = [0_u8; RANDOM_BYTES];
+    crate::remote_build::remote_cli_random_bytes("remote-failure-debug", &mut bytes)
+        .map_err(|error| format!("remote-failure-random-failed:{error}"))?;
+    let mut rendered = String::with_capacity(RANDOM_BYTES.saturating_mul(2));
+    for byte in bytes {
+        use std::fmt::Write as _;
+        write!(&mut rendered, "{byte:02x}").map_err(|_| "remote-failure-random-format-failed".to_string())?;
+    }
+    Ok(rendered)
+}
+
+fn reason(reason: RemoteFailureDebugReasonCode) -> String {
+    reason.as_str().to_string()
+}
+
+pub fn cmd_remote_failure_debug(
+    action: crate::RemoteFailureDebugAction,
+    state_dir: &Path,
+    json_output: bool,
+) -> Result<(), crate::RunError> {
+    match action {
+        crate::RemoteFailureDebugAction::Inspect { bundle } => {
+            cmd_remote_failure_inspect(state_dir, &bundle, json_output)
+        }
+        crate::RemoteFailureDebugAction::ReplayPlan { bundle } => {
+            cmd_remote_failure_replay_plan(state_dir, &bundle, json_output)
+        }
+        crate::RemoteFailureDebugAction::Replay { .. } => {
+            Err(crate::RunError::Internal("remote-failure-replay-dispatch-must-use-main-shell".to_string()))
+        }
+        crate::RemoteFailureDebugAction::Gc { now_unix_s } => cmd_remote_failure_gc(state_dir, now_unix_s, json_output),
+    }
+}
+
+fn cmd_remote_failure_inspect(state_dir: &Path, selector: &str, json_output: bool) -> Result<(), crate::RunError> {
+    let operation_plan =
+        crate::remote_build::operation::plan(crate::remote_build::operation::RemoteOperation::DebugInspect)?;
+    let bundle_dir = resolve_bundle_selector(state_dir, selector)?;
+    let summary = inspect_remote_failure_debug_bundle_from_disk(&bundle_dir).map_err(crate::RunError::Internal)?;
+    crate::remote_build::operation::classify(
+        &operation_plan,
+        crate::remote_build::operation::RemoteOperationFacts::Bundle {
+            bundle_digest: summary.bundle_blake3.as_str(),
+            replay_digest: None,
+        },
+    )?;
+    debug_assert!(!summary.bundle_blake3.as_str().is_empty());
+    debug_assert!(!summary.non_claims.is_empty());
+    if json_output {
+        println!(
+            "{}",
+            serde_json::to_string(&summary).map_err(|error| {
+                crate::RunError::Internal(format!("serializing remote failure inspect summary: {error}"))
+            })?
+        );
+    } else {
+        println!("bundle: {}", summary.bundle_blake3.as_str());
+        println!("phase: {:?}", summary.failure_phase);
+        println!("reason: {}", summary.failure_reason_code);
+        println!("immutable-log: {}", summary.immutable_log_available);
+        println!("captured-artifacts: {}", summary.captured_artifact_count);
+        println!("replay-policy: {}", summary.replay_allowed_by_policy);
+        println!("non-claim: {}", summary.non_claims.join(","));
+    }
+    Ok(())
+}
+
+fn cmd_remote_failure_replay_plan(state_dir: &Path, selector: &str, json_output: bool) -> Result<(), crate::RunError> {
+    let operation_plan =
+        crate::remote_build::operation::plan(crate::remote_build::operation::RemoteOperation::DebugReplayPlan)?;
+    let bundle_dir = resolve_bundle_selector(state_dir, selector)?;
+    let plan = plan_remote_failure_replay_from_disk(&bundle_dir).map_err(crate::RunError::Internal)?;
+    crate::remote_build::operation::classify(
+        &operation_plan,
+        crate::remote_build::operation::RemoteOperationFacts::Bundle {
+            bundle_digest: plan.source_bundle_blake3.as_str(),
+            replay_digest: Some(plan.replay_plan_blake3.as_str()),
+        },
+    )?;
+    debug_assert!(!plan.replay_plan_blake3.as_str().is_empty());
+    debug_assert!(!plan.source_bundle_blake3.as_str().is_empty());
+    if json_output {
+        println!(
+            "{}",
+            serde_json::to_string(&plan).map_err(|error| {
+                crate::RunError::Internal(format!("serializing remote failure replay plan: {error}"))
+            })?
+        );
+    } else {
+        println!("replay-plan: {}", plan.replay_plan_blake3.as_str());
+        println!("source-bundle: {}", plan.source_bundle_blake3.as_str());
+        println!("executable: {}", plan.executable);
+        println!("new-authority-required: {}", plan.new_authority_required);
+        println!("ordinary-route-required: {}", plan.ordinary_route_required);
+        println!("ordinary-output-admission-required: {}", plan.ordinary_output_admission_required);
+        println!("blockers: {}", plan.blockers.join(","));
+    }
+    Ok(())
+}
+
+fn cmd_remote_failure_gc(
+    state_dir: &Path,
+    requested_now_unix_s: Option<u64>,
+    json_output: bool,
+) -> Result<(), crate::RunError> {
+    let operation_plan =
+        crate::remote_build::operation::plan(crate::remote_build::operation::RemoteOperation::DebugGc)?;
+    let now_unix_s = requested_now_unix_s.map_or_else(
+        || crate::remote_build::remote_cli_now_unix_s("remote-debug-gc").map_err(crate::RunError::Internal),
+        Ok,
+    )?;
+    let retention_summary =
+        retain_remote_failure_debug_bundles(state_dir, now_unix_s).map_err(crate::RunError::Internal)?;
+    let classified = crate::remote_build::operation::classify(
+        &operation_plan,
+        crate::remote_build::operation::RemoteOperationFacts::Retention {
+            failed_deletions: retention_summary.failed_deletions.len(),
+        },
+    );
+    debug_assert!(retention_summary.failed_deletions.capacity() >= retention_summary.failed_deletions.len());
+    debug_assert!(!state_dir.as_os_str().is_empty());
+    if json_output {
+        println!(
+            "{}",
+            serde_json::to_string(&serde_json::json!({
+                "schema": "mantle-remote-failure-debug-gc-report-v1",
+                "preserved_count": retention_summary.preserved_count,
+                "deleted_count": retention_summary.deleted_count,
+                "failed_deletion_count": retention_summary.failed_deletions.len(),
+            }))
+            .map_err(|error| crate::RunError::Internal(format!("serializing remote failure gc report: {error}")))?
+        );
+    } else {
+        println!("preserved: {}", retention_summary.preserved_count);
+        println!("deleted: {}", retention_summary.deleted_count);
+        println!("failed-deletions: {}", retention_summary.failed_deletions.len());
+    }
+    classified.map_err(|_| crate::RunError::Internal("remote-failure-debug-gc-partial-failure".to_string()))
+}
+
+pub fn resolve_bundle_selector(state_dir: &Path, selector: &str) -> Result<PathBuf, crate::RunError> {
+    let digest = selector.strip_prefix("remote-failure-debug:").unwrap_or(selector);
+    if is_blake3_hex(digest) {
+        debug_assert_eq!(digest.len(), blake3::OUT_LEN.saturating_mul(2));
+        debug_assert!(digest.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()));
+        let coordinator = state_dir.join(REMOTE_FAILURE_DEBUG_STORE_DIR).join(BUNDLES_DIR).join(digest);
+        if coordinator.is_dir() {
+            return Ok(coordinator);
+        }
+        let workers_root = state_dir.join("remote-workers");
+        if let Ok(workers) = fs::read_dir(workers_root) {
+            for (index, worker) in workers.enumerate() {
+                if index >= MAX_REMOTE_WORKER_STATE_DIRS {
+                    return Err(crate::RunError::Internal("remote-failure-worker-state-limit-exceeded".to_string()));
+                }
+                let candidate = worker
+                    .map_err(|error| {
+                        crate::RunError::Internal(format!("remote-failure-worker-state-read-failed:{error}"))
+                    })?
+                    .path()
+                    .join("state")
+                    .join(REMOTE_FAILURE_DEBUG_STORE_DIR)
+                    .join(BUNDLES_DIR)
+                    .join(digest);
+                if candidate.is_dir() {
+                    return Ok(candidate);
+                }
+            }
+        }
+        return Ok(coordinator);
+    }
+    if selector.is_empty() || selector.chars().any(char::is_control) {
+        return Err(crate::RunError::Internal("remote-failure-bundle-selector-invalid".to_string()));
+    }
+    Ok(PathBuf::from(selector))
+}
+
+fn is_blake3_hex(value: &str) -> bool {
+    const BLAKE3_HEX_LENGTH: usize = 64;
+    value.len() == BLAKE3_HEX_LENGTH && value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+}
+
+/// Prefix of a failure-debug bundle reference.
+pub(crate) const REMOTE_FAILURE_DEBUG_BUNDLE_REF_PREFIX: &str = "remote-failure-debug:";
+pub(crate) const REMOTE_FAILURE_DEBUG_DIGEST_HEX_CHARS: usize = 64;
+
+/// A worker's failure-debug reference: one content digest and two bounded
+/// status codes. It carries no failure text, so it may cross the executor
+/// child, worker frame and client error boundaries.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RemoteWorkerFailureDebugReport {
+    pub(crate) bundle_ref: String,
+    pub(crate) capture_outcome_code: String,
+    pub(crate) cleanup_status_code: String,
+}
+
+impl RemoteWorkerFailureDebugReport {
+    /// The `; worker_…=` fields that `parse_remote_worker_failure_debug_report` reads.
+    pub(crate) fn render_fields(&self) -> String {
+        format!(
+            "; worker_bundle_ref={}; worker_capture_outcome={}; worker_cleanup_status={}",
+            self.bundle_ref, self.capture_outcome_code, self.cleanup_status_code,
+        )
+    }
+
+    /// Admits a report from another process only if it renders and parses back unchanged.
+    pub(crate) fn validated(self) -> Option<Self> {
+        let parsed = parse_remote_worker_failure_debug_report(&self.render_fields())?;
+        (parsed == self).then_some(self)
+    }
+}
+
+pub(crate) fn parse_remote_worker_failure_debug_report(reason: &str) -> Option<RemoteWorkerFailureDebugReport> {
+    debug_assert!(!REMOTE_FAILURE_DEBUG_BUNDLE_REF_PREFIX.is_empty());
+    let bundle_ref = remote_failure_debug_report_field(RemoteFailureFieldQuery {
+        reason,
+        prefix: "worker_bundle_ref=",
+    })?;
+    let capture_outcome_code = remote_failure_debug_report_field(RemoteFailureFieldQuery {
+        reason,
+        prefix: "worker_capture_outcome=",
+    })?;
+    let cleanup_status_code = if reason.contains("remote-failure-workspace-cleanup-degraded") {
+        "cleanup-degraded".to_string()
+    } else {
+        remote_failure_debug_report_field(RemoteFailureFieldQuery {
+            reason,
+            prefix: "worker_cleanup_status=",
+        })?
+    };
+    let digest = bundle_ref.strip_prefix(REMOTE_FAILURE_DEBUG_BUNDLE_REF_PREFIX)?;
+    if digest.len() != REMOTE_FAILURE_DEBUG_DIGEST_HEX_CHARS
+        || !digest.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    {
+        return None;
+    }
+    if !valid_remote_failure_status_code(&capture_outcome_code)
+        || !valid_remote_failure_status_code(&cleanup_status_code)
+    {
+        return None;
+    }
+    Some(RemoteWorkerFailureDebugReport {
+        bundle_ref,
+        capture_outcome_code,
+        cleanup_status_code,
+    })
+}
+
+struct RemoteFailureFieldQuery<'a> {
+    reason: &'a str,
+    prefix: &'a str,
+}
+
+fn remote_failure_debug_report_field(query: RemoteFailureFieldQuery<'_>) -> Option<String> {
+    query.reason.split(';').map(str::trim).find_map(|field| {
+        field
+            .strip_prefix(query.prefix)
+            .and_then(|value| value.split(['\r', '\n']).next())
+            .map(str::to_string)
+    })
+}
+
+/// Whether one remote failure status code is an admissible bounded token.
+fn valid_remote_failure_status_code(value: &str) -> bool {
+    mantle_application_contract::is_remote_failure_status_code_admissible(value)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::os::unix::fs::symlink;
+
+    use crunch_build::distributed::REMOTE_FAILURE_DEBUG_NON_CLAIM;
+    use crunch_build::distributed::RemoteAttemptLogDigest;
+    use crunch_build::distributed::RemoteAttemptLogScope;
+    use crunch_build::distributed::RemoteFailureCapturePolicy;
+    use crunch_build::distributed::RemoteFailureCaptureSensitivity;
+    use crunch_remote_core::attempt::RemoteAttemptId;
+    use crunch_remote_core::attempt::RemoteFenceGeneration;
+    use crunch_remote_core::attempt::RemoteJobId;
+
+    use super::*;
+
+    const NOW_UNIX_S: u64 = 10_000;
+    const LEASE_DURATION_SECS: u64 = 300;
+    const TEST_FENCE: u64 = 2;
+    const MULTIPROCESS_PUBLISHERS: usize = 4;
+    const MULTIPROCESS_CHILD_ENV: &str = "MANTLE_REMOTE_FAILURE_DEBUG_PUBLISH_CHILD";
+    const MULTIPROCESS_STATE_ENV: &str = "MANTLE_REMOTE_FAILURE_DEBUG_PUBLISH_STATE";
+
+    fn request() -> ConcreteBuildRequest {
+        ConcreteBuildRequest {
+            request_id: "request-debug".to_string(),
+            endpoint_binding: None,
+            store_prefix: "/mantle/store".to_string(),
+            input_refs: vec!["/mantle/store/input".to_string()],
+            source_input_refs: Vec::new(),
+            upload_bytes: 0,
+            build_time_limit_secs: 60,
+            contains_raw_frontend_eval: false,
+            payload: crate::remote_build::RemoteConcreteBuildPayload::Action {
+                action_id: "debug-action".to_string(),
+                spec_json: r#"{"schema":"mantle-remote-action-v1","action_id":"debug-action","builder":"/bin/false","outputs":["out"]}"#.to_string(),
+            },
+            expected_outputs: vec![crate::remote_build::RemoteExpectedOutput {
+                name: "out".to_string(),
+                logical_path: None,
+            }],
+            production_attempt: None,
+            transfer_policy: None,
+            resource_requirements: None,
+            locality_scope: None,
+            failure_debug_policy: RemoteFailureDebugPolicy::default(),
+            failure_replay: None,
+        }
+    }
+
+    fn attempt() -> RemoteProductionAttemptBinding {
+        RemoteProductionAttemptBinding {
+            job_id: RemoteJobId::new("debug-job").unwrap(),
+            attempt_id: RemoteAttemptId::new("debug-attempt").unwrap(),
+            fence_generation: RemoteFenceGeneration::new(TEST_FENCE).unwrap(),
+        }
+    }
+
+    fn log_summary() -> RemoteAttemptLogControlSummary {
+        let attempt = attempt();
+        RemoteAttemptLogControlSummary {
+            scope: RemoteAttemptLogScope {
+                job_id: attempt.job_id,
+                attempt_id: attempt.attempt_id,
+                fence_generation: attempt.fence_generation,
+            },
+            retention_policy: crate::remote_build::RemoteLogRetentionPolicy::default(),
+            retained_start_cursor: 0,
+            next_cursor: 1,
+            retained_record_count: 1,
+            retained_payload_bytes: 1,
+            head_record_blake3: Some(RemoteAttemptLogDigest::new("a".repeat(64)).unwrap()),
+            head_segment_blake3: Some(RemoteAttemptLogDigest::new("b".repeat(64)).unwrap()),
+            manifest_blake3: RemoteAttemptLogDigest::new("c".repeat(64)).unwrap(),
+            truncation_anchor_blake3: None,
+            truncated: false,
+        }
+    }
+
+    fn facts() -> RemoteFailureDebugSourceFacts {
+        RemoteFailureDebugSourceFacts {
+            request: request(),
+            attempt: attempt(),
+            immutable_log: Some(log_summary()),
+            route_class: "remote-stdio".to_string(),
+            worker_capability_classes: vec!["exact".to_string()],
+            sandbox_policy_class: "native".to_string(),
+            network_policy_class: "none".to_string(),
+            transfer_status_class: "not-available".to_string(),
+            admission_status_class: "not-admitted".to_string(),
+            workspace_mode: RemoteFailureWorkspaceMode::Ephemeral,
+            failure_phase: RemoteFailureDebugPhase::Execution,
+            failure_reason_code: "sandbox-exit-nonzero".to_string(),
+            cleanup_status_code: "cleanup-complete".to_string(),
+            created_unix_s: NOW_UNIX_S,
+        }
+    }
+
+    fn bundle_dir(state: &Path, outcome: &RemoteFailureDebugPublishOutcome) -> PathBuf {
+        state.join(REMOTE_FAILURE_DEBUG_STORE_DIR).join(BUNDLES_DIR).join(outcome.bundle_blake3.as_str())
+    }
+
+    #[test]
+    fn multiprocess_bundle_publication_is_atomic_and_no_clobber() {
+        if std::env::var_os(MULTIPROCESS_CHILD_ENV).is_some() {
+            let state = PathBuf::from(std::env::var_os(MULTIPROCESS_STATE_ENV).unwrap());
+            let policy = RemoteFailureDebugPolicy {
+                replay_enabled: true,
+                ..RemoteFailureDebugPolicy::default()
+            };
+            publish_remote_failure_debug_bundle(RemoteFailureDebugPublishRequest {
+                state_dir: &state,
+                capture_root: None,
+                facts: facts(),
+                policy,
+            })
+            .unwrap();
+            return;
+        }
+        let state = tempfile::tempdir().unwrap();
+        let current_test = "remote_failure_debug::tests::multiprocess_bundle_publication_is_atomic_and_no_clobber";
+        let mut children = Vec::with_capacity(MULTIPROCESS_PUBLISHERS);
+        for _ in 0..MULTIPROCESS_PUBLISHERS {
+            children.push(
+                std::process::Command::new(std::env::current_exe().unwrap())
+                    .args(["--exact", current_test, "--nocapture"])
+                    .env(MULTIPROCESS_CHILD_ENV, "1")
+                    .env(MULTIPROCESS_STATE_ENV, state.path())
+                    .spawn()
+                    .unwrap(),
+            );
+        }
+        for mut child in children {
+            assert!(child.wait().unwrap().success());
+        }
+        let bundles_root = state.path().join(REMOTE_FAILURE_DEBUG_STORE_DIR).join(BUNDLES_DIR);
+        let entries = fs::read_dir(&bundles_root).unwrap().filter_map(Result::ok).collect::<Vec<_>>();
+
+        assert_eq!(entries.len(), 1);
+        assert!(!entries[0].file_name().to_string_lossy().starts_with(STAGE_PREFIX));
+        assert!(load_and_validate_remote_failure_debug_bundle(&entries[0].path()).is_ok());
+    }
+
+    #[test]
+    fn metadata_only_bundle_publishes_no_clobber_and_inspects_without_sandbox() {
+        let state = tempfile::tempdir().unwrap();
+        let policy = RemoteFailureDebugPolicy {
+            replay_enabled: true,
+            ..RemoteFailureDebugPolicy::default()
+        };
+        let first = publish_remote_failure_debug_bundle(RemoteFailureDebugPublishRequest {
+            state_dir: state.path(),
+            capture_root: None,
+            facts: facts(),
+            policy: policy.clone(),
+        })
+        .unwrap();
+        let second = publish_remote_failure_debug_bundle(RemoteFailureDebugPublishRequest {
+            state_dir: state.path(),
+            capture_root: None,
+            facts: facts(),
+            policy,
+        })
+        .unwrap();
+        let path = bundle_dir(state.path(), &first);
+        let inspect = inspect_remote_failure_debug_bundle_from_disk(&path).unwrap();
+        let replay = plan_remote_failure_replay_from_disk(&path).unwrap();
+
+        assert_eq!(first, second);
+        assert_eq!(first.capture_outcome_code, "metadata-only");
+        assert!(inspect.immutable_log_available);
+        assert!(replay.executable);
+        assert!(replay.new_authority_required);
+        assert!(!path.join(CAPTURE_CAS_DIR).read_dir().unwrap().any(|_| true));
+    }
+
+    #[test]
+    fn allowlisted_regular_file_is_captured_and_symlink_is_rejected_before_publication() {
+        let state = tempfile::tempdir().unwrap();
+        let sandbox = tempfile::tempdir().unwrap();
+        fs::create_dir(sandbox.path().join("build")).unwrap();
+        fs::write(sandbox.path().join("build/trace.json"), b"safe diagnostic").unwrap();
+        let victim = state.path().join("host-secret");
+        fs::write(&victim, b"SHOULD_NOT_LEAK").unwrap();
+        symlink(&victim, sandbox.path().join("build/link")).unwrap();
+        let policy = RemoteFailureDebugPolicy {
+            replay_enabled: true,
+            capture: RemoteFailureCapturePolicy {
+                enabled: true,
+                allowed_relative_paths: vec!["build/trace.json".to_string()],
+                sensitivity: RemoteFailureCaptureSensitivity::RestrictedDiagnostic,
+                ..RemoteFailureCapturePolicy::default()
+            },
+            ..RemoteFailureDebugPolicy::default()
+        };
+        let outcome = publish_remote_failure_debug_bundle(RemoteFailureDebugPublishRequest {
+            state_dir: state.path(),
+            capture_root: Some(sandbox.path()),
+            facts: facts(),
+            policy,
+        })
+        .unwrap();
+        let path = bundle_dir(state.path(), &outcome);
+        let rendered = fs::read(path.join(MANIFEST_FILE)).unwrap();
+
+        assert_eq!(outcome.capture_outcome_code, "captured");
+        assert!(!String::from_utf8_lossy(&rendered).contains("SHOULD_NOT_LEAK"));
+        assert!(load_and_validate_remote_failure_debug_bundle(&path).is_ok());
+        assert!(path.join(CAPTURE_CAS_DIR).read_dir().unwrap().any(|_| true));
+    }
+
+    #[test]
+    fn capture_rejects_final_and_parent_symlink_escape_before_publication() {
+        for allowed_path in ["build/link", "escape/trace.json"] {
+            let state = tempfile::tempdir().unwrap();
+            let sandbox = tempfile::tempdir().unwrap();
+            let external = tempfile::tempdir().unwrap();
+            fs::create_dir(sandbox.path().join("build")).unwrap();
+            fs::write(external.path().join("trace.json"), b"HOST_CONTENT_MUST_NOT_LEAK").unwrap();
+            symlink(external.path().join("trace.json"), sandbox.path().join("build/link")).unwrap();
+            symlink(external.path(), sandbox.path().join("escape")).unwrap();
+            let policy = RemoteFailureDebugPolicy {
+                capture: RemoteFailureCapturePolicy {
+                    enabled: true,
+                    allowed_relative_paths: vec![allowed_path.to_string()],
+                    sensitivity: RemoteFailureCaptureSensitivity::RestrictedDiagnostic,
+                    ..RemoteFailureCapturePolicy::default()
+                },
+                ..RemoteFailureDebugPolicy::default()
+            };
+            let result = publish_remote_failure_debug_bundle(RemoteFailureDebugPublishRequest {
+                state_dir: state.path(),
+                capture_root: Some(sandbox.path()),
+                facts: facts(),
+                policy,
+            });
+            let bundles = state.path().join(REMOTE_FAILURE_DEBUG_STORE_DIR).join(BUNDLES_DIR);
+
+            if let Ok(outcome) = result {
+                assert_eq!(outcome.capture_outcome_code, "capture-rejected");
+                let bundle_path = bundle_dir(state.path(), &outcome);
+                let (bundle, _) = load_and_validate_remote_failure_debug_bundle(&bundle_path).unwrap();
+                assert!(bundle.captured_artifact_manifest_ref.is_none());
+                assert!(!bundle_path.join(CAPTURE_CAS_DIR).read_dir().unwrap().any(|entry| entry.is_ok()));
+            }
+            assert!(bundles.read_dir().unwrap().filter_map(Result::ok).count() <= 1);
+            assert_eq!(fs::read(external.path().join("trace.json")).unwrap(), b"HOST_CONTENT_MUST_NOT_LEAK");
+        }
+    }
+
+    #[test]
+    fn tampered_manifest_object_and_capture_bytes_fail_closed() {
+        let state = tempfile::tempdir().unwrap();
+        let policy = RemoteFailureDebugPolicy {
+            replay_enabled: true,
+            ..RemoteFailureDebugPolicy::default()
+        };
+        let outcome = publish_remote_failure_debug_bundle(RemoteFailureDebugPublishRequest {
+            state_dir: state.path(),
+            capture_root: None,
+            facts: facts(),
+            policy,
+        })
+        .unwrap();
+        let path = bundle_dir(state.path(), &outcome);
+        let (bundle, _) = load_and_validate_remote_failure_debug_bundle(&path).unwrap();
+        fs::write(object_path(&path, &bundle.action_ref), b"{}").unwrap();
+
+        assert!(load_and_validate_remote_failure_debug_bundle(&path).is_err());
+        assert!(plan_remote_failure_replay_from_disk(&path).is_err());
+    }
+
+    #[test]
+    fn active_replay_lease_preserves_expired_bundle_then_drop_allows_deletion() {
+        let state = tempfile::tempdir().unwrap();
+        let policy = RemoteFailureDebugPolicy {
+            replay_enabled: true,
+            retention_secs: 1,
+            ..RemoteFailureDebugPolicy::default()
+        };
+        let outcome = publish_remote_failure_debug_bundle(RemoteFailureDebugPublishRequest {
+            state_dir: state.path(),
+            capture_root: None,
+            facts: facts(),
+            policy,
+        })
+        .unwrap();
+        let path = bundle_dir(state.path(), &outcome);
+        let lease = acquire_remote_failure_debug_lease(&path, NOW_UNIX_S, LEASE_DURATION_SECS).unwrap();
+        let preserved = retain_remote_failure_debug_bundles(state.path(), NOW_UNIX_S + 2).unwrap();
+        drop(lease);
+        let deleted = retain_remote_failure_debug_bundles(state.path(), NOW_UNIX_S + 2).unwrap();
+
+        assert_eq!(preserved.preserved_count, 1);
+        assert_eq!(preserved.deleted_count, 0);
+        assert_eq!(deleted.deleted_count, 1);
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn secret_bearing_action_is_redacted_and_replay_fails_closed() {
+        let state = tempfile::tempdir().unwrap();
+        let mut secret_facts = facts();
+        secret_facts.request.payload = crate::remote_build::RemoteConcreteBuildPayload::Action {
+            action_id: "debug-action".to_string(),
+            spec_json: serde_json::json!({
+                "schema": "mantle-remote-action-v1",
+                "action_id": "debug-action",
+                "builder": "/bin/false",
+                "outputs": ["out"],
+                "api_token": "SHOULD_NOT_LEAK",
+            })
+            .to_string(),
+        };
+        let policy = RemoteFailureDebugPolicy {
+            replay_enabled: true,
+            ..RemoteFailureDebugPolicy::default()
+        };
+        let outcome = publish_remote_failure_debug_bundle(RemoteFailureDebugPublishRequest {
+            state_dir: state.path(),
+            capture_root: None,
+            facts: secret_facts,
+            policy,
+        })
+        .unwrap();
+        let path = bundle_dir(state.path(), &outcome);
+        let (bundle, _) = load_and_validate_remote_failure_debug_bundle(&path).unwrap();
+        let action_bytes = fs::read(object_path(&path, &bundle.action_ref)).unwrap();
+        let replay = plan_remote_failure_replay_from_disk(&path).unwrap();
+
+        assert_eq!(bundle.action_ref.kind, "action-request-redacted");
+        assert!(!String::from_utf8_lossy(&action_bytes).contains("SHOULD_NOT_LEAK"));
+        assert!(!replay.executable);
+        assert!(replay.blockers.iter().any(|blocker| blocker.contains("action-request-redacted")));
+        assert!(load_remote_failure_replay_request(&path).is_err());
+    }
+
+    #[test]
+    fn raw_environment_values_are_excluded_and_block_replay() {
+        let state = tempfile::tempdir().unwrap();
+        let mut environment_facts = facts();
+        environment_facts.request.payload = crate::remote_build::RemoteConcreteBuildPayload::Action {
+            action_id: "debug-action".to_string(),
+            spec_json: serde_json::json!({
+                "schema": "mantle-remote-action-v1",
+                "action_id": "debug-action",
+                "builder": "/bin/false",
+                "outputs": ["out"],
+                "env": { "MODE": "SHOULD_NOT_RENDER" },
+            })
+            .to_string(),
+        };
+        let policy = RemoteFailureDebugPolicy {
+            replay_enabled: true,
+            ..RemoteFailureDebugPolicy::default()
+        };
+        let outcome = publish_remote_failure_debug_bundle(RemoteFailureDebugPublishRequest {
+            state_dir: state.path(),
+            capture_root: None,
+            facts: environment_facts,
+            policy,
+        })
+        .unwrap();
+        let path = bundle_dir(state.path(), &outcome);
+        let (bundle, _) = load_and_validate_remote_failure_debug_bundle(&path).unwrap();
+        let action_bytes = fs::read(object_path(&path, &bundle.action_ref)).unwrap();
+
+        assert_eq!(bundle.action_ref.kind, "action-request-redacted");
+        assert!(!String::from_utf8_lossy(&action_bytes).contains("SHOULD_NOT_RENDER"));
+        assert!(!plan_remote_failure_replay_from_disk(&path).unwrap().executable);
+    }
+
+    #[test]
+    fn missing_immutable_log_is_honest_and_replay_action_has_no_stale_authority() {
+        let state = tempfile::tempdir().unwrap();
+        let mut facts = facts();
+        facts.immutable_log = None;
+        let policy = RemoteFailureDebugPolicy {
+            replay_enabled: true,
+            ..RemoteFailureDebugPolicy::default()
+        };
+        let outcome = publish_remote_failure_debug_bundle(RemoteFailureDebugPublishRequest {
+            state_dir: state.path(),
+            capture_root: None,
+            facts,
+            policy,
+        })
+        .unwrap();
+        let path = bundle_dir(state.path(), &outcome);
+        let inspect = inspect_remote_failure_debug_bundle_from_disk(&path).unwrap();
+        let replay_request = load_remote_failure_replay_request(&path).unwrap();
+
+        assert!(!inspect.immutable_log_available);
+        assert!(replay_request.production_attempt.is_none());
+        assert!(replay_request.transfer_policy.is_none());
+        assert_eq!(outcome.non_claim, REMOTE_FAILURE_DEBUG_NON_CLAIM);
+    }
+
+    #[test]
+    fn worker_failure_debug_reference_admits_only_validated_fields() {
+        let digest = "a".repeat(REMOTE_FAILURE_DEBUG_DIGEST_HEX_CHARS);
+        let report = parse_remote_worker_failure_debug_report(&format!(
+            "build failed; worker_bundle_ref=remote-failure-debug:{digest}; worker_capture_outcome=captured; worker_cleanup_status=cleanup-attempted-after-capture\n\nremediation: mantle.build.nonzero-exit",
+        ))
+        .unwrap();
+        assert_eq!(report.capture_outcome_code, "captured");
+        assert_eq!(report.cleanup_status_code, "cleanup-attempted-after-capture");
+        let relayed = format!("remote-executor-failed{}", report.render_fields());
+        assert_eq!(parse_remote_worker_failure_debug_report(&relayed), Some(report.clone()));
+        assert_eq!(report.clone().validated(), Some(report.clone()));
+        let smuggled = RemoteWorkerFailureDebugReport {
+            capture_outcome_code: "captured; secret=value".to_string(),
+            ..report
+        };
+        assert_eq!(smuggled.validated(), None);
+        assert!(
+            parse_remote_worker_failure_debug_report(
+                "worker_bundle_ref=remote-failure-debug:bad; worker_capture_outcome=captured; worker_cleanup_status=ok"
+            )
+            .is_none()
+        );
+        assert!(
+            parse_remote_worker_failure_debug_report(&format!(
+                "build failed\nworker_bundle_ref=remote-failure-debug:{digest}; worker_capture_outcome=captured; worker_cleanup_status=cleanup-attempted-after-capture",
+            ))
+            .is_none()
+        );
+        assert!(
+            parse_remote_worker_failure_debug_report(&format!(
+                "build failed; worker_bundle_ref=remote-failure-debug:{digest}; worker_capture_outcome=CAPTURED; worker_cleanup_status=cleanup-attempted-after-capture",
+            ))
+            .is_none()
+        );
+    }
+}

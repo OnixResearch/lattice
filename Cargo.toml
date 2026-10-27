@@ -5,27 +5,31 @@ edition = "2024"
 license = "AGPL-3.0-or-later"
 
 [workspace]
+# The root package is implicit; listing "." shadows nested workspace exclusions.
 members = [
-  ".",
   "crates/budget-ledger-core",
   "crates/lattice-core",
+  "crates/lattice-compose-binding",
   "crates/lattice-workflow-contract",
   "crates/lattice-workflow-contract/transport",
 ]
 default-members = ["."]
 exclude = [
+  "vendor-cargo-deps/rats",
   "vendor-cargo-deps/animus",
   "vendor-cargo-deps/basalt",
   "vendor-cargo-deps/basalt/vendor/ucan",
   "vendor-cargo-deps/basalt/vendor/ucan/vendor/verified-logic",
   "vendor-cargo-deps/host-control",
   "vendor-cargo-deps/host-control/crates/host-control-core",
+  "vendor-cargo-deps/hardened-wasmtime-runtime",
+  "vendor-cargo-deps/mantle",
 ]
 resolver = "3"
 
 [workspace.package]
 edition = "2024"
-license = "MIT"
+license = "AGPL-3.0-or-later"
 version = "0.1.0"
 
 [workspace.dependencies]
@@ -48,11 +52,15 @@ path = "src/main.rs"
 [dependencies]
 budget-ledger-core = { path = "crates/budget-ledger-core" }
 lattice-core = { path = "crates/lattice-core" }
+lattice-compose-binding = { path = "crates/lattice-compose-binding" }
 lattice-workflow-contract = { path = "crates/lattice-workflow-contract" }
 lattice-workflow-transport = { path = "crates/lattice-workflow-contract/transport" }
+tile-sdk = { git = "ssh://git@github.com/brittonr/tile.git", rev = "5e703953840bff72a91fec3e928682e9efb607ab" }
+tile-protocol = { git = "ssh://git@github.com/brittonr/tile.git", rev = "5e703953840bff72a91fec3e928682e9efb607ab" }
 tokio = { version = "1.50", features = ["full"] }
 futures = "0.3.32"
 async-trait = "0.1.89"
+base64 = "0.22.1"
 serde = { version = "1.0.228", features = ["derive", "rc"] }
 serde_json = "1.0.149"
 tracing = "0.1.44"
@@ -88,7 +96,7 @@ choregraph-kamacite = { git = "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9
 choregraph-nickel = { git = "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git", rev = "0b2000edaf86d5a7a8601246afbc0d526f4a2a07" }
 seaglass-execution-graph = { package = "choregraph-seaglass", git = "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git", rev = "0b2000edaf86d5a7a8601246afbc0d526f4a2a07" }
 cap-root-core = { git = "https://seed.radicle.garden/z3cWBCK7VPbEmbL5MAvKJWKjCE745.git", rev = "545e77e5a49e4e1d34037aa9a82d924944ac0a1b" }
-basalt = { path = "vendor-cargo-deps/basalt", default-features = false }
+basalt = { path = "vendor-cargo-deps/basalt", default-features = false, features = ["oidc-exchange", "durable-authority"] }
 rat-nodegraph = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-nodegraph" }
 rat-widgets = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-widgets" }
 rat-keymap = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-keymap" }
@@ -107,6 +115,13 @@ which = "8.0.0"
 animus-adapters = { path = "vendor-cargo-deps/animus/crates/animus-adapters" }
 animus-runtime = { path = "vendor-cargo-deps/animus/crates/animus-runtime", default-features = false, features = ["steel"] }
 animus-steel = { path = "vendor-cargo-deps/animus/crates/animus-steel" }
+animus-std-secretspec = { path = "vendor-cargo-deps/animus/crates/animus-std-secretspec", optional = true }
+hardened-wasmtime-runtime = { path = "vendor-cargo-deps/hardened-wasmtime-runtime/crates/hardened-wasmtime-runtime" }
+hardened-wasmtime-shell = { path = "vendor-cargo-deps/hardened-wasmtime-runtime/crates/hardened-wasmtime-shell" }
+mantle-build-contract = { path = "vendor-cargo-deps/mantle/crates/mantle-build-contract", default-features = false }
+mantle-wasm-consumer-verifier = { path = "vendor-cargo-deps/mantle/crates/mantle-wasm-consumer-verifier" }
+valence-core = { git = "ssh://git@github.com/OnixResearch/valence.git", rev = "15e72b5a330b08139ac7c809ac31e7e87f825b22" }
+zeroize = "1"
 
 [dev-dependencies]
 nickel-lang-core = "=0.18.0"
@@ -119,8 +134,11 @@ portable-pty = "0.9.0"
 toml = "0.9"
 trybuild = "1.0.116"
 nix = { version = "0.31", default-features = false, features = ["user"] }
+rustls = { version = "=0.23.42", default-features = false, features = ["ring", "std", "tls12"] }
+crunch-wasm-component-core = { path = "vendor-cargo-deps/mantle/crates/crunch-wasm-component-core" }
 
 [features]
 default = []
 simulation = ["dep:madsim"]
 property-testing = ["dep:bolero", "dep:bolero-generator", "dep:proptest"]
+animus-secretspec = ["dep:animus-std-secretspec"]

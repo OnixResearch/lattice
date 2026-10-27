@@ -4,19 +4,14 @@
 //! evaluate Nickel, fetch proofs, or consult revocation/replay stores. A caller-owned
 //! shell supplies reviewed policy values and references to already-verified UCAN facts.
 
-use serde::Deserialize;
-use serde::Serialize;
-
-use crate::CapabilityGrant;
-use crate::EnforcementRequest;
-use crate::Policy;
-use crate::SUPPORTED_SCHEMA_VERSION;
-pub use crate::authority_identity::AUTHORITY_DECISION_SCHEMA;
-pub use crate::authority_identity::AUTHORITY_FIXTURE_SCHEMA;
-pub use crate::authority_identity::AUTHORITY_INPUT_SCHEMA;
-pub use crate::authority_identity::AUTHORITY_RELEASE_RECEIPT_SCHEMA;
-use crate::enforce;
 use crate::ucan_semantics_identity::BASALT_POLICY_BLAKE3;
+use crate::{CapabilityGrant, EnforcementRequest, Policy, SUPPORTED_SCHEMA_VERSION, enforce};
+use serde::{Deserialize, Serialize};
+
+pub use crate::authority_identity::{
+    AUTHORITY_DECISION_SCHEMA, AUTHORITY_FIXTURE_SCHEMA, AUTHORITY_INPUT_SCHEMA,
+    AUTHORITY_RELEASE_RECEIPT_SCHEMA,
+};
 
 const BLAKE3_REFERENCE_PREFIX: &str = "blake3:";
 const BLAKE3_HEX_BYTES: usize = 64;
@@ -399,7 +394,8 @@ pub fn is_blake3_reference(reference: &str) -> bool {
     let Some(hex) = reference.strip_prefix(BLAKE3_REFERENCE_PREFIX) else {
         return false;
     };
-    hex.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    hex.bytes()
+        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 /// Adapt an existing Basalt request without changing its public fields.
@@ -420,7 +416,11 @@ pub fn adapt_enforcement_request(
     }
 
     let mut verified_grants = Vec::with_capacity(request.capabilities.len());
-    for (capability, binding) in request.capabilities.iter().zip(evidence.grant_bindings.iter()) {
+    for (capability, binding) in request
+        .capabilities
+        .iter()
+        .zip(evidence.grant_bindings.iter())
+    {
         verified_grants.push(VerifiedGrantRef {
             grant_ref: binding.grant_ref.clone(),
             verification_receipt_ref: binding.verification_receipt_ref.clone(),
@@ -550,7 +550,9 @@ fn validate_claims_and_dispositions(input: &AuthorityInput) -> Option<AuthorityD
     None
 }
 
-fn select_exact_grant(input: &AuthorityInput) -> Result<&VerifiedGrantRef, AuthorityDenyDiagnostic> {
+fn select_exact_grant(
+    input: &AuthorityInput,
+) -> Result<&VerifiedGrantRef, AuthorityDenyDiagnostic> {
     if input.verified_grants.is_empty() {
         return Err(AuthorityDenyDiagnostic::MissingVerifiedGrant);
     }
@@ -559,14 +561,16 @@ fn select_exact_grant(input: &AuthorityInput) -> Result<&VerifiedGrantRef, Autho
             return Err(AuthorityDenyDiagnostic::MalformedVerifiedGrant);
         }
     }
-    if let Some(grant) = input
-        .verified_grants
-        .iter()
-        .find(|grant| grant.resource == input.request.resource && grant.ability == input.request.ability)
-    {
+    if let Some(grant) = input.verified_grants.iter().find(|grant| {
+        grant.resource == input.request.resource && grant.ability == input.request.ability
+    }) {
         return Ok(grant);
     }
-    if input.verified_grants.iter().any(|grant| grant.resource == input.request.resource) {
+    if input
+        .verified_grants
+        .iter()
+        .any(|grant| grant.resource == input.request.resource)
+    {
         return Err(AuthorityDenyDiagnostic::WrongAbility);
     }
     Err(AuthorityDenyDiagnostic::WrongResource)
@@ -605,7 +609,11 @@ fn validate_receipt_binding(
     if receipt.request_ref != input.request.request_ref {
         return Some(AuthorityDenyDiagnostic::VerificationRequestMismatch);
     }
-    if !receipt.verified_grant_refs.iter().any(|grant_ref| grant_ref == &grant.grant_ref) {
+    if !receipt
+        .verified_grant_refs
+        .iter()
+        .any(|grant_ref| grant_ref == &grant.grant_ref)
+    {
         return Some(AuthorityDenyDiagnostic::VerificationGrantMismatch);
     }
     None
@@ -613,13 +621,20 @@ fn validate_receipt_binding(
 
 // Explicit branching keeps the unexpected enforcement error visible.
 #[allow(clippy::option_if_let_else)]
-fn enforce_exact_grant(policy: &Policy, input: &AuthorityInput, grant: &VerifiedGrantRef) -> AuthorityDecision {
+fn enforce_exact_grant(
+    policy: &Policy,
+    input: &AuthorityInput,
+    grant: &VerifiedGrantRef,
+) -> AuthorityDecision {
     let request = EnforcementRequest::new(
         input.request.contract_id.clone(),
         input.request.resource.clone(),
         input.request.ability.clone(),
     )
-    .with_capability(CapabilityGrant::new(grant.resource.clone(), grant.ability.clone()));
+    .with_capability(CapabilityGrant::new(
+        grant.resource.clone(),
+        grant.ability.clone(),
+    ));
 
     match enforce(policy, &request) {
         Ok(receipt) if receipt.is_allowed() => allowed(input),
@@ -668,11 +683,16 @@ fn verification_receipt_is_well_formed(receipt: &UcanVerificationReceiptRef) -> 
     {
         return false;
     }
-    receipt.verified_grant_refs.iter().all(|grant_ref| is_blake3_reference(grant_ref.as_str()))
+    receipt
+        .verified_grant_refs
+        .iter()
+        .all(|grant_ref| is_blake3_reference(grant_ref.as_str()))
 }
 
 fn bounded_non_empty(value: &str) -> bool {
-    !value.is_empty() && value.len() <= MAXIMUM_AUTHORITY_FIELD_BYTES && !value.chars().any(char::is_control)
+    !value.is_empty()
+        && value.len() <= MAXIMUM_AUTHORITY_FIELD_BYTES
+        && !value.chars().any(char::is_control)
 }
 
 fn allowed(input: &AuthorityInput) -> AuthorityDecision {

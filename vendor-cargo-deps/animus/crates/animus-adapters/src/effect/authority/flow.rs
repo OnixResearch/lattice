@@ -25,8 +25,13 @@ struct DecisionEvaluation<'a> {
 /// Evaluates a guarded action against contract, UCAN, local caveat, and sandbox checks.
 #[must_use]
 pub fn authorize_capability(context: &AuthorizationContext<'_>) -> super::AuthorizationReceipt {
-    let matching_grants =
-        receipt_count(context.grants.iter().filter(|grant| grant.authorizes(context.request)).count());
+    let matching_grants = receipt_count(
+        context
+            .grants
+            .iter()
+            .filter(|grant| grant.authorizes(context.request))
+            .count(),
+    );
     let caveats = summarize_caveats(context.caveats);
     let issue = authorization_issue(context, matching_grants, caveats);
     build_receipt(&DecisionEvaluation {
@@ -132,12 +137,18 @@ fn summarize_caveats(caveats: &[super::LocalCaveat]) -> super::CaveatSummary {
             super::LocalCaveatDecision::Ask => asks = increment_receipt_count(asks),
         }
     }
-    super::CaveatSummary { allows, denies, asks }
+    super::CaveatSummary {
+        allows,
+        denies,
+        asks,
+    }
 }
 
 fn sandbox_hash(sandbox: &super::SandboxConstraint) -> Option<super::super::SafeHash> {
     match sandbox {
         super::SandboxConstraint::NotRequired => None,
-        super::SandboxConstraint::Required { descriptor_hash, .. } => Some(descriptor_hash.clone()),
+        super::SandboxConstraint::Required {
+            descriptor_hash, ..
+        } => Some(descriptor_hash.clone()),
     }
 }

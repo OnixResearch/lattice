@@ -1,0 +1,17 @@
+[package]
+name = "hardened-wasmtime-shell"
+workspace = "../.."
+description = "Thin imperative shell owning the Wasmtime engine, store, linker, epoch binding, and bounded invocation"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+hardened-wasmtime-runtime.workspace = true
+wasmtime.workspace = true
+blake3.workspace = true

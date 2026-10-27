@@ -1,0 +1,78 @@
+{
+  "schema": "mantle-oci-import-report-v1",
+  "schema_version": 1,
+  "imported": true,
+  "state": "compatibility-only",
+  "layout_blake3": "91ba2b52b5cbcced687a71bce2ac5c4158c52a13fd75341d7b3ab0dea3b44f3b",
+  "manifest_descriptor": {
+    "mediaType": "application/vnd.oci.image.manifest.v1+json",
+    "digest": "sha256:356a437342f3fff5d56af0ccd9c8b0974a6652aab7fcd3c9754c20129027a1bb",
+    "size": 1272,
+    "annotations": {
+      "io.multikernel.kbi.id": "kbi:sha256:7777777777777777777777777777777777777777777777777777777777777777",
+      "org.onix.bundle.schema": "onix-kernel-bundle-v1",
+      "org.opencontainers.image.title": "Onix kernel bundle"
+    },
+    "platform": {
+      "architecture": "x86_64",
+      "os": "linux"
+    }
+  },
+  "objects": [
+    {
+      "role": "base-kernel",
+      "media_type": "application/vnd.onix.kernel.v1",
+      "oci_sha256": "sha256:7d85a326c4eaf5c09d11bed101a08ea50915897a31b627285b5b3446bd37262f",
+      "blob_blake3": "60e4b4d8a925700ceed4ae9543b4cc33a01c4e760657c5495dc5b123593d219a",
+      "size_bytes": 12,
+      "archive_profile": "exact-blob",
+      "artifact_ref": "mantle://blake3/cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    },
+    {
+      "role": "module-pack",
+      "media_type": "application/vnd.onix.module-pack.v1.tar",
+      "oci_sha256": "sha256:ca2549f9e74907368f3cc25bea2446d5ac9394e1cfd8460f07a0a078fb29fdd9",
+      "blob_blake3": "289a57d93bf2f999384052c3028f661de1a06e3e02dcef3207c40be5d9e4e007",
+      "size_bytes": 2560,
+      "archive_profile": "external-safe-inspection",
+      "artifact_ref": "mantle://blake3/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    },
+    {
+      "role": "oci-config",
+      "media_type": "application/vnd.oci.image.config.v1+json",
+      "oci_sha256": "sha256:d3e1a6d0ff6361522ed343ba63271698ad23b994c0148441ff18837ca29c1ce7",
+      "blob_blake3": "512310344ff8e1d8741113833467dec55d049b6a662f09b8ff2dfec9a5201fa1",
+      "size_bytes": 738,
+      "archive_profile": "exact-json",
+      "artifact_ref": "mantle://blake3/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    {
+      "role": "oci-manifest",
+      "media_type": "application/vnd.oci.image.manifest.v1+json",
+      "oci_sha256": "sha256:356a437342f3fff5d56af0ccd9c8b0974a6652aab7fcd3c9754c20129027a1bb",
+      "blob_blake3": "1d95f0c85a3e41955792e143e76bf91809506a4e71f784c26236e9f3f88d4135",
+      "size_bytes": 1272,
+      "archive_profile": "exact-json",
+      "artifact_ref": "mantle://blake3/ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+  ],
+  "frontend_spec": null,
+  "object_admissions_blake3": null,
+  "projection_blake3": null,
+  "round_trip": null,
+  "issues": [],
+  "non_claims": [
+    "CAS admission is not release eligibility",
+    "archive safety is not kernel compatibility",
+    "compatibility-only imports do not recover frontend semantics",
+    "descriptor validation is not signature verification",
+    "frontend semantics remain external",
+    "no bootability claim",
+    "no deployability claim",
+    "no kernel compatibility decision",
+    "no registry publication",
+    "no release eligibility claim",
+    "no signature policy claim"
+  ],
+  "receipt_blake3": "fc440504ff2de05458fd33f2c16578aa0d8fd0202d2ea90fad26d526fce6f5c6"
+}

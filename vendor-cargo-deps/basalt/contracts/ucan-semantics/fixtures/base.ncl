@@ -2,6 +2,7 @@ let Contracts = import "../contracts.ncl" in
 {
   schema | default = Contracts.identity.fixture_schema,
   fixture_id | default = "base",
+  protocol_profile | default = Contracts.identity.protocol_profile,
   runtime_ucan_revision | default = Contracts.identity.runtime_ucan_revision,
   support_catalog_revision | default = Contracts.identity.support_catalog_revision,
   support_catalog_blake3 | default = Contracts.identity.support_catalog_blake3,

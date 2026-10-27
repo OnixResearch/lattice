@@ -7,35 +7,16 @@ mod pattern;
 mod signal;
 mod types;
 
-pub use decision::Binding;
-pub use decision::FailBehavior;
-pub use decision::FailPolicy;
-pub use decision::Gate;
-pub use decision::Issue;
-pub use decision::Outcome;
-pub use decision::Snapshot;
-pub use decision::Status;
-pub use decision::bind;
-pub use evidence::Leak;
-pub use evidence::Receipt;
-pub use evidence::validate_text;
-pub use input::Draft;
-pub use input::Review;
-pub use input::ToolCallDescriptor;
-pub use input::ToolCallDescriptorDraft;
+pub use decision::{
+    Binding, FailBehavior, FailPolicy, Gate, Issue, Outcome, Snapshot, Status, bind,
+};
+pub use evidence::{Leak, Receipt, validate_text};
+pub use input::{Draft, Review, ToolCallDescriptor, ToolCallDescriptorDraft};
 pub use pattern::scan_review_input;
-pub use signal::Category;
-pub use signal::Confidence;
-pub use signal::Disposition;
-pub use signal::Finding;
-pub use signal::Report;
-pub use signal::ScannerStatus;
-pub use types::ActionClass;
-pub use types::AdvisoryOutcome;
-pub use types::AdvisoryReview;
-pub use types::AdvisoryReviewDraft;
-pub use types::Error;
-pub use types::RiskClass;
+pub use signal::{Category, Confidence, Disposition, Finding, Report, ScannerStatus};
+pub use types::{
+    ActionClass, AdvisoryOutcome, AdvisoryReview, AdvisoryReviewDraft, Error, RiskClass,
+};
 
 type Text = alloc::string::String;
 type Collection<T> = alloc::vec::Vec<T>;
@@ -55,10 +36,12 @@ const MAX_EVIDENCE_ITEMS: usize = 16;
 const MAX_ADVISORY_EVIDENCE_ITEMS: usize = 16;
 const RECEIPT_COUNT_LIMIT: u32 = u32::MAX;
 
-const TASK_LABEL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("security_review_task_label");
+const TASK_LABEL_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("security_review_task_label");
 const CONTEXT_SUMMARY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("security_review_context_summary");
-const TOOL_NAME_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("security_review_tool_name");
+const TOOL_NAME_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("security_review_tool_name");
 const TOOL_TARGET_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("security_review_tool_target_label");
 const ARGUMENT_LABEL_FIELD: crate::validation::FieldName =
@@ -92,7 +75,12 @@ const PROMPT_INJECTION_PATTERNS: &[&str] = &[
     "developer message",
     "prompt injection",
 ];
-const DESTRUCTIVE_ACTION_PATTERNS: &[&str] = &["recursive-delete", "rm -rf", "delete workspace", "destructive-action"];
+const DESTRUCTIVE_ACTION_PATTERNS: &[&str] = &[
+    "recursive-delete",
+    "rm -rf",
+    "delete workspace",
+    "destructive-action",
+];
 const EXFILTRATION_PATTERNS: &[&str] = &[
     "unknown-upload-domain",
     "exfiltrate",
@@ -100,7 +88,8 @@ const EXFILTRATION_PATTERNS: &[&str] = &[
     "credential-access",
     "upload secret",
 ];
-const PRIVILEGE_ESCALATION_PATTERNS: &[&str] = &["sudo", "root-required", "privilege-escalation", "chmod 777"];
+const PRIVILEGE_ESCALATION_PATTERNS: &[&str] =
+    &["sudo", "root-required", "privilege-escalation", "chmod 777"];
 const OBFUSCATED_REMOTE_EXECUTION_PATTERNS: &[&str] = &[
     "download-execute",
     "curl-pipe-sh",

@@ -3,14 +3,18 @@ mod tests;
 
 /// Evaluates exec policy and returns a redacted sandbox-escalation event.
 #[must_use]
-pub fn evaluate_sandbox_escalation(request: animus_adapters::ExecPolicyRequest<'_>) -> crate::RuntimeEvent {
+pub fn evaluate_sandbox_escalation(
+    request: animus_adapters::ExecPolicyRequest<'_>,
+) -> crate::RuntimeEvent {
     let evaluation = animus_adapters::evaluate_exec_policy(request);
     sandbox_escalation_event(&evaluation)
 }
 
 /// Builds a redacted sandbox-escalation event from a policy evaluation.
 #[must_use]
-pub fn sandbox_escalation_event(evaluation: &animus_adapters::ExecPolicyEvaluation) -> crate::RuntimeEvent {
+pub fn sandbox_escalation_event(
+    evaluation: &animus_adapters::ExecPolicyEvaluation,
+) -> crate::RuntimeEvent {
     crate::RuntimeEvent::SandboxEscalation {
         decision: evaluation.decision(),
         rule_ids: rule_ids(evaluation),
@@ -23,7 +27,11 @@ pub fn sandbox_escalation_event(evaluation: &animus_adapters::ExecPolicyEvaluati
 }
 
 fn rule_ids(evaluation: &animus_adapters::ExecPolicyEvaluation) -> Vec<String> {
-    evaluation.matched_rules().iter().map(|evidence| String::from(evidence.rule_id())).collect()
+    evaluation
+        .matched_rules()
+        .iter()
+        .map(|evidence| String::from(evidence.rule_id()))
+        .collect()
 }
 
 fn command_fingerprints(evaluation: &animus_adapters::ExecPolicyEvaluation) -> Vec<String> {

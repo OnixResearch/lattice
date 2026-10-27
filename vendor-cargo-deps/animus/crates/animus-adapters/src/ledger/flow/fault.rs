@@ -75,13 +75,20 @@ impl core::fmt::Display for Error {
             Self::DuplicateEntryId { entry_id } => {
                 write!(formatter, "ledger entry id {entry_id} is duplicated")
             }
-            Self::MissingParent { entry_id, parent_id } => {
-                write!(formatter, "ledger entry {entry_id} references missing parent {parent_id}")
-            }
+            Self::MissingParent {
+                entry_id,
+                parent_id,
+            } => write!(
+                formatter,
+                "ledger entry {entry_id} references missing parent {parent_id}"
+            ),
             Self::ParentCycle {
                 entry_id,
                 cycle_entry_id,
-            } => write!(formatter, "ledger entry {entry_id} ancestry repeats {cycle_entry_id}"),
+            } => write!(
+                formatter,
+                "ledger entry {entry_id} ancestry repeats {cycle_entry_id}"
+            ),
             Self::InvalidActiveLeaf { active_leaf } => {
                 write!(formatter, "ledger active leaf {active_leaf} is not present")
             }
@@ -95,22 +102,35 @@ impl core::fmt::Display for Error {
                 redaction.as_str()
             ),
             Self::OrphanToolResult { entry_id } => {
-                write!(formatter, "ledger tool result {entry_id} has no assistant parent")
+                write!(
+                    formatter,
+                    "ledger tool result {entry_id} has no assistant parent"
+                )
             }
-            Self::MalformedSummaryBoundary { entry_id } => {
-                write!(formatter, "ledger summary {entry_id} has no prior model-visible span to replace")
-            }
+            Self::MalformedSummaryBoundary { entry_id } => write!(
+                formatter,
+                "ledger summary {entry_id} has no prior model-visible span to replace"
+            ),
             Self::MissingLabelTarget { target_id } => {
                 write!(formatter, "ledger label target {target_id} is not present")
             }
             Self::MissingLedgerService { session_label } => {
-                write!(formatter, "session {session_label} has no injected ledger service")
+                write!(
+                    formatter,
+                    "session {session_label} has no injected ledger service"
+                )
             }
             Self::MissingSession { session_label } => {
-                write!(formatter, "session {session_label} is not present in ledger service")
+                write!(
+                    formatter,
+                    "session {session_label} is not present in ledger service"
+                )
             }
             Self::UnavailableLedgerService { session_label } => {
-                write!(formatter, "session {session_label} ledger service is unavailable")
+                write!(
+                    formatter,
+                    "session {session_label} ledger service is unavailable"
+                )
             }
         }
     }

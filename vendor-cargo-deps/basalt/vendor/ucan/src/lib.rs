@@ -3,15 +3,49 @@
 
 pub use ucan_core as core;
 
+#[cfg(feature = "durable-authority")]
+pub mod durable_authority;
 pub mod error;
 pub mod integration_profile;
+pub mod profile;
+pub mod protocol_profile;
 pub mod readiness;
 pub mod shell;
 pub mod token;
+pub mod verification_cache;
 pub mod verified;
 
+#[cfg(feature = "durable-authority")]
+pub use durable_authority::DurableAuthorityConfigError;
+#[cfg(feature = "durable-authority")]
+pub use durable_authority::DurableAuthorityField;
+#[cfg(feature = "durable-authority")]
+pub use durable_authority::DurableHolderReplayAdmission;
+#[cfg(feature = "durable-authority")]
+pub use durable_authority::DurableReplayContext;
+#[cfg(feature = "durable-authority")]
+pub use durable_authority::DurableReplayContextInput;
+#[cfg(feature = "durable-authority")]
+pub use durable_authority::DurableReplayDurability;
+#[cfg(feature = "durable-authority")]
+pub use durable_authority::DurableRevocationChecker;
+#[cfg(feature = "durable-authority")]
+pub use durable_authority::DurableRevocationContext;
+#[cfg(feature = "durable-authority")]
+pub use durable_authority::DurableRevocationContextInput;
+#[cfg(feature = "durable-authority")]
+pub use durable_authority::durable_revocation_entry_digest;
 pub use error::Error;
 pub use error::Result;
+pub use protocol_profile::ConformanceClass;
+pub use protocol_profile::ConformanceReport;
+pub use protocol_profile::ProtocolProfileAdmissionError;
+pub use protocol_profile::ProtocolProfileId;
+pub use protocol_profile::Ucan100FixtureManifest;
+pub use protocol_profile::admit_protocol_profile_id;
+pub use protocol_profile::build_conformance_report;
+pub use protocol_profile::protocol_profile_catalog;
+pub use protocol_profile::validate_ucan100_fixture_manifest;
 pub use readiness::IntegrationProfile;
 pub use readiness::ProductionReadinessReport;
 pub use readiness::ReadinessOption;
@@ -46,6 +80,7 @@ pub use token::Ed25519PublicKey;
 pub use token::Ed25519SigningKey;
 pub use token::Ed25519VerificationKey;
 pub use token::EffectiveDelegation;
+pub use token::HolderAuthorizationObservation;
 pub use token::HolderInvocationAuthorized;
 pub use token::HolderInvocationError;
 pub use token::HolderInvocationFixedField;
@@ -63,6 +98,8 @@ pub use token::HolderInvocationRequestDigest;
 pub use token::HolderInvocationResult;
 pub use token::HolderInvocationSigningRequest;
 pub use token::HolderInvocationTokenReference;
+pub use token::HolderRecheckError;
+pub use token::HolderRecheckPolicies;
 pub use token::HolderTokenVerificationContext;
 pub use token::InvocationAllowed;
 pub use token::InvocationDenialReason;
@@ -114,6 +151,7 @@ pub use token::issue_token;
 pub use token::issue_token_with_signer;
 pub use token::parse_compact_token;
 pub use token::proof_reference;
+pub use token::recheck_holder_authorization;
 pub use token::sign_holder_invocation;
 pub use token::validate_decoded_token;
 pub use token::verify_compact_token;

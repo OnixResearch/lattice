@@ -4,22 +4,36 @@
 //! process supervision, credential stores, provider sessions, dashboards, and
 //! dedupe-cache storage.
 
-const PROFILE_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("gateway_profile_id");
-const CLIENT_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("gateway_client_id");
-const SCOPE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("gateway_scope");
-const FEATURE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("gateway_feature");
-const CHALLENGE_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("gateway_challenge_id");
-const VERIFIER_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("gateway_verifier_id");
-const SUMMARY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("gateway_summary");
-const CORRELATION_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("gateway_correlation_id");
-const ACTOR_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("gateway_actor");
+const PROFILE_ID_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("gateway_profile_id");
+const CLIENT_ID_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("gateway_client_id");
+const SCOPE_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("gateway_scope");
+const FEATURE_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("gateway_feature");
+const CHALLENGE_ID_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("gateway_challenge_id");
+const VERIFIER_ID_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("gateway_verifier_id");
+const SUMMARY_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("gateway_summary");
+const CORRELATION_ID_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("gateway_correlation_id");
+const ACTOR_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("gateway_actor");
 const PAYLOAD_SUMMARY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("gateway_payload_summary");
-const STREAM_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("gateway_stream_id");
-const EVENT_NAME_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("gateway_event_name");
-const ERROR_CODE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("gateway_error_code");
-const ERROR_MESSAGE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("gateway_error_message");
-const ERROR_DETAIL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("gateway_error_detail");
+const STREAM_ID_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("gateway_stream_id");
+const EVENT_NAME_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("gateway_event_name");
+const ERROR_CODE_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("gateway_error_code");
+const ERROR_MESSAGE_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("gateway_error_message");
+const ERROR_DETAIL_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("gateway_error_detail");
 
 /// Active Animus gateway protocol version for the bounded `OpenClaw` profile.
 pub const OPENCLAW_PROTOCOL_VERSION: u16 = 1;
@@ -95,8 +109,7 @@ pub enum Error {
     ProtocolMismatch,
     /// A request appeared before a connect handshake.
     HandshakeRequired,
-    /// Text contained a raw prompt, provider payload, credential, path, tool body, or unbounded
-    /// output marker.
+    /// Text contained a raw prompt, provider payload, credential, path, tool body, or unbounded output marker.
     UnsafePayload {
         /// Field that contained unsafe text.
         field: &'static str,
@@ -777,7 +790,11 @@ impl Idempotency {
     /// # Errors
     ///
     /// Returns [`Error`] when hashes or request-binding metadata are invalid.
-    pub fn new(draft: &IdempotencyDraft<'_>, request_method: Method, request_actor: &str) -> Result<Self, Error> {
+    pub fn new(
+        draft: &IdempotencyDraft<'_>,
+        request_method: Method,
+        request_actor: &str,
+    ) -> Result<Self, Error> {
         if draft.method != request_method {
             return Err(Error::IdempotencyMethodMismatch);
         }
@@ -859,7 +876,11 @@ impl RequestFrame {
     pub fn new(draft: &RequestFrameDraft<'_>) -> Result<Self, Error> {
         let actor = required_text(ACTOR_FIELD, draft.actor)?;
         let idempotency = match draft.idempotency {
-            Some(idempotency) => Some(Idempotency::new(&idempotency, draft.method, actor.as_str())?),
+            Some(idempotency) => Some(Idempotency::new(
+                &idempotency,
+                draft.method,
+                actor.as_str(),
+            )?),
             None if draft.method.is_side_effecting() => {
                 return Err(Error::MissingIdempotency);
             }
@@ -971,7 +992,10 @@ impl SafeError {
         Ok(Self {
             code: required_text(ERROR_CODE_FIELD, draft.code)?,
             message: safe_text(ERROR_MESSAGE_FIELD, draft.message)?,
-            detail: draft.detail.map(|detail| safe_text(ERROR_DETAIL_FIELD, detail)).transpose()?,
+            detail: draft
+                .detail
+                .map(|detail| safe_text(ERROR_DETAIL_FIELD, detail))
+                .transpose()?,
         })
     }
 
@@ -1029,7 +1053,10 @@ impl ResponseFrame {
     ///
     /// Returns [`Error`] when frame metadata or safe errors are invalid.
     pub fn new(draft: &ResponseFrameDraft<'_>) -> Result<Self, Error> {
-        let error = draft.error.map(|error| SafeError::new(&error)).transpose()?;
+        let error = draft
+            .error
+            .map(|error| SafeError::new(&error))
+            .transpose()?;
         match (draft.status, error.as_ref()) {
             (ResponseStatus::Accepted, Some(_error)) => {
                 return Err(Error::UnexpectedError);
@@ -1042,9 +1069,15 @@ impl ResponseFrame {
         Ok(Self {
             correlation_id: required_text(CORRELATION_ID_FIELD, draft.correlation_id)?,
             status: draft.status,
-            sequence: draft.sequence.map(|sequence| Sequence::new(&sequence)).transpose()?,
+            sequence: draft
+                .sequence
+                .map(|sequence| Sequence::new(&sequence))
+                .transpose()?,
             state_version: draft.state_version,
-            snapshot: draft.snapshot.map(|snapshot| Snapshot::new(&snapshot)).transpose()?,
+            snapshot: draft
+                .snapshot
+                .map(|snapshot| Snapshot::new(&snapshot))
+                .transpose()?,
             error,
         })
     }
@@ -1131,7 +1164,10 @@ impl EventFrame {
             payload_summary: safe_text(PAYLOAD_SUMMARY_FIELD, draft.payload_summary)?,
             sequence: Sequence::new(&draft.sequence)?,
             state_version: draft.state_version,
-            snapshot: draft.snapshot.map(|snapshot| Snapshot::new(&snapshot)).transpose()?,
+            snapshot: draft
+                .snapshot
+                .map(|snapshot| Snapshot::new(&snapshot))
+                .transpose()?,
         })
     }
 
@@ -1183,7 +1219,10 @@ impl EventFrame {
 /// # Errors
 ///
 /// Returns [`Error::StaleStateVersion`] when `observed` is older than `current`.
-pub const fn ensure_state_fresh(observed: StateVersion, current: StateVersion) -> Result<(), Error> {
+pub const fn ensure_state_fresh(
+    observed: StateVersion,
+    current: StateVersion,
+) -> Result<(), Error> {
     if observed.get() < current.get() {
         Err(Error::StaleStateVersion)
     } else {
@@ -1200,11 +1239,17 @@ fn require_non_empty(field_name: crate::validation::FieldName, len: usize) -> Re
     Ok(())
 }
 
-fn required_text(field_name: crate::validation::FieldName, value: &str) -> Result<alloc::string::String, Error> {
+fn required_text(
+    field_name: crate::validation::FieldName,
+    value: &str,
+) -> Result<alloc::string::String, Error> {
     crate::validation::normalized_adapter_field(field_name, value).map_err(Error::from)
 }
 
-fn safe_text(field_name: crate::validation::FieldName, value: &str) -> Result<alloc::string::String, Error> {
+fn safe_text(
+    field_name: crate::validation::FieldName,
+    value: &str,
+) -> Result<alloc::string::String, Error> {
     let normalized = required_text(field_name, value)?;
     reject_unsafe_text(field_name, normalized.as_str())?;
     Ok(normalized)
@@ -1214,7 +1259,10 @@ fn collect_texts(
     field_name: crate::validation::FieldName,
     values: &[&str],
 ) -> Result<alloc::vec::Vec<alloc::string::String>, Error> {
-    values.iter().map(|value| required_text(field_name, value)).collect()
+    values
+        .iter()
+        .map(|value| required_text(field_name, value))
+        .collect()
 }
 
 fn reject_unsafe_text(field_name: crate::validation::FieldName, value: &str) -> Result<(), Error> {
@@ -1255,7 +1303,8 @@ mod tests {
     const STALE_STATE_VALUE: u64 = 6;
     const EVENT_POSITION: u64 = 3;
     const PROTOCOL_VERSION_INCREMENT: u16 = 1;
-    const NEXT_PROTOCOL_VERSION: u16 = OPENCLAW_PROTOCOL_VERSION.saturating_add(PROTOCOL_VERSION_INCREMENT);
+    const NEXT_PROTOCOL_VERSION: u16 =
+        OPENCLAW_PROTOCOL_VERSION.saturating_add(PROTOCOL_VERSION_INCREMENT);
     const FEATURES: &[Feature] = &[
         Feature::ChallengeBinding,
         Feature::HelloSnapshots,
@@ -1272,7 +1321,8 @@ mod tests {
         // r[verify agent_harness_runtime.openclaw_gateway.idempotency]
         // r[verify agent_harness_runtime.openclaw_gateway.verification]
         let profile = profile();
-        let state_version = StateVersion::new(CURRENT_STATE_VALUE).expect("state version should parse");
+        let state_version =
+            StateVersion::new(CURRENT_STATE_VALUE).expect("state version should parse");
         let handshake = handshake(&profile, state_version);
         let idempotency = IdempotencyDraft {
             key_hash: HASH_B,
@@ -1310,16 +1360,24 @@ mod tests {
         })
         .expect("event should validate");
 
-        validate_first_frame(FirstFrame::Connect(&handshake)).expect("connect first frame should pass");
-        ensure_state_fresh(state_version, state_version).expect("matching state version should pass");
+        validate_first_frame(FirstFrame::Connect(&handshake))
+            .expect("connect first frame should pass");
+        ensure_state_fresh(state_version, state_version)
+            .expect("matching state version should pass");
 
         assert_eq!(profile.reference(), Reference::OpenClaw);
         assert_eq!(profile.rejected_surfaces(), REJECTED_OPENCLAW_SURFACES);
         assert_eq!(handshake.protocol_version(), OPENCLAW_PROTOCOL_VERSION);
-        assert_eq!(handshake.scopes(), &[alloc::string::String::from(SCOPE_SESSION)]);
+        assert_eq!(
+            handshake.scopes(),
+            &[alloc::string::String::from(SCOPE_SESSION)]
+        );
         assert_eq!(request.method(), Method::Send);
         assert!(request.idempotency().is_some());
-        assert_eq!(response.sequence().expect("sequence").position(), EVENT_POSITION);
+        assert_eq!(
+            response.sequence().expect("sequence").position(),
+            EVENT_POSITION
+        );
         assert_eq!(event.event_name(), EVENT_STARTED);
     }
 
@@ -1344,9 +1402,18 @@ mod tests {
         })
         .expect_err("ambient fallback should fail");
 
-        assert_eq!(validate_first_frame(FirstFrame::NonConnect), Err(Error::HandshakeRequired));
-        assert_eq!(negotiate_protocol(&profile, mismatched_range), Err(Error::ProtocolMismatch));
-        assert_eq!(ensure_state_fresh(stale, current), Err(Error::StaleStateVersion));
+        assert_eq!(
+            validate_first_frame(FirstFrame::NonConnect),
+            Err(Error::HandshakeRequired)
+        );
+        assert_eq!(
+            negotiate_protocol(&profile, mismatched_range),
+            Err(Error::ProtocolMismatch)
+        );
+        assert_eq!(
+            ensure_state_fresh(stale, current),
+            Err(Error::StaleStateVersion)
+        );
         assert_eq!(ambient_profile, Error::AmbientTransportFallback);
     }
 
@@ -1436,19 +1503,22 @@ mod tests {
             maximum: OPENCLAW_PROTOCOL_VERSION,
         })
         .expect("range should parse");
-        let handshake = ConnectHandshake::new(profile, &ConnectHandshakeDraft {
-            protocol_range: range,
-            client_id: CLIENT_ID,
-            role: Role::Operator,
-            scopes: &[SCOPE_SESSION],
-            features: FEATURES,
-            challenge: ChallengeEvidenceDraft {
-                challenge_id: CHALLENGE_ID,
-                verifier_id: VERIFIER_ID,
-                evidence_hash: HASH_A,
+        let handshake = ConnectHandshake::new(
+            profile,
+            &ConnectHandshakeDraft {
+                protocol_range: range,
+                client_id: CLIENT_ID,
+                role: Role::Operator,
+                scopes: &[SCOPE_SESSION],
+                features: FEATURES,
+                challenge: ChallengeEvidenceDraft {
+                    challenge_id: CHALLENGE_ID,
+                    verifier_id: VERIFIER_ID,
+                    evidence_hash: HASH_A,
+                },
+                hello: snapshot(state_version),
             },
-            hello: snapshot(state_version),
-        })
+        )
         .expect("handshake should validate");
 
         assert_eq!(handshake.client_id(), CLIENT_ID);

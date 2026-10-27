@@ -1,6 +1,7 @@
 #![allow(non_trait_imports)]
 
-const TEMPLATE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_template");
+const TEMPLATE_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_template");
 const TEMPLATE_VARIABLE_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("recipe_template_variable");
 const PARAMETER_INPUT_NAME_FIELD: crate::validation::FieldName =
@@ -17,7 +18,11 @@ const INPUT_FILE_REF: &str = "file_ref";
 const INPUT_DEFAULT: &str = "default";
 
 /// Template variables that reusable core treats as safe host-provided labels.
-pub const SAFE_TEMPLATE_BUILTINS: &[&str] = &["recipe.identity", "recipe.source_label", "host.project_label"];
+pub const SAFE_TEMPLATE_BUILTINS: &[&str] = &[
+    "recipe.identity",
+    "recipe.source_label",
+    "host.project_label",
+];
 
 type Text = alloc::string::String;
 type Collection<T> = alloc::vec::Vec<T>;
@@ -157,7 +162,9 @@ impl RecipeBinding {
 /// references undeclared variables, leaves declared parameters unused, omits
 /// required values, violates select options, or injects file parameters without a
 /// host content-reference source.
-pub fn bind_recipe_parameters(draft: RecipeBindingDraft<'_>) -> Result<RecipeBinding, super::RecipeWorkflowError> {
+pub fn bind_recipe_parameters(
+    draft: RecipeBindingDraft<'_>,
+) -> Result<RecipeBinding, super::RecipeWorkflowError> {
     crate::validation::validate_required_adapter_field(TEMPLATE_FIELD, draft.template)?;
     let template_variables = tokens::collect_template_variables(draft.template)?;
     tokens::validate_template_variables(draft.workflow, template_variables.as_slice())?;
@@ -178,7 +185,10 @@ fn collect_inputs(
     let mut inputs: Collection<RecipeParameterInput> = Collection::with_capacity(drafts.len());
     for draft in drafts {
         let input = RecipeParameterInput::validate(draft)?;
-        if inputs.iter().any(|existing| existing.name() == input.name()) {
+        if inputs
+            .iter()
+            .any(|existing| existing.name() == input.name())
+        {
             return Err(super::RecipeWorkflowError::DuplicateName {
                 field: PARAMETER_INPUT_NAME_FIELD.as_str(),
                 value: Text::from(input.name()),
@@ -214,6 +224,11 @@ fn default_input(
                 parameter: Text::from(parameter.name()),
             })
         },
-        |default_value| Ok(RecipeParameterInput::from_default(parameter.name(), default_value)),
+        |default_value| {
+            Ok(RecipeParameterInput::from_default(
+                parameter.name(),
+                default_value,
+            ))
+        },
     )
 }

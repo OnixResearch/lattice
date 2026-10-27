@@ -31,10 +31,14 @@ impl core::fmt::Display for Error {
             Self::PayloadTooLong {
                 max_chars,
                 actual_chars,
-            } => write!(formatter, "artifact payload must be at most {max_chars} characters; got {actual_chars}"),
-            Self::PayloadContainsNul { byte_index } => {
-                write!(formatter, "artifact payload contains a NUL character at byte index {byte_index}")
-            }
+            } => write!(
+                formatter,
+                "artifact payload must be at most {max_chars} characters; got {actual_chars}"
+            ),
+            Self::PayloadContainsNul { byte_index } => write!(
+                formatter,
+                "artifact payload contains a NUL character at byte index {byte_index}"
+            ),
         }
     }
 }

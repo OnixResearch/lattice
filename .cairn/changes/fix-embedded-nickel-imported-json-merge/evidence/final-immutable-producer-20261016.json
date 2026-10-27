@@ -1,0 +1,27 @@
+{
+  "schema": "lattice.nickel-immutable-producer-verification.v1",
+  "observed_on": "2026-10-16",
+  "status": "local-immutable-owning-gate-pass-public-source-admission-pending",
+  "maintenance_owner": "nickel-eval producer maintainers; Lattice owns downstream source admission",
+  "revision": "b4ddff052105eb4b75827e228a65b823dc1a0444",
+  "tree": "3652fe8aa0a7141f18f844cd3b1b1162adc9d4e5",
+  "base_revision": "f23be09e41337de8fa729274f50023f861ae0e8a",
+  "archive": {"format": "git archive --format=tar", "tar_umask": "0000", "blake3": "9c45a121f1384f1c8ba1933fcac7a7e5e4e9b9dac22f1b91d1dbe55d95c9afa1"},
+  "checked_source": {"path": "/nix/store/5rjcdvhc8vb750hvf6qr4zjxjgxa57pk-source", "nar_hash": "sha256-gPiQufuAnWzHAybg+v5/czJAwdhJKocaRNJP+iW+oI0=", "hash_command": ["nix", "--extra-experimental-features", "nix-command", "hash", "path", "--sri", "/nix/store/5rjcdvhc8vb750hvf6qr4zjxjgxa57pk-source"], "hash_exit": 0},
+  "owning_gate": {
+    "argv": ["nix", "flake", "check", "--no-write-lock-file", "--option", "min-free", "0", "--option", "max-free", "0", "--option", "eval-cache", "false", "-L", "path:/home/brittonr/git/OnixResearch/.worktrees/nickel-eval-import-closurization-20261016"],
+    "cwd": "/home/brittonr/git/OnixResearch/.worktrees/nickel-eval-import-closurization-20261016",
+    "job": "proc://bg_463",
+    "exit": 0,
+    "exit_evidence": "OWNING_NICKEL_EXIT=0 printed only by the shell's && branch after nix returned success; all checks passed! also observed.",
+    "duration_seconds": 55.88,
+    "log": "final-immutable-producer-20261016.log",
+    "tests_derivation": "/nix/store/m1bmfkvqg941piyyys0imyvh2mhnl18n-nickel-eval-tests-0.1.0.drv",
+    "format_derivation": "/nix/store/cqsicrvd9gmbrdykfp8y82f1arbb94xg-nickel-eval-format.drv",
+    "tests": {"unit": 24, "boundary": 4, "evaluator": 10, "imported_merge": 5, "total_passed": 43, "failed": 0},
+    "build_profile": "Optimized release, actual owned vendor/nickel-lang-core-0.18.0 package compiled; compiler policy unchanged.",
+    "scope": "x86_64-linux; unchanged native-system gate explicitly omitted aarch64-linux."
+  },
+  "repeatability": "Use this exact revision with the recorded owning gate and the producer's retained native imported-merge fixture/external-CLI comparison commands. Consumer root Cargo patch selection must share this same published revision after admission.",
+  "non_claims": ["No remote publication, anonymous acquisition or downstream source admission", "No aarch64 or all-systems result", "No Lattice whole-consumer regression or standalone authority-profile execution", "No lifecycle archive: the compound publication/readback/downstream task remains incomplete"]
+}

@@ -110,7 +110,11 @@ pub struct SubagentDiagnostic {
 impl SubagentDiagnostic {
     /// Builds a safe diagnostic.
     #[must_use]
-    pub fn new(kind: SubagentDiagnosticKind, field: &'static str, message: impl Into<String>) -> Self {
+    pub fn new(
+        kind: SubagentDiagnosticKind,
+        field: &'static str,
+        message: impl Into<String>,
+    ) -> Self {
         Self {
             kind,
             field,
@@ -325,7 +329,9 @@ impl TypedSubagentCapability {
             Self::Search { index_label, .. } => format!("search:{index_label}"),
             Self::ToolUse { tool_label, .. } => format!("tool:{tool_label}"),
             Self::MutationIntent { mutation_kind, .. } => format!("mutation:{mutation_kind}"),
-            Self::WorkspaceAccess { scope_label, mode, .. } => format!("workspace:{mode:?}:{scope_label}"),
+            Self::WorkspaceAccess {
+                scope_label, mode, ..
+            } => format!("workspace:{mode:?}:{scope_label}"),
             Self::ModelUse { model_label, .. } => format!("model:{model_label}"),
             Self::ExternalService { service_label, .. } => format!("external:{service_label}"),
         }
@@ -491,12 +497,24 @@ pub struct SubagentCapabilityReceiptLabel {
 
 /// Builds a safe receipt label for a typed capability.
 #[must_use]
-pub fn subagent_capability_receipt_label(capability: &TypedSubagentCapability) -> SubagentCapabilityReceiptLabel {
+pub fn subagent_capability_receipt_label(
+    capability: &TypedSubagentCapability,
+) -> SubagentCapabilityReceiptLabel {
     SubagentCapabilityReceiptLabel {
         stable_label: capability.stable_label().to_owned(),
         class: capability.class(),
         capability_hash: hash_parts(SAFE_HASH_DOMAIN_CAPABILITY, &[&capability.identity_key()]),
     }
+}
+
+/// Returns the ordered, domain-separated BLAKE3 identity of a capability set.
+#[must_use]
+pub fn subagent_capability_set_identity(capabilities: &[TypedSubagentCapability]) -> String {
+    let labels = capabilities
+        .iter()
+        .map(TypedSubagentCapability::stable_label)
+        .collect::<Vec<_>>();
+    hash_parts(SAFE_HASH_DOMAIN_CAPABILITY, labels.as_slice())
 }
 
 /// Shared subagent context item class.
@@ -646,7 +664,10 @@ pub fn validate_subagent_context_packet(
     }
     let mut seen = std::collections::BTreeSet::new();
     let mut token_estimate = 0_u32;
-    let safe_part_slots = draft.items.len().saturating_add(CONTEXT_PACKET_HASH_PREFIX_PARTS);
+    let safe_part_slots = draft
+        .items
+        .len()
+        .saturating_add(CONTEXT_PACKET_HASH_PREFIX_PARTS);
     let mut safe_parts = Vec::with_capacity(safe_part_slots);
     safe_parts.push(packet_id.as_str());
     safe_parts.push(child_kind_label(draft.child_kind));
@@ -841,7 +862,9 @@ pub struct SubagentAdmission {
 ///
 /// Returns [`SubagentDiagnostic`] for unsupported kinds, missing kind-specific
 /// fields, lossy projection, invalid lower-level data, or execution attempts.
-pub fn validate_subagent_child_run(draft: &SubagentChildRunDraft) -> Result<SubagentChildRun, SubagentDiagnostic> {
+pub fn validate_subagent_child_run(
+    draft: &SubagentChildRunDraft,
+) -> Result<SubagentChildRun, SubagentDiagnostic> {
     if draft.execution_requested {
         return Err(SubagentDiagnostic::new(
             SubagentDiagnosticKind::ExecutionAuthorityRequired,
@@ -884,8 +907,7 @@ pub fn validate_subagent_child_run(draft: &SubagentChildRunDraft) -> Result<Suba
 /// Converts a validated child run into an admitted coordinator DTO.
 #[must_use]
 pub fn admit_subagent_child_run(child: &SubagentChildRun) -> SubagentAdmission {
-    let capability_labels = child.capabilities.iter().map(TypedSubagentCapability::stable_label).collect::<Vec<_>>();
-    let capability_identity = hash_parts(SAFE_HASH_DOMAIN_CAPABILITY, &capability_labels);
+    let capability_identity = subagent_capability_set_identity(child.capabilities.as_slice());
     let admission_parts = [
         child.parent_id.as_str(),
         child.child_id.as_str(),
@@ -895,9 +917,13 @@ pub fn admit_subagent_child_run(child: &SubagentChildRun) -> SubagentAdmission {
         child.kind_metadata_label.as_str(),
     ];
     let admission_identity = hash_parts(SAFE_HASH_DOMAIN_ADMISSION, &admission_parts);
-    let receipt_hash =
-        hash_parts(SAFE_HASH_DOMAIN_RECEIPT, &[admission_identity.as_str(), child.context_packet.packet_hash.as_str()]);
-    debug_assert_eq!(capability_labels.len(), child.capabilities.len());
+    let receipt_hash = hash_parts(
+        SAFE_HASH_DOMAIN_RECEIPT,
+        &[
+            admission_identity.as_str(),
+            child.context_packet.packet_hash.as_str(),
+        ],
+    );
     debug_assert!(!child.context_packet.packet_hash.is_empty());
     SubagentAdmission {
         child_id: child.child_id.clone(),
@@ -940,12 +966,31 @@ pub enum SubagentRunStatus {
 
 impl SubagentRunStatus {
     const fn is_active(self) -> bool {
-        matches!(self, Self::Queued | Self::Running | Self::Cancelling | Self::AwaitingParent)
+        matches!(
+            self,
+            Self::Queued | Self::Running | Self::Cancelling | Self::AwaitingParent
+        )
     }
 
     const fn is_terminal(self) -> bool {
-        matches!(self, Self::Completed | Self::Failed | Self::TimedOut | Self::Cancelled | Self::Collected)
+        matches!(
+            self,
+            Self::Completed | Self::Failed | Self::TimedOut | Self::Cancelled | Self::Collected
+        )
     }
+}
+
+/// Generation-bound values for one concrete subagent handle.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SubagentHandleBinding<'a> {
+    /// Safe parent identity.
+    pub parent_id: &'a str,
+    /// Safe child identity.
+    pub child_id: &'a str,
+    /// Positive registry generation.
+    pub generation: u64,
+    /// Current parent-authority identity.
+    pub authority_identity: &'a str,
 }
 
 /// Opaque service handle for a child run.
@@ -953,10 +998,17 @@ impl SubagentRunStatus {
 pub struct SubagentHandle {
     /// Safe host-issued handle label.
     pub handle_id: String,
+    parent_id: Option<String>,
+    child_id: Option<String>,
+    generation: Option<u64>,
+    authority_identity: Option<String>,
 }
 
 impl SubagentHandle {
-    /// Validates and builds a safe subagent handle.
+    /// Validates and builds a legacy unbound subagent handle.
+    ///
+    /// Concrete child-session hosts reject this compatibility shape because it
+    /// has no parent, child, generation, or authority fence.
     ///
     /// # Errors
     ///
@@ -964,7 +1016,62 @@ impl SubagentHandle {
     pub fn new(handle_id: impl AsRef<str>) -> Result<Self, SubagentDiagnostic> {
         Ok(Self {
             handle_id: validate_label!(FIELD_SERVICE, handle_id.as_ref())?,
+            parent_id: None,
+            child_id: None,
+            generation: None,
+            authority_identity: None,
         })
+    }
+
+    /// Builds a parent-, child-, generation-, and authority-bound handle.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SubagentDiagnostic`] for unsafe labels, a zero generation, or
+    /// a malformed authority identity.
+    pub fn generation_bound(
+        handle_id: impl AsRef<str>,
+        binding: SubagentHandleBinding<'_>,
+    ) -> Result<Self, SubagentDiagnostic> {
+        if binding.generation == 0 {
+            return Err(SubagentDiagnostic::new(
+                SubagentDiagnosticKind::StaleHandle,
+                FIELD_SERVICE,
+                "generation-bound handles require a positive generation",
+            ));
+        }
+        validate_hash(binding.authority_identity)?;
+        Ok(Self {
+            handle_id: validate_label!(FIELD_SERVICE, handle_id.as_ref())?,
+            parent_id: Some(validate_label!(FIELD_SERVICE, binding.parent_id)?),
+            child_id: Some(validate_label!(FIELD_SERVICE, binding.child_id)?),
+            generation: Some(binding.generation),
+            authority_identity: Some(binding.authority_identity.to_owned()),
+        })
+    }
+
+    /// Returns the bound parent identity when present.
+    #[must_use]
+    pub fn parent_id(&self) -> Option<&str> {
+        self.parent_id.as_deref()
+    }
+
+    /// Returns the bound child identity when present.
+    #[must_use]
+    pub fn child_id(&self) -> Option<&str> {
+        self.child_id.as_deref()
+    }
+
+    /// Returns the bound registry generation when present.
+    #[must_use]
+    pub const fn generation(&self) -> Option<u64> {
+        self.generation
+    }
+
+    /// Returns the bound current-authority identity when present.
+    #[must_use]
+    pub fn authority_identity(&self) -> Option<&str> {
+        self.authority_identity.as_deref()
     }
 }
 
@@ -1028,28 +1135,40 @@ pub trait SubagentService {
     ///
     /// Returns [`SubagentServiceFailure`] when the service is unavailable, denied,
     /// timed out, cancelled, or cannot provide a safe handle.
-    fn enqueue(&mut self, admission: &SubagentAdmission) -> Result<SubagentHandle, SubagentServiceFailure>;
+    fn enqueue(
+        &mut self,
+        admission: &SubagentAdmission,
+    ) -> Result<SubagentHandle, SubagentServiceFailure>;
 
     /// Reads child-run status.
     ///
     /// # Errors
     ///
     /// Returns [`SubagentServiceFailure`] when status lookup fails safely.
-    fn status(&mut self, handle: &SubagentHandle) -> Result<SubagentRunStatus, SubagentServiceFailure>;
+    fn status(
+        &mut self,
+        handle: &SubagentHandle,
+    ) -> Result<SubagentRunStatus, SubagentServiceFailure>;
 
     /// Requests child-run cancellation.
     ///
     /// # Errors
     ///
     /// Returns [`SubagentServiceFailure`] when cancellation fails safely.
-    fn cancel(&mut self, handle: &SubagentHandle) -> Result<SubagentRunStatus, SubagentServiceFailure>;
+    fn cancel(
+        &mut self,
+        handle: &SubagentHandle,
+    ) -> Result<SubagentRunStatus, SubagentServiceFailure>;
 
     /// Collects a terminal child report.
     ///
     /// # Errors
     ///
     /// Returns [`SubagentServiceFailure`] when collection fails safely.
-    fn collect(&mut self, handle: &SubagentHandle) -> Result<SubagentReport, SubagentServiceFailure>;
+    fn collect(
+        &mut self,
+        handle: &SubagentHandle,
+    ) -> Result<SubagentReport, SubagentServiceFailure>;
 }
 
 /// Coordinator state for one child run.
@@ -1117,7 +1236,12 @@ pub fn transition_subagent_state(
             if state.handle.is_none() {
                 return Err(stale_handle("status lookup requires an active handle"));
             }
-            if status.is_terminal() && !matches!(status, SubagentRunStatus::Cancelled | SubagentRunStatus::TimedOut) {
+            if status.is_terminal()
+                && !matches!(
+                    status,
+                    SubagentRunStatus::Cancelled | SubagentRunStatus::TimedOut
+                )
+            {
                 return Err(SubagentDiagnostic::new(
                     SubagentDiagnosticKind::MalformedReport,
                     FIELD_REPORT,
@@ -1160,7 +1284,9 @@ pub fn subagent_enqueue(
     state: &SubagentRunState,
 ) -> Result<SubagentRunState, SubagentDiagnostic> {
     let service = injected_subagent_service(service)?;
-    let handle = service.enqueue(&state.admission).map_err(service_failure_to_diagnostic)?;
+    let handle = service
+        .enqueue(&state.admission)
+        .map_err(service_failure_to_diagnostic)?;
     transition_subagent_state(state, SubagentCoordinatorEvent::Enqueued(handle))
 }
 
@@ -1174,9 +1300,14 @@ pub fn subagent_status(
     service: Option<&mut dyn SubagentService>,
     state: &SubagentRunState,
 ) -> Result<SubagentRunState, SubagentDiagnostic> {
-    let handle = state.handle.as_ref().ok_or_else(|| stale_handle("status lookup requires an active handle"))?;
+    let handle = state
+        .handle
+        .as_ref()
+        .ok_or_else(|| stale_handle("status lookup requires an active handle"))?;
     let service = injected_subagent_service(service)?;
-    let status = service.status(handle).map_err(service_failure_to_diagnostic)?;
+    let status = service
+        .status(handle)
+        .map_err(service_failure_to_diagnostic)?;
     transition_subagent_state(state, SubagentCoordinatorEvent::Status(status))
 }
 
@@ -1189,9 +1320,14 @@ pub fn subagent_cancel(
     service: Option<&mut dyn SubagentService>,
     state: &SubagentRunState,
 ) -> Result<SubagentRunState, SubagentDiagnostic> {
-    let handle = state.handle.as_ref().ok_or_else(|| stale_handle("cancel requires an active handle"))?;
+    let handle = state
+        .handle
+        .as_ref()
+        .ok_or_else(|| stale_handle("cancel requires an active handle"))?;
     let service = injected_subagent_service(service)?;
-    let status = service.cancel(handle).map_err(service_failure_to_diagnostic)?;
+    let status = service
+        .cancel(handle)
+        .map_err(service_failure_to_diagnostic)?;
     transition_subagent_state(state, SubagentCoordinatorEvent::Cancel(status))
 }
 
@@ -1199,15 +1335,19 @@ pub fn subagent_cancel(
 ///
 /// # Errors
 ///
-/// Returns [`SubagentDiagnostic`] when the service is missing, stale, denied, or returns malformed
-/// data.
+/// Returns [`SubagentDiagnostic`] when the service is missing, stale, denied, or returns malformed data.
 pub fn subagent_collect(
     service: Option<&mut dyn SubagentService>,
     state: &SubagentRunState,
 ) -> Result<SubagentRunState, SubagentDiagnostic> {
-    let handle = state.handle.as_ref().ok_or_else(|| stale_handle("collect requires an active handle"))?;
+    let handle = state
+        .handle
+        .as_ref()
+        .ok_or_else(|| stale_handle("collect requires an active handle"))?;
     let service = injected_subagent_service(service)?;
-    let collected_child = service.collect(handle).map_err(service_failure_to_diagnostic)?;
+    let collected_child = service
+        .collect(handle)
+        .map_err(service_failure_to_diagnostic)?;
     transition_subagent_state(state, SubagentCoordinatorEvent::Collect(collected_child))
 }
 
@@ -1249,7 +1389,10 @@ pub fn project_subagent_lifecycle_event(state: &SubagentRunState) -> SubagentLif
         capability_identity: state.admission.capability_identity.clone(),
         context_packet_identity: state.admission.context_packet_identity.clone(),
         budget: state.admission.budget,
-        evidence_refs: state.report.as_ref().map_or_else(Vec::new, |report| report.evidence_refs.clone()),
+        evidence_refs: state
+            .report
+            .as_ref()
+            .map_or_else(Vec::new, |report| report.evidence_refs.clone()),
     }
 }
 
@@ -1454,21 +1597,24 @@ pub fn aggregate_subagent_fan_in(
     outcomes: &[SubagentFanInOutcome],
 ) -> Result<SubagentFanInAggregate, SubagentDiagnostic> {
     let outcomes_by_child = indexed_outcomes(outcomes)?;
-    let mutation_intent_slots =
-        outcomes.iter().fold(0_usize, |slots, outcome| slots.saturating_add(outcome.mutation_intents.len()));
+    let mutation_intent_slots = outcomes.iter().fold(0_usize, |slots, outcome| {
+        slots.saturating_add(outcome.mutation_intents.len())
+    });
     let mut successful_children = Vec::with_capacity(plan.children.len());
     let mut non_success_children = Vec::with_capacity(plan.children.len());
     let mut statuses = Vec::with_capacity(plan.children.len());
     let mut mutation_intents = Vec::with_capacity(mutation_intent_slots);
     let mut total_budget = 0_u32;
     for child in &plan.children {
-        let outcome = outcomes_by_child.get(child.child_id.as_str()).ok_or_else(|| {
-            SubagentDiagnostic::new(
-                SubagentDiagnosticKind::MissingChildOutcome,
-                FIELD_PLAN,
-                "fan-in aggregation requires one outcome per admitted child",
-            )
-        })?;
+        let outcome = outcomes_by_child
+            .get(child.child_id.as_str())
+            .ok_or_else(|| {
+                SubagentDiagnostic::new(
+                    SubagentDiagnosticKind::MissingChildOutcome,
+                    FIELD_PLAN,
+                    "fan-in aggregation requires one outcome per admitted child",
+                )
+            })?;
         total_budget = total_budget
             .checked_add(outcome.budget_used)
             .ok_or_else(|| over_budget("fan-in budget usage overflowed shared budget"))?;
@@ -1477,7 +1623,10 @@ pub fn aggregate_subagent_fan_in(
         }
         validate_outcome_report(child, outcome)?;
         statuses.push(status_to_aggregate(outcome.status));
-        if matches!(outcome.status, SubagentRunStatus::Completed | SubagentRunStatus::Collected) {
+        if matches!(
+            outcome.status,
+            SubagentRunStatus::Completed | SubagentRunStatus::Collected
+        ) {
             successful_children.push(child.child_id.clone());
         } else {
             non_success_children.push(child.child_id.clone());
@@ -1485,8 +1634,17 @@ pub fn aggregate_subagent_fan_in(
         mutation_intents.extend(outcome.mutation_intents.iter().cloned());
     }
     let mutation_arbitration = arbitrate_mutations(plan.mutation_policy, mutation_intents)?;
-    let status = aggregate_status(&statuses, &mutation_arbitration, !successful_children.is_empty());
-    debug_assert_eq!(successful_children.len().saturating_add(non_success_children.len()), plan.children.len());
+    let status = aggregate_status(
+        &statuses,
+        &mutation_arbitration,
+        !successful_children.is_empty(),
+    );
+    debug_assert_eq!(
+        successful_children
+            .len()
+            .saturating_add(non_success_children.len()),
+        plan.children.len()
+    );
     debug_assert!(statuses.len() >= plan.children.len());
     Ok(SubagentFanInAggregate {
         status,
@@ -1639,7 +1797,9 @@ pub struct SubagentLineageProjection<'a> {
 
 /// Builds a lineage draft from a safe lifecycle event.
 #[must_use]
-pub fn lineage_draft_from_lifecycle(input: SubagentLineageProjection<'_>) -> SubagentLineageRecordDraft {
+pub fn lineage_draft_from_lifecycle(
+    input: SubagentLineageProjection<'_>,
+) -> SubagentLineageRecordDraft {
     SubagentLineageRecordDraft {
         parent_id: input.event.parent_id.clone(),
         child_id: input.event.child_id.clone(),
@@ -1651,7 +1811,10 @@ pub fn lineage_draft_from_lifecycle(input: SubagentLineageProjection<'_>) -> Sub
         output_hash: input.output_hash.to_owned(),
         handoff_mode: input.handoff_mode,
         terminal_status: input.event.status,
-        failure_class: input.event.failure_class.map(|failure| format!("{failure:?}")),
+        failure_class: input
+            .event
+            .failure_class
+            .map(|failure| format!("{failure:?}")),
         evidence_refs: input.event.evidence_refs.clone(),
         safe_summary: input.safe_summary.to_owned(),
     }
@@ -1684,7 +1847,9 @@ pub fn validate_subagent_replay_influence(
         validate_hash(import.output_hash.as_str())?;
         let record = records
             .iter()
-            .find(|record| record.child_id == import.child_id && record.parent_id == import.parent_id)
+            .find(|record| {
+                record.child_id == import.child_id && record.parent_id == import.parent_id
+            })
             .ok_or_else(|| {
                 SubagentDiagnostic::new(
                     SubagentDiagnosticKind::MissingLineage,
@@ -1700,12 +1865,14 @@ pub fn validate_subagent_replay_influence(
             ));
         }
     }
-    debug_assert!(imports.iter().all(|import| {
-        records
+    debug_assert!(imports.iter().all(|import| records.iter().any(|record| {
+        record.child_id == import.child_id && record.parent_id == import.parent_id
+    })));
+    debug_assert!(
+        imports
             .iter()
-            .any(|record| record.child_id == import.child_id && record.parent_id == import.parent_id)
-    }));
-    debug_assert!(imports.iter().all(|import| import.output_hash.len() == HASH_HEX_CHARS));
+            .all(|import| import.output_hash.len() == HASH_HEX_CHARS)
+    );
     Ok(())
 }
 
@@ -1761,8 +1928,7 @@ pub struct SubagentStatusProjection {
 ///
 /// # Errors
 ///
-/// Returns [`SubagentDiagnostic`] when projection fields are unsafe, lossy, or raw logs are
-/// present.
+/// Returns [`SubagentDiagnostic`] when projection fields are unsafe, lossy, or raw logs are present.
 pub fn validate_subagent_status_projection(
     draft: &SubagentStatusProjectionDraft,
 ) -> Result<SubagentStatusProjection, SubagentDiagnostic> {
@@ -1785,8 +1951,11 @@ pub fn validate_subagent_status_projection(
         .as_ref()
         .map(|value| validate_label!(FIELD_UX, value.as_str()))
         .transpose()?;
-    let evidence_ref =
-        draft.evidence_ref.as_ref().map(|value| validate_label!(FIELD_UX, value.as_str())).transpose()?;
+    let evidence_ref = draft
+        .evidence_ref
+        .as_ref()
+        .map(|value| validate_label!(FIELD_UX, value.as_str()))
+        .transpose()?;
     for mutation in &draft.pending_mutations {
         validate_mutation_intent(mutation)?;
     }
@@ -1887,7 +2056,9 @@ fn command_binding_denial(
     debug_assert!(!child_id.is_empty());
     debug_assert!(!state.admission.child_id.is_empty());
     if child_id != state.admission.child_id {
-        return Some(denied_command(stale_handle("command target does not match active child")));
+        return Some(denied_command(stale_handle(
+            "command target does not match active child",
+        )));
     }
     if !descriptor.handle_fresh {
         return Some(denied_command(SubagentDiagnostic::new(
@@ -1913,9 +2084,9 @@ fn command_kind_denial(
     debug_assert!(descriptor.handle_fresh);
     debug_assert!(descriptor.authorized);
     match descriptor.kind {
-        SubagentCommandKind::Cancel if !state.status.is_active() => {
-            Ok(Some(denied_command(stale_handle("cancel requires an active child state"))))
-        }
+        SubagentCommandKind::Cancel if !state.status.is_active() => Ok(Some(denied_command(
+            stale_handle("cancel requires an active child state"),
+        ))),
         SubagentCommandKind::DetailImportRequest => detail_import_denial(descriptor),
         SubagentCommandKind::Acknowledge if !state.status.is_terminal() => {
             Ok(Some(denied_command(SubagentDiagnostic::new(
@@ -2059,7 +2230,11 @@ pub fn validate_external_subagent_fixture(
     fixture: &ExternalSubagentFixture,
 ) -> Result<ExternalSubagentFixtureResult, SubagentDiagnostic> {
     let fixture_id = validate_label!(FIELD_EXTERNAL, fixture.fixture_id.as_str())?;
-    if matches!(fixture.expected_status, ExternalSubagentFixtureStatus::Denied) && fixture.expected_failure.is_none() {
+    if matches!(
+        fixture.expected_status,
+        ExternalSubagentFixtureStatus::Denied
+    ) && fixture.expected_failure.is_none()
+    {
         return Err(SubagentDiagnostic::new(
             SubagentDiagnosticKind::MissingExpectedFailure,
             FIELD_EXTERNAL,
@@ -2133,7 +2308,8 @@ pub fn validate_external_subagent_conformance_index(
 
 fn validate_capability_catalog(
     catalog: &[SubagentCapabilityCatalogEntry],
-) -> Result<std::collections::BTreeMap<String, SubagentCapabilityCatalogEntry>, SubagentDiagnostic> {
+) -> Result<std::collections::BTreeMap<String, SubagentCapabilityCatalogEntry>, SubagentDiagnostic>
+{
     ensure_non_empty(catalog, FIELD_CATALOG)?;
     if catalog.len() > MAX_CAPABILITY_CATALOG_ENTRIES {
         return Err(SubagentDiagnostic::new(
@@ -2164,7 +2340,9 @@ fn validate_capability_catalog(
                 "tool capability catalog entry is not authorized",
             ));
         }
-        if matches!(entry.class, SubagentCapabilityClass::WorkspaceAccess) && entry.workspace_mode.is_none() {
+        if matches!(entry.class, SubagentCapabilityClass::WorkspaceAccess)
+            && entry.workspace_mode.is_none()
+        {
             return Err(SubagentDiagnostic::new(
                 SubagentDiagnosticKind::MalformedCatalogEntry,
                 FIELD_CATALOG,
@@ -2328,12 +2506,18 @@ fn validate_kind_fields(draft: &SubagentChildRunDraft) -> Result<String, Subagen
             Ok(recipe_id)
         }
         SubagentChildRunKind::FreshContextInvestigation => {
-            let fresh = draft.fresh_context.as_ref().ok_or_else(missing_kind_field)?;
+            let fresh = draft
+                .fresh_context
+                .as_ref()
+                .ok_or_else(missing_kind_field)?;
             validate_safe_text!(FIELD_CHILD, fresh.objective.as_str())?;
             validate_label!(FIELD_CHILD, fresh.scheduler_label.as_str())
         }
         SubagentChildRunKind::ReadOnlySideQuestion => {
-            let fresh = draft.fresh_context.as_ref().ok_or_else(missing_kind_field)?;
+            let fresh = draft
+                .fresh_context
+                .as_ref()
+                .ok_or_else(missing_kind_field)?;
             if !fresh.read_only {
                 return Err(SubagentDiagnostic::new(
                     SubagentDiagnosticKind::LossyProjection,
@@ -2365,7 +2549,10 @@ fn missing_kind_field() -> SubagentDiagnostic {
     )
 }
 
-fn validate_subagent_report(admission: &SubagentAdmission, report: &SubagentReport) -> Result<(), SubagentDiagnostic> {
+fn validate_subagent_report(
+    admission: &SubagentAdmission,
+    report: &SubagentReport,
+) -> Result<(), SubagentDiagnostic> {
     let child_id = validate_label!(FIELD_REPORT, report.child_id.as_str())?;
     if child_id != admission.child_id {
         return Err(SubagentDiagnostic::new(
@@ -2442,7 +2629,9 @@ fn status_to_aggregate(status: SubagentRunStatus) -> SubagentFanInStatus {
     match status {
         SubagentRunStatus::Completed | SubagentRunStatus::Collected => SubagentFanInStatus::Success,
         SubagentRunStatus::TimedOut => SubagentFanInStatus::TimedOut,
-        SubagentRunStatus::Cancelled | SubagentRunStatus::Cancelling => SubagentFanInStatus::Cancelled,
+        SubagentRunStatus::Cancelled | SubagentRunStatus::Cancelling => {
+            SubagentFanInStatus::Cancelled
+        }
         SubagentRunStatus::Failed => SubagentFanInStatus::Failed,
         SubagentRunStatus::Blocked => SubagentFanInStatus::DeniedCapability,
         SubagentRunStatus::Admitted
@@ -2474,7 +2663,9 @@ fn arbitrate_mutations(
         SubagentMutationPolicy::AllowNonConflicting => {
             let mut by_target = std::collections::BTreeMap::new();
             for intent in intents {
-                if let Some(existing_kind) = by_target.insert(intent.target.clone(), intent.mutation_kind.clone()) {
+                if let Some(existing_kind) =
+                    by_target.insert(intent.target.clone(), intent.mutation_kind.clone())
+                {
                     if existing_kind == intent.mutation_kind {
                         unresolved.push(intent);
                     } else {
@@ -2511,7 +2702,10 @@ fn aggregate_status(
     if statuses.contains(&SubagentFanInStatus::BudgetExhausted) {
         return SubagentFanInStatus::BudgetExhausted;
     }
-    if statuses.iter().all(|status| matches!(status, SubagentFanInStatus::Success)) {
+    if statuses
+        .iter()
+        .all(|status| matches!(status, SubagentFanInStatus::Success))
+    {
         return SubagentFanInStatus::Success;
     }
     if has_success {
@@ -2607,11 +2801,16 @@ fn service_failure_to_diagnostic(failure: SubagentServiceFailure) -> SubagentDia
     failure.diagnostic
 }
 
-fn require_status(actual: SubagentRunStatus, expected: SubagentRunStatus) -> Result<(), SubagentDiagnostic> {
+fn require_status(
+    actual: SubagentRunStatus,
+    expected: SubagentRunStatus,
+) -> Result<(), SubagentDiagnostic> {
     if actual == expected {
         Ok(())
     } else {
-        Err(stale_handle("coordinator transition is not valid for current state"))
+        Err(stale_handle(
+            "coordinator transition is not valid for current state",
+        ))
     }
 }
 
@@ -2626,7 +2825,9 @@ fn status_for_failure(kind: SubagentServiceFailureKind) -> SubagentRunStatus {
     }
 }
 
-fn validate_mutation_intent(intent: &SubagentMutationIntentSummary) -> Result<(), SubagentDiagnostic> {
+fn validate_mutation_intent(
+    intent: &SubagentMutationIntentSummary,
+) -> Result<(), SubagentDiagnostic> {
     validate_label!(FIELD_REPORT, intent.target.as_str())?;
     validate_label!(FIELD_REPORT, intent.mutation_kind.as_str())?;
     validate_label!(FIELD_REPORT, intent.evidence_ref.as_str())?;
@@ -2704,7 +2905,10 @@ fn validate_safe_text_input(input: TextValidationInput<'_>) -> Result<String, Su
 }
 
 fn reject_unsafe_text_input(input: TextValidationInput<'_>) -> Result<(), SubagentDiagnostic> {
-    if UNSAFE_TEXT_MARKERS.iter().any(|marker| input.value.contains(marker)) {
+    if UNSAFE_TEXT_MARKERS
+        .iter()
+        .any(|marker| input.value.contains(marker))
+    {
         return Err(SubagentDiagnostic::new(
             SubagentDiagnosticKind::UnsafeText,
             input.field,
@@ -2815,13 +3019,17 @@ mod tests {
         // r[verify agent_harness_runtime.subagent_typed_capabilities.intersection]
         // r[verify agent_harness_runtime.subagent_typed_capabilities.compatibility]
         // r[verify agent_harness_runtime.subagent_typed_capabilities.verification]
-        let conversion =
-            convert_subagent_capability_labels(&catalog(), &[TOOL_CAPABILITY, SEARCH_CAPABILITY, MUTATION_CAPABILITY])
-                .expect("catalog labels should convert");
+        let conversion = convert_subagent_capability_labels(
+            &catalog(),
+            &[TOOL_CAPABILITY, SEARCH_CAPABILITY, MUTATION_CAPABILITY],
+        )
+        .expect("catalog labels should convert");
         let request = conversion.capabilities.clone();
         let denied_workspace = request
             .iter()
-            .filter(|capability| !matches!(capability, TypedSubagentCapability::MutationIntent { .. }))
+            .filter(|capability| {
+                !matches!(capability, TypedSubagentCapability::MutationIntent { .. })
+            })
             .cloned()
             .collect::<Vec<_>>();
         let resolution = resolve_typed_subagent_capabilities(&SubagentCapabilityResolutionInput {
@@ -2849,7 +3057,9 @@ mod tests {
     fn typed_capabilities_fail_closed_for_bad_labels_and_catalogs() {
         // r[verify agent_harness_runtime.subagent_typed_capabilities.fail_closed]
         assert_eq!(
-            convert_subagent_capability_labels(&catalog(), &["*"]).expect_err("wildcard labels must fail").kind,
+            convert_subagent_capability_labels(&catalog(), &["*"])
+                .expect_err("wildcard labels must fail")
+                .kind,
             SubagentDiagnosticKind::OverbroadAuthority
         );
         assert_eq!(
@@ -2885,11 +3095,16 @@ mod tests {
         // r[verify agent_harness_runtime.subagent_context_packets.kind_projection]
         // r[verify agent_harness_runtime.subagent_context_packets.fail_closed]
         // r[verify agent_harness_runtime.subagent_context_packets.verification]
-        let packet = validate_subagent_context_packet(&context_packet_draft(SubagentChildRunKind::RecipeBacked))
-            .expect("minimized context packet should validate");
+        let packet = validate_subagent_context_packet(&context_packet_draft(
+            SubagentChildRunKind::RecipeBacked,
+        ))
+        .expect("minimized context packet should validate");
         assert_eq!(packet.budget.item_count, MIN_POSITIVE_U16);
         assert_eq!(packet.packet_hash.len(), HASH_HEX_CHARS);
-        assert!(project_context_packet_for_child_kind(&packet, SubagentChildRunKind::RecipeBacked).is_ok());
+        assert!(
+            project_context_packet_for_child_kind(&packet, SubagentChildRunKind::RecipeBacked)
+                .is_ok()
+        );
         assert_eq!(
             project_context_packet_for_child_kind(&packet, SubagentChildRunKind::WorkerTeamTask)
                 .expect_err("lossy kind projection must fail")
@@ -2900,13 +3115,17 @@ mod tests {
         let mut unsafe_packet = context_packet_draft(SubagentChildRunKind::RecipeBacked);
         unsafe_packet.items[0].kind = SubagentContextItemKind::Credential;
         assert_eq!(
-            validate_subagent_context_packet(&unsafe_packet).expect_err("credential context must fail").kind,
+            validate_subagent_context_packet(&unsafe_packet)
+                .expect_err("credential context must fail")
+                .kind,
             SubagentDiagnosticKind::UnsafeContext
         );
         let mut over_budget = context_packet_draft(SubagentChildRunKind::RecipeBacked);
         over_budget.admission.max_tokens = MIN_POSITIVE_U32;
         assert_eq!(
-            validate_subagent_context_packet(&over_budget).expect_err("over-budget packets must fail").kind,
+            validate_subagent_context_packet(&over_budget)
+                .expect_err("over-budget packets must fail")
+                .kind,
             SubagentDiagnosticKind::OverBudget
         );
     }
@@ -2924,7 +3143,8 @@ mod tests {
             SubagentChildRunKind::ReadOnlySideQuestion,
             SubagentChildRunKind::WorkerTeamTask,
         ] {
-            let child = validate_subagent_child_run(&child_draft(kind)).expect("kind should validate");
+            let child =
+                validate_subagent_child_run(&child_draft(kind)).expect("kind should validate");
             let admission = admit_subagent_child_run(&child);
             assert_eq!(admission.child_id, CHILD_ID);
             assert_eq!(admission.kind, kind);
@@ -2939,7 +3159,9 @@ mod tests {
         let mut executing = child_draft(SubagentChildRunKind::RecipeBacked);
         executing.execution_requested = true;
         assert_eq!(
-            validate_subagent_child_run(&executing).expect_err("facade validation must not execute").kind,
+            validate_subagent_child_run(&executing)
+                .expect_err("facade validation must not execute")
+                .kind,
             SubagentDiagnosticKind::ExecutionAuthorityRequired
         );
     }
@@ -2953,14 +3175,17 @@ mod tests {
         let admission = valid_admission(SubagentChildRunKind::WorkerTeamTask);
         let state = SubagentRunState::admitted(admission);
         assert_eq!(
-            subagent_enqueue(None, &state).expect_err("missing service must fail closed").kind,
+            subagent_enqueue(None, &state)
+                .expect_err("missing service must fail closed")
+                .kind,
             SubagentDiagnosticKind::ServiceUnavailable
         );
         let mut service = RecordingSubagentService::default();
         let queued = subagent_enqueue(Some(&mut service), &state).expect("enqueue through service");
         let running = subagent_status(Some(&mut service), &queued).expect("status through service");
         assert_eq!(running.status, SubagentRunStatus::Running);
-        let collected = subagent_collect(Some(&mut service), &running).expect("collect through service");
+        let collected =
+            subagent_collect(Some(&mut service), &running).expect("collect through service");
         let event = project_subagent_lifecycle_event(&collected);
         assert_eq!(event.status, SubagentRunStatus::Collected);
         assert_eq!(event.evidence_refs, vec![String::from(EVIDENCE_REF)]);
@@ -2973,7 +3198,9 @@ mod tests {
         let admission = valid_admission(SubagentChildRunKind::WorkerTeamTask);
         let state = SubagentRunState::admitted(admission.clone());
         assert_eq!(
-            subagent_status(None, &state).expect_err("stale handle must fail").kind,
+            subagent_status(None, &state)
+                .expect_err("stale handle must fail")
+                .kind,
             SubagentDiagnosticKind::StaleHandle
         );
         let malformed_child_result = SubagentReport {
@@ -2988,9 +3215,12 @@ mod tests {
             ..SubagentRunState::admitted(admission)
         };
         assert_eq!(
-            transition_subagent_state(&state_with_handle, SubagentCoordinatorEvent::Collect(malformed_child_result))
-                .expect_err("mismatched reports must fail")
-                .kind,
+            transition_subagent_state(
+                &state_with_handle,
+                SubagentCoordinatorEvent::Collect(malformed_child_result)
+            )
+            .expect_err("mismatched reports must fail")
+            .kind,
             SubagentDiagnosticKind::MalformedReport
         );
     }
@@ -3014,10 +3244,14 @@ mod tests {
                 mutation_intents: Vec::new(),
             },
         ];
-        let aggregate = aggregate_subagent_fan_in(&plan, &outcomes).expect("fanin should aggregate");
+        let aggregate =
+            aggregate_subagent_fan_in(&plan, &outcomes).expect("fanin should aggregate");
         assert_eq!(outcomes.len(), TWO_OUTCOMES);
         assert_eq!(aggregate.status, SubagentFanInStatus::PartialSuccess);
-        assert_eq!(aggregate.successful_children, vec![plan.children[0].child_id.clone()]);
+        assert_eq!(
+            aggregate.successful_children,
+            vec![plan.children[0].child_id.clone()]
+        );
     }
 
     #[test]
@@ -3026,12 +3260,15 @@ mod tests {
         let mut duplicate = fanout_plan_draft();
         duplicate.children[1].child_id = duplicate.children[0].child_id.clone();
         assert_eq!(
-            validate_subagent_fanout_plan(&duplicate).expect_err("duplicate children must fail").kind,
+            validate_subagent_fanout_plan(&duplicate)
+                .expect_err("duplicate children must fail")
+                .kind,
             SubagentDiagnosticKind::DuplicateChild
         );
         let mut deny_plan_draft = fanout_plan_draft();
         deny_plan_draft.mutation_policy = SubagentMutationPolicy::DenyAll;
-        let deny_plan = validate_subagent_fanout_plan(&deny_plan_draft).expect("deny-all plan validates");
+        let deny_plan =
+            validate_subagent_fanout_plan(&deny_plan_draft).expect("deny-all plan validates");
         let mutation = valid_mutation();
         let outcomes = deny_plan
             .children
@@ -3039,18 +3276,27 @@ mod tests {
             .map(|child| successful_outcome(child.child_id.as_str(), vec![mutation.clone()]))
             .collect::<Vec<_>>();
         assert_eq!(
-            aggregate_subagent_fan_in(&deny_plan, &outcomes).expect_err("mutation bypass must fail").kind,
+            aggregate_subagent_fan_in(&deny_plan, &outcomes)
+                .expect_err("mutation bypass must fail")
+                .kind,
             SubagentDiagnosticKind::MutationBypass
         );
         let mut conflict_plan_draft = fanout_plan_draft();
         conflict_plan_draft.mutation_policy = SubagentMutationPolicy::AllowNonConflicting;
-        let conflict_plan = validate_subagent_fanout_plan(&conflict_plan_draft).expect("conflict plan validates");
+        let conflict_plan =
+            validate_subagent_fanout_plan(&conflict_plan_draft).expect("conflict plan validates");
         let outcomes = vec![
-            successful_outcome(conflict_plan.children[0].child_id.as_str(), vec![valid_mutation()]),
-            successful_outcome(conflict_plan.children[1].child_id.as_str(), vec![SubagentMutationIntentSummary {
-                mutation_kind: String::from("different-patch"),
-                ..valid_mutation()
-            }]),
+            successful_outcome(
+                conflict_plan.children[0].child_id.as_str(),
+                vec![valid_mutation()],
+            ),
+            successful_outcome(
+                conflict_plan.children[1].child_id.as_str(),
+                vec![SubagentMutationIntentSummary {
+                    mutation_kind: String::from("different-patch"),
+                    ..valid_mutation()
+                }],
+            ),
         ];
         assert_eq!(
             aggregate_subagent_fan_in(&conflict_plan, &outcomes)
@@ -3078,12 +3324,15 @@ mod tests {
         let record = validate_subagent_lineage_record(&draft).expect("lineage should validate");
         assert_eq!(record.parent_id, event.parent_id);
         assert_eq!(record.child_id, event.child_id);
-        validate_subagent_replay_influence(&[record], &[SubagentInfluenceImport {
-            parent_id: event.parent_id,
-            child_id: event.child_id,
-            output_hash,
-            handoff_mode: SubagentHandoffMode::StatusPlusSummary,
-        }])
+        validate_subagent_replay_influence(
+            &[record],
+            &[SubagentInfluenceImport {
+                parent_id: event.parent_id,
+                child_id: event.child_id,
+                output_hash,
+                handoff_mode: SubagentHandoffMode::StatusPlusSummary,
+            }],
+        )
         .expect("replay influence should match lineage");
     }
 
@@ -3099,22 +3348,29 @@ mod tests {
             safe_summary: SAFE_SUMMARY_REF,
         });
         assert_eq!(
-            validate_subagent_lineage_record(&draft).expect_err("bad hashes must fail").kind,
+            validate_subagent_lineage_record(&draft)
+                .expect_err("bad hashes must fail")
+                .kind,
             SubagentDiagnosticKind::InvalidHash
         );
         draft.output_hash = hash_parts(SAFE_HASH_DOMAIN_RECEIPT, &["child-output"]);
         draft.safe_summary = String::from("RAW_TRANSCRIPT: child log");
         assert_eq!(
-            validate_subagent_lineage_record(&draft).expect_err("raw transcript marker must fail").kind,
+            validate_subagent_lineage_record(&draft)
+                .expect_err("raw transcript marker must fail")
+                .kind,
             SubagentDiagnosticKind::UnsafeText
         );
         assert_eq!(
-            validate_subagent_replay_influence(&[], &[SubagentInfluenceImport {
-                parent_id: String::from(PARENT_ID),
-                child_id: String::from(CHILD_ID),
-                output_hash: hash_parts(SAFE_HASH_DOMAIN_RECEIPT, &["child-output"]),
-                handoff_mode: SubagentHandoffMode::SummaryOnly,
-            }],)
+            validate_subagent_replay_influence(
+                &[],
+                &[SubagentInfluenceImport {
+                    parent_id: String::from(PARENT_ID),
+                    child_id: String::from(CHILD_ID),
+                    output_hash: hash_parts(SAFE_HASH_DOMAIN_RECEIPT, &["child-output"]),
+                    handoff_mode: SubagentHandoffMode::SummaryOnly,
+                }],
+            )
             .expect_err("missing lineage must fail")
             .kind,
             SubagentDiagnosticKind::MissingLineage
@@ -3128,12 +3384,13 @@ mod tests {
         // r[verify agent_harness_runtime.subagent_ux_hooks.command_descriptors]
         // r[verify agent_harness_runtime.subagent_ux_hooks.policy_routing]
         // r[verify agent_harness_runtime.subagent_ux_hooks.verification]
-        let projection =
-            validate_subagent_status_projection(&status_projection_draft()).expect("safe projection should validate");
+        let projection = validate_subagent_status_projection(&status_projection_draft())
+            .expect("safe projection should validate");
         assert_eq!(projection.status, SubagentRunStatus::Running);
         let state = running_state();
-        let decision = route_subagent_ux_command(&state, &command_descriptor(SubagentCommandKind::Cancel))
-            .expect("cancel descriptor should route");
+        let decision =
+            route_subagent_ux_command(&state, &command_descriptor(SubagentCommandKind::Cancel))
+                .expect("cancel descriptor should route");
         assert!(decision.accepted);
         assert!(decision.routed_to_policy);
     }
@@ -3144,12 +3401,15 @@ mod tests {
         let mut raw = status_projection_draft();
         raw.raw_log = Some(String::from("RAW_CHILD_LOG: details"));
         assert_eq!(
-            validate_subagent_status_projection(&raw).expect_err("raw logs must fail").kind,
+            validate_subagent_status_projection(&raw)
+                .expect_err("raw logs must fail")
+                .kind,
             SubagentDiagnosticKind::UnsafeText
         );
         let state = running_state();
         let mut unbounded = command_descriptor(SubagentCommandKind::DetailImportRequest);
-        unbounded.requested_detail_bound = Some(MAX_DETAIL_IMPORT_CHARS.saturating_add(MIN_POSITIVE_U32));
+        unbounded.requested_detail_bound =
+            Some(MAX_DETAIL_IMPORT_CHARS.saturating_add(MIN_POSITIVE_U32));
         assert_eq!(
             route_subagent_ux_command(&state, &unbounded)
                 .expect("descriptor validates")
@@ -3176,17 +3436,22 @@ mod tests {
         // r[verify agent_harness_runtime.subagent_external_conformance.negative_fixtures]
         // r[verify agent_harness_runtime.subagent_external_conformance.index]
         // r[verify agent_harness_runtime.subagent_external_conformance.no_live_dependency]
-        let conformance_result = validate_external_subagent_conformance_index(&ExternalSubagentConformanceIndex {
-            fixtures: vec![valid_external_fixture(), ambient_external_fixture()],
-        })
-        .expect("external conformance index should validate offline");
+        let conformance_result =
+            validate_external_subagent_conformance_index(&ExternalSubagentConformanceIndex {
+                fixtures: vec![valid_external_fixture(), ambient_external_fixture()],
+            })
+            .expect("external conformance index should validate offline");
         assert_eq!(conformance_result.results.len(), usize::from(TWO_CHILDREN));
-        assert!(conformance_result.results.iter().all(|result| result.offline_only));
         assert!(
             conformance_result
                 .results
                 .iter()
-                .any(|result| result.failure == Some(SubagentDiagnosticKind::AmbientDiscoveryDenied))
+                .all(|result| result.offline_only)
+        );
+        assert!(
+            conformance_result.results.iter().any(
+                |result| result.failure == Some(SubagentDiagnosticKind::AmbientDiscoveryDenied)
+            )
         );
     }
 
@@ -3202,7 +3467,9 @@ mod tests {
             SubagentDiagnosticKind::MissingExpectedFailure
         );
         let mut undeclared = valid_external_fixture();
-        undeclared.requested_tools.push(String::from("undeclared-tool"));
+        undeclared
+            .requested_tools
+            .push(String::from("undeclared-tool"));
         undeclared.expected_status = ExternalSubagentFixtureStatus::Denied;
         undeclared.expected_failure = Some(SubagentDiagnosticKind::UndeclaredTool);
         assert_eq!(
@@ -3320,7 +3587,10 @@ mod tests {
     }
 
     impl SubagentService for RecordingSubagentService {
-        fn enqueue(&mut self, _admission: &SubagentAdmission) -> Result<SubagentHandle, SubagentServiceFailure> {
+        fn enqueue(
+            &mut self,
+            _admission: &SubagentAdmission,
+        ) -> Result<SubagentHandle, SubagentServiceFailure> {
             self.enqueues += EXPECTED_ONE;
             SubagentHandle::new(HANDLE_ID).map_err(|diagnostic| SubagentServiceFailure {
                 kind: SubagentServiceFailureKind::MalformedReport,
@@ -3328,15 +3598,24 @@ mod tests {
             })
         }
 
-        fn status(&mut self, _handle: &SubagentHandle) -> Result<SubagentRunStatus, SubagentServiceFailure> {
+        fn status(
+            &mut self,
+            _handle: &SubagentHandle,
+        ) -> Result<SubagentRunStatus, SubagentServiceFailure> {
             Ok(SubagentRunStatus::Running)
         }
 
-        fn cancel(&mut self, _handle: &SubagentHandle) -> Result<SubagentRunStatus, SubagentServiceFailure> {
+        fn cancel(
+            &mut self,
+            _handle: &SubagentHandle,
+        ) -> Result<SubagentRunStatus, SubagentServiceFailure> {
             Ok(SubagentRunStatus::Cancelling)
         }
 
-        fn collect(&mut self, _handle: &SubagentHandle) -> Result<SubagentReport, SubagentServiceFailure> {
+        fn collect(
+            &mut self,
+            _handle: &SubagentHandle,
+        ) -> Result<SubagentReport, SubagentServiceFailure> {
             Ok(completed_report(CHILD_ID))
         }
     }

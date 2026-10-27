@@ -1,0 +1,41 @@
+{
+  "schema": "lattice.nickel-import-merge.implementation-evidence.v1",
+  "source_owner": "nickel-eval patched core deserialization, not the Lattice thin adapter",
+  "producer_worktree": "/home/brittonr/git/OnixResearch/.worktrees/nickel-eval-import-closurization-20261016",
+  "producer_base": "f23be09e41337de8fa729274f50023f861ae0e8a",
+  "local_producer_revision": "b4ddff052105eb4b75827e228a65b823dc1a0444",
+  "local_producer_tree": "3652fe8aa0a7141f18f844cd3b1b1162adc9d4e5",
+  "local_producer_archive_blake3": "9c45a121f1384f1c8ba1933fcac7a7e5e4e9b9dac22f1b91d1dbe55d95c9afa1",
+  "local_archive_format": "git archive --format=tar with tar.umask=0000",
+  "local_revision_boundary": "Prepared locally, then exact final payload passed the full native-system Nix gate; see evidence/final-immutable-producer-20261016.json. No remote publication, anonymous readback or consumer pin admission.",
+  "package_path": "vendor/nickel-lang-core-0.18.0",
+  "upstream_fix": "aa94d9b1f7a0981b4f0d6e8dff79f0a74ff1bb1a",
+  "cohort": {"cli": "1.17.0", "nickel_lang": "2.2.0", "nickel_lang_core": "0.18.0"},
+  "lifecycle": {
+    "policy_hash": "a88e98316e48fb6e54901fd7a88dd890c86d1ab7c830098084fe5dfaa70d1a4a",
+    "proposal_receipt": "11da2182d5311db976e6bb6c31fbf997e312da99f71361284da6e9039ff62fcd",
+    "design_receipt": "ab4b1322b5d83b2e7579541d023cbb429a5095337d5479532b1e1a3e5793969a",
+    "tasks_receipt": "a31f012f69c080ea79b49575cbe99a6c0fd8f37b0790e8ca923ad2b385fa9a79",
+    "observed_verdict": "proposal/design/tasks PASS; tasks include intentionally incomplete integration/runtime obligations"
+  },
+  "worker_implemented": [
+    "Native adapter complete-value regressions for nested JSON, both operand orders, relative file imports, captured source absolute imports, recursive override and contracts.",
+    "Missing/malformed imported JSON and contract rejection checks preserving content-omitting SafeFailure categories.",
+    "Exact f23be09 producer branch with canonical two-source-file core repair imported through strict owned script, MIT notice and deterministic source snapshot.",
+    "Producer JSON/YAML, nested contracts, std.deserialize and generic serde runtime behavior regressions; native export example and retained CLI/native smoke fixture.",
+    "Topic source documentation and lifecycle packages."
+  ],
+  "worker_exercised": [
+    "Producer strict exact import/check and negative archive/patch/license/snapshot/existing-destination scenarios passed.",
+    "Pinned /nix/store/xi68vw0zrci8gdq3mn7b953y680z96mi-nickel-1.17.0/bin/nickel exported retained fixture with expected complete JSON value.",
+    "Explicit-root, explicit-policy native Cairn proposal/design/tasks gates passed for consumer and narrow producer package."
+  ],
+  "integration_requirements": [
+    "Publish the corrected local producer object through its canonical public RID, then anonymously verify exact object acquisition; local preparation does not establish public source admission.",
+    "Point both Lattice nickel-eval dependency and root crates.io nickel-lang-core override at that same immutable producer Git revision; align Cargo/Nix locks and source closure without a path or runtime fallback.",
+    "Run cargo test --lib nickel::tests::imported_json_merge and native standalone authority profile smoke with ordinary imported JSON merge.",
+    "Update exact published revision in topic docs/evidence and complete native acceptance/sync/archive after runtime evidence."
+  ],
+  "runtime_status": "Producer format,43 all-targets tests and strict Clippy pass with owning Rust1.90; native complete-value fixture equals the pinned external CLI and missing/malformed/contract cases retain bounded errors. The exact GC-safe owning Nix check now completed with all checks passed on x86_64-linux, including43 release all-targets tests; aarch64-linux was explicitly omitted by the unchanged native-system gate. Exact checked source/NAR and full output are in producer evidence/final-nix-check.json and final-nix-check-20261016.log. Owning typed policy regeneration, drift/negative checks, lifecycle gates and validation also pass; post-Nix task-state gates are retained in evidence/post-nix-tasks-gates-20261016.json. Immutable publication/readback, aligned consumer pins/locks, final Lattice regressions and authority-profile execution remain unperformed and unclaimed.",
+  "non_claims": ["No input rewriting, catch-unwind, assertion removal, fallback-to-external evaluator or evaluator-version upgrade.", "Selected fixture compatibility does not prove arbitrary evaluator equivalence, import closure completeness, Nickel soundness or product readiness."]
+}

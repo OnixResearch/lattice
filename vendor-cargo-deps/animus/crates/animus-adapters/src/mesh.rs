@@ -120,7 +120,10 @@ pub fn normalize_catalog(snapshot: &CatalogSnapshot<'_>) -> Result<Catalog, Cata
         if !ids.insert(row.id) {
             return Err(CatalogError::DuplicateModel);
         }
-        if row.context_tokens == 0 || row.output_tokens == 0 || row.output_tokens > row.context_tokens {
+        if row.context_tokens == 0
+            || row.output_tokens == 0
+            || row.output_tokens > row.context_tokens
+        {
             return Err(CatalogError::InvalidBounds);
         }
         models.push(Model {
@@ -160,7 +163,9 @@ fn safe_model_id(value: &str) -> bool {
     safe_identity(value)
         && value != "auto"
         && value != "mesh"
-        && value.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b':'))
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b':'))
 }
 
 fn catalog_identity(snapshot: &CatalogSnapshot<'_>, models: &[Model]) -> alloc::string::String {
@@ -202,7 +207,11 @@ pub enum ExactModelDecision {
 
 /// Admits only one exact model and conservative explicit capabilities.
 #[must_use]
-pub fn admit_exact_model(catalog: &Catalog, model_id: &str, requirements: &Requirements) -> ExactModelDecision {
+pub fn admit_exact_model(
+    catalog: &Catalog,
+    model_id: &str,
+    requirements: &Requirements,
+) -> ExactModelDecision {
     if model_id == "auto" || model_id == "mesh" || model_id.is_empty() {
         return ExactModelDecision::VirtualModelDenied;
     }
@@ -227,7 +236,9 @@ pub fn admit_exact_model(catalog: &Catalog, model_id: &str, requirements: &Requi
     if requirements.developer_role && model.developer_role != Capability::Supported {
         return ExactModelDecision::CapabilityDenied;
     }
-    let requested_tokens = requirements.input_tokens.saturating_add(requirements.output_tokens);
+    let requested_tokens = requirements
+        .input_tokens
+        .saturating_add(requirements.output_tokens);
     if requirements.output_tokens > model.output_tokens || requested_tokens > model.context_tokens {
         return ExactModelDecision::BudgetDenied;
     }
@@ -341,7 +352,10 @@ pub enum ReceiptError {
 ///
 /// Returns [`ReceiptError`] when a label or identity is unsafe.
 pub fn project_receipt(input: &ReceiptInput<'_>) -> Result<Receipt, ReceiptError> {
-    if !safe_model_id(input.provider_label) || !safe_model_id(input.model_label) || !safe_model_id(input.status) {
+    if !safe_model_id(input.provider_label)
+        || !safe_model_id(input.model_label)
+        || !safe_model_id(input.status)
+    {
         return Err(ReceiptError::UnsafeLabel);
     }
     let identities = [
@@ -457,10 +471,22 @@ mod tests {
             input_tokens: 100,
             output_tokens: 100,
         };
-        assert_eq!(admit_exact_model(&value, "model-a", &requirements), ExactModelDecision::Admitted);
-        assert_eq!(admit_exact_model(&value, "auto", &requirements), ExactModelDecision::VirtualModelDenied);
-        assert_eq!(admit_exact_model(&value, "missing", &requirements), ExactModelDecision::MissingModel);
-        assert_eq!(validate_response_model("model-a", Some("model-b")), ResponseModelDecision::Substituted);
+        assert_eq!(
+            admit_exact_model(&value, "model-a", &requirements),
+            ExactModelDecision::Admitted
+        );
+        assert_eq!(
+            admit_exact_model(&value, "auto", &requirements),
+            ExactModelDecision::VirtualModelDenied
+        );
+        assert_eq!(
+            admit_exact_model(&value, "missing", &requirements),
+            ExactModelDecision::MissingModel
+        );
+        assert_eq!(
+            validate_response_model("model-a", Some("model-b")),
+            ResponseModelDecision::Substituted
+        );
     }
     #[test]
     fn authority_precedes_transport() {

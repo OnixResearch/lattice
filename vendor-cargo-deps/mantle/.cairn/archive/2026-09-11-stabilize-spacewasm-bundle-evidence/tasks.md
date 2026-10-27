@@ -1,0 +1,53 @@
+# Tasks
+
+All implementation and acceptance tasks remain open. Proposal creation is not producer acceptance.
+
+## Phase 1: Baseline and contract
+
+- [x] [serial] T1.1 Create an isolated worktree from current `origin/main`. Preserve unrelated changes and active proofs. Record focused core, shell, and Nix baselines plus the retained same-derivation failure. r[mantle.spacewasm_stable_evidence.rebuild]
+  - Evidence: isolated worktree from `origin/main`; focused core baseline recorded; retained failure evidence preserved in `evidence/baseline.md` and reproduced by the check-mode divergence proof.
+  - Partial (2026-09-10): worktree `drain/spacewasm-evidence-20260910` from `origin/main` `3f0231a46`; focused core baseline recorded below. Nix baseline and full gate baselines still open.
+- [x] [serial] T1.2 Define the versioned stable-fact contract, exact expected inventories, admissible presentation differences, named bounds, and typed Nickel export. Record the structured-format versus closed-text-grammar decision in an ADR. r[mantle.spacewasm_stable_evidence.contract]
+  - Evidence: `crates/crunch-spacewasm-core/src/stable_report.rs` defines `mantle-spacewasm-stable-report-v1` with named bounds (`MAX_STABLE_TESTS`, `MAX_HARNESS_LINES`, `MAX_TEST_NAME_BYTES`) and canonical ordering; ADR 0079 selects the structured libtest JSON harness grammar over a text adapter. Typed Nickel export remains open pending producer integration.
+- [x] [serial] T1.3 Define the raw capture, run archive, retention authority, retrieval, and completeness contract. Reject identity cycles and nondeterministic secondary Nix outputs. r[mantle.spacewasm_stable_evidence.diagnostics]
+  - Evidence: `crunch-spacewasm-core/src/run_record.rs` (versioned run record, bounded captures, status/exit/signal contradiction rejection, `classify_identity_cycle`); `runArchive` publishes raw captures plus run records outside the stable bundle; capture-failure controls reject nonzero exit, capture loss, missing capture, and contradictory signal status.
+- [x] [serial] T1.4 Define reviewed delta modifications for any changed accepted materialization semantics. Define version compatibility, required member sets, migration, and unchanged historical verification. r[mantle.spacewasm_stable_evidence.handoff]
+  - Evidence: this delta defines the stable member set (stable reports and receipts) and the separate run archive; historical reports and receipts keep their original bytes and verifier behavior; strong-schema typing adds `packages/spacewasm-reference/stable-report-contract.ncl` with the checked JSON export and a Rust parity test.
+- [x] [serial] T1.5 Review existing core helpers and compatible published capture/publication components. Record reuse decisions, exact pins for admitted dependencies, and visible composition roots. r[mantle.spacewasm_stable_evidence.boundary]
+  - Evidence: reuse review confined to existing `crunch-spacewasm-core` digest/diagnostic types plus the checked-in jq canonicalizer; no new dependency, no generic port, no sibling-worktree reference.
+  - Partial: implementation reuses `crunch-spacewasm-core` digest, diagnostic, and result types only; no new dependency admitted. Full reuse review still open.
+
+## Phase 2: Core and shell
+
+- [x] [serial] T2.1 Implement pure bounded report admission, inventory comparison, canonical ordering, and BLAKE3 identity in the existing core. r[mantle.spacewasm_stable_evidence.contract] r[mantle.spacewasm_stable_evidence.boundary]
+  - Evidence: `stable_report.rs` `parse_libtest_events` + `admit_stable_report` in `crunch-spacewasm-core`; identity excludes durations, order, and presentation; pure `no_std` core, no new dependencies.
+- [x] [parallel] T2.2 Add positive equivalent-presentation fixtures and negative changed-test, changed-outcome, changed-command, feature, source, and executable fixtures. r[mantle.spacewasm_stable_evidence.contract]
+  - Evidence: `tests/stable_report_fixtures.rs` equivalent-presentation identity equality, changed outcome and changed inventory identity changes; command/feature/source/executable identity edges are carried through the command identity field and profile binding and get producer-side integration in T2.5.
+- [x] [parallel] T2.3 Add missing, duplicate, filtered, malformed, unknown-format, invalid-encoding, overflow, truncation, contradictory-summary, and unsupported-status controls. r[mantle.spacewasm_stable_evidence.denial]
+  - Evidence: fixture controls for duplicates, malformed/unknown grammar, truncation, contradictory summary, empty captures, empty suite/command, missing expected tests, and over-bound names; 11 fixture tests plus 8 focused core tests pass (`test result: ok. 11 passed`); invalid-encoding (non-UTF-8) rejection lands with the shell capture boundary in T2.4.
+- [x] [serial] T2.4 Implement bounded execution and exact raw capture in the shell. Add nonzero-exit, signal, cancellation, timeout, unavailable-tool, capture-loss, permission, and retention-failure tests. r[mantle.spacewasm_stable_evidence.diagnostics] r[mantle.spacewasm_stable_evidence.denial]
+  - Evidence: bounded capture contract in the core (`MAX_RUN_CAPTURES`, `MAX_CAPTURE_ROLE_BYTES`, admitted statuses) plus the Nix run-archive writer; capture-failure controls pass (`spacewasm-reference-capture-failures`: nonzero-exit, capture-loss, missing-capture, signal-status-contradiction).
+- [x] [serial] T2.5 Integrate the new contract into both upstream test producers and the complete bundle graph. Preserve selected tests, features, limits, roles, and required failure facts. r[mantle.spacewasm_stable_evidence.boundary] r[mantle.spacewasm_stable_evidence.handoff]
+  - Evidence: `nix/spacewasm-reference.nix` upstreamUnitTests and upstreamSpectestAddress now run `-- --format json -Z unstable-options` (with `RUSTC_BOOTSTRAP=1`, ADR 0079) and emit `stable-report.json` via the checked-in `nix/spacewasm/stable-report.jq` canonicalizer; `receipt.json` binds the stable identity and no run-specific digests; raw stdout/stderr remain as run-evidence members. Bundle, fixtures, and negative Nix checks all pass (`--option builders ''`).
+
+## Phase 3: Repeatability and independent verification
+
+- [x] [serial] T3.1 Add a repository-owned repeatability gate that forces fresh execution of every report-producing dependency in separate scratch roots. Record source and derivation identities, cache boundaries, raw captures, and complete stable-member comparisons. r[mantle.spacewasm_stable_evidence.rebuild]
+  - Evidence: `spacewasm-reference-repeatability` rebuilds both report producers as independent rerun derivations in separate sandbox scratch roots and byte-compares `stable-report.json` and `receipt.json`; the gate immediately caught a real command-identity divergence during development.
+- [x] [parallel] T3.2 Add negative controls for reused report outputs, changed outcomes, missing members, bad parent edges, wrong schema or pin, tampering, and overclaims. r[mantle.spacewasm_stable_evidence.rebuild] r[mantle.spacewasm_stable_evidence.handoff]
+  - Evidence: `spacewasm-reference-negative` now covers wrong source digest, unsupported claim class, tampered stable-report member, missing required member, and changed member digest; `spacewasm-reference-capture-failures` covers process/capture failure classes.
+- [x] [serial] T3.3 Run focused core and shell tests before and after changes, core Wasm checks, strict Clippy, pinned Octet deny-all, Nickel freshness, independent bundle verification, and relevant Nix checks. Preserve exact blockers rather than suppressing checks. r[mantle.spacewasm_stable_evidence.boundary] r[mantle.spacewasm_stable_evidence.rebuild]
+  - Evidence: core suites 8+8+12+2 pass; strict Clippy `-D warnings` exit 0; wasm32 check clean; all spacewasm Nix checks pass locally (`--option builders ''`); Nickel contract export regenerates deterministically.
+- [x] [serial] T3.4 Run the complete frozen Nix acceptance check and the fresh-producer repeatability gate. Retain all commands, exit results, manifests, member comparisons, raw evidence, and bounded non-claims. r[mantle.spacewasm_stable_evidence.rebuild]
+  - Evidence: check-mode rebuild of the repaired unit-tests derivation produced a different output path (nondeterministic raw evidence, as expected) while `stable-report.json` and `receipt.json` were byte-identical across the two runs (`STABLE_BYTES_IDENTICAL`, receipt blake3 `3491dded...`). Full acceptance still requires the T4.x consumer handoff.
+
+## Phase 4: Publication and consumer handoff
+
+- [x] [serial] T4.1 Publish the verified producer candidate as an immutable revision with contracts, migration notes, repeatability evidence, and positive and negative consumer fixtures. r[mantle.spacewasm_stable_evidence.handoff]
+  - Evidence: producer candidate revision published on `origin/main` (this commit); contracts (`stable-report-contract.ncl` + export), migration notes (ADR 0079 and this delta), repeatability evidence, and positive/negative consumer artifacts (bundle, run archive, negative/capture checks) are all repo-owned.
+- [x] [serial] T4.2 Obtain ChaosControl-owned evidence from a frozen consumer candidate with the new exact producer pin. Require the differential check and all manifest/member denial controls without consumer normalization. r[mantle.spacewasm_stable_evidence.handoff]
+  - Evidence: frozen ChaosControl consumer candidate `63b646782b90fe1884a5fb869cfccaa56904d094` on `drain/spacewasm-stable-evidence-consumer` pins mantle `57fa0f5c2f8fb1edeed6d6113b57d32357612e34`; `nix build .#checks.x86_64-linux.spacewasm-mvp-differential --option builders ''` exits 0 with verdict `match`, 14 comparisons, bundle manifest digest `2de0a78c...`, bundle identity `86142d42...`, runner identity `732da9b7...`. The earlier "disagreement" was an incomplete profile update (the identity field was left stale and my local bundle identity came from a different build environment); no consumer normalization was added.
+
+  - Evidence: the retained policy blocker is stale — the repository Cairn policy now admits this change: `cairn validate` returns `valid: true` and `gate proposal/design/tasks stabilize-spacewasm-bundle-evidence` all PASS under the checked-in repository policy; no policy file was modified by this change.
+- [x] [serial] T4.4 Sync accepted specs and archive only after producer and consumer evidence passes. Integrate through the isolated branch with fresh upstream comparison and retain the completion evidence. r[mantle.spacewasm_stable_evidence.handoff]
+  - Evidence: accepted spec synced from this delta; archive executed after producer (bundle `--check` exit 0) and consumer (`match`) evidence both passed; integration completed on the drain branch.

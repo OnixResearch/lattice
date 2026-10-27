@@ -1,10 +1,11 @@
 let MaximumFixtureCapabilities = 64 in
 let MaximumFixtureIdBytes = 128 in
-let FixtureSchema = "basalt.ucan-semantics-fixture.v1" in
-let RuntimeUcanRevision = "277ab768eb532ac0c715a3bbff2a7dc37a702f11" in
-let SupportCatalogRevision = "277ab768eb532ac0c715a3bbff2a7dc37a702f11" in
-let SupportCatalogBlake3 = "9ffae46c16556feb27614dee3f5945e48321f08a38f0b7c8b1baf7e0e106d095" in
-let BasaltPolicyBlake3 = "5475d5473ec98cbf052a83512836b0739f5dad3e7b9b0ed201eb3094b1cf39bf" in
+let FixtureSchema = "basalt.ucan-semantics-fixture.v2" in
+let ProtocolProfile = "onix-compact-ed25519-v1" in
+let RuntimeUcanRevision = "3a2aa043068a82663cf72ec05ed5d56a7d65ecd5" in
+let SupportCatalogRevision = "3a2aa043068a82663cf72ec05ed5d56a7d65ecd5" in
+let SupportCatalogBlake3 = "fe77fd63076eaef555b74e702e4c14e483bdba70151ccc955c75b17d97412427" in
+let BasaltPolicyBlake3 = "978fd731f98c48cbdbdedd2106d98bbb44e918670bac9b5ab143aab2dc516874" in
 let RequiredNonClaims = [
   "revocation-backend-freshness",
   "key-resolution-truth",
@@ -88,6 +89,7 @@ let fixture_invariants = fun fixture =>
 let FixtureContract = std.contract.Sequence [{
   schema | Exact FixtureSchema,
   fixture_id | BoundedFixtureId,
+  protocol_profile | Exact ProtocolProfile,
   runtime_ucan_revision | Exact RuntimeUcanRevision,
   support_catalog_revision | Exact SupportCatalogRevision,
   support_catalog_blake3 | Blake3Hex | Exact SupportCatalogBlake3,
@@ -105,6 +107,7 @@ let FixtureContract = std.contract.Sequence [{
   Fixture = FixtureContract,
   identity = {
     fixture_schema = FixtureSchema,
+    protocol_profile = ProtocolProfile,
     runtime_ucan_revision = RuntimeUcanRevision,
     support_catalog_revision = SupportCatalogRevision,
     support_catalog_blake3 = SupportCatalogBlake3,

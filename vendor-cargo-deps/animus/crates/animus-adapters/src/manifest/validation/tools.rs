@@ -1,15 +1,8 @@
-use super::Collection;
-use super::PluginDescriptorError;
-use super::TOOL_CAPABILITY_FIELD;
-use super::TOOL_DESCRIPTION_FIELD;
-use super::TOOL_NAME_FIELD;
-use super::TOOL_RESULT_FIELD;
-use super::TOOL_SCHEMA_FIELD;
-use super::ToolDescriptor;
-use super::ToolDescriptorDraft;
-use super::contains_name;
-use super::required_text;
-use super::validate_required_texts;
+use super::{
+    Collection, PluginDescriptorError, TOOL_CAPABILITY_FIELD, TOOL_DESCRIPTION_FIELD,
+    TOOL_NAME_FIELD, TOOL_RESULT_FIELD, TOOL_SCHEMA_FIELD, ToolDescriptor, ToolDescriptorDraft,
+    contains_name, required_text, validate_required_texts,
+};
 
 pub(in crate::manifest) fn collect_descriptors(
     drafts: &[ToolDescriptorDraft<'_>],
@@ -31,16 +24,24 @@ pub(in crate::manifest) fn collect_descriptors(
     let mut tools = Collection::with_capacity(drafts.len());
     for draft in drafts {
         let name = required_text(TOOL_NAME_FIELD, draft.name)?;
-        if contains_name(built_in_tool_names, &name) || contains_name(existing_catalog_tool_names, &name) {
+        if contains_name(built_in_tool_names, &name)
+            || contains_name(existing_catalog_tool_names, &name)
+        {
             return Err(PluginDescriptorError::ToolNameCollision { name });
         }
-        if tools.iter().any(|tool: &ToolDescriptor| tool.name() == name) {
+        if tools
+            .iter()
+            .any(|tool: &ToolDescriptor| tool.name() == name)
+        {
             return Err(PluginDescriptorError::DuplicateTool { name });
         }
         let description = required_text(TOOL_DESCRIPTION_FIELD, draft.description)?;
-        let parameter_schema_identity = required_text(TOOL_SCHEMA_FIELD, draft.parameter_schema_identity)?;
-        let result_contract_identity = required_text(TOOL_RESULT_FIELD, draft.result_contract_identity)?;
-        let capability_labels = validate_required_texts(TOOL_CAPABILITY_FIELD, draft.capability_labels)?;
+        let parameter_schema_identity =
+            required_text(TOOL_SCHEMA_FIELD, draft.parameter_schema_identity)?;
+        let result_contract_identity =
+            required_text(TOOL_RESULT_FIELD, draft.result_contract_identity)?;
+        let capability_labels =
+            validate_required_texts(TOOL_CAPABILITY_FIELD, draft.capability_labels)?;
         tools.push(ToolDescriptor {
             name,
             description,

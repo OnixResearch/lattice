@@ -9,7 +9,8 @@ const MAX_SAFE_LABEL_CHARS: usize = super::data::MAX_SAFE_LABEL_CHARS;
 const MIN_ATTEMPT_COUNT: u32 = super::data::MIN_ATTEMPT_COUNT;
 const MAPPING_HASH_PART_COUNT: usize = 5;
 const PROVIDER_RETRY_DECISION_HASH_DOMAIN: &str = super::data::PROVIDER_RETRY_DECISION_HASH_DOMAIN;
-const PROVIDER_RETRY_INVOCATION_HASH_DOMAIN: &str = super::data::PROVIDER_RETRY_INVOCATION_HASH_DOMAIN;
+const PROVIDER_RETRY_INVOCATION_HASH_DOMAIN: &str =
+    super::data::PROVIDER_RETRY_INVOCATION_HASH_DOMAIN;
 const PROVIDER_RETRY_POLICY_HASH_DOMAIN: &str = super::data::PROVIDER_RETRY_POLICY_HASH_DOMAIN;
 const PROVIDER_RETRY_POLICY_SCHEMA: &str = super::data::PROVIDER_RETRY_POLICY_SCHEMA;
 
@@ -83,7 +84,10 @@ pub fn validate_provider_retry_policy(
     if policy.policy_hash != expected_hash {
         return Err(error(ProviderRetryIssue::StalePolicy, FIELD_POLICY));
     }
-    debug_assert_eq!(policy.delay_schedule_ms.len().saturating_add(1), policy.max_attempts as usize);
+    debug_assert_eq!(
+        policy.delay_schedule_ms.len().saturating_add(1),
+        policy.max_attempts as usize
+    );
     debug_assert_eq!(policy.policy_hash.len(), BLAKE3_HEX_CHARS);
     Ok(policy)
 }
@@ -100,8 +104,18 @@ pub fn provider_retry_policy_content_hash(policy: &ProviderRetryPolicy) -> Strin
         "required".to_string(),
         "deny_after_semantic".to_string(),
     ]);
-    parts.extend(policy.delay_schedule_ms.iter().map(|delay_ms| format!("delay_ms:{delay_ms}")));
-    parts.extend(policy.retryable_classes.iter().map(|class| format!("retryable:{}", class.as_str())));
+    parts.extend(
+        policy
+            .delay_schedule_ms
+            .iter()
+            .map(|delay_ms| format!("delay_ms:{delay_ms}")),
+    );
+    parts.extend(
+        policy
+            .retryable_classes
+            .iter()
+            .map(|class| format!("retryable:{}", class.as_str())),
+    );
     for mapping in &policy.mappings {
         parts.extend([
             "mapping".to_string(),
@@ -148,7 +162,9 @@ pub fn validate_provider_retry_invocation(
 
 /// Returns the canonical BLAKE3 identity for unvalidated invocation dimensions.
 #[must_use]
-pub fn provider_retry_invocation_input_content_hash(input: &ProviderRetryInvocationInput) -> String {
+pub fn provider_retry_invocation_input_content_hash(
+    input: &ProviderRetryInvocationInput,
+) -> String {
     let parts = [
         input.provider_id.clone(),
         input.model_id.clone(),
@@ -210,7 +226,9 @@ pub fn classify_provider_retry_failure(
         .mappings
         .iter()
         .find(|mapping| mapping_matches(mapping, observation))
-        .map_or(ProviderRetryFailureClass::Unknown, |mapping| mapping.canonical_class);
+        .map_or(ProviderRetryFailureClass::Unknown, |mapping| {
+            mapping.canonical_class
+        });
     debug_assert!(ProviderRetryFailureClass::parse(class.as_str()).is_some());
     Ok(class)
 }
@@ -223,12 +241,17 @@ pub const fn observe_provider_retry_stream(
     observation: ProviderRetryStreamObservation,
 ) -> ProviderRetryStreamState {
     match (state, observation) {
-        (ProviderRetryStreamState::Committed(frame), _other) => ProviderRetryStreamState::Committed(frame),
-        (ProviderRetryStreamState::NotStarted, ProviderRetryStreamObservation::TransportStarted) => {
-            ProviderRetryStreamState::TransportStarted
+        (ProviderRetryStreamState::Committed(frame), _other) => {
+            ProviderRetryStreamState::Committed(frame)
         }
+        (
+            ProviderRetryStreamState::NotStarted,
+            ProviderRetryStreamObservation::TransportStarted,
+        ) => ProviderRetryStreamState::TransportStarted,
         (current, ProviderRetryStreamObservation::TransportStarted) => current,
-        (_current, ProviderRetryStreamObservation::Semantic(frame)) => ProviderRetryStreamState::Committed(frame),
+        (_current, ProviderRetryStreamObservation::Semantic(frame)) => {
+            ProviderRetryStreamState::Committed(frame)
+        }
     }
 }
 
@@ -254,7 +277,9 @@ pub const fn observe_provider_retry_model_frame(
 // r[impl agent_harness_runtime.tau_provider_retry.backoff]
 // r[impl agent_harness_runtime.tau_provider_retry.same_target]
 // r[impl agent_harness_runtime.tau_provider_retry.stream_safety]
-pub fn plan_provider_retry(input: ProviderRetryPlanInput<'_>) -> Result<ProviderRetryDecision, ProviderRetryError> {
+pub fn plan_provider_retry(
+    input: ProviderRetryPlanInput<'_>,
+) -> Result<ProviderRetryDecision, ProviderRetryError> {
     validate_attempt_state(input.policy, input.current, input.state)?;
     let reason = classify_provider_retry_failure(input.policy, input.observation)?;
     let status = select_decision_status(&input, reason);
@@ -280,7 +305,10 @@ pub fn plan_provider_retry(input: ProviderRetryPlanInput<'_>) -> Result<Provider
         policy_hash: input.policy.policy_hash.clone(),
         decision_hash,
     };
-    debug_assert_eq!(decision.status == ProviderRetryDecisionStatus::Retry, delay_ms.is_some());
+    debug_assert_eq!(
+        decision.status == ProviderRetryDecisionStatus::Retry,
+        delay_ms.is_some()
+    );
     debug_assert_eq!(decision.next_attempt_count.is_some(), delay_ms.is_some());
     Ok(decision)
 }
@@ -292,13 +320,18 @@ pub fn plan_provider_retry(input: ProviderRetryPlanInput<'_>) -> Result<Provider
 ///
 /// Returns [`ProviderRetryError`] when the decision does not admit retry.
 // r[impl agent_harness_runtime.tau_provider_retry.backoff]
-pub fn plan_provider_retry_wait(decision: &ProviderRetryDecision) -> Result<ProviderRetryWaitPlan, ProviderRetryError> {
+pub fn plan_provider_retry_wait(
+    decision: &ProviderRetryDecision,
+) -> Result<ProviderRetryWaitPlan, ProviderRetryError> {
     if decision.status != ProviderRetryDecisionStatus::Retry {
         return Err(error(ProviderRetryIssue::InvalidInput, FIELD_TIMER));
     }
-    let next_attempt_count =
-        decision.next_attempt_count.ok_or_else(|| error(ProviderRetryIssue::InvalidInput, FIELD_TIMER))?;
-    let delay_ms = decision.delay_ms.ok_or_else(|| error(ProviderRetryIssue::InvalidSchedule, FIELD_DELAY))?;
+    let next_attempt_count = decision
+        .next_attempt_count
+        .ok_or_else(|| error(ProviderRetryIssue::InvalidInput, FIELD_TIMER))?;
+    let delay_ms = decision
+        .delay_ms
+        .ok_or_else(|| error(ProviderRetryIssue::InvalidSchedule, FIELD_DELAY))?;
     let request = ProviderRetryTimerRequest {
         run_id: decision.run_id.clone(),
         next_attempt_count,
@@ -349,7 +382,10 @@ pub fn evaluate_provider_retry_timer(
         decision_hash: state.decision_hash.clone(),
         status: wait_status,
     };
-    debug_assert_eq!(gate.status == ProviderRetryDispatchGateStatus::Ready, gate.request.is_some());
+    debug_assert_eq!(
+        gate.status == ProviderRetryDispatchGateStatus::Ready,
+        gate.request.is_some()
+    );
     debug_assert_eq!(
         next_state.status == ProviderRetryWaitStatus::Waiting,
         !is_correlated && state.status == ProviderRetryWaitStatus::Waiting
@@ -363,10 +399,14 @@ pub fn evaluate_provider_retry_timer(
 /// Projects a provider-neutral progress event from a retry decision.
 #[must_use]
 // r[impl agent_harness_runtime.tau_provider_retry.events]
-pub fn project_provider_retry_decision_event(decision: &ProviderRetryDecision) -> ProviderRetryProgressEvent {
+pub fn project_provider_retry_decision_event(
+    decision: &ProviderRetryDecision,
+) -> ProviderRetryProgressEvent {
     ProviderRetryProgressEvent {
         run_id: decision.run_id.clone(),
-        attempt_count: decision.next_attempt_count.unwrap_or(decision.completed_attempt_count),
+        attempt_count: decision
+            .next_attempt_count
+            .unwrap_or(decision.completed_attempt_count),
         max_attempt_count: decision.max_attempt_count,
         delay_ms: decision.delay_ms,
         reason: decision.reason,
@@ -424,7 +464,8 @@ pub fn advance_provider_retry_attempt(
         .completed_attempt_count
         .checked_add(MIN_ATTEMPT_COUNT)
         .ok_or_else(|| error(ProviderRetryIssue::InvalidSchedule, FIELD_ATTEMPT))?;
-    let is_correlated = request.run_id == state.run_id && request.exact_plan_hash == state.exact_plan_hash;
+    let is_correlated =
+        request.run_id == state.run_id && request.exact_plan_hash == state.exact_plan_hash;
     if !is_correlated || request.attempt_count != expected_attempt_count {
         return Err(error(ProviderRetryIssue::InvalidInput, FIELD_ATTEMPT));
     }
@@ -448,7 +489,9 @@ pub fn project_provider_retry_timer_event(
 ) -> ProviderRetryProgressEvent {
     ProviderRetryProgressEvent {
         run_id: decision.run_id.clone(),
-        attempt_count: decision.next_attempt_count.unwrap_or(decision.completed_attempt_count),
+        attempt_count: decision
+            .next_attempt_count
+            .unwrap_or(decision.completed_attempt_count),
         max_attempt_count: decision.max_attempt_count,
         delay_ms: decision.delay_ms,
         reason: decision.reason,
@@ -492,23 +535,34 @@ fn validate_schedule(input: &ProviderRetryPolicyInput) -> Result<(), ProviderRet
         .max_attempts
         .checked_sub(MIN_ATTEMPT_COUNT)
         .ok_or_else(|| error(ProviderRetryIssue::InvalidSchedule, FIELD_ATTEMPT))?;
-    let expected_retry_count =
-        usize::try_from(retry_count).map_err(|_error| error(ProviderRetryIssue::InvalidSchedule, FIELD_DELAY))?;
+    let expected_retry_count = usize::try_from(retry_count)
+        .map_err(|_error| error(ProviderRetryIssue::InvalidSchedule, FIELD_DELAY))?;
     if input.delay_schedule_ms.len() != expected_retry_count {
         return Err(error(ProviderRetryIssue::InvalidSchedule, FIELD_DELAY));
     }
     if !input.delay_schedule_ms.is_sorted() {
         return Err(error(ProviderRetryIssue::InvalidSchedule, FIELD_DELAY));
     }
-    if input.delay_schedule_ms.iter().any(|delay_ms| *delay_ms > input.max_delay_ms) {
+    if input
+        .delay_schedule_ms
+        .iter()
+        .any(|delay_ms| *delay_ms > input.max_delay_ms)
+    {
         return Err(error(ProviderRetryIssue::InvalidSchedule, FIELD_DELAY));
     }
     debug_assert_eq!(input.delay_schedule_ms.len(), expected_retry_count);
-    debug_assert!(input.delay_schedule_ms.iter().all(|delay_ms| *delay_ms <= MAX_DELAY_MS));
+    debug_assert!(
+        input
+            .delay_schedule_ms
+            .iter()
+            .all(|delay_ms| *delay_ms <= MAX_DELAY_MS)
+    );
     Ok(())
 }
 
-fn validate_retryable_classes(labels: &[String]) -> Result<Vec<ProviderRetryFailureClass>, ProviderRetryError> {
+fn validate_retryable_classes(
+    labels: &[String],
+) -> Result<Vec<ProviderRetryFailureClass>, ProviderRetryError> {
     if labels.is_empty() || labels.len() > MAX_MAPPING_COUNT {
         return Err(error(ProviderRetryIssue::InvalidInput, FIELD_CLASS));
     }
@@ -528,7 +582,9 @@ fn validate_retryable_classes(labels: &[String]) -> Result<Vec<ProviderRetryFail
     Ok(classes)
 }
 
-fn validate_mappings(inputs: &[ProviderRetryMappingInput]) -> Result<Vec<ProviderRetryMapping>, ProviderRetryError> {
+fn validate_mappings(
+    inputs: &[ProviderRetryMappingInput],
+) -> Result<Vec<ProviderRetryMapping>, ProviderRetryError> {
     if inputs.is_empty() || inputs.len() > MAX_MAPPING_COUNT {
         return Err(error(ProviderRetryIssue::InvalidMapping, FIELD_MAPPING));
     }
@@ -540,7 +596,10 @@ fn validate_mappings(inputs: &[ProviderRetryMappingInput]) -> Result<Vec<Provide
         safe_label(input.native_class.as_str(), FIELD_MAPPING)?;
         let canonical_class = ProviderRetryFailureClass::parse(input.canonical_class.as_str())
             .ok_or_else(|| error(ProviderRetryIssue::InvalidMapping, FIELD_MAPPING))?;
-        let key = format!("{}:{}:{}", input.provider_family, input.mapping_version, input.native_class);
+        let key = format!(
+            "{}:{}:{}",
+            input.provider_family, input.mapping_version, input.native_class
+        );
         if !seen.insert(key) {
             return Err(error(ProviderRetryIssue::InvalidMapping, FIELD_MAPPING));
         }
@@ -608,10 +667,18 @@ fn policy_hash_part_capacity(policy: &ProviderRetryPolicy) -> usize {
     fixed_part_count
         .saturating_add(policy.delay_schedule_ms.len())
         .saturating_add(policy.retryable_classes.len())
-        .saturating_add(policy.mappings.len().saturating_mul(MAPPING_HASH_PART_COUNT))
+        .saturating_add(
+            policy
+                .mappings
+                .len()
+                .saturating_mul(MAPPING_HASH_PART_COUNT),
+        )
 }
 
-fn mapping_matches(mapping: &ProviderRetryMapping, observation: &ProviderRetryFailureObservation) -> bool {
+fn mapping_matches(
+    mapping: &ProviderRetryMapping,
+    observation: &ProviderRetryFailureObservation,
+) -> bool {
     mapping.provider_family == observation.provider_family
         && mapping.mapping_version == observation.mapping_version
         && mapping.native_class == observation.native_class
@@ -650,7 +717,10 @@ fn select_decision_status(
     if input.current != input.next {
         return ProviderRetryDecisionStatus::RecompositionRequired;
     }
-    if matches!(input.state.stream_state, ProviderRetryStreamState::Committed(_)) {
+    if matches!(
+        input.state.stream_state,
+        ProviderRetryStreamState::Committed(_)
+    ) {
         return ProviderRetryDecisionStatus::PostCommitTerminal;
     }
     if input.state.completed_attempt_count >= input.policy.max_attempts {
@@ -671,8 +741,8 @@ fn retry_schedule(
         .completed_attempt_count
         .checked_sub(MIN_ATTEMPT_COUNT)
         .ok_or_else(|| error(ProviderRetryIssue::InvalidSchedule, FIELD_DELAY))?;
-    let retry_index =
-        usize::try_from(retry_cursor).map_err(|_error| error(ProviderRetryIssue::InvalidSchedule, FIELD_DELAY))?;
+    let retry_index = usize::try_from(retry_cursor)
+        .map_err(|_error| error(ProviderRetryIssue::InvalidSchedule, FIELD_DELAY))?;
     let delay_ms = policy
         .delay_schedule_ms
         .get(retry_index)
@@ -693,8 +763,12 @@ fn decision_hash(input: &DecisionHashInput<'_>) -> String {
         input.reason.as_str().to_string(),
         input.state.run_id.clone(),
         input.state.completed_attempt_count.to_string(),
-        input.next_attempt_count.map_or_else(|| "none".to_string(), |value| value.to_string()),
-        input.delay_ms.map_or_else(|| "none".to_string(), |value| value.to_string()),
+        input
+            .next_attempt_count
+            .map_or_else(|| "none".to_string(), |value| value.to_string()),
+        input
+            .delay_ms
+            .map_or_else(|| "none".to_string(), |value| value.to_string()),
         input.state.exact_plan_hash.clone(),
         input.policy.policy_hash.clone(),
     ];
@@ -761,16 +835,21 @@ fn reduce_wait_status(
     is_correlated: bool,
 ) -> (ProviderRetryDispatchGateStatus, ProviderRetryWaitStatus) {
     match state.status {
-        ProviderRetryWaitStatus::Completed => {
-            (ProviderRetryDispatchGateStatus::BlockedStale, ProviderRetryWaitStatus::Completed)
+        ProviderRetryWaitStatus::Completed => (
+            ProviderRetryDispatchGateStatus::BlockedStale,
+            ProviderRetryWaitStatus::Completed,
+        ),
+        ProviderRetryWaitStatus::Cancelled => (
+            ProviderRetryDispatchGateStatus::Cancelled,
+            ProviderRetryWaitStatus::Cancelled,
+        ),
+        ProviderRetryWaitStatus::Blocked => (
+            ProviderRetryDispatchGateStatus::BlockedTimer,
+            ProviderRetryWaitStatus::Blocked,
+        ),
+        ProviderRetryWaitStatus::Waiting => {
+            reduce_waiting_status(observation.outcome, is_correlated)
         }
-        ProviderRetryWaitStatus::Cancelled => {
-            (ProviderRetryDispatchGateStatus::Cancelled, ProviderRetryWaitStatus::Cancelled)
-        }
-        ProviderRetryWaitStatus::Blocked => {
-            (ProviderRetryDispatchGateStatus::BlockedTimer, ProviderRetryWaitStatus::Blocked)
-        }
-        ProviderRetryWaitStatus::Waiting => reduce_waiting_status(observation.outcome, is_correlated),
     }
 }
 
@@ -780,20 +859,26 @@ fn reduce_waiting_status(
 ) -> (ProviderRetryDispatchGateStatus, ProviderRetryWaitStatus) {
     let reduced = if is_correlated {
         match outcome {
-            ProviderRetryTimerOutcome::Completed => {
-                (ProviderRetryDispatchGateStatus::Ready, ProviderRetryWaitStatus::Completed)
-            }
-            ProviderRetryTimerOutcome::Cancelled => {
-                (ProviderRetryDispatchGateStatus::Cancelled, ProviderRetryWaitStatus::Cancelled)
-            }
+            ProviderRetryTimerOutcome::Completed => (
+                ProviderRetryDispatchGateStatus::Ready,
+                ProviderRetryWaitStatus::Completed,
+            ),
+            ProviderRetryTimerOutcome::Cancelled => (
+                ProviderRetryDispatchGateStatus::Cancelled,
+                ProviderRetryWaitStatus::Cancelled,
+            ),
             ProviderRetryTimerOutcome::TimedOut
             | ProviderRetryTimerOutcome::Unavailable
-            | ProviderRetryTimerOutcome::Failed => {
-                (ProviderRetryDispatchGateStatus::BlockedTimer, ProviderRetryWaitStatus::Blocked)
-            }
+            | ProviderRetryTimerOutcome::Failed => (
+                ProviderRetryDispatchGateStatus::BlockedTimer,
+                ProviderRetryWaitStatus::Blocked,
+            ),
         }
     } else {
-        (ProviderRetryDispatchGateStatus::BlockedStale, ProviderRetryWaitStatus::Waiting)
+        (
+            ProviderRetryDispatchGateStatus::BlockedStale,
+            ProviderRetryWaitStatus::Waiting,
+        )
     };
     debug_assert_eq!(
         reduced.0 == ProviderRetryDispatchGateStatus::Ready,
@@ -826,9 +911,15 @@ const fn semantic_frame_from_model_frame(
     frame: animus_adapters::ModelStreamFrameKind,
 ) -> Option<ProviderRetrySemanticFrame> {
     match frame {
-        animus_adapters::ModelStreamFrameKind::ContentDelta => Some(ProviderRetrySemanticFrame::Content),
-        animus_adapters::ModelStreamFrameKind::ThoughtDelta => Some(ProviderRetrySemanticFrame::Reasoning),
-        animus_adapters::ModelStreamFrameKind::ToolCallDelta => Some(ProviderRetrySemanticFrame::ToolCall),
+        animus_adapters::ModelStreamFrameKind::ContentDelta => {
+            Some(ProviderRetrySemanticFrame::Content)
+        }
+        animus_adapters::ModelStreamFrameKind::ThoughtDelta => {
+            Some(ProviderRetrySemanticFrame::Reasoning)
+        }
+        animus_adapters::ModelStreamFrameKind::ToolCallDelta => {
+            Some(ProviderRetrySemanticFrame::ToolCall)
+        }
         animus_adapters::ModelStreamFrameKind::Usage => Some(ProviderRetrySemanticFrame::Other),
         animus_adapters::ModelStreamFrameKind::Finish
         | animus_adapters::ModelStreamFrameKind::Cancelled
@@ -836,22 +927,29 @@ const fn semantic_frame_from_model_frame(
     }
 }
 
-const fn progress_status_for_decision(status: ProviderRetryDecisionStatus) -> ProviderRetryProgressStatus {
+const fn progress_status_for_decision(
+    status: ProviderRetryDecisionStatus,
+) -> ProviderRetryProgressStatus {
     match status {
         ProviderRetryDecisionStatus::Retry => ProviderRetryProgressStatus::Scheduled,
         ProviderRetryDecisionStatus::Terminal => ProviderRetryProgressStatus::Terminal,
         ProviderRetryDecisionStatus::Exhausted => ProviderRetryProgressStatus::Exhausted,
-        ProviderRetryDecisionStatus::RecompositionRequired => ProviderRetryProgressStatus::RecompositionRequired,
+        ProviderRetryDecisionStatus::RecompositionRequired => {
+            ProviderRetryProgressStatus::RecompositionRequired
+        }
         ProviderRetryDecisionStatus::PostCommitTerminal => ProviderRetryProgressStatus::PostCommit,
         ProviderRetryDecisionStatus::Cancelled => ProviderRetryProgressStatus::Cancelled,
     }
 }
 
-const fn progress_status_for_gate(status: ProviderRetryDispatchGateStatus) -> ProviderRetryProgressStatus {
+const fn progress_status_for_gate(
+    status: ProviderRetryDispatchGateStatus,
+) -> ProviderRetryProgressStatus {
     match status {
         ProviderRetryDispatchGateStatus::Ready => ProviderRetryProgressStatus::DispatchReady,
         ProviderRetryDispatchGateStatus::Cancelled => ProviderRetryProgressStatus::Cancelled,
-        ProviderRetryDispatchGateStatus::BlockedTimer | ProviderRetryDispatchGateStatus::BlockedStale => {
+        ProviderRetryDispatchGateStatus::BlockedTimer
+        | ProviderRetryDispatchGateStatus::BlockedStale => {
             ProviderRetryProgressStatus::TimerBlocked
         }
     }
@@ -868,8 +966,9 @@ pub(super) fn hash_owned_parts(domain: &str, parts: &[String]) -> String {
 
 pub(super) fn safe_label(value: &str, field: RetryField) -> Result<(), ProviderRetryError> {
     let has_valid_char_count = !value.is_empty() && value.chars().count() <= MAX_SAFE_LABEL_CHARS;
-    let has_valid_characters =
-        value.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'-'));
+    let has_valid_characters = value
+        .bytes()
+        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b':' | b'-'));
     if !has_valid_char_count || !has_valid_characters {
         return Err(error(ProviderRetryIssue::InvalidInput, field));
     }
@@ -878,7 +977,9 @@ pub(super) fn safe_label(value: &str, field: RetryField) -> Result<(), ProviderR
 
 pub(super) fn lowercase_blake3(value: &str, field: RetryField) -> Result<(), ProviderRetryError> {
     let is_valid_hash = value.len() == BLAKE3_HEX_CHARS
-        && value.bytes().all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'));
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'));
     if !is_valid_hash {
         return Err(error(ProviderRetryIssue::InvalidInput, field));
     }

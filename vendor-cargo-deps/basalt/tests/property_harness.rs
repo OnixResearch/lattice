@@ -1,22 +1,12 @@
 use std::collections::BTreeMap;
 
-use basalt::CallableContractDescriptor;
-use basalt::CapabilityGrant;
-use basalt::ContractEffectClass;
-use basalt::ContractEnvelope;
-use basalt::ContractPolicy;
-use basalt::EnforcementRequest;
-use basalt::Policy;
-use basalt::SUPPORTED_SCHEMA_VERSION;
-use basalt::SteelEvaluationReceipt;
-use basalt::SteelEvaluationRequest;
-use basalt::enforce;
-use basalt::parse_policy_json;
-use basalt::steel_receipt_hash;
-use basalt::steel_request_hash;
-use basalt::validate_callable_descriptor;
-use basalt::validate_steel_evaluation_receipt;
-use basalt::validate_steel_evaluation_request;
+use basalt::{
+    CallableContractDescriptor, CapabilityGrant, ContractEffectClass, ContractEnvelope,
+    ContractPolicy, EnforcementRequest, Policy, SUPPORTED_SCHEMA_VERSION, SteelEvaluationReceipt,
+    SteelEvaluationRequest, enforce, parse_policy_json, steel_receipt_hash, steel_request_hash,
+    validate_callable_descriptor, validate_steel_evaluation_receipt,
+    validate_steel_evaluation_request,
+};
 
 const CONTRACT_ID: &str = "document-write";
 const PREFIX: &str = "did:key:z6Mkresource/docs/";
@@ -39,7 +29,11 @@ fn contract(id: &str) -> ContractPolicy {
     }
 }
 
-fn request(resource: &str, ability: &str, capabilities: Vec<CapabilityGrant>) -> EnforcementRequest {
+fn request(
+    resource: &str,
+    ability: &str,
+    capabilities: Vec<CapabilityGrant>,
+) -> EnforcementRequest {
     EnforcementRequest::new(CONTRACT_ID, resource, ability).with_capabilities(capabilities)
 }
 
@@ -61,7 +55,10 @@ fn callable() -> CallableContractDescriptor {
         arity: 1,
         argument_contracts: vec!["document-request.v1".to_owned()],
         return_contract: "bool".to_owned(),
-        required_capabilities: vec![CapabilityGrant::new("did:key:z6Mkresource/docs/report", ABILITY)],
+        required_capabilities: vec![CapabilityGrant::new(
+            "did:key:z6Mkresource/docs/report",
+            ABILITY,
+        )],
         effect_class: ContractEffectClass::ReadsDeclaredCapabilities,
         content_hash: "blake3:callable-source".to_owned(),
         redaction_class: "safe-summary".to_owned(),
@@ -74,61 +71,87 @@ fn generated_enforcement_boundaries_fail_closed_or_allow_deterministically() {
     let cases = [
         (
             "allowed exact grant",
-            request("did:key:z6Mkresource/docs/report", ABILITY, vec![CapabilityGrant::new(
+            request(
                 "did:key:z6Mkresource/docs/report",
                 ABILITY,
-            )]),
+                vec![CapabilityGrant::new(
+                    "did:key:z6Mkresource/docs/report",
+                    ABILITY,
+                )],
+            ),
             true,
             "allowed",
         ),
         (
             "prefix sibling is not inside contract",
-            request("did:key:z6Mkresource/docs-private/report", ABILITY, vec![CapabilityGrant::new(
+            request(
                 "did:key:z6Mkresource/docs-private/report",
                 ABILITY,
-            )]),
+                vec![CapabilityGrant::new(
+                    "did:key:z6Mkresource/docs-private/report",
+                    ABILITY,
+                )],
+            ),
             false,
             "outside contract",
         ),
         (
             "wrong ability denied before capability allow",
-            request("did:key:z6Mkresource/docs/report", "document/delete", vec![CapabilityGrant::new(
+            request(
                 "did:key:z6Mkresource/docs/report",
                 "document/delete",
-            )]),
+                vec![CapabilityGrant::new(
+                    "did:key:z6Mkresource/docs/report",
+                    "document/delete",
+                )],
+            ),
             false,
             "outside contract",
         ),
         (
             "missing exact capability denied",
-            request("did:key:z6Mkresource/docs/report", ABILITY, vec![CapabilityGrant::new(
-                "did:key:z6Mkresource/docs/other",
+            request(
+                "did:key:z6Mkresource/docs/report",
                 ABILITY,
-            )]),
+                vec![CapabilityGrant::new(
+                    "did:key:z6Mkresource/docs/other",
+                    ABILITY,
+                )],
+            ),
             false,
             "ucan capability set",
         ),
         (
             "one of many grants can authorize",
-            request("did:key:z6Mkresource/docs/report", ABILITY, vec![
-                CapabilityGrant::new("did:key:z6Mkresource/docs/other", ABILITY),
-                CapabilityGrant::new("did:key:z6Mkresource/docs/report", ABILITY),
-            ]),
+            request(
+                "did:key:z6Mkresource/docs/report",
+                ABILITY,
+                vec![
+                    CapabilityGrant::new("did:key:z6Mkresource/docs/other", ABILITY),
+                    CapabilityGrant::new("did:key:z6Mkresource/docs/report", ABILITY),
+                ],
+            ),
             true,
             "allowed",
         ),
     ];
 
     for (case_name, request, allowed, reason_fragment) in cases {
-        let receipt = enforce(&policy, &request).unwrap_or_else(|error| panic!("{case_name}: {error}"));
+        let receipt =
+            enforce(&policy, &request).unwrap_or_else(|error| panic!("{case_name}: {error}"));
         assert_eq!(receipt.is_allowed(), allowed, "{case_name}");
-        assert!(receipt.reason().contains(reason_fragment), "{case_name}: {:?}", receipt.reason());
+        assert!(
+            receipt.reason().contains(reason_fragment),
+            "{case_name}: {:?}",
+            receipt.reason()
+        );
     }
 }
 
 #[test]
 fn generated_policy_shape_errors_do_not_authorize() {
-    let unsupported_schema = format!(r#"{{"schema_version":"{SUPPORTED_SCHEMA_VERSION}.next","contracts":{{}}}}"#);
+    let unsupported_schema =
+        format!(r#"{{"schema_version":"{SUPPORTED_SCHEMA_VERSION}.next","contracts":{{}}}}"#);
     let malformed_contract = r#"{
         "schema_version":"ucan-nickel-contracts.policy.v1",
         "contracts":{"document-write":{"id":"document-write"}}
@@ -144,10 +167,14 @@ fn generated_policy_shape_errors_do_not_authorize() {
 
     let receipt = enforce(
         &mismatched_policy,
-        &request("did:key:z6Mkresource/docs/report", ABILITY, vec![CapabilityGrant::new(
+        &request(
             "did:key:z6Mkresource/docs/report",
             ABILITY,
-        )]),
+            vec![CapabilityGrant::new(
+                "did:key:z6Mkresource/docs/report",
+                ABILITY,
+            )],
+        ),
     )
     .expect("id mismatch returns a denial receipt");
     assert!(receipt.is_denied());

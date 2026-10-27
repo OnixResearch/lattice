@@ -58,11 +58,15 @@ impl RouterRotationStaleCursorPolicy {
     ///
     /// Returns [`crate::AdapterContractError`] when the label is empty or unsupported.
     pub fn parse(value: &str) -> Result<Self, crate::AdapterContractError> {
-        crate::parse_value(super::STALE_POLICY_FIELD, value, |normalized| match normalized {
-            super::STALE_RESET => Some(Self::Reset),
-            super::STALE_DENY => Some(Self::Deny),
-            _unsupported => None,
-        })
+        crate::parse_value(
+            super::STALE_POLICY_FIELD,
+            value,
+            |normalized| match normalized {
+                super::STALE_RESET => Some(Self::Reset),
+                super::STALE_DENY => Some(Self::Deny),
+                _unsupported => None,
+            },
+        )
     }
 
     /// Returns the stable stale-cursor policy label.
@@ -97,14 +101,18 @@ impl RouterRotationCursorClass {
     ///
     /// Returns [`crate::AdapterContractError`] when the label is empty or unsupported.
     pub fn parse(value: &str) -> Result<Self, crate::AdapterContractError> {
-        crate::parse_value(super::CURSOR_CLASS_FIELD, value, |normalized| match normalized {
-            super::CURSOR_DISABLED => Some(Self::Disabled),
-            super::CURSOR_ABSENT => Some(Self::Absent),
-            super::CURSOR_MATCHED => Some(Self::Matched),
-            super::CURSOR_WRAPPED => Some(Self::Wrapped),
-            super::CURSOR_STALE_RESET => Some(Self::StaleReset),
-            _unsupported => None,
-        })
+        crate::parse_value(
+            super::CURSOR_CLASS_FIELD,
+            value,
+            |normalized| match normalized {
+                super::CURSOR_DISABLED => Some(Self::Disabled),
+                super::CURSOR_ABSENT => Some(Self::Absent),
+                super::CURSOR_MATCHED => Some(Self::Matched),
+                super::CURSOR_WRAPPED => Some(Self::Wrapped),
+                super::CURSOR_STALE_RESET => Some(Self::StaleReset),
+                _unsupported => None,
+            },
+        )
     }
 
     /// Returns the stable cursor-class label.
@@ -160,7 +168,11 @@ impl RouterRotationCursor {
         self.catalog_hash.as_ref().map(crate::SafeHash::as_str)
     }
 
-    pub(super) fn from_parts(role: crate::Role, position: u32, catalog_hash: crate::SafeHash) -> Self {
+    pub(super) fn from_parts(
+        role: crate::Role,
+        position: u32,
+        catalog_hash: crate::SafeHash,
+    ) -> Self {
         Self {
             role,
             position,
@@ -195,7 +207,9 @@ impl RouterRotationSnapshot {
     /// # Errors
     ///
     /// Returns [`crate::AdapterContractError`] when labels, hashes, or cursors are malformed.
-    pub fn new(draft: RouterRotationSnapshotDraft<'_>) -> Result<Self, crate::AdapterContractError> {
+    pub fn new(
+        draft: RouterRotationSnapshotDraft<'_>,
+    ) -> Result<Self, crate::AdapterContractError> {
         let cursors = draft
             .cursors
             .iter()

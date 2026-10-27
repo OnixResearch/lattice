@@ -1,5 +1,6 @@
 //! Bounded product adapters selected after exact authorization.
 
+pub(crate) mod credential;
 mod operation;
 
 use std::io::Write as _;
@@ -200,7 +201,9 @@ impl<'a> Adapters<'a> {
         if !is_ability_match || !is_payload_match || !is_request_admitted {
             return Err(super::dispatch::Error::AdapterRejected);
         }
-        self.http.execute(request).map_err(|_| super::dispatch::Error::AdapterRejected)
+        self.http
+            .execute_with_cancellation(request, self.cancellation)
+            .map_err(|_| super::dispatch::Error::AdapterRejected)
     }
 }
 

@@ -44,9 +44,18 @@ fn queue_reducer_appends_reorders_dispatches_and_acknowledges() {
         &policy,
     )
     .expect("reorder should succeed");
-    assert_eq!(transition.state.items()[FIRST_ITEM_INDEX].item_id(), ITEM_ONE);
-    assert_eq!(transition.state.items()[SECOND_ITEM_INDEX].item_id(), ITEM_THREE);
-    assert!(matches!(transition.event, UserControlEvent::QueueReordered(_)));
+    assert_eq!(
+        transition.state.items()[FIRST_ITEM_INDEX].item_id(),
+        ITEM_ONE
+    );
+    assert_eq!(
+        transition.state.items()[SECOND_ITEM_INDEX].item_id(),
+        ITEM_THREE
+    );
+    assert!(matches!(
+        transition.event,
+        UserControlEvent::QueueReordered(_)
+    ));
 
     let transition = apply_message_queue_operation(
         &transition.state,
@@ -54,9 +63,15 @@ fn queue_reducer_appends_reorders_dispatches_and_acknowledges() {
         &policy,
     )
     .expect("dispatch-next should succeed");
-    let dispatch = transition.state.pending_dispatch().expect("dispatch should be pending");
+    let dispatch = transition
+        .state
+        .pending_dispatch()
+        .expect("dispatch should be pending");
     assert_eq!(dispatch.item_id(), ITEM_ONE);
-    assert!(matches!(transition.event, UserControlEvent::DispatchReady(_)));
+    assert!(matches!(
+        transition.event,
+        UserControlEvent::DispatchReady(_)
+    ));
 
     let transition = apply_message_queue_operation(
         &transition.state,
@@ -70,7 +85,10 @@ fn queue_reducer_appends_reorders_dispatches_and_acknowledges() {
     .expect("acknowledgement should succeed");
     assert_eq!(transition.state.items().len(), POST_ACK_ITEM_COUNT);
     assert!(transition.state.pending_dispatch().is_none());
-    assert_eq!(transition.state.items()[FIRST_ITEM_INDEX].item_id(), ITEM_THREE);
+    assert_eq!(
+        transition.state.items()[FIRST_ITEM_INDEX].item_id(),
+        ITEM_THREE
+    );
 }
 
 #[test]
@@ -91,7 +109,10 @@ fn queue_reducer_edits_deletes_clears_and_cancels() {
         &policy,
     )
     .expect("edit should succeed");
-    assert_eq!(transition.state.items()[FIRST_ITEM_INDEX].body_hash(), BODY_HASH_TWO);
+    assert_eq!(
+        transition.state.items()[FIRST_ITEM_INDEX].body_hash(),
+        BODY_HASH_TWO
+    );
     assert!(matches!(transition.event, UserControlEvent::QueueEdited(_)));
 
     let transition = apply_message_queue_operation(
@@ -101,19 +122,31 @@ fn queue_reducer_edits_deletes_clears_and_cancels() {
     )
     .expect("cancel-pending should remove item");
     assert!(transition.state.items().is_empty());
-    assert!(matches!(transition.event, UserControlEvent::PendingCancelled(_)));
+    assert!(matches!(
+        transition.event,
+        UserControlEvent::PendingCancelled(_)
+    ));
 
     let state = append(&transition.state, ITEM_ONE, BODY_HASH_ONE, &policy).state;
     let state = append(&state, ITEM_TWO, BODY_HASH_TWO, &policy).state;
-    let transition =
-        apply_message_queue_operation(&state, MessageQueueOperation::Delete(item_op(ITEM_ONE, USER_SOURCE)), &policy)
-            .expect("delete should remove item");
+    let transition = apply_message_queue_operation(
+        &state,
+        MessageQueueOperation::Delete(item_op(ITEM_ONE, USER_SOURCE)),
+        &policy,
+    )
+    .expect("delete should remove item");
     assert_eq!(transition.state.items().len(), SECOND_ITEM_INDEX);
-    assert_eq!(transition.state.items()[FIRST_ITEM_INDEX].item_id(), ITEM_TWO);
+    assert_eq!(
+        transition.state.items()[FIRST_ITEM_INDEX].item_id(),
+        ITEM_TWO
+    );
 
-    let transition =
-        apply_message_queue_operation(&transition.state, MessageQueueOperation::Clear(scope(USER_SOURCE)), &policy)
-            .expect("clear should remove owned items");
+    let transition = apply_message_queue_operation(
+        &transition.state,
+        MessageQueueOperation::Clear(scope(USER_SOURCE)),
+        &policy,
+    )
+    .expect("clear should remove owned items");
     assert!(transition.state.items().is_empty());
     assert_eq!(transition.event.decision_class(), "queue_cleared");
 }
@@ -121,9 +154,16 @@ fn queue_reducer_edits_deletes_clears_and_cancels() {
 #[test]
 fn interrupt_classification_returns_explicit_control_events() {
     let policy = queue_policy(QUEUE_CAPACITY, true, true);
-    let active = active(CancellationHandleClass::Available, ActiveWorkStatus::Running);
+    let active = active(
+        CancellationHandleClass::Available,
+        ActiveWorkStatus::Running,
+    );
     let cancellation = classify_interrupt_signal(
-        signal(InterruptSendMode::Heuristic, Some(InterruptKeyword::Stop), None),
+        signal(
+            InterruptSendMode::Heuristic,
+            Some(InterruptKeyword::Stop),
+            None,
+        ),
         &active,
         &policy,
     )
@@ -147,13 +187,20 @@ fn interrupt_classification_returns_explicit_control_events() {
     .expect("redirect payload should classify");
     assert!(matches!(redirect, UserControlEvent::Redirection(_)));
 
-    let queued = classify_interrupt_signal(signal(InterruptSendMode::Queue, None, None), &active, &policy)
-        .expect("queue mode should classify");
+    let queued = classify_interrupt_signal(
+        signal(InterruptSendMode::Queue, None, None),
+        &active,
+        &policy,
+    )
+    .expect("queue mode should classify");
     assert!(matches!(queued, UserControlEvent::QueueInterrupt(_)));
 
-    let immediate =
-        classify_interrupt_signal(signal(InterruptSendMode::ImmediateDispatch, None, None), &active, &policy)
-            .expect("immediate mode should classify");
+    let immediate = classify_interrupt_signal(
+        signal(InterruptSendMode::ImmediateDispatch, None, None),
+        &active,
+        &policy,
+    )
+    .expect("immediate mode should classify");
     assert!(matches!(immediate, UserControlEvent::ImmediateDispatch(_)));
 }
 
@@ -195,11 +242,17 @@ fn queue_reducer_rejects_stale_duplicate_unauthorized_and_overflow_operations() 
         &policy,
     )
     .expect_err("stale work should fail");
-    assert_eq!(stale_work_error.kind(), MessageQueueErrorKind::StaleActiveWork);
+    assert_eq!(
+        stale_work_error.kind(),
+        MessageQueueErrorKind::StaleActiveWork
+    );
 
-    let duplicate =
-        apply_message_queue_operation(&state, MessageQueueOperation::Append(message(ITEM_ONE, BODY_HASH_TWO)), &policy)
-            .expect_err("duplicate should fail before overflow when identity exists");
+    let duplicate = apply_message_queue_operation(
+        &state,
+        MessageQueueOperation::Append(message(ITEM_ONE, BODY_HASH_TWO)),
+        &policy,
+    )
+    .expect_err("duplicate should fail before overflow when identity exists");
     assert_eq!(duplicate.kind(), MessageQueueErrorKind::DuplicateQueueItem);
 
     let unauthorized = apply_message_queue_operation(
@@ -208,11 +261,17 @@ fn queue_reducer_rejects_stale_duplicate_unauthorized_and_overflow_operations() 
         &policy,
     )
     .expect_err("unauthorized source should fail");
-    assert_eq!(unauthorized.kind(), MessageQueueErrorKind::UnauthorizedSource);
+    assert_eq!(
+        unauthorized.kind(),
+        MessageQueueErrorKind::UnauthorizedSource
+    );
 
-    let overflow =
-        apply_message_queue_operation(&state, MessageQueueOperation::Append(message(ITEM_TWO, BODY_HASH_TWO)), &policy)
-            .expect_err("overflow should fail closed");
+    let overflow = apply_message_queue_operation(
+        &state,
+        MessageQueueOperation::Append(message(ITEM_TWO, BODY_HASH_TWO)),
+        &policy,
+    )
+    .expect_err("overflow should fail closed");
     assert_eq!(overflow.kind(), MessageQueueErrorKind::MaxQueueExceeded);
 }
 
@@ -253,10 +312,13 @@ fn queue_reducer_rejects_unsafe_budget_policy_and_malformed_acknowledgement() {
     assert_eq!(denied.kind(), MessageQueueErrorKind::PolicyDenied);
 
     let state = append(&state, ITEM_ONE, BODY_HASH_ONE, &policy).state;
-    let state =
-        apply_message_queue_operation(&state, MessageQueueOperation::DispatchNext(scope(CONTROLLER_SOURCE)), &policy)
-            .expect("dispatch should start")
-            .state;
+    let state = apply_message_queue_operation(
+        &state,
+        MessageQueueOperation::DispatchNext(scope(CONTROLLER_SOURCE)),
+        &policy,
+    )
+    .expect("dispatch should start")
+    .state;
     let malformed = apply_message_queue_operation(
         &state,
         MessageQueueOperation::Acknowledge(DispatchAcknowledgementDraft {
@@ -267,24 +329,46 @@ fn queue_reducer_rejects_unsafe_budget_policy_and_malformed_acknowledgement() {
         &policy,
     )
     .expect_err("mismatched ack should fail");
-    assert_eq!(malformed.kind(), MessageQueueErrorKind::MalformedAcknowledgement);
+    assert_eq!(
+        malformed.kind(),
+        MessageQueueErrorKind::MalformedAcknowledgement
+    );
 }
 
 #[test]
 fn interrupt_classification_rejects_missing_handles_stale_work_and_bad_redirects() {
     let policy = queue_policy(QUEUE_CAPACITY, true, true);
     let missing_handle = active(CancellationHandleClass::Missing, ActiveWorkStatus::Running);
-    let missing = classify_interrupt_signal(signal(InterruptSendMode::Cancel, None, None), &missing_handle, &policy)
-        .expect_err("missing handle should fail closed");
-    assert_eq!(missing.kind(), MessageQueueErrorKind::MissingCancellationHandle);
+    let missing = classify_interrupt_signal(
+        signal(InterruptSendMode::Cancel, None, None),
+        &missing_handle,
+        &policy,
+    )
+    .expect_err("missing handle should fail closed");
+    assert_eq!(
+        missing.kind(),
+        MessageQueueErrorKind::MissingCancellationHandle
+    );
 
-    let completed = active(CancellationHandleClass::Available, ActiveWorkStatus::Completed);
-    let completed_work_error =
-        classify_interrupt_signal(signal(InterruptSendMode::Pause, None, None), &completed, &policy)
-            .expect_err("completed active work should reject controls");
-    assert_eq!(completed_work_error.kind(), MessageQueueErrorKind::UnsupportedActiveWorkState);
+    let completed = active(
+        CancellationHandleClass::Available,
+        ActiveWorkStatus::Completed,
+    );
+    let completed_work_error = classify_interrupt_signal(
+        signal(InterruptSendMode::Pause, None, None),
+        &completed,
+        &policy,
+    )
+    .expect_err("completed active work should reject controls");
+    assert_eq!(
+        completed_work_error.kind(),
+        MessageQueueErrorKind::UnsupportedActiveWorkState
+    );
 
-    let active = active(CancellationHandleClass::Available, ActiveWorkStatus::Running);
+    let active = active(
+        CancellationHandleClass::Available,
+        ActiveWorkStatus::Running,
+    );
     let stale = classify_interrupt_signal(
         InterruptSignalDraft {
             active_work_id: STALE_WORK_ID,
@@ -296,8 +380,12 @@ fn interrupt_classification_rejects_missing_handles_stale_work_and_bad_redirects
     .expect_err("stale signal should fail");
     assert_eq!(stale.kind(), MessageQueueErrorKind::StaleActiveWork);
 
-    let malformed = classify_interrupt_signal(signal(InterruptSendMode::Redirect, None, None), &active, &policy)
-        .expect_err("redirect mode requires payload");
+    let malformed = classify_interrupt_signal(
+        signal(InterruptSendMode::Redirect, None, None),
+        &active,
+        &policy,
+    )
+    .expect_err("redirect mode requires payload");
     assert_eq!(malformed.kind(), MessageQueueErrorKind::MalformedInterrupt);
 }
 
@@ -347,7 +435,11 @@ fn queue_admission_rejects_policy_hash_mismatch_and_unknown_item() {
     assert_eq!(unknown.kind(), MessageQueueErrorKind::UnknownQueueItem);
 }
 
-fn queue_policy(max_items: u32, allow_queue_mutations: bool, allow_interrupts: bool) -> MessageQueuePolicy {
+fn queue_policy(
+    max_items: u32,
+    allow_queue_mutations: bool,
+    allow_interrupts: bool,
+) -> MessageQueuePolicy {
     MessageQueuePolicy::new(MessageQueuePolicyDraft {
         max_items,
         allowed_sources: &[USER_SOURCE, CONTROLLER_SOURCE],
@@ -359,8 +451,12 @@ fn queue_policy(max_items: u32, allow_queue_mutations: bool, allow_interrupts: b
     .expect("policy should validate")
 }
 
-fn active(cancellation_handle: CancellationHandleClass, status: ActiveWorkStatus) -> ActiveWorkReference {
-    ActiveWorkReference::new(WORK_ID, status, cancellation_handle).expect("active work should validate")
+fn active(
+    cancellation_handle: CancellationHandleClass,
+    status: ActiveWorkStatus,
+) -> ActiveWorkReference {
+    ActiveWorkReference::new(WORK_ID, status, cancellation_handle)
+        .expect("active work should validate")
 }
 
 fn append(
@@ -369,8 +465,12 @@ fn append(
     body_hash: &'static str,
     policy: &MessageQueuePolicy,
 ) -> MessageQueueTransition {
-    apply_message_queue_operation(state, MessageQueueOperation::Append(message(item_id, body_hash)), policy)
-        .expect("append should succeed")
+    apply_message_queue_operation(
+        state,
+        MessageQueueOperation::Append(message(item_id, body_hash)),
+        policy,
+    )
+    .expect("append should succeed")
 }
 
 fn message(item_id: &'static str, body_hash: &'static str) -> QueuedMessageDraft<'static> {

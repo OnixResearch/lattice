@@ -1,11 +1,7 @@
 use basalt::CapabilityGrant;
 use basalt::EnforcementRequest;
 #[cfg(feature = "cli")]
-use basalt::cli_fs::FsError;
-#[cfg(feature = "cli")]
-use basalt::cli_fs::OutputRoot;
-#[cfg(feature = "cli")]
-use basalt::cli_fs::PolicyRoot;
+use basalt::cli_fs::{FsError, OutputRoot, PolicyRoot};
 use basalt::enforce;
 use basalt::parse_policy_json;
 use clap::Parser;
@@ -82,9 +78,11 @@ fn main() -> CliResult<()> {
 
 fn run_enforce(args: EnforceArgs) -> CliResult<()> {
     let policy_root = PolicyRoot::open(args.policy_root.as_str()).context(OpenPolicyRootSnafu)?;
-    let policy_json = policy_root.read_policy(args.policy.as_str()).context(ReadPolicySnafu {
-        path: args.policy.clone(),
-    })?;
+    let policy_json = policy_root
+        .read_policy(args.policy.as_str())
+        .context(ReadPolicySnafu {
+            path: args.policy.clone(),
+        })?;
     let policy = parse_policy_json(policy_json.as_str()).context(EnforceSnafu)?;
     let request = EnforcementRequest {
         contract: args.contract,
@@ -98,9 +96,11 @@ fn run_enforce(args: EnforceArgs) -> CliResult<()> {
 
     if let Some(output_dir) = args.output_dir {
         let output_root = OutputRoot::open(output_dir.as_str()).context(OpenOutputRootSnafu)?;
-        output_root.write("enforce-receipt.json", output.as_str()).context(WriteReceiptSnafu {
-            path: "enforce-receipt.json".to_owned(),
-        })?;
+        output_root
+            .write("enforce-receipt.json", output.as_str())
+            .context(WriteReceiptSnafu {
+                path: "enforce-receipt.json".to_owned(),
+            })?;
     }
     Ok(())
 }

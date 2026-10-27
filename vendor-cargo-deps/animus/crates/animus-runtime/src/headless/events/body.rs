@@ -50,7 +50,9 @@ impl EventPayloadSummary {
 ///
 /// Panics if the computed visible payload length exceeds the original body
 /// length, which would indicate invalid UTF-8 boundary truncation.
-pub fn summarize_event_payload(value: &str) -> Result<EventPayloadSummary, super::super::AutomationError> {
+pub fn summarize_event_payload(
+    value: &str,
+) -> Result<EventPayloadSummary, super::super::AutomationError> {
     let body = super::super::required_text(super::super::TextField {
         field: super::super::EVENT_BODY_FIELD,
         value,

@@ -1,47 +1,24 @@
 #![allow(non_trait_imports)]
 
-use super::EVIDENCE_FIELD;
-use super::FEATURE_CONTENT_PART;
-use super::FEATURE_FIELD;
-use super::FEATURE_METADATA;
-use super::FEATURE_REASONING;
-use super::FEATURE_ROLE;
-use super::FEATURE_STREAMING;
-use super::FEATURE_STRUCTURED;
-use super::FEATURE_TOOL;
-use super::LITERAL_FAMILY_PREFIX;
-use super::LITERAL_IMAGE_PREFIX;
-use super::LITERAL_KEY_VALUE_SEPARATOR;
-use super::LITERAL_METADATA_PREFIX;
-use super::LITERAL_REASONING_PREFIX;
-use super::LITERAL_RESPONSE_PREFIX;
-use super::LITERAL_ROLE_PREFIX;
-use super::LITERAL_SEPARATOR;
-use super::LITERAL_STREAM_PREFIX;
-use super::LITERAL_TEXT_PREFIX;
-use super::LITERAL_TOOL_PREFIX;
-use super::ProviderProjectionError;
-use super::ProviderProjectionFamily;
-use super::ProviderProjectionIndexEntry;
-use super::ProviderProjectionIndexEntryDraft;
-use super::ProviderProjectionIndexStatus;
-use super::ProviderProjectionSupport;
-use super::ProviderRequestProjection;
-use super::ProviderResponseFixtureDraft;
-use super::REASON_FIELD;
-use crate::model::CANONICAL_MODEL_RESPONSE_CONTRACT_IDENTITY;
-use crate::model::CanonicalModelRequest;
-use crate::model::CanonicalModelResponseEnvelope;
-use crate::model::CanonicalModelResponseEnvelopeDraft;
-use crate::model::CanonicalModelResponseItemDraft;
-use crate::model::CanonicalModelRole;
-use crate::model::CanonicalReasoningEffort;
-use crate::model::CanonicalResponseFormatIntent;
-use crate::model::CanonicalSafeMetadata;
+use super::{
+    EVIDENCE_FIELD, FEATURE_CONTENT_PART, FEATURE_FIELD, FEATURE_METADATA, FEATURE_REASONING,
+    FEATURE_ROLE, FEATURE_STREAMING, FEATURE_STRUCTURED, FEATURE_TOOL, LITERAL_FAMILY_PREFIX,
+    LITERAL_IMAGE_PREFIX, LITERAL_KEY_VALUE_SEPARATOR, LITERAL_METADATA_PREFIX,
+    LITERAL_REASONING_PREFIX, LITERAL_RESPONSE_PREFIX, LITERAL_ROLE_PREFIX, LITERAL_SEPARATOR,
+    LITERAL_STREAM_PREFIX, LITERAL_TEXT_PREFIX, LITERAL_TOOL_PREFIX, ProviderProjectionError,
+    ProviderProjectionFamily, ProviderProjectionIndexEntry, ProviderProjectionIndexEntryDraft,
+    ProviderProjectionIndexStatus, ProviderProjectionSupport, ProviderRequestProjection,
+    ProviderResponseFixtureDraft, REASON_FIELD,
+};
+use crate::model::{
+    CANONICAL_MODEL_RESPONSE_CONTRACT_IDENTITY, CanonicalModelRequest,
+    CanonicalModelResponseEnvelope, CanonicalModelResponseEnvelopeDraft,
+    CanonicalModelResponseItemDraft, CanonicalModelRole, CanonicalReasoningEffort,
+    CanonicalResponseFormatIntent, CanonicalSafeMetadata,
+};
 /// # Errors
 ///
-/// Returns [`ProviderProjectionError`] when the selected provider support would lose canonical
-/// semantics.
+/// Returns [`ProviderProjectionError`] when the selected provider support would lose canonical semantics.
 pub fn project_provider_request_fixture(
     request: &CanonicalModelRequest,
     support: ProviderProjectionSupport,
@@ -63,7 +40,10 @@ pub fn project_provider_request_fixture(
     }
     push_response_format(request.response_format(), &mut literal_parts);
     if request.reasoning().enabled() {
-        literal_parts.push(literal(LITERAL_REASONING_PREFIX, reasoning_label(request.reasoning().effort())));
+        literal_parts.push(literal(
+            LITERAL_REASONING_PREFIX,
+            reasoning_label(request.reasoning().effort()),
+        ));
     }
     if request.output().stream() {
         literal_parts.push(literal(LITERAL_STREAM_PREFIX, "true"));
@@ -81,16 +61,17 @@ pub fn project_provider_request_fixture(
 ///
 /// # Errors
 ///
-/// Returns [`ProviderProjectionError`] when projection is lossy or differs from expected literal
-/// data.
+/// Returns [`ProviderProjectionError`] when projection is lossy or differs from expected literal data.
 pub fn assert_provider_request_fixture(
     request: &CanonicalModelRequest,
     support: ProviderProjectionSupport,
     expected: &[&str],
 ) -> Result<ProviderRequestProjection, ProviderProjectionError> {
     let projection = project_provider_request_fixture(request, support)?;
-    let expected: alloc::vec::Vec<alloc::string::String> =
-        expected.iter().map(|part| alloc::string::String::from(*part)).collect();
+    let expected: alloc::vec::Vec<alloc::string::String> = expected
+        .iter()
+        .map(|part| alloc::string::String::from(*part))
+        .collect();
     if projection.literal_parts() == expected.as_slice() {
         return Ok(projection);
     }
@@ -164,7 +145,10 @@ pub fn assert_provider_stream_fixture(
     expected_kinds: &[crate::model::wire::parts::Kind],
 ) -> Result<alloc::vec::Vec<crate::model::wire::types::Frame>, ProviderProjectionError> {
     let frames = crate::model::wire::fixture::parse(chunks)?;
-    let actual_kinds: alloc::vec::Vec<_> = frames.iter().map(crate::model::wire::types::Frame::kind).collect();
+    let actual_kinds: alloc::vec::Vec<_> = frames
+        .iter()
+        .map(crate::model::wire::types::Frame::kind)
+        .collect();
     if actual_kinds.as_slice() == expected_kinds {
         Ok(frames)
     } else {
@@ -178,8 +162,7 @@ pub fn assert_provider_stream_fixture(
 ///
 /// # Errors
 ///
-/// Returns [`ProviderProjectionError`] when covered cases lack evidence or non-covered cases lack
-/// reasons.
+/// Returns [`ProviderProjectionError`] when covered cases lack evidence or non-covered cases lack reasons.
 pub fn validate_provider_projection_index(
     drafts: &[ProviderProjectionIndexEntryDraft<'_>],
 ) -> Result<alloc::vec::Vec<ProviderProjectionIndexEntry>, ProviderProjectionError> {
@@ -205,7 +188,8 @@ fn validate_index_entry(
                 field: EVIDENCE_FIELD.as_str(),
             })
         }
-        ProviderProjectionIndexStatus::Unsupported | ProviderProjectionIndexStatus::NotApplicable
+        ProviderProjectionIndexStatus::Unsupported
+        | ProviderProjectionIndexStatus::NotApplicable
             if reason.is_none() =>
         {
             Err(ProviderProjectionError::MissingIndexField {
@@ -227,7 +211,8 @@ fn reject_unsupported_request_features(
     support: ProviderProjectionSupport,
 ) -> Result<(), ProviderProjectionError> {
     for message in request.messages() {
-        if message.role() == CanonicalModelRole::Developer && !support.developer_role.is_preserved() {
+        if message.role() == CanonicalModelRole::Developer && !support.developer_role.is_preserved()
+        {
             return Err(lossy(FEATURE_ROLE));
         }
         for part in message.content() {

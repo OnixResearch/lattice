@@ -9,36 +9,22 @@ mod model;
 mod selection;
 mod validation;
 
-pub use completion::admit_completion_candidate;
-pub use completion::admit_execution_results;
-pub use completion::evaluate_authoritative_completion;
-pub use model::AgentCheckArtifactDraft;
-pub use model::AgentCheckDiagnostic;
-pub use model::AgentCheckDiagnosticCode;
-pub use model::AgentCheckDiagnosticDraft;
-pub use model::AgentCheckExecutionDraft;
-pub use model::AgentCheckRegistry;
-pub use model::AgentCheckRegistryDraft;
-pub use model::AgentCheckRow;
-pub use model::AgentCheckRowDraft;
-pub use model::AgentCheckSelection;
-pub use model::AuthoritativeCompletionCandidate;
-pub use model::AuthoritativeCompletionCandidateDraft;
-pub use model::AuthoritativeCompletionOutcome;
-pub use model::AuthoritativeCompletionReceipt;
-pub use model::CairnCompletionSummaryDraft;
-pub use model::CairnRequiredCheck;
-pub use model::ChangedArtifactDraft;
-pub use model::CheckCapability;
-pub use model::CheckStatus;
-pub use model::CheckTier;
-pub use model::CompletionCandidateSource;
-pub use model::ExecutionEvidenceReport;
-pub use model::SourceSpanDraft;
-pub use selection::AgentCheckSelectionRequest;
-pub use selection::cairn_command_hash;
-pub use selection::cairn_selection_hash;
-pub use selection::select_required_agent_checks;
+pub use completion::{
+    admit_completion_candidate, admit_execution_results, evaluate_authoritative_completion,
+};
+pub use model::{
+    AgentCheckArtifactDraft, AgentCheckDiagnostic, AgentCheckDiagnosticCode,
+    AgentCheckDiagnosticDraft, AgentCheckExecutionDraft, AgentCheckRegistry,
+    AgentCheckRegistryDraft, AgentCheckRow, AgentCheckRowDraft, AgentCheckSelection,
+    AuthoritativeCompletionCandidate, AuthoritativeCompletionCandidateDraft,
+    AuthoritativeCompletionOutcome, AuthoritativeCompletionReceipt, CairnCompletionSummaryDraft,
+    CairnRequiredCheck, ChangedArtifactDraft, CheckCapability, CheckStatus, CheckTier,
+    CompletionCandidateSource, ExecutionEvidenceReport, SourceSpanDraft,
+};
+pub use selection::{
+    AgentCheckSelectionRequest, cairn_command_hash, cairn_selection_hash,
+    select_required_agent_checks,
+};
 pub use validation::validate_agent_check_registry;
 
 /// Animus-authored registry schema consumed by the pure runtime.
@@ -46,7 +32,8 @@ pub const AGENT_CHECK_REGISTRY_SCHEMA: &str = "animus.agent-check-registry.v1";
 /// Exact authoritative completion schema owned by the pinned Cairn provider.
 pub const CAIRN_COMPLETION_SCHEMA: &str = "cairn.agent-completion.v2";
 /// Cairn generated-policy identity pinned by the current Animus registry.
-pub const PINNED_CAIRN_POLICY_HASH: &str = "b8f81a80716eb7427dacdcd4dac9c01c1599d2bee79cdeb0a6e444525377da59";
+pub const PINNED_CAIRN_POLICY_HASH: &str =
+    "302bc1f8bcb27920c37a6bdc21865e2ca1fbb5a38c268570b3fc326734e59942";
 /// Product behaviors that this reusable core is forbidden to perform.
 pub const PROHIBITED_AUTHORITATIVE_COMPLETION_EFFECTS: &[&str] = &[
     "filesystem read",

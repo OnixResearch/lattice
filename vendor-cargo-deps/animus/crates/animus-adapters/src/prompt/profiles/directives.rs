@@ -106,10 +106,16 @@ fn parse_tokens(
 ) -> Report {
     let mut mode = None;
     let mut chain_target = None;
-    let mut diagnostics = super::support::Collection::with_capacity(super::support::MAX_DIRECTIVE_TOKENS);
+    let mut diagnostics =
+        super::support::Collection::with_capacity(super::support::MAX_DIRECTIVE_TOKENS);
 
-    for token in directive.split_whitespace().take(super::support::MAX_DIRECTIVE_TOKENS) {
-        if let Some(diagnostic) = parse_token(token, supported_chain_targets, &mut mode, &mut chain_target) {
+    for token in directive
+        .split_whitespace()
+        .take(super::support::MAX_DIRECTIVE_TOKENS)
+    {
+        if let Some(diagnostic) =
+            parse_token(token, supported_chain_targets, &mut mode, &mut chain_target)
+        {
             diagnostics.push(diagnostic);
         }
     }
@@ -150,9 +156,10 @@ fn split_directive(body: &str) -> (Option<&str>, super::support::Text) {
 
     let (first_line, rest) = body.split_at(first_line_end);
     match first_line.strip_prefix(PREFIX) {
-        Some(directive) => {
-            (Some(directive), super::support::Text::from(rest.trim_start_matches(LINE_SEPARATOR).trim()))
-        }
+        Some(directive) => (
+            Some(directive),
+            super::support::Text::from(rest.trim_start_matches(LINE_SEPARATOR).trim()),
+        ),
         None => (None, super::support::Text::from(body.trim())),
     }
 }

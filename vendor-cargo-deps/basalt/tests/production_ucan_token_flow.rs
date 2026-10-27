@@ -1,7 +1,4 @@
-use basalt::CapabilityGrant;
-use basalt::EnforcementRequest;
-use basalt::enforce;
-use basalt::parse_policy_json;
+use basalt::{CapabilityGrant, EnforcementRequest, enforce, parse_policy_json};
 
 const POLICY_JSON: &str = r#"{
   "schema_version": "ucan-nickel-contracts.policy.v1",
@@ -64,14 +61,21 @@ fn enforce_with_token(token: FixtureToken, resource: &str, ability: &str) -> boo
         .translate_verified_grant("did:key:zFixtureIssuer", "did:key:zFixtureAudience", 150)
         .into_iter()
         .collect::<Vec<_>>();
-    let request = EnforcementRequest::new("document-write", resource, ability).with_capabilities(capabilities);
+    let request = EnforcementRequest::new("document-write", resource, ability)
+        .with_capabilities(capabilities);
 
-    enforce(&policy, &request).expect("fixture grants are valid capability documents").is_allowed()
+    enforce(&policy, &request)
+        .expect("fixture grants are valid capability documents")
+        .is_allowed()
 }
 
 #[test]
 fn deterministic_ucan_fixture_translates_verified_grants() {
-    assert!(enforce_with_token(fixture_token(), "did:key:z6Mkresource/docs/report", "document/write"));
+    assert!(enforce_with_token(
+        fixture_token(),
+        "did:key:z6Mkresource/docs/report",
+        "document/write"
+    ));
 }
 
 #[test]
@@ -108,7 +112,10 @@ fn deterministic_ucan_fixture_fails_closed_for_invalid_or_mismatched_tokens() {
     ];
 
     for token in cases {
-        assert!(!enforce_with_token(token, "did:key:z6Mkresource/docs/report", "document/write"), "{token:?}");
+        assert!(
+            !enforce_with_token(token, "did:key:z6Mkresource/docs/report", "document/write"),
+            "{token:?}"
+        );
     }
 }
 

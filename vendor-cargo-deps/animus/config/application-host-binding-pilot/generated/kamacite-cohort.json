@@ -1,0 +1,9 @@
+{
+  "binding_schema": "kamacite.application-host-binding.v1",
+  "core_blake3": "4912fa0d0b81c5ac526d6fd762f4fe83d6d7dbba21cb661f3724bb499af5a1db",
+  "producer_revision": "b21732a7458b660367f7281c717a5acc3f8c8190",
+  "receipt_schema": "kamacite.application-host-binding-receipt.v1",
+  "receipt_schema_blake3": "3b48bf894cf40990a6d857542e9c3b26df2f6b50510999698323a7cb5cbca39e",
+  "schema_blake3": "34fdebab3c8a274729f364af8da58691dba38809c67d2643c1f0d0354cb0c80b",
+  "validation_receipt_blake3": "75ac779da7b5fde841188ba326e81c253ba5b78dbf0cc632bc90f8b58a9fb303"
+}

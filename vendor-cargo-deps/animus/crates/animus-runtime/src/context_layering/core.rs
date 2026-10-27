@@ -1,5 +1,4 @@
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven
-// validation compact while drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -7,7 +6,12 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
+#![allow(
+    compound_condition,
+    excessive_file_length,
+    function_length,
+    non_trait_imports
+)]
 #![allow(
     numeric_units,
     path_segment_repetition,
@@ -16,31 +20,17 @@
 )]
 use std::collections::BTreeMap;
 
-use super::BLAKE3_ALGORITHM;
-use super::CONTEXT_LAYER_HASH_DOMAIN;
-use super::EMPTY_COUNT;
-use super::FIELD_BODY;
-use super::FIELD_CLASS;
-use super::FIELD_DISCOVERY;
-use super::FIELD_PRECEDENCE;
-use super::FIELD_SOURCE;
-use super::HASH_PART_SEPARATOR;
-use super::data::ContextLayerAdmissionPolicy;
-use super::data::ContextLayerBoundaryEffect;
-use super::data::ContextLayerClass;
-use super::data::ContextLayerDescriptor;
-use super::data::ContextLayerDiagnostic;
-use super::data::ContextLayerDiagnosticKind;
-use super::data::ContextLayerDiscoveryBoundary;
-use super::data::ContextLayerFreshness;
-use super::data::ContextLayerInclusionPolicy;
-use super::data::ContextLayerPlan;
-use super::data::ContextLayerPolicySwitch;
-use super::data::ContextLayerReceipt;
-use super::data::ContextLayerReceiptEntry;
-use super::data::ContextLayerRedaction;
-use super::data::ContextLayerTrust;
-use super::data::ContextLayerValidationResult;
+use super::{
+    BLAKE3_ALGORITHM, CONTEXT_LAYER_HASH_DOMAIN, EMPTY_COUNT, FIELD_BODY, FIELD_CLASS,
+    FIELD_DISCOVERY, FIELD_PRECEDENCE, FIELD_SOURCE, HASH_PART_SEPARATOR,
+    data::{
+        ContextLayerAdmissionPolicy, ContextLayerBoundaryEffect, ContextLayerClass,
+        ContextLayerDescriptor, ContextLayerDiagnostic, ContextLayerDiagnosticKind,
+        ContextLayerDiscoveryBoundary, ContextLayerFreshness, ContextLayerInclusionPolicy,
+        ContextLayerPlan, ContextLayerPolicySwitch, ContextLayerReceipt, ContextLayerReceiptEntry,
+        ContextLayerRedaction, ContextLayerTrust, ContextLayerValidationResult,
+    },
+};
 
 const RAW_SECRET_MARKER: &str = "API_KEY";
 const RAW_HOST_PATH_MARKER: &str = "/home/";
@@ -65,7 +55,9 @@ pub fn blake3_context_layer_fingerprint(label: &str, bytes: &[u8]) -> String {
 ///
 /// Returns diagnostics for unknown classes, missing source identity, missing
 /// section labels, size/body mismatch, unsafe bodies, or missing descriptor IDs.
-pub fn validate_context_descriptor(descriptor: &ContextLayerDescriptor) -> ContextLayerValidationResult {
+pub fn validate_context_descriptor(
+    descriptor: &ContextLayerDescriptor,
+) -> ContextLayerValidationResult {
     let diagnostics = descriptor_shape_diagnostics(descriptor);
     if diagnostics.is_empty() {
         Ok(())
@@ -89,11 +81,17 @@ pub fn assemble_context_layers(
             admitted.push(descriptor.clone());
         } else {
             diagnostics.extend(descriptor_diagnostics.clone());
-            omitted.push(receipt_entry(descriptor, reason_for(&descriptor_diagnostics)));
+            omitted.push(receipt_entry(
+                descriptor,
+                reason_for(&descriptor_diagnostics),
+            ));
         }
     }
     admitted.sort_by(|left, right| {
-        right.precedence.cmp(&left.precedence).then_with(|| left.descriptor_id.cmp(&right.descriptor_id))
+        right
+            .precedence
+            .cmp(&left.precedence)
+            .then_with(|| left.descriptor_id.cmp(&right.descriptor_id))
     });
     let mut winners: BTreeMap<String, ContextLayerDescriptor> = BTreeMap::new();
     for descriptor in admitted {
@@ -120,8 +118,10 @@ pub fn assemble_context_layers(
             winners.insert(descriptor.section.clone(), descriptor);
         }
     }
-    let mut included: Vec<ContextLayerReceiptEntry> =
-        winners.values().map(|descriptor| receipt_entry(descriptor, "included")).collect();
+    let mut included: Vec<ContextLayerReceiptEntry> = winners
+        .values()
+        .map(|descriptor| receipt_entry(descriptor, "included"))
+        .collect();
     included.sort_by(|left, right| left.descriptor_id.cmp(&right.descriptor_id));
     omitted.sort_by(|left, right| left.descriptor_id.cmp(&right.descriptor_id));
     ContextLayerPlan {
@@ -151,7 +151,8 @@ fn admission_diagnostics(
             "context discovery or inclusion is disabled",
         ));
     }
-    if descriptor.trust != ContextLayerTrust::Trusted && policy.untrusted_context == ContextLayerPolicySwitch::Disabled
+    if descriptor.trust != ContextLayerTrust::Trusted
+        && policy.untrusted_context == ContextLayerPolicySwitch::Disabled
     {
         diagnostics.push(ContextLayerDiagnostic::new(
             ContextLayerDiagnosticKind::Untrusted,
@@ -194,7 +195,9 @@ fn contains_unsafe_marker(text: &str) -> bool {
         || text.contains(WINDOWS_PATH_MARKER)
 }
 
-fn descriptor_shape_diagnostics(descriptor: &ContextLayerDescriptor) -> Vec<ContextLayerDiagnostic> {
+fn descriptor_shape_diagnostics(
+    descriptor: &ContextLayerDescriptor,
+) -> Vec<ContextLayerDiagnostic> {
     let mut diagnostics = Vec::new();
     if descriptor.descriptor_id.trim().is_empty() || descriptor.section.trim().is_empty() {
         diagnostics.push(ContextLayerDiagnostic::new(
@@ -239,16 +242,18 @@ fn descriptor_shape_diagnostics(descriptor: &ContextLayerDescriptor) -> Vec<Cont
 }
 
 fn reason_for(diagnostics: &[ContextLayerDiagnostic]) -> &'static str {
-    diagnostics.first().map_or("omitted", |diagnostic| match diagnostic.kind {
-        ContextLayerDiagnosticKind::UnknownClass => "unknown-class",
-        ContextLayerDiagnosticKind::MissingSource => "missing-source",
-        ContextLayerDiagnosticKind::DiscoveryDisabled => "disabled",
-        ContextLayerDiagnosticKind::Untrusted => "untrusted",
-        ContextLayerDiagnosticKind::Stale => "stale",
-        ContextLayerDiagnosticKind::Oversized => "oversized",
-        ContextLayerDiagnosticKind::Unsafe => "unsafe",
-        ContextLayerDiagnosticKind::Conflict => "conflict",
-    })
+    diagnostics
+        .first()
+        .map_or("omitted", |diagnostic| match diagnostic.kind {
+            ContextLayerDiagnosticKind::UnknownClass => "unknown-class",
+            ContextLayerDiagnosticKind::MissingSource => "missing-source",
+            ContextLayerDiagnosticKind::DiscoveryDisabled => "disabled",
+            ContextLayerDiagnosticKind::Untrusted => "untrusted",
+            ContextLayerDiagnosticKind::Stale => "stale",
+            ContextLayerDiagnosticKind::Oversized => "oversized",
+            ContextLayerDiagnosticKind::Unsafe => "unsafe",
+            ContextLayerDiagnosticKind::Conflict => "conflict",
+        })
 }
 
 fn receipt_entry(descriptor: &ContextLayerDescriptor, reason: &str) -> ContextLayerReceiptEntry {
@@ -257,7 +262,10 @@ fn receipt_entry(descriptor: &ContextLayerDescriptor, reason: &str) -> ContextLa
         class: descriptor.class,
         source_kind: descriptor.source_kind,
         source_identity: descriptor.source_identity.clone(),
-        body_hash: blake3_context_layer_fingerprint(&descriptor.descriptor_id, descriptor.body.as_bytes()),
+        body_hash: blake3_context_layer_fingerprint(
+            &descriptor.descriptor_id,
+            descriptor.body.as_bytes(),
+        ),
         reason: reason.to_string(),
     }
 }

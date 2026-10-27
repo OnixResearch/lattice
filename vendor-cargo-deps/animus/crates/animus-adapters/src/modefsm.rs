@@ -16,9 +16,7 @@
 )]
 
 use crate::artifact::Hash;
-use crate::validation::AdapterContractError;
-use crate::validation::FieldName;
-use crate::validation::{self};
+use crate::validation::{self, AdapterContractError, FieldName};
 
 const MODE_ID_FIELD: FieldName = FieldName::new("mode_id");
 const MODE_LABEL_FIELD: FieldName = FieldName::new("mode_label");
@@ -616,16 +614,28 @@ impl ModeReceipt {
 /// output contracts, untrusted descriptors, or invalid loop budgets.
 pub fn validate_mode_descriptor(draft: &ModeDescriptorDraft<'_>) -> ModeResult<ModeDescriptor> {
     if !draft.trusted {
-        return Err(diagnostic(ModeDiagnosticCode::UnsafeText, None, "untrusted mode descriptor"));
+        return Err(diagnostic(
+            ModeDiagnosticCode::UnsafeText,
+            None,
+            "untrusted mode descriptor",
+        ));
     }
     validate_loop_budget(draft.loop_budget_units)?;
     let mode_id = safe_text(MODE_ID_FIELD, draft.mode_id, None)?;
     let label = safe_bounded_text(MODE_LABEL_FIELD, draft.label, MAX_MODE_LABEL_CHARS, None)?;
     let capability_ceiling = safe_text(CAPABILITY_CEILING_FIELD, draft.capability_ceiling, None)?;
-    let plan_start_marker =
-        safe_bounded_text(MARKER_FIELD, draft.plan_start_marker, MAX_MARKER_CHARS, Some(mode_id.as_str()))?;
-    let plan_end_marker =
-        safe_bounded_text(MARKER_FIELD, draft.plan_end_marker, MAX_MARKER_CHARS, Some(mode_id.as_str()))?;
+    let plan_start_marker = safe_bounded_text(
+        MARKER_FIELD,
+        draft.plan_start_marker,
+        MAX_MARKER_CHARS,
+        Some(mode_id.as_str()),
+    )?;
+    let plan_end_marker = safe_bounded_text(
+        MARKER_FIELD,
+        draft.plan_end_marker,
+        MAX_MARKER_CHARS,
+        Some(mode_id.as_str()),
+    )?;
     if plan_start_marker == plan_end_marker {
         return Err(diagnostic(
             ModeDiagnosticCode::MalformedMarker,
@@ -682,8 +692,15 @@ pub fn extract_plan_steps(descriptor: &ModeDescriptor, text: &str) -> ModeResult
             continue;
         }
         let step = parse_step_line(trimmed, descriptor.mode_id())?;
-        if steps.iter().any(|existing: &PlanStep| existing.step_id() == step.step_id()) {
-            return Err(diagnostic(ModeDiagnosticCode::DuplicateStep, Some(step.step_id()), "duplicate plan step id"));
+        if steps
+            .iter()
+            .any(|existing: &PlanStep| existing.step_id() == step.step_id())
+        {
+            return Err(diagnostic(
+                ModeDiagnosticCode::DuplicateStep,
+                Some(step.step_id()),
+                "duplicate plan step id",
+            ));
         }
         if steps.len() >= MAX_PLAN_STEPS {
             return Err(diagnostic(
@@ -710,7 +727,10 @@ pub fn extract_plan_steps(descriptor: &ModeDescriptor, text: &str) -> ModeResult
 
 /// Creates mode state from a validated extraction.
 #[must_use]
-pub fn mode_state_from_extraction(descriptor: &ModeDescriptor, extraction: &PlanExtraction) -> ModeState {
+pub fn mode_state_from_extraction(
+    descriptor: &ModeDescriptor,
+    extraction: &PlanExtraction,
+) -> ModeState {
     let runtime_state = if extraction.steps().is_empty() {
         ModeRuntimeState::Inactive
     } else {
@@ -731,7 +751,10 @@ pub fn mode_state_from_extraction(descriptor: &ModeDescriptor, extraction: &Plan
 ///
 /// Returns [`ModeDiagnostic`] when the step is unknown or the update epoch is
 /// stale relative to the existing selected epoch.
-pub fn apply_selected_step_update(state: &ModeState, draft: &SelectedStepUpdateDraft<'_>) -> ModeResult<ModeState> {
+pub fn apply_selected_step_update(
+    state: &ModeState,
+    draft: &SelectedStepUpdateDraft<'_>,
+) -> ModeResult<ModeState> {
     let step_id = safe_text(STEP_ID_FIELD, draft.step_id, None)?;
     let mut next = state.clone();
     let Some(step) = next.steps.iter_mut().find(|item| item.step_id() == step_id) else {
@@ -766,7 +789,12 @@ pub fn apply_selected_step_update(state: &ModeState, draft: &SelectedStepUpdateD
 pub fn start_loop_work(state: &ModeState, draft: &LoopConditionDraft<'_>) -> ModeResult<ModeState> {
     validate_loop_budget(draft.budget_units)?;
     let work_id = safe_text(WORK_ID_FIELD, draft.work_id, None)?;
-    let reason = safe_bounded_text(LOOP_REASON_FIELD, draft.reason, MAX_STEP_LABEL_CHARS, Some(work_id.as_str()))?;
+    let reason = safe_bounded_text(
+        LOOP_REASON_FIELD,
+        draft.reason,
+        MAX_STEP_LABEL_CHARS,
+        Some(work_id.as_str()),
+    )?;
     let mut next = state.clone();
     next.runtime_state = ModeRuntimeState::Looping;
     next.retry_class = draft.retry_class;
@@ -843,7 +871,10 @@ pub fn validate_breakout_acknowledgement(
 
 /// Plans host-controller availability without installing commands.
 #[must_use]
-pub fn plan_mode_controller(descriptor: &ModeDescriptor, status: ModeControllerStatus) -> ModeControllerPlan {
+pub fn plan_mode_controller(
+    descriptor: &ModeDescriptor,
+    status: ModeControllerStatus,
+) -> ModeControllerPlan {
     if status == ModeControllerStatus::Missing {
         return ModeControllerPlan {
             status: ModeControllerPlanStatus::MissingController,
@@ -921,14 +952,22 @@ fn parse_step_line(line: &str, mode_id: &str) -> ModeResult<PlanStep> {
 fn validate_plan_text_size(text: &str) -> ModeResult<()> {
     let actual_chars = text.chars().count();
     if actual_chars > MAX_PLAN_BODY_CHARS {
-        return Err(diagnostic(ModeDiagnosticCode::FieldTooLong, None, "plan body is too large"));
+        return Err(diagnostic(
+            ModeDiagnosticCode::FieldTooLong,
+            None,
+            "plan body is too large",
+        ));
     }
     Ok(())
 }
 
 fn validate_loop_budget(budget: u16) -> ModeResult<()> {
     if !(MIN_LOOP_BUDGET_UNITS..=MAX_LOOP_BUDGET_UNITS).contains(&budget) {
-        return Err(diagnostic(ModeDiagnosticCode::InvalidBudget, None, "loop budget is outside bounds"));
+        return Err(diagnostic(
+            ModeDiagnosticCode::InvalidBudget,
+            None,
+            "loop budget is outside bounds",
+        ));
     }
     Ok(())
 }
@@ -937,34 +976,59 @@ fn safe_output_contract(value: &str) -> ModeResult<Text> {
     let output_contract = safe_text(OUTPUT_CONTRACT_FIELD, value, None)?;
     match output_contract.as_str() {
         SELECTED_STEP_CONTRACT | LOOP_WORK_CONTRACT => Ok(output_contract),
-        _ => Err(diagnostic(ModeDiagnosticCode::UnsupportedOutputContract, None, "unsupported mode output contract")),
+        _ => Err(diagnostic(
+            ModeDiagnosticCode::UnsupportedOutputContract,
+            None,
+            "unsupported mode output contract",
+        )),
     }
 }
 
-fn safe_bounded_text(field: FieldName, value: &str, max_chars: usize, subject_id: Option<&str>) -> ModeResult<Text> {
+fn safe_bounded_text(
+    field: FieldName,
+    value: &str,
+    max_chars: usize,
+    subject_id: Option<&str>,
+) -> ModeResult<Text> {
     let text = safe_text(field, value, subject_id)?;
     if text.chars().count() > max_chars {
-        return Err(diagnostic(ModeDiagnosticCode::FieldTooLong, subject_id, field.as_str()));
+        return Err(diagnostic(
+            ModeDiagnosticCode::FieldTooLong,
+            subject_id,
+            field.as_str(),
+        ));
     }
     Ok(text)
 }
 
 fn safe_text(field: FieldName, value: &str, subject_id: Option<&str>) -> ModeResult<Text> {
-    let normalized = validation::normalized_adapter_field(field, value).map_err(|error| map_adapter_error(&error))?;
+    let normalized = validation::normalized_adapter_field(field, value)
+        .map_err(|error| map_adapter_error(&error))?;
     let lower = normalized.to_ascii_lowercase();
-    if UNSAFE_MODE_MARKERS.iter().any(|marker| lower.contains(marker)) {
-        return Err(diagnostic(ModeDiagnosticCode::UnsafeText, subject_id, "mode metadata contains unsafe marker"));
+    if UNSAFE_MODE_MARKERS
+        .iter()
+        .any(|marker| lower.contains(marker))
+    {
+        return Err(diagnostic(
+            ModeDiagnosticCode::UnsafeText,
+            subject_id,
+            "mode metadata contains unsafe marker",
+        ));
     }
     Ok(normalized)
 }
 
 fn safe_hash(value: &str) -> ModeResult<Text> {
-    let normalized =
-        validation::normalized_adapter_field(HASH_FIELD, value).map_err(|error| map_adapter_error(&error))?;
+    let normalized = validation::normalized_adapter_field(HASH_FIELD, value)
+        .map_err(|error| map_adapter_error(&error))?;
     if Hash::new(&normalized).is_ok() {
         Ok(normalized)
     } else {
-        Err(diagnostic(ModeDiagnosticCode::InvalidHash, None, HASH_FIELD.as_str()))
+        Err(diagnostic(
+            ModeDiagnosticCode::InvalidHash,
+            None,
+            HASH_FIELD.as_str(),
+        ))
     }
 }
 
@@ -974,13 +1038,21 @@ fn is_stale_ack(acknowledgement_epoch: u32, current_epoch: u32) -> bool {
 
 fn map_adapter_error(error: &AdapterContractError) -> ModeDiagnostic {
     match error {
-        AdapterContractError::EmptyField { field } => diagnostic(ModeDiagnosticCode::EmptyField, None, field),
-        AdapterContractError::FieldTooLong { field, .. } => diagnostic(ModeDiagnosticCode::FieldTooLong, None, field),
-        AdapterContractError::NulCharacter { field, .. } => diagnostic(ModeDiagnosticCode::NulCharacter, None, field),
+        AdapterContractError::EmptyField { field } => {
+            diagnostic(ModeDiagnosticCode::EmptyField, None, field)
+        }
+        AdapterContractError::FieldTooLong { field, .. } => {
+            diagnostic(ModeDiagnosticCode::FieldTooLong, None, field)
+        }
+        AdapterContractError::NulCharacter { field, .. } => {
+            diagnostic(ModeDiagnosticCode::NulCharacter, None, field)
+        }
         AdapterContractError::InvalidEvidenceHash { field, .. } => {
             diagnostic(ModeDiagnosticCode::InvalidHash, None, field)
         }
-        AdapterContractError::EmptyCollection { field } => diagnostic(ModeDiagnosticCode::MalformedMarker, None, field),
+        AdapterContractError::EmptyCollection { field } => {
+            diagnostic(ModeDiagnosticCode::MalformedMarker, None, field)
+        }
         AdapterContractError::UnsupportedStatusState { field, .. }
         | AdapterContractError::UnsupportedStatusObservationKind { field, .. }
         | AdapterContractError::UnsupportedSessionReferenceKind { field, .. }
@@ -1056,7 +1128,10 @@ mod tests {
         assert_eq!(descriptor.mode_id(), MODE_ID);
         assert_eq!(descriptor.posture(), ModePosture::PlanningReadOnly);
         assert_eq!(descriptor.output_contract(), SELECTED_STEP_CONTRACT);
-        assert_eq!(missing_controller.status(), ModeControllerPlanStatus::MissingController);
+        assert_eq!(
+            missing_controller.status(),
+            ModeControllerPlanStatus::MissingController
+        );
         assert!(missing_controller.installed_commands().is_empty());
         assert!(PROHIBITED_PLAN_LOOP_EFFECTS.contains(&"command registration"));
     }
@@ -1067,9 +1142,11 @@ mod tests {
         let descriptor = descriptor();
         let extraction = extract_plan_steps(&descriptor, PLAN_TEXT).unwrap();
         let no_plan = extract_plan_steps(&descriptor, NUMBERED_PROSE).unwrap();
-        let malformed =
-            extract_plan_steps(&descriptor, "<!-- animus-plan:start -->\n1. not a step\n<!-- animus-plan:end -->")
-                .expect_err("numbered list inside markers must fail explicit record parsing");
+        let malformed = extract_plan_steps(
+            &descriptor,
+            "<!-- animus-plan:start -->\n1. not a step\n<!-- animus-plan:end -->",
+        )
+        .expect_err("numbered list inside markers must fail explicit record parsing");
 
         assert_eq!(extraction.status(), PlanExtractionStatus::Extracted);
         assert_eq!(extraction.steps().len(), 2);
@@ -1100,23 +1177,32 @@ mod tests {
     fn selected_step_updates_reject_unknown_or_stale_steps() {
         // r[verify agent_harness_runtime.hermes_plan_loop_modes.plan_extraction]
         let state = state();
-        let selected = apply_selected_step_update(&state, &SelectedStepUpdateDraft {
-            step_id: STEP_ONE,
-            status: StepSelectionStatus::Selected,
-            update_epoch: SELECTED_EPOCH,
-        })
+        let selected = apply_selected_step_update(
+            &state,
+            &SelectedStepUpdateDraft {
+                step_id: STEP_ONE,
+                status: StepSelectionStatus::Selected,
+                update_epoch: SELECTED_EPOCH,
+            },
+        )
         .unwrap();
-        let stale_update = apply_selected_step_update(&selected, &SelectedStepUpdateDraft {
-            step_id: STEP_ONE,
-            status: StepSelectionStatus::Completed,
-            update_epoch: SELECTED_EPOCH,
-        })
+        let stale_update = apply_selected_step_update(
+            &selected,
+            &SelectedStepUpdateDraft {
+                step_id: STEP_ONE,
+                status: StepSelectionStatus::Completed,
+                update_epoch: SELECTED_EPOCH,
+            },
+        )
         .expect_err("stale selected-step update must fail");
-        let unknown = apply_selected_step_update(&state, &SelectedStepUpdateDraft {
-            step_id: "missing-step",
-            status: StepSelectionStatus::Selected,
-            update_epoch: SELECTED_EPOCH,
-        })
+        let unknown = apply_selected_step_update(
+            &state,
+            &SelectedStepUpdateDraft {
+                step_id: "missing-step",
+                status: StepSelectionStatus::Selected,
+                update_epoch: SELECTED_EPOCH,
+            },
+        )
         .expect_err("unknown selected step must fail");
 
         assert_eq!(selected.runtime_state(), ModeRuntimeState::Selected);
@@ -1128,31 +1214,43 @@ mod tests {
     #[test]
     fn loop_continuation_and_breakout_acknowledgement_match_active_work() {
         // r[verify agent_harness_runtime.hermes_plan_loop_modes.continuation]
-        let loop_state = start_loop_work(&state(), &LoopConditionDraft {
-            work_id: LOOP_WORK_ID,
-            reason: LOOP_REASON,
-            budget_units: LOOP_BUDGET,
-            retry_class: ModeRetryClass::Transient,
-        })
+        let loop_state = start_loop_work(
+            &state(),
+            &LoopConditionDraft {
+                work_id: LOOP_WORK_ID,
+                reason: LOOP_REASON,
+                budget_units: LOOP_BUDGET,
+                retry_class: ModeRetryClass::Transient,
+            },
+        )
         .unwrap();
-        let accepted = validate_breakout_acknowledgement(&loop_state, &BreakoutAcknowledgementDraft {
-            work_id: LOOP_WORK_ID,
-            success: true,
-            acknowledgement_epoch: FRESH_EPOCH,
-            current_epoch: CURRENT_EPOCH,
-        });
-        let mismatch = validate_breakout_acknowledgement(&loop_state, &BreakoutAcknowledgementDraft {
-            work_id: STEP_TWO,
-            success: true,
-            acknowledgement_epoch: FRESH_EPOCH,
-            current_epoch: CURRENT_EPOCH,
-        });
-        let stale = validate_breakout_acknowledgement(&loop_state, &BreakoutAcknowledgementDraft {
-            work_id: LOOP_WORK_ID,
-            success: true,
-            acknowledgement_epoch: STALE_EPOCH,
-            current_epoch: CURRENT_EPOCH,
-        });
+        let accepted = validate_breakout_acknowledgement(
+            &loop_state,
+            &BreakoutAcknowledgementDraft {
+                work_id: LOOP_WORK_ID,
+                success: true,
+                acknowledgement_epoch: FRESH_EPOCH,
+                current_epoch: CURRENT_EPOCH,
+            },
+        );
+        let mismatch = validate_breakout_acknowledgement(
+            &loop_state,
+            &BreakoutAcknowledgementDraft {
+                work_id: STEP_TWO,
+                success: true,
+                acknowledgement_epoch: FRESH_EPOCH,
+                current_epoch: CURRENT_EPOCH,
+            },
+        );
+        let stale = validate_breakout_acknowledgement(
+            &loop_state,
+            &BreakoutAcknowledgementDraft {
+                work_id: LOOP_WORK_ID,
+                success: true,
+                acknowledgement_epoch: STALE_EPOCH,
+                current_epoch: CURRENT_EPOCH,
+            },
+        );
 
         assert_eq!(loop_state.runtime_state(), ModeRuntimeState::Looping);
         assert_eq!(loop_state.retry_class(), ModeRetryClass::Transient);

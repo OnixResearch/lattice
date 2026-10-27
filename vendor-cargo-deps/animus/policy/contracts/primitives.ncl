@@ -47,7 +47,7 @@ let _is_safe_repository_relative_path = fun value =>
   && std.string.length value > 0
   && std.string.substring 0 1 value != "/"
   && !std.string.contains "\\" value
-  && std.string.is_match "^[A-Za-z0-9][A-Za-z0-9._/-]*$" value
+  && std.string.is_match "^[A-Za-z0-9.][A-Za-z0-9._/-]*$" value
   && _path_segments_are_safe value
 in
 

@@ -18,7 +18,21 @@ module_name_repetitions = { level = "allow", priority = 1 }
 pedantic = { level = "deny", priority = -1 }
 undocumented_unsafe_blocks = "deny"
 
+[features]
+default = []
+change-request = ["dep:animus-adapter-change-request"]
+evaluation = ["dep:animus-adapter-eval"]
+harbor-atif = ["dep:animus-adapter-atif"]
+maintenance = ["change-request", "dep:animus-adapter-maintenance"]
+harbor-atif-json = ["harbor-atif", "animus-adapter-atif/json-codec"]
+
 [dependencies]
+animus-adapter-change-request = { path = "../animus-adapter-change-request", version = "0.1.0", optional = true }
+animus-adapter-continual = { path = "../animus-adapter-continual", version = "0.1.0" }
+animus-adapter-daemon = { path = "../animus-adapter-daemon", version = "0.1.0" }
+animus-adapter-eval = { path = "../animus-adapter-eval", version = "0.1.0", optional = true }
+animus-adapter-atif = { path = "../animus-adapter-atif", version = "0.1.0", optional = true }
+animus-adapter-maintenance = { path = "../animus-adapter-maintenance", version = "0.1.0", optional = true }
 animus-adapter-observability = { path = "../animus-adapter-observability", version = "0.1.0" }
 animus-adapter-rlm-kernel = { path = "../animus-adapter-rlm-kernel", version = "0.1.0" }
 animus-adapter-safe = { path = "../animus-adapter-safe", version = "0.1.0" }
@@ -29,4 +43,4 @@ host-control-core = { path = "../../../host-control/crates/host-control-core" }
 
 [dev-dependencies]
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.150"
+serde_json = "1.0.149"

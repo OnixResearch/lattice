@@ -39,13 +39,20 @@ fn validate_optional_draft_parts(
     draft: super::super::WorkerTaskDraft,
 ) -> Result<OptionalDraftParts, super::super::DelegationFailure> {
     let scope = validate_required(draft.scope, super::super::SCOPE_FIELD)?;
-    let context_packet = validate_required(draft.context_packet, super::super::CONTEXT_PACKET_FIELD)?;
+    let context_packet =
+        validate_required(draft.context_packet, super::super::CONTEXT_PACKET_FIELD)?;
     let budgets = validate_required(draft.budgets, super::super::BUDGET_FIELD)?;
     let output_schema = validate_required(draft.output_schema, super::super::OUTPUT_SCHEMA_FIELD)?;
     let parent_trace = validate_required(draft.parent_trace, super::super::PARENT_TRACE_FIELD)?;
     let authority = validate_required(draft.authority, super::super::AUTHORITY_FIELD)?;
-    assert!(!context_packet.items.is_empty(), "context packet items must be present");
-    assert!(!output_schema.required_fields.is_empty(), "output schema required fields must be present");
+    assert!(
+        !context_packet.items.is_empty(),
+        "context packet items must be present"
+    );
+    assert!(
+        !output_schema.required_fields.is_empty(),
+        "output schema required fields must be present"
+    );
     super::contract::validate(super::contract::Input {
         scope: &scope,
         context_packet: &context_packet,
@@ -69,7 +76,10 @@ fn validate_optional_draft_parts(
     })
 }
 
-fn validate_required<T>(value: Option<T>, field: &'static str) -> Result<T, super::super::DelegationFailure> {
+fn validate_required<T>(
+    value: Option<T>,
+    field: &'static str,
+) -> Result<T, super::super::DelegationFailure> {
     value.ok_or_else(|| {
         super::super::DelegationFailure::new(
             super::super::FailureKind::MissingField,

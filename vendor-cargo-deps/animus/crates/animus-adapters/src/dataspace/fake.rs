@@ -40,13 +40,24 @@ impl Backend {
     pub(super) fn publish_assertion(&mut self, assertion: super::Assertion) {
         let sequence = self.next_sequence;
         self.next_sequence = self.next_sequence.saturating_add(SEQUENCE_STEP);
-        self.assertions.push(StoredAssertion { sequence, assertion });
+        self.assertions.push(StoredAssertion {
+            sequence,
+            assertion,
+        });
     }
 
-    pub(super) fn query_assertions(&self, subscription: &super::Subscription) -> alloc::vec::Vec<super::Assertion> {
+    pub(super) fn query_assertions(
+        &self,
+        subscription: &super::Subscription,
+    ) -> alloc::vec::Vec<super::Assertion> {
         self.assertions
             .iter()
-            .filter(|stored| stored.assertion.scope().same_tenant_workspace(subscription.scope()))
+            .filter(|stored| {
+                stored
+                    .assertion
+                    .scope()
+                    .same_tenant_workspace(subscription.scope())
+            })
             .filter(|stored| subscription.allows(stored.assertion.kind()))
             .map(|stored| stored.assertion.clone())
             .collect()
@@ -57,16 +68,18 @@ impl Backend {
             super::OrchestrationEventKind::Cancelled => {
                 self.mark_scope(event.scope(), super::AssertionStatus::Cancelled)
             }
-            super::OrchestrationEventKind::Expired => self.mark_scope(event.scope(), super::AssertionStatus::Expired),
-            super::OrchestrationEventKind::Published | super::OrchestrationEventKind::OwnershipTransferred => {
-                NO_UPDATES
+            super::OrchestrationEventKind::Expired => {
+                self.mark_scope(event.scope(), super::AssertionStatus::Expired)
             }
+            super::OrchestrationEventKind::Published
+            | super::OrchestrationEventKind::OwnershipTransferred => NO_UPDATES,
         }
     }
 
     pub(super) fn cleanup_stale(&mut self, now: u64) -> usize {
         let before = self.assertions.len();
-        self.assertions.retain(|stored| !stored.assertion.is_stale_at(now));
+        self.assertions
+            .retain(|stored| !stored.assertion.is_stale_at(now));
         before.saturating_sub(self.assertions.len())
     }
 

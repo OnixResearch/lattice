@@ -15,6 +15,7 @@ The caller supplies these explicit inputs:
 - a loaded Basalt policy and its trusted policy reference
 - one normalized `EnforcementRequest`
 - the raw compact token
+- one closed `BasaltUcanProtocolProfile`
 - one closed `EnforcementAction`
 - the holder nonce and signature
 - key, proof, revocation, caveat, and replay services
@@ -59,6 +60,27 @@ The adapter has no generic action constructor. A caller can select only a review
 
 A live result for one target action grants only the exact mapped request. It does not execute an effect and does not prove effect correctness.
 
+## Explicit process execution
+
+`ProcessExecute` maps only to contract `process-execute` and ability `process/execute`.
+Its resource is `onix://process-execution/` followed by exactly 64 lowercase hex digits.
+Missing, uppercase, truncated, excessive, non-hex, or path-like references fail binding.
+
+The reference names one complete consumer-admitted invocation context, not just an
+executable. The consumer must bind the invocation, executable, arguments, environment,
+inputs, services, limits, and policy context. Basalt checks the reference shape and
+signed request. It does not authenticate that context or its immutable custody.
+
+The packaged default policy remains unchanged and denies this contract. The separate
+`contracts/process-execution/policy.ncl` is an explicit opt-in policy. Its generated
+JSON uses the same policy parser. Selection does not grant authority without valid
+UCAN and holder verification. No default final-profile command mapping is added.
+
+The compact verifier retains its existing signature, revocation, and final replay
+checks. A changed context cannot reuse a holder signature. Document permissions
+cannot authorize a process. An allowed receipt does not prove execution, resource
+enforcement, durable replay, output contents, or promotion. Basalt runs no process.
+
 ## UCAN source export
 
 These actions depend on the checked-in reviewed UCAN snapshot under `vendor/ucan/`.
@@ -71,15 +93,17 @@ The existing revision, BLAKE3 manifest, and license checks in `tools/sync-vendor
 
 The adapter uses this order:
 
-1. Check token and request bounds.
-2. Bind the typed action to the exact request.
-3. Verify the compact token with the injected services.
-4. Run non-consuming capability and caveat authorization.
-5. Build and evaluate exact Basalt authority facts.
-6. Build the allowed redacted receipt.
-7. Run fresh holder-signed verification with the same services.
-8. Let UCAN call replay once as its final commit.
-9. Move the prebuilt values into `LiveUcanEnforcement`.
+1. Admit the exact compact protocol cohort.
+2. Check token and request bounds.
+3. Bind the typed action to the exact request.
+4. Verify the compact token with the injected services.
+5. Run non-consuming capability and caveat authorization.
+6. Project the private Basalt-owned verified UCAN input.
+7. Build and evaluate exact Basalt authority facts.
+8. Build the allowed redacted receipt.
+9. Run fresh holder-signed verification with the same services.
+10. Let UCAN call replay once as its final commit.
+11. Move the prebuilt values into `LiveUcanEnforcement`.
 
 Key, proof, revocation, and caveat services can receive repeated calls. These services must not consume state.
 
@@ -100,6 +124,24 @@ The type has no public constructor. It does not implement `Clone`, `Serialize`, 
 The prebuilt `AuthorityDecision` has no public getter. Callers cannot copy or serialize the allowed decision from the live wrapper.
 
 Use the live value during the admitted in-process operation. Do not treat a receipt as live authority.
+
+## Observe an existing holder
+
+`LiveUcanEnforcement::observe_holder` accepts the same compact token, an explicit
+`HolderTokenVerificationContext`, and non-consuming `HolderRecheckPolicies`.
+It forwards to the published UCAN recheck with the retained holder authorization.
+There is no replay port, new live enforcement value, or new authority receipt.
+
+The result borrows the retained holder and records supplied observation time.
+UCAN checks exact token binding, the initial-time floor, current token/proof
+verification, revocation, and the original operation's profile and caveats.
+Errors remain UCAN errors rather than fabricated Basalt enforcement receipts.
+
+This method does not evaluate current Basalt policy or extend effective bounds.
+It does not prove authenticated services, continuous freshness, continuing key
+possession, independent custody, or safe release. Consumers retain monotonic time,
+stricter deadlines, current Basalt/application policy, and atomic effect checks.
+The original receipt stays historical even after a successful observation.
 
 ## Denial reasons
 
@@ -138,9 +180,10 @@ The receipt includes these redacted facts:
 - the observed compact-token length
 - the bounded compact-token digest, when permitted
 - the exact request-binding digest
+- the admitted UCAN protocol profile
 - the reviewed operation-profile digest
 - the trusted policy digest
-- the reviewed UCAN revision
+- the reviewed UCAN revision and support-catalog identity
 - explicit non-claims
 
 An oversized token is rejected before token hashing. Its receipt records the input length but omits token identity.

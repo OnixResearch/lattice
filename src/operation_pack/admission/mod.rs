@@ -28,6 +28,11 @@ pub fn admit(
     if lock.platform != facts.platform {
         return Err(super::Error::Invalid("lock platform fact"));
     }
+    if candidate.manifest.runtimes.iter().any(|runtime| runtime.wasm.is_some())
+        && lock.evidence_identities != evidence_identities(facts)
+    {
+        return Err(super::Error::Invalid("component evidence drift"));
+    }
     Ok(super::model::AdmittedPack {
         candidate: candidate.clone(),
         lock: lock.clone(),
@@ -44,7 +49,7 @@ pub fn create_lock(
     let runtime_identities = manifest
         .runtimes
         .iter()
-        .map(|runtime| Ok((runtime.id.clone(), super::identity::runtime_identity(runtime)?)))
+        .map(|runtime| Ok((runtime.id.clone(), locked_runtime_identity(candidate, runtime, &facts.platform)?)))
         .collect::<Result<BTreeMap<_, _>, super::Error>>()?;
     let analyzer_identities = manifest
         .analyzers
@@ -61,6 +66,12 @@ pub fn create_lock(
         .iter()
         .map(|dependency| (dependency.pack_id.clone(), dependency.pack_identity.clone()))
         .collect();
+    let evidence_identities = if manifest.runtimes.iter().any(|runtime| runtime.wasm.is_some()) {
+        evidence_identities(facts)
+    } else {
+        BTreeMap::new()
+    };
+    let component_cohort_identities = component_cohorts(candidate, &facts.platform, &evidence_identities)?;
     let mut lock = super::model::Lock {
         schema: super::model::LOCK_SCHEMA.to_string(),
         identity: String::new(),
@@ -72,6 +83,8 @@ pub fn create_lock(
         runtime_identities,
         analyzer_identities,
         skill_identities,
+        component_cohort_identities,
+        evidence_identities,
         trust_profile_identity: manifest.admission.identity.clone(),
         source_locator: candidate.source_locator.clone(),
     };
@@ -105,7 +118,7 @@ pub fn validate_lock(candidate: &super::model::Candidate, lock: &super::model::L
         .manifest
         .runtimes
         .iter()
-        .map(|runtime| Ok((runtime.id.clone(), super::identity::runtime_identity(runtime)?)))
+        .map(|runtime| Ok((runtime.id.clone(), locked_runtime_identity(candidate, runtime, &lock.platform)?)))
         .collect::<Result<BTreeMap<_, _>, super::Error>>()?;
     let expected_analyzers = candidate
         .manifest
@@ -119,6 +132,25 @@ pub fn validate_lock(candidate: &super::model::Candidate, lock: &super::model::L
         .iter()
         .map(|skill| Ok((skill.name.clone(), super::identity::skill_identity(skill)?)))
         .collect::<Result<BTreeMap<_, _>, super::Error>>()?;
+    let expected_cohorts = component_cohorts(candidate, &lock.platform, &lock.evidence_identities)?;
+    let required_evidence = candidate.manifest.admission.required_evidence.iter().copied().collect::<BTreeSet<_>>();
+    let locked_evidence = lock.evidence_identities.keys().copied().collect::<BTreeSet<_>>();
+    if lock.component_cohort_identities != expected_cohorts
+        || (!expected_cohorts.is_empty() && required_evidence != locked_evidence)
+        || candidate
+            .manifest
+            .runtimes
+            .iter()
+            .filter_map(|runtime| runtime.wasm.as_ref())
+            .any(|descriptor| descriptor.evidence_identities != lock.evidence_identities)
+        || (expected_cohorts.is_empty() && !locked_evidence.is_empty())
+        || lock
+            .evidence_identities
+            .values()
+            .any(|identity| super::validation::validate_identity(identity).is_err())
+    {
+        return Err(super::Error::Invalid("component cohort binding"));
+    }
     if lock.runtime_identities != expected_runtimes
         || lock.analyzer_identities != expected_analyzers
         || lock.skill_identities != expected_skills
@@ -215,5 +247,49 @@ fn validate_facts(
             return Err(super::Error::Invalid("required evidence"));
         }
     }
+    if manifest.runtimes.iter().filter_map(|runtime| runtime.wasm.as_ref()).any(|descriptor| {
+        descriptor
+            .evidence_identities
+            .iter()
+            .any(|(kind, identity)| facts.evidence.get(kind).is_none_or(|evidence| &evidence.identity != identity))
+    }) {
+        return Err(super::Error::Invalid("component evidence identity"));
+    }
     Ok(())
+}
+
+fn evidence_identities(facts: &super::model::AdmissionFacts) -> BTreeMap<super::model::EvidenceKind, String> {
+    facts.evidence.iter().map(|(kind, evidence)| (*kind, evidence.identity.clone())).collect()
+}
+
+fn component_cohorts(
+    candidate: &super::model::Candidate,
+    platform: &str,
+    evidence: &BTreeMap<super::model::EvidenceKind, String>,
+) -> Result<BTreeMap<String, String>, super::Error> {
+    candidate
+        .manifest
+        .runtimes
+        .iter()
+        .filter(|runtime| runtime.wasm.is_some())
+        .map(|runtime| {
+            Ok((
+                runtime.id.clone(),
+                super::identity::component_cohort_identity(candidate, runtime, platform, evidence)?,
+            ))
+        })
+        .collect()
+}
+
+fn locked_runtime_identity(
+    candidate: &super::model::Candidate,
+    runtime: &super::model::RuntimeArtifact,
+    platform: &str,
+) -> Result<String, super::Error> {
+    match &runtime.wasm {
+        Some(descriptor) => {
+            super::identity::component_cohort_identity(candidate, runtime, platform, &descriptor.evidence_identities)
+        }
+        None => super::identity::runtime_identity(runtime),
+    }
 }

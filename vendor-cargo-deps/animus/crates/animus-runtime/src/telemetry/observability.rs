@@ -87,7 +87,9 @@ pub fn project_runtime_event(
 /// # Errors
 ///
 /// Returns [`animus_adapters::ObservabilityError`] when a generated record fails validation.
-pub fn project_report(report: &crate::RunReport) -> Result<Projection, animus_adapters::ObservabilityError> {
+pub fn project_report(
+    report: &crate::RunReport,
+) -> Result<Projection, animus_adapters::ObservabilityError> {
     let mut projection = Projection::new(std::vec::Vec::new(), std::vec::Vec::new());
     let mut sequence = FIRST_EVENT_SEQUENCE;
     for event in report.events() {
@@ -99,7 +101,9 @@ pub fn project_report(report: &crate::RunReport) -> Result<Projection, animus_ad
     Ok(projection)
 }
 
-fn event_specific_labels(event: &super::RuntimeEvent) -> std::vec::Vec<animus_adapters::MetricLabelDraft<'static>> {
+fn event_specific_labels(
+    event: &super::RuntimeEvent,
+) -> std::vec::Vec<animus_adapters::MetricLabelDraft<'static>> {
     match event {
         super::RuntimeEvent::LoopDecision { decision, .. } => {
             vec![animus_adapters::MetricLabelDraft::new(
@@ -107,15 +111,21 @@ fn event_specific_labels(event: &super::RuntimeEvent) -> std::vec::Vec<animus_ad
                 decision.as_str(),
             )]
         }
-        super::RuntimeEvent::AdapterOutcomeClassified { component, class, .. } => vec![
+        super::RuntimeEvent::AdapterOutcomeClassified {
+            component, class, ..
+        } => vec![
             animus_adapters::MetricLabelDraft::new(COMPONENT_LABEL, component.as_str()),
             animus_adapters::MetricLabelDraft::new(FAILURE_CLASS_LABEL, class.as_str()),
         ],
-        super::RuntimeEvent::AdapterError { component, message: _ } => vec![animus_adapters::MetricLabelDraft::new(
+        super::RuntimeEvent::AdapterError {
+            component,
+            message: _,
+        } => vec![animus_adapters::MetricLabelDraft::new(
             COMPONENT_LABEL,
             component.as_str(),
         )],
-        super::RuntimeEvent::HookBlocked { boundary, .. } | super::RuntimeEvent::HookFailed { boundary, .. } => {
+        super::RuntimeEvent::HookBlocked { boundary, .. }
+        | super::RuntimeEvent::HookFailed { boundary, .. } => {
             vec![animus_adapters::MetricLabelDraft::new(
                 HOOK_BOUNDARY_LABEL,
                 boundary.as_str(),
@@ -153,6 +163,7 @@ fn event_specific_labels(event: &super::RuntimeEvent) -> std::vec::Vec<animus_ad
         | super::RuntimeEvent::Cancelled { .. }
         | super::RuntimeEvent::CompactionRequested { .. }
         | super::RuntimeEvent::SessionStateChanged { .. }
+        | super::RuntimeEvent::SessionQueueMutationObserved { .. }
         | super::RuntimeEvent::SessionCommitObserved { .. }
         | super::RuntimeEvent::SessionRecoveryObserved { .. }
         | super::RuntimeEvent::SessionAuthorityProfileObserved { .. } => std::vec::Vec::new(),
@@ -171,7 +182,9 @@ fn level_for_event(event: &super::RuntimeEvent) -> animus_adapters::LogLevel {
         | super::RuntimeEvent::HookBlocked { .. }
         | super::RuntimeEvent::ModelStreamFailed { .. }
         | super::RuntimeEvent::MaxTurnsExceeded { .. }
-        | super::RuntimeEvent::AdapterOutcomeClassified { .. } => animus_adapters::LogLevel::Warning,
+        | super::RuntimeEvent::AdapterOutcomeClassified { .. } => {
+            animus_adapters::LogLevel::Warning
+        }
         super::RuntimeEvent::RuntimeStarted { .. }
         | super::RuntimeEvent::LoopStarted { .. }
         | super::RuntimeEvent::ContextReplayed { .. }
@@ -192,6 +205,7 @@ fn level_for_event(event: &super::RuntimeEvent) -> animus_adapters::LogLevel {
         | super::RuntimeEvent::SandboxEscalation { .. }
         | super::RuntimeEvent::CompactionRequested { .. }
         | super::RuntimeEvent::SessionStateChanged { .. }
+        | super::RuntimeEvent::SessionQueueMutationObserved { .. }
         | super::RuntimeEvent::SessionCommitObserved { .. }
         | super::RuntimeEvent::SessionRecoveryObserved { .. }
         | super::RuntimeEvent::SessionAuthorityProfileObserved { .. }
@@ -212,7 +226,8 @@ mod tests {
     const FAILURE_MESSAGE: &str = "/home/example/private.txt";
 
     #[test]
-    fn projection_uses_safe_runtime_event_labels() -> Result<(), animus_adapters::ObservabilityError> {
+    fn projection_uses_safe_runtime_event_labels() -> Result<(), animus_adapters::ObservabilityError>
+    {
         let event = crate::RuntimeEvent::LoopDecision {
             turn_index: FIRST_SEQUENCE_INDEX,
             decision: crate::LoopDecisionKind::Model,
@@ -221,8 +236,14 @@ mod tests {
 
         assert_eq!(projection.metrics().len(), EXPECTED_SINGLE_RECORD_COUNT);
         assert_eq!(projection.logs().len(), EXPECTED_SINGLE_RECORD_COUNT);
-        assert_eq!(projection.metrics()[FIRST_SEQUENCE_INDEX].name(), RUNTIME_EVENT_METRIC_NAME);
-        assert_eq!(projection.logs()[FIRST_SEQUENCE_INDEX].message(), "loop_decision");
+        assert_eq!(
+            projection.metrics()[FIRST_SEQUENCE_INDEX].name(),
+            RUNTIME_EVENT_METRIC_NAME
+        );
+        assert_eq!(
+            projection.logs()[FIRST_SEQUENCE_INDEX].message(),
+            "loop_decision"
+        );
         assert!(
             projection.metrics()[FIRST_SEQUENCE_INDEX]
                 .labels()
@@ -233,9 +254,10 @@ mod tests {
     }
 
     #[test]
-    fn projection_omits_raw_prompts_model_outputs_and_paths() -> Result<(), animus_adapters::ObservabilityError> {
-        let request =
-            animus_adapters::ModelRequest::new(RAW_PROMPT).expect("raw prompt request should be valid in-process data");
+    fn projection_omits_raw_prompts_model_outputs_and_paths()
+    -> Result<(), animus_adapters::ObservabilityError> {
+        let request = animus_adapters::ModelRequest::new(RAW_PROMPT)
+            .expect("raw prompt request should be valid in-process data");
         let response = animus_adapters::ModelResponse::new(RAW_MODEL_OUTPUT)
             .expect("raw response should be valid in-process data");
         let run_result = crate::RunReport::new(

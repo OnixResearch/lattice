@@ -7,7 +7,14 @@ const EMPTY_COUNT: u32 = 0;
 const MAX_CONTEXT_PRESSURE_PER_MILLE: u16 = 1_000;
 const EMPTY_METADATA_SIGNAL_COUNT: usize = 4;
 
-const UNSAFE_SENTINELS: &[&str] = &["prompt:", "provider payload", "api_key", "credential", "secret", "\n"];
+const UNSAFE_SENTINELS: &[&str] = &[
+    "prompt:",
+    "provider payload",
+    "api_key",
+    "credential",
+    "secret",
+    "\n",
+];
 
 /// Bounded request metadata consumed by the default router signal projector.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -214,9 +221,17 @@ fn validate_context_pressure(value: u16) -> Result<(), SignalProjectionError> {
     Ok(())
 }
 
-fn reject_unsafe_label(field: UnsafeLabelField, label_text: &str) -> Result<(), SignalProjectionError> {
-    if UNSAFE_SENTINELS.iter().any(|sentinel| label_text.contains(sentinel)) {
-        return Err(SignalProjectionError::UnsafePayload { field: field.as_str() });
+fn reject_unsafe_label(
+    field: UnsafeLabelField,
+    label_text: &str,
+) -> Result<(), SignalProjectionError> {
+    if UNSAFE_SENTINELS
+        .iter()
+        .any(|sentinel| label_text.contains(sentinel))
+    {
+        return Err(SignalProjectionError::UnsafePayload {
+            field: field.as_str(),
+        });
     }
     Ok(())
 }

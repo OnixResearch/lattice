@@ -4,9 +4,10 @@ pub fn complete_with_steel_policy_denial(
     state: super::TurnState,
     receipt: &animus_steel::SteelPolicyActivationReceipt,
 ) -> crate::RunReport {
-    let reason = receipt
-        .denied_reason()
-        .map_or_else(|| String::from("unknown"), |reason| String::from(reason.as_str()));
+    let reason = receipt.denied_reason().map_or_else(
+        || String::from("unknown"),
+        |reason| String::from(reason.as_str()),
+    );
     let message = receipt.denial_message();
     let state = state.with_event(crate::RuntimeEvent::SteelPolicyDenied {
         profile: String::from(receipt.profile()),

@@ -203,6 +203,11 @@ pub enum RuntimeEvent {
         /// Bounded pending queue count.
         queue_count: u32,
     },
+    /// A queue compare-and-swap result was observed without private text.
+    SessionQueueMutationObserved {
+        /// Bounded queue mutation metadata.
+        mutation: crate::coding_session_host::CodingSessionQueueMutationEvent,
+    },
     /// A coding-session message crossed its declared durable boundary.
     SessionCommitObserved {
         /// Stable session identity.
@@ -277,10 +282,14 @@ impl RuntimeEvent {
             Self::ToolResponded { .. } => super::RuntimeEventKind::ToolResponded,
             Self::ToolDenied { .. } => super::RuntimeEventKind::ToolDenied,
             Self::FinalResponse { .. } => super::RuntimeEventKind::FinalResponse,
-            Self::CompletionCandidateRequested { .. } => super::RuntimeEventKind::CompletionCandidateRequested,
+            Self::CompletionCandidateRequested { .. } => {
+                super::RuntimeEventKind::CompletionCandidateRequested
+            }
             Self::Stopped => super::RuntimeEventKind::Stopped,
             Self::MaxTurnsExceeded { .. } => super::RuntimeEventKind::MaxTurnsExceeded,
-            Self::AdapterOutcomeClassified { .. } => super::RuntimeEventKind::AdapterOutcomeClassified,
+            Self::AdapterOutcomeClassified { .. } => {
+                super::RuntimeEventKind::AdapterOutcomeClassified
+            }
             Self::AdapterError { .. } => super::RuntimeEventKind::AdapterError,
             Self::FabricError { .. } => super::RuntimeEventKind::FabricError,
             Self::HookBlocked { .. } => super::RuntimeEventKind::HookBlocked,
@@ -291,9 +300,16 @@ impl RuntimeEvent {
             Self::Cancelled { .. } => super::RuntimeEventKind::Cancelled,
             Self::CompactionRequested { .. } => super::RuntimeEventKind::CompactionRequested,
             Self::SessionStateChanged { .. } => super::RuntimeEventKind::SessionStateChanged,
+            Self::SessionQueueMutationObserved { .. } => {
+                super::RuntimeEventKind::SessionQueueMutationObserved
+            }
             Self::SessionCommitObserved { .. } => super::RuntimeEventKind::SessionCommitObserved,
-            Self::SessionRecoveryObserved { .. } => super::RuntimeEventKind::SessionRecoveryObserved,
-            Self::SessionAuthorityProfileObserved { .. } => super::RuntimeEventKind::SessionAuthorityProfileObserved,
+            Self::SessionRecoveryObserved { .. } => {
+                super::RuntimeEventKind::SessionRecoveryObserved
+            }
+            Self::SessionAuthorityProfileObserved { .. } => {
+                super::RuntimeEventKind::SessionAuthorityProfileObserved
+            }
             Self::Shutdown { .. } => super::RuntimeEventKind::Shutdown,
         }
     }
@@ -333,19 +349,22 @@ fn project_stream_frame_event(frame: &animus_adapters::ModelStreamFrame) -> Runt
             call_id: frame.call_id().clone(),
             reason: terminal_reason(frame),
         },
-        animus_adapters::ModelStreamFrameKind::Finish | animus_adapters::ModelStreamFrameKind::Cancelled => {
-            RuntimeEvent::ModelStreamEnded {
-                call_id: frame.call_id().clone(),
-                status: frame.kind(),
-            }
-        }
+        animus_adapters::ModelStreamFrameKind::Finish
+        | animus_adapters::ModelStreamFrameKind::Cancelled => RuntimeEvent::ModelStreamEnded {
+            call_id: frame.call_id().clone(),
+            status: frame.kind(),
+        },
         animus_adapters::ModelStreamFrameKind::ContentDelta
         | animus_adapters::ModelStreamFrameKind::ThoughtDelta
         | animus_adapters::ModelStreamFrameKind::ToolCallDelta
-        | animus_adapters::ModelStreamFrameKind::Usage => RuntimeEvent::ModelStreamFrame { frame: frame.clone() },
+        | animus_adapters::ModelStreamFrameKind::Usage => RuntimeEvent::ModelStreamFrame {
+            frame: frame.clone(),
+        },
     }
 }
 
 fn terminal_reason(frame: &animus_adapters::ModelStreamFrame) -> String {
-    frame.body().map_or_else(|| String::from(frame.kind().as_str()), String::from)
+    frame
+        .body()
+        .map_or_else(|| String::from(frame.kind().as_str()), String::from)
 }

@@ -18,12 +18,9 @@
     )
 )]
 
+use crate::validation::{self, AdapterContractError, FieldName};
 use alloc::string::String;
 use alloc::vec::Vec;
-
-use crate::validation::AdapterContractError;
-use crate::validation::FieldName;
-use crate::validation::{self};
 
 const SOURCE_LABEL_FIELD: FieldName = FieldName::new("document_source_label");
 const FORMAT_FIELD: FieldName = FieldName::new("document_format");
@@ -430,10 +427,18 @@ impl DocumentSourceIdentity {
     /// or the observed hash differs from the expected source hash.
     pub fn new(draft: DocumentSourceIdentityDraft<'_>) -> Result<Self, DocumentIngestError> {
         let mut diagnostics = Vec::new();
-        let safe_source_label = validate_safe_label(SOURCE_LABEL_FIELD, draft.safe_source_label, &mut diagnostics);
-        let source_hash = validate_hash("document_source_hash", draft.source_hash, &mut diagnostics);
-        let observed_hash =
-            validate_hash("document_observed_source_hash", draft.observed_source_hash, &mut diagnostics);
+        let safe_source_label = validate_safe_label(
+            SOURCE_LABEL_FIELD,
+            draft.safe_source_label,
+            &mut diagnostics,
+        );
+        let source_hash =
+            validate_hash("document_source_hash", draft.source_hash, &mut diagnostics);
+        let observed_hash = validate_hash(
+            "document_observed_source_hash",
+            draft.observed_source_hash,
+            &mut diagnostics,
+        );
         if source_hash
             .as_ref()
             .zip(observed_hash.as_ref())
@@ -766,9 +771,13 @@ impl DocumentIngestReport {
     ///
     /// Returns diagnostics when the supplied context label is unsafe or safe
     /// receipt construction rejects metadata.
-    pub fn context_receipt(&self, context_label: &str) -> Result<crate::safe::receipt::Record, DocumentIngestError> {
+    pub fn context_receipt(
+        &self,
+        context_label: &str,
+    ) -> Result<crate::safe::receipt::Record, DocumentIngestError> {
         let mut diagnostics = Vec::new();
-        let context_label = validate_safe_label(CONTEXT_LABEL_FIELD, context_label, &mut diagnostics);
+        let context_label =
+            validate_safe_label(CONTEXT_LABEL_FIELD, context_label, &mut diagnostics);
         if !diagnostics.is_empty() {
             return Err(DocumentIngestError { diagnostics });
         }
@@ -828,7 +837,11 @@ impl DocumentIngestError {
 
 impl core::fmt::Display for DocumentIngestError {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(formatter, "document ingest validation failed with {} diagnostic(s)", self.diagnostics.len())
+        write!(
+            formatter,
+            "document ingest validation failed with {} diagnostic(s)",
+            self.diagnostics.len()
+        )
     }
 }
 
@@ -861,8 +874,10 @@ pub fn validate_document_ingest_report(
             None
         }
     };
-    let extractor_family = validate_safe_label(EXTRACTOR_FIELD, draft.extractor_family, &mut diagnostics);
-    let timeout_class = validate_safe_label(TIMEOUT_CLASS_FIELD, draft.timeout_class, &mut diagnostics);
+    let extractor_family =
+        validate_safe_label(EXTRACTOR_FIELD, draft.extractor_family, &mut diagnostics);
+    let timeout_class =
+        validate_safe_label(TIMEOUT_CLASS_FIELD, draft.timeout_class, &mut diagnostics);
     let sections = validate_sections(draft.sections, &mut diagnostics);
     let table_cells = validate_table_cells(draft.table_cells, &mut diagnostics);
     let metadata = validate_metadata(draft.metadata, &mut diagnostics);
@@ -872,17 +887,20 @@ pub fn validate_document_ingest_report(
     let non_claims = validate_non_claims(draft.non_claims, &mut diagnostics);
 
     if diagnostics.is_empty() {
-        return assemble_document_report(draft, DocumentAssembleParts {
-            source,
-            admitted_format,
-            extractor_family,
-            timeout_class,
-            sections,
-            table_cells,
-            metadata,
-            redactions,
-            non_claims,
-        });
+        return assemble_document_report(
+            draft,
+            DocumentAssembleParts {
+                source,
+                admitted_format,
+                extractor_family,
+                timeout_class,
+                sections,
+                table_cells,
+                metadata,
+                redactions,
+                non_claims,
+            },
+        );
     }
     Err(DocumentIngestError { diagnostics })
 }
@@ -921,7 +939,14 @@ fn assemble_document_report(
         Some(timeout_class),
         Some(redactions),
         Some(non_claims),
-    ) = (source, admitted_format, extractor_family, timeout_class, redactions, non_claims)
+    ) = (
+        source,
+        admitted_format,
+        extractor_family,
+        timeout_class,
+        redactions,
+        non_claims,
+    )
     else {
         return Err(DocumentIngestError {
             diagnostics: alloc::vec![DocumentIngestDiagnostic::new(
@@ -1033,7 +1058,11 @@ fn validate_sections(
             "document ingest section count exceeds DTO bound",
         ));
     }
-    drafts.iter().take(MAX_SECTIONS).filter_map(|draft| validate_section(*draft, diagnostics)).collect()
+    drafts
+        .iter()
+        .take(MAX_SECTIONS)
+        .filter_map(|draft| validate_section(*draft, diagnostics))
+        .collect()
 }
 
 fn validate_section(
@@ -1042,8 +1071,12 @@ fn validate_section(
 ) -> Option<DocumentSection> {
     let section_id = validate_safe_label(SECTION_ID_FIELD, draft.section_id, diagnostics);
     let heading = validate_safe_label(SECTION_HEADING_FIELD, draft.heading, diagnostics);
-    let summary =
-        validate_bounded_safe_text(SECTION_SUMMARY_FIELD, draft.summary, MAX_SECTION_SUMMARY_CHARS, diagnostics);
+    let summary = validate_bounded_safe_text(
+        SECTION_SUMMARY_FIELD,
+        draft.summary,
+        MAX_SECTION_SUMMARY_CHARS,
+        diagnostics,
+    );
     if draft.byte_count == ZERO_COUNT {
         diagnostics.push(DocumentIngestDiagnostic::new(
             DocumentIngestValidationIssue::BudgetViolation,
@@ -1051,12 +1084,15 @@ fn validate_section(
             "document section byte count must be positive",
         ));
     }
-    section_id.zip(heading).zip(summary).map(|((section_id, heading), summary)| DocumentSection {
-        section_id,
-        heading,
-        summary,
-        byte_count: draft.byte_count,
-    })
+    section_id
+        .zip(heading)
+        .zip(summary)
+        .map(|((section_id, heading), summary)| DocumentSection {
+            section_id,
+            heading,
+            summary,
+            byte_count: draft.byte_count,
+        })
 }
 
 fn validate_table_cells(
@@ -1082,14 +1118,20 @@ fn validate_table_cell(
     diagnostics: &mut Vec<DocumentIngestDiagnostic>,
 ) -> Option<DocumentTableCell> {
     let table_id = validate_safe_label(TABLE_ID_FIELD, draft.table_id, diagnostics);
-    let text_summary =
-        validate_bounded_safe_text(TABLE_CELL_FIELD, draft.text_summary, MAX_TABLE_CELL_CHARS, diagnostics);
-    table_id.zip(text_summary).map(|(table_id, text_summary)| DocumentTableCell {
-        table_id,
-        row_index: draft.row_index,
-        column_index: draft.column_index,
-        text_summary,
-    })
+    let text_summary = validate_bounded_safe_text(
+        TABLE_CELL_FIELD,
+        draft.text_summary,
+        MAX_TABLE_CELL_CHARS,
+        diagnostics,
+    );
+    table_id
+        .zip(text_summary)
+        .map(|(table_id, text_summary)| DocumentTableCell {
+            table_id,
+            row_index: draft.row_index,
+            column_index: draft.column_index,
+            text_summary,
+        })
 }
 
 fn validate_metadata(
@@ -1115,8 +1157,14 @@ fn validate_metadata_pair(
     diagnostics: &mut Vec<DocumentIngestDiagnostic>,
 ) -> Option<DocumentMetadata> {
     let key = validate_safe_label(METADATA_KEY_FIELD, draft.key, diagnostics);
-    let value = validate_bounded_safe_text(METADATA_VALUE_FIELD, draft.value, MAX_METADATA_VALUE_CHARS, diagnostics);
-    key.zip(value).map(|(key, value)| DocumentMetadata { key, value })
+    let value = validate_bounded_safe_text(
+        METADATA_VALUE_FIELD,
+        draft.value,
+        MAX_METADATA_VALUE_CHARS,
+        diagnostics,
+    );
+    key.zip(value)
+        .map(|(key, value)| DocumentMetadata { key, value })
 }
 
 fn validate_supplied_diagnostics(
@@ -1131,11 +1179,19 @@ fn validate_supplied_diagnostics(
         ));
     }
     for diagnostic in supplied.iter().take(MAX_DIAGNOSTICS) {
-        validate_bounded_safe_text(DIAGNOSTIC_FIELD, diagnostic.message(), MAX_DIAGNOSTIC_CHARS, diagnostics);
+        validate_bounded_safe_text(
+            DIAGNOSTIC_FIELD,
+            diagnostic.message(),
+            MAX_DIAGNOSTIC_CHARS,
+            diagnostics,
+        );
     }
 }
 
-fn validate_status_and_budget(draft: DocumentIngestReportDraft<'_>, diagnostics: &mut Vec<DocumentIngestDiagnostic>) {
+fn validate_status_and_budget(
+    draft: DocumentIngestReportDraft<'_>,
+    diagnostics: &mut Vec<DocumentIngestDiagnostic>,
+) {
     if draft.status == DocumentIngestStatus::Unsupported {
         diagnostics.push(DocumentIngestDiagnostic::new(
             DocumentIngestValidationIssue::UnsupportedFormat,
@@ -1175,8 +1231,14 @@ fn validate_status_and_budget(draft: DocumentIngestReportDraft<'_>, diagnostics:
     validate_over_budget(draft, diagnostics);
 }
 
-fn validate_caps(draft: DocumentIngestReportDraft<'_>, diagnostics: &mut Vec<DocumentIngestDiagnostic>) {
-    if draft.input_byte_cap < MIN_CAP || draft.output_byte_cap < MIN_CAP || draft.document_count_cap < MIN_CAP {
+fn validate_caps(
+    draft: DocumentIngestReportDraft<'_>,
+    diagnostics: &mut Vec<DocumentIngestDiagnostic>,
+) {
+    if draft.input_byte_cap < MIN_CAP
+        || draft.output_byte_cap < MIN_CAP
+        || draft.document_count_cap < MIN_CAP
+    {
         diagnostics.push(DocumentIngestDiagnostic::new(
             DocumentIngestValidationIssue::BudgetViolation,
             "document_budget",
@@ -1192,18 +1254,25 @@ fn validate_caps(draft: DocumentIngestReportDraft<'_>, diagnostics: &mut Vec<Doc
     }
 }
 
-fn validate_over_budget(draft: DocumentIngestReportDraft<'_>, diagnostics: &mut Vec<DocumentIngestDiagnostic>) {
+fn validate_over_budget(
+    draft: DocumentIngestReportDraft<'_>,
+    diagnostics: &mut Vec<DocumentIngestDiagnostic>,
+) {
     let input_over = draft.input_bytes > draft.input_byte_cap;
     let output_over = draft.output_bytes > draft.output_byte_cap;
     let documents_over = draft.document_count > draft.document_count_cap;
-    if (input_over || output_over || documents_over) && draft.truncation == DocumentTruncationStatus::None {
+    if (input_over || output_over || documents_over)
+        && draft.truncation == DocumentTruncationStatus::None
+    {
         diagnostics.push(DocumentIngestDiagnostic::new(
             DocumentIngestValidationIssue::BudgetViolation,
             "document_budget",
             "over-budget document ingest reports require truncation or rejection status",
         ));
     }
-    if draft.status == DocumentIngestStatus::Completed && draft.truncation == DocumentTruncationStatus::Rejected {
+    if draft.status == DocumentIngestStatus::Completed
+        && draft.truncation == DocumentTruncationStatus::Rejected
+    {
         diagnostics.push(DocumentIngestDiagnostic::new(
             DocumentIngestValidationIssue::BudgetViolation,
             "document_truncation",
@@ -1232,7 +1301,10 @@ fn validate_redactions(
             "document ingest reports require bounded-content and payload-hash redactions",
         ));
     }
-    if diagnostics.iter().any(|diagnostic| diagnostic.field() == "document_redactions") {
+    if diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.field() == "document_redactions")
+    {
         return None;
     }
     let mut redactions = values.to_vec();
@@ -1255,7 +1327,10 @@ fn validate_non_claims(
             break;
         }
     }
-    if diagnostics.iter().any(|diagnostic| diagnostic.field() == "document_non_claims") {
+    if diagnostics
+        .iter()
+        .any(|diagnostic| diagnostic.field() == "document_non_claims")
+    {
         return None;
     }
     let mut non_claims = values.to_vec();
@@ -1272,7 +1347,8 @@ fn contains_non_claim(values: &[DocumentIngestNonClaim], target: DocumentIngestN
     values.contains(&target)
 }
 
-fn required_document_non_claims() -> &'static [DocumentIngestNonClaim; REQUIRED_DOCUMENT_NON_CLAIMS] {
+fn required_document_non_claims() -> &'static [DocumentIngestNonClaim; REQUIRED_DOCUMENT_NON_CLAIMS]
+{
     &[
         DocumentIngestNonClaim::ParserSoundness,
         DocumentIngestNonClaim::ExtractionCompleteness,
@@ -1318,9 +1394,15 @@ fn build_receipt(
         crate::safe::receipt::BoundedCountDraft::new(FIELD_OUTPUT_BYTES, input.output_bytes),
         crate::safe::receipt::BoundedCountDraft::new(FIELD_DOCUMENT_COUNT, input.document_count),
         crate::safe::receipt::BoundedCountDraft::new(FIELD_SECTION_COUNT, input.section_count),
-        crate::safe::receipt::BoundedCountDraft::new(FIELD_TABLE_CELL_COUNT, input.table_cell_count),
+        crate::safe::receipt::BoundedCountDraft::new(
+            FIELD_TABLE_CELL_COUNT,
+            input.table_cell_count,
+        ),
         crate::safe::receipt::BoundedCountDraft::new(FIELD_METADATA_COUNT, input.metadata_count),
-        crate::safe::receipt::BoundedCountDraft::new(FIELD_DIAGNOSTIC_COUNT, input.diagnostic_count),
+        crate::safe::receipt::BoundedCountDraft::new(
+            FIELD_DIAGNOSTIC_COUNT,
+            input.diagnostic_count,
+        ),
         crate::safe::receipt::BoundedCountDraft::new(FIELD_NON_CLAIM_COUNT, input.non_claim_count),
         crate::safe::receipt::BoundedCountDraft::new(FIELD_REDACTION_COUNT, input.redaction_count),
     ];
@@ -1359,8 +1441,18 @@ fn receipt_labels(input: &ReceiptInput<'_>) -> Vec<String> {
         String::from(input.timeout_class),
         String::from(input.isolation.as_str()),
     ];
-    labels.extend(input.non_claims.iter().map(|claim| String::from(claim.as_str())));
-    labels.extend(input.redactions.iter().map(|redaction| String::from(redaction.as_str())));
+    labels.extend(
+        input
+            .non_claims
+            .iter()
+            .map(|claim| String::from(claim.as_str())),
+    );
+    labels.extend(
+        input
+            .redactions
+            .iter()
+            .map(|redaction| String::from(redaction.as_str())),
+    );
     if let Some(extra_label) = input.extra_label {
         labels.push(String::from(extra_label));
     }
@@ -1461,7 +1553,9 @@ fn is_safe_text(value: &str) -> bool {
     if lower.starts_with(ABSOLUTE_UNIX_PREFIX) {
         return false;
     }
-    !UNSAFE_TEXT_MARKERS.iter().any(|marker| lower.contains(marker))
+    !UNSAFE_TEXT_MARKERS
+        .iter()
+        .any(|marker| lower.contains(marker))
 }
 
 fn len_to_u32(value: usize) -> u32 {
@@ -1572,13 +1666,17 @@ mod tests {
         // r[verify document-ingest-adapters.positive]
         // r[verify document-ingest-adapters.report-dto]
         let fixture = Fixture::new();
-        let report =
-            validate_document_ingest_report(fixture.draft()).expect("valid document ingest report should pass");
+        let report = validate_document_ingest_report(fixture.draft())
+            .expect("valid document ingest report should pass");
 
         assert_eq!(report.admitted_format(), DocumentFormat::Markdown);
         assert_eq!(report.sections().len(), EXPECTED_SECTION_COUNT);
         assert_eq!(report.receipt().artifact_hashes()[0].as_str(), HASH_A);
-        assert!(report.non_claims().contains(&DocumentIngestNonClaim::SemanticTruth));
+        assert!(
+            report
+                .non_claims()
+                .contains(&DocumentIngestNonClaim::SemanticTruth)
+        );
         assert!(PROHIBITED_DOCUMENT_INGEST_EFFECTS.contains(&"filesystem reads"));
     }
 
@@ -1586,11 +1684,18 @@ mod tests {
     fn document_context_receipt_preserves_non_claim_labels() {
         // r[verify document-ingest-adapters.validation]
         let fixture = Fixture::new();
-        let report =
-            validate_document_ingest_report(fixture.draft()).expect("valid document ingest report should pass");
-        let receipt = report.context_receipt(CONTEXT_LABEL).expect("context receipt should preserve non-claims");
+        let report = validate_document_ingest_report(fixture.draft())
+            .expect("valid document ingest report should pass");
+        let receipt = report
+            .context_receipt(CONTEXT_LABEL)
+            .expect("context receipt should preserve non-claims");
 
-        assert!(receipt.labels().iter().any(|label| label == DocumentIngestNonClaim::ParserSoundness.as_str()));
+        assert!(
+            receipt
+                .labels()
+                .iter()
+                .any(|label| label == DocumentIngestNonClaim::ParserSoundness.as_str())
+        );
         assert!(receipt.labels().iter().any(|label| label == CONTEXT_LABEL));
     }
 
@@ -1601,20 +1706,32 @@ mod tests {
         let fixture = Fixture::new();
         let mut unsupported = fixture.draft();
         unsupported.admitted_format = "docx-macro";
-        assert_issue(validate_document_ingest_report(unsupported), DocumentIngestValidationIssue::UnsupportedFormat);
+        assert_issue(
+            validate_document_ingest_report(unsupported),
+            DocumentIngestValidationIssue::UnsupportedFormat,
+        );
 
         let mut stale = fixture.draft();
         stale.source.observed_source_hash = HASH_B;
-        assert_issue(validate_document_ingest_report(stale), DocumentIngestValidationIssue::StaleSourceHash);
+        assert_issue(
+            validate_document_ingest_report(stale),
+            DocumentIngestValidationIssue::StaleSourceHash,
+        );
 
         let mut over_budget = fixture.draft();
         over_budget.output_bytes = OUTPUT_CAP.saturating_add(DOCUMENT_COUNT);
-        assert_issue(validate_document_ingest_report(over_budget), DocumentIngestValidationIssue::BudgetViolation);
+        assert_issue(
+            validate_document_ingest_report(over_budget),
+            DocumentIngestValidationIssue::BudgetViolation,
+        );
 
         let mut parser_failure = fixture.draft();
         parser_failure.status = DocumentIngestStatus::ParserFailed;
         parser_failure.diagnostics = &[];
-        assert_issue(validate_document_ingest_report(parser_failure), DocumentIngestValidationIssue::ParserFailure);
+        assert_issue(
+            validate_document_ingest_report(parser_failure),
+            DocumentIngestValidationIssue::ParserFailure,
+        );
 
         let mut missing_non_claim = fixture.draft();
         missing_non_claim.non_claims = &[];
@@ -1625,17 +1742,29 @@ mod tests {
 
         let mut raw_path = fixture.draft();
         raw_path.source.safe_source_label = "/home/example/private.pdf";
-        assert_issue(validate_document_ingest_report(raw_path), DocumentIngestValidationIssue::UnsafeMetadata);
+        assert_issue(
+            validate_document_ingest_report(raw_path),
+            DocumentIngestValidationIssue::UnsafeMetadata,
+        );
 
         let mut trusted = fixture.draft();
         trusted.content_trust = DocumentContentTrust::TrustedContent;
-        assert_issue(validate_document_ingest_report(trusted), DocumentIngestValidationIssue::TrustedContentLabel);
+        assert_issue(
+            validate_document_ingest_report(trusted),
+            DocumentIngestValidationIssue::TrustedContentLabel,
+        );
     }
 
-    fn assert_issue(result: Result<DocumentIngestReport, DocumentIngestError>, issue: DocumentIngestValidationIssue) {
+    fn assert_issue(
+        result: Result<DocumentIngestReport, DocumentIngestError>,
+        issue: DocumentIngestValidationIssue,
+    ) {
         let error = result.expect_err("fixture should fail");
         assert!(
-            error.diagnostics().iter().any(|diagnostic| diagnostic.issue() == issue),
+            error
+                .diagnostics()
+                .iter()
+                .any(|diagnostic| diagnostic.issue() == issue),
             "expected issue {issue:?}, got {:?}",
             error.diagnostics()
         );

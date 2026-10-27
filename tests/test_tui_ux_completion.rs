@@ -807,3 +807,65 @@ fn canvas_renders_bounded_image_metadata_fallback_without_raw_bytes() {
     assert!(rendered.contains("image/png"), "metadata missing: {rendered}");
     assert!(!rendered.contains(RAW_IMAGE_BYTES), "raw bytes rendered: {rendered}");
 }
+
+// r[verify lattice.tui_ux.portable_authoring_parity.verification]
+// r[verify lattice.tui_ux.portable_authoring_parity.discoverability.scenario.help]
+#[cfg(unix)]
+#[test]
+fn operator_e2e_tui_process_authors_http_and_recovers_invalid_constrained_draft() {
+    let temp_dir = tempfile::tempdir().expect("authoring PTY directory");
+    let config_path = write_cli_config(&temp_dir);
+    let mut session = TuiPtySession::start(&config_path, temp_dir.path());
+    session.wait(TUI_WORKSPACE_SURFACES, "the initial authoring workspace");
+    let cursor = session.cursor();
+    session.input(b"\x17", "open typed workflow authoring");
+    session.wait_fresh(cursor, &["Typed Authoring", "Workflow name"], "the typed metadata browser");
+    let cursor = session.cursor();
+    session.input(b"\r\x15\r", "reject an empty workflow name without applying it");
+    session.wait_fresh(cursor, &["workflow name cannot be blank"], "recoverable workflow-name validation");
+    let cursor = session.cursor();
+    session.resize(PTY_CONSTRAINED_ROWS, PTY_CONSTRAINED_COLUMNS);
+    session.wait_fresh(cursor, &["Esc back"], "visible constrained-draft recovery");
+    session.input(TUI_ESCAPE_INPUT, "cancel the invalid metadata draft");
+    let cursor = session.cursor();
+    session.resize(PTY_ROWS, PTY_COLUMNS);
+    session.wait_fresh(cursor, &["Workflow name", "untitled"], "the unchanged prior name after cancellation");
+    let cursor = session.cursor();
+    session.input(b"\r\x15operator-authoring-pty\r", "author and validate the workflow name");
+    session.wait_fresh(cursor, &["operator-authoring-pty"], "the authored workflow name");
+    session.input(TUI_ESCAPE_INPUT, "close typed metadata authoring");
+    let cursor = session.cursor();
+    session.input(b"\x0eh\r", "choose guided HTTP creation");
+    session.wait_fresh(cursor, &["HTTP request (METHOD URL)"], "the typed HTTP request draft");
+    let mut request = vec![0x7f; 64];
+    request.extend_from_slice(b"GET https://example.invalid/authored\r");
+    let cursor = session.cursor();
+    session.input(&request, "create an HTTP definition without dispatching a request");
+    session.wait_fresh(cursor, &["HTTP 1"], "the authored HTTP node on the canvas");
+    let cursor = session.cursor();
+    session.input(b"\x13", "persist the authored workflow");
+    session.wait_fresh(cursor, &["Saved 'operator-authoring-pty'"], "the actual save result");
+    session.input(TUI_QUIT_INPUT, "exit the saved authoring session");
+    let (status, transcript) = session.finish();
+    assert!(status.success(), "authoring TUI exit: {status}; transcript: {transcript}");
+    let store = Store::new(temp_dir.path().join("data").join(STORE_FILE_NAME)).unwrap();
+    let workflow = store.load_workflow("operator-authoring-pty").unwrap().unwrap();
+    assert_eq!(workflow.meta.name, "operator-authoring-pty");
+    let config = workflow.configs.values().next().expect("authored HTTP config");
+    let lattice::engine::workflow::NodeConfig::Http { method, url, .. } = config else {
+        panic!("persisted config is not HTTP")
+    };
+    assert_eq!(method, "GET");
+    assert_eq!(url, "https://example.invalid/authored");
+    assert!(
+        store.list_runs(TUI_RUN_HISTORY_LIMIT).unwrap().is_empty(),
+        "authoring must not dispatch a workflow run"
+    );
+    let nickel = temp_dir.path().join("authored.ncl");
+    std::fs::write(&nickel, lattice::workflow_format::workflow_to_nickel(&workflow)).unwrap();
+    let imported = lattice::workflow_format::load_workflow_nickel_file(&nickel).unwrap();
+    assert_eq!(
+        lattice::workflow_format::workflow_to_portable(&imported),
+        lattice::workflow_format::workflow_to_portable(&workflow)
+    );
+}

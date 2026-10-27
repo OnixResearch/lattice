@@ -2,8 +2,10 @@ const FILE_INCLUSION_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("workspace_file_inclusion");
 const WORKSPACE_OPERATION_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("workspace_operation");
-const COMMIT_TARGET_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("workspace_commit_target");
-const ABORT_POLICY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("workspace_abort_policy");
+const COMMIT_TARGET_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("workspace_commit_target");
+const ABORT_POLICY_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("workspace_abort_policy");
 const CONFLICT_POLICY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("workspace_conflict_policy");
 const CLEANUP_POLICY_FIELD: crate::validation::FieldName =
@@ -79,12 +81,16 @@ impl Operation {
     ///
     /// Returns [`crate::AdapterContractError`] for empty, malformed, or unknown values.
     pub fn parse(value: &str) -> Result<Self, crate::AdapterContractError> {
-        super::text::parse_value(WORKSPACE_OPERATION_FIELD, value, |normalized| match normalized {
-            OPERATION_CREATE => Some(Self::Create),
-            OPERATION_COMMIT => Some(Self::Commit),
-            OPERATION_ABORT => Some(Self::Abort),
-            _ => None,
-        })
+        super::text::parse_value(
+            WORKSPACE_OPERATION_FIELD,
+            value,
+            |normalized| match normalized {
+                OPERATION_CREATE => Some(Self::Create),
+                OPERATION_COMMIT => Some(Self::Commit),
+                OPERATION_ABORT => Some(Self::Abort),
+                _ => None,
+            },
+        )
     }
 
     /// Returns the stable operation label.
@@ -180,11 +186,15 @@ impl ConflictPolicy {
     ///
     /// Returns [`crate::AdapterContractError`] for empty, malformed, or unknown values.
     pub fn parse(value: &str) -> Result<Self, crate::AdapterContractError> {
-        super::text::parse_value(CONFLICT_POLICY_FIELD, value, |normalized| match normalized {
-            CONFLICT_POLICY_FAIL => Some(Self::Fail),
-            CONFLICT_POLICY_ALLOW_MANUAL => Some(Self::AllowManual),
-            _ => None,
-        })
+        super::text::parse_value(
+            CONFLICT_POLICY_FIELD,
+            value,
+            |normalized| match normalized {
+                CONFLICT_POLICY_FAIL => Some(Self::Fail),
+                CONFLICT_POLICY_ALLOW_MANUAL => Some(Self::AllowManual),
+                _ => None,
+            },
+        )
     }
 
     /// Returns the stable conflict-policy label.

@@ -57,6 +57,11 @@ fn handle_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
         _ => {}
     }
 
+    if app.authoring.is_some() {
+        handle_authoring_key(app, key);
+        return None;
+    }
+
     if app.property_edit.is_some() {
         handle_property_edit_key(app, key);
         return None;
@@ -109,6 +114,7 @@ fn handle_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
         (KeyModifiers::CONTROL, KeyCode::Char('o')) => return Some(AppAction::OpenWorkflow),
         (KeyModifiers::CONTROL, KeyCode::Char('l')) => return Some(AppAction::AutoLayout),
         (KeyModifiers::CONTROL, KeyCode::Char('e')) => return Some(AppAction::EditNodeCommand),
+        (KeyModifiers::CONTROL, KeyCode::Char('w')) => return Some(AppAction::OpenAuthoring("all")),
         _ => {}
     }
 
@@ -123,6 +129,46 @@ fn handle_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
         FocusPanel::Canvas => handle_canvas_key(app, key),
         FocusPanel::Properties => handle_properties_key(app, key),
         FocusPanel::Output => handle_output_key(app, key),
+    }
+}
+
+fn handle_authoring_key(app: &mut App, key: &KeyEvent) {
+    if key.code == KeyCode::Esc {
+        app.cancel_authoring();
+        return;
+    }
+    if key.code == KeyCode::Enter {
+        app.confirm_authoring();
+        return;
+    }
+    let Some(state) = &mut app.authoring else {
+        return;
+    };
+    if let Some(draft) = &mut state.draft {
+        match (key.modifiers, key.code) {
+            (KeyModifiers::CONTROL, KeyCode::Char('u')) => draft.text.clear(),
+            (KeyModifiers::CONTROL, KeyCode::Char('j')) => draft.text.push('\n'),
+            (_, KeyCode::Backspace) => {
+                draft.text.pop();
+            }
+            (modifiers, KeyCode::Char(ch)) if accepts_palette_text(modifiers) => draft.text.push(ch),
+            _ => {}
+        }
+        state.error = None;
+    } else {
+        match key.code {
+            KeyCode::Up => state.selected = state.selected.saturating_sub(1),
+            KeyCode::Down | KeyCode::Tab => {
+                state.selected = state.selected.saturating_add(1).min(state.fields.len().saturating_sub(1))
+            }
+            KeyCode::Home => state.selected = 0,
+            KeyCode::End => state.selected = state.fields.len().saturating_sub(1),
+            KeyCode::PageUp => state.selected = state.selected.saturating_sub(8),
+            KeyCode::PageDown => {
+                state.selected = state.selected.saturating_add(8).min(state.fields.len().saturating_sub(1))
+            }
+            _ => {}
+        }
     }
 }
 
@@ -695,6 +741,11 @@ fn is_drag_release(start: Option<(i32, i32)>, end: CanvasPosition) -> bool {
 }
 
 fn handle_mouse(app: &mut App, mouse: &MouseEvent) -> Option<AppAction> {
+    if app.authoring.is_some() || app.property_edit.is_some() {
+        // Keep modal ownership stable instead of mutating the graph behind a draft.
+        return None;
+    }
+
     match mouse.kind {
         MouseEventKind::Down(crossterm::event::MouseButton::Left) => {
             let before = graph_counts(app);

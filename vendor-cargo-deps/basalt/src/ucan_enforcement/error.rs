@@ -1,18 +1,11 @@
-use std::fmt;
-
-use ucan::AuthorizationDenialReason;
-use ucan::HolderInvocationError;
-use ucan::HolderInvocationReplayError;
-use ucan::KeyResolverError;
-use ucan::OperationProfileAdmissionError;
-use ucan::ProofStoreError;
-use ucan::TokenError;
-use ucan::VerificationLimitError;
-
-use super::receipt::ReceiptContext;
-use super::receipt::UcanEnforcementReceipt;
-use super::receipt::build_receipt;
+use super::receipt::{ReceiptContext, UcanEnforcementReceipt, build_receipt};
 use super::types::UcanEnforcementReason;
+use std::fmt;
+use ucan::{
+    AuthorizationDenialReason, HolderInvocationError, HolderInvocationReplayError,
+    KeyResolverError, OperationProfileAdmissionError, ProofStoreError, TokenError,
+    VerificationLimitError,
+};
 
 /// Typed fail-closed adapter error with redacted evidence only.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,13 +30,20 @@ impl UcanEnforcementFailure {
 
 impl fmt::Display for UcanEnforcementFailure {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "UCAN enforcement denied: {}", self.reason.as_str())
+        write!(
+            formatter,
+            "UCAN enforcement denied: {}",
+            self.reason.as_str()
+        )
     }
 }
 
 impl std::error::Error for UcanEnforcementFailure {}
 
-pub(super) fn failure(reason: UcanEnforcementReason, context: ReceiptContext) -> UcanEnforcementFailure {
+pub(super) fn failure(
+    reason: UcanEnforcementReason,
+    context: ReceiptContext,
+) -> UcanEnforcementFailure {
     UcanEnforcementFailure {
         reason,
         receipt: Box::new(build_receipt(reason, false, context)),
@@ -60,9 +60,9 @@ pub(super) const fn token_error_reason(error: &TokenError) -> UcanEnforcementRea
         TokenError::MissingVerificationKey { .. } => UcanEnforcementReason::KeyResolutionDenied,
         TokenError::KeyResolver { source } => key_resolver_error_reason(source),
         TokenError::ProofStore { source } => proof_store_error_reason(source),
-        TokenError::ProofChain { .. } | TokenError::Attenuation { .. } | TokenError::SelfDelegation { .. } => {
-            UcanEnforcementReason::ProofDenied
-        }
+        TokenError::ProofChain { .. }
+        | TokenError::Attenuation { .. }
+        | TokenError::SelfDelegation { .. } => UcanEnforcementReason::ProofDenied,
         TokenError::Revoked { .. } => UcanEnforcementReason::Revoked,
         TokenError::Revocation { .. }
         | TokenError::BackendTranscript { .. }
@@ -88,18 +88,22 @@ pub(super) const fn token_error_reason(error: &TokenError) -> UcanEnforcementRea
     }
 }
 
-pub(super) const fn authorization_error_reason(reason: &AuthorizationDenialReason) -> UcanEnforcementReason {
+pub(super) const fn authorization_error_reason(
+    reason: &AuthorizationDenialReason,
+) -> UcanEnforcementReason {
     match reason {
-        AuthorizationDenialReason::CaveatRejected { .. } | AuthorizationDenialReason::CaveatPolicyMissing { .. } => {
+        AuthorizationDenialReason::CaveatRejected { .. }
+        | AuthorizationDenialReason::CaveatPolicyMissing { .. } => {
             UcanEnforcementReason::CaveatDenied
         }
-        AuthorizationDenialReason::MalformedRequest { .. } | AuthorizationDenialReason::NoMatchingCapability => {
-            UcanEnforcementReason::ScopeDenied
-        }
+        AuthorizationDenialReason::MalformedRequest { .. }
+        | AuthorizationDenialReason::NoMatchingCapability => UcanEnforcementReason::ScopeDenied,
     }
 }
 
-pub(super) const fn profile_error_reason(error: OperationProfileAdmissionError) -> UcanEnforcementReason {
+pub(super) const fn profile_error_reason(
+    error: OperationProfileAdmissionError,
+) -> UcanEnforcementReason {
     match error {
         OperationProfileAdmissionError::UnknownProfile => UcanEnforcementReason::OperationMismatch,
         OperationProfileAdmissionError::Backend => UcanEnforcementReason::BackendUnavailable,
@@ -114,7 +118,9 @@ pub(super) const fn holder_error_reason(error: &HolderInvocationError) -> UcanEn
         | HolderInvocationError::Canonical {
             source:
                 ucan::core::holder_invocation::HolderInvocationCanonicalError::EmptyField { .. }
-                | ucan::core::holder_invocation::HolderInvocationCanonicalError::OutputLengthMismatch { .. },
+                | ucan::core::holder_invocation::HolderInvocationCanonicalError::OutputLengthMismatch {
+                    ..
+                },
         } => UcanEnforcementReason::MalformedCredential,
         HolderInvocationError::Canonical { .. } | HolderInvocationError::Limit { .. } => {
             UcanEnforcementReason::LimitExceeded
@@ -132,8 +138,12 @@ pub(super) const fn holder_error_reason(error: &HolderInvocationError) -> UcanEn
 
 const fn proof_store_error_reason(error: &ProofStoreError) -> UcanEnforcementReason {
     match error {
-        ProofStoreError::MissingProof { .. } | ProofStoreError::Malformed { .. } => UcanEnforcementReason::ProofDenied,
-        ProofStoreError::Stale { .. } | ProofStoreError::Backend { .. } => UcanEnforcementReason::BackendUnavailable,
+        ProofStoreError::MissingProof { .. }
+        | ProofStoreError::Malformed { .. }
+        | ProofStoreError::ReferenceMismatch { .. } => UcanEnforcementReason::ProofDenied,
+        ProofStoreError::Stale { .. } | ProofStoreError::Backend { .. } => {
+            UcanEnforcementReason::BackendUnavailable
+        }
     }
 }
 
@@ -142,7 +152,9 @@ const fn key_resolver_error_reason(error: &KeyResolverError) -> UcanEnforcementR
         KeyResolverError::MissingKey { .. }
         | KeyResolverError::UnsupportedMethod { .. }
         | KeyResolverError::Malformed { .. } => UcanEnforcementReason::KeyResolutionDenied,
-        KeyResolverError::Stale { .. } | KeyResolverError::Backend { .. } => UcanEnforcementReason::BackendUnavailable,
+        KeyResolverError::Stale { .. } | KeyResolverError::Backend { .. } => {
+            UcanEnforcementReason::BackendUnavailable
+        }
     }
 }
 

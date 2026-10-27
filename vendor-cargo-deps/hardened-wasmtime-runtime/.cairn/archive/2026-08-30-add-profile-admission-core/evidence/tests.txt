@@ -1,0 +1,22 @@
+hardened-wasmtime-runtime development environment
+Rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+Gates:
+  cargo test
+  nix run .#octet-deny-all -- --workspace -- --all-targets
+  nix flake check -L
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s
+     Running unittests src/lib.rs (target/debug/deps/hardened_wasmtime_runtime-bc35329daa81ea39)
+
+running 8 tests
+test tests::outcome_classes_are_distinct_and_stable ... ok
+test parity::tests::forced_divergence_is_detected_and_named ... ok
+test parity::tests::oracle_classifies_exact_matches_and_drift ... ok
+test tests::positive_limits_round_trip_exactly ... ok
+test tests::strategy_names_are_stable ... ok
+test tests::zero_bounds_fail_closed_naming_the_field ... ok
+test parity::tests::independence_gate_rejects_duplicate_and_single_backend ... ok
+test parity::tests::corpus_agrees_across_strategies_with_stable_identities ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+

@@ -1,32 +1,18 @@
 use super::Text;
-use super::consts::CONTEXT_AGENT_FIELD;
-use super::consts::CONTEXT_PANE_FIELD;
-use super::consts::CONTEXT_PLUGIN_CONFIG_FIELD;
-use super::consts::CONTEXT_PLUGIN_ROOT_FIELD;
-use super::consts::CONTEXT_PLUGIN_STATE_FIELD;
-use super::consts::CONTEXT_REQUEST_FIELD;
-use super::consts::CONTEXT_SESSION_FIELD;
-use super::consts::CONTEXT_SOURCE_METADATA_FIELD;
-use super::consts::CONTEXT_TAB_FIELD;
-use super::consts::CONTEXT_WORKSPACE_FIELD;
-use super::consts::CONTEXT_WORKTREE_FIELD;
-use super::consts::ROLE_KIND_ACTION;
-use super::consts::ROLE_KIND_EVENT_HOOK;
-use super::consts::ROLE_KIND_HOST_PANE_ENTRYPOINT;
-use super::consts::ROLE_KIND_LINK_HANDLER;
+use super::consts::{
+    CONTEXT_AGENT_FIELD, CONTEXT_PANE_FIELD, CONTEXT_PLUGIN_CONFIG_FIELD,
+    CONTEXT_PLUGIN_ROOT_FIELD, CONTEXT_PLUGIN_STATE_FIELD, CONTEXT_REQUEST_FIELD,
+    CONTEXT_SESSION_FIELD, CONTEXT_SOURCE_METADATA_FIELD, CONTEXT_TAB_FIELD,
+    CONTEXT_WORKSPACE_FIELD, CONTEXT_WORKTREE_FIELD, ROLE_KIND_ACTION, ROLE_KIND_EVENT_HOOK,
+    ROLE_KIND_HOST_PANE_ENTRYPOINT, ROLE_KIND_LINK_HANDLER,
+};
 use super::context::validate_invocation_label;
-use super::types::PluginCompatibility;
-use super::types::PluginDiagnostic;
-use super::types::PluginDiagnosticKind;
-use super::types::PluginDiagnosticSeverity;
-use super::types::PluginInvocationContext;
-use super::types::PluginInvocationContextDraft;
-use super::types::PluginInvocationContextLeak;
-use super::types::PluginRegistryOperationKind;
-use super::types::PluginRegistryPlan;
-use super::types::PluginRegistryPlanStatus;
-use super::types::PluginRole;
-use super::types::PluginRoleKind;
+use super::types::{
+    PluginCompatibility, PluginDiagnostic, PluginDiagnosticKind, PluginDiagnosticSeverity,
+    PluginInvocationContext, PluginInvocationContextDraft, PluginInvocationContextLeak,
+    PluginRegistryOperationKind, PluginRegistryPlan, PluginRegistryPlanStatus, PluginRole,
+    PluginRoleKind,
+};
 
 impl PluginCompatibility {
     /// Returns the minimum host version label.
@@ -140,21 +126,44 @@ impl PluginInvocationContext {
     /// Returns [`PluginDescriptorError`] when a required context field is missing,
     /// invalid, or contains raw prompts, transcripts, credentials, private paths,
     /// unbounded logs, or provider payloads.
-    pub fn validate(draft: &PluginInvocationContextDraft<'_>) -> Result<Self, super::super::PluginDescriptorError> {
+    pub fn validate(
+        draft: &PluginInvocationContextDraft<'_>,
+    ) -> Result<Self, super::super::PluginDescriptorError> {
         Ok(Self {
-            workspace_label: validate_invocation_label(CONTEXT_WORKSPACE_FIELD, draft.workspace_label)?,
+            workspace_label: validate_invocation_label(
+                CONTEXT_WORKSPACE_FIELD,
+                draft.workspace_label,
+            )?,
             tab_label: validate_invocation_label(CONTEXT_TAB_FIELD, draft.tab_label)?,
             pane_label: validate_invocation_label(CONTEXT_PANE_FIELD, draft.pane_label)?,
-            agent_status_label: validate_invocation_label(CONTEXT_AGENT_FIELD, draft.agent_status_label)?,
+            agent_status_label: validate_invocation_label(
+                CONTEXT_AGENT_FIELD,
+                draft.agent_status_label,
+            )?,
             worktree_provenance_label: validate_invocation_label(
                 CONTEXT_WORKTREE_FIELD,
                 draft.worktree_provenance_label,
             )?,
-            session_provenance_label: validate_invocation_label(CONTEXT_SESSION_FIELD, draft.session_provenance_label)?,
-            request_identity: validate_invocation_label(CONTEXT_REQUEST_FIELD, draft.request_identity)?,
-            plugin_root_label: validate_invocation_label(CONTEXT_PLUGIN_ROOT_FIELD, draft.plugin_root_label)?,
-            plugin_config_label: validate_invocation_label(CONTEXT_PLUGIN_CONFIG_FIELD, draft.plugin_config_label)?,
-            plugin_state_label: validate_invocation_label(CONTEXT_PLUGIN_STATE_FIELD, draft.plugin_state_label)?,
+            session_provenance_label: validate_invocation_label(
+                CONTEXT_SESSION_FIELD,
+                draft.session_provenance_label,
+            )?,
+            request_identity: validate_invocation_label(
+                CONTEXT_REQUEST_FIELD,
+                draft.request_identity,
+            )?,
+            plugin_root_label: validate_invocation_label(
+                CONTEXT_PLUGIN_ROOT_FIELD,
+                draft.plugin_root_label,
+            )?,
+            plugin_config_label: validate_invocation_label(
+                CONTEXT_PLUGIN_CONFIG_FIELD,
+                draft.plugin_config_label,
+            )?,
+            plugin_state_label: validate_invocation_label(
+                CONTEXT_PLUGIN_STATE_FIELD,
+                draft.plugin_state_label,
+            )?,
             source_metadata_label: validate_invocation_label(
                 CONTEXT_SOURCE_METADATA_FIELD,
                 draft.source_metadata_label,

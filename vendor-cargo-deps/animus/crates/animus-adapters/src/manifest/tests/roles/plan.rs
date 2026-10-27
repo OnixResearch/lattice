@@ -55,7 +55,10 @@ fn plans_invocation_and_blocks_incompatible_hosts_without_dispatch() {
     assert!(plan.diagnostics().is_empty());
     assert_blocked_with(&newer_plan, PluginDiagnosticKind::NewerHostRequired);
     assert_blocked_with(&platform_plan, PluginDiagnosticKind::UnsupportedPlatform);
-    assert_blocked_with(&capability_plan, PluginDiagnosticKind::MissingHostCapability);
+    assert_blocked_with(
+        &capability_plan,
+        PluginDiagnosticKind::MissingHostCapability,
+    );
 }
 
 #[test]
@@ -83,8 +86,8 @@ fn distinguishes_warnings_from_invocation_blockers() {
     ));
 
     let context = safe_context();
-    let future_event_operation_plan =
-        descriptor_with_drafts(DECLARED_ROLES).plan_registry_operation(&registry_request(
+    let future_event_operation_plan = descriptor_with_drafts(DECLARED_ROLES)
+        .plan_registry_operation(&registry_request(
             PluginRegistryOperationKind::PlanEvent,
             None,
             Some(UNKNOWN_EVENT_NAME),
@@ -94,11 +97,23 @@ fn distinguishes_warnings_from_invocation_blockers() {
         ));
 
     assert_eq!(link_plan.status(), PluginRegistryPlanStatus::Warning);
-    assert_eq!(missing_scheme_plan.status(), PluginRegistryPlanStatus::Warning);
-    assert_eq!(future_event_operation_plan.status(), PluginRegistryPlanStatus::Blocked);
+    assert_eq!(
+        missing_scheme_plan.status(),
+        PluginRegistryPlanStatus::Warning
+    );
+    assert_eq!(
+        future_event_operation_plan.status(),
+        PluginRegistryPlanStatus::Blocked
+    );
     assert_warning_with(&link_plan, PluginDiagnosticKind::UnknownEvent);
-    assert_warning_with(&missing_scheme_plan, PluginDiagnosticKind::MissingOptionalMetadata);
-    assert_blocked_with(&future_event_operation_plan, PluginDiagnosticKind::UnsupportedEvent);
+    assert_warning_with(
+        &missing_scheme_plan,
+        PluginDiagnosticKind::MissingOptionalMetadata,
+    );
+    assert_blocked_with(
+        &future_event_operation_plan,
+        PluginDiagnosticKind::UnsupportedEvent,
+    );
 }
 
 #[test]

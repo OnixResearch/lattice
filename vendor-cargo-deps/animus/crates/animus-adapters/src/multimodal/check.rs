@@ -27,7 +27,9 @@ pub(super) fn normalized_safe_text(
     Ok(normalized)
 }
 
-pub(super) fn validate_hints(raw_hints: &[&str]) -> Result<alloc::vec::Vec<alloc::string::String>, super::Error> {
+pub(super) fn validate_hints(
+    raw_hints: &[&str],
+) -> Result<alloc::vec::Vec<alloc::string::String>, super::Error> {
     assert!(raw_hints.len() <= crate::validation::MAX_ADAPTER_FIELD_CHARS);
     let mut hints = alloc::vec::Vec::with_capacity(raw_hints.len());
     for hint in raw_hints {
@@ -42,7 +44,10 @@ pub(super) fn validate_receipt_fragments(
     assert!(raw_fragments.len() <= crate::validation::MAX_ADAPTER_FIELD_CHARS);
     let mut fragments = alloc::vec::Vec::with_capacity(raw_fragments.len());
     for fragment in raw_fragments {
-        fragments.push(normalized_safe_text(super::METADATA_FRAGMENT_FIELD, fragment)?);
+        fragments.push(normalized_safe_text(
+            super::METADATA_FRAGMENT_FIELD,
+            fragment,
+        )?);
     }
     Ok(fragments)
 }
@@ -60,12 +65,21 @@ pub(super) const fn validate_byte_count(input: ByteLimitInput) -> Result<(), sup
     Ok(())
 }
 
-pub(super) const fn validate_dimensions(width_px: Option<u32>, height_px: Option<u32>) -> Result<(), super::Error> {
+pub(super) const fn validate_dimensions(
+    width_px: Option<u32>,
+    height_px: Option<u32>,
+) -> Result<(), super::Error> {
     if invalid_dimension(width_px) {
-        return Err(super::Error::InvalidDimensions { width_px, height_px });
+        return Err(super::Error::InvalidDimensions {
+            width_px,
+            height_px,
+        });
     }
     if invalid_dimension(height_px) {
-        return Err(super::Error::InvalidDimensions { width_px, height_px });
+        return Err(super::Error::InvalidDimensions {
+            width_px,
+            height_px,
+        });
     }
     Ok(())
 }
@@ -98,11 +112,17 @@ fn unsafe_content_reason(value: &str) -> Option<super::UnsafeContentReason> {
     if is_data_url_like(lower.as_str()) {
         return Some(super::UnsafeContentReason::DataUrl);
     }
+    if lower.starts_with("http://") || lower.starts_with("https://") {
+        return Some(super::UnsafeContentReason::RemoteUrl);
+    }
     if lower.contains("base64") {
         return Some(super::UnsafeContentReason::Base64Payload);
     }
     if is_raw_bytes_like(lower.as_str()) {
         return Some(super::UnsafeContentReason::RawBytes);
+    }
+    if lower.contains("frame_body") || lower.contains("audio_body") {
+        return Some(super::UnsafeContentReason::MediaBody);
     }
     if is_absolute_or_private_path(PathProbe {
         value,

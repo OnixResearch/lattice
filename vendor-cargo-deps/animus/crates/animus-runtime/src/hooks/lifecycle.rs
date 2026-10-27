@@ -107,9 +107,11 @@ impl LifecycleHookEventKind {
             "subagent_stop" => Ok(Self::SubagentStop),
             "workflow_completion" => Ok(Self::WorkflowCompletion),
             "stop" => Ok(Self::Stop),
-            unsupported => {
-                Err(LifecycleHookError::new(LifecycleHookErrorKind::UnknownEvent, "event_kind", unsupported))
-            }
+            unsupported => Err(LifecycleHookError::new(
+                LifecycleHookErrorKind::UnknownEvent,
+                "event_kind",
+                unsupported,
+            )),
         }
     }
 
@@ -157,9 +159,10 @@ impl LifecycleHookEventKind {
             LifecycleHookCapability::RequestContinuation => {
                 matches!(self, Self::PostTurn | Self::Stop)
             }
-            LifecycleHookCapability::RequestRevalidation => {
-                matches!(self, Self::ModelRequest | Self::PreToolUse | Self::PreMutation | Self::Validation)
-            }
+            LifecycleHookCapability::RequestRevalidation => matches!(
+                self,
+                Self::ModelRequest | Self::PreToolUse | Self::PreMutation | Self::Validation
+            ),
         }
     }
 
@@ -175,7 +178,9 @@ impl LifecycleHookEventKind {
                     | Self::SubagentStart
             ),
             LifecycleHookEffectKind::Warning => true,
-            LifecycleHookEffectKind::Deny => self.supports_capability(LifecycleHookCapability::Deny),
+            LifecycleHookEffectKind::Deny => {
+                self.supports_capability(LifecycleHookCapability::Deny)
+            }
             LifecycleHookEffectKind::RequestContinuation => {
                 self.supports_capability(LifecycleHookCapability::RequestContinuation)
             }
@@ -325,7 +330,11 @@ impl LifecycleHookDefinition {
         let event_kind = LifecycleHookEventKind::parse(draft.event_kind)?;
         let capabilities = validate_capabilities(event_kind, draft.capabilities)?;
         if draft.definition_body.is_empty() {
-            return Err(LifecycleHookError::new(LifecycleHookErrorKind::EmptyDefinition, "definition_body", ""));
+            return Err(LifecycleHookError::new(
+                LifecycleHookErrorKind::EmptyDefinition,
+                "definition_body",
+                "",
+            ));
         }
         let definition_hash = hash_definition(DefinitionHashInput {
             hook_id,
@@ -588,8 +597,12 @@ impl LifecycleHookInput {
         let resource_class = validate_safe_label("resource_class", draft.resource_class)?;
         let safe_label = validate_safe_label("safe_label", draft.safe_label)?;
         let summary = validate_safe_summary("summary", draft.summary)?;
-        let status = draft.status.map(|value| validate_safe_label("status", value).map(String::from)).transpose()?;
-        let (body_size_bytes, body_hash, redaction) = summarize_sensitive_body(draft.sensitive_body);
+        let status = draft
+            .status
+            .map(|value| validate_safe_label("status", value).map(String::from))
+            .transpose()?;
+        let (body_size_bytes, body_hash, redaction) =
+            summarize_sensitive_body(draft.sensitive_body);
         Ok(Self {
             event_id: String::from(event_id),
             event_kind,
@@ -609,14 +622,23 @@ impl LifecycleHookInput {
     ///
     /// Returns [`LifecycleHookError`] when any safe metadata is malformed or the
     /// redaction/hash pair is inconsistent.
-    pub fn from_redacted_report(draft: &LifecycleHookInputReportDraft<'_>) -> Result<Self, LifecycleHookError> {
+    pub fn from_redacted_report(
+        draft: &LifecycleHookInputReportDraft<'_>,
+    ) -> Result<Self, LifecycleHookError> {
         let event_id = validate_safe_label("event_id", draft.event_id)?;
         let event_kind = LifecycleHookEventKind::parse(draft.event_kind)?;
         let resource_class = validate_safe_label("resource_class", draft.resource_class)?;
         let safe_label = validate_safe_label("safe_label", draft.safe_label)?;
         let summary = validate_safe_summary("summary", draft.summary)?;
-        let body_hash = validate_redacted_body_summary(draft.body_size_bytes, draft.body_hash, draft.redaction)?;
-        let status = draft.status.map(|value| validate_safe_label("status", value).map(String::from)).transpose()?;
+        let body_hash = validate_redacted_body_summary(
+            draft.body_size_bytes,
+            draft.body_hash,
+            draft.redaction,
+        )?;
+        let status = draft
+            .status
+            .map(|value| validate_safe_label("status", value).map(String::from))
+            .transpose()?;
         Ok(Self {
             event_id: String::from(event_id),
             event_kind,
@@ -1026,7 +1048,9 @@ impl LifecycleHookOutcome {
     ///
     /// Returns [`LifecycleHookError`] when the hook identifier or definition hash
     /// is malformed.
-    pub fn from_redacted_report(draft: &LifecycleHookOutcomeReportDraft<'_>) -> Result<Self, LifecycleHookError> {
+    pub fn from_redacted_report(
+        draft: &LifecycleHookOutcomeReportDraft<'_>,
+    ) -> Result<Self, LifecycleHookError> {
         let hook_id = validate_safe_label("hook_id", draft.hook_id)?;
         let definition_hash = validate_blake3_hex("definition_hash", draft.definition_hash)?;
         Ok(Self {
@@ -1152,11 +1176,23 @@ pub fn evaluate_lifecycle_hook_trust(
     definition: &LifecycleHookDefinition,
     trust_records: &[LifecycleHookTrustRecord],
 ) -> LifecycleHookTrustStatus {
-    if let Some(record) = matching_trust_record(definition, trust_records, LifecycleHookTrustDecision::Denied) {
-        return LifecycleHookTrustStatus::Denied { scope: record.scope() };
+    if let Some(record) = matching_trust_record(
+        definition,
+        trust_records,
+        LifecycleHookTrustDecision::Denied,
+    ) {
+        return LifecycleHookTrustStatus::Denied {
+            scope: record.scope(),
+        };
     }
-    if let Some(record) = matching_trust_record(definition, trust_records, LifecycleHookTrustDecision::Trusted) {
-        return LifecycleHookTrustStatus::Trusted { scope: record.scope() };
+    if let Some(record) = matching_trust_record(
+        definition,
+        trust_records,
+        LifecycleHookTrustDecision::Trusted,
+    ) {
+        return LifecycleHookTrustStatus::Trusted {
+            scope: record.scope(),
+        };
     }
     LifecycleHookTrustStatus::Untrusted
 }
@@ -1170,7 +1206,10 @@ pub fn route_lifecycle_hook_requests(
 ) -> LifecycleHookRoutePlan {
     let mut requests = Vec::new();
     let mut outcomes = Vec::new();
-    for definition in definitions.iter().filter(|definition| definition.event_kind() == input.event_kind()) {
+    for definition in definitions
+        .iter()
+        .filter(|definition| definition.event_kind() == input.event_kind())
+    {
         let trust_status = evaluate_lifecycle_hook_trust(definition, trust_records);
         match trust_status {
             LifecycleHookTrustStatus::Trusted { .. } => requests.push(LifecycleHookRequest {
@@ -1216,11 +1255,14 @@ pub fn bind_lifecycle_hook_output_to_policy(
 ) -> LifecycleHookPolicyStatus {
     match current {
         LifecycleHookPolicyStatus::Denied { .. } => current,
-        LifecycleHookPolicyStatus::ApprovalRequired { .. } => {
-            first_hook_denial(output).map_or(current, |reason| LifecycleHookPolicyStatus::Denied { reason })
-        }
+        LifecycleHookPolicyStatus::ApprovalRequired { .. } => first_hook_denial(output)
+            .map_or(current, |reason| LifecycleHookPolicyStatus::Denied {
+                reason,
+            }),
         LifecycleHookPolicyStatus::Allowed => first_hook_denial(output)
-            .map_or(LifecycleHookPolicyStatus::Allowed, |reason| LifecycleHookPolicyStatus::Denied { reason }),
+            .map_or(LifecycleHookPolicyStatus::Allowed, |reason| {
+                LifecycleHookPolicyStatus::Denied { reason }
+            }),
     }
 }
 
@@ -1251,9 +1293,11 @@ impl LifecycleHookEffectKind {
             "rewrite_denied_action" => Ok(Self::RewriteDeniedAction),
             "weaken_sandbox" => Ok(Self::WeakenSandbox),
             "suppress_approval" => Ok(Self::SuppressApproval),
-            unsupported => {
-                Err(LifecycleHookError::new(LifecycleHookErrorKind::MalformedOutput, "effect_kind", unsupported))
-            }
+            unsupported => Err(LifecycleHookError::new(
+                LifecycleHookErrorKind::MalformedOutput,
+                "effect_kind",
+                unsupported,
+            )),
         }
     }
 
@@ -1273,7 +1317,13 @@ impl LifecycleHookEffectKind {
     }
 
     const fn attempts_policy_bypass(self) -> bool {
-        matches!(self, Self::ExecuteTool | Self::RewriteDeniedAction | Self::WeakenSandbox | Self::SuppressApproval)
+        matches!(
+            self,
+            Self::ExecuteTool
+                | Self::RewriteDeniedAction
+                | Self::WeakenSandbox
+                | Self::SuppressApproval
+        )
     }
 }
 
@@ -1283,7 +1333,11 @@ fn validate_effect(
 ) -> Result<LifecycleHookEffect, LifecycleHookError> {
     let effect_kind = LifecycleHookEffectKind::parse(draft.kind)?;
     if effect_kind.attempts_policy_bypass() {
-        return Err(LifecycleHookError::new(LifecycleHookErrorKind::PolicyBypass, "effect_kind", effect_kind.as_str()));
+        return Err(LifecycleHookError::new(
+            LifecycleHookErrorKind::PolicyBypass,
+            "effect_kind",
+            effect_kind.as_str(),
+        ));
     }
     if !event_kind.supports_effect(effect_kind) {
         return Err(LifecycleHookError::new(
@@ -1336,8 +1390,12 @@ fn required_capability_for_effect(effect: &LifecycleHookEffect) -> LifecycleHook
             LifecycleHookCapability::Annotate
         }
         LifecycleHookEffect::Deny { .. } => LifecycleHookCapability::Deny,
-        LifecycleHookEffect::RequestContinuation { .. } => LifecycleHookCapability::RequestContinuation,
-        LifecycleHookEffect::RequestRevalidation { .. } => LifecycleHookCapability::RequestRevalidation,
+        LifecycleHookEffect::RequestContinuation { .. } => {
+            LifecycleHookCapability::RequestContinuation
+        }
+        LifecycleHookEffect::RequestRevalidation { .. } => {
+            LifecycleHookCapability::RequestRevalidation
+        }
     }
 }
 
@@ -1353,7 +1411,10 @@ fn matching_trust_record<'a>(
     })
 }
 
-fn validate_safe_label<'a>(field: &'static str, value: &'a str) -> Result<&'a str, LifecycleHookError> {
+fn validate_safe_label<'a>(
+    field: &'static str,
+    value: &'a str,
+) -> Result<&'a str, LifecycleHookError> {
     validate_safe_text(field, value, MAX_SAFE_LABEL_BYTES)
 }
 
@@ -1390,27 +1451,50 @@ fn validate_capabilities(
     Ok(normalized)
 }
 
-fn validate_safe_summary<'a>(field: &'static str, value: &'a str) -> Result<&'a str, LifecycleHookError> {
+fn validate_safe_summary<'a>(
+    field: &'static str,
+    value: &'a str,
+) -> Result<&'a str, LifecycleHookError> {
     validate_safe_text(field, value, MAX_SAFE_SUMMARY_BYTES)
 }
 
-fn validate_safe_text<'a>(field: &'static str, value: &'a str, max_len: usize) -> Result<&'a str, LifecycleHookError> {
+fn validate_safe_text<'a>(
+    field: &'static str,
+    value: &'a str,
+    max_len: usize,
+) -> Result<&'a str, LifecycleHookError> {
     if value.is_empty() || value.len() > max_len || leak_marker(value).is_some() {
-        return Err(LifecycleHookError::new(LifecycleHookErrorKind::InvalidLabel, field, value));
+        return Err(LifecycleHookError::new(
+            LifecycleHookErrorKind::InvalidLabel,
+            field,
+            value,
+        ));
     }
     Ok(value)
 }
 
-fn validate_blake3_hex<'a>(field: &'static str, value: &'a str) -> Result<&'a str, LifecycleHookError> {
-    if value.len() != BLAKE3_HEX_LENGTH || !value.chars().all(|character| character.is_ascii_hexdigit()) {
-        return Err(LifecycleHookError::new(LifecycleHookErrorKind::InvalidHash, field, value));
+fn validate_blake3_hex<'a>(
+    field: &'static str,
+    value: &'a str,
+) -> Result<&'a str, LifecycleHookError> {
+    if value.len() != BLAKE3_HEX_LENGTH
+        || !value.chars().all(|character| character.is_ascii_hexdigit())
+    {
+        return Err(LifecycleHookError::new(
+            LifecycleHookErrorKind::InvalidHash,
+            field,
+            value,
+        ));
     }
     Ok(value)
 }
 
 fn leak_marker(value: &str) -> Option<&'static str> {
     let lower = value.to_ascii_lowercase();
-    LEAK_MARKERS.iter().copied().find(|marker| lower.contains(marker))
+    LEAK_MARKERS
+        .iter()
+        .copied()
+        .find(|marker| lower.contains(marker))
 }
 
 fn validate_redacted_body_summary(
@@ -1424,7 +1508,11 @@ fn validate_redacted_body_summary(
             if body_size_bytes == usize::default() && body_hash == expected_hash {
                 Ok(body_hash)
             } else {
-                Err(LifecycleHookError::new(LifecycleHookErrorKind::InvalidHash, "body_hash", body_hash))
+                Err(LifecycleHookError::new(
+                    LifecycleHookErrorKind::InvalidHash,
+                    "body_hash",
+                    body_hash,
+                ))
             }
         }
         LifecycleHookRedaction::BodyRedacted => validate_blake3_hex("body_hash", body_hash),
@@ -1433,8 +1521,20 @@ fn validate_redacted_body_summary(
 
 fn summarize_sensitive_body(body: Option<&str>) -> (usize, String, LifecycleHookRedaction) {
     body.map_or_else(
-        || (usize::default(), no_sensitive_body_hash(), LifecycleHookRedaction::NoSensitiveBody),
-        |body| (body.len(), blake3_hex(body.as_bytes()), LifecycleHookRedaction::BodyRedacted),
+        || {
+            (
+                usize::default(),
+                no_sensitive_body_hash(),
+                LifecycleHookRedaction::NoSensitiveBody,
+            )
+        },
+        |body| {
+            (
+                body.len(),
+                blake3_hex(body.as_bytes()),
+                LifecycleHookRedaction::BodyRedacted,
+            )
+        },
     )
 }
 
@@ -1529,7 +1629,10 @@ mod tests {
             hook_id: PROMPT_HOOK_ID,
             event_kind: LifecycleHookEventKind::UserPromptSubmit.as_str(),
             source: LifecycleHookDefinitionSource::Managed,
-            capabilities: &[LifecycleHookCapability::Observe, LifecycleHookCapability::Annotate],
+            capabilities: &[
+                LifecycleHookCapability::Observe,
+                LifecycleHookCapability::Annotate,
+            ],
             definition_body: PROMPT_DEFINITION_BODY,
         })
         .expect("prompt hook definition should validate")
@@ -1555,7 +1658,10 @@ mod tests {
             hook_id: PERMISSION_HOOK_ID,
             event_kind: LifecycleHookEventKind::PermissionRequest.as_str(),
             source: LifecycleHookDefinitionSource::Project,
-            capabilities: &[LifecycleHookCapability::Observe, LifecycleHookCapability::Deny],
+            capabilities: &[
+                LifecycleHookCapability::Observe,
+                LifecycleHookCapability::Deny,
+            ],
             definition_body: PERMISSION_DEFINITION_BODY,
         })
         .expect("permission hook definition should validate")
@@ -1605,10 +1711,17 @@ mod tests {
         .expect("post-turn hook definition should validate")
     }
 
-    fn input(kind: LifecycleHookEventKind, label: &str, sensitive_body: Option<&str>) -> LifecycleHookInput {
+    fn input(
+        kind: LifecycleHookEventKind,
+        label: &str,
+        sensitive_body: Option<&str>,
+    ) -> LifecycleHookInput {
         let resource_class = if kind == LifecycleHookEventKind::UserPromptSubmit {
             RESOURCE_PROMPT
-        } else if matches!(kind, LifecycleHookEventKind::PreTurn | LifecycleHookEventKind::PostTurn) {
+        } else if matches!(
+            kind,
+            LifecycleHookEventKind::PreTurn | LifecycleHookEventKind::PostTurn
+        ) {
             RESOURCE_TURN
         } else if kind == LifecycleHookEventKind::Stop {
             RESOURCE_RUN
@@ -1646,14 +1759,21 @@ mod tests {
         ];
         let definitions = vec![tool.clone(), prompt];
         let route = route_lifecycle_hook_requests(
-            &input(LifecycleHookEventKind::PreToolUse, TOOL_LABEL, Some(RAW_COMMAND_BODY)),
+            &input(
+                LifecycleHookEventKind::PreToolUse,
+                TOOL_LABEL,
+                Some(RAW_COMMAND_BODY),
+            ),
             &definitions,
             &records,
         );
 
         assert_eq!(route.requests().len(), 1);
         assert_eq!(route.requests()[0].hook_id(), tool.hook_id());
-        assert_eq!(route.requests()[0].event_kind(), LifecycleHookEventKind::PreToolUse);
+        assert_eq!(
+            route.requests()[0].event_kind(),
+            LifecycleHookEventKind::PreToolUse
+        );
         assert!(route.outcomes().is_empty());
     }
 
@@ -1680,14 +1800,20 @@ mod tests {
         let event_labels = [
             ("session_start", LifecycleHookEventKind::SessionStart),
             ("session_end", LifecycleHookEventKind::SessionEnd),
-            ("user_prompt_submit", LifecycleHookEventKind::UserPromptSubmit),
+            (
+                "user_prompt_submit",
+                LifecycleHookEventKind::UserPromptSubmit,
+            ),
             ("prompt_assembly", LifecycleHookEventKind::PromptAssembly),
             ("pre_turn", LifecycleHookEventKind::PreTurn),
             ("post_turn", LifecycleHookEventKind::PostTurn),
             ("model_request", LifecycleHookEventKind::ModelRequest),
             ("model_response", LifecycleHookEventKind::ModelResponse),
             ("pre_tool_use", LifecycleHookEventKind::PreToolUse),
-            ("permission_request", LifecycleHookEventKind::PermissionRequest),
+            (
+                "permission_request",
+                LifecycleHookEventKind::PermissionRequest,
+            ),
             ("post_tool_use", LifecycleHookEventKind::PostToolUse),
             ("pre_mutation", LifecycleHookEventKind::PreMutation),
             ("post_mutation", LifecycleHookEventKind::PostMutation),
@@ -1697,7 +1823,10 @@ mod tests {
             ("receipt_emission", LifecycleHookEventKind::ReceiptEmission),
             ("subagent_start", LifecycleHookEventKind::SubagentStart),
             ("subagent_stop", LifecycleHookEventKind::SubagentStop),
-            ("workflow_completion", LifecycleHookEventKind::WorkflowCompletion),
+            (
+                "workflow_completion",
+                LifecycleHookEventKind::WorkflowCompletion,
+            ),
             ("stop", LifecycleHookEventKind::Stop),
         ];
 
@@ -1720,7 +1849,10 @@ mod tests {
         .expect_err("startup alias should fail");
 
         assert_eq!(error.kind(), LifecycleHookErrorKind::UnknownEvent);
-        assert_eq!(LifecycleHookEventKind::SessionStart.as_str(), "session_start");
+        assert_eq!(
+            LifecycleHookEventKind::SessionStart.as_str(),
+            "session_start"
+        );
     }
 
     #[test]
@@ -1756,7 +1888,10 @@ mod tests {
         .expect_err("post-turn revalidation capability should fail");
 
         assert_eq!(denial.kind(), LifecycleHookErrorKind::UnsupportedCapability);
-        assert_eq!(revalidation.kind(), LifecycleHookErrorKind::UnsupportedCapability);
+        assert_eq!(
+            revalidation.kind(),
+            LifecycleHookErrorKind::UnsupportedCapability
+        );
     }
 
     #[test]
@@ -1775,7 +1910,10 @@ mod tests {
             hook_id: TOOL_HOOK_ID,
             event_kind: LifecycleHookEventKind::PreToolUse.as_str(),
             source: LifecycleHookDefinitionSource::User,
-            capabilities: &[LifecycleHookCapability::Observe, LifecycleHookCapability::Observe],
+            capabilities: &[
+                LifecycleHookCapability::Observe,
+                LifecycleHookCapability::Observe,
+            ],
             definition_body: USER_DEFINITION_BODY,
         })
         .expect_err("duplicate capabilities should fail");
@@ -1789,8 +1927,14 @@ mod tests {
         .expect_err("unsupported capabilities should fail");
 
         assert_eq!(missing.kind(), LifecycleHookErrorKind::MissingCapability);
-        assert_eq!(duplicate.kind(), LifecycleHookErrorKind::DuplicateCapability);
-        assert_eq!(unsupported.kind(), LifecycleHookErrorKind::UnsupportedCapability);
+        assert_eq!(
+            duplicate.kind(),
+            LifecycleHookErrorKind::DuplicateCapability
+        );
+        assert_eq!(
+            unsupported.kind(),
+            LifecycleHookErrorKind::UnsupportedCapability
+        );
     }
 
     #[test]
@@ -1805,7 +1949,10 @@ mod tests {
         )];
 
         assert_ne!(original.definition_hash(), changed.definition_hash());
-        assert_eq!(evaluate_lifecycle_hook_trust(&changed, &records), LifecycleHookTrustStatus::Untrusted);
+        assert_eq!(
+            evaluate_lifecycle_hook_trust(&changed, &records),
+            LifecycleHookTrustStatus::Untrusted
+        );
     }
 
     #[test]
@@ -1818,18 +1965,24 @@ mod tests {
             LifecycleHookTrustRecord::trusted(&changed, LifecycleHookTrustScope::Managed),
         ];
 
-        assert_eq!(evaluate_lifecycle_hook_trust(&changed, &records), LifecycleHookTrustStatus::Trusted {
-            scope: LifecycleHookTrustScope::Managed
-        });
+        assert_eq!(
+            evaluate_lifecycle_hook_trust(&changed, &records),
+            LifecycleHookTrustStatus::Trusted {
+                scope: LifecycleHookTrustScope::Managed
+            }
+        );
     }
 
     #[test]
     fn prompt_hook_accepts_event_scoped_additional_context() {
         // r[verify agent_harness_runtime.openai_codex_hook_trust_lifecycle.io_contract]
-        let validated = output(LifecycleHookEventKind::UserPromptSubmit, &[LifecycleHookEffectDraft {
-            kind: "additional_context",
-            value: SAFE_CONTEXT,
-        }])
+        let validated = output(
+            LifecycleHookEventKind::UserPromptSubmit,
+            &[LifecycleHookEffectDraft {
+                kind: "additional_context",
+                value: SAFE_CONTEXT,
+            }],
+        )
         .expect("prompt context effect should validate");
 
         assert!(matches!(
@@ -1842,10 +1995,13 @@ mod tests {
     #[test]
     fn permission_hook_accepts_deny_effect() {
         // r[verify agent_harness_runtime.openai_codex_hook_trust_lifecycle.io_contract]
-        let validated = output(LifecycleHookEventKind::PermissionRequest, &[LifecycleHookEffectDraft {
-            kind: "deny",
-            value: SAFE_DENIAL,
-        }])
+        let validated = output(
+            LifecycleHookEventKind::PermissionRequest,
+            &[LifecycleHookEffectDraft {
+                kind: "deny",
+                value: SAFE_DENIAL,
+            }],
+        )
         .expect("permission deny effect should validate");
 
         assert!(matches!(
@@ -1859,20 +2015,26 @@ mod tests {
         // r[verify agent_harness_runtime.claude_code_hooks.outcomes]
         // r[verify agent_harness_runtime.claude_code_hooks.outcomes.invalid_modification]
         let model = model_definition();
-        let validated = LifecycleHookOutput::validate_for_definition(&model, &LifecycleHookOutputDraft {
-            effects: &[LifecycleHookEffectDraft {
-                kind: "request_revalidation",
-                value: SAFE_REVALIDATION,
-            }],
-        })
+        let validated = LifecycleHookOutput::validate_for_definition(
+            &model,
+            &LifecycleHookOutputDraft {
+                effects: &[LifecycleHookEffectDraft {
+                    kind: "request_revalidation",
+                    value: SAFE_REVALIDATION,
+                }],
+            },
+        )
         .expect("declared request-revalidation effect should validate");
         let tool = tool_definition(USER_DEFINITION_BODY);
-        let denied = LifecycleHookOutput::validate_for_definition(&tool, &LifecycleHookOutputDraft {
-            effects: &[LifecycleHookEffectDraft {
-                kind: "warning",
-                value: SAFE_CONTEXT,
-            }],
-        })
+        let denied = LifecycleHookOutput::validate_for_definition(
+            &tool,
+            &LifecycleHookOutputDraft {
+                effects: &[LifecycleHookEffectDraft {
+                    kind: "warning",
+                    value: SAFE_CONTEXT,
+                }],
+            },
+        )
         .expect_err("undeclared annotate effect should fail");
 
         assert!(matches!(
@@ -1885,10 +2047,13 @@ mod tests {
     #[test]
     fn stop_hook_accepts_continuation_request() {
         // r[verify agent_harness_runtime.openai_codex_hook_trust_lifecycle.io_contract]
-        let validated = output(LifecycleHookEventKind::Stop, &[LifecycleHookEffectDraft {
-            kind: "request_continuation",
-            value: SAFE_CONTINUATION,
-        }])
+        let validated = output(
+            LifecycleHookEventKind::Stop,
+            &[LifecycleHookEffectDraft {
+                kind: "request_continuation",
+                value: SAFE_CONTINUATION,
+            }],
+        )
         .expect("stop continuation effect should validate");
 
         assert!(matches!(
@@ -1900,15 +2065,21 @@ mod tests {
     #[test]
     fn pre_turn_accepts_context_and_denial_effects() {
         // r[verify agent_harness_runtime.turn_lifecycle_hooks.no_bypass]
-        let context = output(LifecycleHookEventKind::PreTurn, &[LifecycleHookEffectDraft {
-            kind: "additional_context",
-            value: SAFE_CONTEXT,
-        }])
+        let context = output(
+            LifecycleHookEventKind::PreTurn,
+            &[LifecycleHookEffectDraft {
+                kind: "additional_context",
+                value: SAFE_CONTEXT,
+            }],
+        )
         .expect("pre-turn context effect should validate");
-        let denial = output(LifecycleHookEventKind::PreTurn, &[LifecycleHookEffectDraft {
-            kind: "deny",
-            value: SAFE_DENIAL,
-        }])
+        let denial = output(
+            LifecycleHookEventKind::PreTurn,
+            &[LifecycleHookEffectDraft {
+                kind: "deny",
+                value: SAFE_DENIAL,
+            }],
+        )
         .expect("pre-turn denial effect should validate before evaluation");
 
         assert!(matches!(
@@ -1924,15 +2095,21 @@ mod tests {
     #[test]
     fn post_turn_accepts_warning_and_continuation_effects() {
         // r[verify agent_harness_runtime.turn_lifecycle_hooks.no_bypass]
-        let warning = output(LifecycleHookEventKind::PostTurn, &[LifecycleHookEffectDraft {
-            kind: "warning",
-            value: SAFE_CONTEXT,
-        }])
+        let warning = output(
+            LifecycleHookEventKind::PostTurn,
+            &[LifecycleHookEffectDraft {
+                kind: "warning",
+                value: SAFE_CONTEXT,
+            }],
+        )
         .expect("post-turn warning effect should validate");
-        let continuation = output(LifecycleHookEventKind::PostTurn, &[LifecycleHookEffectDraft {
-            kind: "request_continuation",
-            value: SAFE_CONTINUATION,
-        }])
+        let continuation = output(
+            LifecycleHookEventKind::PostTurn,
+            &[LifecycleHookEffectDraft {
+                kind: "request_continuation",
+                value: SAFE_CONTINUATION,
+            }],
+        )
         .expect("post-turn continuation effect should validate");
 
         assert!(matches!(
@@ -1949,7 +2126,10 @@ mod tests {
     fn malformed_outputs_reject_empty_effect_values() {
         // r[verify agent_harness_runtime.openai_codex_hook_trust_lifecycle.io_contract.unsupported]
         let fixtures = [
-            (LifecycleHookEventKind::UserPromptSubmit, "additional_context"),
+            (
+                LifecycleHookEventKind::UserPromptSubmit,
+                "additional_context",
+            ),
             (LifecycleHookEventKind::UserPromptSubmit, "warning"),
             (LifecycleHookEventKind::PreToolUse, "deny"),
             (LifecycleHookEventKind::PreTurn, "deny"),
@@ -1958,10 +2138,13 @@ mod tests {
         ];
 
         for (event_kind, effect_kind) in fixtures {
-            let error = output(event_kind, &[LifecycleHookEffectDraft {
-                kind: effect_kind,
-                value: "",
-            }])
+            let error = output(
+                event_kind,
+                &[LifecycleHookEffectDraft {
+                    kind: effect_kind,
+                    value: "",
+                }],
+            )
             .expect_err("empty effect values should fail");
             assert_eq!(error.kind(), LifecycleHookErrorKind::InvalidLabel);
         }
@@ -1977,14 +2160,20 @@ mod tests {
             (LifecycleHookEventKind::PostTurn, "deny"),
             (LifecycleHookEventKind::PostTurn, "request_revalidation"),
             (LifecycleHookEventKind::PreToolUse, "request_continuation"),
-            (LifecycleHookEventKind::UserPromptSubmit, "rewrite_tool_input"),
+            (
+                LifecycleHookEventKind::UserPromptSubmit,
+                "rewrite_tool_input",
+            ),
         ];
 
         for (event_kind, effect_kind) in fixtures {
-            let error = output(event_kind, &[LifecycleHookEffectDraft {
-                kind: effect_kind,
-                value: SAFE_CONTEXT,
-            }])
+            let error = output(
+                event_kind,
+                &[LifecycleHookEffectDraft {
+                    kind: effect_kind,
+                    value: SAFE_CONTEXT,
+                }],
+            )
             .expect_err("unsupported effects should fail");
             assert_eq!(error.kind(), LifecycleHookErrorKind::UnsupportedEffect);
         }
@@ -2001,10 +2190,13 @@ mod tests {
         ];
 
         for effect_kind in fixtures {
-            let error = output(LifecycleHookEventKind::PostTurn, &[LifecycleHookEffectDraft {
-                kind: effect_kind,
-                value: SAFE_CONTEXT,
-            }])
+            let error = output(
+                LifecycleHookEventKind::PostTurn,
+                &[LifecycleHookEffectDraft {
+                    kind: effect_kind,
+                    value: SAFE_CONTEXT,
+                }],
+            )
             .expect_err("post-turn policy bypass effects should fail");
             assert_eq!(error.kind(), LifecycleHookErrorKind::PolicyBypass);
         }
@@ -2016,10 +2208,13 @@ mod tests {
         // r[verify agent_harness_runtime.openai_codex_hook_trust_lifecycle.policy_binding.bypass]
         // r[verify agent_harness_runtime.claude_code_hooks.scope]
         // r[verify agent_harness_runtime.claude_code_hooks.scope.no_bypass]
-        let safe_context = output(LifecycleHookEventKind::UserPromptSubmit, &[LifecycleHookEffectDraft {
-            kind: "additional_context",
-            value: SAFE_CONTEXT,
-        }])
+        let safe_context = output(
+            LifecycleHookEventKind::UserPromptSubmit,
+            &[LifecycleHookEffectDraft {
+                kind: "additional_context",
+                value: SAFE_CONTEXT,
+            }],
+        )
         .expect("safe context should validate");
         let status = bind_lifecycle_hook_output_to_policy(
             LifecycleHookPolicyStatus::Denied {
@@ -2028,18 +2223,24 @@ mod tests {
             &safe_context,
         );
 
-        assert_eq!(status, LifecycleHookPolicyStatus::Denied {
-            reason: String::from(PRIOR_DENIAL)
-        });
+        assert_eq!(
+            status,
+            LifecycleHookPolicyStatus::Denied {
+                reason: String::from(PRIOR_DENIAL)
+            }
+        );
     }
 
     #[test]
     fn hook_deny_can_make_allowed_or_approval_required_boundary_stricter() {
         // r[verify agent_harness_runtime.openai_codex_hook_trust_lifecycle.policy_binding]
-        let deny_output = output(LifecycleHookEventKind::PreToolUse, &[LifecycleHookEffectDraft {
-            kind: "deny",
-            value: SAFE_DENIAL,
-        }])
+        let deny_output = output(
+            LifecycleHookEventKind::PreToolUse,
+            &[LifecycleHookEffectDraft {
+                kind: "deny",
+                value: SAFE_DENIAL,
+            }],
+        )
         .expect("deny output should validate");
 
         assert_eq!(
@@ -2074,10 +2275,13 @@ mod tests {
         ];
 
         for effect_kind in fixtures {
-            let error = output(LifecycleHookEventKind::PreToolUse, &[LifecycleHookEffectDraft {
-                kind: effect_kind,
-                value: SAFE_CONTEXT,
-            }])
+            let error = output(
+                LifecycleHookEventKind::PreToolUse,
+                &[LifecycleHookEffectDraft {
+                    kind: effect_kind,
+                    value: SAFE_CONTEXT,
+                }],
+            )
             .expect_err("policy bypass effects should fail");
             assert_eq!(error.kind(), LifecycleHookErrorKind::PolicyBypass);
         }
@@ -2087,8 +2291,11 @@ mod tests {
     fn hook_input_payload_exposes_bounded_metadata_without_leaks() {
         // r[verify agent_harness_runtime.claude_code_hooks.payloads]
         // r[verify agent_harness_runtime.claude_code_hooks.payloads.bounded]
-        let input =
-            input(LifecycleHookEventKind::PostToolUse, TOOL_LABEL, Some("tool result body that stays redacted"));
+        let input = input(
+            LifecycleHookEventKind::PostToolUse,
+            TOOL_LABEL,
+            Some("tool result body that stays redacted"),
+        );
         let leak = LifecycleHookInput::validate(&LifecycleHookInputDraft {
             event_id: EVENT_ID,
             event_kind: LifecycleHookEventKind::PostToolUse.as_str(),
@@ -2120,7 +2327,11 @@ mod tests {
         let trust_status = LifecycleHookTrustStatus::Trusted {
             scope: LifecycleHookTrustScope::Managed,
         };
-        let input = input(LifecycleHookEventKind::UserPromptSubmit, PROMPT_LABEL, Some(RAW_PROMPT_BODY));
+        let input = input(
+            LifecycleHookEventKind::UserPromptSubmit,
+            PROMPT_LABEL,
+            Some(RAW_PROMPT_BODY),
+        );
         let report = LifecycleHookOutcome::new(LifecycleHookOutcomeDraft {
             definition: &definition,
             input: &input,
@@ -2132,7 +2343,10 @@ mod tests {
 
         assert_eq!(report.hook_id(), PROMPT_HOOK_ID);
         assert_eq!(report.definition_hash(), definition.definition_hash());
-        assert_eq!(report.input().redaction(), LifecycleHookRedaction::BodyRedacted);
+        assert_eq!(
+            report.input().redaction(),
+            LifecycleHookRedaction::BodyRedacted
+        );
         assert_ne!(report.input().body_hash(), RAW_PROMPT_BODY);
         assert!(!debug.contains(RAW_PROMPT_BODY));
         assert!(debug.contains(definition.definition_hash()));
@@ -2157,7 +2371,10 @@ mod tests {
         assert!(route.requests().is_empty());
         assert_eq!(route.outcomes().len(), 1);
         assert_eq!(route.outcomes()[0].hook_id(), denied.hook_id());
-        assert_eq!(route.outcomes()[0].failure_class(), Some(LifecycleHookFailureClass::HookDeniedByTrust));
+        assert_eq!(
+            route.outcomes()[0].failure_class(),
+            Some(LifecycleHookFailureClass::HookDeniedByTrust)
+        );
     }
 
     #[test]
@@ -2175,7 +2392,10 @@ mod tests {
         );
 
         assert_eq!(report.outcome_class(), LifecycleHookOutcomeClass::Failed);
-        assert_eq!(report.failure_class(), Some(LifecycleHookFailureClass::RequiredHookUnavailable));
+        assert_eq!(
+            report.failure_class(),
+            Some(LifecycleHookFailureClass::RequiredHookUnavailable)
+        );
         assert_eq!(report.trust_status(), trust_status);
     }
 }

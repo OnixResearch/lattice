@@ -1,0 +1,69 @@
+{
+  "artifacts": {
+    "allowlist_required": true,
+    "hidden_tests_allowed": false,
+    "max_bytes": 67108864,
+    "max_entries": 256,
+    "no_follow_required": true
+  },
+  "cleanup": {
+    "hide_post_terminal_failure": false,
+    "late_writes_allowed": false,
+    "max_obligations": 256
+  },
+  "concurrency": {
+    "agents_per_episode": 16,
+    "episodes": 32
+  },
+  "evidence": {
+    "completion_claim_allowed": false,
+    "metadata_only": true,
+    "non_claims": [
+      "not-host-confinement-or-network-enforcement",
+      "not-provider-or-tool-correctness",
+      "not-persistence-durability-or-exactly-once-effects",
+      "not-verifier-soundness-or-artifact-authenticity",
+      "not-benchmark-or-training-fitness",
+      "not-authoritative-completion",
+      "not-production-or-release-readiness"
+    ],
+    "physical_paths_allowed": false,
+    "raw_content_allowed": false
+  },
+  "gateway": {
+    "accepted_turn_required": true,
+    "bind_modes": [
+      "loopback",
+      "caller_admitted"
+    ],
+    "exact_non_streaming_coalescing_only": true,
+    "max_body_bytes": 16777216,
+    "max_stream_events": 65536,
+    "raw_provider_bodies_allowed": false,
+    "response_rewriting_allowed": false,
+    "separate_capabilities_required": true,
+    "terminal_commit_required": true,
+    "wildcard_network_allowed": false
+  },
+  "persistence": {
+    "atomic_replace_required": true,
+    "complete_bytes_required": true,
+    "durability": "file_synced",
+    "malformed_record_can_skip": false,
+    "max_record_bytes": 67108864,
+    "strict_reopen_required": true
+  },
+  "profile_id": "native-evaluation-host-v1",
+  "schema": "animus.native-evaluation-host.v1",
+  "source_cohort": {
+    "identity": "b3:c6336b188596db9b18cb2f0a721c9f5bc551e619342e89807e20ec45f3bb676f",
+    "license": "MIT",
+    "repository": "PrimeIntellect-ai/verifiers",
+    "revision": "1a997814e85a2e4f409add960aa852737388dbd8"
+  },
+  "verifier": {
+    "hidden_material_in_solver_allowed": false,
+    "isolated_required": true,
+    "shared_is_advisory": true
+  }
+}

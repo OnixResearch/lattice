@@ -6,20 +6,11 @@ mod types;
 mod validate;
 
 pub use compose::mutation_requires_runtime_guard;
-pub use data::Descriptor;
-pub use data::Draft;
-pub use data::Kind;
-pub use data::SourceScope;
-pub use data::TrustStatus;
-pub use types::CompositionDiagnostic;
-pub use types::CompositionReport;
-pub use types::DiagnosticKind;
-pub use types::EnforcementBoundary;
-pub use types::Error;
-pub use types::ProjectTrustMode;
-pub use types::PromptHygieneIssue;
-pub use types::PromptSegment;
-pub use types::RuntimeGuardRequirement;
+pub use data::{Descriptor, Draft, Kind, SourceScope, TrustStatus};
+pub use types::{
+    CompositionDiagnostic, CompositionReport, DiagnosticKind, EnforcementBoundary, Error,
+    ProjectTrustMode, PromptHygieneIssue, PromptSegment, RuntimeGuardRequirement,
+};
 
 type Text = alloc::string::String;
 type Collection<T> = alloc::vec::Vec<T>;
@@ -28,12 +19,18 @@ const KIND_FIELD: crate::validation::FieldName = crate::validation::FieldName::n
 const SCOPE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("policy_scope");
 const TRUST_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("policy_trust");
 const GOAL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("policy_goal");
-const SUCCESS_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("policy_success_criteria");
-const CONSTRAINT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("policy_constraint");
-const VALIDATION_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("policy_validation_rule");
-const STOP_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("policy_stop_rule");
-const PROVENANCE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("policy_provenance");
-const SNIPPET_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("policy_prompt_snippet");
+const SUCCESS_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("policy_success_criteria");
+const CONSTRAINT_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("policy_constraint");
+const VALIDATION_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("policy_validation_rule");
+const STOP_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("policy_stop_rule");
+const PROVENANCE_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("policy_provenance");
+const SNIPPET_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("policy_prompt_snippet");
 const MIN_POLICY_PRIORITY: u16 = 1;
 const MAX_POLICY_PRIORITY: u16 = 1_000;
 const MAX_POLICY_ITEMS: usize = 12;
@@ -60,7 +57,10 @@ const _: () = assert!(MAX_POLICY_PROMPT_CHARS > 0);
 
 /// Composes trusted policy profiles into attributed prompt segments.
 #[must_use]
-pub fn compose_context(profiles: &[Descriptor], project_trust_mode: ProjectTrustMode) -> CompositionReport {
+pub fn compose_context(
+    profiles: &[Descriptor],
+    project_trust_mode: ProjectTrustMode,
+) -> CompositionReport {
     compose::context(profiles, project_trust_mode)
 }
 

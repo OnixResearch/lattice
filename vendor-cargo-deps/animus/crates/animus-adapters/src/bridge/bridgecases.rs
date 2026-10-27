@@ -14,7 +14,8 @@ const REDACTED_RESOURCE: &str = "resource-hash-repo-summary";
 const TRUNCATION_NONE: &str = "none";
 const TRUNCATION_BOUNDED: &str = "bounded";
 const TRANSPORT_SAFE_RECEIPT: &str = "server=mcp-review-tools resource=resource-hash";
-const TRANSPORT_LEAK_RECEIPT: &str = "raw_payload={...} provider_payload=/home/user/secret args=token";
+const TRANSPORT_LEAK_RECEIPT: &str =
+    "raw_payload={...} provider_payload=/home/user/secret args=token";
 const UNSAFE_RESOURCE_URL: &str = "https://example.test/raw";
 const BAD_HASH: &str = "bad-hash";
 
@@ -105,12 +106,17 @@ fn mcp_tool_mapping_converts_to_animus_definition_and_rejects_incomplete() {
     // r[verify agent_harness_runtime.claude_code_mcp.mapping]
     // r[verify agent_harness_runtime.claude_code_mcp.mapping.incomplete]
     let mapping = McpToolMapping::validate(&valid_mapping()).expect("mapping parses");
-    let definition = mapping.to_tool_definition().expect("mapping should produce tool definition");
+    let definition = mapping
+        .to_tool_definition()
+        .expect("mapping should produce tool definition");
 
     assert_eq!(mapping.server_label(), MCP_ID);
     assert_eq!(mapping.tool_name(), TOOL_READ);
     assert_eq!(mapping.schema_identity(), SCHEMA);
-    assert_eq!(mapping.resource_policy_refs(), &[Text::from(RESOURCE_POLICY)]);
+    assert_eq!(
+        mapping.resource_policy_refs(),
+        &[Text::from(RESOURCE_POLICY)]
+    );
     assert_eq!(mapping.ability_policy_refs(), &[Text::from(ABILITY_POLICY)]);
     assert_eq!(definition.name(), TOOL_READ);
     assert_eq!(definition.parameter_schema_identity(), SCHEMA);
@@ -122,7 +128,9 @@ fn mcp_tool_mapping_converts_to_animus_definition_and_rejects_incomplete() {
             schema_identity: None,
             ..valid_mapping()
         }),
-        Err(InteropError::Contract(crate::AdapterContractError::EmptyField { .. }))
+        Err(InteropError::Contract(
+            crate::AdapterContractError::EmptyField { .. }
+        ))
     ));
     assert_eq!(
         McpToolMapping::validate(&McpToolMappingDraft {
@@ -138,14 +146,18 @@ fn mcp_tool_mapping_converts_to_animus_definition_and_rejects_incomplete() {
             source_metadata: None,
             ..valid_mapping()
         }),
-        Err(InteropError::Contract(crate::AdapterContractError::EmptyField { .. }))
+        Err(InteropError::Contract(
+            crate::AdapterContractError::EmptyField { .. }
+        ))
     ));
     assert!(matches!(
         McpToolMapping::validate(&McpToolMappingDraft {
             result_bounds: None,
             ..valid_mapping()
         }),
-        Err(InteropError::Contract(crate::AdapterContractError::EmptyField { .. }))
+        Err(InteropError::Contract(
+            crate::AdapterContractError::EmptyField { .. }
+        ))
     ));
     assert_eq!(
         McpToolMapping::validate(&McpToolMappingDraft {
@@ -163,7 +175,9 @@ fn mcp_dispatch_uses_animus_gates_before_server_adapter_call() {
     // r[verify agent_harness_runtime.claude_code_mcp.dispatch]
     // r[verify agent_harness_runtime.claude_code_mcp.dispatch.denied]
     let mapping = McpToolMapping::validate(&valid_mapping()).expect("mapping parses");
-    let definition = mapping.to_tool_definition().expect("mapping should produce tool definition");
+    let definition = mapping
+        .to_tool_definition()
+        .expect("mapping should produce tool definition");
     let ready = evaluate_mcp_dispatch(ready_dispatch_request(&definition));
     let denied = evaluate_mcp_dispatch(McpDispatchRequest {
         capability_status: crate::tool::CapabilityStatus::Denied,
@@ -178,13 +192,25 @@ fn mcp_dispatch_uses_animus_gates_before_server_adapter_call() {
         ..ready_dispatch_request(&definition)
     });
 
-    assert_eq!(ready.dispatch().status(), crate::tool::DispatchStatus::Ready);
+    assert_eq!(
+        ready.dispatch().status(),
+        crate::tool::DispatchStatus::Ready
+    );
     assert!(ready.server_adapter_called());
-    assert_eq!(denied.dispatch().failure_class(), Some(crate::tool::FailureClass::DeniedCapability));
+    assert_eq!(
+        denied.dispatch().failure_class(),
+        Some(crate::tool::FailureClass::DeniedCapability)
+    );
     assert!(!denied.server_adapter_called());
-    assert_eq!(invalid_arguments.dispatch().failure_class(), Some(crate::tool::FailureClass::InvalidInput));
+    assert_eq!(
+        invalid_arguments.dispatch().failure_class(),
+        Some(crate::tool::FailureClass::InvalidInput)
+    );
     assert!(!invalid_arguments.server_adapter_called());
-    assert_eq!(serialized.dispatch().status(), crate::tool::DispatchStatus::Ready);
+    assert_eq!(
+        serialized.dispatch().status(),
+        crate::tool::DispatchStatus::Ready
+    );
     assert!(!serialized.server_adapter_called());
 }
 
@@ -201,11 +227,20 @@ fn mcp_transport_failures_never_fallback() {
     assert_eq!(ready_case.failure_class(), None);
     assert!(!ready_case.fallback_attempted());
     assert!(!blocked_case.available());
-    assert_eq!(blocked_case.failure_class(), Some(McpTransportFailureClass::Unsupported));
+    assert_eq!(
+        blocked_case.failure_class(),
+        Some(McpTransportFailureClass::Unsupported)
+    );
     assert!(!blocked_case.fallback_attempted());
-    assert_eq!(elapsed_case.failure_class(), Some(McpTransportFailureClass::Timeout));
+    assert_eq!(
+        elapsed_case.failure_class(),
+        Some(McpTransportFailureClass::Timeout)
+    );
     assert!(!elapsed_case.fallback_attempted());
-    assert_eq!(bad_response_case.failure_class(), Some(McpTransportFailureClass::MalformedResponse));
+    assert_eq!(
+        bad_response_case.failure_class(),
+        Some(McpTransportFailureClass::MalformedResponse)
+    );
     assert!(!bad_response_case.fallback_attempted());
 }
 
@@ -221,11 +256,17 @@ fn mcp_receipts_redact_payloads_and_validate_hashes() {
 
     assert_eq!(receipt.server_label(), MCP_ID);
     assert_eq!(receipt.tool_name(), TOOL_READ);
-    assert_eq!(receipt.truncation_state(), McpReceiptTruncationState::Bounded);
+    assert_eq!(
+        receipt.truncation_state(),
+        McpReceiptTruncationState::Bounded
+    );
     assert_eq!(receipt.response_hash(), HASH);
     assert_eq!(receipt.identity_hash().len(), BLAKE3_HASH_HEX_CHARS);
     assert_eq!(validate_mcp_receipt_text(TRANSPORT_SAFE_RECEIPT), Ok(()));
-    assert_eq!(validate_mcp_receipt_text(TRANSPORT_LEAK_RECEIPT), Err(InteropError::ReceiptLeak));
+    assert_eq!(
+        validate_mcp_receipt_text(TRANSPORT_LEAK_RECEIPT),
+        Err(InteropError::ReceiptLeak)
+    );
     assert_eq!(
         McpReceipt::new(&McpReceiptDraft {
             redacted_resource_ids: &[UNSAFE_RESOURCE_URL],

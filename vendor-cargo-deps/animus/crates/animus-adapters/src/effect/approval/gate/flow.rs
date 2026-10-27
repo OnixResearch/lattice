@@ -6,9 +6,12 @@ pub fn evaluate_confirmation_outcome(
     current_tick: super::ConfirmationTick,
 ) -> super::ConfirmationEvaluation {
     match outcome {
-        super::super::ServiceOutcome::Completed { value, .. } => {
-            evaluate_confirmation_decision(request, value, super::ConfirmationBrokerClass::Injected, current_tick)
-        }
+        super::super::ServiceOutcome::Completed { value, .. } => evaluate_confirmation_decision(
+            request,
+            value,
+            super::ConfirmationBrokerClass::Injected,
+            current_tick,
+        ),
         super::super::ServiceOutcome::Absent { .. } => denied_evaluation(DeniedEvaluationInput {
             request,
             issue: super::ConfirmationIssue::BrokerAbsent,
@@ -16,13 +19,15 @@ pub fn evaluate_confirmation_outcome(
             timing_class: super::ConfirmationTimingClass::NotApplicable,
             current_tick,
         }),
-        super::super::ServiceOutcome::Unavailable { .. } => denied_evaluation(DeniedEvaluationInput {
-            request,
-            issue: super::ConfirmationIssue::BrokerUnavailable,
-            broker_class: super::ConfirmationBrokerClass::Injected,
-            timing_class: super::ConfirmationTimingClass::NotApplicable,
-            current_tick,
-        }),
+        super::super::ServiceOutcome::Unavailable { .. } => {
+            denied_evaluation(DeniedEvaluationInput {
+                request,
+                issue: super::ConfirmationIssue::BrokerUnavailable,
+                broker_class: super::ConfirmationBrokerClass::Injected,
+                timing_class: super::ConfirmationTimingClass::NotApplicable,
+                current_tick,
+            })
+        }
         super::super::ServiceOutcome::Denied { value, .. } => {
             let issue = denied_issue(value.as_ref());
             denied_evaluation(DeniedEvaluationInput {
@@ -33,13 +38,15 @@ pub fn evaluate_confirmation_outcome(
                 current_tick,
             })
         }
-        super::super::ServiceOutcome::Cancelled { .. } => denied_evaluation(DeniedEvaluationInput {
-            request,
-            issue: super::ConfirmationIssue::BrokerCancelled,
-            broker_class: super::ConfirmationBrokerClass::Injected,
-            timing_class: super::ConfirmationTimingClass::Cancelled,
-            current_tick,
-        }),
+        super::super::ServiceOutcome::Cancelled { .. } => {
+            denied_evaluation(DeniedEvaluationInput {
+                request,
+                issue: super::ConfirmationIssue::BrokerCancelled,
+                broker_class: super::ConfirmationBrokerClass::Injected,
+                timing_class: super::ConfirmationTimingClass::Cancelled,
+                current_tick,
+            })
+        }
         super::super::ServiceOutcome::TimedOut { .. } => denied_evaluation(DeniedEvaluationInput {
             request,
             issue: super::ConfirmationIssue::BrokerTimedOut,
@@ -47,13 +54,15 @@ pub fn evaluate_confirmation_outcome(
             timing_class: super::ConfirmationTimingClass::TimedOut,
             current_tick,
         }),
-        super::super::ServiceOutcome::MalformedOutput { .. } => denied_evaluation(DeniedEvaluationInput {
-            request,
-            issue: super::ConfirmationIssue::MalformedDecision,
-            broker_class: super::ConfirmationBrokerClass::Injected,
-            timing_class: super::ConfirmationTimingClass::NotApplicable,
-            current_tick,
-        }),
+        super::super::ServiceOutcome::MalformedOutput { .. } => {
+            denied_evaluation(DeniedEvaluationInput {
+                request,
+                issue: super::ConfirmationIssue::MalformedDecision,
+                broker_class: super::ConfirmationBrokerClass::Injected,
+                timing_class: super::ConfirmationTimingClass::NotApplicable,
+                current_tick,
+            })
+        }
     }
 }
 
@@ -80,13 +89,15 @@ pub fn evaluate_confirmation_decision(
                 approved_evaluation(request, broker_class, current_tick)
             }
         }
-        super::ConfirmationDecision::Denied { reason } => denied_evaluation(DeniedEvaluationInput {
-            request,
-            issue: reason_issue(*reason),
-            broker_class,
-            timing_class: super::ConfirmationTimingClass::NotApplicable,
-            current_tick,
-        }),
+        super::ConfirmationDecision::Denied { reason } => {
+            denied_evaluation(DeniedEvaluationInput {
+                request,
+                issue: reason_issue(*reason),
+                broker_class,
+                timing_class: super::ConfirmationTimingClass::NotApplicable,
+                current_tick,
+            })
+        }
         super::ConfirmationDecision::NoDecision => denied_evaluation(DeniedEvaluationInput {
             request,
             issue: super::ConfirmationIssue::NoDecision,
@@ -172,7 +183,10 @@ fn binding_issue(
     if binding.expiry() != request.expiry() {
         return Some(super::ConfirmationIssue::MismatchedExpiry);
     }
-    if request.expiry().is_some_and(|expiry| expiry.is_stale(current_tick)) {
+    if request
+        .expiry()
+        .is_some_and(|expiry| expiry.is_stale(current_tick))
+    {
         return Some(super::ConfirmationIssue::StaleDecision);
     }
     None
@@ -194,11 +208,15 @@ const fn timing_for_issue(issue: super::ConfirmationIssue) -> super::Confirmatio
         | super::ConfirmationIssue::MismatchedResource
         | super::ConfirmationIssue::MismatchedAbility
         | super::ConfirmationIssue::MismatchedPolicy
-        | super::ConfirmationIssue::MismatchedExpiry => super::ConfirmationTimingClass::NotApplicable,
+        | super::ConfirmationIssue::MismatchedExpiry => {
+            super::ConfirmationTimingClass::NotApplicable
+        }
     }
 }
 
-const fn broker_class_for_denial(issue: super::ConfirmationIssue) -> super::ConfirmationBrokerClass {
+const fn broker_class_for_denial(
+    issue: super::ConfirmationIssue,
+) -> super::ConfirmationBrokerClass {
     match issue {
         super::ConfirmationIssue::BrokerAbsent => super::ConfirmationBrokerClass::DefaultDeny,
         super::ConfirmationIssue::None
@@ -222,7 +240,9 @@ fn denied_issue(decision: Option<&super::ConfirmationDecision>) -> super::Confir
     match decision {
         Some(super::ConfirmationDecision::Denied { reason }) => reason_issue(*reason),
         Some(super::ConfirmationDecision::NoDecision) => super::ConfirmationIssue::NoDecision,
-        Some(super::ConfirmationDecision::Approved { .. }) | None => super::ConfirmationIssue::BrokerDenied,
+        Some(super::ConfirmationDecision::Approved { .. }) | None => {
+            super::ConfirmationIssue::BrokerDenied
+        }
     }
 }
 

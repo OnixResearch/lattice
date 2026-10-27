@@ -1,24 +1,10 @@
-use super::Collection;
-use super::HashInput;
-use super::InteropError;
-use super::MCP_CAPABILITY_FIELD;
-use super::MCP_RECEIPT_RESOURCE_FIELD;
-use super::MCP_RESPONSE_HASH_FIELD;
-use super::MCP_SERVER_LABEL_FIELD;
-use super::MCP_TOOL_NAME_FIELD;
-use super::MCP_TRUNCATION_BOUNDED;
-use super::MCP_TRUNCATION_FIELD;
-use super::MCP_TRUNCATION_NONE;
-use super::MCP_TRUNCATION_REJECTED;
-use super::RECEIPT_LEAK_MARKERS;
-use super::SCHEMA_FIELD;
-use super::STATUS_FIELD;
-use super::Text;
-use super::hash_parts;
-use super::parse_value;
-use super::required_text;
-use super::text_collection;
-use super::validate_hash;
+use super::{
+    Collection, HashInput, InteropError, MCP_CAPABILITY_FIELD, MCP_RECEIPT_RESOURCE_FIELD,
+    MCP_RESPONSE_HASH_FIELD, MCP_SERVER_LABEL_FIELD, MCP_TOOL_NAME_FIELD, MCP_TRUNCATION_BOUNDED,
+    MCP_TRUNCATION_FIELD, MCP_TRUNCATION_NONE, MCP_TRUNCATION_REJECTED, RECEIPT_LEAK_MARKERS,
+    SCHEMA_FIELD, STATUS_FIELD, Text, hash_parts, parse_value, required_text, text_collection,
+    validate_hash,
+};
 
 /// Truncation state recorded in safe MCP bridge receipts.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -109,9 +95,13 @@ impl McpReceipt {
         let tool_name = safe_receipt_text(MCP_TOOL_NAME_FIELD, draft.tool_name)?;
         let schema_identity = safe_receipt_text(SCHEMA_FIELD, draft.schema_identity)?;
         let status = safe_receipt_text(STATUS_FIELD, draft.status)?;
-        let capability_labels = safe_receipt_text_collection(MCP_CAPABILITY_FIELD, draft.capability_labels, true)?;
-        let redacted_resource_ids =
-            safe_receipt_text_collection(MCP_RECEIPT_RESOURCE_FIELD, draft.redacted_resource_ids, true)?;
+        let capability_labels =
+            safe_receipt_text_collection(MCP_CAPABILITY_FIELD, draft.capability_labels, true)?;
+        let redacted_resource_ids = safe_receipt_text_collection(
+            MCP_RECEIPT_RESOURCE_FIELD,
+            draft.redacted_resource_ids,
+            true,
+        )?;
         let truncation_state = McpReceiptTruncationState::parse(draft.truncation_state)?;
         validate_hash(HashInput {
             field: MCP_RESPONSE_HASH_FIELD.as_str(),
@@ -209,7 +199,10 @@ pub fn validate_mcp_receipt_text(text: &str) -> Result<(), InteropError> {
     Ok(())
 }
 
-fn safe_receipt_text(field_name: crate::validation::FieldName, value: &str) -> Result<Text, InteropError> {
+fn safe_receipt_text(
+    field_name: crate::validation::FieldName,
+    value: &str,
+) -> Result<Text, InteropError> {
     let text = required_text(field_name, value)?;
     validate_mcp_receipt_text(text.as_str())?;
     Ok(text)
@@ -228,5 +221,7 @@ fn safe_receipt_text_collection(
 }
 
 fn contains_mcp_receipt_leak_marker(lowered: &str) -> bool {
-    RECEIPT_LEAK_MARKERS.iter().any(|marker| lowered.contains(marker))
+    RECEIPT_LEAK_MARKERS
+        .iter()
+        .any(|marker| lowered.contains(marker))
 }

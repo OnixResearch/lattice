@@ -88,7 +88,10 @@ pub fn validate_durable_session_store_policy(
         policy_hash: input.policy_hash.clone(),
     };
     debug_assert_eq!(policy.file_mode, PRIVATE_FILE_MODE);
-    debug_assert_eq!(policy.encryption_postures.len(), REQUIRED_ENCRYPTION_POSTURES.len());
+    debug_assert_eq!(
+        policy.encryption_postures.len(),
+        REQUIRED_ENCRYPTION_POSTURES.len()
+    );
     Ok(policy)
 }
 
@@ -145,15 +148,24 @@ pub fn validate_durable_session_store_descriptor(
     safe_label(descriptor.receipt_policy.as_str(), FIELD_DESCRIPTOR)?;
     lowercase_blake3(descriptor.policy_hash.as_str(), FIELD_DESCRIPTOR)?;
     if descriptor.policy_hash != policy.policy_hash {
-        return Err(error(DurableSessionStoreIssue::InvalidDescriptor, FIELD_DESCRIPTOR));
+        return Err(error(
+            DurableSessionStoreIssue::InvalidDescriptor,
+            FIELD_DESCRIPTOR,
+        ));
     }
     if !policy.admits_encryption(descriptor.encryption) {
-        return Err(error(DurableSessionStoreIssue::InvalidDescriptor, FIELD_DESCRIPTOR));
+        return Err(error(
+            DurableSessionStoreIssue::InvalidDescriptor,
+            FIELD_DESCRIPTOR,
+        ));
     }
     if descriptor.encryption == DurableSessionEncryptionPosture::ExternalRequired
         && !descriptor.encryption_service_available
     {
-        return Err(error(DurableSessionStoreIssue::EncryptionUnavailable, FIELD_DESCRIPTOR));
+        return Err(error(
+            DurableSessionStoreIssue::EncryptionUnavailable,
+            FIELD_DESCRIPTOR,
+        ));
     }
     debug_assert!(!descriptor.location_capability.is_empty());
     debug_assert_eq!(descriptor.policy_hash, policy.policy_hash);
@@ -180,11 +192,17 @@ pub fn plan_durable_session_transaction(
     let frame_count = u32::try_from(draft.entries.len())
         .map_err(|_error| error(DurableSessionStoreIssue::BoundExceeded, FIELD_TRANSACTION))?;
     if !(MIN_COUNT..=policy.max_transaction_frames).contains(&frame_count) {
-        return Err(error(DurableSessionStoreIssue::BoundExceeded, FIELD_TRANSACTION));
+        return Err(error(
+            DurableSessionStoreIssue::BoundExceeded,
+            FIELD_TRANSACTION,
+        ));
     }
     validate_transaction_lineage(draft)?;
     if draft.first_sequence == 0 {
-        return Err(error(DurableSessionStoreIssue::SequenceGap, FIELD_TRANSACTION));
+        return Err(error(
+            DurableSessionStoreIssue::SequenceGap,
+            FIELD_TRANSACTION,
+        ));
     }
     let mut frames = Vec::with_capacity(draft.entries.len());
     let mut sidecars = Vec::with_capacity(draft.entries.len());
@@ -228,7 +246,9 @@ struct FrameBuildInput<'a> {
     entry: &'a super::data::DurableSessionPrivateEntryDraft<'a>,
 }
 
-fn build_frame(input: &FrameBuildInput<'_>) -> Result<DurableSessionFrame, DurableSessionStoreError> {
+fn build_frame(
+    input: &FrameBuildInput<'_>,
+) -> Result<DurableSessionFrame, DurableSessionStoreError> {
     safe_label(input.entry.entry_id, FIELD_FRAME)?;
     if let Some(parent_id) = input.entry.parent_id {
         safe_label(parent_id, FIELD_FRAME)?;
@@ -243,17 +263,20 @@ fn build_frame(input: &FrameBuildInput<'_>) -> Result<DurableSessionFrame, Durab
     let sequence = input.sequence.to_string();
     let kind = input.entry.kind.as_str();
     let parent = input.entry.parent_id.unwrap_or("");
-    let frame_hash = hash_parts(FRAME_HASH_DOMAIN, &[
-        input.descriptor.session_id.as_bytes(),
-        input.descriptor.branch_id.as_bytes(),
-        sequence.as_bytes(),
-        input.entry.entry_id.as_bytes(),
-        kind.as_bytes(),
-        parent.as_bytes(),
-        payload_bytes.to_string().as_bytes(),
-        payload_hash.as_bytes(),
-        input.previous_frame_hash.as_bytes(),
-    ])?;
+    let frame_hash = hash_parts(
+        FRAME_HASH_DOMAIN,
+        &[
+            input.descriptor.session_id.as_bytes(),
+            input.descriptor.branch_id.as_bytes(),
+            sequence.as_bytes(),
+            input.entry.entry_id.as_bytes(),
+            kind.as_bytes(),
+            parent.as_bytes(),
+            payload_bytes.to_string().as_bytes(),
+            payload_hash.as_bytes(),
+            input.previous_frame_hash.as_bytes(),
+        ],
+    )?;
     debug_assert!(!payload_hash.is_empty());
     debug_assert_eq!(u32::try_from(input.entry.payload.len()), Ok(payload_bytes));
     Ok(DurableSessionFrame {
@@ -277,10 +300,16 @@ struct CommitBuildInput<'a> {
     frames: &'a [DurableSessionFrame],
 }
 
-fn build_commit(input: &CommitBuildInput<'_>) -> Result<DurableSessionCommit, DurableSessionStoreError> {
+fn build_commit(
+    input: &CommitBuildInput<'_>,
+) -> Result<DurableSessionCommit, DurableSessionStoreError> {
     debug_assert!(!input.frames.is_empty());
     debug_assert!(!input.active_leaf_id.is_empty());
-    let frame_hashes = input.frames.iter().map(|frame| frame.frame_hash.clone()).collect::<Vec<_>>();
+    let frame_hashes = input
+        .frames
+        .iter()
+        .map(|frame| frame.frame_hash.clone())
+        .collect::<Vec<_>>();
     let mut transaction_parts = vec![
         input.descriptor.session_id.as_bytes(),
         input.descriptor.branch_id.as_bytes(),
@@ -289,11 +318,14 @@ fn build_commit(input: &CommitBuildInput<'_>) -> Result<DurableSessionCommit, Du
     ];
     transaction_parts.extend(frame_hashes.iter().map(String::as_bytes));
     let transaction_hash = hash_parts(TRANSACTION_HASH_DOMAIN, transaction_parts.as_slice())?;
-    let commit_hash = hash_parts(COMMIT_HASH_DOMAIN, &[
-        transaction_hash.as_bytes(),
-        input.prior_head_hash.as_bytes(),
-        input.active_leaf_id.as_bytes(),
-    ])?;
+    let commit_hash = hash_parts(
+        COMMIT_HASH_DOMAIN,
+        &[
+            transaction_hash.as_bytes(),
+            input.prior_head_hash.as_bytes(),
+            input.active_leaf_id.as_bytes(),
+        ],
+    )?;
     Ok(DurableSessionCommit {
         transaction_hash,
         prior_head_hash: String::from(input.prior_head_hash),
@@ -303,20 +335,25 @@ fn build_commit(input: &CommitBuildInput<'_>) -> Result<DurableSessionCommit, Du
     })
 }
 
-fn project_sidecar(frame: &DurableSessionFrame) -> Result<DurableSessionSafeSidecar, DurableSessionStoreError> {
+fn project_sidecar(
+    frame: &DurableSessionFrame,
+) -> Result<DurableSessionSafeSidecar, DurableSessionStoreError> {
     let payload_bytes = u32::try_from(frame.payload.len())
         .map_err(|_error| error(DurableSessionStoreIssue::BoundExceeded, FIELD_FRAME))?;
     let sequence = frame.sequence.to_string();
     let payload_bytes_text = payload_bytes.to_string();
-    let sidecar_hash = hash_parts(SIDECAR_HASH_DOMAIN, &[
-        sequence.as_bytes(),
-        frame.entry_id.as_bytes(),
-        frame.kind.as_str().as_bytes(),
-        payload_bytes_text.as_bytes(),
-        frame.payload_hash.as_bytes(),
-        frame.frame_hash.as_bytes(),
-        super::data::REDACTION_MARKER.as_bytes(),
-    ])?;
+    let sidecar_hash = hash_parts(
+        SIDECAR_HASH_DOMAIN,
+        &[
+            sequence.as_bytes(),
+            frame.entry_id.as_bytes(),
+            frame.kind.as_str().as_bytes(),
+            payload_bytes_text.as_bytes(),
+            frame.payload_hash.as_bytes(),
+            frame.frame_hash.as_bytes(),
+            super::data::REDACTION_MARKER.as_bytes(),
+        ],
+    )?;
     debug_assert!(payload_bytes > 0);
     debug_assert!(!sidecar_hash.is_empty());
     Ok(DurableSessionSafeSidecar {
@@ -331,10 +368,15 @@ fn project_sidecar(frame: &DurableSessionFrame) -> Result<DurableSessionSafeSide
     })
 }
 
-fn validate_transaction_lineage(draft: &DurableSessionTransactionDraft<'_>) -> Result<(), DurableSessionStoreError> {
+fn validate_transaction_lineage(
+    draft: &DurableSessionTransactionDraft<'_>,
+) -> Result<(), DurableSessionStoreError> {
     let is_empty_head = draft.prior_head_hash == super::data::DURABLE_SESSION_EMPTY_HEAD_HASH;
     if is_empty_head != draft.prior_active_leaf_id.is_none() {
-        return Err(error(DurableSessionStoreIssue::StaleHead, FIELD_TRANSACTION));
+        return Err(error(
+            DurableSessionStoreIssue::StaleHead,
+            FIELD_TRANSACTION,
+        ));
     }
     if let Some(prior_active_leaf_id) = draft.prior_active_leaf_id {
         safe_label(prior_active_leaf_id, FIELD_TRANSACTION)?;
@@ -343,58 +385,85 @@ fn validate_transaction_lineage(draft: &DurableSessionTransactionDraft<'_>) -> R
     let mut seen_entry_ids = Vec::with_capacity(draft.entries.len());
     for entry in draft.entries {
         safe_label(entry.entry_id, FIELD_TRANSACTION)?;
-        if seen_entry_ids.iter().any(|entry_id| entry_id == &entry.entry_id) || entry.parent_id != expected_parent {
-            return Err(error(DurableSessionStoreIssue::IntegrityMismatch, FIELD_TRANSACTION));
+        if seen_entry_ids
+            .iter()
+            .any(|entry_id| entry_id == &entry.entry_id)
+            || entry.parent_id != expected_parent
+        {
+            return Err(error(
+                DurableSessionStoreIssue::IntegrityMismatch,
+                FIELD_TRANSACTION,
+            ));
         }
         seen_entry_ids.push(entry.entry_id);
         expected_parent = Some(entry.entry_id);
     }
     if expected_parent != Some(draft.active_leaf_id) {
-        return Err(error(DurableSessionStoreIssue::IntegrityMismatch, FIELD_TRANSACTION));
+        return Err(error(
+            DurableSessionStoreIssue::IntegrityMismatch,
+            FIELD_TRANSACTION,
+        ));
     }
     debug_assert_eq!(seen_entry_ids.len(), draft.entries.len());
     debug_assert_eq!(expected_parent, Some(draft.active_leaf_id));
     Ok(())
 }
 
-fn validate_policy_shape(input: &DurableSessionStorePolicyInput) -> Result<(), DurableSessionStoreError> {
+fn validate_policy_shape(
+    input: &DurableSessionStorePolicyInput,
+) -> Result<(), DurableSessionStoreError> {
     let has_required_shape = input.schema == POLICY_SCHEMA
         && input.durability == REQUIRED_DURABILITY
         && input.locking == REQUIRED_LOCKING
         && input.private_data == REQUIRED_PRIVATE_DATA;
-    let has_required_recovery =
-        input.tail_recovery == REQUIRED_TAIL_RECOVERY && input.committed_corruption == REQUIRED_CORRUPTION;
+    let has_required_recovery = input.tail_recovery == REQUIRED_TAIL_RECOVERY
+        && input.committed_corruption == REQUIRED_CORRUPTION;
     if !has_required_shape || !has_required_recovery {
         return Err(error(DurableSessionStoreIssue::InvalidPolicy, FIELD_POLICY));
     }
     safe_label(input.policy_id.as_str(), FIELD_POLICY)?;
     lowercase_blake3(input.policy_hash.as_str(), FIELD_POLICY)?;
-    let has_frame_bound = (MIN_COUNT..=MAX_FRAME_PAYLOAD_BYTES).contains(&input.max_frame_payload_bytes);
-    let has_transaction_bound = (MIN_COUNT..=MAX_TRANSACTION_FRAMES).contains(&input.max_transaction_frames);
-    let has_file_bound = u64::from(MIN_COUNT) <= input.max_file_bytes && input.max_file_bytes <= MAX_FILE_BYTES;
+    let has_frame_bound =
+        (MIN_COUNT..=MAX_FRAME_PAYLOAD_BYTES).contains(&input.max_frame_payload_bytes);
+    let has_transaction_bound =
+        (MIN_COUNT..=MAX_TRANSACTION_FRAMES).contains(&input.max_transaction_frames);
+    let has_file_bound =
+        u64::from(MIN_COUNT) <= input.max_file_bytes && input.max_file_bytes <= MAX_FILE_BYTES;
     if !has_frame_bound || !has_transaction_bound || !has_file_bound {
         return Err(error(DurableSessionStoreIssue::InvalidPolicy, FIELD_POLICY));
     }
     if input.file_mode != PRIVATE_FILE_MODE {
         return Err(error(DurableSessionStoreIssue::InvalidPolicy, FIELD_POLICY));
     }
-    validate_exact_labels(input.encryption_postures.as_slice(), REQUIRED_ENCRYPTION_POSTURES)?;
+    validate_exact_labels(
+        input.encryption_postures.as_slice(),
+        REQUIRED_ENCRYPTION_POSTURES,
+    )?;
     validate_exact_labels(input.receipt_fields.as_slice(), REQUIRED_RECEIPT_FIELDS)?;
     debug_assert!(input.max_file_bytes >= u64::from(input.max_frame_payload_bytes));
     debug_assert_eq!(input.file_mode, PRIVATE_FILE_MODE);
     Ok(())
 }
 
-fn validate_exact_labels(actual: &[String], expected: &[&str]) -> Result<(), DurableSessionStoreError> {
-    let has_exact_labels =
-        actual.len() == expected.len() && actual.iter().map(String::as_str).eq(expected.iter().copied());
+fn validate_exact_labels(
+    actual: &[String],
+    expected: &[&str],
+) -> Result<(), DurableSessionStoreError> {
+    let has_exact_labels = actual.len() == expected.len()
+        && actual
+            .iter()
+            .map(String::as_str)
+            .eq(expected.iter().copied());
     if !has_exact_labels {
         return Err(error(DurableSessionStoreIssue::InvalidPolicy, FIELD_POLICY));
     }
     Ok(())
 }
 
-pub(super) fn hash_parts(domain: &str, parts: &[&[u8]]) -> Result<String, DurableSessionStoreError> {
+pub(super) fn hash_parts(
+    domain: &str,
+    parts: &[&[u8]],
+) -> Result<String, DurableSessionStoreError> {
     let mut hasher = blake3::Hasher::new();
     hasher.update(domain.as_bytes());
     for part in parts {
@@ -411,18 +480,23 @@ pub(super) fn hash_parts(domain: &str, parts: &[&[u8]]) -> Result<String, Durabl
 pub(super) fn safe_label(value: &str, field: StoreField) -> Result<(), DurableSessionStoreError> {
     const MAX_SAFE_LABEL_BYTES: usize = 256;
     let is_label_bounded = !value.is_empty() && value.len() <= MAX_SAFE_LABEL_BYTES;
-    let has_safe_chars = value
-        .chars()
-        .all(|character| character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | ':' | '-'));
+    let has_safe_chars = value.chars().all(|character| {
+        character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | ':' | '-')
+    });
     if !is_label_bounded || !has_safe_chars {
         return Err(error(DurableSessionStoreIssue::InvalidDescriptor, field));
     }
     Ok(())
 }
 
-pub(super) fn lowercase_blake3(value: &str, field: StoreField) -> Result<(), DurableSessionStoreError> {
+pub(super) fn lowercase_blake3(
+    value: &str,
+    field: StoreField,
+) -> Result<(), DurableSessionStoreError> {
     let has_exact_width = value.len() == BLAKE3_HEX_CHARS;
-    let has_lowercase_hex = value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
+    let has_lowercase_hex = value
+        .bytes()
+        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
     if !has_exact_width || !has_lowercase_hex {
         return Err(error(DurableSessionStoreIssue::IntegrityMismatch, field));
     }

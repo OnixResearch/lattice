@@ -1,0 +1,40 @@
+{
+  "catch_up_rules": {
+    "agent_recurring": "skip",
+    "scheduled": "pause",
+    "user_heartbeat": "fire_once"
+  },
+  "claim_before_delivery": true,
+  "cohort": "prime-agent-schedule-reliability",
+  "license": "MIT",
+  "maximum_interval_ticks": 86400,
+  "maximum_jobs_per_session": 64,
+  "maximum_missed_count": 1000000,
+  "minimum_interval_ticks": 1,
+  "non_claims": [
+    "not-exactly-once-execution",
+    "not-real-time",
+    "not-timer-accuracy",
+    "not-outcome-correctness",
+    "not-production-or-release-readiness"
+  ],
+  "one_user_heartbeat": true,
+  "receipt_fields": [
+    "policy_identity",
+    "state_identity",
+    "job_identity",
+    "surface",
+    "decision_class",
+    "clock_identity",
+    "missed_count",
+    "non_claims"
+  ],
+  "schema": "animus.schedule-reliability.v1",
+  "session_scoped": true,
+  "source_revision": "c5991bc853d27754aed345c13ff4d2e05c40f1f4",
+  "surfaces": [
+    "user_heartbeat",
+    "agent_recurring",
+    "scheduled"
+  ]
+}

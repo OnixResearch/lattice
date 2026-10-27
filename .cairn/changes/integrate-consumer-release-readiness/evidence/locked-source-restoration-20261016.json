@@ -1,0 +1,41 @@
+{
+  "schema": "lattice.locked-source-restoration-observation.v1",
+  "observed_on": "2026-10-16",
+  "status": "exact-locked-wrapper-restored-and-independently-verified",
+  "scope": "Host-only source-store intake; no repository pins, compiler, global Nix policy or process ownership changed.",
+  "owning_input": {
+    "repository": "bounded-tree-lattice-mantle-compat",
+    "lock_file": "devenv.lock",
+    "node": "nixpkgs",
+    "lock_lines": "617-635,793-799",
+    "owner": "cachix",
+    "repo": "devenv-nixpkgs",
+    "revision": "c946ff36bf193309589932c371bd5ae6653c912e",
+    "nar_hash": "sha256-VLSslwCjlsICjyaUfrS7lGMypmO03fzmDAqhD85Ae84=",
+    "store_path": "/nix/store/ybi0s79qpn8qnqk618wax8apkq7509l5-source"
+  },
+  "prerequisite_observation": "Read-only LockedNixInputPrerequisites scout found former PID2103679 and its prior lock no longer observable; source remained absent. Old process ownership was not inferred and no process was cancelled.",
+  "restoration": {
+    "cwd": "/tmp",
+    "argv": ["/run/current-system/sw/bin/timeout", "45", "/nix/store/6rwk5j1qqk7na4la5m2ka34p734braxa-nix-2.36.0/bin/nix", "--extra-experimental-features", "nix-command", "--option", "min-free", "0", "--option", "max-free", "0", "--option", "access-tokens", "", "--option", "netrc-file", "/dev/null", "store", "prefetch-file", "--json", "--unpack", "--name", "source", "--expected-hash", "sha256-VLSslwCjlsICjyaUfrS7lGMypmO03fzmDAqhD85Ae84=", "file:///tmp/native-source-store-intake.aMrTJom9/devenv-nixpkgs.tar.gz"],
+    "exit": 0,
+    "stdout": {"hash": "sha256-VLSslwCjlsICjyaUfrS7lGMypmO03fzmDAqhD85Ae84=", "storePath": "/nix/store/ybi0s79qpn8qnqk618wax8apkq7509l5-source"}
+  },
+  "independent_recursive_hash": {
+    "cwd": "/tmp",
+    "argv": ["/run/current-system/sw/bin/timeout", "30", "/nix/store/6rwk5j1qqk7na4la5m2ka34p734braxa-nix-2.36.0/bin/nix", "--extra-experimental-features", "nix-command", "hash", "path", "--sri", "/nix/store/ybi0s79qpn8qnqk618wax8apkq7509l5-source"],
+    "exit": 0,
+    "stdout": "sha256-VLSslwCjlsICjyaUfrS7lGMypmO03fzmDAqhD85Ae84="
+  },
+  "registered_path": {
+    "cwd": "/tmp",
+    "argv": ["/run/current-system/sw/bin/timeout", "30", "/nix/store/6rwk5j1qqk7na4la5m2ka34p734braxa-nix-2.36.0/bin/nix", "--extra-experimental-features", "nix-command", "path-info", "--json", "/nix/store/ybi0s79qpn8qnqk618wax8apkq7509l5-source"],
+    "exit": 0,
+    "nar_hash": "sha256-VLSslwCjlsICjyaUfrS7lGMypmO03fzmDAqhD85Ae84=",
+    "nar_size": 235416,
+    "references": [],
+    "warning": "Nix2.36 warns --json without --json-format is deprecated; observation succeeded."
+  },
+  "next_owners": ["NickelOwningGate", "BoundedTreeOwningCompatibility"],
+  "non_claims": ["Restoring a locked source is not a passing owning producer gate", "No Artifact anonymous hosting or producer publication is established", "No Lattice whole-consumer, runtime or credential-free public-build acceptance is established"]
+}

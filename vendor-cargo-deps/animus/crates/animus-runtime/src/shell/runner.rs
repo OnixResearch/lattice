@@ -21,7 +21,9 @@ where
     Tool::Error: core::fmt::Display,
 {
     match crate::plan_next_turn(config, state) {
-        crate::TurnPlan::Evaluate { state: ready, turn } => run_ready_turn(ready, &turn, fabric, adapters),
+        crate::TurnPlan::Evaluate { state: ready, turn } => {
+            run_ready_turn(ready, &turn, fabric, adapters)
+        }
         crate::TurnPlan::Complete { report } => Step::Complete { report },
     }
 }
@@ -39,8 +41,11 @@ where
     Tool: animus_adapters::ToolAdapter,
     Tool::Error: core::fmt::Display,
 {
-    let state = match wait_for_agent_control(state, animus_adapters::AgentControlCheckpointKind::BeforeFabric, adapters)
-    {
+    let state = match wait_for_agent_control(
+        state,
+        animus_adapters::AgentControlCheckpointKind::BeforeFabric,
+        adapters,
+    ) {
         Ok(ready) => ready,
         Err(report) => return Step::Complete { report },
     };
@@ -84,7 +89,10 @@ enum DispatchStep {
     },
 }
 
-fn apply_dispatch_step<Model, Tool>(step: DispatchStep, adapters: &mut super::RuntimeAdapters<'_, Model, Tool>) -> Step
+fn apply_dispatch_step<Model, Tool>(
+    step: DispatchStep,
+    adapters: &mut super::RuntimeAdapters<'_, Model, Tool>,
+) -> Step
 where
     Model: animus_adapters::ModelAdapter,
     Model::Error: core::fmt::Display,
@@ -95,9 +103,10 @@ where
         DispatchStep::Dispatch { state, request } => {
             let checkpoint = dispatch_checkpoint(&request);
             match wait_for_agent_control(state, checkpoint, adapters) {
-                Ok(ready) => {
-                    apply_adapter_step(crate::apply_adapter_outcome(ready, dispatch_adapter(request, adapters)))
-                }
+                Ok(ready) => apply_adapter_step(crate::apply_adapter_outcome(
+                    ready,
+                    dispatch_adapter(request, adapters),
+                )),
                 Err(report) => Step::Complete { report },
             }
         }
@@ -105,10 +114,16 @@ where
     }
 }
 
-fn dispatch_checkpoint(request: &crate::AdapterRequest) -> animus_adapters::AgentControlCheckpointKind {
+fn dispatch_checkpoint(
+    request: &crate::AdapterRequest,
+) -> animus_adapters::AgentControlCheckpointKind {
     match request {
-        crate::AdapterRequest::Model { .. } => animus_adapters::AgentControlCheckpointKind::BeforeModel,
-        crate::AdapterRequest::Tool { .. } => animus_adapters::AgentControlCheckpointKind::BeforeTool,
+        crate::AdapterRequest::Model { .. } => {
+            animus_adapters::AgentControlCheckpointKind::BeforeModel
+        }
+        crate::AdapterRequest::Tool { .. } => {
+            animus_adapters::AgentControlCheckpointKind::BeforeTool
+        }
     }
 }
 
@@ -119,10 +134,13 @@ fn wait_for_agent_control<Model, Tool>(
 ) -> Result<crate::TurnState, crate::RunReport> {
     match adapters.wait_for_agent_control(checkpoint) {
         Ok(animus_adapters::AgentControlPermit::Continue) => Ok(state),
-        Ok(animus_adapters::AgentControlPermit::Cancel) => {
-            Err(crate::transition::complete_with_agent_control_stop(state, AGENT_CONTROL_CANCELLED))
-        }
-        Err(_error) => Err(crate::transition::complete_with_agent_control_stop(state, AGENT_CONTROL_WAIT_FAILED)),
+        Ok(animus_adapters::AgentControlPermit::Cancel) => Err(
+            crate::transition::complete_with_agent_control_stop(state, AGENT_CONTROL_CANCELLED),
+        ),
+        Err(_error) => Err(crate::transition::complete_with_agent_control_stop(
+            state,
+            AGENT_CONTROL_WAIT_FAILED,
+        )),
     }
 }
 
@@ -132,8 +150,12 @@ fn prepare_dispatch<Model, Tool>(
     adapters: &mut super::RuntimeAdapters<'_, Model, Tool>,
 ) -> DispatchStep {
     match request {
-        crate::AdapterRequest::Model { request } => prepare_model_dispatch(state, request, &mut adapters.middleware),
-        crate::AdapterRequest::Tool { request } => prepare_tool_dispatch(state, request, &mut adapters.middleware),
+        crate::AdapterRequest::Model { request } => {
+            prepare_model_dispatch(state, request, &mut adapters.middleware)
+        }
+        crate::AdapterRequest::Tool { request } => {
+            prepare_tool_dispatch(state, request, &mut adapters.middleware)
+        }
     }
 }
 
@@ -147,7 +169,11 @@ fn prepare_model_dispatch(
             state,
             request: crate::AdapterRequest::Model { request },
         },
-        crate::hooks::chain::MiddlewareOutcome::Blocked { value, hook, reason } => DispatchStep::Complete {
+        crate::hooks::chain::MiddlewareOutcome::Blocked {
+            value,
+            hook,
+            reason,
+        } => DispatchStep::Complete {
             report: crate::complete_with_guard_block(
                 state,
                 crate::AdapterRequest::Model { request: value },
@@ -156,7 +182,11 @@ fn prepare_model_dispatch(
             ),
         },
         crate::hooks::chain::MiddlewareOutcome::Failed { value, error } => DispatchStep::Complete {
-            report: crate::complete_with_guard_failure(state, crate::AdapterRequest::Model { request: value }, &error),
+            report: crate::complete_with_guard_failure(
+                state,
+                crate::AdapterRequest::Model { request: value },
+                &error,
+            ),
         },
     }
 }
@@ -171,7 +201,11 @@ fn prepare_tool_dispatch(
             state,
             request: crate::AdapterRequest::Tool { request },
         },
-        crate::hooks::chain::MiddlewareOutcome::Blocked { value, hook, reason } => DispatchStep::Complete {
+        crate::hooks::chain::MiddlewareOutcome::Blocked {
+            value,
+            hook,
+            reason,
+        } => DispatchStep::Complete {
             report: crate::complete_with_guard_block(
                 state,
                 crate::AdapterRequest::Tool { request: value },
@@ -180,7 +214,11 @@ fn prepare_tool_dispatch(
             ),
         },
         crate::hooks::chain::MiddlewareOutcome::Failed { value, error } => DispatchStep::Complete {
-            report: crate::complete_with_guard_failure(state, crate::AdapterRequest::Tool { request: value }, &error),
+            report: crate::complete_with_guard_failure(
+                state,
+                crate::AdapterRequest::Tool { request: value },
+                &error,
+            ),
         },
     }
 }
@@ -227,10 +265,16 @@ where
         registry: &adapters.capabilities,
         policy: crate::ModelDispatchPolicyDraft::compatibility_defaults(),
     });
-    debug_assert_eq!(plan.request_contract_identity(), animus_adapters::MODEL_REQUEST_CONTRACT_IDENTITY);
+    debug_assert_eq!(
+        plan.request_contract_identity(),
+        animus_adapters::MODEL_REQUEST_CONTRACT_IDENTITY
+    );
     if !plan.is_admitted() {
         return crate::AdapterOutcome::ModelCall {
-            outcome: failed_outcome(model_plan_failure_class(plan.issue()), model_plan_failure_message(plan.issue())),
+            outcome: failed_outcome(
+                model_plan_failure_class(plan.issue()),
+                model_plan_failure_message(plan.issue()),
+            ),
         };
     }
     match adapters.model.as_deref_mut() {
@@ -269,10 +313,16 @@ where
         executor_present: adapters.tool.is_some(),
         policy: crate::ToolDispatchPolicyDraft::current_defaults(),
     });
-    debug_assert_eq!(plan.request_contract_identity(), animus_adapters::TOOL_REQUEST_CONTRACT_IDENTITY);
+    debug_assert_eq!(
+        plan.request_contract_identity(),
+        animus_adapters::TOOL_REQUEST_CONTRACT_IDENTITY
+    );
     if !plan.is_admitted() {
         return crate::AdapterOutcome::ToolCall {
-            outcome: failed_outcome(tool_plan_failure_class(plan.issue()), tool_plan_failure_message(plan.issue())),
+            outcome: failed_outcome(
+                tool_plan_failure_class(plan.issue()),
+                tool_plan_failure_message(plan.issue()),
+            ),
         };
     }
     match adapters.tool.as_deref_mut() {
@@ -316,14 +366,24 @@ fn tool_plan_failure_message(issue: crate::ToolDispatchPlanIssue) -> &'static st
     }
 }
 
-fn model_plan_failure_class(issue: crate::ModelDispatchPlanIssue) -> animus_adapters::AdapterCallFailureClass {
+fn model_plan_failure_class(
+    issue: crate::ModelDispatchPlanIssue,
+) -> animus_adapters::AdapterCallFailureClass {
     match issue {
-        crate::ModelDispatchPlanIssue::MissingProvider => animus_adapters::AdapterCallFailureClass::Absent,
+        crate::ModelDispatchPlanIssue::MissingProvider => {
+            animus_adapters::AdapterCallFailureClass::Absent
+        }
         crate::ModelDispatchPlanIssue::DeniedCapability
         | crate::ModelDispatchPlanIssue::BudgetOverflow
-        | crate::ModelDispatchPlanIssue::FallbackDenied => animus_adapters::AdapterCallFailureClass::Denied,
-        crate::ModelDispatchPlanIssue::Cancelled => animus_adapters::AdapterCallFailureClass::Cancelled,
-        crate::ModelDispatchPlanIssue::TimedOut => animus_adapters::AdapterCallFailureClass::TimedOut,
+        | crate::ModelDispatchPlanIssue::FallbackDenied => {
+            animus_adapters::AdapterCallFailureClass::Denied
+        }
+        crate::ModelDispatchPlanIssue::Cancelled => {
+            animus_adapters::AdapterCallFailureClass::Cancelled
+        }
+        crate::ModelDispatchPlanIssue::TimedOut => {
+            animus_adapters::AdapterCallFailureClass::TimedOut
+        }
         crate::ModelDispatchPlanIssue::None
         | crate::ModelDispatchPlanIssue::InvalidCapability
         | crate::ModelDispatchPlanIssue::MalformedRequestShape
@@ -334,30 +394,49 @@ fn model_plan_failure_class(issue: crate::ModelDispatchPlanIssue) -> animus_adap
     }
 }
 
-fn tool_plan_failure_class(issue: crate::ToolDispatchPlanIssue) -> animus_adapters::AdapterCallFailureClass {
+fn tool_plan_failure_class(
+    issue: crate::ToolDispatchPlanIssue,
+) -> animus_adapters::AdapterCallFailureClass {
     match issue {
-        crate::ToolDispatchPlanIssue::UnknownTool | crate::ToolDispatchPlanIssue::MissingExecutor => {
+        crate::ToolDispatchPlanIssue::UnknownTool
+        | crate::ToolDispatchPlanIssue::MissingExecutor => {
             animus_adapters::AdapterCallFailureClass::MissingExecutor
         }
-        crate::ToolDispatchPlanIssue::UnavailableExecutor => animus_adapters::AdapterCallFailureClass::Unavailable,
-        crate::ToolDispatchPlanIssue::DeniedCapability => animus_adapters::AdapterCallFailureClass::DeniedCapability,
-        crate::ToolDispatchPlanIssue::ApprovalDenied => animus_adapters::AdapterCallFailureClass::ApprovalDenied,
-        crate::ToolDispatchPlanIssue::Cancelled => animus_adapters::AdapterCallFailureClass::Cancelled,
-        crate::ToolDispatchPlanIssue::TimedOut => animus_adapters::AdapterCallFailureClass::TimedOut,
+        crate::ToolDispatchPlanIssue::UnavailableExecutor => {
+            animus_adapters::AdapterCallFailureClass::Unavailable
+        }
+        crate::ToolDispatchPlanIssue::DeniedCapability => {
+            animus_adapters::AdapterCallFailureClass::DeniedCapability
+        }
+        crate::ToolDispatchPlanIssue::ApprovalDenied => {
+            animus_adapters::AdapterCallFailureClass::ApprovalDenied
+        }
+        crate::ToolDispatchPlanIssue::Cancelled => {
+            animus_adapters::AdapterCallFailureClass::Cancelled
+        }
+        crate::ToolDispatchPlanIssue::TimedOut => {
+            animus_adapters::AdapterCallFailureClass::TimedOut
+        }
         crate::ToolDispatchPlanIssue::UnsafeReference => {
             animus_adapters::AdapterCallFailureClass::UnsafeOutputReference
         }
         crate::ToolDispatchPlanIssue::UnboundedOutput => {
             animus_adapters::AdapterCallFailureClass::UnboundedOversizedOutput
         }
-        crate::ToolDispatchPlanIssue::MutationConflict => animus_adapters::AdapterCallFailureClass::MutationConflict,
-        crate::ToolDispatchPlanIssue::FallbackDenied => animus_adapters::AdapterCallFailureClass::FallbackDenied,
+        crate::ToolDispatchPlanIssue::MutationConflict => {
+            animus_adapters::AdapterCallFailureClass::MutationConflict
+        }
+        crate::ToolDispatchPlanIssue::FallbackDenied => {
+            animus_adapters::AdapterCallFailureClass::FallbackDenied
+        }
         crate::ToolDispatchPlanIssue::None
         | crate::ToolDispatchPlanIssue::InvalidRequestShape
         | crate::ToolDispatchPlanIssue::InactiveTool
         | crate::ToolDispatchPlanIssue::UntrustedTool
         | crate::ToolDispatchPlanIssue::SchemaIdentityMismatch
-        | crate::ToolDispatchPlanIssue::MalformedOutputPolicy => animus_adapters::AdapterCallFailureClass::InvalidInput,
+        | crate::ToolDispatchPlanIssue::MalformedOutputPolicy => {
+            animus_adapters::AdapterCallFailureClass::InvalidInput
+        }
     }
 }
 
@@ -365,11 +444,14 @@ fn failed_outcome<Response>(
     class: animus_adapters::AdapterCallFailureClass,
     message: &str,
 ) -> animus_adapters::AdapterCallOutcome<Response> {
-    animus_adapters::AdapterCallOutcome::failed(class, animus_adapters::AdapterCallFailureMetadataDraft {
-        message,
-        correlation_id: None,
-        receipt_reference: None,
-    })
+    animus_adapters::AdapterCallOutcome::failed(
+        class,
+        animus_adapters::AdapterCallFailureMetadataDraft {
+            message,
+            correlation_id: None,
+            receipt_reference: None,
+        },
+    )
     .unwrap_or_else(|_error| fallback_failed_outcome(class))
 }
 

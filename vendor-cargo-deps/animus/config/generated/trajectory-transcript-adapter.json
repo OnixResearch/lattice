@@ -1,0 +1,118 @@
+{
+  "trajectory_transcript_adapter": {
+    "bounds": {
+      "max_content_bytes": 262144,
+      "max_diagnostics": 1024,
+      "max_output_bytes": 2097152,
+      "max_records": 4096,
+      "max_tool_argument_bytes": 65536,
+      "max_tool_calls": 1024,
+      "max_tool_result_bytes": 262144,
+      "max_transcript_bytes": 1048576
+    },
+    "cohort": {
+      "helper_blake3": "1ef86c7687ff8f7354cb08e515e391e66f4e894f892aa807597d4ce399f5de20",
+      "license": "Apache-2.0",
+      "package": "@letta-ai/trajectory",
+      "revision": "a665556089d6a3c59f5806ee109b4d36f6c2ac83",
+      "sources": [
+        "claude_code",
+        "codex",
+        "hermes",
+        "letta_code",
+        "openclaw",
+        "openhands",
+        "pi"
+      ],
+      "trajectory_schema": "https://letta.ai/schemas/trajectory/v1.json",
+      "trajectory_schema_blake3": "4193e80e761f1aaa9e59545f356de02d2aa33443b4430fae4d1d82e29bca1212",
+      "version": "0.2.0"
+    },
+    "content": {
+      "path_metadata": "omit",
+      "reasoning": "omit",
+      "tool_arguments": "omit",
+      "tool_results": "omit"
+    },
+    "diagnostics": [
+      {
+        "code": "invalid_json_line",
+        "disposition": "lossy"
+      },
+      {
+        "code": "non_object_json_line",
+        "disposition": "lossy"
+      },
+      {
+        "code": "injected_context_dropped",
+        "disposition": "accepted_cleanup"
+      },
+      {
+        "code": "noise_record_dropped",
+        "disposition": "accepted_cleanup"
+      },
+      {
+        "code": "sidechain_record_dropped",
+        "disposition": "lossy"
+      },
+      {
+        "code": "tool_call_id_synthesized",
+        "disposition": "lossy"
+      },
+      {
+        "code": "duplicate_tool_call_id",
+        "disposition": "lossy"
+      },
+      {
+        "code": "orphan_tool_result",
+        "disposition": "lossy"
+      },
+      {
+        "code": "duplicate_tool_result",
+        "disposition": "lossy"
+      },
+      {
+        "code": "unknown_tool_name",
+        "disposition": "lossy"
+      },
+      {
+        "code": "tool_arguments_reshaped",
+        "disposition": "lossy"
+      },
+      {
+        "code": "tool_arguments_truncated",
+        "disposition": "lossy"
+      },
+      {
+        "code": "tool_result_truncated",
+        "disposition": "lossy"
+      },
+      {
+        "code": "timestamps_synthesized",
+        "disposition": "accepted_cleanup"
+      },
+      {
+        "code": "timestamps_interpolated",
+        "disposition": "accepted_cleanup"
+      }
+    ],
+    "enabled_by_default": false,
+    "helper_protocol": "trajectory-bridge-v1",
+    "memory_class": "trajectory-bounded",
+    "non_claims": [
+      "source-authenticity",
+      "transcript-completeness",
+      "timestamp-truth",
+      "tool-execution-truth",
+      "semantic-equivalence",
+      "privacy",
+      "model-correctness",
+      "dataset-export-fitness",
+      "release-eligibility"
+    ],
+    "projection": "ledger-and-batch-drafts",
+    "receipt_schema": "animus.trajectory-transcript-receipt.v1",
+    "schema": "animus.trajectory-transcript-adapter.v1",
+    "timeout_class": "trajectory-short"
+  }
+}

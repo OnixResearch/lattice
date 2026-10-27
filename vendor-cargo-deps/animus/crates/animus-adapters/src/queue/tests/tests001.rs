@@ -80,6 +80,7 @@ fn destructive_control_accepts_explicit_all_groups_selector() {
             kind: QueueTargetKind::AllGroups,
             label: None,
         }),
+        parallelism: None,
     })
     .expect("explicit all-groups clean should validate");
 
@@ -93,6 +94,7 @@ fn ambiguous_destructive_control_is_rejected() {
     let error = QueueControlRequest::new(QueueControlDraft {
         operation: QueueOperationKind::Cancel,
         target: None,
+        parallelism: None,
     })
     .expect_err("destructive controls need explicit targets");
 
@@ -100,6 +102,52 @@ fn ambiguous_destructive_control_is_rejected() {
         error,
         QueueContractError::AmbiguousTarget {
             operation: QueueOperationKind::Cancel
+        }
+    );
+}
+
+#[test]
+fn group_parallelism_requires_exact_operation_target_and_positive_value() {
+    let request = QueueControlRequest::new(QueueControlDraft {
+        operation: QueueOperationKind::SetGroupParallelism,
+        target: Some(QueueTargetDraft {
+            kind: QueueTargetKind::Group,
+            label: Some(GROUP_CPU),
+        }),
+        parallelism: Some(CPU_PARALLELISM),
+    })
+    .expect("group parallelism should validate");
+    assert_eq!(request.parallelism(), Some(CPU_PARALLELISM));
+
+    let missing = QueueControlRequest::new(QueueControlDraft {
+        operation: QueueOperationKind::SetGroupParallelism,
+        target: Some(QueueTargetDraft {
+            kind: QueueTargetKind::Group,
+            label: Some(GROUP_CPU),
+        }),
+        parallelism: None,
+    })
+    .expect_err("parallelism is required");
+    assert_eq!(
+        missing,
+        QueueContractError::NonPositiveCount {
+            field: PARALLELISM_FIELD
+        }
+    );
+
+    let unexpected = QueueControlRequest::new(QueueControlDraft {
+        operation: QueueOperationKind::Pause,
+        target: Some(QueueTargetDraft {
+            kind: QueueTargetKind::Group,
+            label: Some(GROUP_CPU),
+        }),
+        parallelism: Some(CPU_PARALLELISM),
+    })
+    .expect_err("parallelism is operation-specific");
+    assert_eq!(
+        unexpected,
+        QueueContractError::ParallelismMismatch {
+            operation: QueueOperationKind::Pause
         }
     );
 }

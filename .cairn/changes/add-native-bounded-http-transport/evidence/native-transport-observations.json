@@ -1,0 +1,69 @@
+{
+  "kind": "scoped-command-observations",
+  "observed_on": "2026-10-16",
+  "scope": "Unchanged production src/http.rs and src/http/native.rs, unchanged tests/test_native_http_transport.rs, and a disposable real TCP consumer; not the full Lattice library, standalone CLI, authority surface, or release gates.",
+  "owner": "Lattice maintainers",
+  "toolchain": {
+    "source": "Exact primary Nixpkgs and rust-overlay identities from the current Lattice flake.lock; nightly from rust-toolchain.toml",
+    "rust": "1.99.0-nightly-2026-07-17",
+    "clang": "21.1.8",
+    "mold": "2.40.4",
+    "cargo_configuration": "Unchanged repository .cargo/config.toml, including clang/mold linker flags"
+  },
+  "dependency_boundary": {
+    "root_manifests_and_locks_changed": false,
+    "temporary_manifest": "Exact current direct registry versions; the existing product Cargo.lock seeded the temporary lock before normal offline Cargo resolution",
+    "resolved_registry_packages": 143,
+    "registry_name_version_source_mismatches_against_product_lock": [],
+    "module_composition": "Normal pub mod http declaration with symbolic links to the unchanged production http.rs and http directory; original integration-test source path",
+    "credentials": "Git credential helper and askpass disabled; SSH command denied and SSH_AUTH_SOCK empty; Cargo offline",
+    "fresh_public_build": false
+  },
+  "sources_blake3": {
+    "src/http.rs": "00b19955a6f3dd748a9eeafdf0933ff93933942252b6f82cc879721f8ab9198e",
+    "src/http/native.rs": "19c09dba5cf1e076467c8357886da66be328c05dfbb4b99637698dbbded17467",
+    "tests/test_native_http_transport.rs": "6c22d7d72efc66db6d2f990425f9430aa2a133672d847e6ab15005da812200ce",
+    "Cargo.toml": "35a3751c83db5fa4f4b15f6c35f26a39a4e2f67cf44ae65cd26194dc41d5c16d",
+    "Cargo.lock": "9cad6c69a72e6c2060c899a10fc8a905ef6a8665b66bba30208f52b7c9dcc095",
+    ".cargo/config.toml": "e6882584fdced4fa74ee1b8de6ef291e8f6ed29b702e58cfe98c895f49ae44cc",
+    "rust-toolchain.toml": "34e88356fdc184e73ae0dbcf34e118455abaf3f8ea59bd17fabde8de96da6fba"
+  },
+  "commands": [
+    {
+      "argv": ["cargo", "test", "--locked", "--offline", "--manifest-path", "/tmp/lattice-http-native-surface-20261016.yEmmnv/Cargo.toml", "--test", "native_transport"],
+      "cwd": "/home/brittonr/git/OnixResearch/lattice",
+      "exit": 0,
+      "result": "9 passed; 0 failed; 0 ignored; 0 filtered out",
+      "cases": [
+        "malformed_and_oversized_requests_never_connect_or_disclose_content",
+        "https_never_downgrades_to_plaintext",
+        "native_request_preserves_method_headers_body_and_response",
+        "untrusted_localhost_certificate_is_rejected_before_http",
+        "redirects_and_server_failures_are_returned_without_followup_requests",
+        "pre_and_inflight_cancellation_stop_local_http_work",
+        "caller_can_narrow_streaming_bounds_but_cannot_enlarge_or_disable_them",
+        "response_body_and_header_limits_have_positive_and_negative_boundaries",
+        "timeout_and_truncated_responses_are_redacted_failures"
+      ]
+    },
+    {
+      "argv": ["cargo", "run", "--locked", "--offline", "--manifest-path", "/tmp/lattice-http-native-surface-20261016.yEmmnv/Cargo.toml", "--bin", "transport-smoke"],
+      "cwd": "/home/brittonr/git/OnixResearch/lattice",
+      "exit": 0,
+      "stdout": "wire=GET /smoke HTTP/1.1 status=201 body=native bytes=6\n",
+      "behavior": "The actual native client sent GET /smoke over an isolated TCP listener; the server observed the exact request line and the client admitted HTTP 201 with exact body bytes."
+    }
+  ],
+  "attempt_boundaries": [
+    "Initial reuse of the HWR compiler environment stopped because clang was absent; the declared Lattice compilers were then resolved without changing product flags or pins.",
+    "A temporary #[path] module wrapper resolved a child module incorrectly; only the disposable harness was corrected to normal module resolution.",
+    "A separate print-dev-env request timed out without an environment result; only that owned caller was cancelled. No daemon, other job, cache policy, or store lock was changed.",
+    "Kache reported cache-index I/O warnings and compiled uncached; no cache-success or fresh-environment claim is made."
+  ],
+  "repeatability": "The durable regression target is cargo test --locked --test test_native_http_transport after the coordinated source cohort is admitted. The recorded run above exercised that same unchanged test source in isolation; the disposable harness is not a permanent test or an integrated-check substitute.",
+  "remaining": [
+    "Actual standalone authorized and denied CLI execution, including observed no-request behavior",
+    "Coordinated full-library, feature, policy, lifecycle, and release gates",
+    "Fresh anonymous source acquisition and public build"
+  ]
+}

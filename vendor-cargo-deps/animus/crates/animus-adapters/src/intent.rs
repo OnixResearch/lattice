@@ -15,9 +15,7 @@
 )]
 
 use crate::artifact::Hash;
-use crate::validation::AdapterContractError;
-use crate::validation::FieldName;
-use crate::validation::{self};
+use crate::validation::{self, AdapterContractError, FieldName};
 
 const CALL_ID_FIELD: FieldName = FieldName::new("intent_call_id");
 const BATCH_ID_FIELD: FieldName = FieldName::new("intent_batch_id");
@@ -614,7 +612,11 @@ impl IntentReceipt {
 pub fn validate_intent_verdict(draft: &IntentVerdictDraft<'_>) -> IntentResult<IntentVerdict> {
     validate_confidence(draft.confidence)?;
     if is_stale(draft.observed_epoch, draft.current_epoch) {
-        return Err(diagnostic(IntentDiagnosticCode::StaleVerdict, Some(draft.call_id), "intent verdict is stale"));
+        return Err(diagnostic(
+            IntentDiagnosticCode::StaleVerdict,
+            Some(draft.call_id),
+            "intent verdict is stale",
+        ));
     }
     let call_id = safe_text(CALL_ID_FIELD, draft.call_id, None)?;
     let batch_id = safe_text(BATCH_ID_FIELD, draft.batch_id, Some(call_id.as_str()))?;
@@ -657,17 +659,43 @@ pub fn validate_intent_verdict(draft: &IntentVerdictDraft<'_>) -> IntentResult<I
 ///
 /// Returns [`IntentDiagnostic`] when examples are missing, unsafe, or do not
 /// match the declared action class fixture convention.
-pub fn validate_intent_heuristic_rule(draft: &IntentHeuristicRuleDraft<'_>) -> IntentResult<IntentHeuristicRule> {
-    validate_non_empty_bound("intent_positive_examples", draft.positive_examples.len(), MAX_EXAMPLES)?;
-    validate_non_empty_bound("intent_negative_examples", draft.negative_examples.len(), MAX_EXAMPLES)?;
+pub fn validate_intent_heuristic_rule(
+    draft: &IntentHeuristicRuleDraft<'_>,
+) -> IntentResult<IntentHeuristicRule> {
+    validate_non_empty_bound(
+        "intent_positive_examples",
+        draft.positive_examples.len(),
+        MAX_EXAMPLES,
+    )?;
+    validate_non_empty_bound(
+        "intent_negative_examples",
+        draft.negative_examples.len(),
+        MAX_EXAMPLES,
+    )?;
     let rule_id = safe_text(RULE_ID_FIELD, draft.rule_id, None)?;
-    let rationale_label = safe_text(RATIONALE_LABEL_FIELD, draft.rationale_label, Some(rule_id.as_str()))?;
-    let positive_examples =
-        validate_text_list("intent_positive_examples", draft.positive_examples, EXAMPLE_FIELD, Some(rule_id.as_str()))?;
-    let negative_examples =
-        validate_text_list("intent_negative_examples", draft.negative_examples, EXAMPLE_FIELD, Some(rule_id.as_str()))?;
-    if !positive_examples.iter().all(|example| example_matches_action_class(example, draft.action_class))
-        || negative_examples.iter().any(|example| example_matches_action_class(example, draft.action_class))
+    let rationale_label = safe_text(
+        RATIONALE_LABEL_FIELD,
+        draft.rationale_label,
+        Some(rule_id.as_str()),
+    )?;
+    let positive_examples = validate_text_list(
+        "intent_positive_examples",
+        draft.positive_examples,
+        EXAMPLE_FIELD,
+        Some(rule_id.as_str()),
+    )?;
+    let negative_examples = validate_text_list(
+        "intent_negative_examples",
+        draft.negative_examples,
+        EXAMPLE_FIELD,
+        Some(rule_id.as_str()),
+    )?;
+    if !positive_examples
+        .iter()
+        .all(|example| example_matches_action_class(example, draft.action_class))
+        || negative_examples
+            .iter()
+            .any(|example| example_matches_action_class(example, draft.action_class))
     {
         return Err(diagnostic(
             IntentDiagnosticCode::MalformedRuleFixture,
@@ -692,25 +720,40 @@ pub fn validate_intent_heuristic_rule(draft: &IntentHeuristicRuleDraft<'_>) -> I
 /// # Errors
 ///
 /// Returns [`IntentDiagnostic`] when safe labels or evidence identities are invalid.
-pub fn validate_pending_intent_call(draft: &PendingIntentCallDraft<'_>) -> IntentResult<PendingIntentCall> {
+pub fn validate_pending_intent_call(
+    draft: &PendingIntentCallDraft<'_>,
+) -> IntentResult<PendingIntentCall> {
     let call_id = safe_text(CALL_ID_FIELD, draft.call_id, None)?;
     Ok(PendingIntentCall {
         call_id: call_id.clone(),
         batch_id: safe_text(BATCH_ID_FIELD, draft.batch_id, Some(call_id.as_str()))?,
         tool_label: safe_text(TOOL_LABEL_FIELD, draft.tool_label, Some(call_id.as_str()))?,
         action_class: draft.action_class,
-        resource_label: safe_text(RESOURCE_LABEL_FIELD, draft.resource_label, Some(call_id.as_str()))?,
+        resource_label: safe_text(
+            RESOURCE_LABEL_FIELD,
+            draft.resource_label,
+            Some(call_id.as_str()),
+        )?,
         evidence_hash: safe_hash(draft.evidence_hash)?,
     })
 }
 
 /// Evaluates deterministic intent heuristics over supplied data only.
 #[must_use]
-pub fn evaluate_intent_heuristics(call: &PendingIntentCall, rules: &[IntentHeuristicRule]) -> IntentVerdict {
-    let selected = rules.iter().find(|rule| rule.action_class() == call.action_class());
+pub fn evaluate_intent_heuristics(
+    call: &PendingIntentCall,
+    rules: &[IntentHeuristicRule],
+) -> IntentVerdict {
+    let selected = rules
+        .iter()
+        .find(|rule| rule.action_class() == call.action_class());
     let (risk, recommendation, summary) = match selected {
         Some(rule) => (rule.risk(), rule.recommendation(), rule.rationale_label()),
-        None => (IntentRiskLevel::Low, IntentRecommendation::Allow, "no-matching-risk-rule"),
+        None => (
+            IntentRiskLevel::Low,
+            IntentRecommendation::Allow,
+            "no-matching-risk-rule",
+        ),
     };
     IntentVerdict {
         call_id: Text::from(call.call_id()),
@@ -738,13 +781,16 @@ pub fn merge_intent_reviewer_verdict(
     let mut merged = deterministic.clone();
     if let Some(reviewer) = reviewer {
         merged.risk = core::cmp::max(merged.risk(), reviewer.risk());
-        merged.recommendation = tighter_recommendation(merged.recommendation(), reviewer.recommendation());
+        merged.recommendation =
+            tighter_recommendation(merged.recommendation(), reviewer.recommendation());
         merged.reviewer_label = reviewer.reviewer_label().map(Text::from);
     }
     if !authority_present || confirmation_required {
-        merged.recommendation = tighter_recommendation(merged.recommendation(), IntentRecommendation::RequireReview);
+        merged.recommendation =
+            tighter_recommendation(merged.recommendation(), IntentRecommendation::RequireReview);
     }
-    if deterministic.risk() == IntentRiskLevel::Critical || deterministic.recommendation() == IntentRecommendation::Deny
+    if deterministic.risk() == IntentRiskLevel::Critical
+        || deterministic.recommendation() == IntentRecommendation::Deny
     {
         merged.risk = core::cmp::max(merged.risk(), IntentRiskLevel::Critical);
         merged.recommendation = IntentRecommendation::Deny;
@@ -755,19 +801,32 @@ pub fn merge_intent_reviewer_verdict(
 /// Evaluates batch-level risk before any partial dispatch.
 #[must_use]
 pub fn evaluate_intent_batch(verdicts: &[IntentVerdict]) -> IntentBatchAdmission {
-    let batch_id = verdicts.first().map_or(Text::from("empty-batch"), |verdict| Text::from(verdict.batch_id()));
-    if verdicts.iter().any(|verdict| verdict.recommendation() == IntentRecommendation::Deny) {
+    let batch_id = verdicts
+        .first()
+        .map_or(Text::from("empty-batch"), |verdict| {
+            Text::from(verdict.batch_id())
+        });
+    if verdicts
+        .iter()
+        .any(|verdict| verdict.recommendation() == IntentRecommendation::Deny)
+    {
         return IntentBatchAdmission {
             status: IntentBatchAdmissionStatus::Denied,
             batch_id,
             reason: Some(Text::from("denied-verdict-present")),
         };
     }
-    let has_sensitive_read = verdicts
-        .iter()
-        .any(|verdict| verdict.evidence_labels().iter().any(|label| label.contains(SENSITIVE_ADJACENT_LABEL)));
+    let has_sensitive_read = verdicts.iter().any(|verdict| {
+        verdict
+            .evidence_labels()
+            .iter()
+            .any(|label| label.contains(SENSITIVE_ADJACENT_LABEL))
+    });
     let has_network_output = verdicts.iter().any(|verdict| {
-        verdict.evidence_labels().iter().any(|label| label.contains(NETWORK_OUTPUT_LABEL))
+        verdict
+            .evidence_labels()
+            .iter()
+            .any(|label| label.contains(NETWORK_OUTPUT_LABEL))
             || verdict.summary_label().contains(NETWORK_OUTPUT_LABEL)
     });
     if has_sensitive_read && has_network_output {
@@ -777,7 +836,10 @@ pub fn evaluate_intent_batch(verdicts: &[IntentVerdict]) -> IntentBatchAdmission
             reason: Some(Text::from("sensitive-read-network-interaction")),
         };
     }
-    if verdicts.iter().any(|verdict| verdict.recommendation() == IntentRecommendation::RequireReview) {
+    if verdicts
+        .iter()
+        .any(|verdict| verdict.recommendation() == IntentRecommendation::RequireReview)
+    {
         return IntentBatchAdmission {
             status: IntentBatchAdmissionStatus::ReviewRequired,
             batch_id,
@@ -795,8 +857,7 @@ pub fn evaluate_intent_batch(verdicts: &[IntentVerdict]) -> IntentBatchAdmission
 ///
 /// # Errors
 ///
-/// Returns [`IntentDiagnostic`] when receipt fields leak raw command/tool bodies or hashes are
-/// malformed.
+/// Returns [`IntentDiagnostic`] when receipt fields leak raw command/tool bodies or hashes are malformed.
 pub fn validate_intent_receipt(draft: &IntentReceiptDraft<'_>) -> IntentResult<IntentReceipt> {
     let batch_id = safe_text(BATCH_ID_FIELD, draft.batch_id, None)?;
     if draft.verdict_count < MIN_VERDICT_COUNT || usize::from(draft.verdict_count) > MAX_VERDICTS {
@@ -822,11 +883,11 @@ pub fn validate_intent_receipt(draft: &IntentReceiptDraft<'_>) -> IntentResult<I
     })
 }
 
-fn tighter_recommendation(left: IntentRecommendation, right: IntentRecommendation) -> IntentRecommendation {
-    use IntentRecommendation::Allow;
-    use IntentRecommendation::Annotate;
-    use IntentRecommendation::Deny;
-    use IntentRecommendation::RequireReview;
+fn tighter_recommendation(
+    left: IntentRecommendation,
+    right: IntentRecommendation,
+) -> IntentRecommendation {
+    use IntentRecommendation::{Allow, Annotate, Deny, RequireReview};
     match (left, right) {
         (Deny, _) | (_, Deny) => Deny,
         (RequireReview, _) | (_, RequireReview) => RequireReview,
@@ -843,7 +904,11 @@ fn collection_with_one<T>(item: T) -> Collection<T> {
 
 fn validate_confidence(confidence: u8) -> IntentResult<()> {
     if !(MIN_CONFIDENCE..=MAX_CONFIDENCE).contains(&confidence) {
-        return Err(diagnostic(IntentDiagnosticCode::InvalidConfidence, None, "intent confidence outside bounds"));
+        return Err(diagnostic(
+            IntentDiagnosticCode::InvalidConfidence,
+            None,
+            "intent confidence outside bounds",
+        ));
     }
     Ok(())
 }
@@ -890,9 +955,13 @@ fn validate_non_empty_bound(field: &'static str, len: usize, max: usize) -> Inte
 }
 
 fn safe_text(field: FieldName, value: &str, subject_id: Option<&str>) -> IntentResult<Text> {
-    let normalized = validation::normalized_adapter_field(field, value).map_err(|error| map_adapter_error(&error))?;
+    let normalized = validation::normalized_adapter_field(field, value)
+        .map_err(|error| map_adapter_error(&error))?;
     let lower = normalized.to_ascii_lowercase();
-    if UNSAFE_INTENT_MARKERS.iter().any(|marker| lower.contains(marker)) {
+    if UNSAFE_INTENT_MARKERS
+        .iter()
+        .any(|marker| lower.contains(marker))
+    {
         return Err(diagnostic(
             IntentDiagnosticCode::UnsafeMetadata,
             subject_id,
@@ -903,12 +972,16 @@ fn safe_text(field: FieldName, value: &str, subject_id: Option<&str>) -> IntentR
 }
 
 fn safe_hash(value: &str) -> IntentResult<Text> {
-    let normalized =
-        validation::normalized_adapter_field(HASH_FIELD, value).map_err(|error| map_adapter_error(&error))?;
+    let normalized = validation::normalized_adapter_field(HASH_FIELD, value)
+        .map_err(|error| map_adapter_error(&error))?;
     if Hash::new(&normalized).is_ok() {
         Ok(normalized)
     } else {
-        Err(diagnostic(IntentDiagnosticCode::InvalidHash, None, HASH_FIELD.as_str()))
+        Err(diagnostic(
+            IntentDiagnosticCode::InvalidHash,
+            None,
+            HASH_FIELD.as_str(),
+        ))
     }
 }
 
@@ -930,9 +1003,15 @@ fn example_matches_action_class(example: &str, class: IntentActionClass) -> bool
 
 fn map_adapter_error(error: &AdapterContractError) -> IntentDiagnostic {
     match error {
-        AdapterContractError::EmptyField { field } => diagnostic(IntentDiagnosticCode::EmptyField, None, field),
-        AdapterContractError::FieldTooLong { field, .. } => diagnostic(IntentDiagnosticCode::FieldTooLong, None, field),
-        AdapterContractError::NulCharacter { field, .. } => diagnostic(IntentDiagnosticCode::NulCharacter, None, field),
+        AdapterContractError::EmptyField { field } => {
+            diagnostic(IntentDiagnosticCode::EmptyField, None, field)
+        }
+        AdapterContractError::FieldTooLong { field, .. } => {
+            diagnostic(IntentDiagnosticCode::FieldTooLong, None, field)
+        }
+        AdapterContractError::NulCharacter { field, .. } => {
+            diagnostic(IntentDiagnosticCode::NulCharacter, None, field)
+        }
         AdapterContractError::InvalidEvidenceHash { field, .. } => {
             diagnostic(IntentDiagnosticCode::InvalidHash, None, field)
         }
@@ -950,7 +1029,11 @@ fn map_adapter_error(error: &AdapterContractError) -> IntentDiagnostic {
     }
 }
 
-fn diagnostic(code: IntentDiagnosticCode, subject_id: Option<&str>, message: &str) -> IntentDiagnostic {
+fn diagnostic(
+    code: IntentDiagnosticCode,
+    subject_id: Option<&str>,
+    message: &str,
+) -> IntentDiagnostic {
     IntentDiagnostic {
         code,
         subject_id: subject_id.map(Text::from),
@@ -1096,9 +1179,12 @@ mod tests {
     #[test]
     fn read_only_verdict_dto_validates_safe_metadata() {
         // r[verify agent_harness_runtime.turnstone_intent_validation.dto]
-        let verdict =
-            validate_intent_verdict(&verdict_draft(CALL_READ, IntentRiskLevel::Low, IntentRecommendation::Allow))
-                .unwrap();
+        let verdict = validate_intent_verdict(&verdict_draft(
+            CALL_READ,
+            IntentRiskLevel::Low,
+            IntentRecommendation::Allow,
+        ))
+        .unwrap();
 
         assert_eq!(verdict.call_id(), CALL_READ);
         assert_eq!(verdict.risk(), IntentRiskLevel::Low);
@@ -1143,20 +1229,38 @@ mod tests {
         // r[verify agent_harness_runtime.turnstone_intent_validation.evaluate]
         let rules = rules();
         let read = evaluate_intent_heuristics(
-            &pending(CALL_READ, TOOL_READ, IntentActionClass::ReadOnly, RESOURCE_READ),
+            &pending(
+                CALL_READ,
+                TOOL_READ,
+                IntentActionClass::ReadOnly,
+                RESOURCE_READ,
+            ),
             &rules,
         );
         let mutation = evaluate_intent_heuristics(
-            &pending(CALL_MUTATE, TOOL_WRITE, IntentActionClass::Mutation, RESOURCE_READ),
+            &pending(
+                CALL_MUTATE,
+                TOOL_WRITE,
+                IntentActionClass::Mutation,
+                RESOURCE_READ,
+            ),
             &rules,
         );
         let process = evaluate_intent_heuristics(
-            &pending(CALL_PROCESS, "process-tool", IntentActionClass::Process, RESOURCE_READ),
+            &pending(
+                CALL_PROCESS,
+                "process-tool",
+                IntentActionClass::Process,
+                RESOURCE_READ,
+            ),
             &rules,
         );
 
         assert_eq!(read.recommendation(), IntentRecommendation::Allow);
-        assert_eq!(mutation.recommendation(), IntentRecommendation::RequireReview);
+        assert_eq!(
+            mutation.recommendation(),
+            IntentRecommendation::RequireReview
+        );
         assert_eq!(process.recommendation(), IntentRecommendation::Deny);
     }
 
@@ -1167,7 +1271,11 @@ mod tests {
             risk: IntentRiskLevel::Critical,
             recommendation: IntentRecommendation::Deny,
             summary_label: SUMMARY_PROCESS,
-            ..verdict_draft(CALL_PROCESS, IntentRiskLevel::Critical, IntentRecommendation::Deny)
+            ..verdict_draft(
+                CALL_PROCESS,
+                IntentRiskLevel::Critical,
+                IntentRecommendation::Deny,
+            )
         })
         .unwrap();
         let reviewer_allow = validate_intent_verdict(&IntentVerdictDraft {
@@ -1175,13 +1283,22 @@ mod tests {
             reviewer_label: Some("classifier-alpha"),
             recommendation: IntentRecommendation::Allow,
             risk: IntentRiskLevel::Low,
-            ..verdict_draft(CALL_PROCESS, IntentRiskLevel::Low, IntentRecommendation::Allow)
+            ..verdict_draft(
+                CALL_PROCESS,
+                IntentRiskLevel::Low,
+                IntentRecommendation::Allow,
+            )
         })
         .unwrap();
-        let merged = merge_intent_reviewer_verdict(&deterministic, Some(&reviewer_allow), true, false);
+        let merged =
+            merge_intent_reviewer_verdict(&deterministic, Some(&reviewer_allow), true, false);
         let missing_authority = merge_intent_reviewer_verdict(
-            &validate_intent_verdict(&verdict_draft(CALL_READ, IntentRiskLevel::Low, IntentRecommendation::Allow))
-                .unwrap(),
+            &validate_intent_verdict(&verdict_draft(
+                CALL_READ,
+                IntentRiskLevel::Low,
+                IntentRecommendation::Allow,
+            ))
+            .unwrap(),
             Some(&reviewer_allow),
             false,
             false,
@@ -1189,7 +1306,10 @@ mod tests {
 
         assert_eq!(merged.recommendation(), IntentRecommendation::Deny);
         assert_eq!(merged.risk(), IntentRiskLevel::Critical);
-        assert_eq!(missing_authority.recommendation(), IntentRecommendation::RequireReview);
+        assert_eq!(
+            missing_authority.recommendation(),
+            IntentRecommendation::RequireReview
+        );
     }
 
     #[test]
@@ -1204,12 +1324,19 @@ mod tests {
         let network = validate_intent_verdict(&IntentVerdictDraft {
             call_id: CALL_NETWORK,
             summary_label: NETWORK_OUTPUT_LABEL,
-            ..verdict_draft(CALL_NETWORK, IntentRiskLevel::Low, IntentRecommendation::Allow)
+            ..verdict_draft(
+                CALL_NETWORK,
+                IntentRiskLevel::Low,
+                IntentRecommendation::Allow,
+            )
         })
         .unwrap();
         let admission = evaluate_intent_batch(&[sensitive, network]);
 
-        assert_eq!(admission.status(), IntentBatchAdmissionStatus::ReviewRequired);
+        assert_eq!(
+            admission.status(),
+            IntentBatchAdmissionStatus::ReviewRequired
+        );
         assert_eq!(admission.batch_id(), BATCH_ID);
     }
 
@@ -1259,8 +1386,14 @@ mod tests {
         .expect_err("receipt leak must fail");
 
         assert_eq!(stale.code(), IntentDiagnosticCode::StaleVerdict);
-        assert_eq!(missing_evidence.code(), IntentDiagnosticCode::MissingEvidence);
-        assert_eq!(bad_confidence.code(), IntentDiagnosticCode::InvalidConfidence);
+        assert_eq!(
+            missing_evidence.code(),
+            IntentDiagnosticCode::MissingEvidence
+        );
+        assert_eq!(
+            bad_confidence.code(),
+            IntentDiagnosticCode::InvalidConfidence
+        );
         assert_eq!(receipt.verdict_count(), SINGLE_VERDICT_COUNT);
         assert_eq!(leaking.code(), IntentDiagnosticCode::UnsafeMetadata);
     }

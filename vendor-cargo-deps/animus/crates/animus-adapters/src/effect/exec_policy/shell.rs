@@ -49,7 +49,10 @@ impl Analysis {
     }
 
     fn simple_chain(intents: super::Collection<super::CommandIntent>) -> Self {
-        assert!(intents.len() >= MIN_CHAIN_COMMANDS, "simple chain must contain multiple intents");
+        assert!(
+            intents.len() >= MIN_CHAIN_COMMANDS,
+            "simple chain must contain multiple intents"
+        );
         Self {
             kind: AnalysisKind::SimpleChain,
             intents,
@@ -88,7 +91,8 @@ fn is_supported_wrapper(argv: &[super::Text]) -> bool {
     }
     let program = argv[PROGRAM_INDEX].as_str();
     let flag = argv[FLAG_INDEX].as_str();
-    matches!(program, PROGRAM_SH | PROGRAM_BASH) && matches!(flag, FLAG_COMMAND | FLAG_LOGIN_COMMAND)
+    matches!(program, PROGRAM_SH | PROGRAM_BASH)
+        && matches!(flag, FLAG_COMMAND | FLAG_LOGIN_COMMAND)
 }
 
 fn parse_simple_chain(source: &str) -> Option<super::Collection<super::CommandIntent>> {
@@ -96,8 +100,14 @@ fn parse_simple_chain(source: &str) -> Option<super::Collection<super::CommandIn
     if token_count == 0 || token_count > super::MAX_COMMAND_WORDS {
         return None;
     }
-    assert!(token_count > 0, "simple chain must contain at least one token");
-    assert!(token_count <= super::MAX_COMMAND_WORDS, "simple chain token count must fit command bound");
+    assert!(
+        token_count > 0,
+        "simple chain must contain at least one token"
+    );
+    assert!(
+        token_count <= super::MAX_COMMAND_WORDS,
+        "simple chain token count must fit command bound"
+    );
     let mut parsed = super::Collection::with_capacity(token_count);
     let mut current = super::Collection::with_capacity(token_count);
     for token in source.split_whitespace() {
@@ -130,7 +140,9 @@ fn is_chain_operator(token: &str) -> bool {
 
 fn is_plain_word(token: &str) -> bool {
     !token.is_empty()
-        && token.chars().all(|character| character.is_ascii_alphanumeric() || is_extra_word_char(character))
+        && token
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || is_extra_word_char(character))
 }
 
 fn is_extra_word_char(character: char) -> bool {

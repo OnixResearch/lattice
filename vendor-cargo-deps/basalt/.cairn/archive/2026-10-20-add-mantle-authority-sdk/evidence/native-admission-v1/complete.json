@@ -1,0 +1,87 @@
+{
+  "records": [
+    {
+      "label": "native-validate",
+      "command": [
+        "/home/brittonr/mantle-cairn-finish/runs/cairn-source-review-operator-smoke-20261020-v1/cairn",
+        "validate",
+        "--root",
+        "."
+      ],
+      "cwd": "/home/brittonr/mantle-cairn-finish/xrepo/basalt-mantle-main-20261020",
+      "exit": 0,
+      "elapsed_s": 0.11415688879787922
+    },
+    {
+      "label": "native-gate-proposal",
+      "command": [
+        "/home/brittonr/mantle-cairn-finish/runs/cairn-source-review-operator-smoke-20261020-v1/cairn",
+        "gate",
+        "proposal",
+        "add-mantle-authority-sdk",
+        "--root",
+        "."
+      ],
+      "cwd": "/home/brittonr/mantle-cairn-finish/xrepo/basalt-mantle-main-20261020",
+      "exit": 0,
+      "elapsed_s": 0.11417433246970177
+    },
+    {
+      "label": "native-gate-design",
+      "command": [
+        "/home/brittonr/mantle-cairn-finish/runs/cairn-source-review-operator-smoke-20261020-v1/cairn",
+        "gate",
+        "design",
+        "add-mantle-authority-sdk",
+        "--root",
+        "."
+      ],
+      "cwd": "/home/brittonr/mantle-cairn-finish/xrepo/basalt-mantle-main-20261020",
+      "exit": 0,
+      "elapsed_s": 0.11440164037048817
+    },
+    {
+      "label": "native-gate-tasks",
+      "command": [
+        "/home/brittonr/mantle-cairn-finish/runs/cairn-source-review-operator-smoke-20261020-v1/cairn",
+        "gate",
+        "tasks",
+        "add-mantle-authority-sdk",
+        "--root",
+        "."
+      ],
+      "cwd": "/home/brittonr/mantle-cairn-finish/xrepo/basalt-mantle-main-20261020",
+      "exit": 0,
+      "elapsed_s": 0.11426505353301764
+    },
+    {
+      "label": "native-sync-preview",
+      "command": [
+        "/home/brittonr/mantle-cairn-finish/runs/cairn-source-review-operator-smoke-20261020-v1/cairn",
+        "sync",
+        "add-mantle-authority-sdk",
+        "--root",
+        "."
+      ],
+      "cwd": "/home/brittonr/mantle-cairn-finish/xrepo/basalt-mantle-main-20261020",
+      "exit": 0,
+      "elapsed_s": 0.21447853092104197
+    },
+    {
+      "label": "native-archive-preview",
+      "command": [
+        "/home/brittonr/mantle-cairn-finish/runs/cairn-source-review-operator-smoke-20261020-v1/cairn",
+        "archive",
+        "add-mantle-authority-sdk",
+        "--root",
+        "."
+      ],
+      "cwd": "/home/brittonr/mantle-cairn-finish/xrepo/basalt-mantle-main-20261020",
+      "exit": 0,
+      "elapsed_s": 0.1644220119342208
+    }
+  ],
+  "implementation_verification": "SDK evidence/owner-release-v6",
+  "lifecycle_mutations": false,
+  "release_authority": false
+}

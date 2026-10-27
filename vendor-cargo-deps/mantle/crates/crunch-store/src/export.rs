@@ -1,0 +1,841 @@
+//! Export castore nodes to the filesystem.
+//!
+//! Reconstructs files, directories, and symlinks on disk from the
+//! content-addressed store. This is the inverse of `ingest_path`.
+
+use snix_castore::Node;
+use snix_castore::blobservice::BlobService;
+use snix_castore::directoryservice::DirectoryService;
+use tokio::io::AsyncReadExt;
+
+/// Maximum directory tree depth when exporting to disk.
+/// Prevents runaway recursion from malformed castore data.
+pub const MAX_EXPORT_DEPTH: u32 = 128;
+
+const MAX_WORKLIST_ENTRIES: usize = 1_000_000;
+const INITIAL_WORKLIST_CAPACITY: usize = 64;
+const NORMALIZED_MTIME_SECONDS: i64 = 1;
+const NORMALIZED_MTIME_NANOSECONDS: u32 = 0;
+const NORMALIZED_NON_EXECUTABLE_MODE: u32 = 0o444;
+const NORMALIZED_EXECUTABLE_MODE: u32 = 0o555;
+const NORMALIZED_DIRECTORY_MODE: u32 = 0o555;
+const EXPORT_READ_BUFFER_BYTES: usize = 65_536;
+const MAX_BLOB_WRITE_BYTES: u64 = 4_294_967_296;
+
+#[derive(Debug)]
+enum ExportWorkItem {
+    WriteNode { node: Node, dest: String, depth: u32 },
+    FinalizeDirectory { dest: String },
+}
+
+struct ExportNodeRequest {
+    node: Node,
+    dest: String,
+    depth: u32,
+}
+
+/// Export a castore Node to a filesystem path.
+///
+/// Uses an explicit bounded worklist instead of recursion. Directories
+/// are created top-down and metadata-normalized after children are written.
+pub async fn export_castore_to_disk(
+    node: &Node,
+    dest: &str,
+    blob_service: &(impl BlobService + Clone),
+    directory_service: &(impl DirectoryService + Clone),
+) -> Result<(), String> {
+    debug_assert!(dest.starts_with('/'), "export dest must be absolute path: {dest}");
+
+    let mut worklist: Vec<ExportWorkItem> = Vec::with_capacity(INITIAL_WORKLIST_CAPACITY);
+    worklist.push(ExportWorkItem::WriteNode {
+        node: node.clone(),
+        dest: dest.to_string(),
+        depth: 0,
+    });
+
+    while let Some(item) = worklist.pop() {
+        match item {
+            ExportWorkItem::WriteNode { node, dest, depth } => {
+                export_node_to_disk(
+                    ExportNodeRequest { node, dest, depth },
+                    &mut worklist,
+                    blob_service,
+                    directory_service,
+                )
+                .await?;
+            }
+            ExportWorkItem::FinalizeDirectory { dest } => {
+                normalize_directory_metadata(&dest)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+async fn export_node_to_disk(
+    request: ExportNodeRequest,
+    worklist: &mut Vec<ExportWorkItem>,
+    blob_service: &(impl BlobService + Clone),
+    directory_service: &(impl DirectoryService + Clone),
+) -> Result<(), String> {
+    assert!(!request.dest.is_empty());
+    assert!(request.dest.starts_with('/'));
+    if request.depth >= MAX_EXPORT_DEPTH {
+        return Err(format!("directory depth limit ({MAX_EXPORT_DEPTH}) exceeded at {}", request.dest));
+    }
+    match request.node {
+        Node::File {
+            digest,
+            size,
+            executable,
+        } => {
+            export_file_to_disk(&digest, size, executable, &request.dest, blob_service).await?;
+        }
+        Node::Symlink { target, .. } => {
+            export_symlink_to_disk(target.as_ref(), &request.dest)?;
+        }
+        Node::Directory { digest, .. } => {
+            export_directory_to_disk(&digest, &request.dest, request.depth, worklist, directory_service).await?;
+        }
+    }
+    Ok(())
+}
+
+async fn export_directory_to_disk(
+    digest: &snix_castore::B3Digest,
+    dest: &str,
+    depth: u32,
+    worklist: &mut Vec<ExportWorkItem>,
+    directory_service: &(impl DirectoryService + Clone),
+) -> Result<(), String> {
+    std::fs::create_dir_all(dest).map_err(|e| format!("creating dir {dest}: {e}"))?;
+    let dir = directory_service
+        .get(digest)
+        .await
+        .map_err(|e| format!("fetching directory {digest}: {e}"))?
+        .ok_or_else(|| format!("directory {digest} not found in castore"))?;
+
+    assert!(worklist.len() < MAX_WORKLIST_ENTRIES, "export worklist exceeded {MAX_WORKLIST_ENTRIES} entries");
+    worklist.push(ExportWorkItem::FinalizeDirectory { dest: dest.to_string() });
+    for (name, child_node) in dir.nodes() {
+        let name_str =
+            std::str::from_utf8(name.as_ref()).map_err(|e| format!("non-UTF8 filename in directory: {e}"))?;
+        let child_dest = format!("{dest}/{name_str}");
+        assert!(worklist.len() < MAX_WORKLIST_ENTRIES, "export worklist exceeded {MAX_WORKLIST_ENTRIES} entries");
+        worklist.push(ExportWorkItem::WriteNode {
+            node: child_node.clone(),
+            dest: child_dest,
+            depth: depth.saturating_add(1),
+        });
+    }
+    Ok(())
+}
+
+/// Write a single file blob to disk.
+async fn export_file_to_disk(
+    digest: &snix_castore::B3Digest,
+    expected_size: u64,
+    is_executable: bool,
+    dest: &str,
+    blob_service: &(impl BlobService + Clone),
+) -> Result<(), String> {
+    assert!(!dest.is_empty(), "export dest must not be empty");
+    assert!(dest.starts_with('/'), "export dest must be absolute path: {dest}");
+
+    let mut reader = blob_service
+        .open_read(digest)
+        .await
+        .map_err(|e| format!("opening blob {digest}: {e}"))?
+        .ok_or_else(|| format!("blob {digest} not found in castore"))?;
+
+    if expected_size > MAX_BLOB_WRITE_BYTES {
+        return Err(format!("blob {digest} expected size {expected_size} exceeds maximum export size for {dest}"));
+    }
+
+    let temp_dest = temporary_export_file_path(dest)?;
+    if let Some(parent) = std::path::Path::new(dest).parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("creating parent dir: {e}"))?;
+    }
+    let mut file = std::fs::File::create(&temp_dest).map_err(|e| format!("creating {temp_dest}: {e}"))?;
+    let mut buf = vec![0u8; EXPORT_READ_BUFFER_BYTES];
+    let mut written_bytes: u64 = 0;
+    let mut hasher = blake3::Hasher::new();
+    for _read_index in 0..=expected_size {
+        let read_byte_count = reader.read(&mut buf).await.map_err(|e| format!("reading blob: {e}"))?;
+        if read_byte_count == 0 {
+            break;
+        }
+        hasher.update(&buf[..read_byte_count]);
+        let read_size_bytes =
+            u64::try_from(read_byte_count).map_err(|_| format!("read size {read_byte_count} overflows u64"))?;
+        written_bytes = written_bytes
+            .checked_add(read_size_bytes)
+            .ok_or_else(|| format!("blob {digest} write size overflow for {dest}"))?;
+        if written_bytes > expected_size {
+            drop(file);
+            let mismatch = format!(
+                "blob {digest} length mismatch for {dest}: expected {expected_size}, stream exceeded declared size"
+            );
+            return Err(cleanup_failed_export(&temp_dest, mismatch));
+        }
+        std::io::Write::write_all(&mut file, &buf[..read_byte_count])
+            .map_err(|e| format!("writing {temp_dest}: {e}"))?;
+    }
+    let observed_digest = snix_castore::B3Digest::from(hasher.finalize().as_bytes());
+    if written_bytes != expected_size {
+        drop(file);
+        let mismatch =
+            format!("blob {digest} length mismatch for {dest}: expected {expected_size}, wrote {written_bytes}");
+        return Err(cleanup_failed_export(&temp_dest, mismatch));
+    }
+    if observed_digest != *digest {
+        drop(file);
+        let mismatch = format!("blob {digest} digest mismatch while exporting {dest}");
+        return Err(cleanup_failed_export(&temp_dest, mismatch));
+    }
+    std::io::Write::flush(&mut file).map_err(|e| format!("flushing {temp_dest}: {e}"))?;
+    drop(file);
+    normalize_file_metadata(&temp_dest, is_executable)?;
+    std::fs::rename(&temp_dest, dest).map_err(|e| format!("renaming {temp_dest} to {dest}: {e}"))?;
+    Ok(())
+}
+
+fn cleanup_failed_export(temp_path: &str, primary_error: String) -> String {
+    match std::fs::remove_file(temp_path) {
+        Ok(()) => primary_error,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => primary_error,
+        Err(error) => format!("{primary_error}; removing temporary export {temp_path}: {error}"),
+    }
+}
+
+fn temporary_export_file_path(dest: &str) -> Result<String, String> {
+    let path = std::path::Path::new(dest);
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| format!("export dest has no UTF-8 file name: {dest}"))?;
+    let tmp_name = format!(".{file_name}.tmp-{}", std::process::id());
+    let tmp_path = path.with_file_name(tmp_name);
+    tmp_path
+        .to_str()
+        .map(str::to_string)
+        .ok_or_else(|| format!("temporary export path is not UTF-8 for {dest}"))
+}
+
+/// Create a symlink on disk.
+fn export_symlink_to_disk(target: &[u8], dest: &str) -> Result<(), String> {
+    if let Some(parent) = std::path::Path::new(dest).parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("creating parent dir: {e}"))?;
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        let target_os = std::ffi::OsStr::from_bytes(target);
+        std::os::unix::fs::symlink(target_os, dest).map_err(|e| format!("creating symlink {dest}: {e}"))?;
+    }
+    normalize_symlink_timestamp(dest)?;
+    Ok(())
+}
+
+fn normalized_file_time() -> filetime::FileTime {
+    filetime::FileTime::from_unix_time(NORMALIZED_MTIME_SECONDS, NORMALIZED_MTIME_NANOSECONDS)
+}
+
+fn normalize_file_metadata(dest: &str, is_executable: bool) -> Result<(), String> {
+    let mode = if is_executable {
+        NORMALIZED_EXECUTABLE_MODE
+    } else {
+        NORMALIZED_NON_EXECUTABLE_MODE
+    };
+    set_path_mode(dest, mode)?;
+    filetime::set_file_mtime(dest, normalized_file_time())
+        .map_err(|e| format!("setting file mtime for {dest}: {e}"))?;
+    Ok(())
+}
+
+fn normalize_directory_metadata(dest: &str) -> Result<(), String> {
+    set_path_mode(dest, NORMALIZED_DIRECTORY_MODE)?;
+    filetime::set_file_mtime(dest, normalized_file_time())
+        .map_err(|e| format!("setting directory mtime for {dest}: {e}"))?;
+    Ok(())
+}
+
+#[cfg(unix)]
+fn set_path_mode(dest: &str, mode: u32) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(dest, std::fs::Permissions::from_mode(mode))
+        .map_err(|e| format!("setting permissions for {dest}: {e}"))
+}
+
+#[cfg(not(unix))]
+fn set_path_mode(_dest: &str, _mode: u32) -> Result<(), String> {
+    Ok(())
+}
+
+#[cfg(unix)]
+fn normalize_symlink_timestamp(dest: &str) -> Result<(), String> {
+    let fixed_time = normalized_file_time();
+    filetime::set_symlink_file_times(dest, fixed_time, fixed_time)
+        .map_err(|e| format!("setting symlink mtime for {dest}: {e}"))
+}
+
+#[cfg(not(unix))]
+fn normalize_symlink_timestamp(_dest: &str) -> Result<(), String> {
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use snix_castore::Directory;
+    use snix_castore::blobservice::BlobReader;
+    use snix_castore::blobservice::BlobService;
+    use snix_castore::blobservice::BlobWriter;
+    use snix_castore::blobservice::MemoryBlobService;
+    use snix_castore::directoryservice::DirectoryService;
+    use snix_castore::directoryservice::RedbDirectoryService;
+    use snix_castore::directoryservice::RedbDirectoryServiceConfig;
+    use tokio::io::AsyncWriteExt;
+
+    use super::*;
+
+    fn tmp_ds() -> RedbDirectoryService {
+        RedbDirectoryService::new_temporary("test".to_string(), RedbDirectoryServiceConfig::default()).unwrap()
+    }
+
+    #[derive(Clone)]
+    struct OneByteBlobService {
+        digest: snix_castore::B3Digest,
+        data: Vec<u8>,
+    }
+
+    struct OneByteBlobReader {
+        data: Vec<u8>,
+        pos: u64,
+    }
+
+    impl OneByteBlobReader {
+        fn new(data: Vec<u8>) -> Self {
+            Self { data, pos: 0 }
+        }
+    }
+
+    impl tokio::io::AsyncRead for OneByteBlobReader {
+        fn poll_read(
+            mut self: std::pin::Pin<&mut Self>,
+            _cx: &mut std::task::Context<'_>,
+            buf: &mut tokio::io::ReadBuf<'_>,
+        ) -> std::task::Poll<std::io::Result<()>> {
+            if buf.remaining() == 0 || self.pos >= self.data.len() as u64 {
+                return std::task::Poll::Ready(Ok(()));
+            }
+            let byte = self.data[self.pos as usize];
+            self.pos = self.pos.saturating_add(1);
+            buf.put_slice(&[byte]);
+            std::task::Poll::Ready(Ok(()))
+        }
+    }
+
+    impl tokio::io::AsyncSeek for OneByteBlobReader {
+        fn start_seek(mut self: std::pin::Pin<&mut Self>, position: std::io::SeekFrom) -> std::io::Result<()> {
+            let len = self.data.len() as u64;
+            let new_pos = match position {
+                std::io::SeekFrom::Start(pos) => pos,
+                std::io::SeekFrom::End(offset) => len
+                    .checked_add_signed(offset)
+                    .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "seek over/underflow"))?,
+                std::io::SeekFrom::Current(offset) => self
+                    .pos
+                    .checked_add_signed(offset)
+                    .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "seek over/underflow"))?,
+            };
+            if new_pos > len {
+                return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "seek past EOF"));
+            }
+            self.pos = new_pos;
+            Ok(())
+        }
+
+        fn poll_complete(
+            self: std::pin::Pin<&mut Self>,
+            _cx: &mut std::task::Context<'_>,
+        ) -> std::task::Poll<std::io::Result<u64>> {
+            std::task::Poll::Ready(Ok(self.pos))
+        }
+    }
+
+    impl BlobReader for OneByteBlobReader {}
+
+    #[async_trait::async_trait]
+    impl BlobService for OneByteBlobService {
+        async fn has(&self, digest: &snix_castore::B3Digest) -> std::io::Result<bool> {
+            Ok(*digest == self.digest)
+        }
+
+        async fn open_read(&self, digest: &snix_castore::B3Digest) -> std::io::Result<Option<Box<dyn BlobReader>>> {
+            if *digest == self.digest {
+                Ok(Some(Box::new(OneByteBlobReader::new(self.data.clone()))))
+            } else {
+                Ok(None)
+            }
+        }
+
+        async fn open_write(&self) -> Box<dyn BlobWriter> {
+            panic!("one-byte test service is read-only")
+        }
+    }
+
+    async fn insert_blob(bs: &MemoryBlobService, data: &[u8]) -> (snix_castore::B3Digest, Node) {
+        let mut writer = bs.open_write().await;
+        writer.write_all(data).await.unwrap();
+        let digest = writer.close().await.unwrap();
+        let node = Node::File {
+            digest,
+            size: data.len() as u64,
+            executable: false,
+        };
+        (digest, node)
+    }
+
+    #[cfg(unix)]
+    fn mode_bits(path: &str) -> u32 {
+        const MODE_PERMISSION_MASK: u32 = 0o777;
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::metadata(path).unwrap().permissions().mode() & MODE_PERMISSION_MASK
+    }
+
+    fn mtime_seconds(path: &str) -> i64 {
+        let metadata = std::fs::metadata(path).unwrap();
+        filetime::FileTime::from_last_modification_time(&metadata).unix_seconds()
+    }
+
+    fn symlink_mtime_seconds(path: &str) -> i64 {
+        let metadata = std::fs::symlink_metadata(path).unwrap();
+        filetime::FileTime::from_last_modification_time(&metadata).unix_seconds()
+    }
+
+    // -- File export --
+
+    #[tokio::test]
+    async fn export_file_writes_content() {
+        let bs = MemoryBlobService::default();
+        let ds = tmp_ds();
+        let data = b"hello export";
+        let (_, node) = insert_blob(&bs, data).await;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let dest = format!("{}/out", tmp.path().display());
+
+        export_castore_to_disk(&node, &dest, &bs, &ds).await.unwrap();
+
+        let written = std::fs::read(&dest).unwrap();
+        assert_eq!(written, data);
+    }
+
+    #[tokio::test]
+    async fn export_file_allows_many_small_reads() {
+        const SLOW_READ_BYTES: usize = 70_000;
+
+        let data = vec![b'x'; SLOW_READ_BYTES];
+        let digest = snix_castore::B3Digest::from(blake3::hash(&data).as_bytes());
+        let bs = OneByteBlobService {
+            digest,
+            data: data.clone(),
+        };
+        let ds = tmp_ds();
+        let node = Node::File {
+            digest,
+            size: SLOW_READ_BYTES as u64,
+            executable: false,
+        };
+        let tmp = tempfile::tempdir().unwrap();
+        let dest = format!("{}/slow", tmp.path().display());
+
+        export_castore_to_disk(&node, &dest, &bs, &ds).await.unwrap();
+
+        let written = std::fs::read(&dest).unwrap();
+        assert_eq!(written, data);
+    }
+
+    #[tokio::test]
+    async fn export_file_rejects_short_blob() {
+        let bs = MemoryBlobService::default();
+        let ds = tmp_ds();
+        let data = b"short";
+        let (_, mut node) = insert_blob(&bs, data).await;
+        if let Node::File { size, .. } = &mut node {
+            *size = size.saturating_add(1);
+        }
+
+        let tmp = tempfile::tempdir().unwrap();
+        let dest = format!("{}/out", tmp.path().display());
+
+        let err = export_castore_to_disk(&node, &dest, &bs, &ds).await.unwrap_err();
+
+        assert!(err.contains("length mismatch"), "unexpected error: {err}");
+        assert!(!std::path::Path::new(&dest).exists(), "short export must not publish destination");
+    }
+
+    #[tokio::test]
+    async fn export_file_non_executable_sets_permissions() {
+        let bs = MemoryBlobService::default();
+        let ds = tmp_ds();
+        let (_, node) = insert_blob(&bs, b"plain").await;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let dest = format!("{}/plain", tmp.path().display());
+
+        export_castore_to_disk(&node, &dest, &bs, &ds).await.unwrap();
+
+        #[cfg(unix)]
+        assert_eq!(mode_bits(&dest), NORMALIZED_NON_EXECUTABLE_MODE);
+    }
+
+    #[tokio::test]
+    async fn export_file_executable_sets_permissions() {
+        let bs = MemoryBlobService::default();
+        let ds = tmp_ds();
+        let data = b"#!/bin/sh\necho hi";
+        let mut writer = bs.open_write().await;
+        writer.write_all(data).await.unwrap();
+        let digest = writer.close().await.unwrap();
+        let node = Node::File {
+            digest,
+            size: data.len() as u64,
+            executable: true,
+        };
+
+        let tmp = tempfile::tempdir().unwrap();
+        let dest = format!("{}/script", tmp.path().display());
+
+        export_castore_to_disk(&node, &dest, &bs, &ds).await.unwrap();
+
+        #[cfg(unix)]
+        assert_eq!(mode_bits(&dest), NORMALIZED_EXECUTABLE_MODE);
+    }
+
+    #[tokio::test]
+    async fn export_file_sets_mtime() {
+        let bs = MemoryBlobService::default();
+        let ds = tmp_ds();
+        let (_, node) = insert_blob(&bs, b"mtime").await;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let dest = format!("{}/mtime", tmp.path().display());
+
+        export_castore_to_disk(&node, &dest, &bs, &ds).await.unwrap();
+
+        assert_eq!(mtime_seconds(&dest), NORMALIZED_MTIME_SECONDS);
+    }
+
+    #[tokio::test]
+    async fn export_file_empty_content() {
+        let bs = MemoryBlobService::default();
+        let ds = tmp_ds();
+        let (_, node) = insert_blob(&bs, b"").await;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let dest = format!("{}/empty", tmp.path().display());
+
+        export_castore_to_disk(&node, &dest, &bs, &ds).await.unwrap();
+
+        let written = std::fs::read(&dest).unwrap();
+        assert!(written.is_empty());
+    }
+
+    #[tokio::test]
+    async fn export_file_creates_parent_directories() {
+        let bs = MemoryBlobService::default();
+        let ds = tmp_ds();
+        let (_, node) = insert_blob(&bs, b"nested").await;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let dest = format!("{}/a/b/c/file", tmp.path().display());
+
+        export_castore_to_disk(&node, &dest, &bs, &ds).await.unwrap();
+
+        assert_eq!(std::fs::read(&dest).unwrap(), b"nested");
+    }
+
+    // -- Symlink export --
+
+    #[tokio::test]
+    async fn export_symlink_creates_link() {
+        let bs = MemoryBlobService::default();
+        let ds = tmp_ds();
+        let node = Node::Symlink {
+            target: snix_castore::SymlinkTarget::try_from("/some/target").unwrap(),
+        };
+
+        let tmp = tempfile::tempdir().unwrap();
+        let dest = format!("{}/link", tmp.path().display());
+
+        export_castore_to_disk(&node, &dest, &bs, &ds).await.unwrap();
+
+        let target = std::fs::read_link(&dest).unwrap();
+        assert_eq!(target.to_str().unwrap(), "/some/target");
+    }
+
+    #[tokio::test]
+    async fn export_symlink_sets_lmtime() {
+        let bs = MemoryBlobService::default();
+        let ds = tmp_ds();
+        let node = Node::Symlink {
+            target: snix_castore::SymlinkTarget::try_from("target").unwrap(),
+        };
+
+        let tmp = tempfile::tempdir().unwrap();
+        let dest = format!("{}/link", tmp.path().display());
+
+        export_castore_to_disk(&node, &dest, &bs, &ds).await.unwrap();
+
+        assert_eq!(symlink_mtime_seconds(&dest), NORMALIZED_MTIME_SECONDS);
+    }
+
+    // -- Directory export --
+
+    #[tokio::test]
+    async fn export_directory_creates_files() {
+        let bs = MemoryBlobService::default();
+        let ds = tmp_ds();
+
+        let (digest_a, _) = insert_blob(&bs, b"content-a").await;
+        let (digest_b, _) = insert_blob(&bs, b"content-b").await;
+
+        let mut dir = Directory::new();
+        dir.add("a.txt".try_into().unwrap(), Node::File {
+            digest: digest_a,
+            size: 9,
+            executable: false,
+        })
+        .unwrap();
+        dir.add("b.txt".try_into().unwrap(), Node::File {
+            digest: digest_b,
+            size: 9,
+            executable: false,
+        })
+        .unwrap();
+
+        let dir_digest = dir.digest();
+        let dir_size = dir.size();
+        ds.put(dir).await.unwrap();
+
+        let node = Node::Directory {
+            digest: dir_digest,
+            size: dir_size,
+        };
+
+        let tmp = tempfile::tempdir().unwrap();
+        let dest = format!("{}/mydir", tmp.path().display());
+
+        export_castore_to_disk(&node, &dest, &bs, &ds).await.unwrap();
+
+        assert_eq!(std::fs::read(format!("{dest}/a.txt")).unwrap(), b"content-a");
+        assert_eq!(std::fs::read(format!("{dest}/b.txt")).unwrap(), b"content-b");
+    }
+
+    #[tokio::test]
+    async fn export_directory_sets_permissions_and_mtime() {
+        let bs = MemoryBlobService::default();
+        let ds = tmp_ds();
+        let mut dir = Directory::new();
+        let (file_digest, _) = insert_blob(&bs, b"child").await;
+        dir.add("child.txt".try_into().unwrap(), Node::File {
+            digest: file_digest,
+            size: 5,
+            executable: false,
+        })
+        .unwrap();
+        let dir_digest = dir.digest();
+        let dir_size = dir.size();
+        ds.put(dir).await.unwrap();
+        let node = Node::Directory {
+            digest: dir_digest,
+            size: dir_size,
+        };
+
+        let tmp = tempfile::tempdir().unwrap();
+        let dest = format!("{}/dir", tmp.path().display());
+
+        export_castore_to_disk(&node, &dest, &bs, &ds).await.unwrap();
+
+        #[cfg(unix)]
+        assert_eq!(mode_bits(&dest), NORMALIZED_DIRECTORY_MODE);
+        assert_eq!(mtime_seconds(&dest), NORMALIZED_MTIME_SECONDS);
+    }
+
+    #[tokio::test]
+    async fn export_nested_directory() {
+        let bs = MemoryBlobService::default();
+        let ds = tmp_ds();
+
+        let (file_digest, _) = insert_blob(&bs, b"leaf").await;
+
+        let mut inner = Directory::new();
+        inner
+            .add("leaf.txt".try_into().unwrap(), Node::File {
+                digest: file_digest,
+                size: 4,
+                executable: false,
+            })
+            .unwrap();
+        let inner_digest = inner.digest();
+        let inner_size = inner.size();
+        ds.put(inner).await.unwrap();
+
+        let mut outer = Directory::new();
+        outer
+            .add("sub".try_into().unwrap(), Node::Directory {
+                digest: inner_digest,
+                size: inner_size,
+            })
+            .unwrap();
+        let outer_digest = outer.digest();
+        let outer_size = outer.size();
+        ds.put(outer).await.unwrap();
+
+        let node = Node::Directory {
+            digest: outer_digest,
+            size: outer_size,
+        };
+
+        let tmp = tempfile::tempdir().unwrap();
+        let dest = format!("{}/root", tmp.path().display());
+
+        export_castore_to_disk(&node, &dest, &bs, &ds).await.unwrap();
+
+        assert_eq!(std::fs::read(format!("{dest}/sub/leaf.txt")).unwrap(), b"leaf");
+    }
+
+    #[tokio::test]
+    async fn export_directory_with_symlink() {
+        let bs = MemoryBlobService::default();
+        let ds = tmp_ds();
+
+        let (file_digest, _) = insert_blob(&bs, b"real").await;
+
+        let mut dir = Directory::new();
+        dir.add("real.txt".try_into().unwrap(), Node::File {
+            digest: file_digest,
+            size: 4,
+            executable: false,
+        })
+        .unwrap();
+        dir.add("link.txt".try_into().unwrap(), Node::Symlink {
+            target: snix_castore::SymlinkTarget::try_from("real.txt").unwrap(),
+        })
+        .unwrap();
+
+        let dir_digest = dir.digest();
+        let dir_size = dir.size();
+        ds.put(dir).await.unwrap();
+
+        let node = Node::Directory {
+            digest: dir_digest,
+            size: dir_size,
+        };
+
+        let tmp = tempfile::tempdir().unwrap();
+        let dest = format!("{}/mixed", tmp.path().display());
+
+        export_castore_to_disk(&node, &dest, &bs, &ds).await.unwrap();
+
+        assert_eq!(std::fs::read(format!("{dest}/real.txt")).unwrap(), b"real");
+        let link_target = std::fs::read_link(format!("{dest}/link.txt")).unwrap();
+        assert_eq!(link_target.to_str().unwrap(), "real.txt");
+    }
+
+    // -- Error paths --
+
+    #[tokio::test]
+    async fn export_missing_blob_returns_error() {
+        let bs = MemoryBlobService::default();
+        let ds = tmp_ds();
+        let fake_digest = snix_castore::B3Digest::from(&[0xffu8; 32]);
+        let node = Node::File {
+            digest: fake_digest,
+            size: 10,
+            executable: false,
+        };
+
+        let tmp = tempfile::tempdir().unwrap();
+        let dest = format!("{}/missing", tmp.path().display());
+
+        let err = export_castore_to_disk(&node, &dest, &bs, &ds).await.unwrap_err();
+        assert!(err.contains("not found"), "error should mention missing blob: {err}");
+    }
+
+    #[tokio::test]
+    async fn export_missing_directory_returns_error() {
+        let bs = MemoryBlobService::default();
+        let ds = tmp_ds();
+        let fake_digest = snix_castore::B3Digest::from(&[0xeeu8; 32]);
+        let node = Node::Directory {
+            digest: fake_digest,
+            size: 0,
+        };
+
+        let tmp = tempfile::tempdir().unwrap();
+        let dest = format!("{}/missing_dir", tmp.path().display());
+
+        let err = export_castore_to_disk(&node, &dest, &bs, &ds).await.unwrap_err();
+        assert!(err.contains("not found"), "error should mention missing directory: {err}");
+    }
+
+    // -- Depth limit --
+
+    /// Build a chain of nested directories to a given depth, with a file at the leaf.
+    async fn build_deep_chain(bs: &MemoryBlobService, ds: &impl DirectoryService, depth: u32) -> Node {
+        let (file_digest, _) = insert_blob(bs, b"leaf").await;
+        let leaf = Node::File {
+            digest: file_digest,
+            size: 4,
+            executable: false,
+        };
+
+        let mut current = leaf;
+        for _depth_index in (0..depth).rev() {
+            // Use a fixed name so we don't need dynamic PathComponent.
+            let mut dir = Directory::new();
+            dir.add("d".try_into().unwrap(), current).unwrap();
+            let dig = dir.digest();
+            let sz = dir.size();
+            ds.put(dir).await.unwrap();
+            current = Node::Directory { digest: dig, size: sz };
+        }
+        current
+    }
+
+    #[tokio::test]
+    async fn export_depth_limit_enforced() {
+        let bs = MemoryBlobService::default();
+        let ds = tmp_ds();
+        // Build a chain deeper than MAX_EXPORT_DEPTH.
+        let node = build_deep_chain(&bs, &ds, MAX_EXPORT_DEPTH + 1).await;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let dest = format!("{}/deep", tmp.path().display());
+
+        let err = export_castore_to_disk(&node, &dest, &bs, &ds).await.unwrap_err();
+        assert!(err.contains("depth limit"), "error should mention depth limit: {err}");
+    }
+
+    #[tokio::test]
+    async fn export_moderate_depth_succeeds() {
+        let bs = MemoryBlobService::default();
+        let ds = tmp_ds();
+        // 5 levels deep — well under the limit.
+        let node = build_deep_chain(&bs, &ds, 5).await;
+
+        let tmp = tempfile::tempdir().unwrap();
+        let dest = format!("{}/moderate", tmp.path().display());
+
+        export_castore_to_disk(&node, &dest, &bs, &ds).await.unwrap();
+
+        // Verify the leaf file exists at the expected depth (d/d/d/d/d).
+        let mut path = dest.to_string();
+        for _ in 0..5 {
+            path = format!("{path}/d");
+        }
+        assert_eq!(std::fs::read(&path).unwrap(), b"leaf");
+    }
+}

@@ -69,14 +69,23 @@ impl DiffReviewFinding {
     ///
     /// Returns [`super::super::DiffReviewError`] when identity, span, evidence,
     /// rationale, remediation, or confidence fields are invalid.
-    pub fn validate(draft: &DiffReviewFindingDraft<'_>) -> Result<Self, super::super::DiffReviewError> {
-        let finding_id = super::super::check::required_safe_text(super::super::FINDING_ID_FIELD, draft.finding_id)?;
+    pub fn validate(
+        draft: &DiffReviewFindingDraft<'_>,
+    ) -> Result<Self, super::super::DiffReviewError> {
+        let finding_id = super::super::check::required_safe_text(
+            super::super::FINDING_ID_FIELD,
+            draft.finding_id,
+        )?;
         let span = super::DiffReviewSpan::validate(&draft.span)?;
         let evidence = super::DiffReviewEvidence::validate(&draft.evidence)?;
-        let rationale =
-            super::super::check::required_safe_text(super::super::FINDING_RATIONALE_FIELD, draft.rationale)?;
-        let remediation =
-            super::super::check::required_safe_text(super::super::FINDING_REMEDIATION_FIELD, draft.remediation)?;
+        let rationale = super::super::check::required_safe_text(
+            super::super::FINDING_RATIONALE_FIELD,
+            draft.rationale,
+        )?;
+        let remediation = super::super::check::required_safe_text(
+            super::super::FINDING_REMEDIATION_FIELD,
+            draft.remediation,
+        )?;
         super::super::check::confidence(super::super::check::ScoreBounds {
             score: draft.confidence,
             max_score: super::super::MAX_CONFIDENCE_SCORE,

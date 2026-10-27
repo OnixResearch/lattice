@@ -1,0 +1,75 @@
+{
+  "allow_text_fallback": true,
+  "max_alt_text_chars": 256,
+  "max_capability_response_bytes": 256,
+  "max_chunks": 8192,
+  "max_decoded_bytes": 134217728,
+  "max_image_bytes": 8388608,
+  "max_lifecycle_entries": 64,
+  "max_operations": 8,
+  "max_prepared_bytes": 33554432,
+  "max_source_height": 8192,
+  "max_source_pixels": 16777216,
+  "max_source_width": 8192,
+  "max_terminal_cells": 32768,
+  "max_terminal_height": 128,
+  "max_terminal_width": 256,
+  "non_claims": [
+    "not-live-terminal-validation",
+    "not-emulator-parity",
+    "not-image-decoder-correctness",
+    "not-process-isolation",
+    "not-video-or-audio-playback",
+    "not-provider-availability",
+    "not-production-readiness",
+    "not-release-eligibility"
+  ],
+  "policy_id": "animus.terminal-image.default.v1",
+  "protocol_rows": [
+    {
+      "cleanup": true,
+      "delete": true,
+      "place": true,
+      "protocol": "kitty",
+      "query": true,
+      "replace": true,
+      "transmit": true,
+      "upstream_payload_adapter": "rat-image-transmit-only"
+    },
+    {
+      "cleanup": false,
+      "delete": false,
+      "place": false,
+      "protocol": "iterm2",
+      "query": false,
+      "replace": false,
+      "transmit": true,
+      "upstream_payload_adapter": "rat-image-transmit-only"
+    },
+    {
+      "cleanup": false,
+      "delete": false,
+      "place": false,
+      "protocol": "sixel",
+      "query": false,
+      "replace": false,
+      "transmit": true,
+      "upstream_payload_adapter": "rat-image-transmit-only"
+    },
+    {
+      "cleanup": false,
+      "delete": false,
+      "place": false,
+      "protocol": "text",
+      "query": false,
+      "replace": false,
+      "transmit": false,
+      "upstream_payload_adapter": "none"
+    }
+  ],
+  "rats_revision": "3b498c3d7c248c335d3e7faf12f133a18c87d632",
+  "receipt_redaction_profile": "metadata-only-v1",
+  "require_injected_byte_resolver": true,
+  "require_injected_writer": true,
+  "schema": "animus.terminal-image-policy.v1"
+}

@@ -1,0 +1,162 @@
+{
+  "bounds": {
+    "fixtures": 22,
+    "max_evidence_labels": 64,
+    "max_identity_bytes": 512,
+    "max_services": 13
+  },
+  "dependencies": {
+    "crate_features": [
+      "animus-eval-core",
+      "animus-adapter-eval",
+      "animus-std-eval",
+      "animus-adapters/evaluation",
+      "animus-runtime/harbor-eval",
+      "animus-runtime/dataset-export"
+    ],
+    "live_dependencies": []
+  },
+  "evidence": {
+    "live_claims_allowed": false,
+    "metadata_only": true,
+    "non_claims": [
+      "not-live-host-provider-or-tool-correctness",
+      "not-sandbox-or-network-enforcement",
+      "not-storage-durability-or-exactly-once-effects",
+      "not-verifier-soundness-or-artifact-authenticity",
+      "not-model-quality-benchmark-validity-or-training-fitness",
+      "not-authoritative-completion",
+      "not-production-or-release-readiness"
+    ],
+    "physical_paths_allowed": false,
+    "raw_content_allowed": false
+  },
+  "families": [
+    {
+      "expected_diagnostic": "taskset-admission",
+      "id": "taskset",
+      "negative_fixture": "taskset-generator-hazards",
+      "positive_fixture": "taskset-exact-bounded"
+    },
+    {
+      "expected_diagnostic": "recipe-admission",
+      "id": "recipes",
+      "negative_fixture": "recipe-authority-widening",
+      "positive_fixture": "recipes-production-paths"
+    },
+    {
+      "expected_diagnostic": "ledger-binding",
+      "id": "episode",
+      "negative_fixture": "episode-ledger-drift",
+      "positive_fixture": "episode-ledger-reference"
+    },
+    {
+      "expected_diagnostic": "service-admission",
+      "id": "ports",
+      "negative_fixture": "ports-service-mismatch",
+      "positive_fixture": "ports-exact-observations"
+    },
+    {
+      "expected_diagnostic": "gateway-commit-order",
+      "id": "gateway",
+      "negative_fixture": "gateway-order-and-retry-drift",
+      "positive_fixture": "gateway-durable-order"
+    },
+    {
+      "expected_diagnostic": "verifier-isolation",
+      "id": "verifier",
+      "negative_fixture": "verifier-artifact-attacks",
+      "positive_fixture": "verifier-isolated-artifacts"
+    },
+    {
+      "expected_diagnostic": "reward-validation",
+      "id": "rewards",
+      "negative_fixture": "rewards-malformed",
+      "positive_fixture": "rewards-finite-attributed"
+    },
+    {
+      "expected_diagnostic": "resume-or-cleanup",
+      "id": "persistence",
+      "negative_fixture": "resume-stale-cleanup-failed",
+      "positive_fixture": "resume-exact-complete"
+    },
+    {
+      "expected_diagnostic": "compatibility-loss",
+      "id": "compatibility",
+      "negative_fixture": "harbor-atif-loss",
+      "positive_fixture": "harbor-atif-safe-subset"
+    },
+    {
+      "expected_diagnostic": "downstream-admission",
+      "id": "downstream",
+      "negative_fixture": "downstream-auto-promotion-or-leak",
+      "positive_fixture": "feedback-dataset-advisory"
+    },
+    {
+      "expected_diagnostic": "evidence-safety",
+      "id": "evidence",
+      "negative_fixture": "receipts-leak-or-overclaim",
+      "positive_fixture": "receipts-metadata-only"
+    }
+  ],
+  "profile_id": "native-evaluation-composition-v1",
+  "public_entrypoints": [
+    "plan_taskset",
+    "plan_environment",
+    "plan_recipe",
+    "reduce_pass_at_n",
+    "reduce_episode",
+    "reduce_reward_dimensions",
+    "build_resume_key",
+    "evaluate_resume",
+    "project_evaluation_receipt",
+    "admit_service",
+    "build_service_request",
+    "project_model_call",
+    "admit_terminal_after_commit",
+    "admit_identical_request_coalescing",
+    "execute_evaluation_host",
+    "preflight_host",
+    "project_host_receipt",
+    "plan_trials",
+    "project_atif",
+    "reduce_rewards",
+    "validate_eval_feedback_plan",
+    "evaluate_feedback_review",
+    "export_chat_messages_row"
+  ],
+  "schema": "animus.native-evaluation-conformance.v1",
+  "services": [
+    "task_source",
+    "agent_execution",
+    "verifier_execution",
+    "artifact_collect",
+    "artifact_restore",
+    "model_call_capture",
+    "result_append",
+    "result_replace",
+    "result_reopen",
+    "tool",
+    "timer",
+    "cancellation",
+    "cleanup"
+  ],
+  "source_cohort": {
+    "identity": "b3:c6336b188596db9b18cb2f0a721c9f5bc551e619342e89807e20ec45f3bb676f",
+    "license": "MIT",
+    "paths": [
+      "verifiers/v1/cli/eval/runner.py",
+      "verifiers/v1/cli/eval/resume.py",
+      "verifiers/v1/episode.py",
+      "verifiers/v1/interception/base.py",
+      "verifiers/v1/interception/pool.py",
+      "verifiers/v1/interception/server.py",
+      "verifiers/v1/rollout.py",
+      "verifiers/v1/runtimes/limiters.py",
+      "verifiers/v1/state.py",
+      "verifiers/v1/utils/artifacts.py"
+    ],
+    "repository": "PrimeIntellect-ai/verifiers",
+    "revision": "1a997814e85a2e4f409add960aa852737388dbd8"
+  }
+}

@@ -35,6 +35,36 @@ pub fn runtime_identity(runtime: &super::model::RuntimeArtifact) -> Result<Strin
     hash_serializable(RUNTIME_DOMAIN, runtime)
 }
 
+/// Component runtimes bind their content and all authoritative pack declarations.
+/// The bounded-process identity contract is intentionally unchanged.
+pub fn runtime_cohort_identity(
+    manifest: &super::model::Manifest,
+    runtime: &super::model::RuntimeArtifact,
+) -> Result<String, super::Error> {
+    if runtime.wasm.is_none() {
+        return runtime_identity(runtime);
+    }
+    hash_serializable(b"lattice.operation-pack-wasm-runtime.v1", &(runtime, manifest_identity(manifest)?))
+}
+
+pub fn component_cohort_identity(
+    candidate: &super::model::Candidate,
+    runtime: &super::model::RuntimeArtifact,
+    platform: &str,
+    evidence: &std::collections::BTreeMap<super::model::EvidenceKind, String>,
+) -> Result<String, super::Error> {
+    hash_serializable(
+        b"lattice.operation-pack-wasm-cohort.v1",
+        &(
+            &candidate.pack_identity,
+            &candidate.manifest_identity,
+            runtime_cohort_identity(&candidate.manifest, runtime)?,
+            platform,
+            evidence,
+        ),
+    )
+}
+
 pub fn analyzer_identity(analyzer: &super::model::AnalyzerManifest) -> Result<String, super::Error> {
     hash_serializable(ANALYZER_DOMAIN, analyzer)
 }
@@ -56,7 +86,11 @@ pub fn lock_identity(lock: &super::model::Lock) -> Result<String, super::Error> 
         &lock.skill_identities,
         &lock.trust_profile_identity,
     );
-    hash_serializable(LOCK_DOMAIN, &projection)
+    if lock.component_cohort_identities.is_empty() && lock.evidence_identities.is_empty() {
+        hash_serializable(LOCK_DOMAIN, &projection)
+    } else {
+        hash_serializable(LOCK_DOMAIN, &(projection, &lock.component_cohort_identities, &lock.evidence_identities))
+    }
 }
 
 fn authoritative_manifest(manifest: &super::model::Manifest) -> impl serde::Serialize + '_ {

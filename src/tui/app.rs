@@ -48,6 +48,7 @@ use crate::engine::value::Value;
 use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::Workflow;
 use crate::engine::workflow::WorkflowNodeIdentity;
+use crate::node_kind_provider;
 use crate::replay::ReplayCursor;
 use crate::replay::ReplayTimeline;
 use crate::store::RunDetailRecord;
@@ -113,6 +114,7 @@ pub enum AppAction {
     EditNodeLabel,
     EditNodeCommand,
     EditNodeTimeout,
+    OpenAuthoring(&'static str),
 }
 
 /// Command palette data.
@@ -212,6 +214,7 @@ pub struct PropertyEditState {
     pub node_id: NodeId,
     pub field: PropertyEditField,
     pub original: String,
+    pub workflow_snapshot: crate::workflow_format::PortableWorkflow,
     pub draft: String,
 }
 
@@ -228,6 +231,7 @@ pub enum PropertyEditError {
     InvalidMergePolicy,
     InvalidHttpConfig,
     InvalidFileConfig,
+    Typed(String),
 }
 
 pub fn validate_timeout_secs(input: &str) -> Result<u64, PropertyEditError> {
@@ -282,6 +286,20 @@ fn condition_predicate_to_draft(predicate: &control_flow::ConditionPredicate) ->
         control_flow::ConditionPredicate::NumberGreaterThan(value) => format!("gt:{value}"),
         control_flow::ConditionPredicate::JsonPointerExists(value) => format!("json_exists:{value}"),
         control_flow::ConditionPredicate::BoolEquals(value) => format!("bool:{value}"),
+    }
+}
+
+fn image_input_config(path: String) -> NodeConfig {
+    let allowed_root = std::path::Path::new(&path)
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| std::path::Path::new("."))
+        .to_string_lossy()
+        .into_owned();
+    NodeConfig::ImageInput {
+        path,
+        allowed_roots: vec![allowed_root],
+        max_bytes: crate::image_node::DEFAULT_MAX_IMAGE_BYTES,
     }
 }
 
@@ -379,7 +397,7 @@ fn credentials_from_draft(input: &str) -> Result<NodeCredentialRefs, PropertyEdi
         let env_name = env_name.trim();
         let provider = provider.trim();
         let key = key.trim();
-        if env_name.is_empty() || provider.is_empty() || key.is_empty() {
+        if env_name.is_empty() || provider.is_empty() || key.is_empty() || refs.env.contains_key(env_name) {
             return Err(PropertyEditError::InvalidAgentCredentials);
         }
         refs.env.insert(env_name.to_string(), SecretRef::new(provider, key, field));
@@ -874,7 +892,7 @@ impl PaletteData {
         let items = vec![
             FuzzyCandidate {
                 id: "add_node".into(),
-                text: "Add Shell Node".into(),
+                text: "Add Node (all built-in kinds)".into(),
                 context: None,
                 icon: Some('+'),
             },
@@ -951,6 +969,54 @@ impl PaletteData {
                 icon: Some('⊞'),
             },
             FuzzyCandidate {
+                id: "authoring_all".into(),
+                text: "Author Workflow / All Typed Fields (Ctrl-W)".into(),
+                context: None,
+                icon: Some('✎'),
+            },
+            FuzzyCandidate {
+                id: "authoring_workflow".into(),
+                text: "Author Workflow Metadata / Timestamps".into(),
+                context: None,
+                icon: Some('✎'),
+            },
+            FuzzyCandidate {
+                id: "authoring_config".into(),
+                text: "Author Selected Node Configuration / Maps / Mappings".into(),
+                context: None,
+                icon: Some('✎'),
+            },
+            FuzzyCandidate {
+                id: "authoring_graph".into(),
+                text: "Author Node Position / Typed Ports / Edges".into(),
+                context: None,
+                icon: Some('✎'),
+            },
+            FuzzyCandidate {
+                id: "authoring_credential".into(),
+                text: "Author Opaque Credential References".into(),
+                context: None,
+                icon: Some('✎'),
+            },
+            FuzzyCandidate {
+                id: "authoring_runner".into(),
+                text: "Author Runtime Binding / Runner Policies".into(),
+                context: None,
+                icon: Some('✎'),
+            },
+            FuzzyCandidate {
+                id: "authoring_trigger".into(),
+                text: "Author Manual / Schedule / Webhook Triggers".into(),
+                context: None,
+                icon: Some('✎'),
+            },
+            FuzzyCandidate {
+                id: "authoring_operation".into(),
+                text: "Author Admitted Operation / Catalog / Typed Arguments".into(),
+                context: None,
+                icon: Some('✎'),
+            },
+            FuzzyCandidate {
                 id: "quit".into(),
                 text: "Quit (Ctrl-Q)".into(),
                 context: None,
@@ -983,6 +1049,14 @@ pub fn palette_action(id: &str) -> Option<AppAction> {
         "edit_label" => Some(AppAction::EditNodeLabel),
         "edit_command" => Some(AppAction::EditNodeCommand),
         "edit_timeout" => Some(AppAction::EditNodeTimeout),
+        "authoring_all" => Some(AppAction::OpenAuthoring("all")),
+        "authoring_workflow" => Some(AppAction::OpenAuthoring("workflow")),
+        "authoring_config" => Some(AppAction::OpenAuthoring("config")),
+        "authoring_graph" => Some(AppAction::OpenAuthoring("graph")),
+        "authoring_credential" => Some(AppAction::OpenAuthoring("credential")),
+        "authoring_runner" => Some(AppAction::OpenAuthoring("runner")),
+        "authoring_trigger" => Some(AppAction::OpenAuthoring("trigger")),
+        "authoring_operation" => Some(AppAction::OpenAuthoring("operation")),
         "quit" => Some(AppAction::Quit),
         _ => None,
     }
@@ -1002,6 +1076,7 @@ pub struct App {
     pub workflow_template_browser: WorkflowTemplateBrowserState,
     pub workflow_template_draft: Option<WorkflowTemplateDraft>,
     pub property_edit: Option<PropertyEditState>,
+    pub authoring: Option<crate::tui::authoring::State>,
     pub add_node_flow: AddNodeFlowState,
     pub node_templates: Vec<NodeTemplate>,
     pub workflow_templates: Vec<crate::workflow_template::ValidatedBundle>,
@@ -1065,6 +1140,7 @@ impl App {
             workflow_template_browser: WorkflowTemplateBrowserState::closed(),
             workflow_template_draft: None,
             property_edit: None,
+            authoring: None,
             add_node_flow: AddNodeFlowState::closed(),
             node_templates: Vec::new(),
             workflow_templates: Vec::new(),
@@ -1433,11 +1509,30 @@ impl App {
         }
     }
 
+    fn commit_guided_node(&mut self, label: &str, config: NodeConfig) {
+        let issues = node_kind_provider::provider_for_config(&config).validate_config(label, &config);
+        if !issues.is_empty() {
+            for issue in issues {
+                self.output.push_line(&issue.message);
+            }
+            return;
+        }
+        match self.workflow.try_add_configured_node(label, config) {
+            Ok(id) => {
+                self.place_new_node(id);
+                self.sync_graph_state();
+                self.select_node(id);
+                self.mark_workflow_dirty();
+                self.cancel_add_node_flow();
+            }
+            Err(error) => self.output.push_line(&format!("Node creation rejected: {error:?}")),
+        }
+    }
+
     fn confirm_shell_node_from_flow(&mut self) {
         let label = normalized_node_label(&self.add_node_flow.label, &self.next_shell_node_label());
         let command = self.add_node_flow.command.clone();
-        self.add_shell_node(&label, &command);
-        self.cancel_add_node_flow();
+        self.commit_guided_node(&label, NodeConfig::shell(command));
     }
 
     fn confirm_http_node_from_flow(&mut self) {
@@ -1449,8 +1544,7 @@ impl App {
                 return;
             }
         };
-        self.add_http_node(&label, &method, &url);
-        self.cancel_add_node_flow();
+        self.commit_guided_node(&label, NodeConfig::http(method, url));
     }
 
     fn confirm_file_node_from_flow(&mut self) {
@@ -1462,22 +1556,27 @@ impl App {
                 return;
             }
         };
-        self.add_file_node(&label, operation, &path);
-        self.cancel_add_node_flow();
+        if let Err(error) = crate::tui::authoring::node::path_text(&path) {
+            self.output.push_line(&error);
+            return;
+        }
+        self.commit_guided_node(&label, NodeConfig::file(operation, path));
     }
 
     fn confirm_image_input_node_from_flow(&mut self) {
         let label = normalized_node_label(&self.add_node_flow.label, &self.next_image_node_label());
         let path = self.add_node_flow.command.clone();
-        self.add_image_input_node(&label, &path);
-        self.cancel_add_node_flow();
+        if let Err(error) = crate::tui::authoring::node::path_text(&path) {
+            self.output.push_line(&error);
+            return;
+        }
+        self.commit_guided_node(&label, image_input_config(path));
     }
 
     fn confirm_agent_node_from_flow(&mut self, target: AgentTarget) {
         let label = normalized_node_label(&self.add_node_flow.label, &self.next_agent_node_label());
         let prompt = self.add_node_flow.command.clone();
-        self.add_agent_node(&label, target, &prompt, AgentOutputMode::Image);
-        self.cancel_add_node_flow();
+        self.commit_guided_node(&label, NodeConfig::agent(target, prompt, AgentOutputMode::Image));
     }
 
     fn confirm_condition_node_from_flow(&mut self) {
@@ -1489,8 +1588,7 @@ impl App {
                 return;
             }
         };
-        self.add_condition_node(&label, ConditionNodeConfig { branches });
-        self.cancel_add_node_flow();
+        self.commit_guided_node(&label, NodeConfig::condition(ConditionNodeConfig { branches }));
     }
 
     fn confirm_merge_node_from_flow(&mut self) {
@@ -1502,8 +1600,7 @@ impl App {
                 return;
             }
         };
-        self.add_merge_node(&label, config);
-        self.cancel_add_node_flow();
+        self.commit_guided_node(&label, NodeConfig::merge(config));
     }
 
     fn confirm_subworkflow_node_from_flow(&mut self) {
@@ -1513,12 +1610,12 @@ impl App {
             self.output.push_line("Subworkflow name is required");
             return;
         }
-        self.add_subworkflow_node(&label, SubworkflowNodeConfig {
+        let config = SubworkflowNodeConfig {
             workflow_name: workflow_name.to_string(),
             input_mappings: Vec::new(),
             output_mappings: Vec::new(),
-        });
-        self.cancel_add_node_flow();
+        };
+        self.commit_guided_node(&label, NodeConfig::subworkflow(config));
     }
 
     fn confirm_template_node(&mut self) {
@@ -1582,8 +1679,28 @@ impl App {
                 return false;
             }
         };
-        let id = self.workflow.graph.add_node(template.name.clone(), &inputs, &outputs);
-        self.workflow.set_node_config(id, NodeConfig::shell(command));
+        let config = NodeConfig::shell(command);
+        let issues = node_kind_provider::provider_for_config(&config).validate_config(&template.name, &config);
+        if !issues.is_empty() {
+            for issue in issues {
+                self.output.push_line(&issue.message);
+            }
+            return false;
+        }
+        let mut candidate = self.workflow.clone();
+        let id = match candidate.graph.try_add_node(template.name.clone(), &inputs, &outputs) {
+            Ok(id) => id,
+            Err(error) => {
+                self.output.push_line(&format!("Template creation rejected: {error}"));
+                return false;
+            }
+        };
+        candidate.set_node_config(id, config);
+        if let Err(error) = candidate.validate_aggregate_ownership() {
+            self.output.push_line(&format!("Template creation rejected: {error:?}"));
+            return false;
+        }
+        self.workflow = candidate;
         self.place_new_node(id);
         self.sync_graph_state();
         self.select_node(id);
@@ -1978,6 +2095,8 @@ impl App {
 
         match store.load_workflow(name) {
             Ok(Some(workflow)) => {
+                self.authoring = None;
+                self.property_edit = None;
                 self.workflow = workflow;
                 self.sync_graph_state();
                 self.clear_workflow_dirty();
@@ -1995,6 +2114,87 @@ impl App {
         }
     }
 
+    /// Browse typed fields without changing the workflow or activating any effects.
+    pub fn open_authoring(&mut self, family: &'static str) {
+        self.close_workflow_template_browser();
+        self.show_palette = false;
+        self.property_edit = None;
+        self.add_node_flow = AddNodeFlowState::closed();
+        self.workflow_browser = WorkflowBrowserState::closed();
+        self.run_history = RunHistoryState::closed();
+        self.approvals = ApprovalState::closed();
+        self.diagnostics.open = false;
+        self.authoring =
+            Some(crate::tui::authoring::State::new(&self.workflow, self.selected_node_id().map(|id| id.0), family));
+    }
+
+    /// Apply exactly one fully parsed field, retaining invalid/stale drafts for repair.
+    pub fn confirm_authoring(&mut self) -> bool {
+        let Some(mut state) = self.authoring.take() else {
+            return false;
+        };
+        let Some(draft) = state.draft.as_ref() else {
+            state.begin(&self.workflow);
+            self.authoring = Some(state);
+            return false;
+        };
+        let current = crate::workflow_format::workflow_to_portable(&self.workflow);
+        if current != draft.original {
+            state.error = Some("Workflow changed while editing; Esc cancels this stale draft".into());
+            self.authoring = Some(state);
+            return false;
+        }
+        let id = draft.field.id.clone();
+        let result = if id.starts_with("operation.") {
+            let runtime = crate::process::core::RuntimeConfig {
+                shell_program: self.config.shell.clone(),
+                limits: self.config.process_limits.clone(),
+            };
+            state.operation.apply(&mut self.workflow, state.node_id, &id, &draft.text, &runtime)
+        } else {
+            crate::tui::authoring::apply(&mut self.workflow, state.node_id, &id, &draft.text)
+        };
+        match result {
+            Ok(()) => {
+                let changed = current != crate::workflow_format::workflow_to_portable(&self.workflow);
+                if changed {
+                    let selection = self.graph_state.selected.clone();
+                    self.sync_graph_state();
+                    self.graph_state.selected =
+                        selection.into_iter().filter(|id| self.graph_state.graph.node(*id).is_some()).collect();
+                    // Explicit metadata timestamps are authorable; do not overwrite
+                    // them with a second clock observation after an exact field edit.
+                    self.dirty = true;
+                }
+                state.draft = None;
+                state.error = None;
+                state.refresh(&self.workflow);
+                if let Some(index) = state.fields.iter().position(|field| field.id == id) {
+                    state.selected = index;
+                }
+                self.authoring = Some(state);
+                changed
+            }
+            Err(error) => {
+                state.error = Some(error);
+                self.authoring = Some(state);
+                false
+            }
+        }
+    }
+
+    pub fn cancel_authoring(&mut self) {
+        if let Some(state) = &mut self.authoring
+            && state.draft.is_some()
+        {
+            state.draft = None;
+            state.error = None;
+            state.refresh(&self.workflow);
+            return;
+        }
+        self.authoring = None;
+    }
+
     /// Delete selected nodes through the aggregate workflow lifecycle operation.
     pub(crate) fn delete_selected_nodes(&mut self) -> usize {
         let mut node_ids = self.graph_state.selected.iter().copied().collect::<Vec<_>>();
@@ -2007,14 +2207,25 @@ impl App {
             return 0;
         }
 
-        let mut removed = 0;
+        let mut candidate = self.workflow.clone();
         for node_id in &node_ids {
-            if self.workflow.remove_node(*node_id).is_ok() {
-                removed += 1;
+            if let Err(error) = candidate.remove_node(*node_id) {
+                self.output.push_line(&format!("Node deletion rejected: {error:?}"));
+                return 0;
             }
         }
+        let removed = node_ids.len();
+        self.workflow = candidate;
         debug_assert_eq!(removed, node_ids.len());
         self.property_edit = self.property_edit.take().filter(|edit| !node_ids.contains(&edit.node_id));
+        if self
+            .authoring
+            .as_ref()
+            .and_then(|state| state.node_id)
+            .is_some_and(|id| node_ids.iter().any(|node| node.0 == id))
+        {
+            self.authoring = None;
+        }
         self.sync_graph_state();
         self.mark_workflow_dirty();
         self.output.push_line(&format!("Deleted {removed} node(s)"));
@@ -2038,6 +2249,7 @@ impl App {
             node_id,
             field,
             original: draft.clone(),
+            workflow_snapshot: crate::workflow_format::workflow_to_portable(&self.workflow),
             draft,
         });
         true
@@ -2097,6 +2309,10 @@ impl App {
             }
             Err(PropertyEditError::InvalidMergePolicy) => {
                 self.output.push_line("Invalid merge policy; use all|first|last|collect");
+                false
+            }
+            Err(PropertyEditError::Typed(message)) => {
+                self.output.push_line(&message);
                 false
             }
             Err(_) => {
@@ -2189,178 +2405,104 @@ impl App {
     }
 
     fn apply_property_edit(&mut self, edit: &PropertyEditState) -> Result<(), PropertyEditError> {
+        if crate::workflow_format::workflow_to_portable(&self.workflow) != edit.workflow_snapshot {
+            return Err(PropertyEditError::Typed("Workflow changed; cancel the stale draft and reopen".into()));
+        }
+        let mut candidate = self.workflow.clone();
+        let node_id = edit.node_id.0;
         match edit.field {
-            PropertyEditField::Label => {
-                let Some(node) = self.workflow.graph.node_mut(edit.node_id) else {
-                    return Err(PropertyEditError::NodeNotFound);
-                };
-                node.label = edit.draft.clone();
-                self.sync_graph_state();
-                self.graph_state.selected.insert(edit.node_id);
-                self.graph_state.focused = Some(edit.node_id);
-                Ok(())
-            }
-            PropertyEditField::Command => {
-                let Some(config) = self.workflow.node_config(edit.node_id).cloned() else {
-                    return Err(PropertyEditError::MissingConfig);
-                };
-                match config {
-                    NodeConfig::Shell {
-                        cwd,
-                        env,
-                        timeout_secs,
-                        pipe_stdin,
-                        ..
-                    } => {
-                        self.workflow.set_node_config(edit.node_id, NodeConfig::Shell {
-                            command: edit.draft.clone(),
-                            cwd,
-                            env,
-                            timeout_secs,
-                            pipe_stdin,
-                        });
-                        Ok(())
-                    }
-                    NodeConfig::Http { .. }
-                    | NodeConfig::File { .. }
-                    | NodeConfig::ImageInput { .. }
-                    | NodeConfig::Agent(_)
-                    | NodeConfig::Operation(_)
-                    | NodeConfig::Condition(_)
-                    | NodeConfig::Merge(_)
-                    | NodeConfig::Subworkflow(_)
-                    | NodeConfig::Approval(_) => Err(PropertyEditError::MissingConfig),
-                }
-            }
-            PropertyEditField::TimeoutSecs => {
-                let timeout_secs = validate_timeout_secs(&edit.draft)?;
-                let Some(config) = self.workflow.node_config(edit.node_id).cloned() else {
-                    return Err(PropertyEditError::MissingConfig);
-                };
-                match config {
-                    NodeConfig::Shell {
-                        command,
-                        cwd,
-                        env,
-                        pipe_stdin,
-                        ..
-                    } => {
-                        self.workflow.set_node_config(edit.node_id, NodeConfig::Shell {
-                            command,
-                            cwd,
-                            env,
-                            timeout_secs,
-                            pipe_stdin,
-                        });
-                        Ok(())
-                    }
-                    NodeConfig::Http {
-                        method,
-                        url,
-                        headers,
-                        body,
-                        ..
-                    } => {
-                        self.workflow.set_node_config(edit.node_id, NodeConfig::Http {
-                            method,
-                            url,
-                            headers,
-                            body,
-                            timeout_secs,
-                        });
-                        Ok(())
-                    }
-                    NodeConfig::File { .. }
-                    | NodeConfig::ImageInput { .. }
-                    | NodeConfig::Agent(_)
-                    | NodeConfig::Operation(_)
-                    | NodeConfig::Condition(_)
-                    | NodeConfig::Merge(_)
-                    | NodeConfig::Subworkflow(_)
-                    | NodeConfig::Approval(_) => Err(PropertyEditError::MissingConfig),
-                }
-            }
-            PropertyEditField::ImagePath => {
-                let Some(config) = self.workflow.node_config(edit.node_id).cloned() else {
-                    return Err(PropertyEditError::MissingConfig);
-                };
-                match config {
-                    NodeConfig::ImageInput {
-                        allowed_roots,
-                        max_bytes,
-                        ..
-                    } => {
-                        self.workflow.set_node_config(edit.node_id, NodeConfig::ImageInput {
-                            path: edit.draft.clone(),
-                            allowed_roots,
-                            max_bytes,
-                        });
-                        Ok(())
-                    }
-                    NodeConfig::Shell { .. }
-                    | NodeConfig::Http { .. }
-                    | NodeConfig::File { .. }
-                    | NodeConfig::Agent(_)
-                    | NodeConfig::Operation(_)
-                    | NodeConfig::Condition(_)
-                    | NodeConfig::Merge(_)
-                    | NodeConfig::Subworkflow(_)
-                    | NodeConfig::Approval(_) => Err(PropertyEditError::MissingConfig),
-                }
-            }
-            PropertyEditField::AgentPrompt
-            | PropertyEditField::AgentTarget
-            | PropertyEditField::AgentOutputMode
-            | PropertyEditField::AgentModelHint
-            | PropertyEditField::AgentToolPolicy
-            | PropertyEditField::AgentContextRefs
-            | PropertyEditField::AgentCwd
-            | PropertyEditField::AgentSession => {
-                let Some(NodeConfig::Agent(mut settings)) = self.workflow.node_config(edit.node_id).cloned() else {
-                    return Err(PropertyEditError::MissingConfig);
-                };
-                match edit.field {
-                    PropertyEditField::AgentPrompt => {
-                        settings.prompt = edit.draft.clone();
-                        settings.prompt_file = None;
-                    }
-                    PropertyEditField::AgentTarget => settings.target = validate_agent_target(&edit.draft)?,
-                    PropertyEditField::AgentOutputMode => {
-                        settings.output_mode = validate_agent_output_mode(&edit.draft)?;
-                    }
-                    PropertyEditField::AgentModelHint => settings.model_hint = optional_draft_value(&edit.draft),
-                    PropertyEditField::AgentToolPolicy => settings.tool_policy = edit.draft.clone(),
-                    PropertyEditField::AgentContextRefs => settings.context_refs = context_refs_from_draft(&edit.draft),
-                    PropertyEditField::AgentCwd => settings.cwd = optional_draft_value(&edit.draft),
-                    PropertyEditField::AgentSession => settings.session = optional_draft_value(&edit.draft),
-                    PropertyEditField::Label
-                    | PropertyEditField::Command
-                    | PropertyEditField::TimeoutSecs
-                    | PropertyEditField::ImagePath
-                    | PropertyEditField::Credentials
-                    | PropertyEditField::ConditionBranches => return Err(PropertyEditError::MissingConfig),
-                }
-                self.workflow.set_node_config(edit.node_id, NodeConfig::Agent(settings));
-                Ok(())
-            }
             PropertyEditField::Credentials => {
-                if self.workflow.node_config(edit.node_id).is_none() {
-                    return Err(PropertyEditError::MissingConfig);
+                let refs = credentials_from_draft(&edit.draft)?;
+                if candidate.graph.node(crate::engine::workflow::NodeId(node_id)).is_none() {
+                    return Err(PropertyEditError::NodeNotFound);
                 }
-                self.workflow.set_node_credentials(edit.node_id, credentials_from_draft(&edit.draft)?);
-                Ok(())
+                let names = candidate
+                    .node_credentials(edit.node_id)
+                    .map(|refs| refs.env.keys().cloned().collect::<Vec<_>>())
+                    .unwrap_or_default();
+                for name in names {
+                    crate::tui::authoring::workflow::apply(
+                        &mut candidate,
+                        Some(node_id),
+                        &format!("credential.env.row.{name}"),
+                        "",
+                    )
+                    .map_err(PropertyEditError::Typed)?;
+                }
+                for (name, reference) in refs.env {
+                    let row = crate::tui::authoring::workflow::row(&[
+                        &name,
+                        &reference.provider,
+                        &reference.key,
+                        reference.field.as_deref().unwrap_or(""),
+                    ]);
+                    crate::tui::authoring::workflow::apply(&mut candidate, Some(node_id), "credential.env.add", &row)
+                        .map_err(PropertyEditError::Typed)?;
+                }
             }
             PropertyEditField::ConditionBranches => {
-                let branches = condition_branches_from_draft(&edit.draft)?;
-                self.workflow
-                    .replace_condition_branches(edit.node_id, branches)
-                    .map_err(|_| PropertyEditError::MissingConfig)?;
-                self.sync_graph_state();
-                self.graph_state.selected.insert(edit.node_id);
-                self.graph_state.focused = Some(edit.node_id);
-                Ok(())
+                candidate
+                    .replace_condition_branches(edit.node_id, condition_branches_from_draft(&edit.draft)?)
+                    .map_err(|error| PropertyEditError::Typed(format!("{error:?}")))?;
+            }
+            PropertyEditField::AgentContextRefs => {
+                let Some(NodeConfig::Agent(settings)) = candidate.configs.get(&node_id) else {
+                    return Err(PropertyEditError::MissingConfig);
+                };
+                let length = settings.context_refs.len();
+                for _ in 0..length {
+                    crate::tui::authoring::node::apply(&mut candidate, node_id, "config.agent.context_refs.0", "")
+                        .map_err(PropertyEditError::Typed)?;
+                }
+                for value in context_refs_from_draft(&edit.draft) {
+                    crate::tui::authoring::node::apply(
+                        &mut candidate,
+                        node_id,
+                        "config.agent.context_refs.add",
+                        &value,
+                    )
+                    .map_err(PropertyEditError::Typed)?;
+                }
+            }
+            field => {
+                let id = match field {
+                    PropertyEditField::Label => "graph.label",
+                    PropertyEditField::Command => "config.shell.command",
+                    PropertyEditField::TimeoutSecs => {
+                        validate_timeout_secs(&edit.draft)?;
+                        match candidate.configs.get(&node_id) {
+                            Some(NodeConfig::Shell { .. }) => "config.shell.timeout_secs",
+                            Some(NodeConfig::Http { .. }) => "config.http.timeout_secs",
+                            _ => return Err(PropertyEditError::MissingConfig),
+                        }
+                    }
+                    PropertyEditField::ImagePath => "config.image_input.path",
+                    PropertyEditField::AgentPrompt => "config.agent.prompt",
+                    PropertyEditField::AgentTarget => {
+                        validate_agent_target(&edit.draft)?;
+                        "config.agent.target"
+                    }
+                    PropertyEditField::AgentOutputMode => {
+                        validate_agent_output_mode(&edit.draft)?;
+                        "config.agent.output_mode"
+                    }
+                    PropertyEditField::AgentModelHint => "config.agent.model_hint",
+                    PropertyEditField::AgentToolPolicy => "config.agent.tool_policy",
+                    PropertyEditField::AgentCwd => "config.agent.cwd",
+                    PropertyEditField::AgentSession => "config.agent.session",
+                    PropertyEditField::Credentials
+                    | PropertyEditField::ConditionBranches
+                    | PropertyEditField::AgentContextRefs => unreachable!("handled compound drafts above"),
+                };
+                crate::tui::authoring::apply(&mut candidate, Some(node_id), id, &edit.draft)
+                    .map_err(PropertyEditError::Typed)?;
             }
         }
+        self.workflow = candidate;
+        self.sync_graph_state();
+        self.graph_state.selected.insert(edit.node_id);
+        self.graph_state.focused = Some(edit.node_id);
+        Ok(())
     }
 
     /// Cycle focus to the next panel.
@@ -2415,17 +2557,7 @@ impl App {
     pub fn add_image_input_node(&mut self, label: impl AsRef<str>, path: impl Into<String>) {
         let path = path.into();
         let id = self.workflow.add_image_input_node(label.as_ref(), &path);
-        let allowed_root = std::path::Path::new(&path)
-            .parent()
-            .filter(|parent| !parent.as_os_str().is_empty())
-            .unwrap_or_else(|| std::path::Path::new("."))
-            .to_string_lossy()
-            .into_owned();
-        self.workflow.set_node_config(id, NodeConfig::ImageInput {
-            path: path.to_string(),
-            allowed_roots: vec![allowed_root],
-            max_bytes: crate::image_node::DEFAULT_MAX_IMAGE_BYTES,
-        });
+        self.workflow.set_node_config(id, image_input_config(path));
         self.place_new_node(id);
         self.sync_graph_state();
         self.select_node(id);
@@ -2822,6 +2954,10 @@ impl App {
     }
 
     fn save_current_workflow(&self, store: &Store) -> Result<(), String> {
+        let diagnostics = crate::workflow_validation::validate_workflow(&self.workflow);
+        if crate::workflow_validation::has_fatal_diagnostics(&diagnostics) {
+            return Err("workflow validation failed; inspect diagnostics before saving".into());
+        }
         let Some(draft) = &self.workflow_template_draft else {
             return store.save_workflow(&self.workflow).map_err(|error| error.to_string());
         };
@@ -2935,6 +3071,7 @@ impl App {
                         AppAction::EditNodeTimeout => {
                             self.start_property_edit(PropertyEditField::TimeoutSecs);
                         }
+                        AppAction::OpenAuthoring(family) => self.open_authoring(family),
                     }
                 }
             }
@@ -3010,6 +3147,9 @@ mod tests {
     }
 
     impl AgentAdapter for TuiErrorAgentAdapter {
+        fn execution_identity(&self, _request: &AgentRequest) -> Result<String, AgentError> {
+            Ok("test/tui-error-agent/v1".to_owned())
+        }
         fn execute(
             &self,
             _request: &AgentRequest,

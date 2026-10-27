@@ -31,8 +31,14 @@ impl Writer {
     }
 
     fn push(&mut self, field: Field<'_>) {
-        assert!(!field.label.is_empty(), "canonical field label must not be empty");
-        assert!(field.value.len() >= field.value.chars().count(), "field byte length covers chars");
+        assert!(
+            !field.label.is_empty(),
+            "canonical field label must not be empty"
+        );
+        assert!(
+            field.value.len() >= field.value.chars().count(),
+            "field byte length covers chars"
+        );
         self.text.push_str(field.label);
         self.text.push_str(LENGTH_SEPARATOR);
         self.text.push_str(&field.value.len().to_string());
@@ -52,9 +58,14 @@ pub(super) fn text(
     payload: &str,
     dependencies: &[super::Hash],
 ) -> alloc::string::String {
-    assert!(!payload.contains(NUL_CHARACTER), "canonical payload must already be NUL-free");
     assert!(
-        dependencies.windows(ORDER_PAIR_LEN).all(|pair| pair[ORDER_LEFT_INDEX] <= pair[ORDER_RIGHT_INDEX]),
+        !payload.contains(NUL_CHARACTER),
+        "canonical payload must already be NUL-free"
+    );
+    assert!(
+        dependencies
+            .windows(ORDER_PAIR_LEN)
+            .all(|pair| pair[ORDER_LEFT_INDEX] <= pair[ORDER_RIGHT_INDEX]),
         "canonical dependencies must be sorted"
     );
     let mut writer = Writer::new();

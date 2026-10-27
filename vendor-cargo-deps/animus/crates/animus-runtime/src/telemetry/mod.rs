@@ -181,6 +181,8 @@ pub enum RuntimeEventKind {
     CompactionRequested,
     /// Coding-session lifecycle state event.
     SessionStateChanged,
+    /// Coding-session queue compare-and-swap event.
+    SessionQueueMutationObserved,
     /// Coding-session durable commit event.
     SessionCommitObserved,
     /// Coding-session recovery event.
@@ -227,6 +229,7 @@ impl RuntimeEventKind {
             Self::Cancelled => "cancelled",
             Self::CompactionRequested => "compaction_requested",
             Self::SessionStateChanged => "session_state_changed",
+            Self::SessionQueueMutationObserved => "session_queue_mutation_observed",
             Self::SessionCommitObserved => "session_commit_observed",
             Self::SessionRecoveryObserved => "session_recovery_observed",
             Self::SessionAuthorityProfileObserved => "session_authority_profile_observed",

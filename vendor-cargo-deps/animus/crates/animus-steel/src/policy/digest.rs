@@ -54,7 +54,9 @@ pub(crate) fn profile_hash(fields: &ProfileFields<'_>) -> String {
 }
 
 pub(crate) fn receipt_hash(fields: &ReceiptFields<'_>) -> String {
-    let reason = fields.denied_reason.map_or("none", super::DenyReason::as_str);
+    let reason = fields
+        .denied_reason
+        .map_or("none", super::DenyReason::as_str);
     let parts = [
         RECEIPT_SCHEMA,
         fields.status.as_str(),
@@ -69,7 +71,11 @@ pub(crate) fn receipt_hash(fields: &ReceiptFields<'_>) -> String {
 }
 
 fn action_labels(actions: &std::collections::BTreeSet<super::HostAction>) -> String {
-    actions.iter().map(|action| action.as_str()).collect::<Vec<_>>().join(",")
+    actions
+        .iter()
+        .map(|action| action.as_str())
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 fn text_hash(text: &str) -> String {

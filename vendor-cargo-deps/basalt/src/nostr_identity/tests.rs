@@ -1,15 +1,15 @@
 use ucan_nostr::VerifiedNostrCredential;
 
+use crate::authority_core::{
+    AUTHORITY_DECISION_SCHEMA, AuthorityDecision, AuthorityDenyDiagnostic, AuthorityRequest,
+};
+
 use super::authentication::resolve_credential_facts;
 use super::authentication_model::CredentialFacts;
-use super::identity::authentication_receipt_identity;
-use super::identity::composition_receipt_identity;
-use super::identity::required_non_claims;
+use super::identity::{
+    authentication_receipt_identity, composition_receipt_identity, required_non_claims,
+};
 use super::*;
-use crate::authority_core::AUTHORITY_DECISION_SCHEMA;
-use crate::authority_core::AuthorityDecision;
-use crate::authority_core::AuthorityDenyDiagnostic;
-use crate::authority_core::AuthorityRequest;
 
 const KEY_ONE: &str = "f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9";
 const KEY_TWO: &str = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
@@ -69,8 +69,14 @@ fn exact_active_binding_authenticates_and_emits_valid_recorded_receipt() {
     let policy = validated();
     let result = resolve_credential_facts(&policy, &facts(KEY_ONE), &request(&policy));
 
-    assert_eq!(result.receipt.decision, NostrAuthenticationDecision::Authenticated);
-    assert_eq!(result.receipt.verification_role, NostrEvidenceRole::RecordedOnly);
+    assert_eq!(
+        result.receipt.decision,
+        NostrAuthenticationDecision::Authenticated
+    );
+    assert_eq!(
+        result.receipt.verification_role,
+        NostrEvidenceRole::RecordedOnly
+    );
     assert!(verify_nostr_authentication_receipt(&result.receipt).is_empty());
     let subject = result.subject().expect("authenticated subject");
     assert_eq!(subject.subject_id(), "subject:operator");
@@ -84,18 +90,24 @@ fn public_adapter_requires_the_opaque_reviewed_credential_type() {
         &VerifiedNostrCredential,
         &NostrIdentityBindingRequest,
     ) -> NostrAuthenticationResult = resolve_verified_nostr_subject;
-    assert_eq!(UCAN_NOSTR_CREDENTIAL_REVISION, "c9d43a7c11dd2fab4d5cb3d100012fa9a2e5b026");
+    assert_eq!(
+        UCAN_NOSTR_CREDENTIAL_REVISION,
+        "c9d43a7c11dd2fab4d5cb3d100012fa9a2e5b026"
+    );
     let _ = adapter;
 }
 
 #[test]
 fn order_independent_policy_identity_and_rotation_preserve_subject() {
     let mut first = policy();
-    first.subjects[0].authenticators.insert(0, NostrAuthenticatorPolicy {
-        binding_id: "binding:operator-retired".to_owned(),
-        public_key: KEY_TWO.to_owned(),
-        state: NostrBindingState::Retired,
-    });
+    first.subjects[0].authenticators.insert(
+        0,
+        NostrAuthenticatorPolicy {
+            binding_id: "binding:operator-retired".to_owned(),
+            public_key: KEY_TWO.to_owned(),
+            state: NostrBindingState::Retired,
+        },
+    );
     let mut second = first.clone();
     second.subjects[0].authenticators.reverse();
     let first = validate_nostr_identity_policy(first).expect("first order");
@@ -104,7 +116,10 @@ fn order_independent_policy_identity_and_rotation_preserve_subject() {
 
     let active = resolve_credential_facts(&first, &facts(KEY_ONE), &request(&first));
     let retired = resolve_credential_facts(&first, &facts(KEY_TWO), &request(&first));
-    assert_eq!(active.receipt.subject_id.as_deref(), Some("subject:operator"));
+    assert_eq!(
+        active.receipt.subject_id.as_deref(),
+        Some("subject:operator")
+    );
     assert_eq!(retired.receipt.reason, "binding-retired");
     assert!(retired.subject().is_none());
 }
@@ -113,7 +128,10 @@ fn order_independent_policy_identity_and_rotation_preserve_subject() {
 fn malformed_duplicate_ambiguous_and_secret_policy_fails_closed() {
     let mut duplicate = policy();
     duplicate.subjects.push(duplicate.subjects[0].clone());
-    assert!(matches!(validate_nostr_identity_policy(duplicate), Err(NostrIdentityPolicyError::Invalid(_))));
+    assert!(matches!(
+        validate_nostr_identity_policy(duplicate),
+        Err(NostrIdentityPolicyError::Invalid(_))
+    ));
 
     let secret_json = r#"{
           "schema":"basalt.nostr-identity-policy.v1",
@@ -122,15 +140,20 @@ fn malformed_duplicate_ambiguous_and_secret_policy_fails_closed() {
           "non_claims":[],
           "private_key":"secret"
         }"#;
-    assert!(matches!(parse_nostr_identity_policy(secret_json), Err(NostrIdentityPolicyError::Decode(_))));
+    assert!(matches!(
+        parse_nostr_identity_policy(secret_json),
+        Err(NostrIdentityPolicyError::Decode(_))
+    ));
 }
 
 #[test]
 fn revoked_missing_stale_and_mismatched_requests_deny() {
     let mut revoked_policy = policy();
     revoked_policy.subjects[0].authenticators[0].state = NostrBindingState::Revoked;
-    let revoked_policy = validate_nostr_identity_policy(revoked_policy).expect("revoked policy is valid");
-    let revoked = resolve_credential_facts(&revoked_policy, &facts(KEY_ONE), &request(&revoked_policy));
+    let revoked_policy =
+        validate_nostr_identity_policy(revoked_policy).expect("revoked policy is valid");
+    let revoked =
+        resolve_credential_facts(&revoked_policy, &facts(KEY_ONE), &request(&revoked_policy));
     assert_eq!(revoked.receipt.reason, "binding-revoked");
 
     let policy = validated();
@@ -246,7 +269,8 @@ fn missing_denied_stale_and_mismatched_authorization_never_compose() {
         AuthorityDenyDiagnostic::PolicyDenied,
         AuthorityDenyDiagnostic::StaleVerificationRef,
     ] {
-        let receipt = compose_nostr_authorization(subject, &authorization(subject, Some(diagnostic)));
+        let receipt =
+            compose_nostr_authorization(subject, &authorization(subject, Some(diagnostic)));
         assert_eq!(receipt.decision, NostrCompositionDecision::Denied);
     }
     let mut mismatch = authorization(subject, None);

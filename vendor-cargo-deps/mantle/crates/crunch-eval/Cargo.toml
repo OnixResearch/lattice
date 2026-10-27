@@ -1,0 +1,33 @@
+[package]
+name = "crunch-eval"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+cranelift-proto = [
+  "dep:cranelift",
+  "dep:cranelift-module",
+  "dep:cranelift-jit",
+  "dep:cranelift-native",
+]
+
+[dependencies]
+blake3 = { version = "=1.8.5", default-features = false, features = ["pure"] }
+nickel-lang = "2.2.0"
+nickel-lang-core = { version = "0.18.0", default-features = false }
+thiserror = "2.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+cranelift = { version = "0.116", optional = true }
+cranelift-module = { version = "0.116", optional = true }
+cranelift-jit = { version = "0.116", optional = true }
+cranelift-native = { version = "0.116", optional = true }
+
+[dev-dependencies]
+crunch-glue = { path = "../crunch-glue" }
+tempfile = "3"
+
+[[example]]
+name = "evaluation_baseline"
+path = "examples/evaluation_baseline.rs"

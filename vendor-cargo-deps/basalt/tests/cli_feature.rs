@@ -1,11 +1,9 @@
 #![cfg(feature = "cli")]
 
 use std::fs;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::time::SystemTime;
-use std::time::UNIX_EPOCH;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 fn cli_binary() -> Option<&'static str> {
     let binary = option_env!("CARGO_BIN_EXE_basalt")?;
@@ -19,8 +17,14 @@ fn cli_binary() -> Option<&'static str> {
 }
 
 fn unique_policy_path(name: &str) -> PathBuf {
-    let unique = SystemTime::now().duration_since(UNIX_EPOCH).expect("system time should be after epoch").as_nanos();
-    std::env::temp_dir().join(format!("basalt-{name}-{}-{unique}.json", std::process::id()))
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system time should be after epoch")
+        .as_nanos();
+    std::env::temp_dir().join(format!(
+        "basalt-{name}-{}-{unique}.json",
+        std::process::id()
+    ))
 }
 
 #[test]
@@ -46,7 +50,10 @@ fn cli_feature_exposes_enforce_smoke() {
         .expect("CLI process should run");
 
     assert!(output.status.success(), "CLI failed: {output:?}");
-    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), r#"{"allowed":true,"reason":"allowed"}"#);
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim(),
+        r#"{"allowed":true,"reason":"allowed"}"#
+    );
     assert!(output.stderr.is_empty(), "CLI stderr should be empty");
 }
 
@@ -86,7 +93,11 @@ fn cli_feature_rejects_malformed_policy_file() {
     fs::create_dir_all(&policy_dir).expect("policy dir should create");
     let policy_path = policy_dir.join("malformed.json");
     fs::write(&policy_path, "not-json").expect("policy fixture should write");
-    let relative = policy_path.file_name().expect("policy path has a file name").to_string_lossy().into_owned();
+    let relative = policy_path
+        .file_name()
+        .expect("policy path has a file name")
+        .to_string_lossy()
+        .into_owned();
 
     let output = Command::new(binary)
         .arg("enforce")
@@ -135,7 +146,10 @@ fn cli_feature_rejects_bad_capability_syntax() {
         .output()
         .expect("CLI process should run");
 
-    assert!(!output.status.success(), "bad capability syntax should fail");
+    assert!(
+        !output.status.success(),
+        "bad capability syntax should fail"
+    );
     assert!(
         String::from_utf8_lossy(&output.stderr).contains("expected RESOURCE=ABILITY"),
         "unexpected stderr: {}",
@@ -196,7 +210,10 @@ fn cli_feature_rejects_traversal_outside_policy_root() {
         .output()
         .expect("CLI process should run");
 
-    assert!(!output.status.success(), "traversal outside the policy root should fail");
+    assert!(
+        !output.status.success(),
+        "traversal outside the policy root should fail"
+    );
     assert!(
         String::from_utf8_lossy(&output.stderr).contains("InvalidPath"),
         "unexpected stderr: {}",

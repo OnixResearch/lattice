@@ -11,7 +11,10 @@ pub trait WorkerService {
     /// Returns [`DelegationFailure`](crate::worker_team::DelegationFailure) when
     /// the injected host service is unavailable, denies the request, times out,
     /// or fails safely.
-    fn enqueue(&mut self, task: &super::WorkerTask) -> Result<WorkerHandle, crate::worker_team::DelegationFailure>;
+    fn enqueue(
+        &mut self,
+        task: &super::WorkerTask,
+    ) -> Result<WorkerHandle, crate::worker_team::DelegationFailure>;
 
     /// Returns worker status for a known handle.
     ///
@@ -19,7 +22,10 @@ pub trait WorkerService {
     ///
     /// Returns [`DelegationFailure`](crate::worker_team::DelegationFailure) when
     /// status lookup fails safely or the handle is not usable.
-    fn status(&mut self, handle: &WorkerHandle) -> Result<WorkerStatus, crate::worker_team::DelegationFailure>;
+    fn status(
+        &mut self,
+        handle: &WorkerHandle,
+    ) -> Result<WorkerStatus, crate::worker_team::DelegationFailure>;
 
     /// Requests worker cancellation.
     ///
@@ -27,7 +33,10 @@ pub trait WorkerService {
     ///
     /// Returns [`DelegationFailure`](crate::worker_team::DelegationFailure) when
     /// cancellation fails safely.
-    fn cancel(&mut self, handle: &WorkerHandle) -> Result<WorkerCancelOutcome, crate::worker_team::DelegationFailure>;
+    fn cancel(
+        &mut self,
+        handle: &WorkerHandle,
+    ) -> Result<WorkerCancelOutcome, crate::worker_team::DelegationFailure>;
 
     /// Collects a terminal worker report.
     ///
@@ -35,7 +44,10 @@ pub trait WorkerService {
     ///
     /// Returns [`DelegationFailure`](crate::worker_team::DelegationFailure) when
     /// collection fails or produces a malformed report.
-    fn collect(&mut self, handle: &WorkerHandle) -> Result<super::Report, crate::worker_team::DelegationFailure>;
+    fn collect(
+        &mut self,
+        handle: &WorkerHandle,
+    ) -> Result<super::Report, crate::worker_team::DelegationFailure>;
 }
 
 /// Worker service handle returned by an injected service.
@@ -53,7 +65,10 @@ impl WorkerHandle {
     /// the handle id is empty, too long, or unsafe.
     pub fn new(id: impl Into<String>) -> Result<Self, crate::worker_team::DelegationFailure> {
         Ok(Self {
-            id: crate::worker_team::core::validate_label(crate::worker_team::WORKER_HANDLE_FIELD, id.into())?,
+            id: crate::worker_team::core::validate_label(
+                crate::worker_team::WORKER_HANDLE_FIELD,
+                id.into(),
+            )?,
         })
     }
 

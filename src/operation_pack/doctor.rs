@@ -71,7 +71,13 @@ pub fn evaluate(
             pack_identity = Some(candidate.pack_identity.clone());
             findings.push(healthy("manifest", "pack manifest and declared content are valid"));
             findings.push(healthy("identity", "manifest, content, and pack identities are exact"));
-            findings.push(healthy("runtimes", "runtime descriptors use admitted bounded-process classes"));
+            findings.push(healthy("runtimes", "runtime descriptors use admitted closed execution classes"));
+            if candidate.manifest.runtimes.iter().any(|runtime| runtime.kind == "wasm-component") {
+                findings.push(skipped(
+                    "component_execution",
+                    "component bytes, Mantle member bytes, exact shared runtime availability, and cleanup were not exercised by inert doctor",
+                ));
+            }
             findings.push(healthy("capabilities", "runtime capabilities remain inside the manifest profile"));
             if candidate.manifest.dependencies.is_empty() {
                 findings.push(skipped("dependencies", "pack declares no dependencies"));

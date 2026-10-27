@@ -1,14 +1,9 @@
 use alloc::vec::Vec;
 
-use super::GUIDANCE_NAME_FIELD;
-use super::GuidanceAssembly;
-use super::GuidanceBudget;
-use super::GuidanceDisposition;
-use super::GuidanceError;
-use super::GuidanceLedgerEntry;
-use super::GuidanceLedgerReason;
-use super::GuidanceSource;
-use super::MAX_GUIDANCE_SOURCES;
+use super::{
+    GUIDANCE_NAME_FIELD, GuidanceAssembly, GuidanceBudget, GuidanceDisposition, GuidanceError,
+    GuidanceLedgerEntry, GuidanceLedgerReason, GuidanceSource, MAX_GUIDANCE_SOURCES,
+};
 
 const ZERO_GUIDANCE_UNITS: u32 = 0;
 
@@ -54,13 +49,22 @@ fn ordered_sources(sources: &[GuidanceSource]) -> Vec<&GuidanceSource> {
     ordered
 }
 
-fn build_guidance_ledger(ordered: &[&GuidanceSource], budget_units: u32) -> Vec<GuidanceLedgerEntry> {
+fn build_guidance_ledger(
+    ordered: &[&GuidanceSource],
+    budget_units: u32,
+) -> Vec<GuidanceLedgerEntry> {
     let mut remaining_units = budget_units;
     let mut ledger = Vec::with_capacity(ordered.len());
     for source in ordered {
-        let (disposition, consumed_units, reason) = guidance_budget_decision(source, remaining_units);
+        let (disposition, consumed_units, reason) =
+            guidance_budget_decision(source, remaining_units);
         remaining_units = remaining_units.saturating_sub(consumed_units);
-        ledger.push(guidance_ledger_entry(source, disposition, consumed_units, reason));
+        ledger.push(guidance_ledger_entry(
+            source,
+            disposition,
+            consumed_units,
+            reason,
+        ));
     }
     ledger
 }
@@ -99,14 +103,28 @@ fn guidance_budget_decision(
 }
 
 const fn redacted_decision() -> (GuidanceDisposition, u32, Option<GuidanceLedgerReason>) {
-    (GuidanceDisposition::Redacted, ZERO_GUIDANCE_UNITS, Some(GuidanceLedgerReason::RedactedByPolicy))
+    (
+        GuidanceDisposition::Redacted,
+        ZERO_GUIDANCE_UNITS,
+        Some(GuidanceLedgerReason::RedactedByPolicy),
+    )
 }
 
-const fn over_budget_decision(remaining_units: u32) -> (GuidanceDisposition, u32, Option<GuidanceLedgerReason>) {
+const fn over_budget_decision(
+    remaining_units: u32,
+) -> (GuidanceDisposition, u32, Option<GuidanceLedgerReason>) {
     if remaining_units > ZERO_GUIDANCE_UNITS {
-        return (GuidanceDisposition::Truncated, remaining_units, Some(GuidanceLedgerReason::OverBudget));
+        return (
+            GuidanceDisposition::Truncated,
+            remaining_units,
+            Some(GuidanceLedgerReason::OverBudget),
+        );
     }
-    (GuidanceDisposition::Skipped, ZERO_GUIDANCE_UNITS, Some(GuidanceLedgerReason::OverBudget))
+    (
+        GuidanceDisposition::Skipped,
+        ZERO_GUIDANCE_UNITS,
+        Some(GuidanceLedgerReason::OverBudget),
+    )
 }
 
 fn reject_ambiguous_guidance_precedence(sources: &[GuidanceSource]) -> Result<(), GuidanceError> {

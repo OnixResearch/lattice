@@ -1,10 +1,7 @@
-use super::CAPABILITY_FIELD;
-use super::CapabilitySetCheck;
-use super::Collection;
-use super::SubagentError;
-use super::Text;
-use super::contains_all;
-use super::text_collection;
+use super::{
+    CAPABILITY_FIELD, CapabilitySetCheck, Collection, SubagentError, Text, contains_all,
+    text_collection,
+};
 
 /// Capability intersection input for a subagent request.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -73,7 +70,10 @@ pub fn resolve_subagent_capabilities(
     let recipe_or_profile = text_collection(CAPABILITY_FIELD, input.recipe_or_profile, true)?;
     let request = text_collection(CAPABILITY_FIELD, input.request, true)?;
     assert!(!request.is_empty(), "capability request is required");
-    assert!(request.len() <= input.request.len(), "normalized capabilities are bounded");
+    assert!(
+        request.len() <= input.request.len(),
+        "normalized capabilities are bounded"
+    );
     let workspace_scope = text_collection(CAPABILITY_FIELD, input.workspace_scope, true)?;
     let host_admission = text_collection(CAPABILITY_FIELD, input.host_admission, true)?;
     let request_count = request.len();

@@ -435,7 +435,7 @@ fn application_config_propagates_typed_process_limits_and_shell_identity() {
     let temp_dir = tempfile::tempdir().expect("temporary typed process config directory");
     let config_path = temp_dir.path().join("config.ncl");
     fs::write(&config_path, lattice::config::default_config_ncl()).expect("write typed default process config");
-    let loaded = lattice::config::load_app_config(&config_path);
+    let loaded = lattice::config::load_app_config(&config_path).expect("typed process config imports");
     assert!(loaded.process_limits.stdin_max_bytes > 0);
     assert!(loaded.process_limits.stdout_max_bytes > 0);
     assert!(loaded.process_limits.stderr_max_bytes > 0);

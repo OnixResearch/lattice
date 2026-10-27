@@ -2,7 +2,8 @@ mod fault;
 
 pub use fault::Error;
 
-const SESSION_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("ledger_session_label");
+const SESSION_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("ledger_session_label");
 const EMPTY_ENTRY_COUNT: usize = 0;
 const NO_CONTEXT_ITEMS: usize = 0;
 
@@ -61,7 +62,10 @@ impl Request {
     /// overlong, or contains a NUL character.
     pub fn new(session_label: &str) -> Result<Self, crate::AdapterContractError> {
         Ok(Self {
-            session_label: crate::validation::normalized_adapter_field(SESSION_FIELD, session_label)?,
+            session_label: crate::validation::normalized_adapter_field(
+                SESSION_FIELD,
+                session_label,
+            )?,
         })
     }
 
@@ -73,9 +77,15 @@ impl Request {
 }
 
 /// Session-ledger adapter contract.
-pub trait SessionLedgerService: crate::ComponentAdapter<Request, crate::ServiceOutcome<Report>> {}
+pub trait SessionLedgerService:
+    crate::ComponentAdapter<Request, crate::ServiceOutcome<Report>>
+{
+}
 
-impl<T> SessionLedgerService for T where T: crate::ComponentAdapter<Request, crate::ServiceOutcome<Report>> {}
+impl<T> SessionLedgerService for T where
+    T: crate::ComponentAdapter<Request, crate::ServiceOutcome<Report>>
+{
+}
 
 /// Replays neutral entries into model-visible context plus safe counts.
 ///
@@ -141,18 +151,32 @@ pub(super) fn replay_entry(
     counts: &mut super::ReplayCounts,
 ) -> Result<Option<super::ContextItem>, Error> {
     match entry {
-        super::Entry::UserMessage { id, content } => {
-            Ok(Some(model_item(counts, super::ContextRole::User, id, content)))
-        }
-        super::Entry::AssistantMessage { id, content } => {
-            Ok(Some(model_item(counts, super::ContextRole::Assistant, id, content)))
-        }
-        super::Entry::ToolResult { id, content, .. } => {
-            Ok(Some(model_item(counts, super::ContextRole::Tool, id, content)))
-        }
+        super::Entry::UserMessage { id, content } => Ok(Some(model_item(
+            counts,
+            super::ContextRole::User,
+            id,
+            content,
+        ))),
+        super::Entry::AssistantMessage { id, content } => Ok(Some(model_item(
+            counts,
+            super::ContextRole::Assistant,
+            id,
+            content,
+        ))),
+        super::Entry::ToolResult { id, content, .. } => Ok(Some(model_item(
+            counts,
+            super::ContextRole::Tool,
+            id,
+            content,
+        ))),
         super::Entry::Summary { id, content, .. } => {
             counts.record_summary();
-            Ok(Some(model_item(counts, super::ContextRole::System, id, content)))
+            Ok(Some(model_item(
+                counts,
+                super::ContextRole::System,
+                id,
+                content,
+            )))
         }
         super::Entry::UsageObservation { .. } => {
             counts.record_usage();
@@ -162,9 +186,8 @@ pub(super) fn replay_entry(
             counts.record_receipt();
             Ok(None)
         }
-        super::Entry::Unsupported { id, kind_label } | super::Entry::AdapterOwned { id, kind_label } => {
-            Err(unsupported_entry(id, kind_label))
-        }
+        super::Entry::Unsupported { id, kind_label }
+        | super::Entry::AdapterOwned { id, kind_label } => Err(unsupported_entry(id, kind_label)),
     }
 }
 
@@ -175,7 +198,11 @@ pub(super) fn model_item(
     content: &str,
 ) -> super::ContextItem {
     counts.record_model_visible();
-    super::ContextItem::new(role, alloc::string::String::from(content), source_id.clone())
+    super::ContextItem::new(
+        role,
+        alloc::string::String::from(content),
+        source_id.clone(),
+    )
 }
 
 pub(super) fn unsupported_entry(id: &super::EntryId, kind_label: &str) -> Error {

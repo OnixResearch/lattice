@@ -1,18 +1,27 @@
 use alloc::string::ToString;
 
-const STEP_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_dag_step_id");
-const STEP_KIND_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_dag_step_kind");
-const DEPENDENCY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_dag_dependency");
-const INPUT_REF_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_dag_input_ref");
-const OUTPUT_REF_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_dag_output_ref");
-const GATE_REF_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_dag_validation_gate");
-const RETRY_REF_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_dag_retry_ref");
-const SUBRECIPE_REF_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_dag_subrecipe_ref");
+const STEP_ID_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_dag_step_id");
+const STEP_KIND_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_dag_step_kind");
+const DEPENDENCY_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_dag_dependency");
+const INPUT_REF_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_dag_input_ref");
+const OUTPUT_REF_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_dag_output_ref");
+const GATE_REF_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_dag_validation_gate");
+const RETRY_REF_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_dag_retry_ref");
+const SUBRECIPE_REF_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_dag_subrecipe_ref");
 const CAPABILITY_REF_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("recipe_dag_capability_ref");
 const DENIED_CAPABILITY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("recipe_dag_denied_capability");
-const DENIED_GATE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_dag_denied_gate");
+const DENIED_GATE_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_dag_denied_gate");
 const DENIED_SUBRECIPE_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("recipe_dag_denied_subrecipe");
 
@@ -399,7 +408,11 @@ pub(super) fn validate_recipe_dag(
     validate_recipe_gates(steps.as_slice(), &context)?;
     let batches = topological_batches(steps.as_slice(), &alloc::collections::BTreeSet::new());
     let blocked_steps = alloc::vec::Vec::new();
-    let receipt = build_receipt(context.workflow_id, steps.as_slice(), blocked_steps.as_slice())?;
+    let receipt = build_receipt(
+        context.workflow_id,
+        steps.as_slice(),
+        blocked_steps.as_slice(),
+    )?;
     Ok(Some(RecipeDagPlan {
         steps,
         batches,
@@ -429,24 +442,48 @@ pub fn plan_recipe_dag(
     let Some(base_plan) = workflow.dag_plan() else {
         return Ok(None);
     };
-    assert!(!base_plan.steps().is_empty(), "validated DAG must keep steps");
-    assert!(base_plan.steps().len() <= MAX_DAG_STEPS, "validated DAG must stay bounded");
-    let denied_capabilities =
-        collect_safe_texts(DENIED_CAPABILITY_FIELD, admission.capabilities, MAX_DAG_REFS_PER_STEP, false)?;
-    let denied_validation_gates =
-        collect_safe_texts(DENIED_GATE_FIELD, admission.validation_gates, MAX_DAG_REFS_PER_STEP, false)?;
-    let denied_subrecipes =
-        collect_safe_texts(DENIED_SUBRECIPE_FIELD, admission.subrecipes, MAX_DAG_REFS_PER_STEP, false)?;
+    assert!(
+        !base_plan.steps().is_empty(),
+        "validated DAG must keep steps"
+    );
+    assert!(
+        base_plan.steps().len() <= MAX_DAG_STEPS,
+        "validated DAG must stay bounded"
+    );
+    let denied_capabilities = collect_safe_texts(
+        DENIED_CAPABILITY_FIELD,
+        admission.capabilities,
+        MAX_DAG_REFS_PER_STEP,
+        false,
+    )?;
+    let denied_validation_gates = collect_safe_texts(
+        DENIED_GATE_FIELD,
+        admission.validation_gates,
+        MAX_DAG_REFS_PER_STEP,
+        false,
+    )?;
+    let denied_subrecipes = collect_safe_texts(
+        DENIED_SUBRECIPE_FIELD,
+        admission.subrecipes,
+        MAX_DAG_REFS_PER_STEP,
+        false,
+    )?;
     let blocked_steps = blocked_steps(
         base_plan.steps(),
         denied_capabilities.as_slice(),
         denied_validation_gates.as_slice(),
         denied_subrecipes.as_slice(),
     );
-    let blocked_ids: alloc::collections::BTreeSet<alloc::string::String> =
-        blocked_steps.iter().map(|blocked| blocked.step_id.clone()).collect();
+    let blocked_ids: alloc::collections::BTreeSet<alloc::string::String> = blocked_steps
+        .iter()
+        .map(|blocked| blocked.step_id.clone())
+        .collect();
     let batches = topological_batches(base_plan.steps(), &blocked_ids);
-    let receipt = build_receipt(workflow.identity(), base_plan.steps(), blocked_steps.as_slice())?;
+    let receipt = build_receipt(
+        workflow.identity(),
+        base_plan.steps(),
+        blocked_steps.as_slice(),
+    )?;
     Ok(Some(RecipeDagPlan {
         steps: base_plan.steps.clone(),
         batches,
@@ -475,15 +512,42 @@ fn collect_steps(
         }
         let kind = RecipeDagStepKind::parse(draft.kind)?;
         let depends_on = collect_dependencies(&step_id, draft.depends_on)?;
-        let input_refs = collect_safe_texts(INPUT_REF_FIELD, draft.input_refs, MAX_DAG_REFS_PER_STEP, false)?;
-        let output_refs = collect_safe_texts(OUTPUT_REF_FIELD, draft.output_refs, MAX_DAG_REFS_PER_STEP, false)?;
-        let validation_gates =
-            collect_safe_texts(GATE_REF_FIELD, draft.validation_gates, MAX_DAG_REFS_PER_STEP, false)?;
-        let retry_refs = collect_safe_texts(RETRY_REF_FIELD, draft.retry_refs, MAX_DAG_REFS_PER_STEP, false)?;
-        let subrecipe_refs =
-            collect_safe_texts(SUBRECIPE_REF_FIELD, draft.subrecipe_refs, MAX_DAG_REFS_PER_STEP, false)?;
-        let capability_ceilings =
-            collect_safe_texts(CAPABILITY_REF_FIELD, draft.capability_ceilings, MAX_DAG_REFS_PER_STEP, false)?;
+        let input_refs = collect_safe_texts(
+            INPUT_REF_FIELD,
+            draft.input_refs,
+            MAX_DAG_REFS_PER_STEP,
+            false,
+        )?;
+        let output_refs = collect_safe_texts(
+            OUTPUT_REF_FIELD,
+            draft.output_refs,
+            MAX_DAG_REFS_PER_STEP,
+            false,
+        )?;
+        let validation_gates = collect_safe_texts(
+            GATE_REF_FIELD,
+            draft.validation_gates,
+            MAX_DAG_REFS_PER_STEP,
+            false,
+        )?;
+        let retry_refs = collect_safe_texts(
+            RETRY_REF_FIELD,
+            draft.retry_refs,
+            MAX_DAG_REFS_PER_STEP,
+            false,
+        )?;
+        let subrecipe_refs = collect_safe_texts(
+            SUBRECIPE_REF_FIELD,
+            draft.subrecipe_refs,
+            MAX_DAG_REFS_PER_STEP,
+            false,
+        )?;
+        let capability_ceilings = collect_safe_texts(
+            CAPABILITY_REF_FIELD,
+            draft.capability_ceilings,
+            MAX_DAG_REFS_PER_STEP,
+            false,
+        )?;
         steps.push(RecipeDagStep {
             step_id,
             kind,
@@ -509,8 +573,12 @@ fn collect_dependencies(
         max_items: MAX_DAG_EDGES_PER_STEP,
     })?;
     assert!(!step_id.is_empty(), "dependency owner step must be named");
-    assert!(values.len() <= MAX_DAG_EDGES_PER_STEP, "DAG dependency cap must hold");
-    let mut dependencies: alloc::vec::Vec<alloc::string::String> = alloc::vec::Vec::with_capacity(values.len());
+    assert!(
+        values.len() <= MAX_DAG_EDGES_PER_STEP,
+        "DAG dependency cap must hold"
+    );
+    let mut dependencies: alloc::vec::Vec<alloc::string::String> =
+        alloc::vec::Vec::with_capacity(values.len());
     for value in values {
         let dependency = safe_required(DEPENDENCY_FIELD, value)?;
         if dependency == step_id {
@@ -518,7 +586,10 @@ fn collect_dependencies(
                 step_id: step_id.to_string(),
             });
         }
-        if dependencies.iter().any(|existing| existing.as_str() == dependency) {
+        if dependencies
+            .iter()
+            .any(|existing| existing.as_str() == dependency)
+        {
             return Err(super::RecipeWorkflowError::DuplicateDagEdge {
                 step_id: step_id.to_string(),
                 dependency,
@@ -598,12 +669,17 @@ fn contains_unsafe_label(value: &str) -> bool {
         return true;
     }
     let lower = value.to_ascii_lowercase();
-    UNSAFE_LABEL_PATTERNS.iter().any(|pattern| lower.contains(pattern))
+    UNSAFE_LABEL_PATTERNS
+        .iter()
+        .any(|pattern| lower.contains(pattern))
 }
 
 fn validate_structure(steps: &[RecipeDagStep]) -> Result<(), super::RecipeWorkflowError> {
     assert!(!steps.is_empty(), "DAG structure must include steps");
-    assert!(steps.len() <= MAX_DAG_STEPS, "DAG structure must stay bounded");
+    assert!(
+        steps.len() <= MAX_DAG_STEPS,
+        "DAG structure must stay bounded"
+    );
     let step_ids: alloc::collections::BTreeSet<alloc::string::String> =
         steps.iter().map(|step| step.step_id.clone()).collect();
     for step in steps {
@@ -617,7 +693,9 @@ fn validate_structure(steps: &[RecipeDagStep]) -> Result<(), super::RecipeWorkfl
         }
     }
     if let Some(cycle_node) = first_cycle_node(steps) {
-        return Err(super::RecipeWorkflowError::DagCycle { step_id: cycle_node });
+        return Err(super::RecipeWorkflowError::DagCycle {
+            step_id: cycle_node,
+        });
     }
     Ok(())
 }
@@ -627,7 +705,10 @@ fn validate_recipe_gates(
     context: &RecipeDagContext<'_>,
 ) -> Result<(), super::RecipeWorkflowError> {
     assert!(!steps.is_empty(), "validated DAG must have steps");
-    assert!(steps.len() <= MAX_DAG_STEPS, "validated DAG must stay bounded");
+    assert!(
+        steps.len() <= MAX_DAG_STEPS,
+        "validated DAG must stay bounded"
+    );
     let output_map = output_map(steps);
     for step in steps {
         validate_input_refs(step, context.parameters, &output_map)?;
@@ -638,7 +719,12 @@ fn validate_recipe_gates(
             GateFailure::ValidationGate,
         )?;
         validate_retry_refs(step, context.retry_policy)?;
-        validate_subset(step.step_id(), step.subrecipe_refs(), context.subrecipes, GateFailure::Subrecipe)?;
+        validate_subset(
+            step.step_id(),
+            step.subrecipe_refs(),
+            context.subrecipes,
+            GateFailure::Subrecipe,
+        )?;
         validate_subset(
             step.step_id(),
             step.capability_ceilings(),
@@ -663,7 +749,10 @@ fn validate_subset(
     failure: GateFailure,
 ) -> Result<(), super::RecipeWorkflowError> {
     assert!(!step_id.is_empty(), "subset owner step must be named");
-    assert!(requested.len() <= MAX_DAG_REFS_PER_STEP, "requested DAG references must stay bounded");
+    assert!(
+        requested.len() <= MAX_DAG_REFS_PER_STEP,
+        "requested DAG references must stay bounded"
+    );
     for value in requested {
         if admitted.iter().any(|allowed| allowed == value) {
             continue;
@@ -691,7 +780,11 @@ fn validate_retry_refs(
     policy: &super::attempt::RecipeRetryPolicy,
 ) -> Result<(), super::RecipeWorkflowError> {
     for retry_ref in step.retry_refs() {
-        if policy.checks().iter().any(|check| check.label() == retry_ref) {
+        if policy
+            .checks()
+            .iter()
+            .any(|check| check.label() == retry_ref)
+        {
             continue;
         }
         return Err(super::RecipeWorkflowError::RetryBypass {
@@ -711,18 +804,29 @@ fn validate_input_refs(
     >,
 ) -> Result<(), super::RecipeWorkflowError> {
     assert!(!step.step_id().is_empty(), "input owner step must be named");
-    assert!(output_map.len() <= MAX_DAG_STEPS, "DAG output map must stay bounded");
+    assert!(
+        output_map.len() <= MAX_DAG_STEPS,
+        "DAG output map must stay bounded"
+    );
     for input_ref in step.input_refs() {
-        if parameters.iter().any(|parameter| parameter.name() == input_ref) {
+        if parameters
+            .iter()
+            .any(|parameter| parameter.name() == input_ref)
+        {
             continue;
         }
-        let Some((upstream_step, output_ref)) = input_ref.split_once(OUTPUT_REFERENCE_SEPARATOR) else {
+        let Some((upstream_step, output_ref)) = input_ref.split_once(OUTPUT_REFERENCE_SEPARATOR)
+        else {
             return Err(super::RecipeWorkflowError::UndeclaredDagInput {
                 step_id: step.step_id.clone(),
                 reference: input_ref.clone(),
             });
         };
-        if !step.depends_on().iter().any(|dependency| dependency == upstream_step) {
+        if !step
+            .depends_on()
+            .iter()
+            .any(|dependency| dependency == upstream_step)
+        {
             return Err(super::RecipeWorkflowError::UndeclaredDagInput {
                 step_id: step.step_id.clone(),
                 reference: input_ref.clone(),
@@ -746,34 +850,53 @@ fn validate_input_refs(
 
 fn output_map(
     steps: &[RecipeDagStep],
-) -> alloc::collections::BTreeMap<alloc::string::String, alloc::collections::BTreeSet<alloc::string::String>> {
-    assert!(steps.len() <= MAX_DAG_STEPS, "output map input must stay bounded");
+) -> alloc::collections::BTreeMap<
+    alloc::string::String,
+    alloc::collections::BTreeSet<alloc::string::String>,
+> {
+    assert!(
+        steps.len() <= MAX_DAG_STEPS,
+        "output map input must stay bounded"
+    );
     assert!(!steps.is_empty(), "output map must have DAG steps");
     steps
         .iter()
         .map(|step| {
-            (step.step_id.clone(), step.output_refs.iter().cloned().collect::<alloc::collections::BTreeSet<_>>())
+            (
+                step.step_id.clone(),
+                step.output_refs
+                    .iter()
+                    .cloned()
+                    .collect::<alloc::collections::BTreeSet<_>>(),
+            )
         })
         .collect()
 }
 
 fn first_cycle_node(steps: &[RecipeDagStep]) -> Option<alloc::string::String> {
     assert!(!steps.is_empty(), "cycle detection requires DAG steps");
-    assert!(steps.len() <= MAX_DAG_STEPS, "cycle detection input must stay bounded");
+    assert!(
+        steps.len() <= MAX_DAG_STEPS,
+        "cycle detection input must stay bounded"
+    );
     let all_ids: alloc::collections::BTreeSet<alloc::string::String> =
         steps.iter().map(|step| step.step_id.clone()).collect();
     let mut dependent_edges: alloc::collections::BTreeMap<
         alloc::string::String,
         alloc::vec::Vec<alloc::string::String>,
     > = alloc::collections::BTreeMap::new();
-    let mut indegree: alloc::collections::BTreeMap<alloc::string::String, usize> = alloc::collections::BTreeMap::new();
+    let mut indegree: alloc::collections::BTreeMap<alloc::string::String, usize> =
+        alloc::collections::BTreeMap::new();
     for step in steps {
         dependent_edges.entry(step.step_id.clone()).or_default();
         indegree.entry(step.step_id.clone()).or_default();
     }
     for step in steps {
         for dependency in &step.depends_on {
-            dependent_edges.entry(dependency.clone()).or_default().push(step.step_id.clone());
+            dependent_edges
+                .entry(dependency.clone())
+                .or_default()
+                .push(step.step_id.clone());
             *indegree.entry(step.step_id.clone()).or_default() += 1;
         }
     }
@@ -801,15 +924,24 @@ fn first_cycle_node(steps: &[RecipeDagStep]) -> Option<alloc::string::String> {
             }
         }
     }
-    all_ids.iter().find(|step_id| !processed.contains(*step_id)).cloned()
+    all_ids
+        .iter()
+        .find(|step_id| !processed.contains(*step_id))
+        .cloned()
 }
 
 fn topological_batches(
     steps: &[RecipeDagStep],
     blocked_ids: &alloc::collections::BTreeSet<alloc::string::String>,
 ) -> alloc::vec::Vec<RecipeDagBatch> {
-    assert!(steps.len() <= MAX_DAG_STEPS, "batch input must stay bounded");
-    assert!(blocked_ids.len() <= steps.len(), "blocked IDs must be a DAG subset");
+    assert!(
+        steps.len() <= MAX_DAG_STEPS,
+        "batch input must stay bounded"
+    );
+    assert!(
+        blocked_ids.len() <= steps.len(),
+        "blocked IDs must be a DAG subset"
+    );
     let available_ids: alloc::collections::BTreeSet<alloc::string::String> = steps
         .iter()
         .map(|step| step.step_id.clone())
@@ -858,7 +990,8 @@ fn topological_batches(
 }
 
 struct EdgeMaps {
-    dependent_edges: alloc::collections::BTreeMap<alloc::string::String, alloc::vec::Vec<alloc::string::String>>,
+    dependent_edges:
+        alloc::collections::BTreeMap<alloc::string::String, alloc::vec::Vec<alloc::string::String>>,
     indegree: alloc::collections::BTreeMap<alloc::string::String, usize>,
 }
 
@@ -869,8 +1002,14 @@ struct EdgeMapRequest<'a> {
 }
 
 fn edge_maps(request: EdgeMapRequest<'_>) -> EdgeMaps {
-    assert!(request.available_ids.len() <= MAX_DAG_STEPS, "available DAG IDs must stay bounded");
-    assert!(request.steps.len() <= MAX_DAG_STEPS, "edge-map input must stay bounded");
+    assert!(
+        request.available_ids.len() <= MAX_DAG_STEPS,
+        "available DAG IDs must stay bounded"
+    );
+    assert!(
+        request.steps.len() <= MAX_DAG_STEPS,
+        "edge-map input must stay bounded"
+    );
     let mut dependent_edges = alloc::collections::BTreeMap::new();
     let mut indegree = alloc::collections::BTreeMap::new();
     for step_id in request.available_ids {
@@ -878,7 +1017,12 @@ fn edge_maps(request: EdgeMapRequest<'_>) -> EdgeMaps {
         indegree.entry(step_id.clone()).or_default();
     }
     for step in request.steps {
-        add_available_edges(step, request.available_ids, &mut dependent_edges, &mut indegree);
+        add_available_edges(
+            step,
+            request.available_ids,
+            &mut dependent_edges,
+            &mut indegree,
+        );
     }
     EdgeMaps {
         dependent_edges,
@@ -889,25 +1033,43 @@ fn edge_maps(request: EdgeMapRequest<'_>) -> EdgeMaps {
 fn add_available_edges(
     step: &RecipeDagStep,
     available_ids: &alloc::collections::BTreeSet<alloc::string::String>,
-    dependent_edges: &mut alloc::collections::BTreeMap<alloc::string::String, alloc::vec::Vec<alloc::string::String>>,
+    dependent_edges: &mut alloc::collections::BTreeMap<
+        alloc::string::String,
+        alloc::vec::Vec<alloc::string::String>,
+    >,
     indegree: &mut alloc::collections::BTreeMap<alloc::string::String, usize>,
 ) {
-    assert!(available_ids.len() <= MAX_DAG_STEPS, "available IDs must stay bounded");
-    assert!(indegree.len() <= MAX_DAG_STEPS, "indegree map must stay bounded");
+    assert!(
+        available_ids.len() <= MAX_DAG_STEPS,
+        "available IDs must stay bounded"
+    );
+    assert!(
+        indegree.len() <= MAX_DAG_STEPS,
+        "indegree map must stay bounded"
+    );
     if !available_ids.contains(step.step_id()) {
         return;
     }
     for dependency in step.depends_on() {
         if available_ids.contains(dependency) {
-            dependent_edges.entry(dependency.clone()).or_default().push(step.step_id.clone());
+            dependent_edges
+                .entry(dependency.clone())
+                .or_default()
+                .push(step.step_id.clone());
             *indegree.entry(step.step_id.clone()).or_default() += 1;
         }
     }
 }
 
-fn next_batch(next_batch_index: &mut u32, step_ids: alloc::vec::Vec<alloc::string::String>) -> RecipeDagBatch {
+fn next_batch(
+    next_batch_index: &mut u32,
+    step_ids: alloc::vec::Vec<alloc::string::String>,
+) -> RecipeDagBatch {
     assert!(!step_ids.is_empty(), "batch must contain steps");
-    assert!(step_ids.len() <= MAX_DAG_STEPS, "batch width must stay bounded");
+    assert!(
+        step_ids.len() <= MAX_DAG_STEPS,
+        "batch width must stay bounded"
+    );
     let batch = RecipeDagBatch {
         index: *next_batch_index,
         step_ids,
@@ -922,20 +1084,38 @@ fn blocked_steps(
     denied_validation_gates: &[alloc::string::String],
     denied_subrecipes: &[alloc::string::String],
 ) -> alloc::vec::Vec<RecipeDagBlockedStep> {
-    assert!(steps.len() <= MAX_DAG_STEPS, "blocked DAG input must stay bounded");
-    assert!(denied_capabilities.len() <= MAX_DAG_REFS_PER_STEP, "denied capability refs must stay bounded");
+    assert!(
+        steps.len() <= MAX_DAG_STEPS,
+        "blocked DAG input must stay bounded"
+    );
+    assert!(
+        denied_capabilities.len() <= MAX_DAG_REFS_PER_STEP,
+        "denied capability refs must stay bounded"
+    );
     let mut accumulator = BlockAccumulator::with_capacity(steps.len());
     for step in steps {
         if let Some(capability) = first_overlap(step.capability_ceilings(), denied_capabilities) {
-            accumulator.push(step.step_id(), RecipeDagBlockReason::CapabilityDenied, capability);
+            accumulator.push(
+                step.step_id(),
+                RecipeDagBlockReason::CapabilityDenied,
+                capability,
+            );
             continue;
         }
         if let Some(gate) = first_overlap(step.validation_gates(), denied_validation_gates) {
-            accumulator.push(step.step_id(), RecipeDagBlockReason::ValidationGateDenied, gate);
+            accumulator.push(
+                step.step_id(),
+                RecipeDagBlockReason::ValidationGateDenied,
+                gate,
+            );
             continue;
         }
         if let Some(subrecipe) = first_overlap(step.subrecipe_refs(), denied_subrecipes) {
-            accumulator.push(step.step_id(), RecipeDagBlockReason::SubrecipeDenied, subrecipe);
+            accumulator.push(
+                step.step_id(),
+                RecipeDagBlockReason::SubrecipeDenied,
+                subrecipe,
+            );
         }
     }
 
@@ -946,8 +1126,16 @@ fn blocked_steps(
             if accumulator.contains(step.step_id()) {
                 continue;
             }
-            if let Some(dependency) = step.depends_on().iter().find(|dependency| accumulator.contains(dependency)) {
-                accumulator.push(step.step_id(), RecipeDagBlockReason::DependencyBlocked, dependency);
+            if let Some(dependency) = step
+                .depends_on()
+                .iter()
+                .find(|dependency| accumulator.contains(dependency))
+            {
+                accumulator.push(
+                    step.step_id(),
+                    RecipeDagBlockReason::DependencyBlocked,
+                    dependency,
+                );
                 is_changed = true;
             }
         }
@@ -955,7 +1143,10 @@ fn blocked_steps(
     accumulator.into_blocked()
 }
 
-fn first_overlap<'a>(values: &'a [alloc::string::String], denied: &[alloc::string::String]) -> Option<&'a str> {
+fn first_overlap<'a>(
+    values: &'a [alloc::string::String],
+    denied: &[alloc::string::String],
+) -> Option<&'a str> {
     values
         .iter()
         .find(|value| denied.iter().any(|denied_value| denied_value == *value))
@@ -969,7 +1160,10 @@ struct BlockAccumulator {
 
 impl BlockAccumulator {
     fn with_capacity(step_count: usize) -> Self {
-        assert!(step_count <= MAX_DAG_STEPS, "blocked accumulator must stay bounded");
+        assert!(
+            step_count <= MAX_DAG_STEPS,
+            "blocked accumulator must stay bounded"
+        );
         Self {
             blocked: alloc::vec::Vec::with_capacity(step_count),
             blocked_ids: alloc::collections::BTreeSet::new(),
@@ -1000,8 +1194,14 @@ fn build_receipt(
     steps: &[RecipeDagStep],
     blocked_steps: &[RecipeDagBlockedStep],
 ) -> Result<RecipeDagReceipt, super::RecipeWorkflowError> {
-    assert!(!workflow_id.is_empty(), "receipt workflow ID must be present");
-    assert!(steps.len() <= MAX_DAG_STEPS, "receipt step count must stay bounded");
+    assert!(
+        !workflow_id.is_empty(),
+        "receipt workflow ID must be present"
+    );
+    assert!(
+        steps.len() <= MAX_DAG_STEPS,
+        "receipt step count must stay bounded"
+    );
     let step_count = bounded_count(ItemLimit {
         field_name: STEP_ID_FIELD,
         actual_items: steps.len(),

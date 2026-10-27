@@ -4,6 +4,7 @@ mod approval;
 mod audit;
 mod authority;
 mod exec_policy;
+mod gate;
 mod input;
 mod permit;
 mod result;
@@ -15,53 +16,37 @@ mod taxonomy;
 #[cfg(test)]
 mod tests;
 
-pub use approval::ConfirmationActionKind;
-pub use approval::ConfirmationBinding;
-pub use approval::ConfirmationBindingDraft;
-pub use approval::ConfirmationBrokerClass;
-pub use approval::ConfirmationDecision;
-pub use approval::ConfirmationEvaluation;
-pub use approval::ConfirmationExpiry;
-pub use approval::ConfirmationExpiryClass;
-pub use approval::ConfirmationIssue;
-pub use approval::ConfirmationLevel;
-pub use approval::ConfirmationReceipt;
-pub use approval::ConfirmationReceiptDraft;
-pub use approval::ConfirmationReceiptLeak;
-pub use approval::ConfirmationRequest;
-pub use approval::ConfirmationRequestDraft;
-pub use approval::ConfirmationStatus;
-pub use approval::ConfirmationTick;
-pub use approval::ConfirmationTimingClass;
-pub use approval::evaluate_confirmation_decision;
-pub use approval::evaluate_confirmation_outcome;
-pub use approval::validate_confirmation_receipt_text;
-pub use audit::Receipt;
-pub use audit::ReceiptDraft;
-pub use audit::SAFE_HASH_HEX_CHARS;
-pub use audit::SAFE_RECEIPT_CONTRACT_IDENTITY;
-pub use audit::SafeHash;
-pub use authority::AuthorizationContext;
-pub use authority::AuthorizationIssue;
-pub use authority::AuthorizationLeak;
-pub use authority::AuthorizationReceipt;
-pub use authority::AuthorizationStatus;
-pub use authority::CapabilityPolicyContract;
-pub use authority::CapabilityRequest;
-pub use authority::CaveatSummary;
-pub use authority::GuardedAction;
-pub use authority::LocalCaveat;
-pub use authority::LocalCaveatDecision;
-pub use authority::LocalPolicyLayer;
-pub use authority::SandboxConstraint;
-pub use authority::SandboxState;
-pub use authority::UcanGrant;
-pub use authority::authorize_capability;
-pub use authority::validate_authorization_receipt_text;
-pub use input::CancellationCheck;
-pub use input::CapabilityDecisionRequest;
-pub use input::HostRequest;
-pub use input::RuntimePolicyRequest;
+pub use approval::{
+    ConfirmationActionKind, ConfirmationBinding, ConfirmationBindingDraft, ConfirmationBrokerClass,
+    ConfirmationDecision, ConfirmationEvaluation, ConfirmationExpiry, ConfirmationExpiryClass,
+    ConfirmationIssue, ConfirmationLevel, ConfirmationReceipt, ConfirmationReceiptDraft,
+    ConfirmationReceiptLeak, ConfirmationRequest, ConfirmationRequestDraft, ConfirmationStatus,
+    ConfirmationTick, ConfirmationTimingClass, evaluate_confirmation_decision,
+    evaluate_confirmation_outcome, validate_confirmation_receipt_text,
+};
+pub use audit::{
+    Receipt, ReceiptDraft, SAFE_HASH_HEX_CHARS, SAFE_RECEIPT_CONTRACT_IDENTITY, SafeHash,
+};
+pub use authority::{
+    AuthorizationContext, AuthorizationIssue, AuthorizationLeak, AuthorizationReceipt,
+    AuthorizationStatus, CapabilityPolicyContract, CapabilityRequest, CaveatSummary, GuardedAction,
+    LocalCaveat, LocalCaveatDecision, LocalPolicyLayer, SandboxConstraint, SandboxState, UcanGrant,
+    authorize_capability, validate_authorization_receipt_text,
+};
+pub use gate::{
+    AgentAuthorityBinding, AgentAuthorityBindingDraft, BindingFreshness,
+    EffectiveAuthorityDecision, HOST_AUTHORITY_NON_CLAIMS, HostAuthorityBounds,
+    HostAuthorityDecision, HostAuthorityDecisionDraft, HostAuthorityFreshnessClass,
+    HostAuthorityIssue, HostAuthorityReceipt, HostAuthorityReceiptDraft, HostAuthorityReceiptLeak,
+    HostAuthorityReplayClass, HostAuthorityRequest, HostAuthorityRequestDraft,
+    HostAuthorityService, HostAuthorityStatus, RequiredHostGates, admit_agent_authority_binding,
+    admit_host_authority_request, build_host_authority_decision, build_host_authority_receipt,
+    intersect_host_authority, validate_agent_authority_binding_set,
+    validate_host_authority_receipt_text,
+};
+/// Compatibility name for one independent host authority check status.
+pub type HostGateStatus = gate::Status;
+pub use input::{CancellationCheck, CapabilityDecisionRequest, HostRequest, RuntimePolicyRequest};
 /// Exec-policy command intent.
 pub type ExecPolicyCommandIntent = exec_policy::CommandIntent;
 /// Exec-policy command intent draft.
@@ -97,7 +82,9 @@ pub fn evaluate_exec_policy(request: ExecPolicyRequest<'_>) -> ExecPolicyEvaluat
 
 /// Analyzes a shell wrapper without evaluating policy.
 #[must_use]
-pub fn analyze_exec_policy_shell_wrapper(command: &ExecPolicyCommandIntent) -> ExecPolicyShellAnalysis {
+pub fn analyze_exec_policy_shell_wrapper(
+    command: &ExecPolicyCommandIntent,
+) -> ExecPolicyShellAnalysis {
     exec_policy::analyze_wrapper(command)
 }
 /// Permission prompt decision.
@@ -183,7 +170,9 @@ pub fn resolve_permission(request: PermissionResolutionRequest<'_>) -> Permissio
 
 /// Resolves advisory permission-mode defaults below stronger authority gates.
 #[must_use]
-pub fn resolve_permission_mode_default(request: PermissionModeDefaultRequest) -> PermissionModeDefaultResolution {
+pub fn resolve_permission_mode_default(
+    request: PermissionModeDefaultRequest,
+) -> PermissionModeDefaultResolution {
     permit::resolve_mode_default(request)
 }
 
@@ -211,45 +200,22 @@ pub fn validate_permission_session_allowlist(
 pub fn validate_permission_receipt_text(text: &str) -> Result<(), PermissionReceiptLeak> {
     permit::validate_text(text)
 }
-pub use result::OutcomeKind;
-pub use result::Reason;
-pub use result::ServiceOutcome;
-pub use sandbox::SandboxConstraintClass;
-pub use sandbox::SandboxCowDisposition;
-pub use sandbox::SandboxDescriptor;
-pub use sandbox::SandboxDescriptorDraft;
-pub use sandbox::SandboxDeterminismPolicy;
-pub use sandbox::SandboxDispatchDecision;
-pub use sandbox::SandboxDispatchIssue;
-pub use sandbox::SandboxDispatchReceipt;
-pub use sandbox::SandboxDispatchReceiptDraft;
-pub use sandbox::SandboxDispatchStatus;
-pub use sandbox::SandboxEnforcementRequirement;
-pub use sandbox::SandboxEnvironmentPolicy;
-pub use sandbox::SandboxFilesystemMode;
-pub use sandbox::SandboxHttpPolicy;
-pub use sandbox::SandboxNetworkPolicy;
-pub use sandbox::SandboxPlatformCapability;
-pub use sandbox::SandboxPlatformSupport;
-pub use sandbox::SandboxPlatformSupportDraft;
-pub use sandbox::SandboxPolicy;
-pub use sandbox::SandboxPolicyDraft;
-pub use sandbox::SandboxProcessProfile;
-pub use sandbox::SandboxReceiptLeak;
-pub use sandbox::SandboxWorkdirMode;
-pub use sandbox::evaluate_sandbox_dispatch;
-pub use sandbox::validate_sandbox_receipt_text;
-pub use service::CancellationService;
-pub use service::CapabilityDecisionService;
-pub use service::ConfirmationBroker;
-pub use service::HostService;
-pub use service::ModelProviderService;
-pub use service::RuntimePolicyService;
-pub use service::ToolExecutionService;
-pub use service::default_deny_confirmation;
-pub use taxonomy::CapabilityClass;
-pub use taxonomy::RedactionMarker;
-pub use taxonomy::ServiceKind;
+pub use result::{OutcomeKind, Reason, ServiceOutcome};
+pub use sandbox::{
+    SandboxConstraintClass, SandboxCowDisposition, SandboxDescriptor, SandboxDescriptorDraft,
+    SandboxDeterminismPolicy, SandboxDispatchDecision, SandboxDispatchIssue,
+    SandboxDispatchReceipt, SandboxDispatchReceiptDraft, SandboxDispatchStatus,
+    SandboxEnforcementRequirement, SandboxEnvironmentPolicy, SandboxFilesystemMode,
+    SandboxHttpPolicy, SandboxNetworkPolicy, SandboxPlatformCapability, SandboxPlatformSupport,
+    SandboxPlatformSupportDraft, SandboxPolicy, SandboxPolicyDraft, SandboxProcessProfile,
+    SandboxReceiptLeak, SandboxWorkdirMode, evaluate_sandbox_dispatch,
+    validate_sandbox_receipt_text,
+};
+pub use service::{
+    CancellationService, CapabilityDecisionService, ConfirmationBroker, HostService,
+    ModelProviderService, RuntimePolicyService, ToolExecutionService, default_deny_confirmation,
+};
+pub use taxonomy::{CapabilityClass, RedactionMarker, ServiceKind};
 
 /// Capability decision returned by an injected policy service.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

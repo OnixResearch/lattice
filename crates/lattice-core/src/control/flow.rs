@@ -232,8 +232,31 @@ pub fn validate_condition_config(config: &ConditionNodeConfig) -> Result<(), Con
         if !seen.insert(branch.label.clone()) {
             return Err(ControlFlowError::DuplicateBranchLabel(branch.label.clone()));
         }
+        if let ConditionPredicate::NumberGreaterThan(value) = &branch.predicate
+            && !value.is_finite()
+        {
+            return Err(ControlFlowError::InvalidPredicate("numeric threshold must be finite".to_string()));
+        }
+        if let ConditionPredicate::JsonPointerExists(pointer) = &branch.predicate
+            && !valid_json_pointer(pointer)
+        {
+            return Err(ControlFlowError::InvalidPredicate(format!("invalid JSON pointer: {pointer}")));
+        }
     }
     Ok(())
+}
+
+fn valid_json_pointer(pointer: &str) -> bool {
+    if !pointer.is_empty() && !pointer.starts_with('/') {
+        return false;
+    }
+    let mut bytes = pointer.bytes();
+    while let Some(byte) = bytes.next() {
+        if byte == b'~' && !matches!(bytes.next(), Some(b'0' | b'1')) {
+            return false;
+        }
+    }
+    true
 }
 
 // r[impl n8nclone.workflow_execution.control_flow.merge]

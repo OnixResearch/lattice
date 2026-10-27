@@ -119,7 +119,7 @@ fn transport_profile() -> TransportProfile {
     }
 }
 
-fn fixture(
+pub(super) fn fixture(
     command: &str,
 ) -> (
     tempfile::TempDir,
@@ -413,7 +413,8 @@ fn exchange_shell_exit_controls_durable_results_and_dependent_effects() {
                 crate::store::RunNodeDetailStatus::Completed
             } else {
                 crate::store::RunNodeDetailStatus::Skipped
-            }
+            },
+            "dependent result: {dependent_node:?}"
         );
         let observe = new_request(ExchangeCommand::Observe {
             profile: contract,
@@ -438,6 +439,102 @@ fn exchange_shell_exit_controls_durable_results_and_dependent_effects() {
             assert!(!marker.exists(), "failed dependency must prevent downstream effects");
         }
     }
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn active_cancel_stops_started_child_and_prevents_dependent_effect() {
+    let (directory, store, mut workflow, contract, mut request, mut profile) = fixture(TEST_COMMAND);
+    let pid_path = directory.path().join("started-pid");
+    let marker = directory.path().join("dependent-effect");
+    let source = crate::engine::workflow::NodeId(profile.routes[0].nodes[0].workflow_node_id);
+    if let Some(crate::engine::workflow::NodeConfig::Shell { command, .. }) = workflow.configs.get_mut(&source.0) {
+        *command = format!("printf '%s' $$ > '{}'; exec sleep 30", pid_path.display());
+    }
+    let dependent = workflow.add_shell_node("dependent", format!("printf dependent > '{}'", marker.display()));
+    let stdout = workflow.graph.node(source).unwrap().output_ports[0].id;
+    let stdin = workflow.graph.node(dependent).unwrap().input_ports[0].id;
+    workflow.graph.add_edge(stdout, stdin).expect("dependency is valid");
+    store.save_workflow(&workflow).expect("workflow saves");
+    request.graph.nodes.push(WorkflowNode {
+        id: label("dependent"),
+        kind: label("build"),
+        effect_class: EffectClass::Build,
+        adapter_kind: label("local"),
+        operation_identity: identity('8'),
+    });
+    request.graph.edges.push(WorkflowEdge {
+        source: label("build"),
+        target: label("dependent"),
+    });
+    request.graph.identity = graph_identity(&request.graph);
+    request.identity = lattice_workflow_contract::request_identity(&request);
+    let route = &mut profile.routes[0];
+    route.graph_identity = request.graph.identity.clone();
+    route.workflow_revision = super::application::workflow_facts(&workflow).unwrap().revision;
+    route.nodes.push(super::RouteNode {
+        request_node_id: label("dependent"),
+        operation_identity: identity('8'),
+        workflow_node_id: dependent.0,
+    });
+    let handler =
+        super::ApplicationHandler::new(store.clone(), profile, crate::agent_node::AgentRuntimeConfig::default())
+            .expect("handler starts");
+    let mut service = WorkflowExchangeService::new(handler);
+    let dispatch = new_request(ExchangeCommand::Dispatch {
+        profile: contract.clone(),
+        request: request.clone(),
+    })
+    .unwrap();
+    let accepted = accepted_from_response(service.exchange(&dispatch).unwrap());
+    let pid = (0..RUNNING_OBSERVATION_ATTEMPTS)
+        .find_map(|_| {
+            let pid = std::fs::read_to_string(&pid_path).ok().and_then(|value| value.parse::<u32>().ok());
+            if pid.is_none() {
+                std::thread::sleep(std::time::Duration::from_millis(RUNNING_OBSERVATION_DELAY_MILLISECONDS));
+            }
+            pid
+        })
+        .expect("owned child started and published its PID");
+    let process_path = std::path::PathBuf::from(format!("/proc/{pid}"));
+    assert!(process_path.exists(), "child must be active before cancel");
+    let observe = new_request(ExchangeCommand::Observe {
+        profile: contract.clone(),
+        request: request.clone(),
+        accepted: accepted.clone(),
+    })
+    .unwrap();
+    let current = observed(service.exchange(&observe).unwrap());
+    assert_eq!(current.state, ExecutionState::Running);
+    let control = ControlRequest {
+        schema: CONTROL_SCHEMA.to_string(),
+        request_identity: request.identity.clone(),
+        workflow_identity: accepted.workflow_identity.clone(),
+        execution_identity: accepted.execution_identity.clone(),
+        expected_sequence: current.sequence,
+        action: ControlAction::Cancel,
+    };
+    let cancel = new_request(ExchangeCommand::Control {
+        profile: contract,
+        request,
+        accepted: accepted.clone(),
+        current_sequence: current.sequence,
+        control,
+    })
+    .unwrap();
+    let response = service.exchange(&cancel).expect("exact cancel is processed");
+    assert!(matches!(response.result, ExchangeResult::Success(_)));
+    service.handler_mut().wait_for_workers();
+    assert!(!process_path.exists(), "owned child must be stopped and reaped");
+    assert!(!marker.exists(), "pending dependent effect must not execute");
+    let observation = observed(service.exchange(&observe).unwrap());
+    assert_eq!(observation.state, ExecutionState::Cancelled);
+    assert!(observation.terminal);
+    assert!(!observation.successful);
+    assert!(observation.nodes.iter().all(|node| node.state == NodeState::Cancelled));
+    let durable = store.load_workflow_exchange(&accepted.execution_identity).unwrap().unwrap();
+    assert_eq!(durable.state, super::DurableExecutionState::Cancelled);
+    assert!(durable.receipt_identity.is_some());
 }
 
 // r[verify lattice.workflow_interchange.application_admission.scenario.conflict]

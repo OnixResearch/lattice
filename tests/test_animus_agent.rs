@@ -364,7 +364,7 @@ fn unsupported_animus_inputs_fail_before_provider_dispatch() {
 // r[verify lattice.agent_runtime.animus_leaf.scenario.execute]
 #[tokio::test]
 async fn typed_examples_load_validate_and_execute_through_the_runner() {
-    let config = load_app_config(Path::new(CONFIG_EXAMPLE_PATH));
+    let config = load_app_config(Path::new(CONFIG_EXAMPLE_PATH)).expect("Animus app config imports");
     let workflow = load_workflow_nickel_file(Path::new(WORKFLOW_EXAMPLE_PATH)).expect("Animus workflow imports");
     let diagnostics = validate_workflow(&workflow);
     let node = workflow.graph.nodes().next().expect("Animus workflow has one node");

@@ -198,6 +198,7 @@ impl RuntimeProjection {
                 escalation_reason, ..
             } => Self::summary_checked("sandbox_escalation", escalation_reason),
             crate::RuntimeEvent::SessionStateChanged { .. }
+            | crate::RuntimeEvent::SessionQueueMutationObserved { .. }
             | crate::RuntimeEvent::SessionCommitObserved { .. }
             | crate::RuntimeEvent::SessionRecoveryObserved { .. }
             | crate::RuntimeEvent::SessionAuthorityProfileObserved { .. } => {
@@ -219,6 +220,18 @@ impl RuntimeProjection {
                 "session_state",
                 format!("{status} queue_count={queue_count}").as_str(),
             ),
+            crate::RuntimeEvent::SessionQueueMutationObserved { mutation } => {
+                Self::summary_checked(
+                    "session_queue_mutation",
+                    format!(
+                        "{} {} generation={}",
+                        mutation.operation.as_str(),
+                        mutation.status,
+                        mutation.generation.value()
+                    )
+                    .as_str(),
+                )
+            }
             crate::RuntimeEvent::SessionCommitObserved {
                 message_kind,
                 durable_cursor,

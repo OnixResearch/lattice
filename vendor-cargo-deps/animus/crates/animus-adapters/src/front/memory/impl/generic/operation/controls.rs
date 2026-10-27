@@ -1,27 +1,13 @@
 #![allow(unknown_lints)]
 #![cfg_attr(animus_octet, allow(tigerstyle::excessive_file_length))]
 
-use super::DESCRIPTOR_ID_FIELD;
-use super::GenericMemoryRecordKind;
-use super::MAX_MEMORY_DESCRIPTORS;
-use super::MEMORY_EVIDENCE_FIELD;
-use super::MemoryAdmissionStatus;
-use super::MemoryConfidence;
-use super::MemoryError;
-use super::MemoryFreshness;
-use super::MemoryInjectionBudget;
-use super::MemoryMatchReason;
-use super::MemoryReceiptLeak;
-use super::MemoryRecordEnvelope;
-use super::MemoryRedactionClass;
-use super::MemoryRetrievalOutcomeStatus;
-use super::MemoryRetrievalPlan;
-use super::MemoryTrustScope;
-use super::NonZeroU32;
-use super::String;
-use super::Vec;
-use super::memory_leak;
-use super::normalize;
+use super::{
+    DESCRIPTOR_ID_FIELD, GenericMemoryRecordKind, MAX_MEMORY_DESCRIPTORS, MEMORY_EVIDENCE_FIELD,
+    MemoryAdmissionStatus, MemoryConfidence, MemoryError, MemoryFreshness, MemoryInjectionBudget,
+    MemoryMatchReason, MemoryReceiptLeak, MemoryRecordEnvelope, MemoryRedactionClass,
+    MemoryRetrievalOutcomeStatus, MemoryRetrievalPlan, MemoryTrustScope, NonZeroU32, String, Vec,
+    memory_leak, normalize,
+};
 
 const MEMORY_ADAPTER_LABEL_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("memory_adapter_label");
@@ -30,8 +16,10 @@ const MEMORY_OPERATION_LABEL_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("memory_operation_label");
 const MEMORY_COMMAND_LABEL_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("memory_command_label");
-const MEMORY_TARGET_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("memory_target_id");
-const MEMORY_REASON_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("memory_reason_label");
+const MEMORY_TARGET_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("memory_target_id");
+const MEMORY_REASON_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("memory_reason_label");
 
 /// Generic memory operation kind used by safe receipts.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -172,15 +160,20 @@ impl MemoryOperationReceipt {
         reject_operation_receipt_leaks(draft)?;
         Ok(Self {
             operation_label: normalize(MEMORY_OPERATION_LABEL_FIELD, draft.operation_label)?,
-            adapter_family_label: normalize(MEMORY_ADAPTER_LABEL_FIELD, draft.adapter_family_label)?,
+            adapter_family_label: normalize(
+                MEMORY_ADAPTER_LABEL_FIELD,
+                draft.adapter_family_label,
+            )?,
             operation_kind: draft.operation_kind,
             record_id: normalize_optional(MEMORY_TARGET_FIELD, draft.record_id)?,
             candidate_id: normalize_optional(MEMORY_TARGET_FIELD, draft.candidate_id)?,
             item_count: draft.item_count,
             status: draft.status,
             redaction_class: draft.redaction_class,
-            policy_hash: crate::artifact::Hash::new(draft.policy_hash).map_err(MemoryError::InvalidHash)?,
-            body_hash: crate::artifact::Hash::new(draft.body_hash).map_err(MemoryError::InvalidHash)?,
+            policy_hash: crate::artifact::Hash::new(draft.policy_hash)
+                .map_err(MemoryError::InvalidHash)?,
+            body_hash: crate::artifact::Hash::new(draft.body_hash)
+                .map_err(MemoryError::InvalidHash)?,
         })
     }
 
@@ -291,7 +284,10 @@ impl MemoryControlCommandKind {
     /// Returns true when the command can mutate memory state.
     #[must_use]
     pub const fn mutates(self) -> bool {
-        matches!(self, Self::Approve | Self::Reject | Self::Forget | Self::Update | Self::Supersede)
+        matches!(
+            self,
+            Self::Approve | Self::Reject | Self::Forget | Self::Update | Self::Supersede
+        )
     }
 
     /// Returns true when a command requires a target record or candidate.
@@ -299,7 +295,13 @@ impl MemoryControlCommandKind {
     pub const fn requires_target(self) -> bool {
         matches!(
             self,
-            Self::Show | Self::Why | Self::Approve | Self::Reject | Self::Forget | Self::Update | Self::Supersede
+            Self::Show
+                | Self::Why
+                | Self::Approve
+                | Self::Reject
+                | Self::Forget
+                | Self::Update
+                | Self::Supersede
         )
     }
 
@@ -378,13 +380,11 @@ pub struct MemoryControlRequest {
 }
 
 impl MemoryControlRequest {
-    /// Validates memory control metadata before adapter mutation, remote calls, or prompt
-    /// influence.
+    /// Validates memory control metadata before adapter mutation, remote calls, or prompt influence.
     ///
     /// # Errors
     ///
-    /// Returns [`MemoryControlError`] when capability, admission, freshness, evidence, target, safe
-    /// output, or redaction validation fails.
+    /// Returns [`MemoryControlError`] when capability, admission, freshness, evidence, target, safe output, or redaction validation fails.
     // r[impl agent_harness_runtime.memory_controls.commands]
     // r[impl agent_harness_runtime.memory_controls.validation]
     // r[impl agent_harness_runtime.memory_controls.remote_admission]
@@ -532,15 +532,25 @@ impl core::fmt::Display for MemoryControlError {
                 write!(formatter, "{command_label} is missing a memory target")
             }
             Self::CapabilityDenied { command_label } => {
-                write!(formatter, "{command_label} is denied by memory capability policy")
+                write!(
+                    formatter,
+                    "{command_label} is denied by memory capability policy"
+                )
             }
-            Self::RemoteAdmission { command_label, status } => {
-                write!(formatter, "{command_label} failed remote memory admission: {status:?}")
-            }
+            Self::RemoteAdmission {
+                command_label,
+                status,
+            } => write!(
+                formatter,
+                "{command_label} failed remote memory admission: {status:?}"
+            ),
             Self::StaleCommand {
                 command_label,
                 freshness,
-            } => write!(formatter, "{command_label} cannot dispatch with {freshness:?} memory freshness"),
+            } => write!(
+                formatter,
+                "{command_label} cannot dispatch with {freshness:?} memory freshness"
+            ),
         }
     }
 }
@@ -639,7 +649,10 @@ pub fn project_memory_control_listing(
     for record in records {
         assert!(!record.id().is_empty());
         assert!(record.budget_units().get() > ZERO_MEMORY_UNITS);
-        let remaining_units = safe_output_budget.units().get().saturating_sub(consumed_units);
+        let remaining_units = safe_output_budget
+            .units()
+            .get()
+            .saturating_sub(consumed_units);
         if record.budget_units().get() > remaining_units {
             continue;
         }
@@ -770,8 +783,10 @@ pub fn transition_memory_candidate_review(
     let reason_label = normalize(MEMORY_REASON_FIELD, input.reason_label)?;
     assert!(!candidate_id.is_empty());
     assert!(!reason_label.is_empty());
-    let needs_admission =
-        matches!(input.requested_state, MemoryCandidateReviewState::Approved | MemoryCandidateReviewState::Persisted);
+    let needs_admission = matches!(
+        input.requested_state,
+        MemoryCandidateReviewState::Approved | MemoryCandidateReviewState::Persisted
+    );
     if needs_admission && input.admission_status != MemoryAdmissionStatus::Admitted {
         return Ok(MemoryCandidateReviewTransition {
             candidate_id,
@@ -880,10 +895,15 @@ impl MemoryMutationReceipt {
         Ok(Self {
             operation_kind: draft.operation_kind,
             target_id: normalize(MEMORY_TARGET_FIELD, draft.target_id)?,
-            adapter_family_label: normalize(MEMORY_ADAPTER_LABEL_FIELD, draft.adapter_family_label)?,
+            adapter_family_label: normalize(
+                MEMORY_ADAPTER_LABEL_FIELD,
+                draft.adapter_family_label,
+            )?,
             status: draft.status,
-            policy_hash: crate::artifact::Hash::new(draft.policy_hash).map_err(MemoryError::InvalidHash)?,
-            body_hash: crate::artifact::Hash::new(draft.body_hash).map_err(MemoryError::InvalidHash)?,
+            policy_hash: crate::artifact::Hash::new(draft.policy_hash)
+                .map_err(MemoryError::InvalidHash)?,
+            body_hash: crate::artifact::Hash::new(draft.body_hash)
+                .map_err(MemoryError::InvalidHash)?,
         })
     }
 
@@ -1041,11 +1061,16 @@ pub fn explain_memory_influence(plan: &MemoryRetrievalPlan) -> MemoryInfluenceEx
     MemoryInfluenceExplanation { entries }
 }
 
-fn normalize_optional(field: crate::validation::FieldName, value: Option<&str>) -> Result<Option<String>, MemoryError> {
+fn normalize_optional(
+    field: crate::validation::FieldName,
+    value: Option<&str>,
+) -> Result<Option<String>, MemoryError> {
     value.map(|inner| normalize(field, inner)).transpose()
 }
 
-fn reject_operation_receipt_leaks(draft: &MemoryOperationReceiptDraft<'_>) -> Result<(), MemoryError> {
+fn reject_operation_receipt_leaks(
+    draft: &MemoryOperationReceiptDraft<'_>,
+) -> Result<(), MemoryError> {
     if draft.raw_memory_body.is_some() || draft.hidden_memory_body.is_some() {
         return Err(memory_leak(MemoryReceiptLeak::RawMemoryBody));
     }
@@ -1080,7 +1105,9 @@ fn reject_control_leaks(draft: &MemoryControlRequestDraft<'_>) -> Result<(), Mem
     Ok(())
 }
 
-fn reject_mutation_receipt_leaks(draft: &MemoryMutationReceiptDraft<'_>) -> Result<(), MemoryError> {
+fn reject_mutation_receipt_leaks(
+    draft: &MemoryMutationReceiptDraft<'_>,
+) -> Result<(), MemoryError> {
     if draft.raw_memory_body.is_some() {
         return Err(memory_leak(MemoryReceiptLeak::RawMemoryBody));
     }

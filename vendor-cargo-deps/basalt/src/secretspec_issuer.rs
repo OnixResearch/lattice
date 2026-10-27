@@ -9,31 +9,25 @@
 //! This boundary proves only that a reviewed `SecretSpec` boundary can resolve a
 //! declared issuer key. It does not verify OIDC tokens, issue UCAN
 //! capabilities, or prove that any provider is a correct secret authority.
+//!
 // Traceability:
 // r[impl ucan_token_flow.oidc.secretspec_dependency]
 // r[impl ucan_token_flow.oidc.secretspec_issuer_key]
 
-use serde::Deserialize;
-use serde::Serialize;
-
-pub use crate::secretspec_issuer_identity::ISSUER_DECLARATION_SCHEMA;
-pub use crate::secretspec_issuer_identity::ISSUER_RELEASE_RECEIPT_SCHEMA;
-pub use crate::secretspec_issuer_identity::ISSUER_RESOLUTION_RESULT_SCHEMA;
-pub use crate::secretspec_issuer_identity::ISSUER_RESOLUTION_SCHEMA;
-pub use crate::secretspec_issuer_identity::OIDC_EXCHANGE_SCOPE;
-pub use crate::secretspec_issuer_identity::REQUIRED_ISSUER_NON_CLAIMS;
-pub use crate::secretspec_issuer_identity::SECRETSPEC_LICENSE;
-pub use crate::secretspec_issuer_identity::SECRETSPEC_REVIEWED_COMMIT;
-pub use crate::secretspec_issuer_identity::SECRETSPEC_VERSION;
+pub use crate::secretspec_issuer_identity::{
+    ISSUER_DECLARATION_SCHEMA, ISSUER_RELEASE_RECEIPT_SCHEMA, ISSUER_RESOLUTION_RESULT_SCHEMA,
+    ISSUER_RESOLUTION_SCHEMA, OIDC_EXCHANGE_SCOPE, REQUIRED_ISSUER_NON_CLAIMS, SECRETSPEC_LICENSE,
+    SECRETSPEC_REVIEWED_COMMIT, SECRETSPEC_VERSION,
+};
+use serde::{Deserialize, Serialize};
 
 mod shell;
 #[cfg(test)]
 mod tests;
 
-pub use shell::IssuerResolutionFailure;
-pub use shell::ResolutionBoundaries;
-pub use shell::ShellResolution;
-pub use shell::resolve_issuer_key;
+pub use shell::{
+    IssuerResolutionFailure, ResolutionBoundaries, ShellResolution, resolve_issuer_key,
+};
 
 /// Maximum accepted byte length for a resolved issuer-key value.
 pub const DEFAULT_MAX_RESOLVED_VALUE_BYTES: usize = 8 * 1024;
@@ -110,7 +104,11 @@ pub struct IssuerKeyDeclaration {
 impl IssuerKeyDeclaration {
     /// Construct a bounded issuer-key declaration under the reviewed scope.
     #[must_use]
-    pub fn new(profile: impl Into<String>, key_id: impl Into<String>, provider: impl Into<String>) -> Self {
+    pub fn new(
+        profile: impl Into<String>,
+        key_id: impl Into<String>,
+        provider: impl Into<String>,
+    ) -> Self {
         Self {
             schema: ISSUER_DECLARATION_SCHEMA.to_owned(),
             secretspec_version: SECRETSPEC_VERSION.to_owned(),
@@ -174,21 +172,36 @@ impl IssuerResolutionResult {
 pub fn validate_declaration(declaration: &IssuerKeyDeclaration) -> Vec<IssuerIssue> {
     let mut issues = Vec::new();
     if declaration.schema != ISSUER_DECLARATION_SCHEMA {
-        issues.push(IssuerIssue::new("issuer.schema", "unsupported issuer-key declaration schema"));
+        issues.push(IssuerIssue::new(
+            "issuer.schema",
+            "unsupported issuer-key declaration schema",
+        ));
     }
     if declaration.scope != OIDC_EXCHANGE_SCOPE {
-        issues.push(IssuerIssue::new("issuer.scope", "issuer-key declaration must use the reviewed exchange scope"));
+        issues.push(IssuerIssue::new(
+            "issuer.scope",
+            "issuer-key declaration must use the reviewed exchange scope",
+        ));
     }
     if !bounded_non_empty(&declaration.profile) {
-        issues.push(IssuerIssue::new("issuer.profile", "issuer-key declaration profile must be non-empty and bounded"));
+        issues.push(IssuerIssue::new(
+            "issuer.profile",
+            "issuer-key declaration profile must be non-empty and bounded",
+        ));
     }
     if !bounded_non_empty(&declaration.key_id) {
-        issues.push(IssuerIssue::new("issuer.key-id", "issuer key identifier must be non-empty and bounded"));
+        issues.push(IssuerIssue::new(
+            "issuer.key-id",
+            "issuer key identifier must be non-empty and bounded",
+        ));
     }
     if declaration.secretspec_version != SECRETSPEC_VERSION
         || declaration.secretspec_commit != SECRETSPEC_REVIEWED_COMMIT
     {
-        issues.push(IssuerIssue::new("issuer.dependency", "declaration does not pin the reviewed SecretSpec identity"));
+        issues.push(IssuerIssue::new(
+            "issuer.dependency",
+            "declaration does not pin the reviewed SecretSpec identity",
+        ));
     }
     if declaration.non_claims != REQUIRED_ISSUER_NON_CLAIMS.map(str::to_owned) {
         issues.push(IssuerIssue::new(
@@ -232,7 +245,10 @@ pub fn classify_resolution(
 ) -> IssuerResolutionResult {
     let declaration_issues = validate_declaration(declaration);
     if !declaration_issues.is_empty() {
-        return result_with(IssuerResolutionReason::DeclarationRejected, declaration_issues);
+        return result_with(
+            IssuerResolutionReason::DeclarationRejected,
+            declaration_issues,
+        );
     }
 
     if output_bytes > DEFAULT_MAX_RESOLVED_VALUE_BYTES {
@@ -275,7 +291,10 @@ pub fn classify_resolution(
     result_with(IssuerResolutionReason::Loaded, Vec::new())
 }
 
-pub(crate) fn result_with(reason: IssuerResolutionReason, issues: Vec<IssuerIssue>) -> IssuerResolutionResult {
+pub(crate) fn result_with(
+    reason: IssuerResolutionReason,
+    issues: Vec<IssuerIssue>,
+) -> IssuerResolutionResult {
     IssuerResolutionResult {
         schema: ISSUER_RESOLUTION_RESULT_SCHEMA.to_owned(),
         reason,
@@ -353,7 +372,10 @@ pub fn validate_rotation_window(window: &RotationWindow) -> Vec<IssuerIssue> {
             ));
         }
     }
-    if window.overlap_digests.contains(&window.active_verification_digest) {
+    if window
+        .overlap_digests
+        .contains(&window.active_verification_digest)
+    {
         issues.push(IssuerIssue::new(
             "issuer.rotation.active-duplicate",
             "active verification digest must not repeat in the overlap window",
@@ -363,5 +385,7 @@ pub fn validate_rotation_window(window: &RotationWindow) -> Vec<IssuerIssue> {
 }
 
 fn bounded_non_empty(value: &str) -> bool {
-    !value.is_empty() && value.len() <= MAX_DECLARATION_FIELD_BYTES && !value.chars().any(char::is_control)
+    !value.is_empty()
+        && value.len() <= MAX_DECLARATION_FIELD_BYTES
+        && !value.chars().any(char::is_control)
 }

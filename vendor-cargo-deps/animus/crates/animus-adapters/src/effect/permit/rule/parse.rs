@@ -1,6 +1,8 @@
 use alloc::string::ToString;
 
-pub(super) fn validate(draft: &super::PolicyDraft<'_>) -> Result<super::Policy, super::super::Error> {
+pub(super) fn validate(
+    draft: &super::PolicyDraft<'_>,
+) -> Result<super::Policy, super::super::Error> {
     let fields = Fields::from_draft(draft)?;
     if fields.trust_status == super::TrustStatus::Untrusted {
         return Err(super::super::Error::UntrustedDescriptor {
@@ -25,16 +27,27 @@ impl Fields {
     fn from_draft(draft: &super::PolicyDraft<'_>) -> Result<Self, super::super::Error> {
         let action_text = super::super::required_text(super::super::ACTION_FIELD, draft.action)?;
         let outcome_text = super::super::required_text(super::super::OUTCOME_FIELD, draft.outcome)?;
-        let scope_text = super::super::required_text(super::super::TRUST_SCOPE_FIELD, draft.trust_scope)?;
-        let trust_text = super::super::required_text(super::super::TRUST_STATUS_FIELD, draft.trust_status)?;
-        let prompt_text = super::super::required_text(super::super::PROMPT_POLICY_FIELD, draft.prompt_summary_policy)?;
+        let scope_text =
+            super::super::required_text(super::super::TRUST_SCOPE_FIELD, draft.trust_scope)?;
+        let trust_text =
+            super::super::required_text(super::super::TRUST_STATUS_FIELD, draft.trust_status)?;
+        let prompt_text = super::super::required_text(
+            super::super::PROMPT_POLICY_FIELD,
+            draft.prompt_summary_policy,
+        )?;
         Ok(Self {
             action: action_from_label(action_text.as_str())
                 .ok_or_else(|| unsupported(super::super::ACTION_FIELD, action_text))?,
-            resource_label: super::super::required_text(super::super::RESOURCE_FIELD, draft.resource_label)?,
+            resource_label: super::super::required_text(
+                super::super::RESOURCE_FIELD,
+                draft.resource_label,
+            )?,
             outcome: outcome_from_label(outcome_text.as_str())
                 .ok_or_else(|| unsupported(super::super::OUTCOME_FIELD, outcome_text))?,
-            source_identity: super::super::required_text(super::super::SOURCE_FIELD, draft.source_identity)?,
+            source_identity: super::super::required_text(
+                super::super::SOURCE_FIELD,
+                draft.source_identity,
+            )?,
             trust_scope: trust_scope_from_label(scope_text.as_str())
                 .ok_or_else(|| unsupported(super::super::TRUST_SCOPE_FIELD, scope_text))?,
             trust_status: trust_status_from_label(trust_text.as_str())
@@ -70,7 +83,10 @@ impl Fields {
     }
 }
 
-fn unsupported(field: crate::validation::FieldName, value: super::super::Text) -> super::super::Error {
+fn unsupported(
+    field: crate::validation::FieldName,
+    value: super::super::Text,
+) -> super::super::Error {
     super::super::Error::UnsupportedValue {
         field: field.as_str(),
         value,

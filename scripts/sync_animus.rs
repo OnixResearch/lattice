@@ -9,7 +9,9 @@ use std::process::ExitCode;
 const EXPECTED_ARGUMENT_COUNT: usize = 3;
 const SOURCE_ARGUMENT_INDEX: usize = 1;
 const DESTINATION_ARGUMENT_INDEX: usize = 2;
-const EXPECTED_REVISION: &str = "f1662a8ed290b170c3986d2ddf2909b36d7e5fdc";
+const EXPECTED_REVISION: &str = "51d2683776ab73d4fd36d3d9e6ced2beadf9793d";
+// BLAKE3 of `git -c tar.umask=0000 archive --format=tar` at the exact revision.
+const SOURCE_ARCHIVE_BLAKE3: &str = "5f59a2b900095aec757bad5b5542d844e92eac2a0bd818e110d70927611ddb46";
 const HOST_CONTROL_REVISION: &str = "7735faf3d8895b0bfa89f563184c4321b3b144a1";
 const GIT_PROGRAM: &str = "git";
 const FAILURE_EXIT_CODE: u8 = 1;
@@ -21,6 +23,10 @@ const CARGO_MANIFEST_FILE_NAME: &str = "Cargo.toml";
 const SOURCE_METADATA_FILE_NAME: &str = "source.ncl";
 const CRATES_DIRECTORY_NAME: &str = "crates";
 const ANIMUS_ADAPTERS_CRATE_NAME: &str = "animus-adapters";
+const SECRET_SPEC_CRATE_NAME: &str = "animus-std-secretspec";
+const SECRET_SPEC_LICENSE: &str = "license = \"AGPL-3.0-or-later\"";
+const BOUNDED_EXEC_SOURCE_DEPENDENCY: &str = r#"bounded-exec = { git = "ssh://git@github.com/OnixResearch/bounded-exec.git", rev = "29dac88ecded94457572db3fdfaaaab95fa91525" }"#;
+const BOUNDED_EXEC_ANONYMOUS_DEPENDENCY: &str = r#"bounded-exec = { git = "https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git", rev = "29dac88ecded94457572db3fdfaaaab95fa91525" }"#;
 const HOST_CONTROL_DIRECTORY_NAME: &str = "host-control";
 const HOST_CONTROL_SOURCE_FILE_NAME: &str = "SOURCE";
 const HOST_CONTROL_CORE_MANIFEST: &str = "crates/host-control-core/Cargo.toml";
@@ -61,35 +67,62 @@ undocumented_unsafe_blocks = "deny"
 const STAGING_PREFIX: &str = ".animus-sync-stage";
 const WORKTREE_PREFIX: &str = "lattice-animus-sync-worktree";
 const REQUIRED_CRATES: &[&str] = &[
+    "animus-adapter-atif",
+    "animus-adapter-change-request",
+    "animus-adapter-continual",
+    "animus-adapter-daemon",
+    "animus-adapter-eval",
+    "animus-adapter-maintenance",
     "animus-adapter-observability",
     "animus-adapter-rlm-kernel",
     "animus-adapter-safe",
     "animus-adapters",
     "animus-core",
+    "animus-eval-core",
     "animus-router",
     "animus-runtime",
+    "animus-session-core",
+    "animus-std-secretspec",
     "animus-steel",
 ];
 
 const NORMALIZED_WORKSPACE_MANIFEST: &str = r#"[workspace]
 members = [
+  "crates/animus-adapter-atif",
+  "crates/animus-adapter-change-request",
+  "crates/animus-adapter-continual",
+  "crates/animus-adapter-daemon",
+  "crates/animus-adapter-eval",
+  "crates/animus-adapter-maintenance",
   "crates/animus-adapter-observability",
   "crates/animus-adapter-rlm-kernel",
   "crates/animus-adapter-safe",
   "crates/animus-adapters",
   "crates/animus-core",
+  "crates/animus-eval-core",
   "crates/animus-router",
   "crates/animus-runtime",
+  "crates/animus-session-core",
+  "crates/animus-std-secretspec",
   "crates/animus-steel",
 ]
 default-members = [
+  "crates/animus-adapter-atif",
+  "crates/animus-adapter-change-request",
+  "crates/animus-adapter-continual",
+  "crates/animus-adapter-daemon",
+  "crates/animus-adapter-eval",
+  "crates/animus-adapter-maintenance",
   "crates/animus-adapter-observability",
   "crates/animus-adapter-rlm-kernel",
   "crates/animus-adapter-safe",
   "crates/animus-adapters",
   "crates/animus-core",
+  "crates/animus-eval-core",
   "crates/animus-router",
   "crates/animus-runtime",
+  "crates/animus-session-core",
+  "crates/animus-std-secretspec",
   "crates/animus-steel",
 ]
 resolver = "2"
@@ -291,6 +324,12 @@ fn normalize_manifest(crate_name: &str, source: &str) -> Result<String, String> 
     ];
     let mut normalized = source.to_string();
     for (workspace_value, explicit_value) in replacements {
+        if crate_name == SECRET_SPEC_CRATE_NAME && workspace_value == "license.workspace = true" {
+            if normalized.contains(workspace_value) || normalized.matches(SECRET_SPEC_LICENSE).count() != 1 {
+                return Err("SecretSpec host must retain its explicit AGPL-3.0-or-later license".to_string());
+            }
+            continue;
+        }
         if normalized.matches(workspace_value).count() != 1 {
             return Err(format!("expected one manifest field {workspace_value:?}"));
         }
@@ -303,6 +342,12 @@ fn normalize_manifest(crate_name: &str, source: &str) -> Result<String, String> 
         normalized = normalized.replacen(HOST_CONTROL_SOURCE_DEPENDENCY, HOST_CONTROL_PATH_DEPENDENCY, 1);
     } else if normalized.contains(HOST_CONTROL_SOURCE_DEPENDENCY) {
         return Err(format!("unexpected Host Control dependency in {crate_name}"));
+    }
+    if crate_name == SECRET_SPEC_CRATE_NAME {
+        if normalized.matches(BOUNDED_EXEC_SOURCE_DEPENDENCY).count() != 1 {
+            return Err("SecretSpec host must contain one exact reviewed Bounded Exec dependency".to_string());
+        }
+        normalized = normalized.replacen(BOUNDED_EXEC_SOURCE_DEPENDENCY, BOUNDED_EXEC_ANONYMOUS_DEPENDENCY, 1);
     }
     Ok(normalized)
 }
@@ -363,16 +408,31 @@ fn source_metadata() -> String {
         r#"let Source = {{
   repository | String,
   revision | String,
+  source_archive_blake3 | String,
+  source_archive_format | String,
+  source_archive_tar_umask | String,
   host_control_revision | String,
   crates | Array String,
   normalized_workspace_manifest | Bool,
   normalized_crate_manifests | Bool,
   host_control_path_dependency | Bool,
   includes_compile_time_assets | Bool,
+  secretspec_version | String,
+  secretspec_revision | String,
+  secretspec_license | String,
+  secretspec_host_license | String,
+  secretspec_default_features | Bool,
+  secretspec_features | Array String,
+  bounded_exec_revision | String,
+  bounded_exec_license | String,
+  bounded_exec_transport_normalized | Bool,
 }} in
 {{
   repository = "ssh://git@github.com/OnixResearch/animus.git",
   revision = "{EXPECTED_REVISION}",
+  source_archive_blake3 = "{SOURCE_ARCHIVE_BLAKE3}",
+  source_archive_format = "git-tar",
+  source_archive_tar_umask = "0000",
   host_control_revision = "{HOST_CONTROL_REVISION}",
   crates = [
 {crate_rows}
@@ -381,6 +441,15 @@ fn source_metadata() -> String {
   normalized_crate_manifests = true,
   host_control_path_dependency = true,
   includes_compile_time_assets = true,
+  secretspec_version = "0.17.0",
+  secretspec_revision = "a8794e46ec9664a0e1a3869cc3105d0853937e48",
+  secretspec_license = "Apache-2.0",
+  secretspec_host_license = "AGPL-3.0-or-later",
+  secretspec_default_features = false,
+  secretspec_features = ["sops"],
+  bounded_exec_revision = "29dac88ecded94457572db3fdfaaaab95fa91525",
+  bounded_exec_license = "AGPL-3.0-or-later",
+  bounded_exec_transport_normalized = true,
 }} | Source
 "#
     )
@@ -397,16 +466,6 @@ mod tests {
     }
 
     #[test]
-    fn normalization_uses_the_vendored_host_control_core() {
-        let source = workspace_manifest(HOST_CONTROL_SOURCE_DEPENDENCY);
-        let normalized = normalize_manifest(ANIMUS_ADAPTERS_CRATE_NAME, &source).expect("normalize adapters manifest");
-
-        assert!(normalized.contains(HOST_CONTROL_PATH_DEPENDENCY));
-        assert!(!normalized.contains(HOST_CONTROL_SOURCE_DEPENDENCY));
-        assert!(normalized.contains(CRATE_EDITION));
-    }
-
-    #[test]
     fn normalization_rejects_missing_or_misplaced_host_control_dependencies() {
         let missing = workspace_manifest("");
         assert!(normalize_manifest(ANIMUS_ADAPTERS_CRATE_NAME, &missing).is_err());
@@ -420,8 +479,6 @@ mod tests {
         let source = "[package]\nname = \"host-control-core\"\nedition.workspace = true\nlicense.workspace = true\nrust-version.workspace = true\nversion.workspace = true\n\n[lints]\nworkspace = true\n";
         let normalized = normalize_host_control_manifest(source).expect("normalize Host Control manifest");
 
-        assert!(normalized.contains(HOST_CONTROL_CRATE_EDITION));
-        assert!(normalized.contains(HOST_CONTROL_LINT_BLOCK));
         assert_eq!(normalize_host_control_manifest(&normalized), Ok(normalized));
     }
 

@@ -7,15 +7,9 @@
 //! fail closed instead of silently overwriting prior entries, and it compares
 //! each object key with the mapped value's id before enforcement.
 
-use iddqd::IdOrdItem;
-use iddqd::IdOrdMap;
-use iddqd::id_upcast;
-use serde::Deserialize;
-use serde::Serialize;
-
-use crate::ContractBackendPolicy;
-use crate::ContractPolicy;
-use crate::Policy;
+use crate::{ContractBackendPolicy, ContractPolicy, Policy};
+use iddqd::{IdOrdItem, IdOrdMap, id_upcast};
+use serde::{Deserialize, Serialize};
 
 /// Schema marker for a validated policy identity index set.
 pub const POLICY_IDENTITY_SCHEMA: &str = "basalt.policy-identity.v1";
@@ -87,7 +81,8 @@ impl PolicyIdentityIndexes {
 impl IdOrdItem for ContractPolicy {
     type Key<'a>
         = &'a str
-    where Self: 'a;
+    where
+        Self: 'a;
 
     fn key(&self) -> Self::Key<'_> {
         self.id.as_str()
@@ -99,7 +94,8 @@ impl IdOrdItem for ContractPolicy {
 impl IdOrdItem for ContractBackendPolicy {
     type Key<'a>
         = &'a str
-    where Self: 'a;
+    where
+        Self: 'a;
 
     fn key(&self) -> Self::Key<'_> {
         self.id.as_str()
@@ -121,7 +117,9 @@ impl IdOrdItem for ContractBackendPolicy {
 /// Returns a non-empty `Vec<PolicyIdentityIssue>` when any identity drift,
 /// duplicate id, empty id, key/value mismatch, or unsupported backend id is
 /// detected before enforcement.
-pub fn build_policy_identity_indexes(policy: &Policy) -> Result<PolicyIdentityIndexes, Vec<PolicyIdentityIssue>> {
+pub fn build_policy_identity_indexes(
+    policy: &Policy,
+) -> Result<PolicyIdentityIndexes, Vec<PolicyIdentityIssue>> {
     let mut issues = Vec::new();
     let mut contracts = IdOrdMap::<ContractPolicy>::new();
     let mut backends = IdOrdMap::<ContractBackendPolicy>::new();
@@ -130,7 +128,10 @@ pub fn build_policy_identity_indexes(policy: &Policy) -> Result<PolicyIdentityIn
     build_backend_index(policy, &mut backends, &mut issues);
 
     if issues.is_empty() {
-        Ok(PolicyIdentityIndexes { contracts, backends })
+        Ok(PolicyIdentityIndexes {
+            contracts,
+            backends,
+        })
     } else {
         Err(issues)
     }
@@ -152,7 +153,10 @@ fn build_contract_index(
         if key.as_str() != value.id {
             issues.push(PolicyIdentityIssue::new(
                 "policy-identity.contract.key-value-id-mismatch",
-                &format!("contract object key {key} does not match value id {}", value.id),
+                &format!(
+                    "contract object key {key} does not match value id {}",
+                    value.id
+                ),
             ));
         }
         if let Err(error) = contracts.insert_unique(value.clone()) {
@@ -181,7 +185,10 @@ fn build_backend_index(
         if key.as_str() != value.id {
             issues.push(PolicyIdentityIssue::new(
                 "policy-identity.backend.key-value-id-mismatch",
-                &format!("backend object key {key} does not match value id {}", value.id),
+                &format!(
+                    "backend object key {key} does not match value id {}",
+                    value.id
+                ),
             ));
         }
         if !value.is_supported() {
@@ -208,10 +215,7 @@ fn bounded_non_empty(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::EnforcementRequest;
-    use crate::Policy;
-    use crate::enforce;
-    use crate::parse_policy_json;
+    use crate::{EnforcementRequest, Policy, enforce, parse_policy_json};
 
     fn valid_policy_json() -> &'static str {
         r#"{
@@ -250,7 +254,9 @@ mod tests {
 
         assert_eq!(indexes.contract_count(), 1);
         assert_eq!(indexes.backend_count(), 2);
-        let contract = indexes.contract("document-write").expect("contract present");
+        let contract = indexes
+            .contract("document-write")
+            .expect("contract present");
         assert_eq!(contract.id, "document-write");
         assert!(indexes.backend("nickel").is_some());
         assert!(indexes.backend("steel").is_some());
@@ -260,8 +266,15 @@ mod tests {
     fn enforcement_still_resolves_via_stable_id() {
         let policy = policy(valid_policy_json());
         let indexes = build_policy_identity_indexes(&policy).expect("valid indexes");
-        let request = EnforcementRequest::new("document-write", "did:key:z6Mkresource/docs/report", "document/write")
-            .with_capability(crate::CapabilityGrant::new("did:key:z6Mkresource/docs/report", "document/write"));
+        let request = EnforcementRequest::new(
+            "document-write",
+            "did:key:z6Mkresource/docs/report",
+            "document/write",
+        )
+        .with_capability(crate::CapabilityGrant::new(
+            "did:key:z6Mkresource/docs/report",
+            "document/write",
+        ));
 
         let resolved = indexes.contract("document-write").expect("resolved by id");
         assert_eq!(resolved.id, request.contract);
@@ -282,7 +295,11 @@ mod tests {
         );
 
         let issues = build_policy_identity_indexes(&policy).expect_err("duplicate id must fail");
-        assert!(issues.iter().any(|i| i.class == "policy-identity.contract.duplicate-id"));
+        assert!(
+            issues
+                .iter()
+                .any(|i| i.class == "policy-identity.contract.duplicate-id")
+        );
     }
 
     #[test]
@@ -298,7 +315,11 @@ mod tests {
         );
 
         let issues = build_policy_identity_indexes(&policy).expect_err("mismatch must fail");
-        assert!(issues.iter().any(|i| i.class == "policy-identity.contract.key-value-id-mismatch"));
+        assert!(
+            issues
+                .iter()
+                .any(|i| i.class == "policy-identity.contract.key-value-id-mismatch")
+        );
     }
 
     #[test]
@@ -314,7 +335,11 @@ mod tests {
         );
 
         let issues = build_policy_identity_indexes(&policy).expect_err("empty id must fail");
-        assert!(issues.iter().any(|i| i.class == "policy-identity.contract.empty-id"));
+        assert!(
+            issues
+                .iter()
+                .any(|i| i.class == "policy-identity.contract.empty-id")
+        );
     }
 
     #[test]
@@ -329,8 +354,13 @@ mod tests {
             }"#,
         );
 
-        let issues = build_policy_identity_indexes(&policy).expect_err("unsupported backend must fail");
-        assert!(issues.iter().any(|i| i.class == "policy-identity.backend.unsupported"));
+        let issues =
+            build_policy_identity_indexes(&policy).expect_err("unsupported backend must fail");
+        assert!(
+            issues
+                .iter()
+                .any(|i| i.class == "policy-identity.backend.unsupported")
+        );
     }
 
     #[test]
@@ -345,8 +375,13 @@ mod tests {
             }"#,
         );
 
-        let issues = build_policy_identity_indexes(&policy).expect_err("empty backend id must fail");
-        assert!(issues.iter().any(|i| i.class == "policy-identity.backend.empty-id"));
+        let issues =
+            build_policy_identity_indexes(&policy).expect_err("empty backend id must fail");
+        assert!(
+            issues
+                .iter()
+                .any(|i| i.class == "policy-identity.backend.empty-id")
+        );
     }
 
     #[test]
@@ -361,21 +396,32 @@ mod tests {
             }"#,
         );
 
-        let issues = build_policy_identity_indexes(&policy).expect_err("backend mismatch must fail");
-        assert!(issues.iter().any(|i| i.class == "policy-identity.backend.key-value-id-mismatch"));
+        let issues =
+            build_policy_identity_indexes(&policy).expect_err("backend mismatch must fail");
+        assert!(
+            issues
+                .iter()
+                .any(|i| i.class == "policy-identity.backend.key-value-id-mismatch")
+        );
     }
 
     #[test]
     fn negative_malformed_policy_fails_at_parse() {
         let result = parse_policy_json(r#"{"schema_version":"ucan-nickel-contracts.policy.v1"}"#);
-        assert!(result.is_err(), "malformed policy without required contracts should fail parse");
+        assert!(
+            result.is_err(),
+            "malformed policy without required contracts should fail parse"
+        );
     }
 
     #[test]
     fn contracts_iterate_in_stable_order() {
         let policy = policy(valid_policy_json());
         let indexes = build_policy_identity_indexes(&policy).expect("valid indexes");
-        let ids = indexes.contracts().map(|c| c.id.as_str()).collect::<Vec<_>>();
+        let ids = indexes
+            .contracts()
+            .map(|c| c.id.as_str())
+            .collect::<Vec<_>>();
         let mut sorted = ids.clone();
         sorted.sort_unstable();
         assert_eq!(ids, sorted);

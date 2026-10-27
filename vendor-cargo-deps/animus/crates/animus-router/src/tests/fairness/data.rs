@@ -3,7 +3,8 @@ use super::super::*;
 pub(super) const EXPECTED_ROTATION_DECISIONS: usize = 1;
 pub(super) const PRIMARY_ROTATION_CATALOG_COUNT: usize = 2;
 pub(super) const FALLBACK_ROTATION_CATALOG_COUNT: usize = 4;
-pub(super) const UPPERCASE_POLICY_HASH: &str = "A000000000000000000000000000000000000000000000000000000000000000";
+pub(super) const UPPERCASE_POLICY_HASH: &str =
+    "A000000000000000000000000000000000000000000000000000000000000000";
 
 pub(super) fn primary_rotation_catalog() -> alloc::vec::Vec<crate::CatalogEntry> {
     let catalog = alloc::vec![

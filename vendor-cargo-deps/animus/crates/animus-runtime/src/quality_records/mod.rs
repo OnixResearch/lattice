@@ -5,8 +5,7 @@
 //! guidance inventory logic. Filesystem sidecars, JSONL storage, clocks, Git,
 //! discovery, and CLI execution remain host/adapter concerns.
 
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while
-// drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -14,7 +13,12 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
+#![allow(
+    compound_condition,
+    excessive_file_length,
+    function_length,
+    non_trait_imports
+)]
 #![allow(
     numeric_units,
     path_segment_repetition,
@@ -24,38 +28,20 @@
 mod core;
 mod data;
 
-pub use core::active_quality_records;
-pub use core::blake3_quality_fingerprint;
-pub use core::classify_quality_span_freshness;
-pub use core::export_quality_sidecar_record;
-pub use core::quality_dependency_isolation_report;
-pub use core::quality_record_id;
-pub use core::report_quality_after_edit;
-pub use core::resolve_quality_agents_guidance;
-pub use core::roundtrip_unknown_sidecar_record;
-pub use core::validate_quality_record;
-
-pub use data::QualityAgentsGuidanceError;
-pub use data::QualityAgentsGuidancePage;
-pub use data::QualityAnnotationBody;
-pub use data::QualityDependencyIsolationReport;
-pub use data::QualityDependencyRequirement;
-pub use data::QualityDiagnostic;
-pub use data::QualityDiagnosticKind;
-pub use data::QualityEditReport;
-pub use data::QualityFingerprint;
-pub use data::QualityFreshness;
-pub use data::QualityIssuerClassification;
-pub use data::QualityLifecycleReport;
-pub use data::QualityMetadataField;
-pub use data::QualityRecordBody;
-pub use data::QualityRecordEnvelope;
-pub use data::QualityRecordKind;
-pub use data::QualitySidecarExport;
-pub use data::QualitySpan;
-pub use data::QualitySpanFreshnessReport;
-pub use data::QualityUnknownSidecarRecord;
-pub use data::QualityValidationResult;
+pub use core::{
+    active_quality_records, blake3_quality_fingerprint, classify_quality_span_freshness,
+    export_quality_sidecar_record, quality_dependency_isolation_report, quality_record_id,
+    report_quality_after_edit, resolve_quality_agents_guidance, roundtrip_unknown_sidecar_record,
+    validate_quality_record,
+};
+pub use data::{
+    QualityAgentsGuidanceError, QualityAgentsGuidancePage, QualityAnnotationBody,
+    QualityDependencyIsolationReport, QualityDependencyRequirement, QualityDiagnostic,
+    QualityDiagnosticKind, QualityEditReport, QualityFingerprint, QualityFreshness,
+    QualityIssuerClassification, QualityLifecycleReport, QualityMetadataField, QualityRecordBody,
+    QualityRecordEnvelope, QualityRecordKind, QualitySidecarExport, QualitySpan,
+    QualitySpanFreshnessReport, QualityUnknownSidecarRecord, QualityValidationResult,
+};
 
 pub(crate) const BLAKE3_ALGORITHM: &str = "BLAKE3";
 pub(crate) const CURRENT_QUALITY_VERSION: u32 = 1;

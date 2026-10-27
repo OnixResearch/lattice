@@ -1,0 +1,26 @@
+[
+  {
+    "id": "workflow-contract-key-order",
+    "description": "Lattice workflow exchange values retain nested keys, null outputs and ordered dependency arrays under Preserves canonicalization.",
+    "value": {"workflow_id":"daily-digest","nodes":[{"node_id":"collect","dependencies":[],"output":null},{"node_id":"summarize","dependencies":["collect"],"output":{"count":3,"ok":true}}],"revision":1},
+    "expected_hash": "cb47317786c8c0eca5c4236c2cadefeb9af1d89dabc7aabe7349f3e55dd61c9f"
+  },
+  {
+    "id": "workflow-contract-reordered-keys",
+    "description": "Equivalent workflow exchange records with reordered object keys must share canonical bytes and digest.",
+    "value": {"revision":1,"nodes":[{"output":null,"dependencies":[],"node_id":"collect"},{"output":{"ok":true,"count":3},"dependencies":["collect"],"node_id":"summarize"}],"workflow_id":"daily-digest"},
+    "expected_hash": "cb47317786c8c0eca5c4236c2cadefeb9af1d89dabc7aabe7349f3e55dd61c9f"
+  },
+  {
+    "id": "workflow-contract-sequence-order",
+    "description": "Reordering nodes is not object key canonicalization and must retain a distinct ordered value identity.",
+    "value": {"workflow_id":"daily-digest","nodes":[{"node_id":"summarize","dependencies":["collect"],"output":{"count":3,"ok":true}},{"node_id":"collect","dependencies":[],"output":null}],"revision":1},
+    "expected_hash": "158b4edb7704e0bea32b7ca0f0edde793ca146a0b294c55c7e53d3ce7c0d021b"
+  },
+  {
+    "id": "workflow-contract-absent-output",
+    "description": "An absent output field differs from a present null observation.",
+    "value": {"workflow_id":"daily-digest","nodes":[{"node_id":"collect","dependencies":[]},{"node_id":"summarize","dependencies":["collect"],"output":{"count":3,"ok":true}}],"revision":1},
+    "expected_hash": "6cc1d2c718a1e4fcfa3738d07e6b1630da803a7d5cd38a1a25c5e63c8db90882"
+  }
+]

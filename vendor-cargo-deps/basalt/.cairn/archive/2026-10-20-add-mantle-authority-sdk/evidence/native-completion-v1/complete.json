@@ -1,0 +1,78 @@
+{
+  "records": [
+    {
+      "label": "native-sync-execute",
+      "command": [
+        "/home/brittonr/mantle-cairn-finish/runs/cairn-source-review-operator-smoke-20261020-v1/cairn",
+        "sync",
+        "add-mantle-authority-sdk",
+        "--root",
+        ".",
+        "--execute"
+      ],
+      "cwd": "/home/brittonr/mantle-cairn-finish/xrepo/basalt-mantle-main-20261020",
+      "exit": 0,
+      "archive_date": "2026-10-20",
+      "elapsed_s": 0.26471681892871857
+    },
+    {
+      "label": "native-validate-after-sync",
+      "command": [
+        "/home/brittonr/mantle-cairn-finish/runs/cairn-source-review-operator-smoke-20261020-v1/cairn",
+        "validate",
+        "--root",
+        "."
+      ],
+      "cwd": "/home/brittonr/mantle-cairn-finish/xrepo/basalt-mantle-main-20261020",
+      "exit": 0,
+      "archive_date": "2026-10-20",
+      "elapsed_s": 0.11430805083364248
+    },
+    {
+      "label": "native-archive-preview",
+      "command": [
+        "/home/brittonr/mantle-cairn-finish/runs/cairn-source-review-operator-smoke-20261020-v1/cairn",
+        "archive",
+        "add-mantle-authority-sdk",
+        "--root",
+        "."
+      ],
+      "cwd": "/home/brittonr/mantle-cairn-finish/xrepo/basalt-mantle-main-20261020",
+      "exit": 0,
+      "archive_date": "2026-10-20",
+      "elapsed_s": 0.21462780889123678
+    },
+    {
+      "label": "native-archive-execute",
+      "command": [
+        "/home/brittonr/mantle-cairn-finish/runs/cairn-source-review-operator-smoke-20261020-v1/cairn",
+        "archive",
+        "add-mantle-authority-sdk",
+        "--root",
+        ".",
+        "--execute"
+      ],
+      "cwd": "/home/brittonr/mantle-cairn-finish/xrepo/basalt-mantle-main-20261020",
+      "exit": 0,
+      "archive_date": "2026-10-20",
+      "elapsed_s": 0.21493342518806458
+    },
+    {
+      "label": "native-validate-post-archive",
+      "command": [
+        "/home/brittonr/mantle-cairn-finish/runs/cairn-source-review-operator-smoke-20261020-v1/cairn",
+        "validate",
+        "--root",
+        "."
+      ],
+      "cwd": "/home/brittonr/mantle-cairn-finish/xrepo/basalt-mantle-main-20261020",
+      "exit": 0,
+      "archive_date": "2026-10-20",
+      "elapsed_s": 0.11469171661883593
+    }
+  ],
+  "archive": ".cairn/archive/2026-10-20-add-mantle-authority-sdk",
+  "post_archive_validation": true,
+  "real_deployment_approval": false,
+  "release_authority": false
+}

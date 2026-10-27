@@ -1,9 +1,7 @@
-use basalt::CapabilityGrant;
-use basalt::DEFAULT_POLICY_JSON;
-use basalt::EnforcementRequest;
-use basalt::default_policy;
-use basalt::enforce;
-use basalt::parse_policy_json;
+use basalt::{
+    CapabilityGrant, DEFAULT_POLICY_JSON, EnforcementRequest, default_policy, enforce,
+    parse_policy_json,
+};
 
 #[test]
 fn packaged_policy_json_is_parseable_and_usable() {
@@ -11,8 +9,15 @@ fn packaged_policy_json_is_parseable_and_usable() {
     assert!(policy.contract("document-read").is_some());
     assert!(policy.contract("document-write").is_some());
 
-    let request = EnforcementRequest::new("document-read", "did:key:z6Mkresource/docs/report", "document/read")
-        .with_capability(CapabilityGrant::new("did:key:z6Mkresource/docs/report", "document/read"));
+    let request = EnforcementRequest::new(
+        "document-read",
+        "did:key:z6Mkresource/docs/report",
+        "document/read",
+    )
+    .with_capability(CapabilityGrant::new(
+        "did:key:z6Mkresource/docs/report",
+        "document/read",
+    ));
 
     let receipt = enforce(&policy, &request).expect("packaged policy should enforce");
     assert!(receipt.is_allowed());

@@ -1,0 +1,5498 @@
+{
+  "environment_assumptions": [
+    {
+      "category": "kernel",
+      "description": "Linux x86_64 kernel with seccomp user notification and the seed syscall ABI",
+      "id": "linux-kernel"
+    },
+    {
+      "category": "orchestrator",
+      "description": "The running Mantle process stages checked bytes and supervises exact executable decisions",
+      "id": "mantle-orchestrator"
+    }
+  ],
+  "generated_artifacts": [
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "cf21608d883b8bdcc1fa6438703630f2fa496cf74d483ce351f876c0656ecf80"
+      },
+      "id": "hex0-reproduced",
+      "name": "reproduced hex0 assembler",
+      "producing_tool_id": "hex0-seed-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "edc664d028b349824cc8c66030a8883b81bdc03d07bc871e44e60ecb4311ab2a"
+      },
+      "id": "kaem-0",
+      "name": "minimal kaem transition runner",
+      "producing_tool_id": "hex0-reproduced-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "080eca455a46f2cab998f0ff78b401077294ad612d829397309df7be23fa5a8e"
+      },
+      "id": "stage0-m0",
+      "name": "Stage0 M0",
+      "producing_tool_id": "stage0-mini-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "78be6fd6f49cee594969f3f82c8677a7b771e2907c023380c637628eff92c760"
+      },
+      "id": "stage0-m1-bootstrap",
+      "name": "Stage0 bootstrap M1",
+      "producing_tool_id": "stage0-mini-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "2d583c15ad3fa677883b769e7d8e91c7847ea30cff93013e1f0307b5451d70ed"
+      },
+      "id": "stage0-m2",
+      "name": "Stage0 M2",
+      "producing_tool_id": "stage0-mini-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "2f4f5d787f886552ef4600ab8b7e31c612e78b59a341e79ed2911558c9180eda"
+      },
+      "id": "stage0-blood-elf-bootstrap",
+      "name": "Stage0 bootstrap blood-elf",
+      "producing_tool_id": "stage0-mini-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "0d2c2c14eaf77c130f5ffaaea777e7b6f7eab1408acf57c8b516b5f56c451899"
+      },
+      "id": "stage0-catm",
+      "name": "Stage0 catm",
+      "producing_tool_id": "stage0-mini-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "e91376dee1ac7aa4ef6dc5b86c3e73f08b71fc78b5e069f5e80035955eb971e4"
+      },
+      "id": "stage0-cc-amd64",
+      "name": "Stage0 cc_amd64",
+      "producing_tool_id": "stage0-mini-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "580b8b771a6dc2b91feb34775ea7152623cc096b37013382f166f2fa9c6d1e40"
+      },
+      "id": "stage0-hex1",
+      "name": "Stage0 hex1",
+      "producing_tool_id": "stage0-mini-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "84c05689d80bacb397a41eb22c02b3e8e827c648b3b1b5f941d4545decbae0b3"
+      },
+      "id": "stage0-hex2-bootstrap",
+      "name": "Stage0 bootstrap hex2",
+      "producing_tool_id": "stage0-mini-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "2954bef3c2eeae38f0de55556d920c51491f9dd4e74ed482fecbc43c83ef3c1a"
+      },
+      "id": "stage0-hex2-intermediate",
+      "name": "Stage0 intermediate hex2",
+      "producing_tool_id": "stage0-mini-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b58f328ad2106ed666e68c485b1e1504ef893e09aed44fbe9805f2a534543642"
+      },
+      "id": "stage0-m1",
+      "name": "Stage0 M1",
+      "producing_tool_id": "stage0-mini-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "2954bef3c2eeae38f0de55556d920c51491f9dd4e74ed482fecbc43c83ef3c1a"
+      },
+      "id": "stage0-hex2",
+      "name": "Stage0 final hex2",
+      "producing_tool_id": "stage0-mini-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "c6c2f9136a41ec16b049e2af0a017d87804d69f4cad882b20eefbbc6725ea854"
+      },
+      "id": "stage0-kaem",
+      "name": "Stage0 full kaem",
+      "producing_tool_id": "stage0-mini-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "e473c5670f6a2cfc0af270d75c72405930c24d741febbe4577d28f4cbf90cd36"
+      },
+      "id": "stage0-full-m2-mesoplanet",
+      "name": "full Stage0 M2-Mesoplanet",
+      "producing_tool_id": "stage0-full-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "9133f106b326b9badb5945fa50a7a5f36cffa2bdea76ad0568328cb06685f166"
+      },
+      "id": "stage0-full-m2-planet",
+      "name": "full Stage0 M2-Planet",
+      "producing_tool_id": "stage0-full-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "23154d5fdfc6b669714a5551587feb34d4964759729dd28bc51581960fd19c25"
+      },
+      "id": "stage0-full-blood-elf",
+      "name": "full Stage0 blood-elf",
+      "producing_tool_id": "stage0-full-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "2ecde44089def1bb3496368f90d17fbba30d8938cf4109383375e3845ce52be3"
+      },
+      "id": "stage0-full-catm",
+      "name": "full Stage0 catm",
+      "producing_tool_id": "stage0-full-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "1ce14e51cd2020400ecaa356a8d67cb8fa6d53357a63e236c45901ee9759ac63"
+      },
+      "id": "stage0-full-chmod",
+      "name": "full Stage0 chmod",
+      "producing_tool_id": "stage0-full-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "636b9ee7cc548bfb59fd3425d9fd7cdfe9340766f2ea23e85c98f76f5276c23b"
+      },
+      "id": "stage0-full-cp",
+      "name": "full Stage0 cp",
+      "producing_tool_id": "stage0-full-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "94eb62461a1e94ca7fef4c5c90fa017505696dc22e3235df6b9cc341cf5234e3"
+      },
+      "id": "stage0-full-get-machine",
+      "name": "full Stage0 get_machine",
+      "producing_tool_id": "stage0-full-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b6862c346146a63d7e334c3e057e54eb77ce841e788583f0d0a824879cff0c97"
+      },
+      "id": "stage0-full-match",
+      "name": "full Stage0 match",
+      "producing_tool_id": "stage0-full-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "a023e38258367002b7f9dde5fcb49cec445c34cce08a8b63c8933fa3fab5cf62"
+      },
+      "id": "stage0-full-mkdir",
+      "name": "full Stage0 mkdir",
+      "producing_tool_id": "stage0-full-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "4e67d5271e052629f8d92a11979ec8a93e7d8c416070544b71266d189f37dbbd"
+      },
+      "id": "stage0-full-replace",
+      "name": "full Stage0 replace",
+      "producing_tool_id": "stage0-full-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "e7a77376f5a41340b42929b679da8af84ff508ceda13b0f077e6f77e06423e20"
+      },
+      "id": "stage0-full-rm",
+      "name": "full Stage0 rm",
+      "producing_tool_id": "stage0-full-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "c507561a47ca67648247eaa06d054193d9aac21160708a7671987dc2f1c48a61"
+      },
+      "id": "stage0-full-sha256sum",
+      "name": "full Stage0 sha256sum",
+      "producing_tool_id": "stage0-full-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "51319fe1892cd3b43fee2751ef3d00ec4ae1ff2a70a6fa72c0764cf9d9e75010"
+      },
+      "id": "stage0-full-unbz2",
+      "name": "full Stage0 unbz2",
+      "producing_tool_id": "stage0-full-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "d7e6dae760f6635196ebd80f203aada32ad83eb8fb0d013b7b09f879dc45290d"
+      },
+      "id": "stage0-full-ungz",
+      "name": "full Stage0 ungz",
+      "producing_tool_id": "stage0-full-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "794461d61868aa601955182f5abc1fbc6f840a1402ece32855c41b59efb2bdf0"
+      },
+      "id": "stage0-full-untar",
+      "name": "full Stage0 untar",
+      "producing_tool_id": "stage0-full-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "8a1543cab9d6290e9c9306e16efc83ac0d230307c9c394b048e2d0b41b719771"
+      },
+      "id": "stage0-full-unxz",
+      "name": "full Stage0 unxz",
+      "producing_tool_id": "stage0-full-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "1d08486cfb920032a821c7603f56410af6c0372c0a4b78546d6c8d8bb1c0f9e0"
+      },
+      "id": "stage0-full-wrap",
+      "name": "full Stage0 wrap",
+      "producing_tool_id": "stage0-full-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "de4f20cdc2ad232ca79c5aee20c1ef491a71ce95fcfdb28020fc0c9a4c51ea3d"
+      },
+      "id": "mes-m2",
+      "name": "source-built mes-m2 Scheme runtime",
+      "producing_tool_id": "mes-m2-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "de4f20cdc2ad232ca79c5aee20c1ef491a71ce95fcfdb28020fc0c9a4c51ea3d"
+      },
+      "id": "mes",
+      "name": "source-built Mes runtime compatibility executable",
+      "producing_tool_id": "mes-m2-kaem-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "34ecfa676a692c79fe14fe85882dbd3b325c6f6f732e475ab94b9240f18cf445"
+      },
+      "id": "mescc-entrypoint",
+      "name": "relocatable mescc Scheme entrypoint",
+      "producing_tool_id": "mes-runtime-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "e49c87f324b58369183ab753fb1f346aeb28fc2974956d2872e046f8ef27416d"
+      },
+      "id": "mes-crt1",
+      "name": "Mes x86_64 crt1 object",
+      "producing_tool_id": "mes-runtime-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "a1107fe39ca1c6486dc57bccf82ad40569fa13e34695e8f2c119fbb892b02892"
+      },
+      "id": "mes-x86_64-m1",
+      "name": "Mes x86_64 M1 definitions",
+      "producing_tool_id": "mes-runtime-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "12f9ee98f249da9a85158df6f242f5382c1e2d9a590dc84d521c70249d01dda1"
+      },
+      "id": "mes-libc-mini",
+      "name": "Mes minimal libc archive",
+      "producing_tool_id": "mes-runtime-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "2f7c7eb4d002097cf68ad3b84ffecbb107195563fd21f27672b9918c3cfad2bd"
+      },
+      "id": "mes-libmes",
+      "name": "Mes runtime archive",
+      "producing_tool_id": "mes-runtime-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "6a8d1e0a5f9dea02ae863552744e36f721833e57d054c993466d74c83eed7cdc"
+      },
+      "id": "mes-libmescc",
+      "name": "Mes compiler support archive",
+      "producing_tool_id": "mes-runtime-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "d70f11fe75e9eaa59b0aa4d0d92d8c663afe33a0e8f60e3864d364b45d0105c4"
+      },
+      "id": "mes-libc",
+      "name": "Mes libc archive",
+      "producing_tool_id": "mes-runtime-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "348f304db99daa3dc1eec807133cb232d28768b0d20a563bf8f6d68b493440d7"
+      },
+      "id": "mes-libc-tcc",
+      "name": "Mes TinyCC support libc archive",
+      "producing_tool_id": "mes-runtime-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "c11be20d8d70e8ed3a88f1cea0a54ade5c64f8035c50974859dccb77f1bea055"
+      },
+      "id": "mes-libtcc1",
+      "name": "Mes TinyCC runtime archive",
+      "producing_tool_id": "mes-runtime-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "04806a625d31f6a1ae4c92343e23ac4d355bcaa880f8aaa55b372f4a3785f135"
+      },
+      "id": "mes-libgetopt",
+      "name": "Mes getopt archive",
+      "producing_tool_id": "mes-runtime-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "892b042fe8e7d17b9774e89c83979c35f79f067fa2bdfd2bcc7279ac2858d8d4"
+      },
+      "id": "mes-elf-header",
+      "name": "Mes x86_64 ELF header recipe",
+      "producing_tool_id": "mes-runtime-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b23189272376d99464531e041d1367b5a93086665513280645c1f41ce7ecda79"
+      },
+      "id": "mes-elf-footer",
+      "name": "Mes x86_64 ELF footer recipe",
+      "producing_tool_id": "mes-runtime-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "ef10b32c5de0b9322dfdcc5653bab9f0b9e8d5ee57b248ec8cb570c2ae10e9b3"
+      },
+      "id": "tcc-mes",
+      "name": "Mes-linked TinyCC compiler",
+      "producing_tool_id": "tinycc-mes-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "8b3f20ef69f2356e64d513b82d26afb5c67bce9e51c045bbfbbf14784d13c66f"
+      },
+      "id": "tcc-boot0",
+      "name": "first TinyCC self-compiled boundary",
+      "producing_tool_id": "tinycc-boot0-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "ef10b32c5de0b9322dfdcc5653bab9f0b9e8d5ee57b248ec8cb570c2ae10e9b3"
+      },
+      "id": "tinycc-0.9.26",
+      "name": "final source-built TinyCC 0.9.26 compiler",
+      "producing_tool_id": "tinycc-final-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "d3fec15bd12fd72fdbdf4248d6df6b21a44cfb6a3e2c9d787a0d081ff7143df1"
+      },
+      "id": "tinycc-crt1",
+      "name": "TinyCC-refreshed crt1",
+      "producing_tool_id": "tinycc-runtime-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "cbc10117c34515b9b3ad14f3e4dc73a37708c6206f36cd51dc6f1e8a98093f8c"
+      },
+      "id": "tinycc-libc",
+      "name": "TinyCC-refreshed Mes libc",
+      "producing_tool_id": "tinycc-runtime-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "0e8b75458ad70ab03142b27a3014af68f57c03004f4d22a65702e60d531140e9"
+      },
+      "id": "tinycc-libtcc1",
+      "name": "TinyCC runtime support archive",
+      "producing_tool_id": "tinycc-runtime-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "1fb5e11a952e173ec451601f2f11c09b2703d48e20b6533d327dc83b6b520449"
+      },
+      "id": "tinycc-libgetopt",
+      "name": "TinyCC-refreshed getopt archive",
+      "producing_tool_id": "tinycc-runtime-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "0374e6d6c06eb731b2189d02283736cb93a0caa66ef4022737f2617ae037c7e8"
+      },
+      "id": "tinycc27-va-list",
+      "name": "TinyCC 0.9.27 x86_64 va_list object",
+      "producing_tool_id": "tinycc27-runtime-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "bd46a4a350e17ec4a7870be6c6dea82f7327c513ee4e2720bebb7b6e26f20d85"
+      },
+      "id": "tinycc27-libc",
+      "name": "TinyCC 0.9.27 Mes libc archive",
+      "producing_tool_id": "tinycc27-runtime-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "51a5345bd89dbdb0537340f90151c663d144f34343a60c56c0110cd5a15dee39"
+      },
+      "id": "tinycc-0.9.27",
+      "name": "source-built TinyCC 0.9.27 compiler",
+      "producing_tool_id": "tinycc27-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "51a5345bd89dbdb0537340f90151c663d144f34343a60c56c0110cd5a15dee39"
+      },
+      "id": "tinycc27-alias",
+      "name": "TinyCC 0.9.27 compiler alias",
+      "producing_tool_id": "tinycc27-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "19efdabfedafc9bf94f3ddc49967773a2a5e5b5f28128c6f95ac4f36184fdb92"
+      },
+      "id": "tinycc27-positive-object",
+      "name": "TinyCC 0.9.27 positive smoke object",
+      "producing_tool_id": "tinycc27-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "8a5aa115eab6069a8f69cf1b2c63c69c478d64b271bc13fda7ea4e3531b841d1"
+      },
+      "id": "make-3.82",
+      "name": "source-built GNU Make 3.82",
+      "producing_tool_id": "make-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "028ececbb67a3394595027c9273a44ed2ba5b465c209767589b5a989032b93d1"
+      },
+      "id": "make-recipe-runner",
+      "name": "source-built bounded Make recipe runner",
+      "producing_tool_id": "make-recipe-runner-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "8dd632d8df367d6751cc2e2497e8d9c38e0c5a1e58b100d59e1c0fdac235e3a2"
+      },
+      "id": "make-recipe-smoke",
+      "name": "GNU Make protected recipe smoke output",
+      "producing_tool_id": "make-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "2193ea653bfbc16acc2609a5c7ef6c0b03a7a65dc50e6525d23868598e25fbcb"
+      },
+      "id": "gnu-patch-2.5.9",
+      "name": "source-built GNU patch 2.5.9",
+      "producing_tool_id": "gnu-patch-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "79d1d8da0b625035cdbfc9d51841030861b9f4cf7c5abbe442a8d13efc352170"
+      },
+      "id": "gnu-patch-smoke",
+      "name": "GNU patch protected positive smoke output",
+      "producing_tool_id": "gnu-patch-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "dd10648de513f76a1ecdbfa23cc88953f8c6e46848311a6372de7498aed43c6e"
+      },
+      "id": "gzip-makecrc",
+      "name": "source-built gzip CRC generator",
+      "producing_tool_id": "gzip-generator-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "19a3f07c4b071fe898927d1da2c3b64d37e02b0e8cf309d2a9fc4d70ac9d8fa1"
+      },
+      "id": "gzip-crc-table",
+      "name": "generated gzip CRC table",
+      "producing_tool_id": "gzip-generator-run-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "d2939461715a694222c1a612c0908754e599eb2d268fe012c525845367eff04a"
+      },
+      "id": "gzip-1.2.4",
+      "name": "source-built gzip 1.2.4",
+      "producing_tool_id": "gzip-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "d2939461715a694222c1a612c0908754e599eb2d268fe012c525845367eff04a"
+      },
+      "id": "gunzip-1.2.4",
+      "name": "source-built gunzip 1.2.4 alias",
+      "producing_tool_id": "gzip-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "78abaccbae9efa7039ff82d80215d2fbd3c4cd0221dadd85dd9df731f15d8751"
+      },
+      "id": "gzip-smoke",
+      "name": "gzip protected roundtrip smoke output",
+      "producing_tool_id": "gzip-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "57c861b961bfc2c1047ab7f175c0f16024ea91787ba5a5e43600c721b5eff6ca"
+      },
+      "id": "tar-1.12",
+      "name": "source-built GNU tar 1.12",
+      "producing_tool_id": "tar-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "59392bf4bef63f5688ff8604868a22adcecfe94f75c1234fe7c9df1107038be2"
+      },
+      "id": "tar-smoke",
+      "name": "GNU tar protected roundtrip smoke output",
+      "producing_tool_id": "tar-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "cc4bc898fbad65d9c0a07eab85c61c99abdb9d7d7d747948067bea7d9954618a"
+      },
+      "id": "sed-4.0.9",
+      "name": "source-built GNU sed 4.0.9",
+      "producing_tool_id": "sed-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "91f02abc6d98e0f00da4f3b1249ae0acd29544f7b19304f190d29f523885c077"
+      },
+      "id": "sed-smoke",
+      "name": "GNU sed protected substitution smoke output",
+      "producing_tool_id": "sed-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "a3e8d977c0652889d2714f7eb9d1cfbe48581c05c7b7e3b79405334504fedd73"
+      },
+      "id": "bzip2-configured-source",
+      "name": "protected bzip2 source rewrite identity",
+      "producing_tool_id": "bzip2-rewrite-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b6911b1a367e8b159264078e7976d363e3cb9d268a1dd074ddca51a76916b8a7"
+      },
+      "id": "bzip2-1.0.8",
+      "name": "source-built bzip2 1.0.8",
+      "producing_tool_id": "bzip2-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "f4bf3e19bd09bcd64503def65eb7bd7eaa5ea43af94536b8d6e638a48501e0a0"
+      },
+      "id": "bzip2recover-1.0.8",
+      "name": "source-built bzip2recover 1.0.8",
+      "producing_tool_id": "bzip2-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b37fa30b2c16ae67d4e023b19fbecf3b10dab989e5fdedec510c29780cc5793b"
+      },
+      "id": "bzip2-smoke",
+      "name": "bzip2 protected compression roundtrip output",
+      "producing_tool_id": "bzip2-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "232ccf0c23c2e8a028c5ca42cbb46f3afa1aad664a5d5187e11fecdcb04334d4"
+      },
+      "id": "coreutils-configured-source",
+      "name": "protected coreutils configured source identity",
+      "producing_tool_id": "coreutils-patch-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3d9de9e7f81612a74e75312f22d038b665e69c5d9590662c293843e9711cf020"
+      },
+      "id": "coreutils-cat",
+      "name": "source-built coreutils cat",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "8fe8251243646c8e44ffe50e827cb27f2197eed344c498b31c365c7d27e07779"
+      },
+      "id": "coreutils-chmod",
+      "name": "source-built coreutils chmod",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "8c11ead9af84f2371178ce892afbac6daa416c445f2575a2300b2b5ffadf17f3"
+      },
+      "id": "coreutils-cp",
+      "name": "source-built coreutils cp",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3ce3cfec07fda35f97485b30fddd8a14f4cb04bd8427d2aa3acc4e94fd650a3f"
+      },
+      "id": "coreutils-echo",
+      "name": "source-built coreutils echo",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "7f332bcf208b458595c202f4b1f2faf3fffadd80f7cd34ff67c711ee6183b210"
+      },
+      "id": "coreutils-install",
+      "name": "source-built coreutils install",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "8146091298782331503b99b3f0bf02b0a92de93a5fe7b57fba08b5d870087c33"
+      },
+      "id": "coreutils-ln",
+      "name": "source-built coreutils ln",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "32e2fcd7893befd1096a15b0a44992dcfd522044aed0601df96f434b39a60683"
+      },
+      "id": "coreutils-ls",
+      "name": "source-built coreutils ls",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b94fc26390ef29d55b71e608b800fa0451ff477b33c15ff3d2be3c8a2a06621b"
+      },
+      "id": "coreutils-mkdir",
+      "name": "source-built coreutils mkdir",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "d765750db422dcaf98b1203911d1bbd0569a1cbe5a2e7006c2e26a476e420886"
+      },
+      "id": "coreutils-mv",
+      "name": "source-built coreutils mv",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "f1bf6e9330c0b9e1a88b85185f5834a38b2b89526b4ca95bbb095930e57714da"
+      },
+      "id": "coreutils-rm",
+      "name": "source-built coreutils rm",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "0a8235d566edcd18d68ed94df5ed2449e0fa9a4d37394367cb832536fa554dbc"
+      },
+      "id": "coreutils-rmdir",
+      "name": "source-built coreutils rmdir",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "8b861f615fa0f7e868107b5c788562ba1d4dc2fff2ed9e9bca0f7d7df6c455bf"
+      },
+      "id": "coreutils-sort",
+      "name": "source-built coreutils sort",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "87baf4f61820a2861bbb1a08b3bd9b4c7a5b8baed66ddb0e152d7a981ae27669"
+      },
+      "id": "coreutils-test",
+      "name": "source-built coreutils test",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "deb8e7848bca7728c6594600c9d5a1b40d64beb6729fec2e71785236af2cc1e9"
+      },
+      "id": "coreutils-true",
+      "name": "source-built coreutils true",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b476958f8326512fe4fa9563cb97bf79a658900b646f64c8f9f84426ae099ac9"
+      },
+      "id": "coreutils-false",
+      "name": "source-built coreutils false",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "71a84fad92471f61509ba9b781414934bb3b0975fd1635cef51709f952bf682b"
+      },
+      "id": "coreutils-head",
+      "name": "source-built coreutils head",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "d0840c1a769287b4c1acf913dd8c4cc396294158dd57e9cd5bcf3e7cdca06962"
+      },
+      "id": "coreutils-tail",
+      "name": "source-built coreutils tail",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "bc5ae003d38d9c4ca64568d97fe444d23e62258c93a936015e242806fb028f49"
+      },
+      "id": "coreutils-wc",
+      "name": "source-built coreutils wc",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "e6c5b456a4f2279400f46ff272734dfb68829281c9e702c9fcc1e1c852eb1074"
+      },
+      "id": "coreutils-basename",
+      "name": "source-built coreutils basename",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b21c5d4963d0d336150374699a4398c920fb2b323c265be463baf5264dae940e"
+      },
+      "id": "coreutils-dirname",
+      "name": "source-built coreutils dirname",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "8c7c183c9af7a4fddcf526b8f0318ffb847faea0be75967de1bb72e0d51b4ea0"
+      },
+      "id": "coreutils-tr",
+      "name": "source-built coreutils tr",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "fadb7ca3f75ac06d73d01e8e304c86f06364a91f6001ba13717e69eb1dcbc328"
+      },
+      "id": "coreutils-uniq",
+      "name": "source-built coreutils uniq",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "75770b1702a18bec30618d11cc55eb07eafc5f1349ca0d1d0567e24534b437f2"
+      },
+      "id": "coreutils-expr",
+      "name": "source-built coreutils expr",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "d5ec19db795aef5f981b4f99e310a4e977c0543dffbf192cc4539bcb0fff3975"
+      },
+      "id": "coreutils-tee",
+      "name": "source-built coreutils tee",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "a2b77b46e85c94390f459f158ebb33c529bbc5eb730c7719f24632f1fd6b6a4c"
+      },
+      "id": "coreutils-touch",
+      "name": "source-built coreutils touch",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "87baf4f61820a2861bbb1a08b3bd9b4c7a5b8baed66ddb0e152d7a981ae27669"
+      },
+      "id": "coreutils-bracket",
+      "name": "source-built coreutils bracket alias",
+      "producing_tool_id": "coreutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "fd65316f83e13de60a964675b6ab49ee8bd0e40db3aef391c8c1cbee240375d8"
+      },
+      "id": "coreutils-smoke",
+      "name": "coreutils protected filesystem smoke output",
+      "producing_tool_id": "coreutils-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "f4cde58315dcbfc49c47928f9258debd030140c54e249cb2a11beef1eba30296"
+      },
+      "id": "oyacc-configured-source",
+      "name": "protected oyacc configured source identity",
+      "producing_tool_id": "oyacc-patch-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "0b073649ea023167a293495f25302cc3debc4dd6727d9214ce6be9361503aa50"
+      },
+      "id": "oyacc-6.6",
+      "name": "source-built oyacc 6.6",
+      "producing_tool_id": "oyacc-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "6e719a5fc57aa5e8a06b7f7f37c6fdf672cd2ef2f91c27a7ca1daff128ac65a2"
+      },
+      "id": "oyacc-smoke-output",
+      "name": "oyacc protected generated-parser smoke output",
+      "producing_tool_id": "oyacc-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "acd33bededf76dc149f7c7fa14a2e1a1246c5dafe2ef65eee18cf0d82e3d6bcd"
+      },
+      "id": "bash-configured-source",
+      "name": "bounded bash configured source identity",
+      "producing_tool_id": "bash-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "f7326a0fcc0878e7cd3616640cee376f71bab5583460b5459cac91168809c03f"
+      },
+      "id": "bash-2.05b",
+      "name": "source-built bash 2.05b",
+      "producing_tool_id": "bash-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "f7326a0fcc0878e7cd3616640cee376f71bab5583460b5459cac91168809c03f"
+      },
+      "id": "sh-2.05b",
+      "name": "source-built bash sh alias",
+      "producing_tool_id": "bash-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "f9bb7985b1ac20ccbfdd1195397be795edb7996ab02e6f173d166517c19eb579"
+      },
+      "id": "bash-smoke-output",
+      "name": "bash protected command smoke output",
+      "producing_tool_id": "bash-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "29489150a78ce433dac24acfaf58ec66a4cd37d3eb93e223c5b9150f5c71a0aa"
+      },
+      "id": "tcc-musl-prep-configured-source",
+      "name": "TinyCC-to-musl configured source identity",
+      "producing_tool_id": "tcc-musl-prep-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "4add5639d2016d79b1ac258aa502098fc941354ded0acd91bf8cafea42240a77"
+      },
+      "id": "tcc-musl-prep",
+      "name": "TinyCC compiler prepared for musl",
+      "producing_tool_id": "tcc-musl-prep-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "4add5639d2016d79b1ac258aa502098fc941354ded0acd91bf8cafea42240a77"
+      },
+      "id": "tcc-musl-prep-alias",
+      "name": "TinyCC musl-prep compiler alias",
+      "producing_tool_id": "tcc-musl-prep-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "bd46a4a350e17ec4a7870be6c6dea82f7327c513ee4e2720bebb7b6e26f20d85"
+      },
+      "id": "tcc-musl-prep-libc",
+      "name": "carried Mes libc for musl handoff",
+      "producing_tool_id": "tcc-musl-prep-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "d3fec15bd12fd72fdbdf4248d6df6b21a44cfb6a3e2c9d787a0d081ff7143df1"
+      },
+      "id": "tcc-musl-prep-crt1",
+      "name": "carried Mes startup object for musl handoff",
+      "producing_tool_id": "tcc-musl-prep-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "0e8b75458ad70ab03142b27a3014af68f57c03004f4d22a65702e60d531140e9"
+      },
+      "id": "tcc-musl-prep-libtcc1",
+      "name": "carried TinyCC runtime archive for musl handoff",
+      "producing_tool_id": "tcc-musl-prep-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "2577c43f136d52c8d7b61ba8f7cab614b31898586d3fab634bebe6e1fd14cb7d"
+      },
+      "id": "tcc-musl-prep-headers",
+      "name": "carried Mes headers for musl handoff",
+      "producing_tool_id": "tcc-musl-prep-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "41c08a115f275f00099aa397872090612e853be0fb5f13ba55ddb89737e42377"
+      },
+      "id": "tcc-musl-prep-positive-object",
+      "name": "TinyCC musl-prep positive object",
+      "producing_tool_id": "tcc-musl-prep-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "d1d3f1b8c7b99ba3902a4b999f55ee4ba3410cfd7ebac9462176f2d1d7565dcf"
+      },
+      "id": "musl-configured-source",
+      "name": "reduced musl configured source identity",
+      "producing_tool_id": "musl-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b3a7f8bd311e8d3eaa6b1767e87276d3d02dce04a95808ed187082b05bb6211d"
+      },
+      "id": "musl-libc",
+      "name": "reduced first-musl static libc",
+      "producing_tool_id": "musl-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "701c5afce9f5e09d0bcca0702764c64148fcacfe7e1477e2321b249b03af66be"
+      },
+      "id": "musl-crt1",
+      "name": "reduced first-musl startup object",
+      "producing_tool_id": "musl-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "ecf4006e5ea51c3ad49a243165909cd4f9eddfbe181b576ac43513ede8578be4"
+      },
+      "id": "musl-crti",
+      "name": "reduced first-musl initialization object",
+      "producing_tool_id": "musl-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b3b3153225cc100b8c429f5916ae36b96ef4903169b86f841f86498c0fd7251d"
+      },
+      "id": "musl-crtn",
+      "name": "reduced first-musl finalization object",
+      "producing_tool_id": "musl-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3ba363b1c314e158a3ed3769a2d8c73272b3a01da712c43ecc25af2e4295a3bb"
+      },
+      "id": "musl-libm",
+      "name": "empty compatibility archive",
+      "producing_tool_id": "musl-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3ba363b1c314e158a3ed3769a2d8c73272b3a01da712c43ecc25af2e4295a3bb"
+      },
+      "id": "musl-librt",
+      "name": "empty compatibility archive",
+      "producing_tool_id": "musl-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3ba363b1c314e158a3ed3769a2d8c73272b3a01da712c43ecc25af2e4295a3bb"
+      },
+      "id": "musl-libpthread",
+      "name": "empty compatibility archive",
+      "producing_tool_id": "musl-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3ba363b1c314e158a3ed3769a2d8c73272b3a01da712c43ecc25af2e4295a3bb"
+      },
+      "id": "musl-libcrypt",
+      "name": "empty compatibility archive",
+      "producing_tool_id": "musl-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3ba363b1c314e158a3ed3769a2d8c73272b3a01da712c43ecc25af2e4295a3bb"
+      },
+      "id": "musl-libutil",
+      "name": "empty compatibility archive",
+      "producing_tool_id": "musl-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3ba363b1c314e158a3ed3769a2d8c73272b3a01da712c43ecc25af2e4295a3bb"
+      },
+      "id": "musl-libxnet",
+      "name": "empty compatibility archive",
+      "producing_tool_id": "musl-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3ba363b1c314e158a3ed3769a2d8c73272b3a01da712c43ecc25af2e4295a3bb"
+      },
+      "id": "musl-libresolv",
+      "name": "empty compatibility archive",
+      "producing_tool_id": "musl-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3ba363b1c314e158a3ed3769a2d8c73272b3a01da712c43ecc25af2e4295a3bb"
+      },
+      "id": "musl-libdl",
+      "name": "empty compatibility archive",
+      "producing_tool_id": "musl-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "4d5a63f48ef27c8377a5319d3d68cd1a2b724a974ee5d8281a67f8fb0b5dc1c7"
+      },
+      "id": "musl-headers",
+      "name": "reduced first-musl installed headers",
+      "producing_tool_id": "musl-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "92ebe6be234ab289a07f5560ce0f25b1a696917d4515d2ec92c330fa0cd3a8a4"
+      },
+      "id": "musl-smoke-binary",
+      "name": "reduced first-musl linked smoke binary",
+      "producing_tool_id": "musl-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "679e40759989e2bf0886a430ac3cb00ef22b045dd18fa50fdeddba44230c7674"
+      },
+      "id": "tcc-musl-configured-source",
+      "name": "musl-linked TinyCC configured source identity",
+      "producing_tool_id": "tcc-musl-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "053f36a66503797b3aaee40d2b0962dc643554e4ecf35d00ee2b7f947601f2af"
+      },
+      "id": "tcc-musl",
+      "name": "first musl-linked TinyCC compiler",
+      "producing_tool_id": "tcc-musl-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "053f36a66503797b3aaee40d2b0962dc643554e4ecf35d00ee2b7f947601f2af"
+      },
+      "id": "tcc-musl-alias",
+      "name": "musl-linked TinyCC compiler alias",
+      "producing_tool_id": "tcc-musl-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "0e8b75458ad70ab03142b27a3014af68f57c03004f4d22a65702e60d531140e9"
+      },
+      "id": "tcc-musl-libtcc1",
+      "name": "musl-linked TinyCC runtime archive",
+      "producing_tool_id": "tcc-musl-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "f7d6cd4379debd6239bbbcfffdd602d87ad9e8cfabe322902a85fa5ace902fc6"
+      },
+      "id": "tcc-musl-positive-object",
+      "name": "musl-linked TinyCC positive object",
+      "producing_tool_id": "tcc-musl-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "92ebe6be234ab289a07f5560ce0f25b1a696917d4515d2ec92c330fa0cd3a8a4"
+      },
+      "id": "tcc-musl-positive-binary",
+      "name": "musl-linked TinyCC positive binary",
+      "producing_tool_id": "tcc-musl-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "575e19d9e8f5d23be1ae0e87b9e40bebbaa3be7845632980586f38ef2d906e5d"
+      },
+      "id": "musl-pass2-configured-source",
+      "name": "second-musl configured source identity",
+      "producing_tool_id": "musl-pass2-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "86f238f807b2580bcb814ef914a64a288e34bb89101c8b5f094cd2a124febaed"
+      },
+      "id": "musl-pass2-libc",
+      "name": "second-musl static libc archive",
+      "producing_tool_id": "musl-pass2-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "c34258edb3d4de07a67e1d20c7dc5946543ce4ba078ace182b0b99cd4bbb7257"
+      },
+      "id": "musl-pass2-crt1",
+      "name": "second-musl crt1 object",
+      "producing_tool_id": "musl-pass2-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "ecf4006e5ea51c3ad49a243165909cd4f9eddfbe181b576ac43513ede8578be4"
+      },
+      "id": "musl-pass2-crti",
+      "name": "second-musl crti object",
+      "producing_tool_id": "musl-pass2-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b3b3153225cc100b8c429f5916ae36b96ef4903169b86f841f86498c0fd7251d"
+      },
+      "id": "musl-pass2-crtn",
+      "name": "second-musl crtn object",
+      "producing_tool_id": "musl-pass2-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3ba363b1c314e158a3ed3769a2d8c73272b3a01da712c43ecc25af2e4295a3bb"
+      },
+      "id": "musl-pass2-libm",
+      "name": "second-musl empty libm archive",
+      "producing_tool_id": "musl-pass2-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3ba363b1c314e158a3ed3769a2d8c73272b3a01da712c43ecc25af2e4295a3bb"
+      },
+      "id": "musl-pass2-librt",
+      "name": "second-musl empty librt archive",
+      "producing_tool_id": "musl-pass2-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3ba363b1c314e158a3ed3769a2d8c73272b3a01da712c43ecc25af2e4295a3bb"
+      },
+      "id": "musl-pass2-libpthread",
+      "name": "second-musl empty libpthread archive",
+      "producing_tool_id": "musl-pass2-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3ba363b1c314e158a3ed3769a2d8c73272b3a01da712c43ecc25af2e4295a3bb"
+      },
+      "id": "musl-pass2-libcrypt",
+      "name": "second-musl empty libcrypt archive",
+      "producing_tool_id": "musl-pass2-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3ba363b1c314e158a3ed3769a2d8c73272b3a01da712c43ecc25af2e4295a3bb"
+      },
+      "id": "musl-pass2-libutil",
+      "name": "second-musl empty libutil archive",
+      "producing_tool_id": "musl-pass2-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3ba363b1c314e158a3ed3769a2d8c73272b3a01da712c43ecc25af2e4295a3bb"
+      },
+      "id": "musl-pass2-libxnet",
+      "name": "second-musl empty libxnet archive",
+      "producing_tool_id": "musl-pass2-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3ba363b1c314e158a3ed3769a2d8c73272b3a01da712c43ecc25af2e4295a3bb"
+      },
+      "id": "musl-pass2-libresolv",
+      "name": "second-musl empty libresolv archive",
+      "producing_tool_id": "musl-pass2-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3ba363b1c314e158a3ed3769a2d8c73272b3a01da712c43ecc25af2e4295a3bb"
+      },
+      "id": "musl-pass2-libdl",
+      "name": "second-musl empty libdl archive",
+      "producing_tool_id": "musl-pass2-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "4d5a63f48ef27c8377a5319d3d68cd1a2b724a974ee5d8281a67f8fb0b5dc1c7"
+      },
+      "id": "musl-pass2-headers",
+      "name": "second-musl installed header tree",
+      "producing_tool_id": "musl-pass2-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "30c18329ab3981639dba0dbdef48cd01beae52abab89c8b732f8f6eb1248fc57"
+      },
+      "id": "musl-pass2-smoke-binary",
+      "name": "second-musl linked smoke binary",
+      "producing_tool_id": "musl-pass2-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b68ec9f7c46ca1cbec5508a98476f771e4bcc4d90b4e088a237065aac1c6061b"
+      },
+      "id": "tcc-musl-v2-configured-source",
+      "name": "TinyCC musl-v2 configured source identity",
+      "producing_tool_id": "tcc-musl-v2-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "a17643b015db05bd452918841ba7811b8e063edfe29328672388f6b693a1b8ec"
+      },
+      "id": "tcc-musl-v2",
+      "name": "TinyCC musl-v2 compiler",
+      "producing_tool_id": "tcc-musl-v2-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "a17643b015db05bd452918841ba7811b8e063edfe29328672388f6b693a1b8ec"
+      },
+      "id": "tcc-musl-v2-alias",
+      "name": "TinyCC musl-v2 compiler alias",
+      "producing_tool_id": "tcc-musl-v2-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "c201ffd35a5466b4171345fc924b64a75c650fabbe7d0c20d365cfe08faf0860"
+      },
+      "id": "tcc-musl-v2-libtcc1",
+      "name": "TinyCC musl-v2 variadic runtime archive",
+      "producing_tool_id": "tcc-musl-v2-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "5461df0d2a3503f2a7d124859d2ddedab87694f16bd81b644b9cdb8fffdfa367"
+      },
+      "id": "tcc-musl-v2-source-tree",
+      "name": "TinyCC musl-v2 normalized source tree",
+      "producing_tool_id": "tcc-musl-v2-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "2fa068749df350a62721e60696d625b6d5b0e3061019929a4c67970155833424"
+      },
+      "id": "tcc-musl-v2-header-tree",
+      "name": "TinyCC musl-v2 header tree",
+      "producing_tool_id": "tcc-musl-v2-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "a507376f7e9af418c78cc9f9121e7b182c8b1ef3b741de98741d6320f6f301b2"
+      },
+      "id": "tcc-musl-v2-positive-object",
+      "name": "TinyCC musl-v2 positive variadic object",
+      "producing_tool_id": "tcc-musl-v2-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "2a6733b887417ec6f848ece381d125e10d5d5544f0839dcfa896eacc88529fa6"
+      },
+      "id": "tcc-musl-v2-positive-binary",
+      "name": "TinyCC musl-v2 positive variadic binary",
+      "producing_tool_id": "tcc-musl-v2-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
+      },
+      "id": "tcc-musl-v2-positive-execution",
+      "name": "TinyCC musl-v2 zero-output successful execution",
+      "producing_tool_id": "tcc-musl-v2-execution-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "8e6580da40c5892b941423ae108d6218b3636ebd3643bc3ba1e78e33d6c4898a"
+      },
+      "id": "tcc-musl-selfhost",
+      "name": "self-hosted TinyCC compiler",
+      "producing_tool_id": "tcc-musl-selfhost-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "8e6580da40c5892b941423ae108d6218b3636ebd3643bc3ba1e78e33d6c4898a"
+      },
+      "id": "tcc-musl-selfhost-alias",
+      "name": "self-hosted TinyCC compiler alias",
+      "producing_tool_id": "tcc-musl-selfhost-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "dbf67a48eed6afe4a0e74ce5d3b27bbe97dd6531b0eb5a5a648a3e290d9723ca"
+      },
+      "id": "tcc-musl-selfhost-libtcc",
+      "name": "self-hosted TinyCC library archive",
+      "producing_tool_id": "tcc-musl-selfhost-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "6df478ee2068dca31c540583925db4116d24b6db9cf21c788d5a0106f02123ef"
+      },
+      "id": "tcc-musl-selfhost-main-object",
+      "name": "self-hosted TinyCC main object",
+      "producing_tool_id": "tcc-musl-selfhost-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "5e918d19d4d7151f17a5a81bd07d25fd8a55e57037b4735f038344365326b3d4"
+      },
+      "id": "tcc-musl-selfhost-patched-source",
+      "name": "self-hosted TinyCC patched source tree",
+      "producing_tool_id": "tcc-musl-selfhost-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "e5c7d2d26adf9230fa6c713ae526d666089c31d9bca4a32c3bdc4a876a01ae39"
+      },
+      "id": "tcc-musl-selfhost-object-tree",
+      "name": "self-hosted TinyCC compiler object tree",
+      "producing_tool_id": "tcc-musl-selfhost-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "cc40480286f053fc69e7d17431b4cf5de82b477b0f84e646717cd6c3c71cecb1"
+      },
+      "id": "tcc-musl-selfhost-smoke-object",
+      "name": "self-hosted TinyCC syntax smoke object",
+      "producing_tool_id": "tcc-musl-selfhost-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "25136ba596733447cbb6259862f4e0b37dd557fc4dd8cc4392912e2f34880f18"
+      },
+      "id": "musl-native-configured-source",
+      "name": "upstream-shaped native musl configured source identity",
+      "producing_tool_id": "musl-native-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "87bea2db6aa8d4d34ec72427bbb9effad86ed6e0458bf4ce600b57d4966f92a7"
+      },
+      "id": "musl-native-libc",
+      "name": "upstream-shaped native musl static libc",
+      "producing_tool_id": "musl-native-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "bcfefaf8179325fd26e8ecaa83b22a87fe75d3bbadb411e32113b4cb69f21f66"
+      },
+      "id": "musl-native-crt1",
+      "name": "native musl startup object",
+      "producing_tool_id": "musl-native-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "ecf4006e5ea51c3ad49a243165909cd4f9eddfbe181b576ac43513ede8578be4"
+      },
+      "id": "musl-native-crti",
+      "name": "native musl initialization object",
+      "producing_tool_id": "musl-native-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b3b3153225cc100b8c429f5916ae36b96ef4903169b86f841f86498c0fd7251d"
+      },
+      "id": "musl-native-crtn",
+      "name": "native musl finalization object",
+      "producing_tool_id": "musl-native-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3ba363b1c314e158a3ed3769a2d8c73272b3a01da712c43ecc25af2e4295a3bb"
+      },
+      "id": "musl-native-libm",
+      "name": "native musl empty libm archive",
+      "producing_tool_id": "musl-native-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3ba363b1c314e158a3ed3769a2d8c73272b3a01da712c43ecc25af2e4295a3bb"
+      },
+      "id": "musl-native-librt",
+      "name": "native musl empty librt archive",
+      "producing_tool_id": "musl-native-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3ba363b1c314e158a3ed3769a2d8c73272b3a01da712c43ecc25af2e4295a3bb"
+      },
+      "id": "musl-native-libpthread",
+      "name": "native musl empty libpthread archive",
+      "producing_tool_id": "musl-native-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3ba363b1c314e158a3ed3769a2d8c73272b3a01da712c43ecc25af2e4295a3bb"
+      },
+      "id": "musl-native-libcrypt",
+      "name": "native musl empty libcrypt archive",
+      "producing_tool_id": "musl-native-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3ba363b1c314e158a3ed3769a2d8c73272b3a01da712c43ecc25af2e4295a3bb"
+      },
+      "id": "musl-native-libutil",
+      "name": "native musl empty libutil archive",
+      "producing_tool_id": "musl-native-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3ba363b1c314e158a3ed3769a2d8c73272b3a01da712c43ecc25af2e4295a3bb"
+      },
+      "id": "musl-native-libxnet",
+      "name": "native musl empty libxnet archive",
+      "producing_tool_id": "musl-native-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3ba363b1c314e158a3ed3769a2d8c73272b3a01da712c43ecc25af2e4295a3bb"
+      },
+      "id": "musl-native-libresolv",
+      "name": "native musl empty libresolv archive",
+      "producing_tool_id": "musl-native-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3ba363b1c314e158a3ed3769a2d8c73272b3a01da712c43ecc25af2e4295a3bb"
+      },
+      "id": "musl-native-libdl",
+      "name": "native musl empty libdl archive",
+      "producing_tool_id": "musl-native-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "315e38bd3f318804adf63fadc9689a9b692ee69986e26c6fddd4670190498700"
+      },
+      "id": "musl-native-headers",
+      "name": "native musl installed header tree",
+      "producing_tool_id": "musl-native-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "37b452f13fc423d7a1a5cc061264e4a897b305d144b0e214648738d106cb3e49"
+      },
+      "id": "musl-native-smoke-binary",
+      "name": "native musl runtime smoke binary",
+      "producing_tool_id": "musl-native-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "f578c82fb2c9eb48d87b171daedaef41f63c7f82b64d26b14e6f686f9c3f230e"
+      },
+      "id": "musl-native-validation-receipt",
+      "name": "native musl execution and malformed-source validation receipt",
+      "producing_tool_id": "musl-native-execution-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "dbd75c146b108dfe62f23aeb29675b68d0d41bc8ca5b5dfd137d346a284376ac"
+      },
+      "id": "m4-configured-source",
+      "name": "GNU M4 configured source identity",
+      "producing_tool_id": "m4-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3dfd2a1223ff6e0c2c540bc2507a097948ab24e2465f232e2363944e5b704741"
+      },
+      "id": "m4-1.4.7",
+      "name": "source-built GNU M4 1.4.7 with ambient shell builtins disabled",
+      "producing_tool_id": "m4-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "c9b69698f54279bd5ce4b9cba7442ba625e7ba92717ee139d3152093331c0e75"
+      },
+      "id": "m4-version-observation",
+      "name": "GNU M4 version observation",
+      "producing_tool_id": "m4-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "f737ffa0d1bffb14295a97110f43d0f9cf059d5cbffc7ff6187b2182250d34ca"
+      },
+      "id": "m4-macro-observation",
+      "name": "GNU M4 macro and ambient-shell-disable observation",
+      "producing_tool_id": "m4-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "6277dd4b0cbd4b080f3a4c4e561d05f128ffee445dadefa2116cc8e3b079e26c"
+      },
+      "id": "m4-prefix-observation",
+      "name": "GNU M4 prefixed macro observation",
+      "producing_tool_id": "m4-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "675bd6ec5c382c78909a394f1f5a59e8b51e7e617f9ad9537e466fd799553420"
+      },
+      "id": "m4-malformed-rejection",
+      "name": "GNU M4 malformed-input rejection receipt",
+      "producing_tool_id": "m4-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "00d79a6f09d23d7a3430ccfd407a8cac0351aa5ecc6efc122f8cf093989cbbe5"
+      },
+      "id": "diffutils-configured-source",
+      "name": "GNU diffutils configured source identity",
+      "producing_tool_id": "diffutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "054ba2636aef71a1cbda93de3358ff8b8a7c92127ce951dcb7cc5814ac0e2d66"
+      },
+      "id": "diffutils-diff-2.7",
+      "name": "source-built GNU diff 2.7",
+      "producing_tool_id": "diffutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "145c05e3557ba74a8ce85912c08feee01b7616fcc273e92279a96dbe18a8793b"
+      },
+      "id": "diffutils-cmp-2.7",
+      "name": "source-built GNU cmp 2.7",
+      "producing_tool_id": "diffutils-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "33510988f98a66cf0bc0e53661c6af77e8ed062faa45eac70734aef40a65ce6c"
+      },
+      "id": "diffutils-version-observation",
+      "name": "GNU diffutils version observation",
+      "producing_tool_id": "diffutils-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "db3c58f16a007600d256c0be6306d55101919037d37ed4ece231bab4c3bbe2ca"
+      },
+      "id": "diffutils-diff-observation",
+      "name": "GNU diff difference observation",
+      "producing_tool_id": "diffutils-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "5d5856604bb2fa260c00b5ed8bcaa9a6b0bb89a644c7b23a2b678bf0e9127f6e"
+      },
+      "id": "diffutils-cmp-observation",
+      "name": "GNU cmp difference observation",
+      "producing_tool_id": "diffutils-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "202fa55131223d7bc743f2ff8d6896e001df815d001f698d58be1bc451ea5725"
+      },
+      "id": "diffutils-malformed-rejection",
+      "name": "GNU diffutils malformed-input rejection receipt",
+      "producing_tool_id": "diffutils-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "d86dde390ef4ab7b4456f0371cbd29afa8b0e31ca297e7acc85b5f9544775c40"
+      },
+      "id": "grep-configured-source",
+      "name": "GNU grep bridge configured source identity",
+      "producing_tool_id": "grep-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b4adac2bf1f29e3e3b8ec736207a0cdfc3eb5b51c658a2f9f8eff85aee4ef71d"
+      },
+      "id": "grep-2.4-runner",
+      "name": "native runner for the checked GNU grep 2.4 bridge subset",
+      "producing_tool_id": "grep-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b4adac2bf1f29e3e3b8ec736207a0cdfc3eb5b51c658a2f9f8eff85aee4ef71d"
+      },
+      "id": "egrep-2.4-runner",
+      "name": "egrep alias for the native GNU grep bridge runner",
+      "producing_tool_id": "grep-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b4adac2bf1f29e3e3b8ec736207a0cdfc3eb5b51c658a2f9f8eff85aee4ef71d"
+      },
+      "id": "fgrep-2.4-runner",
+      "name": "fgrep alias for the native GNU grep bridge runner",
+      "producing_tool_id": "grep-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3da22b084c98e1ebef50ddcbe404c681d6a7d81b29389d26151729b1c74127de"
+      },
+      "id": "grep-2.4-bridge-script",
+      "name": "exact checked GNU grep 2.4 shell bridge retained as non-executable data",
+      "producing_tool_id": "grep-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "8e4c7c1b99dbfd50e7a95185fead5ee1448fa904a2fdd778eaf5f2dbfd629a99"
+      },
+      "id": "grep-literal-observation",
+      "name": "GNU grep bridge literal-match observation",
+      "producing_tool_id": "grep-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
+      },
+      "id": "grep-quiet-observation",
+      "name": "GNU grep bridge quiet-match observation",
+      "producing_tool_id": "grep-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "aa95faeede7041e63c6056bdcf10e6fbf709a355e539259da51a067e5dd27802"
+      },
+      "id": "grep-anchored-observation",
+      "name": "GNU grep bridge anchored-match observation",
+      "producing_tool_id": "grep-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "ccf0a5c408f8d60f4c8d72413c4c0ec0f8a49e29884c54c229ede61284dc7988"
+      },
+      "id": "gawk-configured-source",
+      "name": "GNU Gawk configured source identity",
+      "producing_tool_id": "gawk-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "1608d2ac4b0f9faaecd91494502942fccfcec3fd6298aa610f2dfd4308aaf5d1"
+      },
+      "id": "gawk-3.0.4",
+      "name": "source-built GNU Gawk 3.0.4",
+      "producing_tool_id": "gawk-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "1608d2ac4b0f9faaecd91494502942fccfcec3fd6298aa610f2dfd4308aaf5d1"
+      },
+      "id": "awk-3.0.4-alias",
+      "name": "AWK alias for source-built GNU Gawk 3.0.4",
+      "producing_tool_id": "gawk-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "e8d40a8383b8b65278313f2589e148f294e19cba489e3517f3153c38d8603f7f"
+      },
+      "id": "gawk-behavior-observation",
+      "name": "GNU Gawk record and expression behavior observation",
+      "producing_tool_id": "gawk-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "c95e800034a073abe91702b1faca0c3bf102d53fdebcd4d0cf46b39c524a98ba"
+      },
+      "id": "gawk-numeric-observation",
+      "name": "GNU Gawk numeric-array observation",
+      "producing_tool_id": "gawk-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "49124bf4f7f37328738ac34216a60dcd5f58bb198c5c3f6719b6becafb7e7882"
+      },
+      "id": "gawk-decimal-observation",
+      "name": "GNU Gawk decimal-arithmetic observation",
+      "producing_tool_id": "gawk-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b9a1a3183dd350f0e896d0f4b59c87e7bda8b1ed3a1af76afc86c1cb8f7cbbde"
+      },
+      "id": "gawk-length-observation",
+      "name": "GNU Gawk generator string-length observation",
+      "producing_tool_id": "gawk-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "320b59884ca4a418f85cef0916f3761d8a7225abda1b1069cb2182a9a15bdde9"
+      },
+      "id": "gawk-hex-observation",
+      "name": "GNU Gawk hexadecimal-format observation",
+      "producing_tool_id": "gawk-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "9633428410d0cea43777d103fa8f7aa73048977e6b3421ee6d8ea663f7722e65"
+      },
+      "id": "gawk-negative-observation",
+      "name": "GNU Gawk malformed-program diagnostic",
+      "producing_tool_id": "gawk-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b59a7a3ea06ce3059bdb45f57197d14ea5d2ecae9fb8b840cf7f486fc9685f33"
+      },
+      "id": "gawk-installed-observation",
+      "name": "installed GNU Gawk behavior observation",
+      "producing_tool_id": "gawk-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "7b9699a83f7028fb22c8aa5bffaa5e314e2a9e1ad8625c0304c2a7bbbf37f121"
+      },
+      "id": "bison-configured-source",
+      "name": "GNU Bison configured source identity",
+      "producing_tool_id": "bison-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3db09397aa2752eea9c438a4cb1c5ebd27605f58b56ec43781baf411c3f2b983"
+      },
+      "id": "bison-2.3",
+      "name": "source-built GNU Bison 2.3",
+      "producing_tool_id": "bison-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "f3d4a63ba0b8049557c690ad7db8d48d954c3dd6e45cfdd9488fe6d75d01bc7c"
+      },
+      "id": "bison-2.3-runtime-data",
+      "name": "GNU Bison 2.3 runtime data tree",
+      "producing_tool_id": "bison-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "a83fcaecff55230ffd6fb2ff09b2018392e8c403a3e2a8087d2cb68115f383c3"
+      },
+      "id": "bison-version-observation",
+      "name": "GNU Bison version observation",
+      "producing_tool_id": "bison-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "bf73d7f6db6f0dd4a96706a1efb9e23dd287cbf847badd17f64d4c7ed235c923"
+      },
+      "id": "bison-positive-parser-source",
+      "name": "GNU Bison positive generated parser source",
+      "producing_tool_id": "bison-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "afa05cc327a73b17e33baf53fb44030b1a111aa993db60f01565a2a80dc8f913"
+      },
+      "id": "bison-positive-parser-header",
+      "name": "GNU Bison positive generated parser header",
+      "producing_tool_id": "bison-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "d0c674aaeab59c3efab1090e74cb598ae4df44bbcd42bc451a0a3f1a1257dcb4"
+      },
+      "id": "bison-negative-observation",
+      "name": "GNU Bison malformed-grammar diagnostic",
+      "producing_tool_id": "bison-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "d2d7e2a0ed46329fc2e37d58d25dab8f17c01b5c9b7b97de09930ef3e25fe3b7"
+      },
+      "id": "flex-configured-source",
+      "name": "GNU Flex configured source identity",
+      "producing_tool_id": "flex-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "502324a00e1b35d6fc18a6cf6c3a257d3578b7d5fd8bffc27ce41b9da3c1ebbf"
+      },
+      "id": "flex-2.6.4",
+      "name": "source-built GNU Flex 2.6.4 with a canonical bounded runtime-section name",
+      "producing_tool_id": "flex-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "45c3a2d2e338eae19d24fa17df35127f5c61c16dca0ce98dce45efb13b920bfa"
+      },
+      "id": "flex-libfl",
+      "name": "GNU Flex yywrap archive",
+      "producing_tool_id": "flex-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "713ca824326279098cc1eb9b18ddd200e7506335c502cf2d79b4af7aaa330cdf"
+      },
+      "id": "flex-cxx-header",
+      "name": "GNU Flex C++ scanner header",
+      "producing_tool_id": "flex-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "9d13005da4640c131d85edff0a255a83471b136d31ce41d2b04534c8a7b533b4"
+      },
+      "id": "flex-libfl-consumer",
+      "name": "GNU Flex yywrap archive proof consumer",
+      "producing_tool_id": "flex-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3697eccbbb98cf059d94cc199ff12f77bee88f5097ad8f0826c86bcf1fcbd5a7"
+      },
+      "id": "flex-version-observation",
+      "name": "GNU Flex version observation",
+      "producing_tool_id": "flex-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "fb2c93883438dca7366f41ba363944da66b78787f76be32767cb697943b26732"
+      },
+      "id": "flex-positive-scanner-source",
+      "name": "GNU Flex positive generated scanner source",
+      "producing_tool_id": "flex-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "f1180cfefce605bb56ee38ccfec3bbd99f448e2d5f391bec146f4a02cdff336f"
+      },
+      "id": "flex-negative-observation",
+      "name": "GNU Flex malformed-scanner diagnostic",
+      "producing_tool_id": "flex-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "725e682bc5f91728a92f72a81332dda87537ff0ec27b20134b9644b5f2cd43a7"
+      },
+      "id": "bash-full-mkbuiltins",
+      "name": "protected Bash 2.05b builtin generator",
+      "producing_tool_id": "bash-full-generator-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "1797cb39c0507d6fbb40afbbd58299ffd9a0eb7d0e983bbe64742499a3fdc9c9"
+      },
+      "id": "bash-full-generated-builtins",
+      "name": "generated Bash 2.05b builtin source tree",
+      "producing_tool_id": "bash-full-generator-run-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "dc3fd01b5f34af5e2f3031c10cda243f43b3c9ce45a0fd2181693727fb629a2e"
+      },
+      "id": "bash-full-configured-source",
+      "name": "normalized full Bash 2.05b configured source",
+      "producing_tool_id": "bash-full-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3f166d5bb28aee29982ec38ba07f8b1dca3c488390737a0e78d35950876e4d4e"
+      },
+      "id": "bash-2.05b-full",
+      "name": "source-built full Bash 2.05b",
+      "producing_tool_id": "bash-full-build-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "1cb581932f76e9f3870af0a75060141d692acd438ef5663ebb182798642fa20e"
+      },
+      "id": "bash-full-version-observation",
+      "name": "full Bash version observation",
+      "producing_tool_id": "bash-full-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "6687d0952325979e333ab55180b9aea8835ff490e46b7652ea5ec204c94b9c2a"
+      },
+      "id": "bash-full-functional-observation",
+      "name": "full Bash control-flow and builtin observation",
+      "producing_tool_id": "bash-full-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "f1184a47cefae3e975232299de76d9a96ea5a9354c87f19f77413895583d8da3"
+      },
+      "id": "bash-full-negative-observation",
+      "name": "full Bash malformed-input diagnostic",
+      "producing_tool_id": "bash-full-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "deb003aad7485e87e9a7ec33306fe4e89ca6774d39eeea26371b78d21cd8c292"
+      },
+      "id": "bash-full-external-child-observation",
+      "name": "full Bash external GNU Make child observation",
+      "producing_tool_id": "bash-full-smoke-exec"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "97ce45a8f015be46bbbd66c2abd778940a5aed257069c4e9dfd432b751c968d8"
+      },
+      "id": "bash-full-make-shell-observation",
+      "name": "GNU Make recipe through full Bash observation",
+      "producing_tool_id": "bash-full-smoke-exec"
+    }
+  ],
+  "patches": [
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b05705f548352080041ae56e2cacdf2e0898aa7dd5c857888004cf808884fc7f"
+      },
+      "id": "tinycc-0.9.27-stagex-patch",
+      "name": "bounded TinyCC 0.9.27 StageX compatibility patch",
+      "provenance": "bootstrap/patches/tcc-0.9.27-stagex.patch derived from the checked TinyCC 0.9.27 recipe",
+      "target_artifact_id": "tinycc-0.9.27-source"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "51c890dd1f9a2ddf816c68ebfbd4506241e45e3993ca4f14151c0d8665f87e59"
+      },
+      "id": "make-3.82-stagex-patch",
+      "name": "bounded GNU Make 3.82 TinyCC compatibility patch",
+      "provenance": "bootstrap/patches/make-3.82-stagex.patch derived from the checked Make 3.82 recipe",
+      "target_artifact_id": "make-3.82-source"
+    }
+  ],
+  "provider_outputs": [
+    {
+      "producing_artifact_id": "tcc-musl-selfhost",
+      "role": "target_prefixed_tools"
+    },
+    {
+      "producing_artifact_id": "musl-native-headers",
+      "role": "headers"
+    },
+    {
+      "producing_artifact_id": "musl-native-libc",
+      "role": "libraries"
+    },
+    {
+      "producing_artifact_id": "tcc-musl-selfhost",
+      "role": "provider_metadata"
+    }
+  ],
+  "seed": {
+    "audit_note": "The 229-byte checked seed matches the annotated hex source byte for byte.",
+    "audit_seed_max_bytes": 4096,
+    "entry_point": "0x600078",
+    "host_interface_surface": "Linux x86_64 open, read, write, and exit system calls",
+    "human_readable_source": "bootstrap/seeds/AMD64/hex0_AMD64.hex0",
+    "instruction_set": "x86_64",
+    "io_contract": "argv[1] input path and argv[2] output path; output mode 0700",
+    "reproduction_transcript": "copy checked seed, set mode 0700, execute seed with hex0 source and create-new output",
+    "seed_bytes_len": 229,
+    "seed_class": "hex0_seed",
+    "seed_digest": {
+      "algorithm": "blake3",
+      "hex_value": "cf21608d883b8bdcc1fa6438703630f2fa496cf74d483ce351f876c0656ecf80"
+    }
+  },
+  "source_artifacts": [
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "0fb23576a10b41df29c165e39514f18c411da96ae71873a6a2e2f0b1d94de614"
+      },
+      "id": "hex0-source",
+      "name": "annotated AMD64 hex0 source",
+      "provenance": "bootstrap/seeds/AMD64/hex0_AMD64.hex0"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "5a56b4164dca4d1e03ba35bc8ce4b418a0de2baf1cb9e6a0912607e26532d30d"
+      },
+      "id": "kaem-minimal-source",
+      "name": "minimal AMD64 kaem source",
+      "provenance": "bootstrap/seeds/AMD64/kaem-minimal.hex0"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
+      },
+      "id": "kaem-smoke-script",
+      "name": "empty kaem smoke script",
+      "provenance": "generated as zero bytes by the bounded transition plan"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "541eae99be64df5f13ed8ff52403e83d034c8ce4747984a2d8d11cffc10b01ab"
+      },
+      "id": "stage0-source-bundle",
+      "name": "authenticated offline full-source closure",
+      "provenance": "mantle-source-bundle-v1 manifest identity loaded and validated before Stage0 execution"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "f983a7b79acdd53fd4d31c8959c62ca24eabbea491327aaa113c4bc11549e5f9"
+      },
+      "id": "stage0-posix-amd64-source",
+      "name": "stage0-posix AMD64 snapshot",
+      "provenance": "Git revision 82efa0d6be1c9bb993a7a62af1cccd8d2cda91f6"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "30d135a3e1c83495b521ae969d2c0e97da44baff7e143a16bcab0919fb0a36d2"
+      },
+      "id": "bootstrap-seeds-source",
+      "name": "bootstrap-seeds snapshot",
+      "provenance": "Git revision cedec6b8066d1db229b6c77d42d120a23c6980ed"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "a4b081c01854e735697908471cd6170e270f5084170a64e51c5a20302c842d89"
+      },
+      "id": "m2-planet-source",
+      "name": "M2-Planet snapshot",
+      "provenance": "Git revision bd2fe4b0659fd0ad3f476a5ad0ef801bd134665d"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "13450e1e9a31edfbeccd0adc30c52b2d085d4c3c6b58f42a1b6f902e903f3b4a"
+      },
+      "id": "m2libc-source",
+      "name": "M2libc snapshot",
+      "provenance": "Git revision 68a23cfd05d5a355ba7a30c770d684cbe86fcc4e"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "2dcf2577f60e195efa112a8d8978b41542a13f25ef0ee3d9ab4068256096ce94"
+      },
+      "id": "mescc-tools-source",
+      "name": "mescc-tools snapshot",
+      "provenance": "Git revision 5adfbf3364261a77109878a56b100aeeb6ef9ac4"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "0cc000667e857118296d9abd7959a323024eed0fc09231d307985e9ffe7a6ae6"
+      },
+      "id": "mescc-tools-extra-source",
+      "name": "mescc-tools-extra snapshot",
+      "provenance": "Git revision a151c245e512076971a3c85bb1502cf92cfa83b6"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "f2c5526d58cc9424f32e78f6d96e9c271237998a7c8ac007d80fdd118d50fa47"
+      },
+      "id": "m2-mesoplanet-source",
+      "name": "M2-Mesoplanet snapshot",
+      "provenance": "Git revision 4b011a85da73a7c97212468d41f17e806ba99547"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "0ddbb5dad8868a17ddcb7e36bcd981e822f8f374c057ad7d40b5ea5fdf160765"
+      },
+      "id": "stage0-amd64-answers",
+      "name": "Stage0 AMD64 SHA-256 interoperability answers",
+      "provenance": "bootstrap/stage0-amd64.answers"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
+      },
+      "id": "stage0-after-script",
+      "name": "empty Stage0 after hook",
+      "provenance": "generated as zero bytes by the bounded transition plan"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "dd0e49258701c541d8fc097a899e4d00ae987d49951346ee22bd5743d5e81582"
+      },
+      "id": "mes-0.27.1-source",
+      "name": "GNU Mes 0.27.1 fixed-output source",
+      "provenance": "source bundle record fixed-url-5fda7b5bed4dbf8d8da85b3dd19ee873cae96c563d0b33d7d796c645aaf2e14d"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3cdb842d8699276ce030e5fbbab455193d12ab41cfb36aabfc3f3bbdfa4c47db"
+      },
+      "id": "nyacc-1.00.2-source",
+      "name": "NYACC 1.00.2 fixed-output source",
+      "provenance": "source bundle record fixed-url-cc3d97f8a1c6486f4393ae3002300713a08781fc4b8ec843a9bd2fe73ba082bc"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "db8c11387fd0db5783b4d2349b578ba1edfc739bf13d0865ab8b6b5f83a0711b"
+      },
+      "id": "tinycc-0.9.26-source",
+      "name": "TinyCC 0.9.26 fixed-output source",
+      "provenance": "source bundle record fixed-url-71495e1ddb39612a9f8197f340bf7254942f843ef7ff361eca64dae0b0a7bd2f"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "438536d1095c3cd1f19b2645572dbe4ec265353513076db6ba5c395e23e6841a"
+      },
+      "id": "tinycc-mes-0.27.1-source",
+      "name": "fresh GNU Mes 0.27.1 source for TinyCC handoff",
+      "provenance": "source bundle record fixed-url-6b4961e6c9fff76f8cf2bab720817eff96172d622164c4b23580203514d4b7b2"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "a3417d7e6218de60bfb3b30cab2db9fbe3e65891d9b3e765f09a4ac87539d03d"
+      },
+      "id": "tinycc-0.9.27-source",
+      "name": "TinyCC 0.9.27 fixed-output source",
+      "provenance": "source bundle record fixed-url-767003cf551d3f2e8409b6666cc3e000e1377f298a55fbf20daea3867bd3aed4"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b768ff74b8f16f6c41fb869833582c7cf614e98a8728a1c74616a6b6157ece77"
+      },
+      "id": "make-3.82-source",
+      "name": "GNU Make 3.82 fixed-output source",
+      "provenance": "source bundle record fixed-url-ae11d5ec6f5d6b01fdeeb081181a8a51ad8208ab2d8b651cd2d8383f8fcda3f0"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "2d6a9757ecb8ba18de695edadd2473f14cc8c51427c8a922310c13f97221f6e8"
+      },
+      "id": "make-recipe-runner-source",
+      "name": "bounded GNU Make recipe runner source",
+      "provenance": "bootstrap/seeds/make-recipe-runner.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "d7dd692b74dea83bc6b6aed6efbd9f874aa991a1ba5722e8f4b06bf0c20a21e0"
+      },
+      "id": "gnu-patch-2.5.9-source",
+      "name": "GNU patch 2.5.9 fixed-output source",
+      "provenance": "source bundle record fixed-url-08fc9bbfa8cbf77e5bbfca6cffcfe7116d4927854bfc2b9352b912a00e017545"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "de8516b8bfc78a91f5d37837ff70d6926f4b03cf68924ae7ef6ed602f7f316fd"
+      },
+      "id": "gzip-1.2.4-source",
+      "name": "gzip 1.2.4 fixed-output source",
+      "provenance": "source bundle record fixed-url-28390b124a4e4a0426e370860163351efc23ff1d3d3b6be84a5609868b00f45d"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "48240f8bb743e9fd202f7bc2d98367607f853d2ed7483d484f50892bc69d9ef1"
+      },
+      "id": "gzip-makecrc-source",
+      "name": "bounded gzip CRC generator source",
+      "provenance": "bootstrap/seeds/gzip-makecrc.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "0cbc269e6eccf79f32b9f64204a0277a0e6df877dc1a6d0fd0d3e240365abdff"
+      },
+      "id": "tar-1.12-source",
+      "name": "GNU tar 1.12 fixed-output source",
+      "provenance": "source bundle record fixed-url-56372665c26229fd9923e24885bba78d12de4459e7fb19f3ee6d5cb21dd1f1ac"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "a479349008d81a7766d3e56dd5bd1d83e8645c0690228d4bb2d89d6f04d4f0a9"
+      },
+      "id": "tar-getdate-stub-source",
+      "name": "bounded GNU tar date-parser stub source",
+      "provenance": "bootstrap/seeds/tar-getdate-stub.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "65aa1a57a2966a247b4992de6525e319adb99f8ad2fe4cc2eb543a28740994ad"
+      },
+      "id": "sed-4.0.9-source",
+      "name": "GNU sed 4.0.9 fixed-output source",
+      "provenance": "source bundle record fixed-url-2861bfe2bbe8003326313432362cdd09a73a549a874abb706bce6ba4e5378011"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "969e26e40644aaed6137a7403c29397ada624f6dc20d38dfae5fec9d2079292d"
+      },
+      "id": "bzip2-1.0.8-source",
+      "name": "bzip2 1.0.8 fixed-output source",
+      "provenance": "source bundle record fixed-url-29051c18498ee931a89eb96a6c890e06b4098c8ec2e0f4242f0d8337192a8070"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3bf37f6c622b15c4f6acada147c5ca5921da1cfefe9b0cb6dc53c5d10a10de13"
+      },
+      "id": "bzip2-utime-header-source",
+      "name": "bounded bzip2 compatibility header",
+      "provenance": "bootstrap/seeds/bzip2-utime.h"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "82d3dd8a0cbb5b5032512d747b5bb79b5dfdfd94b2cd11d9ae50a1dd0b05d814"
+      },
+      "id": "coreutils-5.0-source",
+      "name": "coreutils 5.0 fixed-output source",
+      "provenance": "source bundle record fixed-url-758798ffe110eb26e73f9f7832f4addd66c8b8722387fba4513bb786c8528d76"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "03f96124348df7f962ee7c2e23ecfb97a7eeadcbd32a50e503850d5d0c6513b0"
+      },
+      "id": "coreutils-5.0-config-header-source",
+      "name": "bounded coreutils configuration header",
+      "provenance": "bootstrap/seeds/coreutils-5.0-config.h"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b3be0a3a118ad92371d0a1b5d664c216d33964a22e18060184e9d10d65d0ddf8"
+      },
+      "id": "coreutils-modechange-patch-source",
+      "name": "live-bootstrap modechange compatibility patch",
+      "provenance": "bootstrap/seeds/coreutils-5.0-modechange.patch"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "d6a42d969bc7665e7b9193f15b0bb583c5d6fd1277ab2aa5a180c808aa70a877"
+      },
+      "id": "coreutils-mbstate-patch-source",
+      "name": "live-bootstrap mbstate compatibility patch",
+      "provenance": "bootstrap/seeds/coreutils-5.0-mbstate.patch"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "80c602c5e65288de9bf4153acc139b71477d89572ef6dc100bc39d40aa93cbd8"
+      },
+      "id": "coreutils-ls-strcmp-patch-source",
+      "name": "live-bootstrap ls compatibility patch",
+      "provenance": "bootstrap/seeds/coreutils-5.0-ls-strcmp.patch"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "ea379c4de61b38f39aebb7cac135e0c462814065f7849b9a5bb819154d0ee7f5"
+      },
+      "id": "coreutils-touch-getdate-patch-source",
+      "name": "live-bootstrap touch compatibility patch",
+      "provenance": "bootstrap/seeds/coreutils-5.0-touch-getdate.patch"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "e9441c3a23908b695aa7084b50a05065ed7daf852d573645ba82499bbdd6c995"
+      },
+      "id": "coreutils-tac-uint64-patch-source",
+      "name": "live-bootstrap TinyCC integer compatibility patch",
+      "provenance": "bootstrap/seeds/coreutils-5.0-tac-uint64.patch"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "0b808546ae32923f754a12dc0c7578aa68624400159a5c97a93cd49a6252f1a6"
+      },
+      "id": "coreutils-expr-strcmp-patch-source",
+      "name": "live-bootstrap expr compatibility patch",
+      "provenance": "bootstrap/seeds/coreutils-5.0-expr-strcmp.patch"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "69792c09234934fd70f1795affca68cdae6c622a7532898d55794572597ae7c7"
+      },
+      "id": "coreutils-sort-locale-patch-source",
+      "name": "live-bootstrap sort compatibility patch",
+      "provenance": "bootstrap/seeds/coreutils-5.0-sort-locale.patch"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "407c0d0457158c2ceb0a165babfeb5e2f574c3f3bea44b774eb336203a2d6daf"
+      },
+      "id": "coreutils-hash-tcc-patch-source",
+      "name": "bounded TinyCC hash-table compatibility patch",
+      "provenance": "bootstrap/seeds/coreutils-5.0-hash-tcc.patch"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b1ea74a498a000f5f27160860fd44042d738295c78c1db56a4e0fdd10ea5ee76"
+      },
+      "id": "oyacc-6.6-source",
+      "name": "oyacc 6.6 fixed-output source",
+      "provenance": "source bundle record fixed-url-a674f552ef5345d19cb7e37f3c6f80f38dcf1a2f54b188894680bda6c6930c1a"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "5c61da581cf9442bc3da26780e417e3918a8a12c9c9be4d846607e7f5f994934"
+      },
+      "id": "oyacc-smoke-grammar-source",
+      "name": "positive oyacc smoke grammar",
+      "provenance": "bootstrap/seeds/oyacc-smoke.y"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "dbab9cbaaae8309d582edff2ed8c25748316c0364c7049333eb616056033228a"
+      },
+      "id": "oyacc-malformed-grammar-source",
+      "name": "negative oyacc smoke grammar",
+      "provenance": "bootstrap/seeds/oyacc-malformed.y"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
+      },
+      "id": "oyacc-empty-config-source",
+      "name": "authenticated empty oyacc configuration",
+      "provenance": "zero-byte config.h required by the live-bootstrap recipe"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "776fde281b132b5f38011466151a96f40fa1d25c0132c00f4e7c64ce44101c31"
+      },
+      "id": "oyacc-meslibc-patch-source",
+      "name": "live-bootstrap oyacc Mes libc compatibility patch",
+      "provenance": "bootstrap/seeds/oyacc-6.6-meslibc.patch"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "56c7df4bfa6adbf223a14fedfdc56b82d3c0fc702d6d88d5f54de158dcea0706"
+      },
+      "id": "oyacc-tcc-patch-source",
+      "name": "live-bootstrap oyacc TinyCC compatibility patch",
+      "provenance": "bootstrap/seeds/oyacc-6.6-tcc.patch"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "130da251856869c8d04a52d35299181bc6c3be8e38624e731a9323382c3d755e"
+      },
+      "id": "bash-2.05b-source",
+      "name": "bash 2.05b fixed-output source",
+      "provenance": "source bundle record fixed-url-62e1b90422b8fcc2101590edd36dc56e7a72e8bc233854bb1e8b63dc0f76a6c0"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "83fa7ce8da2012b7efab048046f52b6a1416e71058704b086478419bffe0994d"
+      },
+      "id": "bash-2.05b-recipe-source",
+      "name": "checked bounded bash recipe container",
+      "provenance": "bootstrap/bash-2.05b-tcc.ncl"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "c4c01b7f8f7129e8f6228d84d9792f05d79b345effcc715436cb5f3dd5f900ff"
+      },
+      "id": "bash-config-header-source",
+      "name": "bounded bash configuration header",
+      "provenance": "CONFIG heredoc in bootstrap/bash-2.05b-tcc.ncl"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "37f38802c7756f7fa6f316697b8c45ab40408fc37445b0acaf95a020f7506e64"
+      },
+      "id": "bash-pathnames-header-source",
+      "name": "bounded bash pathnames header",
+      "provenance": "PATHS heredoc in bootstrap/bash-2.05b-tcc.ncl"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "9f778f7eb9163e51926466add39958654cc6f8ddf64bbc24b65d1ec9a331e0e4"
+      },
+      "id": "bash-signames-header-source",
+      "name": "bounded bash signal-name header",
+      "provenance": "SIGS heredoc in bootstrap/bash-2.05b-tcc.ncl"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "2e23bab4e73551bf46dd410fc474e088c2586b0bd72483e751a8315c8790ddef"
+      },
+      "id": "bash-version-header-source",
+      "name": "bounded bash version header",
+      "provenance": "VER heredoc in bootstrap/bash-2.05b-tcc.ncl"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3a39f97f535b38b4765ca9ab98866e44ef89e62bcde36de3502dbf572b27e0a3"
+      },
+      "id": "bash-builtext-header-source",
+      "name": "bounded bash builtin extension header",
+      "provenance": "BUILTEXT heredoc in bootstrap/bash-2.05b-tcc.ncl"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "916c161448de17a494684e30eb1dfb4a474cb7c901f79dcc056067effdef2827"
+      },
+      "id": "bash-termios-header-source",
+      "name": "bounded bash termios compatibility header",
+      "provenance": "TERM heredoc in bootstrap/bash-2.05b-tcc.ncl"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "17dcfcc315eec400baa889b9e109c93831e86018d275877ba9d19701ac2a4706"
+      },
+      "id": "bash-syntax-source",
+      "name": "bounded bash syntax table source",
+      "provenance": "SYN heredoc in bootstrap/bash-2.05b-tcc.ncl"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "85d458eb329da9adb9c86e1333791a99e0253403aab2d2192f2586d512426ba9"
+      },
+      "id": "bash-siglist-source",
+      "name": "bounded bash signal-list source",
+      "provenance": "SIGL heredoc in bootstrap/bash-2.05b-tcc.ncl"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "7b78354611deacef7f61db89f8890ba817e351045dbccb8f502b377ba34546b3"
+      },
+      "id": "bash-builtin-stubs-source",
+      "name": "bounded bash builtin stubs source",
+      "provenance": "BSTUB heredoc in bootstrap/bash-2.05b-tcc.ncl"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "8178ce89f526ed0d738b7d0d4b7ae946e75949c4278713342e68ed969b6644ca"
+      },
+      "id": "bash-readline-stub-source",
+      "name": "bounded bash readline stub source",
+      "provenance": "RLSTUB heredoc in bootstrap/bash-2.05b-tcc.ncl"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "88f0a242b6e53d3618383af6d9fce83bbacaa4cf4f2403bba56baf9651901b4e"
+      },
+      "id": "tcc-musl-prep-recipe-source",
+      "name": "checked TinyCC-to-musl bridge recipe",
+      "provenance": "bootstrap/tcc-musl-prep.ncl"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "2abcaf25adf8f529b9f45e5549bfaa5cc5827305624c081e9388ac2ad828ba17"
+      },
+      "id": "musl-1.1.24-source",
+      "name": "musl 1.1.24 fixed-output source",
+      "provenance": "source bundle record fixed-url-e5130672fe4e4cdd9b19e8602ae7cbe70696d8de4b08732ff6bc01fa3c9b7d85"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "cbcdc20f7e285b11921a9a0e0799363132296e9d1725d2a4e3baae9a7e24a9d9"
+      },
+      "id": "musl-1.1.24-recipe-source",
+      "name": "checked reduced first-musl recipe",
+      "provenance": "bootstrap/musl-1.1.24-tcc.ncl"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "69fc61b70094ca956699dc2fa39f752cab7c65d568bd8fe05d4a936322c3960b"
+      },
+      "id": "musl-minmath-source",
+      "name": "reduced musl math compatibility source",
+      "provenance": "musl recipe heredoc src/math/minmath.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "05695e5b671545adf3d7b175c06e5abc9d7f3568f1cfdeee904da8b5daca199e"
+      },
+      "id": "musl-minunistd-source",
+      "name": "reduced musl unistd compatibility source",
+      "provenance": "musl recipe heredoc src/unistd/minunistd.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "c00f0c394966d3976dc551183d23ae074b38071b7e10f36fca82865a0f27c46c"
+      },
+      "id": "musl-minstdlib-source",
+      "name": "reduced musl stdlib compatibility source",
+      "provenance": "musl recipe heredoc src/stdlib/minstdlib.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "c77a6ae68839a92336105833735770df1455bf76466d9e8ef9bbc606f9dbce90"
+      },
+      "id": "musl-minstdio-source",
+      "name": "reduced musl stdio compatibility source",
+      "provenance": "musl recipe heredoc src/stdio/minstdio.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "57a8675cd8c7bba2de72af0bbc8a5e31e29c71c3136dc8a5f057d6754765ca84"
+      },
+      "id": "musl-malloc-source",
+      "name": "reduced musl allocator source",
+      "provenance": "musl recipe heredoc src/malloc/malloc.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "4e0b9e10f5d0cb0b2cfdb9a7952b835805901275757978bd0df7491d777e5f2e"
+      },
+      "id": "musl-sysconf-source",
+      "name": "reduced musl sysconf source",
+      "provenance": "musl recipe heredoc src/conf/sysconf.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "5a4e448755715c58f92a4e59913a2013eda231bbb5a7718e954408e629371f30"
+      },
+      "id": "musl-mb-cur-max-source",
+      "name": "reduced musl multibyte bound source",
+      "provenance": "musl recipe heredoc src/ctype/__ctype_get_mb_cur_max.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "a92a92721c1f5045b81dcb38d3c2d2d47bafa822132021c59f5c0ee2e80861cf"
+      },
+      "id": "musl-init-tls-source",
+      "name": "reduced musl TLS initialization source",
+      "provenance": "musl recipe heredoc src/env/__init_tls.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "0d47c776d69f29aaf091831b88487376786bef2cda19b03de55dfbf1ce7c0abe"
+      },
+      "id": "musl-reset-tls-source",
+      "name": "reduced musl TLS reset source",
+      "provenance": "musl recipe heredoc src/env/__reset_tls.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "dad22f13907c8a5c01177ea03c9b7439d88f82cad27c249bfea98a7cfd0c47cc"
+      },
+      "id": "musl-stack-fail-source",
+      "name": "reduced musl stack failure source",
+      "provenance": "musl recipe heredoc src/env/__stack_chk_fail.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "69c3f1dde3ebc3b778a8e586c9fb83656700a8606d37679b18a89ff8288135ac"
+      },
+      "id": "musl-start-main-source",
+      "name": "reduced musl process start source",
+      "provenance": "musl recipe heredoc src/env/__libc_start_main.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "5362208b59d4de384c2c80c1a9141f163836d9538b8b8218794d25f7a32d7b5a"
+      },
+      "id": "musl-errno-location-source",
+      "name": "reduced musl errno source",
+      "provenance": "musl recipe heredoc src/errno/__errno_location.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "357e6527f4faddb05e93bb0ee6f6cdb70c8c60c9d08ddd5bbcab3ffbe974b9f8"
+      },
+      "id": "musl-strerror-source",
+      "name": "reduced musl strerror source",
+      "provenance": "musl recipe heredoc src/errno/strerror.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "497171f9dc9dcf6b118c3b559d2ae224982710179603e91f1f6ae5390066d018"
+      },
+      "id": "musl-abort-source",
+      "name": "reduced musl abort source",
+      "provenance": "musl recipe heredoc src/exit/abort.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "7f3afdf5148358c90c7f8915de354742da02d7a60d85bbfe22b41c99e2f98bf5"
+      },
+      "id": "musl-open-source",
+      "name": "reduced musl open source",
+      "provenance": "musl recipe heredoc src/fcntl/open.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "8876c1c3b87682ba175d0ca3da3c19aafd773d6780baa63638049ec99c735343"
+      },
+      "id": "musl-openat-source",
+      "name": "reduced musl openat source",
+      "provenance": "musl recipe heredoc src/fcntl/openat.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b4ba89e259263927792ffb789b4efc42c72d5e6834a5a0dc1c2f7175469164ee"
+      },
+      "id": "musl-fadvise-source",
+      "name": "reduced musl fadvise source",
+      "provenance": "musl recipe heredoc src/fcntl/posix_fadvise.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "fd96b7cf48005c85e7756e1aeb548127a07c1162861e4a68d717644521469282"
+      },
+      "id": "musl-fcntl-source",
+      "name": "reduced musl fcntl source",
+      "provenance": "musl recipe heredoc src/fcntl/fcntl.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "49f71cb10539bd5244198385c8d26d8e70955c5c7d1289a6580c5a6e5e7aa65f"
+      },
+      "id": "musl-crt1-source",
+      "name": "reduced musl startup source",
+      "provenance": "musl recipe heredoc crt/crt1.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b54e82c47c18b998c196fe0e7451edbeb56649e36ebb78719093a6ee8f26f419"
+      },
+      "id": "musl-confstr-source",
+      "name": "reduced musl confstr source",
+      "provenance": "musl recipe heredoc src/conf/confstr.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "4f36091d58b669daef9b9001f82acac22f13ecd171831058d10c90a31502e672"
+      },
+      "id": "musl-crypt-source",
+      "name": "reduced musl crypt source",
+      "provenance": "musl recipe heredoc src/crypt/crypt_sha256.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "22289baa86062d7aa482f84bd3b3b1492519b225419e9df6ba46397e86d27e2d"
+      },
+      "id": "musl-semctl-source",
+      "name": "reduced musl semctl source",
+      "provenance": "musl recipe heredoc src/ipc/semctl.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "9e63330518eb48f3e5b3caf961cc7e05ffef11e3f13768c6e8b22d066d6804c7"
+      },
+      "id": "musl-dlerror-source",
+      "name": "reduced musl dlerror source",
+      "provenance": "musl recipe heredoc src/ldso/dlerror.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "2e7056cbed4ae4e55a676ebfdad8ccfe39bbb06090e9ca86dd2a445fa3cfb33c"
+      },
+      "id": "musl-fenv-source",
+      "name": "reduced musl fenv assembly source",
+      "provenance": "musl recipe heredoc src/fenv/x86_64/fenv.s"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "8692c674f19ec7dcf7643365a984dbac570418dbb81989874f078792dd2668c4"
+      },
+      "id": "tcc-musl-recipe-source",
+      "name": "checked musl-linked TinyCC recipe",
+      "provenance": "bootstrap/tcc-musl.ncl"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "5f85fc84eb8eb235ca15d3179db8a3504668804f140d46f15fe7af2e53a0dec5"
+      },
+      "id": "musl-pass2-recipe-source",
+      "name": "checked second-musl recipe",
+      "provenance": "bootstrap/musl-1.1.24-tcc-musl.ncl"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "69fc61b70094ca956699dc2fa39f752cab7c65d568bd8fe05d4a936322c3960b"
+      },
+      "id": "musl-pass2-minmath-source",
+      "name": "second-musl math helper",
+      "provenance": "musl pass2 recipe heredoc src/math/minmath.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "7a201a50dbb656dccea6b064ae51b5f5fcffcd1bd5d0de2f95b16af50d5b3045"
+      },
+      "id": "musl-pass2-minunistd-source",
+      "name": "second-musl unistd helper",
+      "provenance": "musl pass2 recipe heredoc src/unistd/minunistd.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "a4b5ad9096f8826607865f54b26136f8c19da0058dbe86dcb78ad1d06ec4f7d1"
+      },
+      "id": "musl-pass2-minstdlib-source",
+      "name": "second-musl stdlib helper",
+      "provenance": "musl pass2 recipe heredoc src/stdlib/minstdlib.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "52c1a3ee69221559e4c38b1efe6c82e3a8f84c87fa9ce8d3835cbac6e732c697"
+      },
+      "id": "musl-pass2-minstdio-source",
+      "name": "second-musl stdio helper",
+      "provenance": "musl pass2 recipe heredoc src/stdio/minstdio.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "57a8675cd8c7bba2de72af0bbc8a5e31e29c71c3136dc8a5f057d6754765ca84"
+      },
+      "id": "musl-pass2-malloc-source",
+      "name": "second-musl allocator helper",
+      "provenance": "musl pass2 recipe heredoc src/malloc/malloc.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "4e0b9e10f5d0cb0b2cfdb9a7952b835805901275757978bd0df7491d777e5f2e"
+      },
+      "id": "musl-pass2-sysconf-source",
+      "name": "second-musl sysconf helper",
+      "provenance": "musl pass2 recipe heredoc src/conf/sysconf.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "5a4e448755715c58f92a4e59913a2013eda231bbb5a7718e954408e629371f30"
+      },
+      "id": "musl-pass2-mb-cur-max-source",
+      "name": "second-musl multibyte helper",
+      "provenance": "musl pass2 recipe heredoc src/ctype/__ctype_get_mb_cur_max.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "a92a92721c1f5045b81dcb38d3c2d2d47bafa822132021c59f5c0ee2e80861cf"
+      },
+      "id": "musl-pass2-init-tls-source",
+      "name": "second-musl TLS init helper",
+      "provenance": "musl pass2 recipe heredoc src/env/__init_tls.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "0d47c776d69f29aaf091831b88487376786bef2cda19b03de55dfbf1ce7c0abe"
+      },
+      "id": "musl-pass2-reset-tls-source",
+      "name": "second-musl TLS reset helper",
+      "provenance": "musl pass2 recipe heredoc src/env/__reset_tls.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "dad22f13907c8a5c01177ea03c9b7439d88f82cad27c249bfea98a7cfd0c47cc"
+      },
+      "id": "musl-pass2-stack-fail-source",
+      "name": "second-musl stack guard helper",
+      "provenance": "musl pass2 recipe heredoc src/env/__stack_chk_fail.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "69c3f1dde3ebc3b778a8e586c9fb83656700a8606d37679b18a89ff8288135ac"
+      },
+      "id": "musl-pass2-start-main-source",
+      "name": "second-musl process start helper",
+      "provenance": "musl pass2 recipe heredoc src/env/__libc_start_main.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "5362208b59d4de384c2c80c1a9141f163836d9538b8b8218794d25f7a32d7b5a"
+      },
+      "id": "musl-pass2-errno-location-source",
+      "name": "second-musl errno helper",
+      "provenance": "musl pass2 recipe heredoc src/errno/__errno_location.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "357e6527f4faddb05e93bb0ee6f6cdb70c8c60c9d08ddd5bbcab3ffbe974b9f8"
+      },
+      "id": "musl-pass2-strerror-source",
+      "name": "second-musl strerror helper",
+      "provenance": "musl pass2 recipe heredoc src/errno/strerror.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "497171f9dc9dcf6b118c3b559d2ae224982710179603e91f1f6ae5390066d018"
+      },
+      "id": "musl-pass2-abort-source",
+      "name": "second-musl abort helper",
+      "provenance": "musl pass2 recipe heredoc src/exit/abort.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "7f3afdf5148358c90c7f8915de354742da02d7a60d85bbfe22b41c99e2f98bf5"
+      },
+      "id": "musl-pass2-open-source",
+      "name": "second-musl open helper",
+      "provenance": "musl pass2 recipe heredoc src/fcntl/open.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "8876c1c3b87682ba175d0ca3da3c19aafd773d6780baa63638049ec99c735343"
+      },
+      "id": "musl-pass2-openat-source",
+      "name": "second-musl openat helper",
+      "provenance": "musl pass2 recipe heredoc src/fcntl/openat.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b4ba89e259263927792ffb789b4efc42c72d5e6834a5a0dc1c2f7175469164ee"
+      },
+      "id": "musl-pass2-fadvise-source",
+      "name": "second-musl fadvise helper",
+      "provenance": "musl pass2 recipe heredoc src/fcntl/posix_fadvise.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "fd96b7cf48005c85e7756e1aeb548127a07c1162861e4a68d717644521469282"
+      },
+      "id": "musl-pass2-fcntl-source",
+      "name": "second-musl fcntl helper",
+      "provenance": "musl pass2 recipe heredoc src/fcntl/fcntl.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "e4d5e5096162c3979357fab4392cdff388a5df93bbf048dbd72b86d1cca8318b"
+      },
+      "id": "musl-pass2-minstat-source",
+      "name": "second-musl stat helper",
+      "provenance": "musl pass2 recipe heredoc src/stat/minstat.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "dc2a168ba09d83414283a3aa337dddd71a13d7f88b5cc06186f762c85460c495"
+      },
+      "id": "musl-pass2-remove-source",
+      "name": "second-musl remove helper",
+      "provenance": "musl pass2 recipe heredoc src/stdio/remove.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "670df56105afbae06807aea52df008850ac343be79850c6c6a6a8fc1b5ac0f82"
+      },
+      "id": "musl-pass2-utime-source",
+      "name": "second-musl utime helper",
+      "provenance": "musl pass2 recipe heredoc src/time/utime.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "d157fbf502c72be6a283483115ddb04e18ce295ce731bc98112147759f4608d0"
+      },
+      "id": "musl-pass2-signal-source",
+      "name": "second-musl signal helper",
+      "provenance": "musl pass2 recipe heredoc src/signal/signal.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "df822d5849c76562ea29882c4b5ed6cf4dceca203eb65d52442f0c0871ca29fc"
+      },
+      "id": "musl-pass2-crt1-source",
+      "name": "second-musl process entry helper",
+      "provenance": "musl pass2 recipe heredoc crt/crt1.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b54e82c47c18b998c196fe0e7451edbeb56649e36ebb78719093a6ee8f26f419"
+      },
+      "id": "musl-pass2-confstr-source",
+      "name": "second-musl confstr helper",
+      "provenance": "musl pass2 recipe heredoc src/conf/confstr.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "4f36091d58b669daef9b9001f82acac22f13ecd171831058d10c90a31502e672"
+      },
+      "id": "musl-pass2-crypt-source",
+      "name": "second-musl crypt helper",
+      "provenance": "musl pass2 recipe heredoc src/crypt/crypt_sha256.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "22289baa86062d7aa482f84bd3b3b1492519b225419e9df6ba46397e86d27e2d"
+      },
+      "id": "musl-pass2-semctl-source",
+      "name": "second-musl semctl helper",
+      "provenance": "musl pass2 recipe heredoc src/ipc/semctl.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "9e63330518eb48f3e5b3caf961cc7e05ffef11e3f13768c6e8b22d066d6804c7"
+      },
+      "id": "musl-pass2-dlerror-source",
+      "name": "second-musl dlerror helper",
+      "provenance": "musl pass2 recipe heredoc src/ldso/dlerror.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "2e7056cbed4ae4e55a676ebfdad8ccfe39bbb06090e9ca86dd2a445fa3cfb33c"
+      },
+      "id": "musl-pass2-fenv-source",
+      "name": "second-musl fenv assembly helper",
+      "provenance": "musl pass2 recipe heredoc src/fenv/x86_64/fenv.s"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "c82e4b5c375d3f9ba767c916ad4dba18e995d239755ea492ae94a007d2f49190"
+      },
+      "id": "tcc-musl-v2-recipe-source",
+      "name": "checked TinyCC musl-v2 recipe",
+      "provenance": "bootstrap/tcc-musl-v2.ncl"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "39655914dd22719e8f64182e281622ccaa4104ab7d901f728db84338659cc942"
+      },
+      "id": "tcc-musl-v2-stdarg-runtime-source",
+      "name": "checked TinyCC variadic runtime helper",
+      "provenance": "TinyCC musl-v2 recipe heredoc /tmp/tcc-stdarg-runtime.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "e24d7a19746cbae7387c7c7d739c7a3ee5ae6c8e343351f3deacebad1be805d2"
+      },
+      "id": "tcc-musl-selfhost-recipe-source",
+      "name": "checked TinyCC self-host recipe",
+      "provenance": "bootstrap/tcc-musl-selfhost.ncl"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "0f86c28c5a4f7290002200871edede784e79566b4f02c9ebb1f22b654c1e6c1c"
+      },
+      "id": "musl-native-recipe-source",
+      "name": "checked upstream-shaped native musl recipe",
+      "provenance": "bootstrap/musl-1.1.24-native.ncl"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "1acf045348ef14f9fb38dc1e23fec5146d32b4fb6b7bb5c4dfb9742da12ce0d1"
+      },
+      "id": "m4-1.4.7-source",
+      "name": "authenticated GNU M4 1.4.7 source",
+      "provenance": "fixed-output source record m4-1.4.7-src"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "39671a43fce58c3cae66c38810b1912b27a29f7a5c134c84acf03b678af22e74"
+      },
+      "id": "m4-1.4.7-recipe-source",
+      "name": "checked GNU M4 1.4.7 recipe",
+      "provenance": "bootstrap/m4-1.4.7-musl.ncl"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "36714b7ee4e36f7f39ca3fb32010c5babe8a09532ee991f565771f9ca26daf90"
+      },
+      "id": "diffutils-2.7-source",
+      "name": "authenticated GNU diffutils 2.7 source",
+      "provenance": "fixed-output source record diffutils-2.7-src"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "51279c523c0443488a89650985fce68305233907ee2b915540978cb3271f1254"
+      },
+      "id": "diffutils-2.7-recipe-source",
+      "name": "checked GNU diffutils 2.7 recipe",
+      "provenance": "bootstrap/diffutils-2.7-musl.ncl"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b40c519f58ef370f44bbafc37a76ae843a3cf621a44ef83158294fb29ada14d0"
+      },
+      "id": "grep-2.4-source",
+      "name": "authenticated GNU grep 2.4 source",
+      "provenance": "fixed-output source record grep-2.4-src"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "15afa14595fb8c84cd5e1ce8d0807ed853a2177146a4e585bcedd90b3d589ad6"
+      },
+      "id": "grep-2.4-recipe-source",
+      "name": "checked GNU grep 2.4 bridge recipe",
+      "provenance": "bootstrap/grep-2.4-musl.ncl"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "926cba44f7f96479db1e73a85e428346eccc380ca463704fa7f2e68905e9363f"
+      },
+      "id": "grep-2.4-bridge-runner-source",
+      "name": "bounded native runner for the checked GNU grep bridge subset",
+      "provenance": "bootstrap/stagex-grep-bridge-runner.c"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "db0f59d2c7905c1e16d8c45df3548e304a593bdd193444da7e550ff109deb9aa"
+      },
+      "id": "gawk-3.0.4-source",
+      "name": "authenticated GNU Gawk 3.0.4 source",
+      "provenance": "fixed-output source record gawk-3.0.4-src"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "1d35ef5716aea8d04a916ec05d3b4345256d4c4313205fd360b119aebb54b637"
+      },
+      "id": "gawk-3.0.4-recipe-source",
+      "name": "checked GNU Gawk 3.0.4 recipe",
+      "provenance": "bootstrap/gawk-3.0.4-musl.ncl"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "45e40c482750cf4aa35637a7f62ee4f865a8a6d5dcf06aa557be8797c7bc4c62"
+      },
+      "id": "bison-2.3-source",
+      "name": "authenticated GNU Bison 2.3 source",
+      "provenance": "fixed-output source record bison-2.3-src"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "a086f71d144ee17961fe8462fee3b1d9184af885e45ee0200aa133c9fd54bd63"
+      },
+      "id": "bison-2.3-recipe-source",
+      "name": "checked GNU Bison 2.3 recipe",
+      "provenance": "bootstrap/bison-2.3-musl.ncl"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "6a84744fa55e734f9640c58c694c509dba34ddff104ab83e0131b9bc2468f8c0"
+      },
+      "id": "flex-2.6.4-source",
+      "name": "authenticated GNU Flex 2.6.4 source",
+      "provenance": "fixed-output source record flex-2.6.4-src"
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b9e11c2ef244ef9fab988d13bda45d0f0bdeabea8913964bb58cb00c9ac9688b"
+      },
+      "id": "flex-2.6.4-recipe-source",
+      "name": "checked GNU Flex 2.6.4 recipe",
+      "provenance": "bootstrap/flex-2.6.4-musl.ncl"
+    }
+  ],
+  "stage_graph": [
+    {
+      "from_node_id": "seed",
+      "to_node_id": "hex0-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "kaem-minimal-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "kaem-smoke-script"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "stage0-source-bundle"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "stage0-posix-amd64-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "bootstrap-seeds-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "m2-planet-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "m2libc-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "mescc-tools-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "mescc-tools-extra-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "m2-mesoplanet-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "stage0-amd64-answers"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "stage0-after-script"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "mes-0.27.1-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "nyacc-1.00.2-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "tinycc-0.9.26-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "tinycc-mes-0.27.1-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "tinycc-0.9.27-source"
+    },
+    {
+      "from_node_id": "tinycc-0.9.27-source",
+      "to_node_id": "tinycc-0.9.27-stagex-patch"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "make-3.82-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "make-recipe-runner-source"
+    },
+    {
+      "from_node_id": "make-3.82-source",
+      "to_node_id": "make-3.82-stagex-patch"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "gnu-patch-2.5.9-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "gzip-1.2.4-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "gzip-makecrc-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "tar-1.12-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "tar-getdate-stub-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "sed-4.0.9-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "bzip2-1.0.8-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "bzip2-utime-header-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "coreutils-5.0-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "coreutils-5.0-config-header-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "coreutils-modechange-patch-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "coreutils-mbstate-patch-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "coreutils-ls-strcmp-patch-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "coreutils-touch-getdate-patch-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "coreutils-tac-uint64-patch-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "coreutils-expr-strcmp-patch-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "coreutils-sort-locale-patch-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "coreutils-hash-tcc-patch-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "oyacc-6.6-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "oyacc-smoke-grammar-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "oyacc-malformed-grammar-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "oyacc-empty-config-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "oyacc-meslibc-patch-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "oyacc-tcc-patch-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "bash-2.05b-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "bash-2.05b-recipe-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "bash-config-header-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "bash-pathnames-header-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "bash-signames-header-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "bash-version-header-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "bash-builtext-header-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "bash-termios-header-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "bash-syntax-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "bash-siglist-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "bash-builtin-stubs-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "bash-readline-stub-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "tcc-musl-prep-recipe-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-1.1.24-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-1.1.24-recipe-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-minmath-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-minunistd-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-minstdlib-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-minstdio-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-malloc-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-sysconf-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-mb-cur-max-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-init-tls-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-reset-tls-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-stack-fail-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-start-main-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-errno-location-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-strerror-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-abort-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-open-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-openat-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-fadvise-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-fcntl-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-crt1-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-confstr-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-crypt-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-semctl-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-dlerror-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-fenv-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "tcc-musl-recipe-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-recipe-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-minmath-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-minunistd-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-minstdlib-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-minstdio-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-malloc-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-sysconf-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-mb-cur-max-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-init-tls-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-reset-tls-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-stack-fail-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-start-main-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-errno-location-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-strerror-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-abort-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-open-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-openat-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-fadvise-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-fcntl-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-minstat-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-remove-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-utime-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-signal-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-crt1-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-confstr-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-crypt-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-semctl-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-dlerror-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-pass2-fenv-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "tcc-musl-v2-recipe-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "tcc-musl-v2-stdarg-runtime-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "tcc-musl-selfhost-recipe-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "musl-native-recipe-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "m4-1.4.7-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "m4-1.4.7-recipe-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "diffutils-2.7-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "diffutils-2.7-recipe-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "grep-2.4-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "grep-2.4-recipe-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "grep-2.4-bridge-runner-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "gawk-3.0.4-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "gawk-3.0.4-recipe-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "bison-2.3-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "bison-2.3-recipe-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "flex-2.6.4-source"
+    },
+    {
+      "from_node_id": "seed",
+      "to_node_id": "flex-2.6.4-recipe-source"
+    }
+  ],
+  "transition_tools": [
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "cf21608d883b8bdcc1fa6438703630f2fa496cf74d483ce351f876c0656ecf80"
+      },
+      "id": "hex0-seed-exec",
+      "input_artifact_ids": [],
+      "name": "audited hex0 seed",
+      "output_artifact_ids": [
+        "hex0-reproduced"
+      ],
+      "source_artifact_ids": [
+        "hex0-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "cf21608d883b8bdcc1fa6438703630f2fa496cf74d483ce351f876c0656ecf80"
+      },
+      "id": "hex0-reproduced-exec",
+      "input_artifact_ids": [
+        "hex0-reproduced"
+      ],
+      "name": "reproduced hex0 assembler",
+      "output_artifact_ids": [
+        "kaem-0"
+      ],
+      "source_artifact_ids": [
+        "kaem-minimal-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "edc664d028b349824cc8c66030a8883b81bdc03d07bc871e44e60ecb4311ab2a"
+      },
+      "id": "stage0-mini-kaem-exec",
+      "input_artifact_ids": [
+        "hex0-reproduced",
+        "kaem-0"
+      ],
+      "name": "source-built kaem-0 executing the absolute-path mini Stage0 recipe",
+      "output_artifact_ids": [
+        "stage0-m0",
+        "stage0-m1-bootstrap",
+        "stage0-m2",
+        "stage0-blood-elf-bootstrap",
+        "stage0-catm",
+        "stage0-cc-amd64",
+        "stage0-hex1",
+        "stage0-hex2-bootstrap",
+        "stage0-hex2-intermediate",
+        "stage0-m1",
+        "stage0-hex2",
+        "stage0-kaem"
+      ],
+      "source_artifact_ids": [
+        "stage0-source-bundle",
+        "stage0-posix-amd64-source",
+        "bootstrap-seeds-source",
+        "m2-planet-source",
+        "m2libc-source",
+        "mescc-tools-source",
+        "mescc-tools-extra-source",
+        "m2-mesoplanet-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "c6c2f9136a41ec16b049e2af0a017d87804d69f4cad882b20eefbbc6725ea854"
+      },
+      "id": "stage0-full-kaem-exec",
+      "input_artifact_ids": [
+        "stage0-m2",
+        "stage0-blood-elf-bootstrap",
+        "stage0-m1",
+        "stage0-hex2",
+        "stage0-kaem"
+      ],
+      "name": "source-built full kaem executing the absolute-path full Stage0 recipes",
+      "output_artifact_ids": [
+        "stage0-full-m2-mesoplanet",
+        "stage0-full-m2-planet",
+        "stage0-full-blood-elf",
+        "stage0-full-catm",
+        "stage0-full-chmod",
+        "stage0-full-cp",
+        "stage0-full-get-machine",
+        "stage0-full-match",
+        "stage0-full-mkdir",
+        "stage0-full-replace",
+        "stage0-full-rm",
+        "stage0-full-sha256sum",
+        "stage0-full-unbz2",
+        "stage0-full-ungz",
+        "stage0-full-untar",
+        "stage0-full-unxz",
+        "stage0-full-wrap"
+      ],
+      "source_artifact_ids": [
+        "stage0-amd64-answers",
+        "stage0-after-script"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "de4f20cdc2ad232ca79c5aee20c1ef491a71ce95fcfdb28020fc0c9a4c51ea3d"
+      },
+      "id": "mes-m2-kaem-exec",
+      "input_artifact_ids": [
+        "stage0-kaem",
+        "stage0-m1",
+        "stage0-hex2",
+        "stage0-full-m2-planet",
+        "stage0-full-blood-elf",
+        "stage0-full-mkdir",
+        "stage0-full-cp"
+      ],
+      "name": "source-built full Stage0 tools executing the bounded mes-m2 recipe",
+      "output_artifact_ids": [
+        "mes-m2",
+        "mes"
+      ],
+      "source_artifact_ids": [
+        "stage0-source-bundle",
+        "mes-0.27.1-source",
+        "nyacc-1.00.2-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "27e64a1954a37d4ac5ec39c219fa9906237a0f6861ea10fbc3d528b3a514f549"
+      },
+      "id": "mes-runtime-exec",
+      "input_artifact_ids": [
+        "mes-m2",
+        "stage0-m1",
+        "stage0-full-blood-elf"
+      ],
+      "name": "source-built mes-m2 and full Stage0 M1 materializing Mes modules and runtime archives",
+      "output_artifact_ids": [
+        "mescc-entrypoint",
+        "mes-crt1",
+        "mes-x86_64-m1",
+        "mes-libc-mini",
+        "mes-libmes",
+        "mes-libmescc",
+        "mes-libc",
+        "mes-libc-tcc",
+        "mes-libtcc1",
+        "mes-libgetopt",
+        "mes-elf-header",
+        "mes-elf-footer"
+      ],
+      "source_artifact_ids": [
+        "mes-0.27.1-source",
+        "nyacc-1.00.2-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "de4f20cdc2ad232ca79c5aee20c1ef491a71ce95fcfdb28020fc0c9a4c51ea3d"
+      },
+      "id": "tinycc-mes-exec",
+      "input_artifact_ids": [
+        "mes-m2",
+        "mescc-entrypoint",
+        "mes-libc-tcc",
+        "stage0-m1",
+        "stage0-hex2"
+      ],
+      "name": "Mes and full Stage0 tools materializing the first TinyCC compiler",
+      "output_artifact_ids": [
+        "tcc-mes"
+      ],
+      "source_artifact_ids": [
+        "tinycc-0.9.26-source",
+        "tinycc-mes-0.27.1-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "ef10b32c5de0b9322dfdcc5653bab9f0b9e8d5ee57b248ec8cb570c2ae10e9b3"
+      },
+      "id": "tinycc-runtime-exec",
+      "input_artifact_ids": [
+        "tcc-mes",
+        "mes-crt1",
+        "mes-libc-tcc"
+      ],
+      "name": "Mes-linked TinyCC refreshing its crt and runtime archives",
+      "output_artifact_ids": [
+        "tinycc-crt1",
+        "tinycc-libc",
+        "tinycc-libtcc1",
+        "tinycc-libgetopt"
+      ],
+      "source_artifact_ids": [
+        "tinycc-0.9.26-source",
+        "tinycc-mes-0.27.1-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "ef10b32c5de0b9322dfdcc5653bab9f0b9e8d5ee57b248ec8cb570c2ae10e9b3"
+      },
+      "id": "tinycc-boot0-exec",
+      "input_artifact_ids": [
+        "tcc-mes",
+        "tinycc-crt1",
+        "tinycc-libc",
+        "tinycc-libtcc1"
+      ],
+      "name": "Mes-linked TinyCC compiling the first TinyCC self-boundary",
+      "output_artifact_ids": [
+        "tcc-boot0"
+      ],
+      "source_artifact_ids": [
+        "tinycc-0.9.26-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "de4f20cdc2ad232ca79c5aee20c1ef491a71ce95fcfdb28020fc0c9a4c51ea3d"
+      },
+      "id": "tinycc-final-exec",
+      "input_artifact_ids": [
+        "tcc-boot0",
+        "tcc-mes",
+        "mes-m2",
+        "stage0-m1",
+        "stage0-hex2"
+      ],
+      "name": "source-built Mes tools materializing final TinyCC 0.9.26",
+      "output_artifact_ids": [
+        "tinycc-0.9.26"
+      ],
+      "source_artifact_ids": [
+        "tinycc-0.9.26-source",
+        "tinycc-mes-0.27.1-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "ef10b32c5de0b9322dfdcc5653bab9f0b9e8d5ee57b248ec8cb570c2ae10e9b3"
+      },
+      "id": "tinycc27-runtime-exec",
+      "input_artifact_ids": [
+        "tinycc-0.9.26",
+        "tinycc-crt1",
+        "tinycc-libtcc1"
+      ],
+      "name": "TinyCC 0.9.26 refreshing the Mes runtime for the TinyCC 0.9.27 ABI",
+      "output_artifact_ids": [
+        "tinycc27-va-list",
+        "tinycc27-libc"
+      ],
+      "source_artifact_ids": [
+        "tinycc-0.9.27-source",
+        "tinycc-mes-0.27.1-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "ef10b32c5de0b9322dfdcc5653bab9f0b9e8d5ee57b248ec8cb570c2ae10e9b3"
+      },
+      "id": "tinycc27-build-exec",
+      "input_artifact_ids": [
+        "tinycc-0.9.26",
+        "tinycc27-va-list",
+        "tinycc27-libc",
+        "tinycc-libtcc1"
+      ],
+      "name": "TinyCC 0.9.26 materializing TinyCC 0.9.27",
+      "output_artifact_ids": [
+        "tinycc-0.9.27",
+        "tinycc27-alias"
+      ],
+      "source_artifact_ids": [
+        "tinycc-0.9.27-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "51a5345bd89dbdb0537340f90151c663d144f34343a60c56c0110cd5a15dee39"
+      },
+      "id": "tinycc27-smoke-exec",
+      "input_artifact_ids": [
+        "tinycc-0.9.27"
+      ],
+      "name": "TinyCC 0.9.27 executing bounded positive and negative smoke checks",
+      "output_artifact_ids": [
+        "tinycc27-positive-object"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "51a5345bd89dbdb0537340f90151c663d144f34343a60c56c0110cd5a15dee39"
+      },
+      "id": "make-recipe-runner-build-exec",
+      "input_artifact_ids": [
+        "tinycc-0.9.27",
+        "tinycc27-libc",
+        "tinycc-crt1",
+        "tinycc-libtcc1"
+      ],
+      "name": "TinyCC 0.9.27 materializing the bounded Make recipe runner",
+      "output_artifact_ids": [
+        "make-recipe-runner"
+      ],
+      "source_artifact_ids": [
+        "make-recipe-runner-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "51a5345bd89dbdb0537340f90151c663d144f34343a60c56c0110cd5a15dee39"
+      },
+      "id": "make-build-exec",
+      "input_artifact_ids": [
+        "tinycc-0.9.27",
+        "tinycc27-libc",
+        "tinycc-crt1",
+        "tinycc-libtcc1"
+      ],
+      "name": "TinyCC 0.9.27 materializing GNU Make 3.82",
+      "output_artifact_ids": [
+        "make-3.82"
+      ],
+      "source_artifact_ids": [
+        "make-3.82-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "8a5aa115eab6069a8f69cf1b2c63c69c478d64b271bc13fda7ea4e3531b841d1"
+      },
+      "id": "make-smoke-exec",
+      "input_artifact_ids": [
+        "make-3.82",
+        "make-recipe-runner"
+      ],
+      "name": "GNU Make 3.82 dispatching a protected bounded recipe and rejecting malformed input",
+      "output_artifact_ids": [
+        "make-recipe-smoke"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "51a5345bd89dbdb0537340f90151c663d144f34343a60c56c0110cd5a15dee39"
+      },
+      "id": "gnu-patch-build-exec",
+      "input_artifact_ids": [
+        "tinycc-0.9.27",
+        "tinycc27-libc",
+        "tinycc-crt1",
+        "tinycc-libtcc1",
+        "make-recipe-smoke"
+      ],
+      "name": "TinyCC 0.9.27 materializing GNU patch 2.5.9 after the Make handoff",
+      "output_artifact_ids": [
+        "gnu-patch-2.5.9"
+      ],
+      "source_artifact_ids": [
+        "gnu-patch-2.5.9-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "2193ea653bfbc16acc2609a5c7ef6c0b03a7a65dc50e6525d23868598e25fbcb"
+      },
+      "id": "gnu-patch-smoke-exec",
+      "input_artifact_ids": [
+        "gnu-patch-2.5.9"
+      ],
+      "name": "GNU patch 2.5.9 applying a positive patch and rejecting malformed input",
+      "output_artifact_ids": [
+        "gnu-patch-smoke"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "51a5345bd89dbdb0537340f90151c663d144f34343a60c56c0110cd5a15dee39"
+      },
+      "id": "gzip-generator-build-exec",
+      "input_artifact_ids": [
+        "tinycc-0.9.27",
+        "tinycc27-libc",
+        "tinycc-crt1",
+        "tinycc-libtcc1",
+        "gnu-patch-smoke"
+      ],
+      "name": "TinyCC 0.9.27 materializing the bounded gzip CRC generator",
+      "output_artifact_ids": [
+        "gzip-makecrc"
+      ],
+      "source_artifact_ids": [
+        "gzip-makecrc-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "dd10648de513f76a1ecdbfa23cc88953f8c6e46848311a6372de7498aed43c6e"
+      },
+      "id": "gzip-generator-run-exec",
+      "input_artifact_ids": [
+        "gzip-makecrc"
+      ],
+      "name": "source-built gzip CRC generator materializing the checked table",
+      "output_artifact_ids": [
+        "gzip-crc-table"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "51a5345bd89dbdb0537340f90151c663d144f34343a60c56c0110cd5a15dee39"
+      },
+      "id": "gzip-build-exec",
+      "input_artifact_ids": [
+        "tinycc-0.9.27",
+        "tinycc27-libc",
+        "tinycc-crt1",
+        "tinycc-libtcc1",
+        "gzip-crc-table"
+      ],
+      "name": "TinyCC 0.9.27 materializing gzip and gunzip 1.2.4",
+      "output_artifact_ids": [
+        "gzip-1.2.4",
+        "gunzip-1.2.4"
+      ],
+      "source_artifact_ids": [
+        "gzip-1.2.4-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "d2939461715a694222c1a612c0908754e599eb2d268fe012c525845367eff04a"
+      },
+      "id": "gzip-smoke-exec",
+      "input_artifact_ids": [
+        "gzip-1.2.4",
+        "gunzip-1.2.4"
+      ],
+      "name": "gzip and gunzip executing a roundtrip and rejecting malformed input",
+      "output_artifact_ids": [
+        "gzip-smoke"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "51a5345bd89dbdb0537340f90151c663d144f34343a60c56c0110cd5a15dee39"
+      },
+      "id": "tar-build-exec",
+      "input_artifact_ids": [
+        "tinycc-0.9.27",
+        "tinycc27-libc",
+        "tinycc-crt1",
+        "tinycc-libtcc1",
+        "gzip-smoke"
+      ],
+      "name": "TinyCC 0.9.27 materializing GNU tar 1.12 after gzip",
+      "output_artifact_ids": [
+        "tar-1.12"
+      ],
+      "source_artifact_ids": [
+        "tar-1.12-source",
+        "tar-getdate-stub-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "57c861b961bfc2c1047ab7f175c0f16024ea91787ba5a5e43600c721b5eff6ca"
+      },
+      "id": "tar-smoke-exec",
+      "input_artifact_ids": [
+        "tar-1.12"
+      ],
+      "name": "GNU tar 1.12 executing an archive roundtrip and rejecting malformed input",
+      "output_artifact_ids": [
+        "tar-smoke"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3e96d4952cf6c52707082fc120d9a372def665c73bef7ec13609abbfc201b99c"
+      },
+      "id": "sed-build-exec",
+      "input_artifact_ids": [
+        "tinycc-0.9.27",
+        "tinycc27-libc",
+        "tinycc-crt1",
+        "tinycc-libtcc1",
+        "tar-smoke"
+      ],
+      "name": "TinyCC 0.9.27 materializing GNU sed 4.0.9 after GNU tar",
+      "output_artifact_ids": [
+        "sed-4.0.9"
+      ],
+      "source_artifact_ids": [
+        "sed-4.0.9-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "cc4bc898fbad65d9c0a07eab85c61c99abdb9d7d7d747948067bea7d9954618a"
+      },
+      "id": "sed-smoke-exec",
+      "input_artifact_ids": [
+        "sed-4.0.9"
+      ],
+      "name": "GNU sed 4.0.9 executing a substitution and rejecting malformed input",
+      "output_artifact_ids": [
+        "sed-smoke"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "a3e8d977c0652889d2714f7eb9d1cfbe48581c05c7b7e3b79405334504fedd73"
+      },
+      "id": "bzip2-rewrite-exec",
+      "input_artifact_ids": [
+        "sed-4.0.9",
+        "sed-smoke"
+      ],
+      "name": "GNU sed 4.0.9 applying bounded bzip2 compatibility rewrites",
+      "output_artifact_ids": [
+        "bzip2-configured-source"
+      ],
+      "source_artifact_ids": [
+        "bzip2-1.0.8-source",
+        "bzip2-utime-header-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "a3e8d977c0652889d2714f7eb9d1cfbe48581c05c7b7e3b79405334504fedd73"
+      },
+      "id": "bzip2-build-exec",
+      "input_artifact_ids": [
+        "bzip2-configured-source",
+        "tinycc-0.9.27",
+        "tinycc27-libc",
+        "tinycc-crt1",
+        "tinycc-libtcc1"
+      ],
+      "name": "TinyCC 0.9.27 materializing bzip2 1.0.8",
+      "output_artifact_ids": [
+        "bzip2-1.0.8",
+        "bzip2recover-1.0.8"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b6911b1a367e8b159264078e7976d363e3cb9d268a1dd074ddca51a76916b8a7"
+      },
+      "id": "bzip2-smoke-exec",
+      "input_artifact_ids": [
+        "bzip2-1.0.8"
+      ],
+      "name": "bzip2 1.0.8 executing a compression roundtrip and rejecting malformed input",
+      "output_artifact_ids": [
+        "bzip2-smoke"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "232ccf0c23c2e8a028c5ca42cbb46f3afa1aad664a5d5187e11fecdcb04334d4"
+      },
+      "id": "coreutils-patch-exec",
+      "input_artifact_ids": [
+        "gnu-patch-2.5.9"
+      ],
+      "name": "GNU patch 2.5.9 applying bounded coreutils compatibility patches",
+      "output_artifact_ids": [
+        "coreutils-configured-source"
+      ],
+      "source_artifact_ids": [
+        "coreutils-5.0-source",
+        "coreutils-5.0-config-header-source",
+        "coreutils-modechange-patch-source",
+        "coreutils-mbstate-patch-source",
+        "coreutils-ls-strcmp-patch-source",
+        "coreutils-touch-getdate-patch-source",
+        "coreutils-tac-uint64-patch-source",
+        "coreutils-expr-strcmp-patch-source",
+        "coreutils-sort-locale-patch-source",
+        "coreutils-hash-tcc-patch-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "232ccf0c23c2e8a028c5ca42cbb46f3afa1aad664a5d5187e11fecdcb04334d4"
+      },
+      "id": "coreutils-build-exec",
+      "input_artifact_ids": [
+        "coreutils-configured-source",
+        "tinycc-0.9.27",
+        "tinycc27-libc",
+        "tinycc-crt1",
+        "tinycc-libtcc1"
+      ],
+      "name": "TinyCC 0.9.27 materializing the bounded coreutils 5.0 utility set",
+      "output_artifact_ids": [
+        "coreutils-cat",
+        "coreutils-chmod",
+        "coreutils-cp",
+        "coreutils-echo",
+        "coreutils-install",
+        "coreutils-ln",
+        "coreutils-ls",
+        "coreutils-mkdir",
+        "coreutils-mv",
+        "coreutils-rm",
+        "coreutils-rmdir",
+        "coreutils-sort",
+        "coreutils-test",
+        "coreutils-true",
+        "coreutils-false",
+        "coreutils-head",
+        "coreutils-tail",
+        "coreutils-wc",
+        "coreutils-basename",
+        "coreutils-dirname",
+        "coreutils-tr",
+        "coreutils-uniq",
+        "coreutils-expr",
+        "coreutils-tee",
+        "coreutils-touch",
+        "coreutils-bracket"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "fd65316f83e13de60a964675b6ab49ee8bd0e40db3aef391c8c1cbee240375d8"
+      },
+      "id": "coreutils-smoke-exec",
+      "input_artifact_ids": [
+        "coreutils-mkdir",
+        "coreutils-echo",
+        "coreutils-cp",
+        "coreutils-cat",
+        "coreutils-test"
+      ],
+      "name": "coreutils 5.0 executing bounded filesystem smokes and rejecting a missing copy source",
+      "output_artifact_ids": [
+        "coreutils-smoke"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "f4cde58315dcbfc49c47928f9258debd030140c54e249cb2a11beef1eba30296"
+      },
+      "id": "oyacc-patch-exec",
+      "input_artifact_ids": [
+        "gnu-patch-2.5.9",
+        "coreutils-smoke"
+      ],
+      "name": "GNU patch 2.5.9 applying bounded oyacc compatibility patches",
+      "output_artifact_ids": [
+        "oyacc-configured-source"
+      ],
+      "source_artifact_ids": [
+        "oyacc-6.6-source",
+        "oyacc-smoke-grammar-source",
+        "oyacc-malformed-grammar-source",
+        "oyacc-empty-config-source",
+        "oyacc-meslibc-patch-source",
+        "oyacc-tcc-patch-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "f4cde58315dcbfc49c47928f9258debd030140c54e249cb2a11beef1eba30296"
+      },
+      "id": "oyacc-build-exec",
+      "input_artifact_ids": [
+        "oyacc-configured-source",
+        "tinycc-0.9.27",
+        "tinycc27-libc",
+        "tinycc-crt1",
+        "tinycc-libtcc1"
+      ],
+      "name": "TinyCC 0.9.27 materializing oyacc 6.6",
+      "output_artifact_ids": [
+        "oyacc-6.6"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "0b073649ea023167a293495f25302cc3debc4dd6727d9214ce6be9361503aa50"
+      },
+      "id": "oyacc-smoke-exec",
+      "input_artifact_ids": [
+        "oyacc-6.6"
+      ],
+      "name": "oyacc 6.6 generating a parser and rejecting malformed grammar",
+      "output_artifact_ids": [
+        "oyacc-smoke-output"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "acd33bededf76dc149f7c7fa14a2e1a1246c5dafe2ef65eee18cf0d82e3d6bcd"
+      },
+      "id": "bash-build-exec",
+      "input_artifact_ids": [
+        "oyacc-smoke-output",
+        "coreutils-smoke",
+        "tinycc-0.9.27",
+        "tinycc27-libc",
+        "tinycc-crt1",
+        "tinycc-libtcc1"
+      ],
+      "name": "bounded helper materialization and TinyCC 0.9.27 bash build",
+      "output_artifact_ids": [
+        "bash-configured-source",
+        "bash-2.05b",
+        "sh-2.05b"
+      ],
+      "source_artifact_ids": [
+        "bash-2.05b-source",
+        "bash-2.05b-recipe-source",
+        "bash-config-header-source",
+        "bash-pathnames-header-source",
+        "bash-signames-header-source",
+        "bash-version-header-source",
+        "bash-builtext-header-source",
+        "bash-termios-header-source",
+        "bash-syntax-source",
+        "bash-siglist-source",
+        "bash-builtin-stubs-source",
+        "bash-readline-stub-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "f7326a0fcc0878e7cd3616640cee376f71bab5583460b5459cac91168809c03f"
+      },
+      "id": "bash-smoke-exec",
+      "input_artifact_ids": [
+        "bash-2.05b"
+      ],
+      "name": "bash 2.05b executing bounded commands and rejecting malformed syntax",
+      "output_artifact_ids": [
+        "bash-smoke-output"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "29489150a78ce433dac24acfaf58ec66a4cd37d3eb93e223c5b9150f5c71a0aa"
+      },
+      "id": "tcc-musl-prep-build-exec",
+      "input_artifact_ids": [
+        "bash-smoke-output",
+        "tinycc-0.9.27",
+        "tinycc27-libc",
+        "tinycc-crt1",
+        "tinycc-libtcc1"
+      ],
+      "name": "TinyCC 0.9.27 materializing the compiler prepared for musl",
+      "output_artifact_ids": [
+        "tcc-musl-prep-configured-source",
+        "tcc-musl-prep",
+        "tcc-musl-prep-alias",
+        "tcc-musl-prep-libc",
+        "tcc-musl-prep-crt1",
+        "tcc-musl-prep-libtcc1",
+        "tcc-musl-prep-headers"
+      ],
+      "source_artifact_ids": [
+        "tinycc-0.9.27-source",
+        "tinycc-0.9.27-patch-source",
+        "tcc-musl-prep-recipe-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "4add5639d2016d79b1ac258aa502098fc941354ded0acd91bf8cafea42240a77"
+      },
+      "id": "tcc-musl-prep-smoke-exec",
+      "input_artifact_ids": [
+        "tcc-musl-prep",
+        "tcc-musl-prep-headers"
+      ],
+      "name": "TinyCC musl-prep compiling an object and rejecting malformed C",
+      "output_artifact_ids": [
+        "tcc-musl-prep-positive-object"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "d1d3f1b8c7b99ba3902a4b999f55ee4ba3410cfd7ebac9462176f2d1d7565dcf"
+      },
+      "id": "musl-build-exec",
+      "input_artifact_ids": [
+        "tcc-musl-prep",
+        "tcc-musl-prep-libc",
+        "tcc-musl-prep-crt1",
+        "tcc-musl-prep-libtcc1",
+        "tcc-musl-prep-headers"
+      ],
+      "name": "TinyCC musl-prep materializing the reduced first musl",
+      "output_artifact_ids": [
+        "musl-configured-source",
+        "musl-libc",
+        "musl-crt1",
+        "musl-crti",
+        "musl-crtn",
+        "musl-libm",
+        "musl-librt",
+        "musl-libpthread",
+        "musl-libcrypt",
+        "musl-libutil",
+        "musl-libxnet",
+        "musl-libresolv",
+        "musl-libdl",
+        "musl-headers"
+      ],
+      "source_artifact_ids": [
+        "musl-1.1.24-source",
+        "musl-1.1.24-recipe-source",
+        "musl-minmath-source",
+        "musl-minunistd-source",
+        "musl-minstdlib-source",
+        "musl-minstdio-source",
+        "musl-malloc-source",
+        "musl-sysconf-source",
+        "musl-mb-cur-max-source",
+        "musl-init-tls-source",
+        "musl-reset-tls-source",
+        "musl-stack-fail-source",
+        "musl-start-main-source",
+        "musl-errno-location-source",
+        "musl-strerror-source",
+        "musl-abort-source",
+        "musl-open-source",
+        "musl-openat-source",
+        "musl-fadvise-source",
+        "musl-fcntl-source",
+        "musl-crt1-source",
+        "musl-confstr-source",
+        "musl-crypt-source",
+        "musl-semctl-source",
+        "musl-dlerror-source",
+        "musl-fenv-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "4add5639d2016d79b1ac258aa502098fc941354ded0acd91bf8cafea42240a77"
+      },
+      "id": "musl-smoke-exec",
+      "input_artifact_ids": [
+        "musl-libc",
+        "musl-crt1",
+        "musl-headers",
+        "tcc-musl-prep-libtcc1"
+      ],
+      "name": "TinyCC musl-prep compiling and linking against reduced musl",
+      "output_artifact_ids": [
+        "musl-smoke-binary"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "679e40759989e2bf0886a430ac3cb00ef22b045dd18fa50fdeddba44230c7674"
+      },
+      "id": "tcc-musl-build-exec",
+      "input_artifact_ids": [
+        "tcc-musl-prep",
+        "tcc-musl-prep-libc",
+        "tcc-musl-prep-crt1",
+        "tcc-musl-prep-libtcc1",
+        "musl-libc",
+        "musl-crt1",
+        "musl-headers"
+      ],
+      "name": "TinyCC musl-prep materializing the first musl-linked TinyCC",
+      "output_artifact_ids": [
+        "tcc-musl-configured-source",
+        "tcc-musl",
+        "tcc-musl-alias",
+        "tcc-musl-libtcc1"
+      ],
+      "source_artifact_ids": [
+        "tinycc-0.9.27-source",
+        "tinycc-0.9.27-patch-source",
+        "tcc-musl-recipe-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "053f36a66503797b3aaee40d2b0962dc643554e4ecf35d00ee2b7f947601f2af"
+      },
+      "id": "tcc-musl-smoke-exec",
+      "input_artifact_ids": [
+        "tcc-musl",
+        "tcc-musl-libtcc1",
+        "musl-libc",
+        "musl-crt1"
+      ],
+      "name": "musl-linked TinyCC compiling, linking, and rejecting malformed C",
+      "output_artifact_ids": [
+        "tcc-musl-positive-object",
+        "tcc-musl-positive-binary"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "575e19d9e8f5d23be1ae0e87b9e40bebbaa3be7845632980586f38ef2d906e5d"
+      },
+      "id": "musl-pass2-build-exec",
+      "input_artifact_ids": [
+        "tcc-musl",
+        "tcc-musl-libtcc1",
+        "musl-libc",
+        "musl-crt1",
+        "musl-headers"
+      ],
+      "name": "musl-linked TinyCC rebuilding reduced musl",
+      "output_artifact_ids": [
+        "musl-pass2-configured-source",
+        "musl-pass2-libc",
+        "musl-pass2-crt1",
+        "musl-pass2-crti",
+        "musl-pass2-crtn",
+        "musl-pass2-libm",
+        "musl-pass2-librt",
+        "musl-pass2-libpthread",
+        "musl-pass2-libcrypt",
+        "musl-pass2-libutil",
+        "musl-pass2-libxnet",
+        "musl-pass2-libresolv",
+        "musl-pass2-libdl",
+        "musl-pass2-headers"
+      ],
+      "source_artifact_ids": [
+        "musl-1.1.24-source",
+        "musl-pass2-recipe-source",
+        "musl-pass2-minmath-source",
+        "musl-pass2-minunistd-source",
+        "musl-pass2-minstdlib-source",
+        "musl-pass2-minstdio-source",
+        "musl-pass2-malloc-source",
+        "musl-pass2-sysconf-source",
+        "musl-pass2-mb-cur-max-source",
+        "musl-pass2-init-tls-source",
+        "musl-pass2-reset-tls-source",
+        "musl-pass2-stack-fail-source",
+        "musl-pass2-start-main-source",
+        "musl-pass2-errno-location-source",
+        "musl-pass2-strerror-source",
+        "musl-pass2-abort-source",
+        "musl-pass2-open-source",
+        "musl-pass2-openat-source",
+        "musl-pass2-fadvise-source",
+        "musl-pass2-fcntl-source",
+        "musl-pass2-minstat-source",
+        "musl-pass2-remove-source",
+        "musl-pass2-utime-source",
+        "musl-pass2-signal-source",
+        "musl-pass2-crt1-source",
+        "musl-pass2-confstr-source",
+        "musl-pass2-crypt-source",
+        "musl-pass2-semctl-source",
+        "musl-pass2-dlerror-source",
+        "musl-pass2-fenv-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "053f36a66503797b3aaee40d2b0962dc643554e4ecf35d00ee2b7f947601f2af"
+      },
+      "id": "musl-pass2-smoke-exec",
+      "input_artifact_ids": [
+        "musl-pass2-libc",
+        "musl-pass2-crt1",
+        "musl-pass2-headers",
+        "tcc-musl-libtcc1"
+      ],
+      "name": "musl-linked TinyCC compiling and linking against second-musl",
+      "output_artifact_ids": [
+        "musl-pass2-smoke-binary"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b68ec9f7c46ca1cbec5508a98476f771e4bcc4d90b4e088a237065aac1c6061b"
+      },
+      "id": "tcc-musl-v2-build-exec",
+      "input_artifact_ids": [
+        "tinycc-0.9.26",
+        "tinycc-libtcc1",
+        "tcc-musl-prep-libtcc1",
+        "musl-pass2-libc",
+        "musl-pass2-crt1",
+        "musl-pass2-headers"
+      ],
+      "name": "TinyCC 0.9.26 materializing TinyCC musl-v2 and its variadic runtime",
+      "output_artifact_ids": [
+        "tcc-musl-v2-configured-source",
+        "tcc-musl-v2",
+        "tcc-musl-v2-alias",
+        "tcc-musl-v2-libtcc1",
+        "tcc-musl-v2-source-tree",
+        "tcc-musl-v2-header-tree"
+      ],
+      "source_artifact_ids": [
+        "tinycc-0.9.27-source",
+        "tinycc-0.9.27-patch-source",
+        "tcc-musl-v2-recipe-source",
+        "tcc-musl-v2-stdarg-runtime-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "a17643b015db05bd452918841ba7811b8e063edfe29328672388f6b693a1b8ec"
+      },
+      "id": "tcc-musl-v2-smoke-exec",
+      "input_artifact_ids": [
+        "tcc-musl-v2",
+        "tcc-musl-v2-libtcc1",
+        "musl-pass2-libc",
+        "musl-pass2-crt1",
+        "musl-pass2-headers"
+      ],
+      "name": "TinyCC musl-v2 variadic compile, link, execute, and malformed-source rejection",
+      "output_artifact_ids": [
+        "tcc-musl-v2-positive-object",
+        "tcc-musl-v2-positive-binary"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "2a6733b887417ec6f848ece381d125e10d5d5544f0839dcfa896eacc88529fa6"
+      },
+      "id": "tcc-musl-v2-execution-exec",
+      "input_artifact_ids": [
+        "tcc-musl-v2-positive-binary"
+      ],
+      "name": "TinyCC musl-v2 positive variadic execution",
+      "output_artifact_ids": [
+        "tcc-musl-v2-positive-execution"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "8e6580da40c5892b941423ae108d6218b3636ebd3643bc3ba1e78e33d6c4898a"
+      },
+      "id": "tcc-musl-selfhost-build-exec",
+      "input_artifact_ids": [
+        "tcc-musl-v2",
+        "tcc-musl-v2-source-tree",
+        "tinycc-0.9.26",
+        "tinycc-libc",
+        "tinycc-libtcc1",
+        "musl-pass2-libc"
+      ],
+      "name": "TinyCC musl-v2 compiling self-hosted TinyCC objects with declared predecessor linking",
+      "output_artifact_ids": [
+        "tcc-musl-selfhost",
+        "tcc-musl-selfhost-alias",
+        "tcc-musl-selfhost-libtcc",
+        "tcc-musl-selfhost-main-object",
+        "tcc-musl-selfhost-patched-source",
+        "tcc-musl-selfhost-object-tree"
+      ],
+      "source_artifact_ids": [
+        "tcc-musl-selfhost-recipe-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "cc40480286f053fc69e7d17431b4cf5de82b477b0f84e646717cd6c3c71cecb1"
+      },
+      "id": "tcc-musl-selfhost-smoke-exec",
+      "input_artifact_ids": [
+        "tcc-musl-selfhost"
+      ],
+      "name": "self-hosted TinyCC syntax and variadic object smoke",
+      "output_artifact_ids": [
+        "tcc-musl-selfhost-smoke-object"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b65d4f08a8a49ebc0c402c00f68a9348fb416cb8d66b066b4d08022e744018b2"
+      },
+      "id": "musl-native-build-exec",
+      "input_artifact_ids": [
+        "tcc-musl-selfhost",
+        "tcc-musl-v2"
+      ],
+      "name": "self-hosted TinyCC materializing upstream-shaped native musl with declared predecessor assistance",
+      "output_artifact_ids": [
+        "musl-native-configured-source",
+        "musl-native-libc",
+        "musl-native-crt1",
+        "musl-native-crti",
+        "musl-native-crtn",
+        "musl-native-libm",
+        "musl-native-librt",
+        "musl-native-libpthread",
+        "musl-native-libcrypt",
+        "musl-native-libutil",
+        "musl-native-libxnet",
+        "musl-native-libresolv",
+        "musl-native-libdl",
+        "musl-native-headers"
+      ],
+      "source_artifact_ids": [
+        "musl-1.1.24-source",
+        "musl-native-recipe-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "37b452f13fc423d7a1a5cc061264e4a897b305d144b0e214648738d106cb3e49"
+      },
+      "id": "musl-native-smoke-exec",
+      "input_artifact_ids": [
+        "musl-native-libc",
+        "musl-native-crt1",
+        "musl-native-headers",
+        "tcc-musl-selfhost"
+      ],
+      "name": "native musl compile and static link smoke",
+      "output_artifact_ids": [
+        "musl-native-smoke-binary"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "f578c82fb2c9eb48d87b171daedaef41f63c7f82b64d26b14e6f686f9c3f230e"
+      },
+      "id": "musl-native-execution-exec",
+      "input_artifact_ids": [
+        "musl-native-smoke-binary",
+        "tcc-musl-v2"
+      ],
+      "name": "native musl execution and malformed-source rejection",
+      "output_artifact_ids": [
+        "musl-native-validation-receipt"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "dbd75c146b108dfe62f23aeb29675b68d0d41bc8ca5b5dfd137d346a284376ac"
+      },
+      "id": "m4-build-exec",
+      "input_artifact_ids": [
+        "tcc-musl-v2",
+        "musl-native-libc",
+        "musl-native-crt1",
+        "musl-native-headers"
+      ],
+      "name": "TinyCC musl-v2 materializing GNU M4 against native musl",
+      "output_artifact_ids": [
+        "m4-configured-source",
+        "m4-1.4.7"
+      ],
+      "source_artifact_ids": [
+        "m4-1.4.7-source",
+        "m4-1.4.7-recipe-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3dfd2a1223ff6e0c2c540bc2507a097948ab24e2465f232e2363944e5b704741"
+      },
+      "id": "m4-smoke-exec",
+      "input_artifact_ids": [
+        "m4-1.4.7"
+      ],
+      "name": "GNU M4 executing version, macro, prefix, and malformed-input checks",
+      "output_artifact_ids": [
+        "m4-version-observation",
+        "m4-macro-observation",
+        "m4-prefix-observation",
+        "m4-malformed-rejection"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "00d79a6f09d23d7a3430ccfd407a8cac0351aa5ecc6efc122f8cf093989cbbe5"
+      },
+      "id": "diffutils-build-exec",
+      "input_artifact_ids": [
+        "tcc-musl-v2",
+        "musl-native-libc",
+        "musl-native-crt1",
+        "musl-native-headers"
+      ],
+      "name": "TinyCC musl-v2 materializing GNU diffutils against native musl",
+      "output_artifact_ids": [
+        "diffutils-configured-source",
+        "diffutils-diff-2.7",
+        "diffutils-cmp-2.7"
+      ],
+      "source_artifact_ids": [
+        "diffutils-2.7-source",
+        "diffutils-2.7-recipe-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "054ba2636aef71a1cbda93de3358ff8b8a7c92127ce951dcb7cc5814ac0e2d66"
+      },
+      "id": "diffutils-smoke-exec",
+      "input_artifact_ids": [
+        "diffutils-diff-2.7",
+        "diffutils-cmp-2.7"
+      ],
+      "name": "GNU diffutils executing equality, difference, version, and malformed-input checks",
+      "output_artifact_ids": [
+        "diffutils-version-observation",
+        "diffutils-diff-observation",
+        "diffutils-cmp-observation",
+        "diffutils-malformed-rejection"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "d86dde390ef4ab7b4456f0371cbd29afa8b0e31ca297e7acc85b5f9544775c40"
+      },
+      "id": "grep-build-exec",
+      "input_artifact_ids": [
+        "tcc-musl-v2",
+        "musl-native-libc",
+        "musl-native-crt1",
+        "musl-native-headers"
+      ],
+      "name": "TinyCC musl-v2 materializing the checked GNU grep bridge and native subset runner",
+      "output_artifact_ids": [
+        "grep-configured-source",
+        "grep-2.4-runner",
+        "egrep-2.4-runner",
+        "fgrep-2.4-runner",
+        "grep-2.4-bridge-script"
+      ],
+      "source_artifact_ids": [
+        "grep-2.4-source",
+        "grep-2.4-recipe-source",
+        "grep-2.4-bridge-runner-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "b4adac2bf1f29e3e3b8ec736207a0cdfc3eb5b51c658a2f9f8eff85aee4ef71d"
+      },
+      "id": "grep-smoke-exec",
+      "input_artifact_ids": [
+        "grep-2.4-runner"
+      ],
+      "name": "native GNU grep bridge runner executing literal, quiet, and anchored checks",
+      "output_artifact_ids": [
+        "grep-literal-observation",
+        "grep-quiet-observation",
+        "grep-anchored-observation"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "ccf0a5c408f8d60f4c8d72413c4c0ec0f8a49e29884c54c229ede61284dc7988"
+      },
+      "id": "gawk-build-exec",
+      "input_artifact_ids": [
+        "tcc-musl-v2",
+        "musl-native-libc",
+        "musl-native-crt1",
+        "musl-native-headers"
+      ],
+      "name": "TinyCC musl-v2 materializing GNU Gawk against native musl",
+      "output_artifact_ids": [
+        "gawk-configured-source",
+        "gawk-3.0.4",
+        "awk-3.0.4-alias"
+      ],
+      "source_artifact_ids": [
+        "gawk-3.0.4-source",
+        "gawk-3.0.4-recipe-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "1608d2ac4b0f9faaecd91494502942fccfcec3fd6298aa610f2dfd4308aaf5d1"
+      },
+      "id": "gawk-smoke-exec",
+      "input_artifact_ids": [
+        "gawk-3.0.4"
+      ],
+      "name": "GNU Gawk executing bounded generator and malformed-program checks",
+      "output_artifact_ids": [
+        "gawk-behavior-observation",
+        "gawk-numeric-observation",
+        "gawk-decimal-observation",
+        "gawk-length-observation",
+        "gawk-hex-observation",
+        "gawk-negative-observation",
+        "gawk-installed-observation"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "7b9699a83f7028fb22c8aa5bffaa5e314e2a9e1ad8625c0304c2a7bbbf37f121"
+      },
+      "id": "bison-build-exec",
+      "input_artifact_ids": [
+        "tcc-musl-v2",
+        "musl-native-libc",
+        "musl-native-crt1",
+        "musl-native-headers",
+        "m4-1.4.7"
+      ],
+      "name": "TinyCC musl-v2 materializing GNU Bison against native musl",
+      "output_artifact_ids": [
+        "bison-configured-source",
+        "bison-2.3",
+        "bison-2.3-runtime-data"
+      ],
+      "source_artifact_ids": [
+        "bison-2.3-source",
+        "bison-2.3-recipe-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3db09397aa2752eea9c438a4cb1c5ebd27605f58b56ec43781baf411c3f2b983"
+      },
+      "id": "bison-smoke-exec",
+      "input_artifact_ids": [
+        "bison-2.3",
+        "bison-2.3-runtime-data",
+        "m4-1.4.7"
+      ],
+      "name": "GNU Bison executing version, valid grammar, and malformed grammar checks",
+      "output_artifact_ids": [
+        "bison-version-observation",
+        "bison-positive-parser-source",
+        "bison-positive-parser-header",
+        "bison-negative-observation"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "d2d7e2a0ed46329fc2e37d58d25dab8f17c01b5c9b7b97de09930ef3e25fe3b7"
+      },
+      "id": "flex-build-exec",
+      "input_artifact_ids": [
+        "tcc-musl-v2",
+        "musl-native-libc",
+        "musl-native-crt1",
+        "musl-native-headers",
+        "m4-1.4.7"
+      ],
+      "name": "TinyCC musl-v2 materializing GNU Flex against native musl",
+      "output_artifact_ids": [
+        "flex-configured-source",
+        "flex-2.6.4",
+        "flex-libfl",
+        "flex-cxx-header",
+        "flex-libfl-consumer"
+      ],
+      "source_artifact_ids": [
+        "flex-2.6.4-source",
+        "flex-2.6.4-recipe-source"
+      ]
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "502324a00e1b35d6fc18a6cf6c3a257d3578b7d5fd8bffc27ce41b9da3c1ebbf"
+      },
+      "id": "flex-smoke-exec",
+      "input_artifact_ids": [
+        "flex-2.6.4",
+        "flex-libfl",
+        "flex-libfl-consumer",
+        "m4-1.4.7"
+      ],
+      "name": "GNU Flex executing archive, version, valid scanner, and malformed scanner checks",
+      "output_artifact_ids": [
+        "flex-version-observation",
+        "flex-positive-scanner-source",
+        "flex-negative-observation"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "725e682bc5f91728a92f72a81332dda87537ff0ec27b20134b9644b5f2cd43a7"
+      },
+      "id": "bash-full-generator-build-exec",
+      "input_artifact_ids": [
+        "bash-configured-source",
+        "tcc-musl-v2",
+        "musl-native-libc",
+        "musl-native-headers"
+      ],
+      "name": "TinyCC musl-v2 materializing the Bash builtin generator",
+      "output_artifact_ids": [
+        "bash-full-mkbuiltins"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "1797cb39c0507d6fbb40afbbd58299ffd9a0eb7d0e983bbe64742499a3fdc9c9"
+      },
+      "id": "bash-full-generator-run-exec",
+      "input_artifact_ids": [
+        "bash-configured-source",
+        "bash-full-mkbuiltins"
+      ],
+      "name": "authenticated Bash builtin generation",
+      "output_artifact_ids": [
+        "bash-full-generated-builtins"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "dc3fd01b5f34af5e2f3031c10cda243f43b3c9ce45a0fd2181693727fb629a2e"
+      },
+      "id": "bash-full-build-exec",
+      "input_artifact_ids": [
+        "bash-configured-source",
+        "bash-full-generated-builtins",
+        "tcc-musl-v2",
+        "musl-native-libc",
+        "musl-native-crt1",
+        "musl-native-headers"
+      ],
+      "name": "TinyCC musl-v2 materializing full Bash against native musl",
+      "output_artifact_ids": [
+        "bash-full-configured-source",
+        "bash-2.05b-full"
+      ],
+      "source_artifact_ids": []
+    },
+    {
+      "digest": {
+        "algorithm": "blake3",
+        "hex_value": "3f166d5bb28aee29982ec38ba07f8b1dca3c488390737a0e78d35950876e4d4e"
+      },
+      "id": "bash-full-smoke-exec",
+      "input_artifact_ids": [
+        "bash-2.05b-full",
+        "make-3.82"
+      ],
+      "name": "full Bash control-flow, builtin, external-child, and GNU Make shell checks",
+      "output_artifact_ids": [
+        "bash-full-version-observation",
+        "bash-full-functional-observation",
+        "bash-full-negative-observation",
+        "bash-full-external-child-observation",
+        "bash-full-make-shell-observation"
+      ],
+      "source_artifact_ids": []
+    }
+  ]
+}

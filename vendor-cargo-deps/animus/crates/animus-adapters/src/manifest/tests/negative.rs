@@ -5,12 +5,15 @@ use super::support::*;
 fn rejects_missing_required_identity() {
     let mut draft = safe_stdio_draft();
     draft.identity = None;
-    let error =
-        PluginDescriptor::validate(&draft, BUILT_IN_TOOLS, CATALOG_TOOLS).expect_err("missing identity should fail");
+    let error = PluginDescriptor::validate(&draft, BUILT_IN_TOOLS, CATALOG_TOOLS)
+        .expect_err("missing identity should fail");
 
-    assert_eq!(error, PluginDescriptorError::MissingField {
-        field: IDENTITY_FIELD.as_str(),
-    });
+    assert_eq!(
+        error,
+        PluginDescriptorError::MissingField {
+            field: IDENTITY_FIELD.as_str(),
+        }
+    );
 }
 
 #[test]
@@ -24,14 +27,20 @@ fn rejects_unknown_toolset_kind_and_trust_status() {
     let trust_error = PluginDescriptor::validate(&bad_trust, BUILT_IN_TOOLS, CATALOG_TOOLS)
         .expect_err("unknown trust status should fail");
 
-    assert_eq!(kind_error, PluginDescriptorError::UnknownDescriptorValue {
-        field: TOOLSET_KIND_FIELD.as_str(),
-        value: Text::from(UNKNOWN_TOOLSET_KIND),
-    });
-    assert_eq!(trust_error, PluginDescriptorError::UnknownDescriptorValue {
-        field: TRUST_STATUS_FIELD.as_str(),
-        value: Text::from(UNKNOWN_TRUST_STATUS),
-    });
+    assert_eq!(
+        kind_error,
+        PluginDescriptorError::UnknownDescriptorValue {
+            field: TOOLSET_KIND_FIELD.as_str(),
+            value: Text::from(UNKNOWN_TOOLSET_KIND),
+        }
+    );
+    assert_eq!(
+        trust_error,
+        PluginDescriptorError::UnknownDescriptorValue {
+            field: TRUST_STATUS_FIELD.as_str(),
+            value: Text::from(UNKNOWN_TRUST_STATUS),
+        }
+    );
 }
 
 #[test]
@@ -41,10 +50,13 @@ fn rejects_unknown_runtime_kind() {
     let error = PluginDescriptor::validate(&draft, BUILT_IN_TOOLS, CATALOG_TOOLS)
         .expect_err("unknown runtime kind should fail");
 
-    assert_eq!(error, PluginDescriptorError::UnknownDescriptorValue {
-        field: RUNTIME_KIND_FIELD.as_str(),
-        value: Text::from(UNKNOWN_RUNTIME_KIND),
-    });
+    assert_eq!(
+        error,
+        PluginDescriptorError::UnknownDescriptorValue {
+            field: RUNTIME_KIND_FIELD.as_str(),
+            value: Text::from(UNKNOWN_RUNTIME_KIND),
+        }
+    );
 }
 
 #[test]
@@ -54,9 +66,12 @@ fn rejects_missing_launch_command_for_stdio() {
     let error = PluginDescriptor::validate(&draft, BUILT_IN_TOOLS, CATALOG_TOOLS)
         .expect_err("stdio descriptors require a launch label");
 
-    assert_eq!(error, PluginDescriptorError::MissingLaunchCommand {
-        runtime_kind: RuntimeKind::Stdio,
-    });
+    assert_eq!(
+        error,
+        PluginDescriptorError::MissingLaunchCommand {
+            runtime_kind: RuntimeKind::Stdio,
+        }
+    );
 }
 
 #[test]
@@ -70,14 +85,18 @@ fn rejects_missing_tool_metadata() {
     }];
     let mut missing_description = safe_stdio_draft();
     missing_description.declared_tools = &tools;
-    let description_error = PluginDescriptor::validate(&missing_description, BUILT_IN_TOOLS, CATALOG_TOOLS)
-        .expect_err("missing tool description should fail");
+    let description_error =
+        PluginDescriptor::validate(&missing_description, BUILT_IN_TOOLS, CATALOG_TOOLS)
+            .expect_err("missing tool description should fail");
 
     assert_eq!(missing_description.declared_tools.len(), tools.len());
     assert_eq!(missing_description.declared_tools[0].description, None);
-    assert_eq!(description_error, PluginDescriptorError::MissingField {
-        field: TOOL_DESCRIPTION_FIELD.as_str(),
-    });
+    assert_eq!(
+        description_error,
+        PluginDescriptorError::MissingField {
+            field: TOOL_DESCRIPTION_FIELD.as_str(),
+        }
+    );
 }
 
 #[test]
@@ -113,16 +132,26 @@ fn rejects_missing_schema_result_and_capabilities() {
         .expect_err("missing result identity should fail");
     let mut missing_capability = safe_stdio_draft();
     missing_capability.declared_tools = &missing_capability_tools;
-    let capability_error = PluginDescriptor::validate(&missing_capability, BUILT_IN_TOOLS, CATALOG_TOOLS)
-        .expect_err("missing capability labels should fail");
+    let capability_error =
+        PluginDescriptor::validate(&missing_capability, BUILT_IN_TOOLS, CATALOG_TOOLS)
+            .expect_err("missing capability labels should fail");
 
-    assert_eq!(schema_error, PluginDescriptorError::MissingField {
-        field: TOOL_SCHEMA_FIELD.as_str(),
-    });
-    assert_eq!(result_error, PluginDescriptorError::MissingField {
-        field: TOOL_RESULT_FIELD.as_str(),
-    });
-    assert_eq!(capability_error, PluginDescriptorError::MissingField {
-        field: TOOL_CAPABILITY_FIELD.as_str(),
-    });
+    assert_eq!(
+        schema_error,
+        PluginDescriptorError::MissingField {
+            field: TOOL_SCHEMA_FIELD.as_str(),
+        }
+    );
+    assert_eq!(
+        result_error,
+        PluginDescriptorError::MissingField {
+            field: TOOL_RESULT_FIELD.as_str(),
+        }
+    );
+    assert_eq!(
+        capability_error,
+        PluginDescriptorError::MissingField {
+            field: TOOL_CAPABILITY_FIELD.as_str(),
+        }
+    );
 }

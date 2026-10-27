@@ -5,13 +5,9 @@
 //! thin shell owns file reads and Nickel invocation. Runtime enforcement never
 //! evaluates Nickel.
 
+use crate::{Policy, SUPPORTED_SCHEMA_VERSION};
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-
-use serde::Deserialize;
-use serde::Serialize;
-
-use crate::Policy;
-use crate::SUPPORTED_SCHEMA_VERSION;
 
 const MAXIMUM_ID_BYTES: usize = 128;
 const MAXIMUM_FIELD_BYTES: usize = 4_096;
@@ -107,8 +103,18 @@ fn check_contracts(issues: &mut Vec<ProjectionIssue>, policy: &Policy) {
                 "policy declares duplicate contract identity".to_owned(),
             ));
         }
-        check_allowlist(issues, key.as_str(), &contract.resource_prefixes, "projection.contracts.resource-prefixes");
-        check_allowlist(issues, key.as_str(), &contract.abilities, "projection.contracts.abilities");
+        check_allowlist(
+            issues,
+            key.as_str(),
+            &contract.resource_prefixes,
+            "projection.contracts.resource-prefixes",
+        );
+        check_allowlist(
+            issues,
+            key.as_str(),
+            &contract.abilities,
+            "projection.contracts.abilities",
+        );
     }
 }
 
@@ -126,7 +132,10 @@ fn check_backends(issues: &mut Vec<ProjectionIssue>, policy: &Policy) {
         if supported_backend_negative(backend.id.as_str()) {
             issues.push(ProjectionIssue::new(
                 "projection.backends.unsupported".to_owned(),
-                format!("backend id {:?} is not in the supported Rust vocabulary", backend.id),
+                format!(
+                    "backend id {:?} is not in the supported Rust vocabulary",
+                    backend.id
+                ),
             ));
         }
         if !seen_ids.insert(backend.id.as_str()) {
@@ -141,7 +150,11 @@ fn check_backends(issues: &mut Vec<ProjectionIssue>, policy: &Policy) {
 fn check_lexical(issues: &mut Vec<ProjectionIssue>, policy: &Policy) {
     for contract in policy.contracts.values() {
         for prefix in &contract.resource_prefixes {
-            check_lexical_value(issues, prefix.as_str(), "projection.lexical.resource-prefix");
+            check_lexical_value(
+                issues,
+                prefix.as_str(),
+                "projection.lexical.resource-prefix",
+            );
         }
         for ability in &contract.abilities {
             check_ability(issues, ability.as_str());
@@ -149,7 +162,12 @@ fn check_lexical(issues: &mut Vec<ProjectionIssue>, policy: &Policy) {
     }
 }
 
-fn check_allowlist(issues: &mut Vec<ProjectionIssue>, contract_key: &str, allowlist: &[String], class: &str) {
+fn check_allowlist(
+    issues: &mut Vec<ProjectionIssue>,
+    contract_key: &str,
+    allowlist: &[String],
+    class: &str,
+) {
     if allowlist.is_empty() {
         issues.push(ProjectionIssue::new(
             class.to_owned(),
@@ -204,7 +222,9 @@ fn check_ability(issues: &mut Vec<ProjectionIssue>, ability: &str) {
     if segments.is_empty()
         || segments.len() > MAXIMUM_TOKENS_PER_ITEM
         || segments.iter().any(|segment| segment.is_empty())
-        || segments.iter().any(|segment| segment.len() > MAXIMUM_PATH_SEGMENT_BYTES)
+        || segments
+            .iter()
+            .any(|segment| segment.len() > MAXIMUM_PATH_SEGMENT_BYTES)
     {
         issues.push(ProjectionIssue::new(
             "projection.lexical.ability.path".to_owned(),
@@ -250,27 +270,30 @@ fn supported_backend_negative(backend: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-
     use super::*;
-    use crate::ContractBackendPolicy;
-    use crate::ContractPolicy;
-    use crate::EnforcementRequest;
+    use crate::{ContractBackendPolicy, ContractPolicy, EnforcementRequest};
+    use std::collections::BTreeMap;
 
     fn valid_policy() -> Policy {
         let mut contracts = BTreeMap::new();
-        contracts.insert("document-write".to_owned(), ContractPolicy {
-            id: "document-write".to_owned(),
-            description: String::new(),
-            resource_prefixes: vec!["did:key:z6Mkresource/docs/".to_owned()],
-            abilities: vec!["document/write".to_owned()],
-        });
+        contracts.insert(
+            "document-write".to_owned(),
+            ContractPolicy {
+                id: "document-write".to_owned(),
+                description: String::new(),
+                resource_prefixes: vec!["did:key:z6Mkresource/docs/".to_owned()],
+                abilities: vec!["document/write".to_owned()],
+            },
+        );
         let mut backends = BTreeMap::new();
-        backends.insert("nickel".to_owned(), ContractBackendPolicy {
-            id: "nickel".to_owned(),
-            description: String::new(),
-            supports_higher_order: false,
-        });
+        backends.insert(
+            "nickel".to_owned(),
+            ContractBackendPolicy {
+                id: "nickel".to_owned(),
+                description: String::new(),
+                supports_higher_order: false,
+            },
+        );
         Policy {
             schema_version: SUPPORTED_SCHEMA_VERSION.to_owned(),
             contracts,
@@ -287,56 +310,96 @@ mod tests {
     #[test]
     fn key_id_mismatch_fails_closed() {
         let mut policy = valid_policy();
-        let entry = policy.contracts.get_mut("document-write").expect("test contract");
+        let entry = policy
+            .contracts
+            .get_mut("document-write")
+            .expect("test contract");
         entry.id = "document-read".to_owned();
         let verdict = validate_projection(&policy);
         assert!(!verdict.is_accepted());
-        assert!(verdict.issues.iter().any(|i| i.class == "projection.contracts.key-id-mismatch"));
+        assert!(
+            verdict
+                .issues
+                .iter()
+                .any(|i| i.class == "projection.contracts.key-id-mismatch")
+        );
     }
 
     #[test]
     fn empty_allowlist_fails_closed() {
         let mut policy = valid_policy();
-        let entry = policy.contracts.get_mut("document-write").expect("test contract");
+        let entry = policy
+            .contracts
+            .get_mut("document-write")
+            .expect("test contract");
         entry.abilities.clear();
         let verdict = validate_projection(&policy);
         assert!(!verdict.is_accepted());
-        assert!(verdict.issues.iter().any(|i| i.class == "projection.contracts.abilities"));
+        assert!(
+            verdict
+                .issues
+                .iter()
+                .any(|i| i.class == "projection.contracts.abilities")
+        );
     }
 
     #[test]
     fn duplicate_allowlist_entry_fails_closed() {
         let mut policy = valid_policy();
-        let entry = policy.contracts.get_mut("document-write").expect("test contract");
+        let entry = policy
+            .contracts
+            .get_mut("document-write")
+            .expect("test contract");
         entry.abilities.push("document/write".to_owned());
         let verdict = validate_projection(&policy);
         assert!(!verdict.is_accepted());
-        assert!(verdict.issues.iter().any(|i| i.class == "projection.contracts.abilities.duplicate"));
+        assert!(
+            verdict
+                .issues
+                .iter()
+                .any(|i| i.class == "projection.contracts.abilities.duplicate")
+        );
     }
 
     #[test]
     fn malformed_ability_fails_lexically() {
         let mut policy = valid_policy();
-        let entry = policy.contracts.get_mut("document-write").expect("test contract");
+        let entry = policy
+            .contracts
+            .get_mut("document-write")
+            .expect("test contract");
         entry.abilities = vec!["document/".to_owned()];
         let verdict = validate_projection(&policy);
         assert!(!verdict.is_accepted());
-        assert!(verdict.issues.iter().any(|i| i.class == "projection.lexical.ability.path"));
+        assert!(
+            verdict
+                .issues
+                .iter()
+                .any(|i| i.class == "projection.lexical.ability.path")
+        );
     }
 
     #[test]
     fn unsupported_backend_fails_closed() {
         let mut policy = valid_policy();
         let mut backends = BTreeMap::new();
-        backends.insert("rust".to_owned(), ContractBackendPolicy {
-            id: "rust".to_owned(),
-            description: String::new(),
-            supports_higher_order: false,
-        });
+        backends.insert(
+            "rust".to_owned(),
+            ContractBackendPolicy {
+                id: "rust".to_owned(),
+                description: String::new(),
+                supports_higher_order: false,
+            },
+        );
         policy.backends = backends;
         let verdict = validate_projection(&policy);
         assert!(!verdict.is_accepted());
-        assert!(verdict.issues.iter().any(|i| i.class == "projection.backends.unsupported"));
+        assert!(
+            verdict
+                .issues
+                .iter()
+                .any(|i| i.class == "projection.backends.unsupported")
+        );
     }
 
     #[test]
@@ -345,14 +408,26 @@ mod tests {
         policy.contracts = BTreeMap::new();
         let verdict = validate_projection(&policy);
         assert!(!verdict.is_accepted());
-        assert!(verdict.issues.iter().any(|i| i.class == "projection.contracts.empty"));
+        assert!(
+            verdict
+                .issues
+                .iter()
+                .any(|i| i.class == "projection.contracts.empty")
+        );
     }
 
     #[test]
     fn accepted_projection_still_requires_runtime_authorization() {
         let policy = valid_policy();
-        let request = EnforcementRequest::new("document-write", "did:key:z6Mkresource/docs/report", "document/write")
-            .with_capability(crate::CapabilityGrant::new("did:key:z6Mkresource/docs/report", "document/write"));
+        let request = EnforcementRequest::new(
+            "document-write",
+            "did:key:z6Mkresource/docs/report",
+            "document/write",
+        )
+        .with_capability(crate::CapabilityGrant::new(
+            "did:key:z6Mkresource/docs/report",
+            "document/write",
+        ));
         let verdict = validate_projection(&policy);
         // Parity conformance does not by itself authorize anything.
         assert!(verdict.is_accepted());

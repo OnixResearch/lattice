@@ -7,14 +7,20 @@ fn missing_credential_blocks_before_side_effects() {
     let decision = super::super::admit(&request).expect("decision should evaluate");
 
     assert_eq!(decision.verdict(), super::super::AdmissionVerdict::Deny);
-    assert_eq!(decision.reason(), Some(super::super::AdmissionReason::MissingCredential));
+    assert_eq!(
+        decision.reason(),
+        Some(super::super::AdmissionReason::MissingCredential)
+    );
     assert!(!decision.is_allowed());
 }
 
 #[test]
 fn wrong_audience_fails_closed() {
-    let reason =
-        denied_reason(Some(credential(WRONG_AUDIENCE_CREDENTIAL)), Some(HASH_B), super::super::AdmissionCaveat::Allow);
+    let reason = denied_reason(
+        Some(credential(WRONG_AUDIENCE_CREDENTIAL)),
+        Some(HASH_B),
+        super::super::AdmissionCaveat::Allow,
+    );
 
     assert_eq!(reason, Some(super::super::AdmissionReason::WrongAudience));
 }
@@ -30,7 +36,10 @@ fn expired_credential_fails_closed() {
         super::super::AdmissionCaveat::Allow,
     );
 
-    assert_eq!(reason, Some(super::super::AdmissionReason::ExpiredCredential));
+    assert_eq!(
+        reason,
+        Some(super::super::AdmissionReason::ExpiredCredential)
+    );
 }
 
 #[test]
@@ -44,20 +53,30 @@ fn revoked_credential_fails_closed() {
         super::super::AdmissionCaveat::Allow,
     );
 
-    assert_eq!(reason, Some(super::super::AdmissionReason::RevokedCredential));
+    assert_eq!(
+        reason,
+        Some(super::super::AdmissionReason::RevokedCredential)
+    );
 }
 
 #[test]
 fn missing_grant_fails_closed() {
-    let reason =
-        denied_reason(Some(credential(OTHER_RESOURCE_CREDENTIAL)), Some(HASH_B), super::super::AdmissionCaveat::Allow);
+    let reason = denied_reason(
+        Some(credential(OTHER_RESOURCE_CREDENTIAL)),
+        Some(HASH_B),
+        super::super::AdmissionCaveat::Allow,
+    );
 
     assert_eq!(reason, Some(super::super::AdmissionReason::MissingGrant));
 }
 
 #[test]
 fn caveat_denial_fails_closed() {
-    let reason = denied_reason(Some(credential(VALID_CREDENTIAL)), Some(HASH_B), super::super::AdmissionCaveat::Deny);
+    let reason = denied_reason(
+        Some(credential(VALID_CREDENTIAL)),
+        Some(HASH_B),
+        super::super::AdmissionCaveat::Deny,
+    );
 
     assert_eq!(reason, Some(super::super::AdmissionReason::CaveatDenied));
 }
@@ -73,12 +92,19 @@ fn verifier_unavailable_fails_closed() {
         super::super::AdmissionCaveat::Allow,
     );
 
-    assert_eq!(reason, Some(super::super::AdmissionReason::VerifierUnavailable));
+    assert_eq!(
+        reason,
+        Some(super::super::AdmissionReason::VerifierUnavailable)
+    );
 }
 
 #[test]
 fn missing_policy_fails_closed() {
-    let reason = denied_reason(Some(credential(VALID_CREDENTIAL)), None, super::super::AdmissionCaveat::Allow);
+    let reason = denied_reason(
+        Some(credential(VALID_CREDENTIAL)),
+        None,
+        super::super::AdmissionCaveat::Allow,
+    );
 
     assert_eq!(reason, Some(super::super::AdmissionReason::MissingPolicy));
 }
@@ -87,19 +113,31 @@ fn missing_policy_fails_closed() {
 fn unsupported_entrypoint_fails_closed() {
     let request = super::super::AdmissionRequest::new(&super::super::AdmissionRequestDraft {
         entrypoint: super::super::Entrypoint::Unsupported,
-        ..draft(Some(credential(VALID_CREDENTIAL)), Some(HASH_B), super::super::AdmissionCaveat::Allow)
+        ..draft(
+            Some(credential(VALID_CREDENTIAL)),
+            Some(HASH_B),
+            super::super::AdmissionCaveat::Allow,
+        )
     })
     .expect("request should validate");
 
-    let reason = super::super::admit(&request).expect("decision should evaluate").reason();
+    let reason = super::super::admit(&request)
+        .expect("decision should evaluate")
+        .reason();
 
-    assert_eq!(reason, Some(super::super::AdmissionReason::UnsupportedEntrypoint));
+    assert_eq!(
+        reason,
+        Some(super::super::AdmissionReason::UnsupportedEntrypoint)
+    );
 }
 
 #[test]
 fn receipt_leak_fixtures_are_rejected() {
     for marker in super::super::LEAK_MARKERS {
-        assert_eq!(super::super::validate_safe_text(marker), Err(super::super::AdmissionError::ReceiptLeak { marker }));
+        assert_eq!(
+            super::super::validate_safe_text(marker),
+            Err(super::super::AdmissionError::ReceiptLeak { marker })
+        );
     }
 }
 
@@ -115,7 +153,10 @@ fn plain_http_remote_server_fails_closed_when_tls_required() {
         ..RemoteDenialFixture::default()
     });
 
-    assert_eq!(reason, Some(super::super::RemoteServerAdmissionReason::MissingTls));
+    assert_eq!(
+        reason,
+        Some(super::super::RemoteServerAdmissionReason::MissingTls)
+    );
 }
 
 #[test]
@@ -125,9 +166,15 @@ fn missing_remote_server_handshake_fails_closed_without_probe_effects() {
     let policy = remote_policy().expect("policy should validate");
     let decision = remote_decision(&descriptor, None, &policy).expect("admission should evaluate");
 
-    assert_eq!(decision.reason(), Some(super::super::RemoteServerAdmissionReason::MissingHandshake));
+    assert_eq!(
+        decision.reason(),
+        Some(super::super::RemoteServerAdmissionReason::MissingHandshake)
+    );
     assert!(!decision.is_admitted());
-    assert_eq!(decision.receipt().tls_status(), super::super::RemoteServerObservedTls::NotObserved);
+    assert_eq!(
+        decision.receipt().tls_status(),
+        super::super::RemoteServerObservedTls::NotObserved
+    );
 }
 
 #[test]
@@ -140,7 +187,10 @@ fn remote_server_fingerprint_mismatch_fails_closed() {
         ..RemoteDenialFixture::default()
     });
 
-    assert_eq!(reason, Some(super::super::RemoteServerAdmissionReason::FingerprintMismatch));
+    assert_eq!(
+        reason,
+        Some(super::super::RemoteServerAdmissionReason::FingerprintMismatch)
+    );
 }
 
 #[test]
@@ -154,7 +204,10 @@ fn remote_server_tofu_pending_without_approval_fails_closed() {
         ..RemoteDenialFixture::default()
     });
 
-    assert_eq!(reason, Some(super::super::RemoteServerAdmissionReason::TofuPending));
+    assert_eq!(
+        reason,
+        Some(super::super::RemoteServerAdmissionReason::TofuPending)
+    );
 }
 
 #[test]
@@ -167,7 +220,10 @@ fn remote_server_secret_unavailable_fails_closed() {
         ..RemoteDenialFixture::default()
     });
 
-    assert_eq!(reason, Some(super::super::RemoteServerAdmissionReason::SecretUnavailable));
+    assert_eq!(
+        reason,
+        Some(super::super::RemoteServerAdmissionReason::SecretUnavailable)
+    );
 }
 
 #[test]
@@ -180,7 +236,10 @@ fn remote_server_unauthorized_fails_closed() {
         ..RemoteDenialFixture::default()
     });
 
-    assert_eq!(reason, Some(super::super::RemoteServerAdmissionReason::Unauthorized));
+    assert_eq!(
+        reason,
+        Some(super::super::RemoteServerAdmissionReason::Unauthorized)
+    );
 }
 
 #[test]
@@ -193,7 +252,10 @@ fn remote_server_unsupported_protocol_fails_closed() {
         ..RemoteDenialFixture::default()
     });
 
-    assert_eq!(reason, Some(super::super::RemoteServerAdmissionReason::UnsupportedProtocol));
+    assert_eq!(
+        reason,
+        Some(super::super::RemoteServerAdmissionReason::UnsupportedProtocol)
+    );
 }
 
 #[test]
@@ -206,7 +268,10 @@ fn remote_server_wrong_audience_fails_closed() {
         ..RemoteDenialFixture::default()
     });
 
-    assert_eq!(reason, Some(super::super::RemoteServerAdmissionReason::AudienceMismatch));
+    assert_eq!(
+        reason,
+        Some(super::super::RemoteServerAdmissionReason::AudienceMismatch)
+    );
 }
 
 #[test]
@@ -219,7 +284,10 @@ fn remote_server_capability_widening_fails_closed() {
         ..RemoteDenialFixture::default()
     });
 
-    assert_eq!(reason, Some(super::super::RemoteServerAdmissionReason::CapabilityWidening));
+    assert_eq!(
+        reason,
+        Some(super::super::RemoteServerAdmissionReason::CapabilityWidening)
+    );
 }
 
 #[test]
@@ -232,7 +300,10 @@ fn remote_server_fallback_request_fails_closed() {
         ..RemoteDenialFixture::default()
     });
 
-    assert_eq!(reason, Some(super::super::RemoteServerAdmissionReason::FallbackDenied));
+    assert_eq!(
+        reason,
+        Some(super::super::RemoteServerAdmissionReason::FallbackDenied)
+    );
 }
 
 #[test]
@@ -248,25 +319,29 @@ fn remote_server_receipt_leak_fixtures_are_rejected() {
 
 #[test]
 fn raw_endpoint_descriptor_is_rejected() {
-    let result = super::super::RemoteServerDescriptor::new(&super::super::RemoteServerDescriptorDraft {
-        backend_identity: RAW_ENDPOINT,
-        endpoint_identity_hash: HASH_C,
-        endpoint_identity_class: super::super::RemoteServerEndpointIdentityClass::HashOnly,
-        transport: super::super::RemoteServerTransportKind::Https,
-        protocol_role: super::super::RemoteServerProtocolRole::HeadlessControl,
-        platform_role: super::super::RemoteServerPlatformRole::GooseServeBackend,
-        tls_requirement: super::super::RemoteServerTlsRequirement::Required,
-        fingerprint_policy: super::super::RemoteServerFingerprintPolicy::Pinned,
-        secret_source_label: SECRET_SOURCE,
-        secret_source_class: super::super::RemoteServerSecretSourceClass::SharedSecret,
-        scope: SCOPE,
-        capability_ceilings: &[CAPABILITY_PROMPT],
-        expected_audience_hash: HASH_A,
-        provenance_hash: HASH_D,
-    });
+    let result =
+        super::super::RemoteServerDescriptor::new(&super::super::RemoteServerDescriptorDraft {
+            backend_identity: RAW_ENDPOINT,
+            endpoint_identity_hash: HASH_C,
+            endpoint_identity_class: super::super::RemoteServerEndpointIdentityClass::HashOnly,
+            transport: super::super::RemoteServerTransportKind::Https,
+            protocol_role: super::super::RemoteServerProtocolRole::HeadlessControl,
+            platform_role: super::super::RemoteServerPlatformRole::GooseServeBackend,
+            tls_requirement: super::super::RemoteServerTlsRequirement::Required,
+            fingerprint_policy: super::super::RemoteServerFingerprintPolicy::Pinned,
+            secret_source_label: SECRET_SOURCE,
+            secret_source_class: super::super::RemoteServerSecretSourceClass::SharedSecret,
+            scope: SCOPE,
+            capability_ceilings: &[CAPABILITY_PROMPT],
+            expected_audience_hash: HASH_A,
+            provenance_hash: HASH_D,
+        });
 
     assert!(result.is_err());
-    assert_eq!(result, Err(super::super::RemoteServerAdmissionError::UnsafeMaterial { marker: "https://" }));
+    assert_eq!(
+        result,
+        Err(super::super::RemoteServerAdmissionError::UnsafeMaterial { marker: "https://" })
+    );
 }
 
 #[derive(Clone, Copy)]
@@ -292,7 +367,9 @@ impl RemoteDenialFixture<'_> {
     }
 }
 
-fn remote_denial_reason(fixture: RemoteDenialFixture<'_>) -> Option<super::super::RemoteServerAdmissionReason> {
+fn remote_denial_reason(
+    fixture: RemoteDenialFixture<'_>,
+) -> Option<super::super::RemoteServerAdmissionReason> {
     let descriptor = remote_descriptor_with(
         fixture.transport,
         fixture.fingerprint_policy,
@@ -300,7 +377,10 @@ fn remote_denial_reason(fixture: RemoteDenialFixture<'_>) -> Option<super::super
         fixture.expected_audience_hash,
     )
     .expect("descriptor should validate");
-    let handshake = fixture.handshake.map(remote_handshake_with).map(|value| value.expect("handshake should validate"));
+    let handshake = fixture
+        .handshake
+        .map(remote_handshake_with)
+        .map(|value| value.expect("handshake should validate"));
     let policy = remote_policy_with(fixture.policy).expect("policy should validate");
     remote_decision(&descriptor, handshake.as_ref(), &policy)
         .expect("admission should evaluate")

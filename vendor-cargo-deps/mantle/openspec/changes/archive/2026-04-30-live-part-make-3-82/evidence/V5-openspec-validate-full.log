@@ -1,0 +1,16 @@
+{
+  "live-part-make-3-82": [
+    {
+      "severity": "warning",
+      "message": "specs/bootstrap/spec.md:3 heading missing r[...] id"
+    },
+    {
+      "severity": "warning",
+      "message": "specs/bootstrap/spec.md:9 heading missing r[...] id"
+    },
+    {
+      "severity": "warning",
+      "message": "specs/bootstrap/spec.md:17 heading missing r[...] id"
+    }
+  ]
+}

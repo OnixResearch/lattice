@@ -14,6 +14,7 @@ const IMPORT_TOKEN: &[u8] = b"import";
 #[cfg(unix)]
 const EXECUTABLE_MODE_MASK: u32 = 0o111;
 
+pub mod component;
 pub mod execution;
 pub mod installation;
 pub mod probe;

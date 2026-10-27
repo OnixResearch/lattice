@@ -5,21 +5,17 @@
 //! validates the declared decision facts, fails closed on every non-admitted fact,
 //! and passes only admitted effective grants to [`crate::enforce`].
 
-use serde::Deserialize;
-use serde::Serialize;
+use crate::ucan_profile::{BasaltUcanProtocolProfile, admit_compact_profile};
+use crate::{
+    CapabilityGrant, DEFAULT_POLICY_JSON, EnforcementReceipt, EnforcementRequest, Policy,
+    default_policy, enforce,
+};
+use serde::{Deserialize, Serialize};
 
-use crate::CapabilityGrant;
-use crate::DEFAULT_POLICY_JSON;
-use crate::EnforcementReceipt;
-use crate::EnforcementRequest;
-use crate::Policy;
-use crate::default_policy;
-use crate::enforce;
-pub use crate::ucan_semantics_identity::BASALT_POLICY_BLAKE3;
-pub use crate::ucan_semantics_identity::UCAN_RUNTIME_REVISION;
-pub use crate::ucan_semantics_identity::UCAN_SEMANTICS_FIXTURE_SCHEMA;
-pub use crate::ucan_semantics_identity::UCAN_SUPPORT_CATALOG_BLAKE3;
-pub use crate::ucan_semantics_identity::UCAN_SUPPORT_CATALOG_REVISION;
+pub use crate::ucan_semantics_identity::{
+    BASALT_POLICY_BLAKE3, UCAN_PROTOCOL_PROFILE, UCAN_RUNTIME_REVISION,
+    UCAN_SEMANTICS_FIXTURE_SCHEMA, UCAN_SUPPORT_CATALOG_BLAKE3, UCAN_SUPPORT_CATALOG_REVISION,
+};
 
 const MAXIMUM_FIXTURE_CAPABILITIES: usize = 64;
 const MAXIMUM_FIXTURE_ID_BYTES: usize = 128;
@@ -144,6 +140,8 @@ pub struct UcanSemanticsFixture {
     pub schema: String,
     /// Stable fixture identifier.
     pub fixture_id: String,
+    /// Explicit nominal UCAN protocol profile.
+    pub protocol_profile: BasaltUcanProtocolProfile,
     /// Exact UCAN revision linked by Basalt at runtime.
     pub runtime_ucan_revision: String,
     /// Exact UCAN revision that produced the reviewed support catalog.
@@ -214,7 +212,9 @@ impl SemanticsReplayReport {
 /// Return the BLAKE3 identity of the embedded default policy bytes.
 #[must_use]
 pub fn default_policy_blake3() -> String {
-    blake3::hash(DEFAULT_POLICY_JSON.as_bytes()).to_hex().to_string()
+    blake3::hash(DEFAULT_POLICY_JSON.as_bytes())
+        .to_hex()
+        .to_string()
 }
 
 /// Validate fixture shape and immutable dependency identities without performing I/O.
@@ -230,6 +230,12 @@ pub fn validate_semantics_fixture(fixture: &UcanSemanticsFixture) -> Vec<Semanti
         "unsupported UCAN semantics fixture schema",
     );
     check_fixture_id(&mut issues, fixture.fixture_id.as_str());
+    if admit_compact_profile(fixture.protocol_profile).is_err() {
+        issues.push(SemanticsIssue::new(
+            "semantics.profile.mismatch",
+            "fixture protocol profile does not match the compact adapter cohort",
+        ));
+    }
     check_exact(
         &mut issues,
         fixture.runtime_ucan_revision.as_str(),
@@ -324,7 +330,9 @@ fn replay_valid_fixture(policy: &Policy, fixture: &UcanSemanticsFixture) -> Sema
         None => enforce_admitted_fixture(policy, fixture),
     };
 
-    if enforcement.allowed != fixture.expected.allowed || reason_class != fixture.expected.reason_class {
+    if enforcement.allowed != fixture.expected.allowed
+        || reason_class != fixture.expected.reason_class
+    {
         issues.push(SemanticsIssue::new(
             "semantics.expected.mismatch",
             "actual Basalt replay result does not match the fixture expectation",
@@ -345,7 +353,11 @@ fn replay_valid_fixture(policy: &Policy, fixture: &UcanSemanticsFixture) -> Sema
 fn enforce_admitted_fixture(
     policy: &Policy,
     fixture: &UcanSemanticsFixture,
-) -> (EnforcementReceipt, SemanticsReasonClass, Vec<SemanticsIssue>) {
+) -> (
+    EnforcementReceipt,
+    SemanticsReasonClass,
+    Vec<SemanticsIssue>,
+) {
     let mut capabilities = fixture.direct_capabilities.clone();
     capabilities.extend_from_slice(fixture.effective_delegated_capabilities.as_slice());
     let request = EnforcementRequest::new(
@@ -360,18 +372,22 @@ fn enforce_admitted_fixture(
             let reason_class = classify_enforcement(&enforcement);
             (enforcement, reason_class, Vec::new())
         }
-        Err(_) => (EnforcementReceipt::denied(ENFORCEMENT_ERROR_REASON), SemanticsReasonClass::EnforcementError, vec![
-            SemanticsIssue::new(
+        Err(_) => (
+            EnforcementReceipt::denied(ENFORCEMENT_ERROR_REASON),
+            SemanticsReasonClass::EnforcementError,
+            vec![SemanticsIssue::new(
                 "semantics.enforcement.error",
                 "Basalt enforcement returned an error and the adapter failed closed",
-            ),
-        ]),
+            )],
+        ),
     }
 }
 
 // Keep the no-precondition return visible instead of hiding it behind `?`.
 #[allow(clippy::question_mark)]
-fn precondition_denial(fixture: &UcanSemanticsFixture) -> Option<(EnforcementReceipt, SemanticsReasonClass)> {
+fn precondition_denial(
+    fixture: &UcanSemanticsFixture,
+) -> Option<(EnforcementReceipt, SemanticsReasonClass)> {
     let Some(reason_class) = precondition_reason_class(fixture) else {
         return None;
     };
@@ -389,11 +405,13 @@ fn precondition_denial(fixture: &UcanSemanticsFixture) -> Option<(EnforcementRec
 // Explicit branching keeps invalid UCAN requests and decision ordering visible.
 #[allow(clippy::option_if_let_else)]
 fn precondition_reason_class(fixture: &UcanSemanticsFixture) -> Option<SemanticsReasonClass> {
-    let request_is_concrete =
-        match ucan::VerifiedCapability::new(fixture.request_resource.clone(), fixture.request_ability.clone()) {
-            Ok(request) => request.is_concrete(),
-            Err(_) => false,
-        };
+    let request_is_concrete = match ucan::VerifiedCapability::new(
+        fixture.request_resource.clone(),
+        fixture.request_ability.clone(),
+    ) {
+        Ok(request) => request.is_concrete(),
+        Err(_) => false,
+    };
     if !request_is_concrete {
         return Some(SemanticsReasonClass::WildcardRequestDenied);
     }
@@ -422,7 +440,13 @@ fn classify_enforcement(enforcement: &EnforcementReceipt) -> SemanticsReasonClas
     }
 }
 
-fn check_exact(issues: &mut Vec<SemanticsIssue>, actual: &str, expected: &str, code: &str, message: &str) {
+fn check_exact(
+    issues: &mut Vec<SemanticsIssue>,
+    actual: &str,
+    expected: &str,
+    code: &str,
+    message: &str,
+) {
     if actual != expected {
         issues.push(SemanticsIssue::new(code, message));
     }
@@ -453,8 +477,10 @@ fn check_policy_identity(issues: &mut Vec<SemanticsIssue>) {
 }
 
 fn check_capability_limit(issues: &mut Vec<SemanticsIssue>, fixture: &UcanSemanticsFixture) {
-    let capability_count =
-        fixture.direct_capabilities.len().saturating_add(fixture.effective_delegated_capabilities.len());
+    let capability_count = fixture
+        .direct_capabilities
+        .len()
+        .saturating_add(fixture.effective_delegated_capabilities.len());
     if capability_count > MAXIMUM_FIXTURE_CAPABILITIES {
         issues.push(SemanticsIssue::new(
             "semantics.capabilities.limit",
@@ -465,7 +491,9 @@ fn check_capability_limit(issues: &mut Vec<SemanticsIssue>, fixture: &UcanSemant
 
 fn check_capabilities(issues: &mut Vec<SemanticsIssue>, fixture: &UcanSemanticsFixture) {
     for capability in &fixture.direct_capabilities {
-        if ucan::VerifiedCapability::new(capability.resource.clone(), capability.ability.clone()).is_err() {
+        if ucan::VerifiedCapability::new(capability.resource.clone(), capability.ability.clone())
+            .is_err()
+        {
             issues.push(SemanticsIssue::new(
                 "semantics.capabilities.direct-invalid",
                 "fixture contains an invalid direct UCAN capability",
@@ -473,14 +501,21 @@ fn check_capabilities(issues: &mut Vec<SemanticsIssue>, fixture: &UcanSemanticsF
         }
     }
     for capability in &fixture.effective_delegated_capabilities {
-        if ucan::VerifiedCapability::new(capability.resource.clone(), capability.ability.clone()).is_err() {
+        if ucan::VerifiedCapability::new(capability.resource.clone(), capability.ability.clone())
+            .is_err()
+        {
             issues.push(SemanticsIssue::new(
                 "semantics.capabilities.delegated-invalid",
                 "fixture contains an invalid effective delegated UCAN capability",
             ));
         }
     }
-    if ucan::VerifiedCapability::new(fixture.request_resource.clone(), fixture.request_ability.clone()).is_err() {
+    if ucan::VerifiedCapability::new(
+        fixture.request_resource.clone(),
+        fixture.request_ability.clone(),
+    )
+    .is_err()
+    {
         issues.push(SemanticsIssue::new(
             "semantics.request.invalid",
             "fixture request is not a valid UCAN resource and ability pair",
@@ -534,7 +569,10 @@ fn rejected_report(fixture_id: String, code: &str, message: &str) -> SemanticsRe
     invalid_fixture_report(fixture_id, vec![SemanticsIssue::new(code, message)])
 }
 
-fn invalid_fixture_report(fixture_id: String, issues: Vec<SemanticsIssue>) -> SemanticsReplayReport {
+fn invalid_fixture_report(
+    fixture_id: String,
+    issues: Vec<SemanticsIssue>,
+) -> SemanticsReplayReport {
     SemanticsReplayReport {
         fixture_id,
         accepted: false,

@@ -69,7 +69,7 @@ fn command(fixture: &Fixture) -> Command {
 }
 
 fn trust(command: &mut Command) {
-    command.arg("--confirm-trust-local").arg("--allow-license").arg("MIT");
+    command.arg("--confirm-trust-local").arg("--allow-license").arg("AGPL-3.0-or-later");
 }
 
 #[test]

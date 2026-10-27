@@ -10,7 +10,39 @@ use crate::agent_node::ProcessOutput;
 use crate::agent_node::ProcessRequest;
 use crate::agent_node::ProcessRunner;
 
-const REDACTION_MARKER: &str = "<redacted>";
+pub mod config;
+pub(crate) mod execution;
+
+#[cfg(feature = "animus-secretspec")]
+pub mod secretspec;
+
+/// Descriptive current-boundary facts, not an authority issuer or effect grant.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CredentialSubject {
+    Node { workflow_id: String, node_id: String },
+    TriggerAuthentication { workflow_id: String, trigger_id: String },
+    TriggerInvocation { workflow_id: String, trigger_id: String },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub enum CredentialDestination {
+    ShellEnvironment,
+    HttpHeader,
+    AgentEnvironment,
+    WebhookAuthentication,
+    TriggerInvocation,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CredentialResolutionContext {
+    pub subject: CredentialSubject,
+    pub binding: String,
+    pub reference: SecretRef,
+    pub destination: CredentialDestination,
+    pub reason: String,
+}
+
+pub(crate) const REDACTION_MARKER: &str = "<redacted>";
 const SECRET_IDENTITY_SEPARATOR: &str = ":";
 const SECRET_FIELD_SEPARATOR: &str = ".";
 const DEFAULT_PROVIDER_TIMEOUT_SECS: u64 = 5;
@@ -57,7 +89,7 @@ impl NodeCredentialRefs {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct SecretValue(String);
 
 impl SecretValue {
@@ -67,6 +99,18 @@ impl SecretValue {
 
     pub fn expose_for_execution(&self) -> &str {
         &self.0
+    }
+}
+
+impl std::fmt::Debug for SecretValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("SecretValue(<redacted>)")
+    }
+}
+
+impl Drop for SecretValue {
+    fn drop(&mut self) {
+        zeroize::Zeroize::zeroize(&mut self.0);
     }
 }
 
@@ -101,6 +145,34 @@ impl std::error::Error for CredentialError {}
 
 pub trait CredentialProvider: Send + Sync {
     fn resolve(&self, secret_ref: &SecretRef) -> Result<SecretValue, CredentialError>;
+
+    fn validate_reference(&self, secret_ref: &SecretRef) -> Result<(), CredentialError> {
+        validate_secret_ref(secret_ref)
+    }
+
+    /// Public purpose selected by explicit provider policy, never a value probe.
+    fn resolution_reason(&self, _secret_ref: &SecretRef) -> Option<&str> {
+        None
+    }
+    /// Public resolver/configuration identity only; never derived from material.
+    fn resolution_policy_identity(&self, secret_ref: &SecretRef) -> Result<Option<&str>, CredentialError> {
+        self.validate_reference(secret_ref)?;
+        Ok(None)
+    }
+
+    fn resolve_in_context(
+        &self,
+        secret_ref: &SecretRef,
+        _context: &CredentialResolutionContext,
+        _cancellation: Option<&std::sync::atomic::AtomicBool>,
+    ) -> Result<SecretValue, CredentialError> {
+        self.resolve(secret_ref)
+    }
+
+    /// A legacy probe may resolve material; restricted providers override this.
+    fn probe(&self, secret_ref: &SecretRef) -> CredentialProbeResult {
+        credential_probe_result(secret_ref, self.resolve(secret_ref).is_ok())
+    }
 }
 
 #[derive(Debug, Default)]
@@ -190,6 +262,12 @@ impl CredentialProviderRegistry {
                 reason: "provider id is empty".to_string(),
             });
         }
+        if self.providers.contains_key(&metadata.id) {
+            return Err(CredentialError::MalformedRef {
+                identity: metadata.id,
+                reason: "duplicate credential provider id".to_string(),
+            });
+        }
         self.providers.insert(metadata.id.clone(), RegisteredCredentialProvider { metadata, provider });
         Ok(())
     }
@@ -211,17 +289,59 @@ impl CredentialProviderRegistry {
                 identity: secret_ref.identity(),
             });
         }
-        Ok(())
+        registered.provider.validate_reference(secret_ref)
     }
 }
 
 impl CredentialProvider for CredentialProviderRegistry {
+    fn validate_reference(&self, secret_ref: &SecretRef) -> Result<(), CredentialError> {
+        self.validate_secret_ref(secret_ref)
+    }
+
+    fn resolution_reason(&self, secret_ref: &SecretRef) -> Option<&str> {
+        self.providers.get(&secret_ref.provider)?.provider.resolution_reason(secret_ref)
+    }
+
+    fn resolution_policy_identity(&self, secret_ref: &SecretRef) -> Result<Option<&str>, CredentialError> {
+        self.validate_secret_ref(secret_ref)?;
+        self.providers
+            .get(&secret_ref.provider)
+            .ok_or_else(|| CredentialError::UnknownProvider {
+                provider: secret_ref.provider.clone(),
+            })?
+            .provider
+            .resolution_policy_identity(secret_ref)
+    }
+
     fn resolve(&self, secret_ref: &SecretRef) -> Result<SecretValue, CredentialError> {
         self.validate_secret_ref(secret_ref)?;
         let registered = self.providers.get(&secret_ref.provider).ok_or_else(|| CredentialError::UnknownProvider {
             provider: secret_ref.provider.clone(),
         })?;
         registered.provider.resolve(secret_ref)
+    }
+
+    fn resolve_in_context(
+        &self,
+        secret_ref: &SecretRef,
+        context: &CredentialResolutionContext,
+        cancellation: Option<&std::sync::atomic::AtomicBool>,
+    ) -> Result<SecretValue, CredentialError> {
+        self.validate_secret_ref(secret_ref)?;
+        self.providers
+            .get(&secret_ref.provider)
+            .ok_or_else(|| CredentialError::UnknownProvider {
+                provider: secret_ref.provider.clone(),
+            })?
+            .provider
+            .resolve_in_context(secret_ref, context, cancellation)
+    }
+
+    fn probe(&self, secret_ref: &SecretRef) -> CredentialProbeResult {
+        match self.providers.get(&secret_ref.provider) {
+            Some(entry) => entry.provider.probe(secret_ref),
+            None => credential_probe_result(secret_ref, false),
+        }
     }
 }
 
@@ -533,14 +653,30 @@ fn credential_probe_result(secret_ref: &SecretRef, is_reachable: bool) -> Creden
 
 // r[impl n8nclone.credentials.provider_diagnostics.redaction]
 pub fn test_provider_reference(provider: &dyn CredentialProvider, secret_ref: &SecretRef) -> CredentialProbeResult {
-    let is_reachable = provider.resolve(secret_ref).is_ok();
-    credential_probe_result(secret_ref, is_reachable)
+    provider.probe(secret_ref)
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Execution-only owned plaintext. Moving either collection requires transferring
+/// cleanup responsibility to another owner; ordinary scope exit clears both.
+#[derive(Clone, PartialEq, Eq)]
 pub struct ResolvedSecretEnv {
     pub env: HashMap<String, String>,
     pub secret_values: Vec<String>,
+}
+
+impl Drop for ResolvedSecretEnv {
+    fn drop(&mut self) {
+        for value in self.env.values_mut() {
+            zeroize::Zeroize::zeroize(value);
+        }
+        zeroize::Zeroize::zeroize(&mut self.secret_values);
+    }
+}
+
+impl std::fmt::Debug for ResolvedSecretEnv {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ResolvedSecretEnv(<redacted>)")
+    }
 }
 
 // r[impl n8nclone.credentials.validation]
@@ -571,22 +707,51 @@ pub fn resolve_secret_env(
     refs: &NodeCredentialRefs,
     provider: &dyn CredentialProvider,
 ) -> Result<ResolvedSecretEnv, CredentialError> {
-    let mut resolved_env = HashMap::new();
-    let mut secret_values = Vec::new();
+    let mut resolved = ResolvedSecretEnv {
+        env: HashMap::new(),
+        secret_values: Vec::new(),
+    };
     let mut refs_by_env = refs.env.iter().collect::<Vec<_>>();
     refs_by_env.sort_by_key(|(name, _)| *name);
 
     for (name, secret_ref) in refs_by_env {
         validate_secret_ref(secret_ref)?;
         let value = provider.resolve(secret_ref)?;
-        secret_values.push(value.expose_for_execution().to_string());
-        resolved_env.insert(name.clone(), value.expose_for_execution().to_string());
+        resolved.secret_values.push(value.expose_for_execution().to_string());
+        resolved.env.insert(name.clone(), value.expose_for_execution().to_string());
     }
 
-    Ok(ResolvedSecretEnv {
-        env: resolved_env,
-        secret_values,
-    })
+    Ok(resolved)
+}
+
+/// Resolve only current bindings; subject facts do not issue effect authority.
+pub fn resolve_secret_env_in_context(
+    refs: &NodeCredentialRefs,
+    provider: &dyn CredentialProvider,
+    subject: &CredentialSubject,
+    destination: CredentialDestination,
+    cancellation: Option<&std::sync::atomic::AtomicBool>,
+) -> Result<ResolvedSecretEnv, CredentialError> {
+    let mut resolved = ResolvedSecretEnv {
+        env: HashMap::new(),
+        secret_values: Vec::new(),
+    };
+    let mut bindings = refs.env.iter().collect::<Vec<_>>();
+    bindings.sort_by_key(|(name, _)| *name);
+    for (binding, reference) in bindings {
+        validate_secret_ref(reference)?;
+        let current = CredentialResolutionContext {
+            subject: subject.clone(),
+            binding: binding.clone(),
+            reference: reference.clone(),
+            destination,
+            reason: provider.resolution_reason(reference).unwrap_or_default().to_owned(),
+        };
+        let value = provider.resolve_in_context(reference, &current, cancellation)?;
+        resolved.env.insert(binding.clone(), value.expose_for_execution().to_string());
+        resolved.secret_values.push(value.expose_for_execution().to_string());
+    }
+    Ok(resolved)
 }
 
 // r[impl n8nclone.credentials.redaction]

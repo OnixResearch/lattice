@@ -51,12 +51,15 @@ impl DiffReviewPolicyProfile {
     #[must_use]
     pub const fn evaluate_action(self, action: DiffReviewActionKind) -> DiffReviewPolicyDecision {
         if !self.read_only {
-            return DiffReviewPolicyDecision::denied(action, DiffReviewDenialReason::ApprovalEscalation);
+            return DiffReviewPolicyDecision::denied(
+                action,
+                DiffReviewDenialReason::ApprovalEscalation,
+            );
         }
         match action {
-            DiffReviewActionKind::InspectDiff | DiffReviewActionKind::ReadFile | DiffReviewActionKind::ModelReview => {
-                DiffReviewPolicyDecision::allowed(action)
-            }
+            DiffReviewActionKind::InspectDiff
+            | DiffReviewActionKind::ReadFile
+            | DiffReviewActionKind::ModelReview => DiffReviewPolicyDecision::allowed(action),
             DiffReviewActionKind::EditFile => {
                 DiffReviewPolicyDecision::denied(action, DiffReviewDenialReason::FileMutation)
             }
@@ -66,12 +69,14 @@ impl DiffReviewPolicyProfile {
             DiffReviewActionKind::ApprovalEscalation => {
                 DiffReviewPolicyDecision::denied(action, DiffReviewDenialReason::ApprovalEscalation)
             }
-            DiffReviewActionKind::CommitCreation => {
-                DiffReviewPolicyDecision::denied(action, DiffReviewDenialReason::VersionControlMutation)
-            }
-            DiffReviewActionKind::PullRequestManagement => {
-                DiffReviewPolicyDecision::denied(action, DiffReviewDenialReason::PullRequestManagement)
-            }
+            DiffReviewActionKind::CommitCreation => DiffReviewPolicyDecision::denied(
+                action,
+                DiffReviewDenialReason::VersionControlMutation,
+            ),
+            DiffReviewActionKind::PullRequestManagement => DiffReviewPolicyDecision::denied(
+                action,
+                DiffReviewDenialReason::PullRequestManagement,
+            ),
         }
     }
 }

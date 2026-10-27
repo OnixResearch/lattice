@@ -115,14 +115,16 @@ pub(super) async fn run_saved_workflow_with_executor_factory(
         .store
         .load_workflow(request.workflow_name)?
         .ok_or_else(|| super::HeadlessRunError::WorkflowNotFound(request.workflow_name.to_string()))?;
-    run_workflow_snapshot_with_executor_factory(request, workflow, executor_factory).await
+    run_workflow_snapshot_with_executor_factory(request, workflow, executor_factory)
+        .await
+        .map(|outcome| outcome.summary)
 }
 
 pub(super) async fn run_workflow_snapshot_with_executor_factory(
     request: ProductRunRequest<'_>,
     workflow: crate::engine::workflow::Workflow,
     executor_factory: impl FnOnce() -> crate::engine::executor::Executor,
-) -> Result<super::HeadlessRunSummary, super::HeadlessRunError> {
+) -> Result<SnapshotRunOutcome, super::HeadlessRunError> {
     let ProductRunRequest {
         store,
         workflow_name,
@@ -162,7 +164,10 @@ pub(super) async fn run_workflow_snapshot_with_executor_factory(
                 suspension,
             })
             .map_err(|error| super::HeadlessRunError::Store(error.to_string()))?;
-        return Ok(summary);
+        return Ok(SnapshotRunOutcome {
+            summary,
+            cancelled: executor.cancellation_observed(),
+        });
     }
     let results = outcome.results;
     let summary = super::summarize_run(run_id, &workflow, &results);
@@ -188,7 +193,17 @@ pub(super) async fn run_workflow_snapshot_with_executor_factory(
     );
     store.save_run_replay_events(run_id, &replay_events)?;
 
-    Ok(summary)
+    Ok(SnapshotRunOutcome {
+        summary,
+        cancelled: executor.cancellation_observed(),
+    })
+}
+
+#[derive(Debug, Clone)]
+pub struct SnapshotRunOutcome {
+    pub summary: super::HeadlessRunSummary,
+    /// Observed owned process termination, never the cancellation request flag.
+    pub cancelled: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -204,7 +219,7 @@ pub async fn run_workflow_snapshot_with_authority_provider_and_cancellation(
     store: &crate::store::Store,
     request: SnapshotRunRequest,
     authority_provider: &dyn crate::engine::effect::execution::RunContextProvider,
-) -> Result<super::HeadlessRunSummary, super::HeadlessRunError> {
+) -> Result<SnapshotRunOutcome, super::HeadlessRunError> {
     let workflow_name = request.workflow.meta.name.clone();
     run_workflow_snapshot_with_executor_factory(
         ProductRunRequest {

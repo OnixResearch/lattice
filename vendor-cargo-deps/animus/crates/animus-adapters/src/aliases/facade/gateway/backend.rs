@@ -2,11 +2,14 @@ const BACKEND_IDENTITY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("remote_server_backend_identity");
 const SECRET_SOURCE_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("remote_server_secret_source");
-const SCOPE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("remote_server_scope");
-const CAPABILITY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("remote_server_capability");
+const SCOPE_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("remote_server_scope");
+const CAPABILITY_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("remote_server_capability");
 const PROTOCOL_VERSION_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("remote_server_protocol_version");
-const FEATURE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("remote_server_feature");
+const FEATURE_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("remote_server_feature");
 const ZERO_IDENTITY_HEX: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 const MAX_CAPABILITY_LABELS: usize = 32;
 const MAX_FEATURE_LABELS: usize = 32;
@@ -531,10 +534,14 @@ impl RemoteServerDescriptor {
     ///
     /// Returns [`RemoteServerAdmissionError`] when labels, hashes, or capability
     /// collections are invalid or contain unsafe raw material.
-    pub fn new(draft: &RemoteServerDescriptorDraft<'_>) -> Result<Self, RemoteServerAdmissionError> {
+    pub fn new(
+        draft: &RemoteServerDescriptorDraft<'_>,
+    ) -> Result<Self, RemoteServerAdmissionError> {
         let backend_identity = safe_label(BACKEND_IDENTITY_FIELD, draft.backend_identity)?;
-        let backend_identity_hash =
-            identity_for_label(IdentityLabel::new("backend_identity", backend_identity.as_str()))?;
+        let backend_identity_hash = identity_for_label(IdentityLabel::new(
+            "backend_identity",
+            backend_identity.as_str(),
+        ))?;
         Ok(Self {
             backend_identity,
             backend_identity_hash,
@@ -548,7 +555,11 @@ impl RemoteServerDescriptor {
             secret_source_label: safe_label(SECRET_SOURCE_FIELD, draft.secret_source_label)?,
             secret_source_class: draft.secret_source_class,
             scope: safe_label(SCOPE_FIELD, draft.scope)?,
-            capability_ceilings: safe_labels(CAPABILITY_FIELD, draft.capability_ceilings, MAX_CAPABILITY_LABELS)?,
+            capability_ceilings: safe_labels(
+                CAPABILITY_FIELD,
+                draft.capability_ceilings,
+                MAX_CAPABILITY_LABELS,
+            )?,
             expected_audience_hash: crate::ArtifactHash::new(draft.expected_audience_hash)?,
             provenance_hash: crate::ArtifactHash::new(draft.provenance_hash)?,
         })
@@ -687,14 +698,20 @@ impl RemoteServerHandshakeSummary {
     ///
     /// Returns [`RemoteServerAdmissionError`] when labels or hashes are invalid
     /// or contain unsafe raw material.
-    pub fn new(draft: &RemoteServerHandshakeSummaryDraft<'_>) -> Result<Self, RemoteServerAdmissionError> {
+    pub fn new(
+        draft: &RemoteServerHandshakeSummaryDraft<'_>,
+    ) -> Result<Self, RemoteServerAdmissionError> {
         Ok(Self {
             observed_tls: draft.observed_tls,
             fingerprint_status: draft.fingerprint_status,
             auth_outcome: draft.auth_outcome,
             protocol_version: safe_label(PROTOCOL_VERSION_FIELD, draft.protocol_version)?,
             protocol_version_status: draft.protocol_version_status,
-            accepted_features: safe_labels(FEATURE_FIELD, draft.accepted_features, MAX_FEATURE_LABELS)?,
+            accepted_features: safe_labels(
+                FEATURE_FIELD,
+                draft.accepted_features,
+                MAX_FEATURE_LABELS,
+            )?,
             audience_hash: crate::ArtifactHash::new(draft.audience_hash)?,
             safe_failure_class: draft.safe_failure_class,
         })
@@ -784,11 +801,17 @@ impl RemoteServerAdmissionPolicy {
     ///
     /// Returns [`RemoteServerAdmissionError`] when policy hashes, scope, or
     /// capability labels are invalid or contain unsafe raw material.
-    pub fn new(draft: &RemoteServerAdmissionPolicyDraft<'_>) -> Result<Self, RemoteServerAdmissionError> {
+    pub fn new(
+        draft: &RemoteServerAdmissionPolicyDraft<'_>,
+    ) -> Result<Self, RemoteServerAdmissionError> {
         Ok(Self {
             policy_hash: crate::ArtifactHash::new(draft.policy_hash)?,
             requested_scope: safe_label(SCOPE_FIELD, draft.requested_scope)?,
-            requested_capabilities: safe_labels(CAPABILITY_FIELD, draft.requested_capabilities, MAX_CAPABILITY_LABELS)?,
+            requested_capabilities: safe_labels(
+                CAPABILITY_FIELD,
+                draft.requested_capabilities,
+                MAX_CAPABILITY_LABELS,
+            )?,
             credential_source_availability: draft.credential_source_availability,
             tofu_approved: draft.tofu_approved,
             fallback_requested: draft.fallback_requested,
@@ -1034,11 +1057,15 @@ pub fn evaluate_remote_server_admission(
 /// Returns [`RemoteServerAdmissionError::UnsafeMaterial`] when text contains a
 /// known endpoint, secret, header, token, credential, certificate, provider,
 /// prompt, or path leak marker.
-pub fn validate_remote_server_admission_receipt_text(text: &str) -> Result<(), RemoteServerAdmissionError> {
+pub fn validate_remote_server_admission_receipt_text(
+    text: &str,
+) -> Result<(), RemoteServerAdmissionError> {
     ensure_no_remote_server_leak(text)
 }
 
-fn admission_reason(request: RemoteServerAdmissionRequest<'_>) -> Option<RemoteServerAdmissionReason> {
+fn admission_reason(
+    request: RemoteServerAdmissionRequest<'_>,
+) -> Option<RemoteServerAdmissionReason> {
     fallback_denial(request.policy)
         .or_else(|| handshake_denial(request))
         .or_else(|| tls_denial(request))
@@ -1051,11 +1078,18 @@ fn admission_reason(request: RemoteServerAdmissionRequest<'_>) -> Option<RemoteS
 }
 
 fn fallback_denial(policy: &RemoteServerAdmissionPolicy) -> Option<RemoteServerAdmissionReason> {
-    policy.fallback_requested().then_some(RemoteServerAdmissionReason::FallbackDenied)
+    policy
+        .fallback_requested()
+        .then_some(RemoteServerAdmissionReason::FallbackDenied)
 }
 
-fn handshake_denial(request: RemoteServerAdmissionRequest<'_>) -> Option<RemoteServerAdmissionReason> {
-    request.handshake.is_none().then_some(RemoteServerAdmissionReason::MissingHandshake)
+fn handshake_denial(
+    request: RemoteServerAdmissionRequest<'_>,
+) -> Option<RemoteServerAdmissionReason> {
+    request
+        .handshake
+        .is_none()
+        .then_some(RemoteServerAdmissionReason::MissingHandshake)
 }
 
 fn tls_denial(request: RemoteServerAdmissionRequest<'_>) -> Option<RemoteServerAdmissionReason> {
@@ -1066,16 +1100,21 @@ fn tls_denial(request: RemoteServerAdmissionRequest<'_>) -> Option<RemoteServerA
         return Some(RemoteServerAdmissionReason::MissingTls);
     }
     let handshake = request.handshake?;
-    (handshake.observed_tls() != RemoteServerObservedTls::Enabled).then_some(RemoteServerAdmissionReason::MissingTls)
+    (handshake.observed_tls() != RemoteServerObservedTls::Enabled)
+        .then_some(RemoteServerAdmissionReason::MissingTls)
 }
 
-fn fingerprint_denial(request: RemoteServerAdmissionRequest<'_>) -> Option<RemoteServerAdmissionReason> {
+fn fingerprint_denial(
+    request: RemoteServerAdmissionRequest<'_>,
+) -> Option<RemoteServerAdmissionReason> {
     let handshake = request.handshake?;
     match handshake.fingerprint_status() {
         RemoteServerFingerprintStatus::Stale => Some(RemoteServerAdmissionReason::StalePin),
         RemoteServerFingerprintStatus::Mismatched
         | RemoteServerFingerprintStatus::Missing
-        | RemoteServerFingerprintStatus::NotObserved => Some(RemoteServerAdmissionReason::FingerprintMismatch),
+        | RemoteServerFingerprintStatus::NotObserved => {
+            Some(RemoteServerAdmissionReason::FingerprintMismatch)
+        }
         RemoteServerFingerprintStatus::TofuPending => tofu_denial(request.policy),
         RemoteServerFingerprintStatus::Matched | RemoteServerFingerprintStatus::TofuApproved => {
             pinned_denial(request.descriptor, handshake)
@@ -1104,7 +1143,9 @@ fn secret_denial(request: RemoteServerAdmissionRequest<'_>) -> Option<RemoteServ
     if !request.descriptor.secret_source_class().requires_secret() {
         return None;
     }
-    if request.policy.credential_source_availability() != RemoteServerCredentialSourceAvailability::Available {
+    if request.policy.credential_source_availability()
+        != RemoteServerCredentialSourceAvailability::Available
+    {
         return Some(RemoteServerAdmissionReason::SecretUnavailable);
     }
     let handshake = request.handshake?;
@@ -1113,11 +1154,15 @@ fn secret_denial(request: RemoteServerAdmissionRequest<'_>) -> Option<RemoteServ
         RemoteServerAuthOutcome::Unauthorized => Some(RemoteServerAdmissionReason::Unauthorized),
         RemoteServerAuthOutcome::SecretUnavailable
         | RemoteServerAuthOutcome::Missing
-        | RemoteServerAuthOutcome::NotObserved => Some(RemoteServerAdmissionReason::SecretUnavailable),
+        | RemoteServerAuthOutcome::NotObserved => {
+            Some(RemoteServerAdmissionReason::SecretUnavailable)
+        }
     }
 }
 
-fn protocol_denial(request: RemoteServerAdmissionRequest<'_>) -> Option<RemoteServerAdmissionReason> {
+fn protocol_denial(
+    request: RemoteServerAdmissionRequest<'_>,
+) -> Option<RemoteServerAdmissionReason> {
     if request.descriptor.protocol_role() == RemoteServerProtocolRole::Unsupported {
         return Some(RemoteServerAdmissionReason::UnsupportedProtocol);
     }
@@ -1126,17 +1171,22 @@ fn protocol_denial(request: RemoteServerAdmissionRequest<'_>) -> Option<RemoteSe
         .then_some(RemoteServerAdmissionReason::UnsupportedProtocol)
 }
 
-fn audience_denial(request: RemoteServerAdmissionRequest<'_>) -> Option<RemoteServerAdmissionReason> {
+fn audience_denial(
+    request: RemoteServerAdmissionRequest<'_>,
+) -> Option<RemoteServerAdmissionReason> {
     let handshake = request.handshake?;
     (handshake.audience_hash() != request.descriptor.expected_audience_hash())
         .then_some(RemoteServerAdmissionReason::AudienceMismatch)
 }
 
 fn scope_denial(request: RemoteServerAdmissionRequest<'_>) -> Option<RemoteServerAdmissionReason> {
-    (request.policy.requested_scope() != request.descriptor.scope()).then_some(RemoteServerAdmissionReason::ScopeDenied)
+    (request.policy.requested_scope() != request.descriptor.scope())
+        .then_some(RemoteServerAdmissionReason::ScopeDenied)
 }
 
-fn capability_denial(request: RemoteServerAdmissionRequest<'_>) -> Option<RemoteServerAdmissionReason> {
+fn capability_denial(
+    request: RemoteServerAdmissionRequest<'_>,
+) -> Option<RemoteServerAdmissionReason> {
     request
         .policy
         .requested_capabilities()
@@ -1146,7 +1196,10 @@ fn capability_denial(request: RemoteServerAdmissionRequest<'_>) -> Option<Remote
 }
 
 fn capability_allowed(descriptor: &RemoteServerDescriptor, requested: &str) -> bool {
-    descriptor.capability_ceilings().iter().any(|ceiling| ceiling.as_str() == requested)
+    descriptor
+        .capability_ceilings()
+        .iter()
+        .any(|ceiling| ceiling.as_str() == requested)
 }
 
 fn build_receipt(
@@ -1154,7 +1207,10 @@ fn build_receipt(
     outcome: RemoteServerAdmissionOutcome,
     reason: Option<RemoteServerAdmissionReason>,
 ) -> Result<RemoteServerAdmissionReceipt, RemoteServerAdmissionError> {
-    debug_assert_eq!(matches!(outcome, RemoteServerAdmissionOutcome::Denied), reason.is_some());
+    debug_assert_eq!(
+        matches!(outcome, RemoteServerAdmissionOutcome::Denied),
+        reason.is_some()
+    );
     debug_assert!(!request.descriptor.capability_ceilings().is_empty());
     let mut receipt = RemoteServerAdmissionReceipt {
         outcome,
@@ -1179,26 +1235,44 @@ fn build_receipt(
 }
 
 fn handshake_tls(handshake: Option<&RemoteServerHandshakeSummary>) -> RemoteServerObservedTls {
-    handshake.map_or(RemoteServerObservedTls::NotObserved, RemoteServerHandshakeSummary::observed_tls)
+    handshake.map_or(
+        RemoteServerObservedTls::NotObserved,
+        RemoteServerHandshakeSummary::observed_tls,
+    )
 }
 
-fn handshake_fingerprint(handshake: Option<&RemoteServerHandshakeSummary>) -> RemoteServerFingerprintStatus {
-    handshake.map_or(RemoteServerFingerprintStatus::NotObserved, RemoteServerHandshakeSummary::fingerprint_status)
+fn handshake_fingerprint(
+    handshake: Option<&RemoteServerHandshakeSummary>,
+) -> RemoteServerFingerprintStatus {
+    handshake.map_or(
+        RemoteServerFingerprintStatus::NotObserved,
+        RemoteServerHandshakeSummary::fingerprint_status,
+    )
 }
 
 fn handshake_auth(handshake: Option<&RemoteServerHandshakeSummary>) -> RemoteServerAuthOutcome {
-    handshake.map_or(RemoteServerAuthOutcome::NotObserved, RemoteServerHandshakeSummary::auth_outcome)
+    handshake.map_or(
+        RemoteServerAuthOutcome::NotObserved,
+        RemoteServerHandshakeSummary::auth_outcome,
+    )
 }
 
-fn handshake_protocol_status(handshake: Option<&RemoteServerHandshakeSummary>) -> RemoteServerProtocolVersionStatus {
+fn handshake_protocol_status(
+    handshake: Option<&RemoteServerHandshakeSummary>,
+) -> RemoteServerProtocolVersionStatus {
     handshake.map_or(
         RemoteServerProtocolVersionStatus::NotObserved,
         RemoteServerHandshakeSummary::protocol_version_status,
     )
 }
 
-fn handshake_failure_class(handshake: Option<&RemoteServerHandshakeSummary>) -> RemoteServerFailureClass {
-    handshake.map_or(RemoteServerFailureClass::NetworkUnavailable, RemoteServerHandshakeSummary::safe_failure_class)
+fn handshake_failure_class(
+    handshake: Option<&RemoteServerHandshakeSummary>,
+) -> RemoteServerFailureClass {
+    handshake.map_or(
+        RemoteServerFailureClass::NetworkUnavailable,
+        RemoteServerHandshakeSummary::safe_failure_class,
+    )
 }
 
 fn handshake_audience_hash(
@@ -1218,22 +1292,58 @@ fn render_receipt_text(receipt: &RemoteServerAdmissionReceipt) -> alloc::string:
     if let Some(reason) = receipt.reason() {
         renderer.push(ReceiptLine::new("denial_class", reason.as_str()));
     }
-    renderer.push(ReceiptLine::new("backend_identity_hash", receipt.backend_identity_hash().as_str()));
-    renderer.push(ReceiptLine::new("endpoint_identity_class", receipt.endpoint_identity_class().as_str()));
-    renderer.push(ReceiptLine::new("endpoint_identity_hash", receipt.endpoint_identity_hash().as_str()));
-    renderer.push(ReceiptLine::new("tls_status", receipt.tls_status().as_str()));
-    renderer.push(ReceiptLine::new("fingerprint_status", receipt.fingerprint_status().as_str()));
-    renderer.push(ReceiptLine::new("auth_status", receipt.auth_status().as_str()));
-    renderer.push(ReceiptLine::new("protocol_version_status", receipt.protocol_version_status().as_str()));
-    renderer.push(ReceiptLine::new("audience_hash", receipt.audience_hash().as_str()));
-    renderer.push(ReceiptLine::new("secret_source_class", receipt.secret_source_class().as_str()));
+    renderer.push(ReceiptLine::new(
+        "backend_identity_hash",
+        receipt.backend_identity_hash().as_str(),
+    ));
+    renderer.push(ReceiptLine::new(
+        "endpoint_identity_class",
+        receipt.endpoint_identity_class().as_str(),
+    ));
+    renderer.push(ReceiptLine::new(
+        "endpoint_identity_hash",
+        receipt.endpoint_identity_hash().as_str(),
+    ));
+    renderer.push(ReceiptLine::new(
+        "tls_status",
+        receipt.tls_status().as_str(),
+    ));
+    renderer.push(ReceiptLine::new(
+        "fingerprint_status",
+        receipt.fingerprint_status().as_str(),
+    ));
+    renderer.push(ReceiptLine::new(
+        "auth_status",
+        receipt.auth_status().as_str(),
+    ));
+    renderer.push(ReceiptLine::new(
+        "protocol_version_status",
+        receipt.protocol_version_status().as_str(),
+    ));
+    renderer.push(ReceiptLine::new(
+        "audience_hash",
+        receipt.audience_hash().as_str(),
+    ));
+    renderer.push(ReceiptLine::new(
+        "secret_source_class",
+        receipt.secret_source_class().as_str(),
+    ));
     renderer.push(ReceiptLine::new("scope", receipt.scope()));
     for capability in receipt.capability_ceilings() {
         renderer.push(ReceiptLine::new("capability_ceiling", capability.as_str()));
     }
-    renderer.push(ReceiptLine::new("policy_hash", receipt.policy_hash().as_str()));
-    renderer.push(ReceiptLine::new("failure_class", receipt.failure_class().as_str()));
-    renderer.push(ReceiptLine::new("receipt_hash", receipt.receipt_hash().as_str()));
+    renderer.push(ReceiptLine::new(
+        "policy_hash",
+        receipt.policy_hash().as_str(),
+    ));
+    renderer.push(ReceiptLine::new(
+        "failure_class",
+        receipt.failure_class().as_str(),
+    ));
+    renderer.push(ReceiptLine::new(
+        "receipt_hash",
+        receipt.receipt_hash().as_str(),
+    ));
     renderer.finish()
 }
 
@@ -1291,7 +1401,10 @@ fn safe_labels(
     debug_assert!(!field.as_str().is_empty());
     debug_assert!(max_items > 0);
     if values.is_empty() {
-        return Err(crate::AdapterContractError::EmptyCollection { field: field.as_str() }.into());
+        return Err(crate::AdapterContractError::EmptyCollection {
+            field: field.as_str(),
+        }
+        .into());
     }
     if values.len() > max_items {
         return Err(crate::AdapterContractError::FieldTooLong {
@@ -1301,7 +1414,10 @@ fn safe_labels(
         }
         .into());
     }
-    values.iter().map(|value| safe_label(field, value)).collect()
+    values
+        .iter()
+        .map(|value| safe_label(field, value))
+        .collect()
 }
 
 fn ensure_no_remote_server_leak(text: &str) -> Result<(), RemoteServerAdmissionError> {
@@ -1330,7 +1446,9 @@ impl<'a> IdentityLabel<'a> {
     }
 }
 
-fn identity_for_label(identity: IdentityLabel<'_>) -> Result<crate::ArtifactHash, RemoteServerAdmissionError> {
+fn identity_for_label(
+    identity: IdentityLabel<'_>,
+) -> Result<crate::ArtifactHash, RemoteServerAdmissionError> {
     debug_assert!(!identity.label.is_empty());
     debug_assert!(!identity.value.is_empty());
     let mut renderer = ReceiptRenderer::new();

@@ -35,6 +35,15 @@ all-families = [
   "worker-team",
 ]
 compat = ["all-families", "steel"]
+autonomous-gates = []
+persistent-goals = []
+schedule-reliability = []
+session-event-replay = ["animus-session-core/session-event-replay"]
+execution-backend-planner = []
+native-evaluation = ["dep:animus-eval-core"]
+harbor-eval = ["native-evaluation", "animus-adapters/evaluation", "animus-adapters/harbor-atif", "dep:animus-adapter-atif"]
+pijul-vcs-adapter = ["dep:serde", "dep:serde_json"]
+trajectory-transcript-adapter = ["dep:serde_json"]
 batch = []
 compaction = []
 dataset-export = []
@@ -44,19 +53,28 @@ policy = []
 provenance = []
 quality = []
 research = []
-rlm-kernel = ["dep:animus-adapter-rlm-kernel"]
+rlm-kernel = [
+  "dep:animus-steel",
+  "animus-steel/rlm-kernel",
+  "steel",
+]
 scaffold = []
 status = []
 worker-team = []
 steel = ["dep:animus-steel"]
 
 [dependencies]
-animus-adapter-rlm-kernel = { path = "../animus-adapter-rlm-kernel", version = "0.1.0", optional = true }
+animus-adapter-rlm-kernel = { path = "../animus-adapter-rlm-kernel", version = "0.1.0" }
+animus-adapter-atif = { path = "../animus-adapter-atif", version = "0.1.0", optional = true }
 animus-adapters = { path = "../animus-adapters", version = "0.1.0" }
 animus-core = { path = "../animus-core", version = "0.1.0" }
+animus-eval-core = { path = "../animus-eval-core", version = "0.1.0", optional = true }
+animus-session-core = { path = "../animus-session-core", version = "0.1.0" }
 animus-steel = { path = "../animus-steel", version = "0.1.0", optional = true }
 blake3 = { version = "1.8.5", default-features = false }
+serde = { version = "1.0.228", features = ["derive"], optional = true }
+serde_json = { version = "1.0.149", optional = true }
 
 [dev-dependencies]
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.150"
+serde_json = "1.0.149"

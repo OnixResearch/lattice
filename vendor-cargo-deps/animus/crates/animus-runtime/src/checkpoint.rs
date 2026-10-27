@@ -320,7 +320,12 @@ pub struct VcsSnapshotError {
 }
 
 impl VcsSnapshotError {
-    fn new(kind: VcsSnapshotErrorKind, field: &'static str, subject: impl Into<Text>, reason: impl Into<Text>) -> Self {
+    fn new(
+        kind: VcsSnapshotErrorKind,
+        field: &'static str,
+        subject: impl Into<Text>,
+        reason: impl Into<Text>,
+    ) -> Self {
         Self {
             kind,
             field,
@@ -511,18 +516,30 @@ impl VcsSnapshotRecord {
         Ok(Self {
             intent: draft.intent,
             backend_kind: draft.backend_kind,
-            snapshot_id_hash: validate_hash(SafeFieldValue::new(FIELD_SNAPSHOT, draft.snapshot_id_hash))?,
+            snapshot_id_hash: validate_hash(SafeFieldValue::new(
+                FIELD_SNAPSHOT,
+                draft.snapshot_id_hash,
+            ))?,
             parent_snapshot_id_hash: draft
                 .parent_snapshot_id_hash
                 .map(|hash| validate_hash(SafeFieldValue::new(FIELD_PARENT, hash)))
                 .transpose()?,
-            workspace_hash: validate_hash(SafeFieldValue::new(FIELD_WORKSPACE, draft.workspace_hash))?,
+            workspace_hash: validate_hash(SafeFieldValue::new(
+                FIELD_WORKSPACE,
+                draft.workspace_hash,
+            ))?,
             content_hashes: validate_hashes(FIELD_CONTENT, draft.content_hashes)?,
             changed_artifact_count: draft.changed_artifact_count,
             actor_label: validate_safe_text(SafeFieldValue::new(FIELD_ACTOR, draft.actor_label))?,
-            session_label: validate_safe_text(SafeFieldValue::new(FIELD_SESSION, draft.session_label))?,
+            session_label: validate_safe_text(SafeFieldValue::new(
+                FIELD_SESSION,
+                draft.session_label,
+            ))?,
             freshness: draft.freshness,
-            receipt_hash: validate_hash(SafeFieldValue::new(FIELD_RECEIPT_HASH, draft.receipt_hash))?,
+            receipt_hash: validate_hash(SafeFieldValue::new(
+                FIELD_RECEIPT_HASH,
+                draft.receipt_hash,
+            ))?,
         })
     }
 
@@ -643,8 +660,14 @@ impl VcsSnapshotPlanRequest {
     pub fn new(draft: &VcsSnapshotPlanRequestDraft<'_>) -> Result<Self, VcsSnapshotError> {
         Ok(Self {
             operation: draft.operation,
-            target_snapshot_id_hash: validate_hash(SafeFieldValue::new(FIELD_SNAPSHOT, draft.target_snapshot_id_hash))?,
-            current_workspace_hash: validate_hash(SafeFieldValue::new(FIELD_WORKSPACE, draft.current_workspace_hash))?,
+            target_snapshot_id_hash: validate_hash(SafeFieldValue::new(
+                FIELD_SNAPSHOT,
+                draft.target_snapshot_id_hash,
+            ))?,
+            current_workspace_hash: validate_hash(SafeFieldValue::new(
+                FIELD_WORKSPACE,
+                draft.current_workspace_hash,
+            ))?,
             freshness_workspace_hash: validate_hash(SafeFieldValue::new(
                 FIELD_WORKSPACE,
                 draft.freshness_workspace_hash,
@@ -652,7 +675,10 @@ impl VcsSnapshotPlanRequest {
             policy_hash: validate_hash(SafeFieldValue::new(FIELD_POLICY, draft.policy_hash))?,
             protected_action: draft.protected_action,
             confirmation: draft.confirmation,
-            required_capabilities: validate_safe_texts(FIELD_CAPABILITY, draft.required_capabilities)?,
+            required_capabilities: validate_safe_texts(
+                FIELD_CAPABILITY,
+                draft.required_capabilities,
+            )?,
             backend_command: draft
                 .backend_command
                 .map(|command| validate_safe_text(SafeFieldValue::new(FIELD_COMMAND, command)))
@@ -999,8 +1025,10 @@ fn apply_freshness_diagnostics(
     if request.operation() == VcsSnapshotOperation::Compare {
         return;
     }
-    let is_proof_matching_workspace = request.current_workspace_hash() == request.freshness_workspace_hash();
-    let is_record_fresh = target.is_some_and(|record| record.freshness() == VcsSnapshotFreshness::Fresh);
+    let is_proof_matching_workspace =
+        request.current_workspace_hash() == request.freshness_workspace_hash();
+    let is_record_fresh =
+        target.is_some_and(|record| record.freshness() == VcsSnapshotFreshness::Fresh);
     if !is_proof_matching_workspace || !is_record_fresh {
         diagnostics.push(VcsSnapshotDiagnostic::new(
             VcsSnapshotDiagnosticKind::StaleSnapshot,
@@ -1040,7 +1068,11 @@ fn apply_capability_diagnostics(
     input: VcsSnapshotPlannerInput<'_>,
     diagnostics: &mut Collection<VcsSnapshotDiagnostic>,
 ) {
-    let capability_allowlist = input.supported_capabilities.iter().copied().collect::<std::collections::BTreeSet<_>>();
+    let capability_allowlist = input
+        .supported_capabilities
+        .iter()
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>();
     for required in input.request.required_capabilities() {
         if !capability_allowlist.contains(required.as_str()) {
             diagnostics.push(VcsSnapshotDiagnostic::new(
@@ -1052,7 +1084,10 @@ fn apply_capability_diagnostics(
     }
 }
 
-fn apply_command_diagnostics(request: &VcsSnapshotPlanRequest, diagnostics: &mut Collection<VcsSnapshotDiagnostic>) {
+fn apply_command_diagnostics(
+    request: &VcsSnapshotPlanRequest,
+    diagnostics: &mut Collection<VcsSnapshotDiagnostic>,
+) {
     if request.backend_command().is_some() {
         diagnostics.push(VcsSnapshotDiagnostic::new(
             VcsSnapshotDiagnosticKind::BackendCommandRejected,
@@ -1074,13 +1109,24 @@ fn snapshot_receipt(input: ReceiptInput<'_>) -> VcsSnapshotReceipt {
     // r[impl agent_harness_runtime.hermes_vcs_snapshot_ledger.receipts]
     debug_assert!(!input.request.target_snapshot_id_hash().is_empty());
     debug_assert!(!input.request.policy_hash().is_empty());
-    let diagnostics = input.diagnostics.iter().map(VcsSnapshotDiagnostic::kind).collect::<Collection<_>>();
+    let diagnostics = input
+        .diagnostics
+        .iter()
+        .map(VcsSnapshotDiagnostic::kind)
+        .collect::<Collection<_>>();
     let backend_kind = input.record.map(VcsSnapshotRecord::backend_kind);
-    let changed_artifact_count = input.record.map_or(u32::from(0_u8), VcsSnapshotRecord::changed_artifact_count);
-    let freshness = input.record.map_or(VcsSnapshotFreshness::Unknown, VcsSnapshotRecord::freshness);
+    let changed_artifact_count = input
+        .record
+        .map_or(u32::from(0_u8), VcsSnapshotRecord::changed_artifact_count);
+    let freshness = input
+        .record
+        .map_or(VcsSnapshotFreshness::Unknown, VcsSnapshotRecord::freshness);
     let workspace_hash = input
         .record
-        .map_or_else(|| input.request.current_workspace_hash(), VcsSnapshotRecord::workspace_hash)
+        .map_or_else(
+            || input.request.current_workspace_hash(),
+            VcsSnapshotRecord::workspace_hash,
+        )
         .to_owned();
     let receipt_hash = snapshot_receipt_hash(ReceiptHashInput {
         request: input.request,
@@ -1124,7 +1170,12 @@ fn snapshot_receipt_hash(input: ReceiptHashInput<'_>) -> Text {
     push_hash_part(&mut normalized, SAFE_RECEIPT_STATUS);
     push_hash_part(&mut normalized, input.request.operation().as_str());
     push_hash_part(&mut normalized, input.status.as_str());
-    push_hash_part(&mut normalized, input.backend_kind.map_or(UNKNOWN_SUBJECT, VcsSnapshotBackendKind::as_str));
+    push_hash_part(
+        &mut normalized,
+        input
+            .backend_kind
+            .map_or(UNKNOWN_SUBJECT, VcsSnapshotBackendKind::as_str),
+    );
     push_hash_part(&mut normalized, input.request.target_snapshot_id_hash());
     push_hash_part(&mut normalized, input.workspace_hash);
     push_hash_part(&mut normalized, &input.changed_artifact_count.to_string());
@@ -1137,12 +1188,24 @@ fn snapshot_receipt_hash(input: ReceiptHashInput<'_>) -> Text {
     blake3::hash(normalized.as_bytes()).to_hex().to_string()
 }
 
-fn validate_hashes(field: &'static str, values: &[&str]) -> Result<Collection<Text>, VcsSnapshotError> {
-    values.iter().map(|value| validate_hash(SafeFieldValue::new(field, value))).collect()
+fn validate_hashes(
+    field: &'static str,
+    values: &[&str],
+) -> Result<Collection<Text>, VcsSnapshotError> {
+    values
+        .iter()
+        .map(|value| validate_hash(SafeFieldValue::new(field, value)))
+        .collect()
 }
 
-fn validate_safe_texts(field: &'static str, values: &[&str]) -> Result<Collection<Text>, VcsSnapshotError> {
-    values.iter().map(|value| validate_safe_text(SafeFieldValue::new(field, value))).collect()
+fn validate_safe_texts(
+    field: &'static str,
+    values: &[&str],
+) -> Result<Collection<Text>, VcsSnapshotError> {
+    values
+        .iter()
+        .map(|value| validate_safe_text(SafeFieldValue::new(field, value)))
+        .collect()
 }
 
 #[derive(Clone, Copy)]
@@ -1201,7 +1264,10 @@ fn validate_safe_text(input: SafeFieldValue<'_>) -> Result<Text, VcsSnapshotErro
 
 fn contains_unsafe_material(value: &str) -> Option<LeakMarker> {
     let lower = value.to_ascii_lowercase();
-    LEAK_MARKERS.iter().copied().find(|marker| lower.contains(marker.needle))
+    LEAK_MARKERS
+        .iter()
+        .copied()
+        .find(|marker| lower.contains(marker.needle))
 }
 
 fn push_hash_part(normalized: &mut Text, part: &str) {
@@ -1240,7 +1306,8 @@ mod tests {
     fn restore_plan_requires_fresh_proof_and_confirmation() {
         // r[verify agent_harness_runtime.hermes_vcs_snapshot_ledger.plans.restore_freshness]
         let records = records().expect("records should validate");
-        let request = request(RequestFixture::protected_restore()).expect("request should validate");
+        let request =
+            request(RequestFixture::protected_restore()).expect("request should validate");
         let plan = plan_vcs_snapshot_operation(VcsSnapshotPlannerInput {
             request: &request,
             records: records.as_slice(),
@@ -1250,7 +1317,10 @@ mod tests {
 
         assert_eq!(plan.status(), VcsSnapshotPlanStatus::Admitted);
         assert_eq!(plan.target_snapshot_id_hash(), HASH_B);
-        assert_eq!(plan.receipt().backend_kind(), Some(VcsSnapshotBackendKind::Git));
+        assert_eq!(
+            plan.receipt().backend_kind(),
+            Some(VcsSnapshotBackendKind::Git)
+        );
         assert_eq!(plan.receipt().receipt_hash().len(), HASH_HEX_LENGTH);
     }
 
@@ -1278,7 +1348,8 @@ mod tests {
     fn stale_missing_service_no_confirmation_and_auto_snapshot_fail_closed() {
         // r[verify agent_harness_runtime.hermes_vcs_snapshot_ledger.host_owned.no_autocommit]
         let records = records().expect("records should validate");
-        let stale = request(RequestFixture::stale_restore()).expect("stale request should validate");
+        let stale =
+            request(RequestFixture::stale_restore()).expect("stale request should validate");
         let stale_plan = plan_vcs_snapshot_operation(VcsSnapshotPlannerInput {
             request: &stale,
             records: records.as_slice(),
@@ -1302,8 +1373,14 @@ mod tests {
             supported_capabilities: &[CAP_RESTORE],
         });
         assert_eq!(unconfirmed_plan.status(), VcsSnapshotPlanStatus::Denied);
-        assert_diagnostic(&unconfirmed_plan, VcsSnapshotDiagnosticKind::MissingConfirmation);
-        assert_diagnostic(&unconfirmed_plan, VcsSnapshotDiagnosticKind::AutomaticSnapshotDenied);
+        assert_diagnostic(
+            &unconfirmed_plan,
+            VcsSnapshotDiagnosticKind::MissingConfirmation,
+        );
+        assert_diagnostic(
+            &unconfirmed_plan,
+            VcsSnapshotDiagnosticKind::AutomaticSnapshotDenied,
+        );
     }
 
     #[test]
@@ -1322,8 +1399,14 @@ mod tests {
             supported_capabilities: &[],
         });
         assert_eq!(command_plan.status(), VcsSnapshotPlanStatus::Denied);
-        assert_diagnostic(&command_plan, VcsSnapshotDiagnosticKind::BackendCommandRejected);
-        assert_diagnostic(&command_plan, VcsSnapshotDiagnosticKind::UnsupportedOperation);
+        assert_diagnostic(
+            &command_plan,
+            VcsSnapshotDiagnosticKind::BackendCommandRejected,
+        );
+        assert_diagnostic(
+            &command_plan,
+            VcsSnapshotDiagnosticKind::UnsupportedOperation,
+        );
     }
 
     #[test]
@@ -1335,15 +1418,17 @@ mod tests {
             "command: git stash",
             "authorization: token",
         ] {
-            let error =
-                validate_vcs_snapshot_receipt_text(fixture).expect_err("unsafe snapshot receipt text should fail");
+            let error = validate_vcs_snapshot_receipt_text(fixture)
+                .expect_err("unsafe snapshot receipt text should fail");
             assert_eq!(error.kind(), VcsSnapshotErrorKind::UnsafeText);
         }
     }
 
     fn assert_diagnostic(plan: &VcsSnapshotPlan, expected: VcsSnapshotDiagnosticKind) {
         assert!(
-            plan.diagnostics().iter().any(|diagnostic| diagnostic.kind() == expected),
+            plan.diagnostics()
+                .iter()
+                .any(|diagnostic| diagnostic.kind() == expected),
             "expected {expected:?} in {:?}",
             plan.diagnostics()
         );

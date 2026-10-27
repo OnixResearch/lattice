@@ -1,5 +1,4 @@
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven
-// validation compact while drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -7,7 +6,12 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
+#![allow(
+    compound_condition,
+    excessive_file_length,
+    function_length,
+    non_trait_imports
+)]
 #![allow(
     numeric_units,
     path_segment_repetition,
@@ -15,39 +19,21 @@
     clippy::too_many_arguments,
     unbounded_collection_growth
 )]
-use super::BLAKE3_ALGORITHM;
-use super::FIELD_API_STYLE;
-use super::FIELD_EXTRA_BODY;
-use super::FIELD_HEADER;
-use super::FIELD_MODEL;
-use super::HASH_PART_SEPARATOR;
-use super::PROVIDER_HARDENING_HASH_DOMAIN;
-use super::data::ModelCapabilityDecisionStatus;
-use super::data::ModelCapabilityDowngrade;
-use super::data::ModelCapabilityDowngradePolicy;
-use super::data::ModelCapabilityIssue;
-use super::data::ModelCapabilityIssueKind;
-use super::data::ModelCapabilityNegotiationDecision;
-use super::data::ModelCapabilityNegotiationInput;
-use super::data::ProviderApiStyle;
-use super::data::ProviderApiStylePolicy;
-use super::data::ProviderDiagnostic;
-use super::data::ProviderDiagnosticKind;
-use super::data::ProviderEndpointSensitivity;
-use super::data::ProviderExtraBodyDescriptor;
-use super::data::ProviderHeaderDescriptor;
-use super::data::ProviderHeaderResolution;
-use super::data::ProviderHeaderValueSource;
-use super::data::ProviderModelCapabilityMatrix;
-use super::data::ProviderModelClass;
-use super::data::ProviderModelContentPartClass;
-use super::data::ProviderModelMetadata;
-use super::data::ProviderPrivacyPosture;
-use super::data::ProviderSelectionReceipt;
-use super::data::ProviderSelectionReceiptInput;
-use super::data::ProviderStreamChannel;
-use super::data::ProviderStructuredOutputMode;
-use super::data::ProviderValidationResult;
+use super::{
+    BLAKE3_ALGORITHM, FIELD_API_STYLE, FIELD_EXTRA_BODY, FIELD_HEADER, FIELD_MODEL,
+    HASH_PART_SEPARATOR, PROVIDER_HARDENING_HASH_DOMAIN,
+    data::{
+        ModelCapabilityDecisionStatus, ModelCapabilityDowngrade, ModelCapabilityDowngradePolicy,
+        ModelCapabilityIssue, ModelCapabilityIssueKind, ModelCapabilityNegotiationDecision,
+        ModelCapabilityNegotiationInput, ProviderApiStyle, ProviderApiStylePolicy,
+        ProviderDiagnostic, ProviderDiagnosticKind, ProviderEndpointSensitivity,
+        ProviderExtraBodyDescriptor, ProviderHeaderDescriptor, ProviderHeaderResolution,
+        ProviderHeaderValueSource, ProviderModelCapabilityMatrix, ProviderModelClass,
+        ProviderModelContentPartClass, ProviderModelMetadata, ProviderPrivacyPosture,
+        ProviderSelectionReceipt, ProviderSelectionReceiptInput, ProviderStreamChannel,
+        ProviderStructuredOutputMode, ProviderValidationResult,
+    },
+};
 
 const HEADER_PREFIX: &str = "x-";
 const REDACTED_ENV_PREFIX: &str = "env:";
@@ -89,12 +75,28 @@ pub fn validate_model_capability_matrix(
             DETAIL_MISSING_OR_STALE,
         ));
     }
-    push_if_blank(&mut diagnostics, FEATURE_PROVIDER_ID, &capabilities.provider_id);
+    push_if_blank(
+        &mut diagnostics,
+        FEATURE_PROVIDER_ID,
+        &capabilities.provider_id,
+    );
     push_if_blank(&mut diagnostics, FEATURE_MODEL_ID, &capabilities.model_id);
     push_if_empty(&mut diagnostics, FEATURE_ROLES, capabilities.roles.len());
-    push_if_empty(&mut diagnostics, FEATURE_CONTENT_PARTS, capabilities.content_parts.len());
-    push_if_zero(&mut diagnostics, FEATURE_CONTEXT_BUDGET, capabilities.context_budget);
-    push_if_zero(&mut diagnostics, FEATURE_OUTPUT_BUDGET, capabilities.output_budget);
+    push_if_empty(
+        &mut diagnostics,
+        FEATURE_CONTENT_PARTS,
+        capabilities.content_parts.len(),
+    );
+    push_if_zero(
+        &mut diagnostics,
+        FEATURE_CONTEXT_BUDGET,
+        capabilities.context_budget,
+    );
+    push_if_zero(
+        &mut diagnostics,
+        FEATURE_OUTPUT_BUDGET,
+        capabilities.output_budget,
+    );
     if diagnostics.is_empty() {
         Ok(capabilities.clone())
     } else {
@@ -104,7 +106,9 @@ pub fn validate_model_capability_matrix(
 
 /// Negotiates canonical request requirements against a selected model capability matrix.
 #[must_use]
-pub fn negotiate_model_capability(input: ModelCapabilityNegotiationInput<'_>) -> ModelCapabilityNegotiationDecision {
+pub fn negotiate_model_capability(
+    input: ModelCapabilityNegotiationInput<'_>,
+) -> ModelCapabilityNegotiationDecision {
     let mut evidence = vec![
         format!("schema:{}", input.capabilities.schema_identity),
         format!("provider:{}", input.capabilities.provider_id),
@@ -120,20 +124,58 @@ pub fn negotiate_model_capability(input: ModelCapabilityNegotiationInput<'_>) ->
         ));
     }
     if let Err(diagnostics) = validate_model_capability_matrix(input.capabilities) {
-        issues.extend(diagnostics.into_iter().map(|diagnostic| ModelCapabilityIssue {
-            kind: ModelCapabilityIssueKind::UnknownCapabilityMetadata,
-            feature: diagnostic.field,
-            detail: diagnostic.detail,
-        }));
+        issues.extend(
+            diagnostics
+                .into_iter()
+                .map(|diagnostic| ModelCapabilityIssue {
+                    kind: ModelCapabilityIssueKind::UnknownCapabilityMetadata,
+                    feature: diagnostic.field,
+                    detail: diagnostic.detail,
+                }),
+        );
     }
     check_roles(input.request, input.capabilities, &mut issues);
-    check_content_parts(input.request, input.capabilities, input.downgrade_policy, &mut downgrades, &mut issues);
+    check_content_parts(
+        input.request,
+        input.capabilities,
+        input.downgrade_policy,
+        &mut downgrades,
+        &mut issues,
+    );
     check_tools(input.request, input.capabilities, &mut issues);
-    check_structured_output(input.request, input.capabilities, input.downgrade_policy, &mut downgrades, &mut issues);
-    check_streaming(input.request, input.capabilities, input.downgrade_policy, &mut downgrades, &mut issues);
-    check_reasoning(input.request, input.capabilities, input.downgrade_policy, &mut downgrades, &mut issues);
-    check_budgets(input.request, input.capabilities, &mut evidence, &mut issues);
-    check_privacy(input.required_privacy, input.capabilities.privacy, &mut evidence, &mut issues);
+    check_structured_output(
+        input.request,
+        input.capabilities,
+        input.downgrade_policy,
+        &mut downgrades,
+        &mut issues,
+    );
+    check_streaming(
+        input.request,
+        input.capabilities,
+        input.downgrade_policy,
+        &mut downgrades,
+        &mut issues,
+    );
+    check_reasoning(
+        input.request,
+        input.capabilities,
+        input.downgrade_policy,
+        &mut downgrades,
+        &mut issues,
+    );
+    check_budgets(
+        input.request,
+        input.capabilities,
+        &mut evidence,
+        &mut issues,
+    );
+    check_privacy(
+        input.required_privacy,
+        input.capabilities.privacy,
+        &mut evidence,
+        &mut issues,
+    );
     let status = if issues.is_empty() {
         if downgrades.is_empty() {
             ModelCapabilityDecisionStatus::Admitted
@@ -180,8 +222,12 @@ pub fn resolve_provider_api_style(
         return Ok(style);
     }
     match (custom_gateway, policy) {
-        (true, ProviderApiStylePolicy::CompatibleGatewayChatDefault) => Ok(ProviderApiStyle::ChatCompletions),
-        (true, ProviderApiStylePolicy::CompatibleGatewayResponsesDefault) => Ok(ProviderApiStyle::Responses),
+        (true, ProviderApiStylePolicy::CompatibleGatewayChatDefault) => {
+            Ok(ProviderApiStyle::ChatCompletions)
+        }
+        (true, ProviderApiStylePolicy::CompatibleGatewayResponsesDefault) => {
+            Ok(ProviderApiStyle::Responses)
+        }
         _ => Err(vec![ProviderDiagnostic::new(
             ProviderDiagnosticKind::AmbiguousApiStyle,
             FIELD_API_STYLE,
@@ -207,11 +253,13 @@ pub fn validate_provider_header(
         )]);
     }
     match &header.value_source {
-        ProviderHeaderValueSource::Literal(value) if value.trim().is_empty() => Err(vec![ProviderDiagnostic::new(
-            ProviderDiagnosticKind::InvalidHeader,
-            FIELD_HEADER,
-            "provider header literal is empty",
-        )]),
+        ProviderHeaderValueSource::Literal(value) if value.trim().is_empty() => {
+            Err(vec![ProviderDiagnostic::new(
+                ProviderDiagnosticKind::InvalidHeader,
+                FIELD_HEADER,
+                "provider header literal is empty",
+            )])
+        }
         ProviderHeaderValueSource::Literal(_) => Ok(ProviderHeaderResolution {
             name: header.name.clone(),
             redacted_source: "literal:redacted".to_string(),
@@ -226,7 +274,10 @@ pub fn validate_provider_header(
                 Err(vec![ProviderDiagnostic::new(
                     ProviderDiagnosticKind::MissingHeaderSecret,
                     FIELD_HEADER,
-                    format!("missing provider header source {REDACTED_ENV_PREFIX}{}", reference.label),
+                    format!(
+                        "missing provider header source {REDACTED_ENV_PREFIX}{}",
+                        reference.label
+                    ),
                 )])
             }
         }
@@ -244,7 +295,10 @@ pub fn resolve_extra_body_descriptor(
     selected_model: &str,
 ) -> ProviderValidationResult<ProviderExtraBodyDescriptor> {
     let provider_matches = descriptor.provider_id == selected_provider;
-    let model_matches = descriptor.model_id.as_ref().is_none_or(|model| model == selected_model);
+    let model_matches = descriptor
+        .model_id
+        .as_ref()
+        .is_none_or(|model| model == selected_model);
     if provider_matches && model_matches {
         Ok(descriptor.clone())
     } else {
@@ -279,7 +333,9 @@ pub fn filter_agent_model(
 
 /// Builds a safe provider selection receipt.
 #[must_use]
-pub fn provider_selection_receipt(input: &ProviderSelectionReceiptInput) -> ProviderSelectionReceipt {
+pub fn provider_selection_receipt(
+    input: &ProviderSelectionReceiptInput,
+) -> ProviderSelectionReceipt {
     let endpoint_identity = match input.sensitivity {
         ProviderEndpointSensitivity::Public => input.endpoint.clone(),
         ProviderEndpointSensitivity::Sensitive => {
@@ -301,7 +357,9 @@ pub fn provider_selection_receipt(input: &ProviderSelectionReceiptInput) -> Prov
 fn valid_header_name(name: &str) -> bool {
     !name.trim().is_empty()
         && name.starts_with(HEADER_PREFIX)
-        && name.bytes().all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+        && name
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
 }
 
 fn push_if_blank(diagnostics: &mut Vec<ProviderDiagnostic>, field: &str, value: &str) {
@@ -386,7 +444,11 @@ fn check_tools(
     issues: &mut Vec<ModelCapabilityIssue>,
 ) {
     if !request.tools().is_empty() && !capabilities.tool_calls {
-        issues.push(issue(ModelCapabilityIssueKind::UnsupportedToolCalls, FEATURE_TOOL_CALLS, DETAIL_UNSUPPORTED));
+        issues.push(issue(
+            ModelCapabilityIssueKind::UnsupportedToolCalls,
+            FEATURE_TOOL_CALLS,
+            DETAIL_UNSUPPORTED,
+        ));
     }
 }
 
@@ -399,7 +461,9 @@ fn check_structured_output(
 ) {
     let required = match request.response_format() {
         animus_adapters::CanonicalModelResponseFormatIntent::Text => return,
-        animus_adapters::CanonicalModelResponseFormatIntent::JsonObject => ProviderStructuredOutputMode::JsonObject,
+        animus_adapters::CanonicalModelResponseFormatIntent::JsonObject => {
+            ProviderStructuredOutputMode::JsonObject
+        }
         animus_adapters::CanonicalModelResponseFormatIntent::JsonSchema { .. } => {
             ProviderStructuredOutputMode::JsonSchema
         }
@@ -425,13 +489,21 @@ fn check_streaming(
     downgrades: &mut Vec<ModelCapabilityDowngrade>,
     issues: &mut Vec<ModelCapabilityIssue>,
 ) {
-    if !request.output().stream() || capabilities.stream_channels.contains(&ProviderStreamChannel::Content) {
+    if !request.output().stream()
+        || capabilities
+            .stream_channels
+            .contains(&ProviderStreamChannel::Content)
+    {
         return;
     }
     if policy.allow_streaming_omission {
         downgrades.push(downgrade(FEATURE_STREAMING));
     } else {
-        issues.push(issue(ModelCapabilityIssueKind::UnsupportedStreaming, FEATURE_STREAMING, DETAIL_UNSUPPORTED));
+        issues.push(issue(
+            ModelCapabilityIssueKind::UnsupportedStreaming,
+            FEATURE_STREAMING,
+            DETAIL_UNSUPPORTED,
+        ));
     }
 }
 
@@ -442,13 +514,21 @@ fn check_reasoning(
     downgrades: &mut Vec<ModelCapabilityDowngrade>,
     issues: &mut Vec<ModelCapabilityIssue>,
 ) {
-    if !request.reasoning().enabled() || capabilities.reasoning_controls.contains(&request.reasoning().effort()) {
+    if !request.reasoning().enabled()
+        || capabilities
+            .reasoning_controls
+            .contains(&request.reasoning().effort())
+    {
         return;
     }
     if policy.allow_reasoning_omission {
         downgrades.push(downgrade(FEATURE_REASONING));
     } else {
-        issues.push(issue(ModelCapabilityIssueKind::UnsupportedReasoning, FEATURE_REASONING, DETAIL_UNSUPPORTED));
+        issues.push(issue(
+            ModelCapabilityIssueKind::UnsupportedReasoning,
+            FEATURE_REASONING,
+            DETAIL_UNSUPPORTED,
+        ));
     }
 }
 
@@ -462,12 +542,20 @@ fn check_budgets(
     evidence.push(format!("context_units:{context_units}"));
     evidence.push(format!("output_budget:{}", capabilities.output_budget));
     if context_units > capabilities.context_budget {
-        issues.push(issue(ModelCapabilityIssueKind::BudgetOverflow, FEATURE_CONTEXT_BUDGET, DETAIL_BUDGET_OVERFLOW));
+        issues.push(issue(
+            ModelCapabilityIssueKind::BudgetOverflow,
+            FEATURE_CONTEXT_BUDGET,
+            DETAIL_BUDGET_OVERFLOW,
+        ));
     }
     if let Some(output_tokens) = request.output().max_output_tokens()
         && output_tokens > capabilities.output_budget
     {
-        issues.push(issue(ModelCapabilityIssueKind::BudgetOverflow, FEATURE_OUTPUT_BUDGET, DETAIL_BUDGET_OVERFLOW));
+        issues.push(issue(
+            ModelCapabilityIssueKind::BudgetOverflow,
+            FEATURE_OUTPUT_BUDGET,
+            DETAIL_BUDGET_OVERFLOW,
+        ));
     }
 }
 
@@ -481,7 +569,11 @@ fn check_privacy(
     if privacy_satisfies(required, actual) {
         return;
     }
-    issues.push(issue(ModelCapabilityIssueKind::UnsupportedPrivacy, FEATURE_PRIVACY, DETAIL_PRIVACY));
+    issues.push(issue(
+        ModelCapabilityIssueKind::UnsupportedPrivacy,
+        FEATURE_PRIVACY,
+        DETAIL_PRIVACY,
+    ));
 }
 
 fn request_context_units(request: &animus_adapters::CanonicalModelRequest) -> u32 {
@@ -503,12 +595,16 @@ fn usize_to_u32(value: usize) -> u32 {
     u32::try_from(value).unwrap_or(u32::MAX)
 }
 
-const fn privacy_satisfies(required: ProviderPrivacyPosture, actual: ProviderPrivacyPosture) -> bool {
+const fn privacy_satisfies(
+    required: ProviderPrivacyPosture,
+    actual: ProviderPrivacyPosture,
+) -> bool {
     match required {
         ProviderPrivacyPosture::RemoteProvider => true,
-        ProviderPrivacyPosture::PrivateGateway => {
-            matches!(actual, ProviderPrivacyPosture::LocalOnly | ProviderPrivacyPosture::PrivateGateway)
-        }
+        ProviderPrivacyPosture::PrivateGateway => matches!(
+            actual,
+            ProviderPrivacyPosture::LocalOnly | ProviderPrivacyPosture::PrivateGateway
+        ),
         ProviderPrivacyPosture::LocalOnly => matches!(actual, ProviderPrivacyPosture::LocalOnly),
     }
 }

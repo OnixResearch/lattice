@@ -150,15 +150,16 @@ fn facade_aliases_resolve() {
 
     assert_function_item(&animus_adapters::project_router_signals);
     let source = animus_adapters::router::RuleSignalSource;
-    let metadata_result = animus_adapters::RouterRequestMetadata::new(animus_adapters::RouterRequestMetadataDraft {
-        prompt_char_estimate: PARITY_PROMPT_CHARS,
-        tool_call_count: PARITY_TOOL_CALLS,
-        contains_code: false,
-        requires_structured_output: false,
-        context_window_fill_per_mille: PARITY_CONTEXT_PER_MILLE,
-        privacy_policy: "remote_allowed",
-        fallback_hint: "eligible",
-    });
+    let metadata_result =
+        animus_adapters::RouterRequestMetadata::new(animus_adapters::RouterRequestMetadataDraft {
+            prompt_char_estimate: PARITY_PROMPT_CHARS,
+            tool_call_count: PARITY_TOOL_CALLS,
+            contains_code: false,
+            requires_structured_output: false,
+            context_window_fill_per_mille: PARITY_CONTEXT_PER_MILLE,
+            privacy_policy: "remote_allowed",
+            fallback_hint: "eligible",
+        });
     assert!(metadata_result.is_ok());
     let metadata = match metadata_result {
         Ok(metadata) => metadata,

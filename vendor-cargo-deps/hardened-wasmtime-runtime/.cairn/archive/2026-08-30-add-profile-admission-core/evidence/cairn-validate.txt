@@ -1,0 +1,176 @@
+{
+  "change_issues": [],
+  "changes": 2,
+  "cross_repo_dependencies": [],
+  "cross_repo_evidence_issues": [],
+  "findings": [],
+  "issues": [],
+  "layout": "cairn",
+  "policy": "hardened-wasmtime-default",
+  "profile_issues": [],
+  "resolution": {
+    "diagnostics": [],
+    "locator_consulted": false,
+    "registry_lookup": "local_locator_only",
+    "selected": {
+      "project_identity": null,
+      "root": ".",
+      "source": "explicit_root",
+      "store_id": null,
+      "store_identity": null
+    },
+    "valid": true
+  },
+  "spec_findings": [],
+  "spec_issues": [],
+  "spec_substance": [
+    {
+      "path": "./.cairn/changes/add-profile-admission-core/specs/hardened-wasmtime-runtime/spec.md",
+      "requirement_blocks": 5,
+      "scenario_blocks": 11,
+      "substantive_requirement_blocks": 5
+    },
+    {
+      "path": "./.cairn/changes/extract-hardened-wasmtime-runtime/specs/hardened-wasmtime-runtime/spec.md",
+      "requirement_blocks": 12,
+      "scenario_blocks": 30,
+      "substantive_requirement_blocks": 12
+    }
+  ],
+  "specs_validated": 2,
+  "substance": [
+    {
+      "checkbox_tasks": 0,
+      "kind": "design",
+      "malformed_dependency_markers": 0,
+      "path": "./.cairn/changes/add-profile-admission-core/design.md",
+      "requirement_blocks": 0,
+      "scenario_blocks": 0,
+      "substantive_lines": 14,
+      "substantive_requirement_blocks": 0,
+      "substantive_tasks": 0,
+      "task_done": 0,
+      "task_in_progress": 0,
+      "task_todo": 0
+    },
+    {
+      "checkbox_tasks": 0,
+      "kind": "proposal",
+      "malformed_dependency_markers": 0,
+      "path": "./.cairn/changes/add-profile-admission-core/proposal.md",
+      "requirement_blocks": 0,
+      "scenario_blocks": 0,
+      "substantive_lines": 18,
+      "substantive_requirement_blocks": 0,
+      "substantive_tasks": 0,
+      "task_done": 0,
+      "task_in_progress": 0,
+      "task_todo": 0
+    },
+    {
+      "checkbox_tasks": 0,
+      "kind": "delta_spec",
+      "malformed_dependency_markers": 0,
+      "path": "./.cairn/changes/add-profile-admission-core/specs/hardened-wasmtime-runtime/spec.md",
+      "requirement_blocks": 5,
+      "scenario_blocks": 11,
+      "substantive_lines": 39,
+      "substantive_requirement_blocks": 5,
+      "substantive_tasks": 0,
+      "task_done": 0,
+      "task_in_progress": 0,
+      "task_todo": 0
+    },
+    {
+      "checkbox_tasks": 11,
+      "kind": "tasks",
+      "malformed_dependency_markers": 0,
+      "path": "./.cairn/changes/add-profile-admission-core/tasks.md",
+      "requirement_blocks": 0,
+      "scenario_blocks": 0,
+      "substantive_lines": 35,
+      "substantive_requirement_blocks": 0,
+      "substantive_tasks": 11,
+      "task_done": 0,
+      "task_in_progress": 0,
+      "task_todo": 11
+    },
+    {
+      "checkbox_tasks": 0,
+      "kind": "design",
+      "malformed_dependency_markers": 0,
+      "path": "./.cairn/changes/extract-hardened-wasmtime-runtime/design.md",
+      "requirement_blocks": 0,
+      "scenario_blocks": 0,
+      "substantive_lines": 22,
+      "substantive_requirement_blocks": 0,
+      "substantive_tasks": 0,
+      "task_done": 0,
+      "task_in_progress": 0,
+      "task_todo": 0
+    },
+    {
+      "checkbox_tasks": 0,
+      "kind": "proposal",
+      "malformed_dependency_markers": 0,
+      "path": "./.cairn/changes/extract-hardened-wasmtime-runtime/proposal.md",
+      "requirement_blocks": 0,
+      "scenario_blocks": 0,
+      "substantive_lines": 14,
+      "substantive_requirement_blocks": 0,
+      "substantive_tasks": 0,
+      "task_done": 0,
+      "task_in_progress": 0,
+      "task_todo": 0
+    },
+    {
+      "checkbox_tasks": 0,
+      "kind": "delta_spec",
+      "malformed_dependency_markers": 0,
+      "path": "./.cairn/changes/extract-hardened-wasmtime-runtime/specs/hardened-wasmtime-runtime/spec.md",
+      "requirement_blocks": 12,
+      "scenario_blocks": 30,
+      "substantive_lines": 102,
+      "substantive_requirement_blocks": 12,
+      "substantive_tasks": 0,
+      "task_done": 0,
+      "task_in_progress": 0,
+      "task_todo": 0
+    },
+    {
+      "checkbox_tasks": 15,
+      "kind": "tasks",
+      "malformed_dependency_markers": 0,
+      "path": "./.cairn/changes/extract-hardened-wasmtime-runtime/tasks.md",
+      "requirement_blocks": 0,
+      "scenario_blocks": 0,
+      "substantive_lines": 15,
+      "substantive_requirement_blocks": 0,
+      "substantive_tasks": 15,
+      "task_done": 0,
+      "task_in_progress": 0,
+      "task_todo": 15
+    }
+  ],
+  "substance_findings": [],
+  "substance_issues": [],
+  "valid": true,
+  "workflow_profiles": [
+    {
+      "acceptance_ids": [],
+      "non_claims": [
+        "workflow state proves only the selected policy graph and observed structural artifact facts",
+        "workflow instructions do not prove artifact truth, review quality, or implementation correctness",
+        "workflow state does not satisfy proposal, design, tasks, sync, archive, evidence, or release gates",
+        "workflow commands are read-only and do not create, edit, delete, or approve lifecycle artifacts"
+      ],
+      "profile_identity_hash": "8b103754ef48d41edaa32bb6aa63ce982335d8342641082132451fc5022442ff",
+      "review_receipt_hashes": [],
+      "spec_effect": "delta",
+      "workflow_profile": "spec-driven",
+      "workflow_profile_compatibility_fallback": false,
+      "workflow_profile_source": "change_create",
+      "workflow_profile_version": 1
+    }
+  ]
+}

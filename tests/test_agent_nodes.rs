@@ -110,6 +110,9 @@ impl StaticAgentAdapter {
 }
 
 impl AgentAdapter for StaticAgentAdapter {
+    fn execution_identity(&self, _request: &AgentRequest) -> Result<String, AgentError> {
+        Ok("test/static-agent/v1".to_owned())
+    }
     fn execute(&self, request: &AgentRequest, _context: &AgentExecutionContext) -> Result<AgentResponse, AgentError> {
         self.requests.lock().push(request.clone());
         Ok(self.response.clone())
@@ -136,6 +139,9 @@ impl ErrorAgentAdapter {
 }
 
 impl AgentAdapter for ErrorAgentAdapter {
+    fn execution_identity(&self, _request: &AgentRequest) -> Result<String, AgentError> {
+        Ok("test/error-agent/v1".to_owned())
+    }
     fn execute(&self, _request: &AgentRequest, _context: &AgentExecutionContext) -> Result<AgentResponse, AgentError> {
         *self.calls.lock() += 1;
         Err(self.error.clone())

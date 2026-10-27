@@ -1,0 +1,360 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/crunch-android-core",
+  "crates/crunch-android",
+  "crates/crunch-cmake-core",
+  "crates/crunch-cmake",
+  "crates/crunch-esp-idf-core",
+  "crates/crunch-esp-idf",
+  "crates/crunch-fpga-core",
+  "crates/crunch-fpga",
+  "crates/crunch-gpu-core",
+  "crates/crunch-gpu",
+  "crates/crunch-model-conversion-core",
+  "crates/crunch-model-conversion",
+  "crates/crunch-pnpm-core",
+  "crates/crunch-pnpm",
+  "crates/crunch-python-core",
+  "crates/crunch-python",
+  "crates/crunch-test-core",
+  "crates/crunch-test-app",
+  "crates/crunch-test",
+  "crates/crunch-zephyr-core",
+  "crates/crunch-zephyr",
+  "crates/mantle-cargo-build-bundle-core",
+  "crates/crunch-verification-bridge-core",
+  "crates/crunch-verification-bridge",
+  "crates/crunch-nix-gateway-core",
+  "crates/crunch-nix-gateway",
+  "crates/crunch-watch-core",
+  "crates/mantle-rust-differential-core",
+  "crates/mantle-rust-differential",
+  "crates/crunch-action-result-core",
+  "crates/crunch-service-readiness-core",
+  "crates/crunch-remote-core",
+  "crates/crunch-remote-app",
+  "crates/mantle-causal-trace-core",
+  "crates/crunch-composition-core",
+  "crates/crunch-nar",
+  "crates/crunch-rust-cache-core",
+  "crates/crunch-rust-cache",
+  "crates/crunch-rustc-wrapper",
+  "crates/mantlepkgs-core",
+  "crates/mantle-cargo-unit-plan",
+  "crates/mantle-lock-vendor-core",
+  "crates/mantle-lock-vendor-producer",
+  "crates/mantle-rust-plan-core",
+  "crates/mantle-rust-plan-app",
+  "crates/mantle-application-contract",
+  "crates/mantle-portable-client-core",
+  "crates/mantle-build-contract",
+  "crates/crunch-eval",
+  "crates/crunch-eval-budget-core",
+  "crates/crunch-evaluation-stream-core",
+  "crates/crunch-glue",
+  "crates/crunch-gc-core",
+  "crates/crunch-overlay-core",
+  "crates/crunch-repair-core",
+  "crates/crunch-store",
+  "crates/crunch-build",
+  "crates/crunch-pipeline",
+  "crates/crunch-project",
+  "crates/crunch-project-core",
+  "crates/crunch-attestation",
+  "crates/crunch-attestation-core",
+  "crates/crunch-delta",
+  "crates/crunch-delta-core",
+  "crates/crunch-shell",
+  "crates/crunch-shell-core",
+  "crates/crunch-release-core",
+  "crates/crunch-bootstrap-core",
+  "crates/crunch-hardware-simulation-core",
+  "crates/crunch-hardware-simulation",
+  "crates/crunch-kernelscript-core",
+  "crates/crunch-kernelscript-adapter",
+  "crates/crunch-source-core",
+  "crates/crunch-spacewasm-core",
+  "crates/crunch-spacewasm",
+  "crates/crunch-wasm-component-core",
+  "crates/crunch-wasm-component",
+  "crates/mantle-wasm-consumer-verifier",
+  "vendor/nix-compat",
+  "vendor/nix-compat-derive",
+  "vendor/snix-build",
+  "vendor/snix-castore",
+  "vendor/snix-store",
+  "vendor/snix-tracing",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+
+[workspace.metadata.octet]
+default_scope = ["-p", "crunch-build"]
+cargo_check_args = ["--lib"]
+
+[workspace.metadata.tigerstyle]
+default_scope = [
+  "-p", "mantle",
+  "-p", "crunch-action-result-core",
+  "-p", "crunch-android-core",
+  "-p", "crunch-android",
+  "-p", "crunch-cmake-core",
+  "-p", "crunch-cmake",
+  "-p", "crunch-esp-idf-core",
+  "-p", "crunch-esp-idf",
+  "-p", "crunch-fpga-core",
+  "-p", "crunch-fpga",
+  "-p", "crunch-gpu-core",
+  "-p", "crunch-gpu",
+  "-p", "crunch-model-conversion-core",
+  "-p", "crunch-model-conversion",
+  "-p", "crunch-pnpm-core",
+  "-p", "crunch-pnpm",
+  "-p", "crunch-python-core",
+  "-p", "crunch-python",
+  "-p", "crunch-test-core",
+  "-p", "crunch-test-app",
+  "-p", "crunch-test",
+  "-p", "crunch-verification-bridge-core",
+  "-p", "crunch-verification-bridge",
+  "-p", "crunch-zephyr-core",
+  "-p", "crunch-zephyr",
+  "-p", "mantle-cargo-build-bundle-core",
+  "-p", "crunch-composition-core",
+  "-p", "crunch-nar",
+  "-p", "mantlepkgs-core",
+  "-p", "mantle-rust-plan-core",
+  "-p", "mantle-rust-plan-app",
+  "-p", "mantle-cargo-unit-plan",
+  "-p", "mantle-causal-trace-core",
+  "-p", "mantle-application-contract",
+  "-p", "mantle-portable-client-core",
+  "-p", "mantle-build-contract",
+  "-p", "crunch-attestation",
+  "-p", "crunch-attestation-core",
+  "-p", "crunch-service-readiness-core",
+  "-p", "crunch-build",
+  "-p", "crunch-delta",
+  "-p", "crunch-delta-core",
+  "-p", "crunch-eval",
+  "-p", "crunch-eval-budget-core",
+  "-p", "crunch-evaluation-stream-core",
+  "-p", "crunch-glue",
+  "-p", "crunch-gc-core",
+  "-p", "crunch-overlay-core",
+  "-p", "crunch-hardware-simulation-core",
+  "-p", "crunch-hardware-simulation",
+  "-p", "crunch-kernelscript-core",
+  "-p", "crunch-kernelscript-adapter",
+  "-p", "crunch-source-core",
+  "-p", "crunch-spacewasm-core",
+  "-p", "crunch-spacewasm",
+  "-p", "crunch-pipeline",
+  "-p", "crunch-project",
+  "-p", "crunch-project-core",
+  "-p", "crunch-remote-core",
+  "-p", "crunch-remote-app",
+  "-p", "crunch-release-core",
+  "-p", "crunch-repair-core",
+  "-p", "crunch-rust-cache-core",
+  "-p", "crunch-rust-cache",
+  "-p", "crunch-rustc-wrapper",
+  "-p", "crunch-watch-core",
+  "-p", "crunch-shell",
+  "-p", "crunch-shell-core",
+  "-p", "crunch-store",
+  "-p", "crunch-wasm-component-core",
+  "-p", "crunch-wasm-component",
+  "-p", "mantle-wasm-consumer-verifier",
+]
+cargo_check_args = ["--lib"]
+
+[package]
+name = "mantle"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+autoexamples = false
+
+[[bin]]
+name = "mantle"
+path = "src/main.rs"
+
+[[bin]]
+name = "crunch"
+path = "src/main.rs"
+
+[[bin]]
+name = "generate-operator-command-contract"
+path = "tools/generate_operator_command_contract.rs"
+
+[[bin]]
+name = "generate-portable-platform-profiles"
+path = "tools/generate_portable_platform_profiles.rs"
+
+[[example]]
+name = "benchmark_compare"
+path = "examples/benchmark_compare.rs"
+
+[[example]]
+name = "picolibc_compare"
+path = "examples/picolibc_compare.rs"
+
+[[example]]
+name = "distributed_eval_assess"
+path = "examples/distributed_eval_assess.rs"
+
+[[example]]
+name = "benchmark_eval_smoke"
+path = "examples/benchmark_eval_smoke.rs"
+
+[[example]]
+name = "benchmark_eval_backends"
+path = "examples/benchmark_eval_backends.rs"
+
+[[example]]
+name = "benchmark_lazy_eval"
+path = "examples/benchmark_lazy_eval.rs"
+
+[[example]]
+name = "benchmark_suite"
+path = "examples/benchmark_suite.rs"
+
+[[example]]
+name = "benchmark_scheduler_priority"
+path = "examples/benchmark_scheduler_priority.rs"
+
+[[example]]
+name = "resource_policy_replay"
+path = "examples/resource_policy_replay.rs"
+
+[[example]]
+name = "resource_evidence_check"
+path = "examples/resource_evidence_check.rs"
+
+[[example]]
+name = "hardware_simulation_plan"
+path = "examples/hardware_simulation_plan.rs"
+
+[[example]]
+name = "delta_substitution"
+path = "examples/projects/delta-substitution/demo.rs"
+
+[[example]]
+name = "release_witness_handoff"
+path = "examples/projects/release-witness-handoff/demo.rs"
+
+[[example]]
+name = "shared_action_result_publish"
+path = "examples/projects/shared-action-result-roundtrip/publish.rs"
+
+[dependencies]
+crunch-nar = { path = "crates/crunch-nar" }
+mantle-build-contract = { path = "crates/mantle-build-contract" }
+mantle-application-contract = { path = "crates/mantle-application-contract" }
+mantle-rust-plan-core = { path = "crates/mantle-rust-plan-core" }
+mantle-rust-plan-app = { path = "crates/mantle-rust-plan-app" }
+mantle-lock-vendor-core = { path = "crates/mantle-lock-vendor-core" }
+mantle-cargo-build-bundle-core = { path = "crates/mantle-cargo-build-bundle-core" }
+crunch-test = { path = "crates/crunch-test" }
+crunch-test-core = { path = "crates/crunch-test-core" }
+mantle-causal-trace-core = { path = "crates/mantle-causal-trace-core" }
+crunch-remote-core = { path = "crates/crunch-remote-core", features = ["serde"] }
+crunch-remote-app = { path = "crates/crunch-remote-app" }
+crunch-nix-gateway-core = { path = "crates/crunch-nix-gateway-core" }
+crunch-nix-gateway = { path = "crates/crunch-nix-gateway" }
+crunch-pipeline = { path = "crates/crunch-pipeline" }
+crunch-eval = { path = "crates/crunch-eval" }
+crunch-eval-budget-core = { path = "crates/crunch-eval-budget-core" }
+crunch-evaluation-stream-core = { path = "crates/crunch-evaluation-stream-core" }
+nickel-export-core = { git = "https://github.com/OnixResearch/nickel-export", rev = "257fafc1c746f1faf156207043a4c826bfb16d49" }
+crunch-glue = { path = "crates/crunch-glue" }
+crunch-action-result-core = { path = "crates/crunch-action-result-core" }
+crunch-service-readiness-core = { path = "crates/crunch-service-readiness-core" }
+crunch-composition-core = { path = "crates/crunch-composition-core" }
+crunch-rust-cache-core = { path = "crates/crunch-rust-cache-core" }
+crunch-rust-cache = { path = "crates/crunch-rust-cache" }
+crunch-rustc-wrapper = { path = "crates/crunch-rustc-wrapper" }
+mantlepkgs-core = { path = "crates/mantlepkgs-core" }
+mantle-portable-client-core = { path = "crates/mantle-portable-client-core" }
+crunch-build = { path = "crates/crunch-build" }
+crunch-store = { path = "crates/crunch-store" }
+crunch-wasm-component = { path = "crates/crunch-wasm-component" }
+crunch-project = { path = "crates/crunch-project" }
+crunch-project-core = { path = "crates/crunch-project-core" }
+crunch-attestation = { path = "crates/crunch-attestation" }
+crunch-shell = { path = "crates/crunch-shell" }
+crunch-bootstrap-core = { path = "crates/crunch-bootstrap-core" }
+crunch-release-core = { path = "crates/crunch-release-core" }
+crunch-source-core = { path = "crates/crunch-source-core" }
+artifact-auth-core = { git = "ssh://git@github.com/OnixResearch/onix-artifact.git", rev = "5f3962d7471d1547e044f57daeda72f56621fd52", default-features = false }
+artifact-auth-ed25519 = { git = "ssh://git@github.com/OnixResearch/onix-artifact.git", rev = "5f3962d7471d1547e044f57daeda72f56621fd52", default-features = false }
+basalt = { git = "ssh://git@github.com/OnixResearch/basalt.git", rev = "4c5c9e919b4573a7865559db2dc98a99c0c58144", default-features = false, features = ["durable-authority"] }
+valence-core = { git = "ssh://git@github.com/OnixResearch/valence.git", rev = "15e72b5a330b08139ac7c809ac31e7e87f825b22" }
+bounded-tree-core = { git = "https://seed.radicle.garden/zqhtZvsteJhxCJE96dMAZSZ9y1PX.git", rev = "cc9e0fb611e75bb2d7f662435d1918653c93ce07" }
+bounded-tree-cap = { git = "https://seed.radicle.garden/zqhtZvsteJhxCJE96dMAZSZ9y1PX.git", rev = "cc9e0fb611e75bb2d7f662435d1918653c93ce07" }
+durable-file-publication = { git = "https://git.onix.computer/z3tAR4For7qw8ZirkJzoDw1VNDDLM.git", rev = "951c27f59003cea9bfdb40ed4d89653d50fada1f" }
+crunch-delta = { path = "crates/crunch-delta" }
+nix-compat = { path = "vendor/nix-compat" }
+nix-derivation = "=0.1.0"
+snix-build = { path = "vendor/snix-build" }
+snix-castore = { path = "vendor/snix-castore" }
+snix-store = { path = "vendor/snix-store" }
+cap-std = "4.0.2"
+cap-fs-ext = "4.0.2"
+futures = "0.3"
+fs2 = "0.4"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+clap = { version = "4", features = ["derive", "env"] }
+data-encoding = "2.6"
+ed25519-dalek = "2.1.1"
+tempfile = "3"
+bstr = "=1.12.1"
+base64 = "0.22"
+blake3 = "=1.8.5"
+rand = "0.8"
+digest = "=0.10.7"
+secretspec = { version = "=0.17.0", default-features = false, features = ["sops"] }
+subtle = "2.6.1"
+zeroize = "1"
+sha2 = "0.10.8"
+ureq = { version = "3.0", default-features = false, features = ["rustls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+postcard = { version = "1", default-features = false, features = ["use-std"] }
+toml = "0.8.19"
+libc = "0.2"
+parking_lot = "0.12"
+url = "2"
+tar = "0.4"
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+chapter-tgz = "=0.1.0"
+
+[patch.crates-io]
+fuse-backend-rs = { path = "vendor/fuse-backend-rs" }
+
+[dev-dependencies]
+casita = { git = "https://github.com/cachix/casita", rev = "90404fcb1cfb3d83f2233715448dfefe913f5fd1", default-features = false, features = ["native", "experimental"] }
+crunch-android-core = { path = "crates/crunch-android-core" }
+crunch-hardware-simulation-core = { path = "crates/crunch-hardware-simulation-core" }
+crunch-gc-core = { path = "crates/crunch-gc-core" }
+crunch-hardware-simulation = { path = "crates/crunch-hardware-simulation" }
+crunch-kernelscript-core = { path = "crates/crunch-kernelscript-core" }
+crunch-wasm-component-core = { path = "crates/crunch-wasm-component-core" }
+crunch-store = { path = "crates/crunch-store", features = ["test-support"] }
+transactional-reconciliation-core = { git = "https://seed.radicle.garden/z4Tky6zvC8w4Y6c4YBzNxVbq5n752.git", rev = "606489b5f40298181214bb76bc3457b607f225d9" }
+pretty_assertions = "1.0"
+tempfile = "3"
+assert_cmd = "2"
+predicates = "3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+futures = "0.3"
+sha2 = "0.10.8"
+tar = "0.4"

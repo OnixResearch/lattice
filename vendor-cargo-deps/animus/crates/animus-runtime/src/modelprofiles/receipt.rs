@@ -6,19 +6,13 @@
     allow(tigerstyle::non_trait_imports, tigerstyle::path_segment_repetition)
 )]
 
-use super::composition::ModelInvocationOmissionClass;
-use super::composition::ModelInvocationPlan;
-use super::types::MODEL_INVOCATION_RECEIPT_HASH_DOMAIN;
-use super::types::ModelMemoryAccessMode;
-use super::types::ModelProfileSourceScope;
-use super::types::ModelProfileSpecificity;
-use super::types::ModelProfileTrustStatus;
-use super::types::ModelRuntimeProfileError;
-use super::types::ModelRuntimeProfileIssue;
-use super::types::NativeToolCallingMode;
-use super::types::ResolvedModelRuntimeProfile;
-use super::validation::blake3_parts;
-use super::validation::error;
+use super::composition::{ModelInvocationOmissionClass, ModelInvocationPlan};
+use super::types::{
+    MODEL_INVOCATION_RECEIPT_HASH_DOMAIN, ModelMemoryAccessMode, ModelProfileSourceScope,
+    ModelProfileSpecificity, ModelProfileTrustStatus, ModelRuntimeProfileError,
+    ModelRuntimeProfileIssue, NativeToolCallingMode, ResolvedModelRuntimeProfile,
+};
+use super::validation::{blake3_parts, error};
 
 const FIELD_RECEIPT: &str = "model_invocation_receipt";
 const REDACTION_MARKER: &str = "raw-model-context-omitted";
@@ -138,7 +132,9 @@ impl ModelInvocationToolReceiptEntry {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModelInvocationReceipt {
     provider_id: String,
+    provider_transport_id: String,
     model_id: String,
+    model_dialect_id: String,
     router_role: Option<String>,
     target_hash: String,
     profile_id: String,
@@ -174,10 +170,22 @@ impl ModelInvocationReceipt {
         self.provider_id.as_str()
     }
 
+    /// Returns the safe versioned provider-transport ID.
+    #[must_use]
+    pub fn provider_transport_id(&self) -> &str {
+        self.provider_transport_id.as_str()
+    }
+
     /// Returns the safe model ID.
     #[must_use]
     pub fn model_id(&self) -> &str {
         self.model_id.as_str()
+    }
+
+    /// Returns the safe versioned model-facing dialect ID.
+    #[must_use]
+    pub fn model_dialect_id(&self) -> &str {
+        self.model_dialect_id.as_str()
     }
 
     /// Returns the optional router role.
@@ -383,7 +391,9 @@ pub fn project_model_invocation_receipt(
     });
     let receipt = ModelInvocationReceipt {
         provider_id: plan.target().provider_id().to_string(),
+        provider_transport_id: plan.target().provider_transport_id().to_string(),
         model_id: plan.target().model_id().to_string(),
+        model_dialect_id: plan.target().model_dialect_id().to_string(),
         router_role: plan.target().router_role().map(str::to_string),
         target_hash: plan.target().target_hash().to_string(),
         profile_id: plan.profile_id().to_string(),
@@ -422,17 +432,41 @@ fn reject_sensitive_receipt_fields(
     let leaks = [
         (sensitive.raw_prompt, ModelInvocationReceiptLeak::RawPrompt),
         (sensitive.skill_body, ModelInvocationReceiptLeak::SkillBody),
-        (sensitive.memory_body, ModelInvocationReceiptLeak::MemoryBody),
-        (sensitive.script_or_asset, ModelInvocationReceiptLeak::ScriptOrAsset),
-        (sensitive.tool_arguments, ModelInvocationReceiptLeak::ToolArguments),
-        (sensitive.tool_output, ModelInvocationReceiptLeak::ToolOutput),
-        (sensitive.provider_payload, ModelInvocationReceiptLeak::ProviderPayload),
+        (
+            sensitive.memory_body,
+            ModelInvocationReceiptLeak::MemoryBody,
+        ),
+        (
+            sensitive.script_or_asset,
+            ModelInvocationReceiptLeak::ScriptOrAsset,
+        ),
+        (
+            sensitive.tool_arguments,
+            ModelInvocationReceiptLeak::ToolArguments,
+        ),
+        (
+            sensitive.tool_output,
+            ModelInvocationReceiptLeak::ToolOutput,
+        ),
+        (
+            sensitive.provider_payload,
+            ModelInvocationReceiptLeak::ProviderPayload,
+        ),
         (sensitive.credential, ModelInvocationReceiptLeak::Credential),
-        (sensitive.environment_value, ModelInvocationReceiptLeak::EnvironmentValue),
+        (
+            sensitive.environment_value,
+            ModelInvocationReceiptLeak::EnvironmentValue,
+        ),
         (sensitive.full_path, ModelInvocationReceiptLeak::FullPath),
         (sensitive.endpoint, ModelInvocationReceiptLeak::Endpoint),
-        (sensitive.hidden_reasoning, ModelInvocationReceiptLeak::HiddenReasoning),
-        (sensitive.unbounded_trace, ModelInvocationReceiptLeak::UnboundedTrace),
+        (
+            sensitive.hidden_reasoning,
+            ModelInvocationReceiptLeak::HiddenReasoning,
+        ),
+        (
+            sensitive.unbounded_trace,
+            ModelInvocationReceiptLeak::UnboundedTrace,
+        ),
     ];
     if leaks.iter().any(|(candidate, _)| candidate.is_some()) {
         return Err(error(
@@ -508,7 +542,10 @@ fn receipt_hash(input: ReceiptHashInput<'_>) -> String {
         REDACTION_MARKER.to_string(),
     ];
     for skill in input.skills {
-        parts.push(format!("skill:{}:{}:{}", skill.name, skill.content_identity, skill.selected));
+        parts.push(format!(
+            "skill:{}:{}:{}",
+            skill.name, skill.content_identity, skill.selected
+        ));
     }
     for tool in input.tools {
         parts.push(format!("tool:{}:{}", tool.name, tool.schema_identity));

@@ -9,35 +9,21 @@ mod select;
 #[cfg(test)]
 mod tests;
 
-pub use admit::AbilityKind;
-pub use admit::Activation;
-pub use admit::ActivationIssue;
-pub use admit::ActivationPolicy;
-pub use admit::ActivationRequest;
-pub use admit::ActivationStatus;
-pub use admit::Admission;
-pub use admit::AdmissionStatus;
-pub use admit::DeniedEscalation;
 pub use admit::core::activate;
-pub use catalog::AuthorityBoundary;
-pub use catalog::Draft;
-pub use catalog::Manifest;
-pub use catalog::SourceScope;
-pub use catalog::TrustStatus;
-pub use evidence::Receipt;
-pub use evidence::ReceiptDraft;
-pub use evidence::ReceiptLeak;
-pub use evidence::validate_text;
+pub use admit::{
+    AbilityKind, Activation, ActivationIssue, ActivationPolicy, ActivationRequest,
+    ActivationStatus, Admission, AdmissionStatus, DeniedEscalation,
+};
+pub use catalog::{AuthorityBoundary, Draft, Manifest, SourceScope, TrustStatus};
+pub use evidence::{Receipt, ReceiptDraft, ReceiptLeak, validate_text};
 pub use fault::Error;
-pub use select::Diagnostic;
-pub use select::DiscoveryIssue;
-pub use select::DiscoveryReport;
-pub use select::discover;
+pub use select::{Diagnostic, DiscoveryIssue, DiscoveryReport, discover};
 
 type Text = alloc::string::String;
 type Collection<T> = alloc::vec::Vec<T>;
 
-pub(super) const NAME_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("agent_name");
+pub(super) const NAME_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("agent_name");
 pub(super) const DESCRIPTION_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("agent_description");
 pub(super) const MODEL_FIELD: crate::validation::FieldName =
@@ -46,14 +32,18 @@ pub(super) const PROMPT_FRAGMENT_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("agent_prompt_fragment");
 pub(super) const CAPABILITY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("agent_capability_ceiling");
-pub(super) const TOOLSET_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("agent_toolset_limit");
-pub(super) const MEMORY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("agent_memory_scope");
+pub(super) const TOOLSET_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("agent_toolset_limit");
+pub(super) const MEMORY_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("agent_memory_scope");
 pub(super) const CONTEXT_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("agent_context_reference_scope");
 pub(super) const WORKFLOW_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("agent_workflow_ability");
-pub(super) const SOURCE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("agent_source_scope");
-pub(super) const TRUST_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("agent_trust_status");
+pub(super) const SOURCE_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("agent_source_scope");
+pub(super) const TRUST_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("agent_trust_status");
 pub(super) const MANIFEST_IDENTITY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("agent_manifest_identity");
 pub(super) const REDACTION_MARKER_FIELD: crate::validation::FieldName =
@@ -75,7 +65,10 @@ const _: () = assert!(USER_SOURCE_RANK < PROJECT_SOURCE_RANK);
 const _: () = assert!(MAX_ITEMS > 0);
 const _: () = assert!(MAX_PROMPT_CHARS > 0);
 
-pub(super) fn required_text(field_name: crate::validation::FieldName, value: Option<&str>) -> Result<Text, Error> {
+pub(super) fn required_text(
+    field_name: crate::validation::FieldName,
+    value: Option<&str>,
+) -> Result<Text, Error> {
     match value {
         Some(raw) => required_text_value(field_name, raw),
         None => Err(Error::MissingField {
@@ -84,7 +77,10 @@ pub(super) fn required_text(field_name: crate::validation::FieldName, value: Opt
     }
 }
 
-pub(super) fn required_text_value(field_name: crate::validation::FieldName, value: &str) -> Result<Text, Error> {
+pub(super) fn required_text_value(
+    field_name: crate::validation::FieldName,
+    value: &str,
+) -> Result<Text, Error> {
     crate::validation::normalized_adapter_field(field_name, value).map_err(Error::from)
 }
 
@@ -121,14 +117,20 @@ pub(super) fn optional_label_set(
     normalized_label_set(field_name, values)
 }
 
-fn normalized_label_set(field_name: crate::validation::FieldName, values: &[&str]) -> Result<Collection<Text>, Error> {
+fn normalized_label_set(
+    field_name: crate::validation::FieldName,
+    values: &[&str],
+) -> Result<Collection<Text>, Error> {
     let mut labels = collect_texts(field_name, values)?;
     labels.sort();
     labels.dedup();
     Ok(labels)
 }
 
-fn collect_texts(field_name: crate::validation::FieldName, values: &[&str]) -> Result<Collection<Text>, Error> {
+fn collect_texts(
+    field_name: crate::validation::FieldName,
+    values: &[&str],
+) -> Result<Collection<Text>, Error> {
     validate_item_count(field_name, values.len())?;
     let mut normalized = Collection::with_capacity(values.len());
     for value in values {
@@ -137,7 +139,10 @@ fn collect_texts(field_name: crate::validation::FieldName, values: &[&str]) -> R
     Ok(normalized)
 }
 
-fn validate_item_count(field_name: crate::validation::FieldName, item_count: usize) -> Result<(), Error> {
+fn validate_item_count(
+    field_name: crate::validation::FieldName,
+    item_count: usize,
+) -> Result<(), Error> {
     if item_count > MAX_ITEMS {
         return Err(Error::TooManyItems {
             field: field_name.as_str(),

@@ -1,12 +1,19 @@
 #![allow(non_trait_imports)]
 
-const CHECK_LABEL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_retry_check_label");
-const EFFECT_KIND_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_retry_effect_kind");
-const CAPABILITY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_retry_capability");
-const SANDBOX_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_retry_sandbox");
-const TIMEOUT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_retry_timeout");
-const CLEANUP_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_retry_cleanup");
-const RECEIPT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_retry_receipt");
+const CHECK_LABEL_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_retry_check_label");
+const EFFECT_KIND_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_retry_effect_kind");
+const CAPABILITY_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_retry_capability");
+const SANDBOX_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_retry_sandbox");
+const TIMEOUT_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_retry_timeout");
+const CLEANUP_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_retry_cleanup");
+const RECEIPT_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_retry_receipt");
 
 const EFFECT_VALIDATION_CHECK: &str = "validation_check";
 const EFFECT_CLEANUP_REQUEST: &str = "cleanup_request";
@@ -65,10 +72,12 @@ impl RecipeHostEffectKind {
         if normalized.as_str() == EFFECT_SHELL {
             return Err(super::RecipeWorkflowError::UnsafeRetryEffect { effect: normalized });
         }
-        Self::from_normalized(normalized.as_str()).ok_or(super::RecipeWorkflowError::UnsupportedWorkflowValue {
-            field: EFFECT_KIND_FIELD.as_str(),
-            value: normalized,
-        })
+        Self::from_normalized(normalized.as_str()).ok_or(
+            super::RecipeWorkflowError::UnsupportedWorkflowValue {
+                field: EFFECT_KIND_FIELD.as_str(),
+                value: normalized,
+            },
+        )
     }
 
     fn from_normalized(value: &str) -> Option<Self> {
@@ -104,7 +113,9 @@ impl RecipeRetryPolicy {
     /// Returns [`super::RecipeWorkflowError`] when attempts are unbounded, checks
     /// are missing, labels are malformed, shell effects are requested, or timeout
     /// and receipt labels are absent.
-    pub fn validate(draft: &RecipeRetryPolicyDraft<'_>) -> Result<Self, super::RecipeWorkflowError> {
+    pub fn validate(
+        draft: &RecipeRetryPolicyDraft<'_>,
+    ) -> Result<Self, super::RecipeWorkflowError> {
         if draft.max_attempts < MIN_RETRY_ATTEMPTS {
             return Err(super::RecipeWorkflowError::ZeroRetryAttempts);
         }
@@ -211,19 +222,20 @@ impl RecipeRetryCheck {
 
 mod host;
 
-pub use host::RecipeRetryDenialReason;
-pub use host::RecipeRetryPlan;
-pub use host::RecipeRetryPlanDraft;
-pub use host::RecipeRetryRequest;
-pub use host::RecipeRetryRequestStatus;
-pub use host::plan_recipe_retry;
+pub use host::{
+    RecipeRetryDenialReason, RecipeRetryPlan, RecipeRetryPlanDraft, RecipeRetryRequest,
+    RecipeRetryRequestStatus, plan_recipe_retry,
+};
 fn collect_checks(
     drafts: &[RecipeRetryCheckDraft<'_>],
 ) -> Result<Collection<RecipeRetryCheck>, super::RecipeWorkflowError> {
     let mut checks: Collection<RecipeRetryCheck> = Collection::with_capacity(drafts.len());
     for draft in drafts {
         let check = RecipeRetryCheck::validate(draft)?;
-        if checks.iter().any(|existing| existing.label() == check.label()) {
+        if checks
+            .iter()
+            .any(|existing| existing.label() == check.label())
+        {
             return Err(super::RecipeWorkflowError::DuplicateName {
                 field: CHECK_LABEL_FIELD.as_str(),
                 value: Text::from(check.label()),

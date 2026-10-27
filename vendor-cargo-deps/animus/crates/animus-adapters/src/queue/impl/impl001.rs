@@ -34,6 +34,11 @@ pub enum QueueContractError {
         /// Destructive operation that required the selector.
         operation: QueueOperationKind,
     },
+    /// A parallelism value was supplied for the wrong operation.
+    ParallelismMismatch {
+        /// Operation whose parallelism field was invalid.
+        operation: QueueOperationKind,
+    },
     /// A count or bound that must be positive was zero.
     NonPositiveCount {
         /// Field whose count was zero.
@@ -201,6 +206,8 @@ pub struct QueueControlDraft<'a> {
     pub operation: QueueOperationKind,
     /// Explicit target selector, required for destructive controls.
     pub target: Option<QueueTargetDraft<'a>>,
+    /// Positive group parallelism for `SetGroupParallelism` only.
+    pub parallelism: Option<u32>,
 }
 
 /// Validated queue control request.
@@ -208,6 +215,7 @@ pub struct QueueControlDraft<'a> {
 pub struct QueueControlRequest {
     operation: QueueOperationKind,
     target: Option<QueueTarget>,
+    parallelism: Option<u32>,
 }
 
 impl QueueControlRequest {
@@ -223,10 +231,39 @@ impl QueueControlRequest {
                 operation: draft.operation,
             });
         }
+        let parallelism = match (draft.operation, draft.parallelism) {
+            (QueueOperationKind::SetGroupParallelism, Some(value))
+                if value >= MIN_POSITIVE_COUNT =>
+            {
+                Some(value)
+            }
+            (QueueOperationKind::SetGroupParallelism, _) => {
+                return Err(QueueContractError::NonPositiveCount {
+                    field: PARALLELISM_FIELD,
+                });
+            }
+            (_, None) => None,
+            (operation, Some(_)) => {
+                return Err(QueueContractError::ParallelismMismatch { operation });
+            }
+        };
         let target = draft.target.map(QueueTarget::new).transpose()?;
+        if draft.operation == QueueOperationKind::SetGroupParallelism
+            && !target.as_ref().is_some_and(|target| {
+                matches!(
+                    target.kind(),
+                    QueueTargetKind::Group | QueueTargetKind::DefaultGroup
+                )
+            })
+        {
+            return Err(QueueContractError::ParallelismMismatch {
+                operation: draft.operation,
+            });
+        }
         Ok(Self {
             operation: draft.operation,
             target,
+            parallelism,
         })
     }
 
@@ -240,6 +277,12 @@ impl QueueControlRequest {
     #[must_use]
     pub const fn target(&self) -> Option<&QueueTarget> {
         self.target.as_ref()
+    }
+
+    /// Returns the positive group parallelism, when requested.
+    #[must_use]
+    pub const fn parallelism(&self) -> Option<u32> {
+        self.parallelism
     }
 }
 

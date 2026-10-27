@@ -11,7 +11,9 @@
 ///
 /// Returns [`super::failure::Error`] when chunks are empty, truncated,
 /// malformed, or yield an invalid stream.
-pub(crate) fn parse(chunks: &[&str]) -> Result<alloc::vec::Vec<super::types::Frame>, super::failure::Error> {
+pub(crate) fn parse(
+    chunks: &[&str],
+) -> Result<alloc::vec::Vec<super::types::Frame>, super::failure::Error> {
     check_chunks(chunks)?;
     let buffer = buffer(chunks);
     check_complete(buffer.as_str())?;
@@ -52,7 +54,10 @@ fn check_complete(buffer: &str) -> Result<(), super::failure::Error> {
 }
 
 fn records(buffer: &str) -> Result<alloc::vec::Vec<super::types::Frame>, super::failure::Error> {
-    assert!(buffer.ends_with(super::RECORD_SEPARATOR), "fixture buffer has a record separator");
+    assert!(
+        buffer.ends_with(super::RECORD_SEPARATOR),
+        "fixture buffer has a record separator"
+    );
     let mut frames = alloc::vec::Vec::with_capacity(record_count(buffer));
     for record in buffer.split(super::RECORD_SEPARATOR) {
         if !record.is_empty() {
@@ -63,7 +68,10 @@ fn records(buffer: &str) -> Result<alloc::vec::Vec<super::types::Frame>, super::
 }
 
 fn record_count(buffer: &str) -> usize {
-    buffer.split(super::RECORD_SEPARATOR).filter(|record| !record.is_empty()).count()
+    buffer
+        .split(super::RECORD_SEPARATOR)
+        .filter(|record| !record.is_empty())
+        .count()
 }
 
 fn record_fields(record: &str) -> Result<super::types::Frame, super::failure::Error> {
@@ -90,7 +98,10 @@ fn record_fields(record: &str) -> Result<super::types::Frame, super::failure::Er
     }
 }
 
-fn text(fields: &[&str], kind: super::parts::Kind) -> Result<super::types::Frame, super::failure::Error> {
+fn text(
+    fields: &[&str],
+    kind: super::parts::Kind,
+) -> Result<super::types::Frame, super::failure::Error> {
     if fields.len() != super::STANDARD_FIELD_COUNT {
         return Err(super::failure::Error::MalformedFixture {
             reason: super::MALFORMED_FIELD_COUNT,
@@ -156,7 +167,10 @@ fn usage(fields: &[&str]) -> Result<super::types::Frame, super::failure::Error> 
     })
 }
 
-fn terminal(fields: &[&str], kind: super::parts::Kind) -> Result<super::types::Frame, super::failure::Error> {
+fn terminal(
+    fields: &[&str],
+    kind: super::parts::Kind,
+) -> Result<super::types::Frame, super::failure::Error> {
     if fields.len() != super::TERMINAL_FIELD_COUNT {
         return Err(super::failure::Error::MalformedFixture {
             reason: super::MALFORMED_FIELD_COUNT,
@@ -173,7 +187,10 @@ fn terminal(fields: &[&str], kind: super::parts::Kind) -> Result<super::types::F
     })
 }
 
-fn reason(fields: &[&str], kind: super::parts::Kind) -> Result<super::types::Frame, super::failure::Error> {
+fn reason(
+    fields: &[&str],
+    kind: super::parts::Kind,
+) -> Result<super::types::Frame, super::failure::Error> {
     if fields.len() != super::TERMINAL_REASON_FIELD_COUNT {
         return Err(super::failure::Error::MalformedFixture {
             reason: super::MALFORMED_FIELD_COUNT,
@@ -191,13 +208,15 @@ fn reason(fields: &[&str], kind: super::parts::Kind) -> Result<super::types::Fra
 }
 
 fn order(raw: &str) -> Result<u64, super::failure::Error> {
-    raw.parse::<u64>().map_err(|_error| super::failure::Error::MalformedFixture {
-        reason: super::MALFORMED_ORDER,
-    })
+    raw.parse::<u64>()
+        .map_err(|_error| super::failure::Error::MalformedFixture {
+            reason: super::MALFORMED_ORDER,
+        })
 }
 
 fn usage_count(raw: &str) -> Result<u32, super::failure::Error> {
-    raw.parse::<u32>().map_err(|_error| super::failure::Error::MalformedFixture {
-        reason: super::MALFORMED_USAGE,
-    })
+    raw.parse::<u32>()
+        .map_err(|_error| super::failure::Error::MalformedFixture {
+            reason: super::MALFORMED_USAGE,
+        })
 }

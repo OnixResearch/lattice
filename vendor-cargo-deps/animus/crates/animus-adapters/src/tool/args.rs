@@ -66,8 +66,10 @@ impl PreparedArguments {
     /// malformed, compatibility creates duplicates, or unknown fields remain
     /// after preparation.
     pub fn prepare(request: &ArgumentPreparationRequest<'_>) -> Result<Self, super::ContractError> {
-        let schema_identity = super::required_text_value(super::SCHEMA_FIELD, request.current_schema_identity)?;
-        let allowed = super::normalized_label_set(super::ARGUMENT_NAME_FIELD, request.allowed_field_names)?;
+        let schema_identity =
+            super::required_text_value(super::SCHEMA_FIELD, request.current_schema_identity)?;
+        let allowed =
+            super::normalized_label_set(super::ARGUMENT_NAME_FIELD, request.allowed_field_names)?;
         reject_compatibility_rules(request.compatibility_rules)?;
         let fields = prepared_fields(request.fields, &allowed)?;
         Ok(Self {
@@ -114,7 +116,10 @@ fn validate_known_unique_field(
             name: super::Text::from(current_name),
         });
     }
-    if fields.iter().any(|existing| existing.name() == current_name) {
+    if fields
+        .iter()
+        .any(|existing| existing.name() == current_name)
+    {
         return Err(super::ContractError::DuplicateArgument {
             name: super::Text::from(current_name),
         });
@@ -122,7 +127,9 @@ fn validate_known_unique_field(
     Ok(())
 }
 
-fn reject_compatibility_rules(rules: &[ArgumentCompatibilityRule<'_>]) -> Result<(), super::ContractError> {
+fn reject_compatibility_rules(
+    rules: &[ArgumentCompatibilityRule<'_>],
+) -> Result<(), super::ContractError> {
     super::validate_item_count(super::ARGUMENT_NAME_FIELD, rules.len())?;
     if rules.is_empty() {
         Ok(())

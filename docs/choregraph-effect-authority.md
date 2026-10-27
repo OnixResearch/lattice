@@ -16,7 +16,7 @@ A reviewed Nickel policy defines the Basalt contracts. Workflow graph data canno
 2. Load current authority and optional scope facts.
 3. Validate exact request and scope bindings and enforce the reviewed Basalt policy.
 4. Persist any denial before returning; successful authorization alone is not an effect outcome.
-5. Invoke only the selected bounded adapter.
+5. Resolve only the admitted intent's credential bindings and invoke the selected bounded adapter.
 6. Persist an observed success, failure, or unknown-after-dispatch outcome.
 
 A duplicate attempt or persistence error stops before the adapter. Replay always denies fresh dispatch.
@@ -81,9 +81,11 @@ The contract is [`contracts/standalone-effect-authority.ncl`](../contracts/stand
 Profiles admit 1–64 explicit grants, at most 64 roots, and nonempty root IDs of
 at most 128 UTF-8 bytes. Node IDs are unique. Each grant binds one exact node,
 operation, resource, and ability; wildcards, unknown fields, and unsupported
-tuples deny. Process, network, and file grants cannot substitute for one another.
-The stock executor still selects `NoopHttpClient`; a network grant does not
-install a transport or prove an HTTP request was sent.
+tuples deny. Process, network, file, and Agent grants cannot substitute for one another.
+The stock executor selects `NativeHttpClient` for HTTP and HTTPS. A current network
+grant permits only the existing exact planned effect; transport admission and TLS
+verification can still reject it. Authorization alone is not evidence of a sent
+request or remote success.
 
 Keep the explicit record form above. The pinned embedded evaluator panicked on
 `(import "authority-requirements.json") & { ... }` under this contract even
@@ -117,9 +119,133 @@ The host opens `cap_std::fs::Dir` roots from operator-owned configuration and as
 
 `cap-root` performs lexical admission. Existing capability-relative open behavior enforces the Lattice no-follow boundary. Only the host shell opens ambient roots; pure authority admission does not access the filesystem.
 
-## Process and network effects
+## Process, network, and Agent effects
 
-Process effects use the existing bounded process runner. Network effects use the selected HTTP client after method and URL validation. `cap-std` does not authorize either effect type.
+Process effects use the existing bounded process runner. Network effects use the
+native HTTP client after exact authorization and pure method/URL planning.
+`cap-std` does not authorize either effect type. Embedders may explicitly select
+another `HttpClient`, including `NoopHttpClient` to disable networking.
+
+Agent nodes require `lattice/agent`, `agent/execute`, and the exact
+`lattice://agent/<node>` resource under `lattice-agent`. Their material-free
+payload binds the request, selected command/OpenAI-compatible/Animus backend,
+runtime configuration, credential references, and resolver policy. A target name
+alone is not a backend identity. Denied or unavailable authority stops before
+provider resolution and transport; a consumed recipe cannot dispatch twice.
+Changing the backend or resolver policy invalidates the sealed request, while
+rotating a value behind unchanged references does not persist or hash that value.
+
+Adding the Agent contract changes the shared policy identity. Re-inspect every
+affected workflow and review a replacement operator profile; profiles bound to
+the previous policy are rejected, not silently upgraded.
+
+Custom `AgentAdapter` implementations must supply `execution_identity` without
+resolving credentials or performing effects. The explicit compatibility/embedder
+path remains trusted host execution, not a product authorization fallback.
+
+### Native HTTP bounds and trust
+
+<!-- r[impl lattice.native_http.bounds] r[impl lattice.native_http.security] r[impl lattice.native_http.cancellation] -->
+
+The native client uses the existing Reqwest 0.12.28 dependency and verified Rustls
+TLS, on HTTP/1 only. It disables automatic redirects, protocol retries, proxies,
+referer propagation and idle connection pooling. It does not read `.netrc`, infer
+credentials from URL userinfo, install cookies, or accept invalid certificates or
+hostnames. HTTP status failures and redirects remain ordinary workflow responses;
+the client never follows `Location`, including same-origin locations.
+
+| Boundary | Native limit |
+| --- | --- |
+| URL | 8192 UTF-8 bytes; http/https with a host, no userinfo, fragment, control or whitespace bytes |
+| Request body | 1 MiB |
+| Response body | 8 MiB, checked before accumulation; UTF-8 required |
+| Request/decoded response headers | 64 fields and 16 KiB total name/value bytes plus four framing bytes per field |
+| Request deadline | 1–300 seconds, including response body reads |
+| Connect deadline | Minimum of request deadline and 10 seconds |
+| Cancellation observation | Poll the admitted runtime flag every 10 ms |
+
+Consumers may use `HttpClient::execute_bounded(plan, &HttpBounds, cancellation)`
+to narrow response body, header bytes and combined DNS/TCP/TLS connect deadlines.
+Each bound must be positive and at most its native ceiling. An embedding client
+that does not implement this strict port fails closed instead of ignoring limits.
+The ordinary native execute methods use this same path with the default ceilings.
+Native-owned accumulated response bodies and decoded headers are zeroized on
+failure or cancellation; successful values transfer to the caller. This does not
+promise erasure of Reqwest/Rustls internal copies, allocator history, kernel
+buffers, or complete process memory. Credential-aware callers must own and clear
+their request and successful response buffers.
+
+Request `Host`, framing, proxy authorization and hop-by-hop headers are
+transport-owned and rejected, as are case-insensitive duplicate request fields.
+Request budgets conservatively reserve three generated fields (`Host`, `Accept`,
+`Content-Length`), leaving at most 61 supplied fields even when a method omits
+one generated field. The byte budget includes those generated-field reservations.
+Repeated response fields use newline-separated values in the workflow header
+map, retaining distinctions such as repeated `Set-Cookie`. Header limits include
+every repeated field. Native errors contain fixed typed classifications, never
+vendor errors, URLs, headers or bodies. Response values are intentional workflow
+data and are not metadata-only receipts.
+
+The 16 KiB decoded-header limit is not an exact wire-parser allocation ceiling:
+Reqwest has no public knob for the HTTP/1 parser buffer. Pinned Hyper 1.10.1 has
+its own finite default read ceiling of 417792 bytes; oversized or malformed wire
+heads may fail there as a redacted transport error before decoded admission.
+Automatic gzip, Brotli, deflate and Zstd decompression is explicitly disabled,
+including when another dependency enables a compression feature.
+
+Stable `bounded-http` checkout `bc4fe8d81f3defc178ed702096452f73d9675c76` was
+inspected first. Its `CanonicalUrl::parse_https`
+rejects `http:` and the shell always negotiates authenticated TLS. It cannot
+implement Lattice's existing plaintext HTTP workflow contract. Using the existing
+Reqwest dependency for both schemes avoids two incompatible transport conventions
+or a producer-local scheme bypass. This does not import an unaccepted producer
+revision or promise bounded-http's destination/peer-revalidation contract.
+
+A network grant is **not** an IP sandbox, SSRF filter, DNS-rebinding defense, or
+arbitrary peer trust. Operators own destinations, local services and workflow
+content. Plaintext HTTP is intentionally supported and offers no confidentiality;
+use HTTPS when sending credentials. HTTPS establishes ordinary certificate and
+hostname validation under the client's public roots, not application trust.
+
+The native scoped worker is joined. Pre-cancellation prevents any request;
+in-flight cancellation or timeout drops local HTTP futures and closes the client.
+OS DNS resolution may continue independently after cancellation; shutdown does
+not wait indefinitely for the resolver. Neither cancellation nor timeout proves
+the server did not receive or perform the request. There are no implicit retries.
+
+### Deterministic local HTTP and TLS smoke
+
+Run the real production-client and actual-CLI regressions from the Lattice root
+after the coordinated source build:
+
+```sh
+cargo test --locked --test test_native_http_transport --test test_native_http_authority
+```
+
+The transport cases bind isolated loopback ports and exercise request/response
+content, malformed plans without connections, exact body/header boundaries,
+redirect denial, server errors, truncation, deadlines, cancellation, and rejection
+of plaintext on an HTTPS endpoint plus rejection of a fixed public test-only
+self-signed localhost certificate by the actual production client. The TLS server
+uses an explicit per-server crypto provider, not process-global mutation. The CLI
+case launches the actual `lattice`
+binary twice against an isolated store: missing authority must not connect; an
+exact current operator grant must send `GET /observed` and complete successfully.
+
+For certificate-verification smoke, create a temporary self-signed localhost
+certificate with `openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj
+'/CN=localhost' -addext 'subjectAltName=DNS:localhost'`, writing its key and cert
+only to a temporary directory. Start `openssl s_server -accept 127.0.0.1:PORT
+-cert CERT -key KEY -www -naccept 1` on a free local port. Import an HTTP workflow
+whose URL is `https://localhost:PORT/`, inspect it, and grant that exact workflow
+using the operator-profile procedure above. The actual CLI run must fail with an
+adapter rejection, and the server must not receive an HTTP request after its
+untrusted handshake. Do not add a test root or disable TLS verification in the
+production client. A positive HTTPS smoke requires a locally provisioned endpoint
+with a certificate chain already trusted by the production public root store;
+self-signing does not supply that prerequisite. Stop the local server and remove
+the temporary directory afterward. This is a scoped TLS check, not arbitrary
+remote peer trust or a sandbox claim.
 
 ## Scope currentness
 

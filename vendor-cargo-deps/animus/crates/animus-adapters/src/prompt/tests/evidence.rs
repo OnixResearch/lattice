@@ -4,10 +4,18 @@ use super::support::*;
 #[test]
 fn provenance_accepts_budgeted_safe_metadata() -> Result<(), ContextReferenceError> {
     let reference = parse_context_reference(SAMPLE_FILE)?;
-    let candidate = ResolvedContextCandidate::new(reference, ContextResolverKind::File, SHORT_CONTENT);
-    let budget = ContextReferenceBudget::new(MAX_VISIBLE_BYTES, MAX_VISIBLE_LINES, ContextOversizedPolicy::Truncate)?;
+    let candidate =
+        ResolvedContextCandidate::new(reference, ContextResolverKind::File, SHORT_CONTENT);
+    let budget = ContextReferenceBudget::new(
+        MAX_VISIBLE_BYTES,
+        MAX_VISIBLE_LINES,
+        ContextOversizedPolicy::Truncate,
+    )?;
     let fragment = apply_context_budget(candidate, budget)?;
-    let draft = ContextReferenceProvenanceDraft::from_fragment(&fragment, ContextReferencePolicyDecision::Allowed);
+    let draft = ContextReferenceProvenanceDraft::from_fragment(
+        &fragment,
+        ContextReferencePolicyDecision::Allowed,
+    );
 
     let provenance = ContextReferenceProvenance::new(draft)?;
 
@@ -28,7 +36,9 @@ fn provenance_rejects_raw_content_credentials_and_paths() {
     .with_content_hash(&hash);
     assert!(matches!(
         ContextReferenceProvenance::new(raw_content),
-        Err(ContextReferenceError::SafeMetadata(crate::safe::receipt::Error::UnsafeMetadata { .. }))
+        Err(ContextReferenceError::SafeMetadata(
+            crate::safe::receipt::Error::UnsafeMetadata { .. }
+        ))
     ));
 
     let credential = ContextReferenceProvenanceDraft::new(
@@ -39,7 +49,9 @@ fn provenance_rejects_raw_content_credentials_and_paths() {
     );
     assert!(matches!(
         ContextReferenceProvenance::new(credential),
-        Err(ContextReferenceError::SafeMetadata(crate::safe::receipt::Error::UnsafeMetadata { .. }))
+        Err(ContextReferenceError::SafeMetadata(
+            crate::safe::receipt::Error::UnsafeMetadata { .. }
+        ))
     ));
 
     let path = ContextReferenceProvenanceDraft::new(
@@ -50,7 +62,9 @@ fn provenance_rejects_raw_content_credentials_and_paths() {
     );
     assert!(matches!(
         ContextReferenceProvenance::new(path),
-        Err(ContextReferenceError::SafeMetadata(crate::safe::receipt::Error::UnsafeMetadata { .. }))
+        Err(ContextReferenceError::SafeMetadata(
+            crate::safe::receipt::Error::UnsafeMetadata { .. }
+        ))
     ));
 }
 
@@ -64,7 +78,9 @@ fn provenance_rejects_oversized_labels_and_unbounded_output() {
     );
     assert!(matches!(
         ContextReferenceProvenance::new(overlong_label),
-        Err(ContextReferenceError::SafeMetadata(crate::safe::receipt::Error::UnsafeMetadata { .. }))
+        Err(ContextReferenceError::SafeMetadata(
+            crate::safe::receipt::Error::UnsafeMetadata { .. }
+        ))
     ));
 
     let unbounded = ContextReferenceProvenanceDraft::new(
@@ -81,9 +97,11 @@ fn provenance_rejects_oversized_labels_and_unbounded_output() {
     ));
     assert!(matches!(
         ContextReferenceProvenance::new(unbounded),
-        Err(ContextReferenceError::SafeMetadata(crate::safe::receipt::Error::UnsafeMetadata {
-            class: crate::safe::receipt::LeakClass::UnboundedOutput,
-            ..
-        }))
+        Err(ContextReferenceError::SafeMetadata(
+            crate::safe::receipt::Error::UnsafeMetadata {
+                class: crate::safe::receipt::LeakClass::UnboundedOutput,
+                ..
+            }
+        ))
     ));
 }

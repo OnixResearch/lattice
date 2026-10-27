@@ -209,7 +209,9 @@ impl RuntimeLoopDecision {
     ///
     /// Returns [`RuntimeLoopContractError`] for empty required fields,
     /// unsupported decision kinds, or adapter DTO validation failures.
-    pub fn from_draft(draft: RuntimeLoopDecisionDraft<'_>) -> Result<Self, RuntimeLoopContractError> {
+    pub fn from_draft(
+        draft: RuntimeLoopDecisionDraft<'_>,
+    ) -> Result<Self, RuntimeLoopContractError> {
         match normalized_kind(draft.kind)? {
             MODEL_KIND => from_model_draft(draft),
             TOOL_KIND => from_tool_draft(draft),
@@ -243,11 +245,13 @@ impl From<animus_steel::LoopDecision> for RuntimeLoopDecision {
             animus_steel::LoopDecision::CallModel { request } => Self::CallModel { request },
             animus_steel::LoopDecision::CallTool { request } => Self::CallTool { request },
             animus_steel::LoopDecision::Respond { response } => Self::Respond { response },
-            animus_steel::LoopDecision::CompletionCandidate { candidate } => Self::CompletionCandidate {
-                candidate: RuntimeCompletionCandidate {
-                    request: candidate.request().to_string(),
-                },
-            },
+            animus_steel::LoopDecision::CompletionCandidate { candidate } => {
+                Self::CompletionCandidate {
+                    candidate: RuntimeCompletionCandidate {
+                        request: candidate.request().to_string(),
+                    },
+                }
+            }
             animus_steel::LoopDecision::Stop => Self::Stop,
         }
     }
@@ -258,7 +262,11 @@ impl TryFrom<&RuntimeLoopTurn> for animus_steel::LoopTurn {
     type Error = animus_steel::LoopError;
 
     fn try_from(turn: &RuntimeLoopTurn) -> Result<Self, Self::Error> {
-        Self::new(turn.summary(), turn.last_model_message(), turn.last_tool_output())
+        Self::new(
+            turn.summary(),
+            turn.last_model_message(),
+            turn.last_tool_output(),
+        )
     }
 }
 
@@ -315,15 +323,27 @@ impl core::fmt::Display for RuntimeLoopContractError {
                 field,
                 max_chars,
                 actual_chars,
-            } => write!(formatter, "{field} must be at most {max_chars} characters; got {actual_chars}"),
+            } => write!(
+                formatter,
+                "{field} must be at most {max_chars} characters; got {actual_chars}"
+            ),
             Self::NulCharacter { field, byte_index } => {
-                write!(formatter, "{field} contains a NUL character at byte index {byte_index}")
+                write!(
+                    formatter,
+                    "{field} contains a NUL character at byte index {byte_index}"
+                )
             }
             Self::UnsupportedDecisionKind { field, value } => {
-                write!(formatter, "{field} contains unsupported decision kind {value}")
+                write!(
+                    formatter,
+                    "{field} contains unsupported decision kind {value}"
+                )
             }
             Self::CurrentShapeRequired { field } => {
-                write!(formatter, "{field} requires current structured tool-call payload")
+                write!(
+                    formatter,
+                    "{field} requires current structured tool-call payload"
+                )
             }
             Self::AdapterContract { field, message } => {
                 write!(formatter, "{field} failed adapter validation: {message}")
@@ -334,14 +354,18 @@ impl core::fmt::Display for RuntimeLoopContractError {
 
 impl std::error::Error for RuntimeLoopContractError {}
 
-fn from_model_draft(draft: RuntimeLoopDecisionDraft<'_>) -> Result<RuntimeLoopDecision, RuntimeLoopContractError> {
+fn from_model_draft(
+    draft: RuntimeLoopDecisionDraft<'_>,
+) -> Result<RuntimeLoopDecision, RuntimeLoopContractError> {
     let prompt = required_payload(MODEL_PROMPT_FIELD, draft.model_prompt)?;
     animus_adapters::ModelRequest::new(prompt)
         .map(|request| RuntimeLoopDecision::CallModel { request })
         .map_err(|error| adapter_error(MODEL_PROMPT_FIELD, &error))
 }
 
-fn from_tool_draft(draft: RuntimeLoopDecisionDraft<'_>) -> Result<RuntimeLoopDecision, RuntimeLoopContractError> {
+fn from_tool_draft(
+    draft: RuntimeLoopDecisionDraft<'_>,
+) -> Result<RuntimeLoopDecision, RuntimeLoopContractError> {
     let _name = required_payload(TOOL_NAME_FIELD, draft.tool_name)?;
     let _input = required_payload(TOOL_INPUT_FIELD, draft.tool_input)?;
     Err(RuntimeLoopContractError::CurrentShapeRequired {
@@ -349,7 +373,9 @@ fn from_tool_draft(draft: RuntimeLoopDecisionDraft<'_>) -> Result<RuntimeLoopDec
     })
 }
 
-fn from_respond_draft(draft: RuntimeLoopDecisionDraft<'_>) -> Result<RuntimeLoopDecision, RuntimeLoopContractError> {
+fn from_respond_draft(
+    draft: RuntimeLoopDecisionDraft<'_>,
+) -> Result<RuntimeLoopDecision, RuntimeLoopContractError> {
     let message = required_payload(RESPONSE_MESSAGE_FIELD, draft.response_message)?;
     animus_adapters::ModelResponse::new(message)
         .map(|response| RuntimeLoopDecision::Respond { response })
@@ -378,15 +404,23 @@ fn normalized_kind(kind: &str) -> Result<&str, RuntimeLoopContractError> {
     Ok(kind.trim())
 }
 
-fn required_payload(field: FieldName, value: Option<&str>) -> Result<&str, RuntimeLoopContractError> {
+fn required_payload(
+    field: FieldName,
+    value: Option<&str>,
+) -> Result<&str, RuntimeLoopContractError> {
     let Some(value) = value else {
-        return Err(RuntimeLoopContractError::EmptyField { field: field.as_str() });
+        return Err(RuntimeLoopContractError::EmptyField {
+            field: field.as_str(),
+        });
     };
     validate_required_text(field, value)?;
     Ok(value)
 }
 
-fn adapter_error(field: FieldName, error: &animus_adapters::AdapterContractError) -> RuntimeLoopContractError {
+fn adapter_error(
+    field: FieldName,
+    error: &animus_adapters::AdapterContractError,
+) -> RuntimeLoopContractError {
     RuntimeLoopContractError::AdapterContract {
         field: field.as_str(),
         message: error.to_string(),
@@ -396,12 +430,17 @@ fn adapter_error(field: FieldName, error: &animus_adapters::AdapterContractError
 fn validate_required_text(field: FieldName, value: &str) -> Result<(), RuntimeLoopContractError> {
     assert!(!field.as_str().is_empty(), "field name must not be empty");
     if value.trim().is_empty() {
-        return Err(RuntimeLoopContractError::EmptyField { field: field.as_str() });
+        return Err(RuntimeLoopContractError::EmptyField {
+            field: field.as_str(),
+        });
     }
     validate_optional_text(field, Some(value))
 }
 
-fn validate_optional_text(field: FieldName, value: Option<&str>) -> Result<(), RuntimeLoopContractError> {
+fn validate_optional_text(
+    field: FieldName,
+    value: Option<&str>,
+) -> Result<(), RuntimeLoopContractError> {
     assert!(!field.as_str().is_empty(), "field name must not be empty");
     const {
         assert!(
@@ -420,8 +459,9 @@ fn validate_optional_text(field: FieldName, value: Option<&str>) -> Result<(), R
             actual_chars,
         });
     }
-    if let Some((byte_index, _character)) =
-        value.char_indices().find(|(_byte_index, character)| *character == NUL_CHARACTER)
+    if let Some((byte_index, _character)) = value
+        .char_indices()
+        .find(|(_byte_index, character)| *character == NUL_CHARACTER)
     {
         return Err(RuntimeLoopContractError::NulCharacter {
             field: field.as_str(),
@@ -445,8 +485,8 @@ mod tests {
 
     #[test]
     fn neutral_turn_accepts_valid_inputs() {
-        let turn =
-            RuntimeLoopTurn::new(SUMMARY, Some(MODEL_MESSAGE), Some(TOOL_INPUT)).expect("valid turn should build");
+        let turn = RuntimeLoopTurn::new(SUMMARY, Some(MODEL_MESSAGE), Some(TOOL_INPUT))
+            .expect("valid turn should build");
 
         assert_eq!(turn.summary(), SUMMARY);
         assert_eq!(turn.last_model_message(), Some(MODEL_MESSAGE));
@@ -460,9 +500,12 @@ mod tests {
                 .expect("model decision should build"),
             RuntimeLoopDecision::from_draft(RuntimeLoopDecisionDraft::respond(MODEL_MESSAGE))
                 .expect("response decision should build"),
-            RuntimeLoopDecision::from_draft(RuntimeLoopDecisionDraft::completion_candidate(EXACT_COMPLETION_REQUEST))
-                .expect("candidate decision should build"),
-            RuntimeLoopDecision::from_draft(RuntimeLoopDecisionDraft::stop()).expect("stop decision should build"),
+            RuntimeLoopDecision::from_draft(RuntimeLoopDecisionDraft::completion_candidate(
+                EXACT_COMPLETION_REQUEST,
+            ))
+            .expect("candidate decision should build"),
+            RuntimeLoopDecision::from_draft(RuntimeLoopDecisionDraft::stop())
+                .expect("stop decision should build"),
         ];
 
         assert_eq!(decisions[0].kind(), MODEL_KIND);
@@ -474,10 +517,14 @@ mod tests {
     #[test]
     fn neutral_decision_rejects_legacy_raw_tool_payload() {
         // r[verify agent_harness_runtime.tool_calling_breaking.current_shape.rejects_legacy]
-        let error = RuntimeLoopDecision::from_draft(RuntimeLoopDecisionDraft::tool(TOOL_NAME, TOOL_INPUT))
-            .expect_err("legacy raw tool payload should fail");
+        let error =
+            RuntimeLoopDecision::from_draft(RuntimeLoopDecisionDraft::tool(TOOL_NAME, TOOL_INPUT))
+                .expect_err("legacy raw tool payload should fail");
 
-        assert!(matches!(error, RuntimeLoopContractError::CurrentShapeRequired { .. }));
+        assert!(matches!(
+            error,
+            RuntimeLoopContractError::CurrentShapeRequired { .. }
+        ));
     }
 
     #[test]
@@ -493,20 +540,30 @@ mod tests {
             completion_request: None,
         })
         .expect_err("unsupported kind should fail");
-        let response_payload =
-            "x".repeat(animus_adapters::MAX_ADAPTER_FIELD_CHARS.saturating_add(OVERSIZED_EXTRA_CHAR));
-        let too_long = RuntimeLoopDecision::from_draft(RuntimeLoopDecisionDraft::respond(response_payload.as_str()))
-            .expect_err("oversized response should fail");
-        let incidental =
-            RuntimeLoopDecision::from_draft(RuntimeLoopDecisionDraft::completion_candidate("not COMPLETE"))
-                .expect_err("incidental marker must fail");
+        let response_payload = "x"
+            .repeat(animus_adapters::MAX_ADAPTER_FIELD_CHARS.saturating_add(OVERSIZED_EXTRA_CHAR));
+        let too_long = RuntimeLoopDecision::from_draft(RuntimeLoopDecisionDraft::respond(
+            response_payload.as_str(),
+        ))
+        .expect_err("oversized response should fail");
+        let incidental = RuntimeLoopDecision::from_draft(
+            RuntimeLoopDecisionDraft::completion_candidate("not COMPLETE"),
+        )
+        .expect_err("incidental marker must fail");
 
         assert!(matches!(empty, RuntimeLoopContractError::EmptyField { .. }));
-        assert!(matches!(kind_rejection, RuntimeLoopContractError::UnsupportedDecisionKind { .. }));
+        assert!(matches!(
+            kind_rejection,
+            RuntimeLoopContractError::UnsupportedDecisionKind { .. }
+        ));
         assert!(matches!(
             too_long,
-            RuntimeLoopContractError::AdapterContract { .. } | RuntimeLoopContractError::FieldTooLong { .. }
+            RuntimeLoopContractError::AdapterContract { .. }
+                | RuntimeLoopContractError::FieldTooLong { .. }
         ));
-        assert!(matches!(incidental, RuntimeLoopContractError::UnsupportedDecisionKind { .. }));
+        assert!(matches!(
+            incidental,
+            RuntimeLoopContractError::UnsupportedDecisionKind { .. }
+        ));
     }
 }

@@ -1,0 +1,73 @@
+{
+  "schema": "foreign-derivation-graph-v1",
+  "producer": {
+    "kind": "nix",
+    "identity": "nix-derivation-json:hello",
+    "revision": "fixture-revision"
+  },
+  "source_store_prefixes": [
+    "/nix/store"
+  ],
+  "target_store_prefix": null,
+  "root_derivation_ids": [
+    "nix:hello"
+  ],
+  "nodes": [
+    {
+      "node_id": "nix:hello",
+      "original_derivation": "/nix/store/22222222222222222222222222222222-hello.drv",
+      "name": "hello",
+      "system": "x86_64-linux",
+      "builder": "/nix/store/33333333333333333333333333333333-bash/bin/bash",
+      "args": [
+        "-c",
+        "cp /nix/store/00000000000000000000000000000000-hello-source $out"
+      ],
+      "env": {
+        "executable": "0",
+        "mode": "recursive",
+        "out": "/nix/store/11111111111111111111111111111111-hello",
+        "src": "/nix/store/00000000000000000000000000000000-hello-source",
+        "url": "https://source.example.invalid/hello.tar.gz"
+      },
+      "outputs": {
+        "out": {
+          "path": "/nix/store/11111111111111111111111111111111-hello",
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "input_derivations": [],
+      "source_refs": [
+        {
+          "payload_id": "nix-hello-source",
+          "field": "source-ref"
+        }
+      ],
+      "fixed_output": {
+        "algorithm": "sha256",
+        "digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "recursive": true
+      },
+      "builtin": "builtin:download",
+      "declared_references": [
+        "/nix/store/00000000000000000000000000000000-hello-source"
+      ],
+      "sandbox_capabilities": [],
+      "unsupported_features": [],
+      "cache_hints": []
+    }
+  ],
+  "source_payloads": [
+    {
+      "payload_id": "nix-hello-source",
+      "kind": "fixed-output-source",
+      "content_ref": "/nix/store/00000000000000000000000000000000-hello-source",
+      "embedded_text": null,
+      "mirrors": [
+        "https://cache.example.invalid/hello.tar.gz"
+      ]
+    }
+  ],
+  "unsupported_features": [],
+  "frontend_metadata": []
+}

@@ -58,9 +58,16 @@ fn context_adapter_roles_register_independently() -> Result<(), ContextReference
     let manifest = ContextAdapterFamilyManifest::new(&records)?;
 
     assert_eq!(manifest.roles().len(), records.len());
-    assert!(manifest.require_admitted_role(ContextAdapterRole::File)?.is_dispatch_admitted());
+    assert!(
+        manifest
+            .require_admitted_role(ContextAdapterRole::File)?
+            .is_dispatch_admitted()
+    );
     assert_eq!(
-        manifest.role_record(ContextAdapterRole::Url).expect("URL role is registered").capability_label(),
+        manifest
+            .role_record(ContextAdapterRole::Url)
+            .expect("URL role is registered")
+            .capability_label(),
         URL_CAPABILITY
     );
     assert_eq!(ContextAdapterRole::ContextLayerSource.resolver_kind(), None);
@@ -76,7 +83,10 @@ fn context_adapter_roles_fail_closed_for_mismatches_and_unsafe_metadata() {
         })
     );
     assert_eq!(
-        validate_context_resolver_role(ContextAdapterRole::ExternalHandle, ContextResolverKind::File,),
+        validate_context_resolver_role(
+            ContextAdapterRole::ExternalHandle,
+            ContextResolverKind::File,
+        ),
         Err(ContextReferenceError::UnsupportedKind {
             reason: "context adapter role does not match resolver kind",
         })
@@ -98,8 +108,8 @@ fn context_adapter_roles_fail_closed_for_mismatches_and_unsafe_metadata() {
         evidence_label: DIRECTORY_EVIDENCE,
     })
     .expect("denied role record uses safe metadata");
-    let manifest =
-        ContextAdapterFamilyManifest::new(&[missing, denied]).expect("manifest with unique roles should validate");
+    let manifest = ContextAdapterFamilyManifest::new(&[missing, denied])
+        .expect("manifest with unique roles should validate");
     assert_eq!(
         manifest.require_admitted_role(ContextAdapterRole::File),
         Err(ContextReferenceError::ResolverMissing)

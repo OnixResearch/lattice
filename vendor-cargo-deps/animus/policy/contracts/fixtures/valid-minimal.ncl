@@ -6,7 +6,7 @@ let contracts = import "../primitives.ncl" in
     bounded | contracts.integer_between "NICKEL_POLICY_BOUNDED_INTEGER" 1 4 = 2,
     mode | contracts.enum "NICKEL_POLICY_ENUM" ["allow", "deny"] = "deny",
     identity | contracts.lowercase_blake3 "NICKEL_POLICY_BLAKE3" = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    path | contracts.safe_repository_relative_path "NICKEL_POLICY_SAFE_PATH" = "policy/example/value.ncl",
+    path | contracts.safe_repository_relative_path "NICKEL_POLICY_SAFE_PATH" = ".cairn/specs/agent-harness-runtime/spec.md",
     unique = contracts.all_unique ["alpha", "beta"],
   },
 }

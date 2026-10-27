@@ -40,6 +40,10 @@ pub struct Report {
     pub status: Status,
     pub operation_data_version: Option<String>,
     pub analyzer_outcomes: Vec<super::super::analyzer::Outcome>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub component: Option<super::component::Receipt>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub effect_run_ids: Vec<u64>,
     pub output_content_omitted: bool,
     pub credentials_omitted: bool,
     pub private_paths_omitted: bool,
@@ -64,6 +68,9 @@ pub fn run(request: Request<'_>) -> Result<Report, super::super::Error> {
     super::super::admission::validate_lock(&request.admitted.candidate, &request.admitted.lock)?;
     let operation = select_operation(&request)?;
     let runtime = select_runtime(&request, operation)?;
+    if runtime.kind == super::super::wasm::RUNTIME_KIND {
+        return super::component::run(&request, operation, runtime);
+    }
     let catalog_path =
         super::content_path(request.pack_root, &request.admitted.candidate, &operation.catalog_content_id)?;
     let executable_path = super::content_path(request.pack_root, &request.admitted.candidate, &runtime.content_id)?;
@@ -147,6 +154,8 @@ pub fn run(request: Request<'_>) -> Result<Report, super::super::Error> {
         status,
         operation_data_version,
         analyzer_outcomes,
+        component: None,
+        effect_run_ids: Vec::new(),
         output_content_omitted: true,
         credentials_omitted: true,
         private_paths_omitted: true,
@@ -183,7 +192,9 @@ fn select_runtime<'a>(
         .iter()
         .find(|runtime| runtime.id == operation.runtime_id)
         .ok_or(super::super::Error::Invalid("pack operation runtime"))?;
-    if !runtime.platforms.contains(&request.admitted.lock.platform) || runtime.kind != "bounded_process" {
+    if !runtime.platforms.contains(&request.admitted.lock.platform)
+        || !matches!(runtime.kind.as_str(), "bounded_process" | "wasm-component")
+    {
         return Err(super::super::Error::Invalid("pack runtime platform or class"));
     }
     Ok(runtime)
@@ -209,14 +220,14 @@ fn validate_plan_binding(
     Ok(())
 }
 
-fn absolute_data_root(path: &std::path::Path) -> Result<std::path::PathBuf, super::super::Error> {
+pub(super) fn absolute_data_root(path: &std::path::Path) -> Result<std::path::PathBuf, super::super::Error> {
     if !path.is_absolute() {
         return Err(super::super::Error::Invalid("operation pack data root"));
     }
     Ok(path.to_path_buf())
 }
 
-fn validate_external_instances(path: &std::path::Path) -> Result<(), super::super::Error> {
+pub(super) fn validate_external_instances(path: &std::path::Path) -> Result<(), super::super::Error> {
     if !path.is_absolute() {
         return Err(super::super::Error::Invalid("operation instances path"));
     }
@@ -230,7 +241,7 @@ fn validate_external_instances(path: &std::path::Path) -> Result<(), super::supe
     Ok(())
 }
 
-fn operation_record_draft(
+pub(super) fn operation_record_draft(
     pack_identity: &str,
     plan: &crate::operation::InvocationPlan,
     run_id: u64,

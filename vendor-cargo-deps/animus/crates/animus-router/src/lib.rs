@@ -39,72 +39,35 @@ mod test_support;
 // ── Public re-exports ────────────────────────────────────────────────────────
 
 pub use boundary::AdapterContractError;
-pub use choose::Budget;
-pub use choose::CatalogEntry;
-pub use choose::CatalogEntryDraft;
-pub use choose::RotatingSelectionRequest;
-pub use choose::SelectedPlan;
-pub use choose::SelectionDenial;
-pub use choose::select_recipe;
-pub use choose::select_recipe_with_rotation;
-pub use evidence::DurationBucket;
-pub use evidence::ExecutionPlanError;
-pub use evidence::FallbackChain;
-pub use evidence::FallbackStep;
-pub use evidence::QuorumClass;
-pub use evidence::Receipt;
-pub use evidence::ReceiptDraft;
-pub use evidence::ReceiptLeak;
-pub use evidence::Redaction;
-pub use evidence::RoleStep;
-pub use evidence::RouterExecutionPlan;
-pub use evidence::materialize_execution_plan;
-pub use evidence::materialize_execution_plan_with_rotation;
-pub use evidence::validate_receipt_text;
-pub use fairness::RouterRotationCursor;
-pub use fairness::RouterRotationCursorClass;
-pub use fairness::RouterRotationCursorDraft;
-pub use fairness::RouterRotationDecision;
-pub use fairness::RouterRotationError;
-pub use fairness::RouterRotationPolicy;
-pub use fairness::RouterRotationReceipt;
-pub use fairness::RouterRotationReceiptDraft;
-pub use fairness::RouterRotationSnapshot;
-pub use fairness::RouterRotationSnapshotDraft;
-pub use fairness::RouterRotationStaleCursorPolicy;
-pub use fairness::rotate_eligible_candidates;
-pub use input::RequestMetadata;
-pub use input::RequestMetadataDraft;
-pub use input::RuleSignalSource;
-pub use input::SignalProjectionError;
-pub use input::SignalSource;
-pub use input::project_signals;
-pub use limit::Bounds;
-pub use limit::BoundsDraft;
-pub use limit::BudgetLedger;
-pub use limit::DeadlineClass;
-pub use limit::FallbackPolicy;
-pub use outcome::BudgetExhausted;
-pub use outcome::BudgetKind;
-pub use outcome::FallbackDecision;
-pub use outcome::FallbackRouteReason;
-pub use outcome::ResultDraft;
-pub use outcome::RouteResult;
-pub use outcome::RouteResultStatus;
-pub use outcome::StepFailure;
-pub use outcome::evaluate_fallback;
+pub use choose::{
+    Budget, CatalogEntry, CatalogEntryDraft, RotatingSelectionRequest, SelectedPlan,
+    SelectionDenial, select_recipe, select_recipe_with_rotation,
+};
+pub use evidence::{
+    DurationBucket, ExecutionPlanError, FallbackChain, FallbackStep, QuorumClass, Receipt,
+    ReceiptDraft, ReceiptLeak, Redaction, RoleStep, RouterExecutionPlan,
+    materialize_execution_plan, materialize_execution_plan_with_rotation, validate_receipt_text,
+};
+pub use fairness::{
+    RouterRotationCursor, RouterRotationCursorClass, RouterRotationCursorDraft,
+    RouterRotationDecision, RouterRotationError, RouterRotationPolicy, RouterRotationReceipt,
+    RouterRotationReceiptDraft, RouterRotationSnapshot, RouterRotationSnapshotDraft,
+    RouterRotationStaleCursorPolicy, rotate_eligible_candidates,
+};
+pub use input::{
+    RequestMetadata, RequestMetadataDraft, RuleSignalSource, SignalProjectionError, SignalSource,
+    project_signals,
+};
+pub use limit::{Bounds, BoundsDraft, BudgetLedger, DeadlineClass, FallbackPolicy};
+pub use outcome::{
+    BudgetExhausted, BudgetKind, FallbackDecision, FallbackRouteReason, ResultDraft, RouteResult,
+    RouteResultStatus, StepFailure, evaluate_fallback,
+};
 pub use policy::ROUTER_RECIPE_POLICY_JSON;
-pub use projection::FallbackEligibility;
-pub use projection::PrivacyBand;
-pub use projection::SignalBand;
-pub use projection::SignalDraft;
-pub use projection::Signals;
-pub use projection::TaskShape;
-pub use schema::OutputContract;
-pub use schema::Recipe;
-pub use schema::RecipeDraft;
-pub use schema::Role;
-pub use schema::RouteFamily;
+pub use projection::{
+    FallbackEligibility, PrivacyBand, SignalBand, SignalDraft, Signals, TaskShape,
+};
+pub use schema::{OutputContract, Recipe, RecipeDraft, Role, RouteFamily};
 
 pub(crate) type FieldName = boundary::FieldName;
 pub(crate) type SafeHash = boundary::SafeHash;

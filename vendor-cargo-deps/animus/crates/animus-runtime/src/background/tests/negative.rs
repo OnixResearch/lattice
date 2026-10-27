@@ -13,15 +13,19 @@ fn same_precedence_duplicate_profiles_fail_closed() {
             super::support::valid_profile(),
         ),
     ];
-    let error = super::super::resolve_process_job_profile(super::super::ProcessJobProfileResolveRequest {
-        sources: sources.as_slice(),
-        profile_name: super::support::PROFILE_NAME,
-        owner_label: super::support::OWNER_LABEL,
-        policy: &super::support::policy(),
-    })
-    .expect_err("duplicates at same precedence must fail");
+    let error =
+        super::super::resolve_process_job_profile(super::super::ProcessJobProfileResolveRequest {
+            sources: sources.as_slice(),
+            profile_name: super::support::PROFILE_NAME,
+            owner_label: super::support::OWNER_LABEL,
+            policy: &super::support::policy(),
+        })
+        .expect_err("duplicates at same precedence must fail");
 
-    assert_eq!(error.kind(), super::super::ProcessJobProfileErrorKind::DuplicateProfile);
+    assert_eq!(
+        error.kind(),
+        super::super::ProcessJobProfileErrorKind::DuplicateProfile
+    );
     assert_eq!(error.field(), super::super::SOURCE_FIELD);
     assert!(error.reason().contains("workspace-a"));
     assert!(error.reason().contains("workspace-b"));
@@ -60,7 +64,11 @@ fn policy_rejects_secret_env_paths_and_unsupported_backend() {
     assert_eq!(cases.len(), super::support::SECRET_ENV_POLICY_CASES);
     for (profile, expected_kind) in cases {
         let error = super::support::manifest(profile)
-            .resolve(super::support::PROFILE_NAME, super::support::OWNER_LABEL, &super::support::policy())
+            .resolve(
+                super::support::PROFILE_NAME,
+                super::support::OWNER_LABEL,
+                &super::support::policy(),
+            )
             .expect_err("invalid profile should fail before dispatch");
         assert_eq!(error.kind(), expected_kind);
     }
@@ -106,7 +114,11 @@ fn policy_rejects_command_shape_args_writable_path_and_limits() {
     assert!(cases.len() > super::support::SECRET_ENV_POLICY_CASES);
     for (profile, expected_kind) in cases {
         let error = super::support::manifest(profile)
-            .resolve(super::support::PROFILE_NAME, super::support::OWNER_LABEL, &super::support::policy())
+            .resolve(
+                super::support::PROFILE_NAME,
+                super::support::OWNER_LABEL,
+                &super::support::policy(),
+            )
             .expect_err("invalid profile should fail before dispatch");
         assert_eq!(error.kind(), expected_kind);
     }
@@ -120,25 +132,43 @@ fn unsupported_schema_and_invalid_policy_fail_before_request() {
         profiles: super::support::manifest(super::support::command_profile()).profiles,
     };
     let schema_error = future_manifest
-        .resolve(super::support::PROFILE_NAME, super::support::OWNER_LABEL, &super::support::policy())
+        .resolve(
+            super::support::PROFILE_NAME,
+            super::support::OWNER_LABEL,
+            &super::support::policy(),
+        )
         .expect_err("future schema should fail");
     let bad_policy = super::super::ProcessJobProfilePolicy {
         policy_hash: String::from(super::support::INVALID_HASH),
         ..super::support::policy()
     };
     let policy_error = super::support::manifest(super::support::command_profile())
-        .resolve(super::support::PROFILE_NAME, super::support::OWNER_LABEL, &bad_policy)
+        .resolve(
+            super::support::PROFILE_NAME,
+            super::support::OWNER_LABEL,
+            &bad_policy,
+        )
         .expect_err("invalid policy identity should fail");
 
-    assert_eq!(schema_error.kind(), super::super::ProcessJobProfileErrorKind::UnsupportedSchemaVersion,);
-    assert_eq!(policy_error.kind(), super::super::ProcessJobProfileErrorKind::UnsafeIdentity,);
+    assert_eq!(
+        schema_error.kind(),
+        super::super::ProcessJobProfileErrorKind::UnsupportedSchemaVersion,
+    );
+    assert_eq!(
+        policy_error.kind(),
+        super::super::ProcessJobProfileErrorKind::UnsafeIdentity,
+    );
 }
 
 #[test]
 fn identity_envelope_rejects_leaks_and_excludes_raw_env_values() {
     // r[verify agent_harness_runtime.process_job_profiles.identity.rejects_env]
     let resolved = super::support::manifest(super::support::valid_profile())
-        .resolve(super::support::PROFILE_NAME, super::support::OWNER_LABEL, &super::support::policy())
+        .resolve(
+            super::support::PROFILE_NAME,
+            super::support::OWNER_LABEL,
+            &super::support::policy(),
+        )
         .expect("valid profile should resolve");
     let leak_error = super::super::ProcessJobProfileSource::new(
         super::super::ProcessJobProfileSourcePrecedence::Workspace,
@@ -146,12 +176,31 @@ fn identity_envelope_rejects_leaks_and_excludes_raw_env_values() {
         super::support::manifest(super::support::command_profile()),
     )
     .expect_err("source labels must not contain full paths");
-    let invalid_identity =
-        super::super::envelope::identity_with_source(&resolved.identity, "systemd://Authorization=token");
-    let identity_error = invalid_identity.validate().expect_err("credential-looking locators fail");
+    let invalid_identity = super::super::envelope::identity_with_source(
+        &resolved.identity,
+        "systemd://Authorization=token",
+    );
+    let identity_error = invalid_identity
+        .validate()
+        .expect_err("credential-looking locators fail");
 
-    assert_eq!(resolved.identity.schema_version(), super::super::PROCESS_JOB_PROFILE_SCHEMA_VERSION,);
-    assert!(!resolved.request.metadata.values().any(|value| value == super::support::APP_MODE_VALUE));
-    assert_eq!(leak_error.kind(), super::super::ProcessJobProfileErrorKind::UnsafeIdentity,);
-    assert_eq!(identity_error.kind(), super::super::ProcessJobProfileErrorKind::UnsafeIdentity,);
+    assert_eq!(
+        resolved.identity.schema_version(),
+        super::super::PROCESS_JOB_PROFILE_SCHEMA_VERSION,
+    );
+    assert!(
+        !resolved
+            .request
+            .metadata
+            .values()
+            .any(|value| value == super::support::APP_MODE_VALUE)
+    );
+    assert_eq!(
+        leak_error.kind(),
+        super::super::ProcessJobProfileErrorKind::UnsafeIdentity,
+    );
+    assert_eq!(
+        identity_error.kind(),
+        super::super::ProcessJobProfileErrorKind::UnsafeIdentity,
+    );
 }

@@ -7,19 +7,12 @@
 )]
 
 use super::separation::AgentRoleSeparationDecision;
-use super::types::AGENT_ROLE_ASSIGNMENT_HASH_DOMAIN;
-use super::types::AGENT_ROLE_CAPABILITY_HASH_DOMAIN;
-use super::types::AGENT_ROLE_HANDOFF_HASH_DOMAIN;
-use super::types::AGENT_ROLE_MODEL_PLAN_HASH_DOMAIN;
-use super::types::AGENT_ROLE_PLAN_HASH_DOMAIN;
-use super::types::AgentRoleError;
-use super::types::AgentRoleIssue;
-use super::types::AgentRoleProfile;
-use super::validation::ValidationValue;
-use super::validation::error;
-use super::validation::hash_parts;
-use super::validation::lowercase_blake3;
-use super::validation::safe_label;
+use super::types::{
+    AGENT_ROLE_ASSIGNMENT_HASH_DOMAIN, AGENT_ROLE_CAPABILITY_HASH_DOMAIN,
+    AGENT_ROLE_HANDOFF_HASH_DOMAIN, AGENT_ROLE_MODEL_PLAN_HASH_DOMAIN, AGENT_ROLE_PLAN_HASH_DOMAIN,
+    AgentRoleError, AgentRoleIssue, AgentRoleProfile,
+};
+use super::validation::{ValidationValue, error, hash_parts, lowercase_blake3, safe_label};
 
 /// Capability contract used for semantic role requests.
 pub const AGENT_ROLE_CAPABILITY_CONTRACT: &str = "animus.runtime";
@@ -37,7 +30,8 @@ const FIELD_TRANSITION: &str = "agent_role_transition";
 const FIELD_HANDOFF: &str = "agent_role_handoff";
 const FIELD_TOOL_ACTION: &str = "agent_role_tool_action";
 const AGENT_ROLE_ACTIVATION_HASH_DOMAIN: &str = "animus.agent-role-activation.v1";
-const AGENT_ROLE_HANDOFF_AUTHORIZATION_HASH_DOMAIN: &str = "animus.agent-role-handoff-authorization.v1";
+const AGENT_ROLE_HANDOFF_AUTHORIZATION_HASH_DOMAIN: &str =
+    "animus.agent-role-handoff-authorization.v1";
 const AGENT_ROLE_TOOL_ACTION_HASH_DOMAIN: &str = "animus.agent-role-tool-action.v1";
 const CAPABILITY_CEILING_COUNT: usize = 14;
 const CAPABILITY_SET_COUNT: usize = CAPABILITY_CEILING_COUNT.saturating_add(1);
@@ -128,18 +122,30 @@ pub fn compose_agent_role_model_plan(
         approved_tools: input.authority.approved_tools,
         policy_hash: input.authority.policy_hash,
     };
-    let plan = crate::compose_model_invocation_plan(crate::ModelInvocationCompositionInput { authority, ..input })
-        .map_err(|model_error| error(AgentRoleIssue::ResourceDenied, FIELD_MODEL_PLAN, model_error.detail()))?;
-    let binding_hash = hash_parts(AGENT_ROLE_MODEL_PLAN_HASH_DOMAIN, &[
-        profile.profile_hash().to_string(),
-        plan.plan_hash().to_string(),
-        plan.profile_hash().to_string(),
-        plan.target().target_hash().to_string(),
-        plan.prompt_plan_hash().to_string(),
-        plan.skill_plan_hash().to_string(),
-        plan.memory_plan_hash().to_string(),
-        plan.tool_plan_hash().to_string(),
-    ]);
+    let plan = crate::compose_model_invocation_plan(crate::ModelInvocationCompositionInput {
+        authority,
+        ..input
+    })
+    .map_err(|model_error| {
+        error(
+            AgentRoleIssue::ResourceDenied,
+            FIELD_MODEL_PLAN,
+            model_error.detail(),
+        )
+    })?;
+    let binding_hash = hash_parts(
+        AGENT_ROLE_MODEL_PLAN_HASH_DOMAIN,
+        &[
+            profile.profile_hash().to_string(),
+            plan.plan_hash().to_string(),
+            plan.profile_hash().to_string(),
+            plan.target().target_hash().to_string(),
+            plan.prompt_plan_hash().to_string(),
+            plan.skill_plan_hash().to_string(),
+            plan.memory_plan_hash().to_string(),
+            plan.tool_plan_hash().to_string(),
+        ],
+    );
     debug_assert_eq!(ceilings.len(), ceiling_count);
     debug_assert!(!binding_hash.is_empty());
     Ok(AgentRoleBoundModelPlan {
@@ -180,11 +186,22 @@ fn string_refs(values: &[String]) -> Vec<&str> {
     values.iter().map(String::as_str).collect()
 }
 
-fn validate_role_resource_admission(composition: &AgentRoleModelCompositionInput<'_>) -> Result<(), AgentRoleError> {
+fn validate_role_resource_admission(
+    composition: &AgentRoleModelCompositionInput<'_>,
+) -> Result<(), AgentRoleError> {
     for (field, values) in [
-        ("admitted_output_contracts", composition.admitted_output_contracts),
-        ("admitted_budget_policies", composition.admitted_budget_policies),
-        ("admitted_workspace_scopes", composition.admitted_workspace_scopes),
+        (
+            "admitted_output_contracts",
+            composition.admitted_output_contracts,
+        ),
+        (
+            "admitted_budget_policies",
+            composition.admitted_budget_policies,
+        ),
+        (
+            "admitted_workspace_scopes",
+            composition.admitted_workspace_scopes,
+        ),
     ] {
         if values.is_empty() {
             return Err(error(
@@ -208,13 +225,17 @@ fn validate_role_resource_admission(composition: &AgentRoleModelCompositionInput
             }
         }
     }
-    let is_output_admitted = composition.admitted_output_contracts.contains(&composition.profile.output_contract());
-    let is_budget_admitted = composition.admitted_budget_policies.contains(&composition.profile.budget_policy_ref());
-    let is_workspace_scope_admitted = composition
-        .profile
-        .workspace_scopes()
-        .iter()
-        .all(|scope| composition.admitted_workspace_scopes.contains(&scope.as_str()));
+    let is_output_admitted = composition
+        .admitted_output_contracts
+        .contains(&composition.profile.output_contract());
+    let is_budget_admitted = composition
+        .admitted_budget_policies
+        .contains(&composition.profile.budget_policy_ref());
+    let is_workspace_scope_admitted = composition.profile.workspace_scopes().iter().all(|scope| {
+        composition
+            .admitted_workspace_scopes
+            .contains(&scope.as_str())
+    });
     if !is_output_admitted || !is_budget_admitted || !is_workspace_scope_admitted {
         return Err(error(
             AgentRoleIssue::ResourceDenied,
@@ -268,32 +289,44 @@ pub struct AgentRoleActivationResourceInput<'a> {
 ///
 /// Returns [`AgentRoleError`] when any bound identity is malformed or the role,
 /// model plan, separation decision, policy, or subject bindings disagree.
-pub fn agent_role_activation_resource(input: AgentRoleActivationResourceInput<'_>) -> Result<String, AgentRoleError> {
+pub fn agent_role_activation_resource(
+    input: AgentRoleActivationResourceInput<'_>,
+) -> Result<String, AgentRoleError> {
     validate_activation_resource_input(&input)?;
-    let binding_hash = hash_parts(AGENT_ROLE_ACTIVATION_HASH_DOMAIN, &[
-        input.profile.role_id().to_string(),
-        input.profile.profile_hash().to_string(),
-        input.model_plan.binding_hash().to_string(),
-        input.separation.decision_hash().to_string(),
-        input.subject_hash.to_string(),
-        input.task_hash.to_string(),
-        input.actor_hash.to_string(),
-        input.parent_lineage_hash.to_string(),
-        input.run_thread_hash.to_string(),
-        input.session_hash.to_string(),
-        input.workspace_hash.to_string(),
-        input.mutation_lineage_hash.to_string(),
-        input.agent_definition_hash.to_string(),
-        input.profile.policy_hash().to_string(),
-        input.grant_set_hash.to_string(),
-        input.freshness_hash.to_string(),
-        input.output_contract_hash.to_string(),
-    ]);
+    let binding_hash = hash_parts(
+        AGENT_ROLE_ACTIVATION_HASH_DOMAIN,
+        &[
+            input.profile.role_id().to_string(),
+            input.profile.profile_hash().to_string(),
+            input.model_plan.binding_hash().to_string(),
+            input.separation.decision_hash().to_string(),
+            input.subject_hash.to_string(),
+            input.task_hash.to_string(),
+            input.actor_hash.to_string(),
+            input.parent_lineage_hash.to_string(),
+            input.run_thread_hash.to_string(),
+            input.session_hash.to_string(),
+            input.workspace_hash.to_string(),
+            input.mutation_lineage_hash.to_string(),
+            input.agent_definition_hash.to_string(),
+            input.profile.policy_hash().to_string(),
+            input.grant_set_hash.to_string(),
+            input.freshness_hash.to_string(),
+            input.output_contract_hash.to_string(),
+        ],
+    );
     debug_assert!(!binding_hash.is_empty());
-    Ok(format!("role:{}:{}:{}", input.profile.role_id(), input.subject_hash, binding_hash))
+    Ok(format!(
+        "role:{}:{}:{}",
+        input.profile.role_id(),
+        input.subject_hash,
+        binding_hash
+    ))
 }
 
-fn validate_activation_resource_input(input: &AgentRoleActivationResourceInput<'_>) -> Result<(), AgentRoleError> {
+fn validate_activation_resource_input(
+    input: &AgentRoleActivationResourceInput<'_>,
+) -> Result<(), AgentRoleError> {
     for (field, value) in [
         ("subject_hash", input.subject_hash),
         ("task_hash", input.task_hash),
@@ -483,27 +516,30 @@ pub fn admit_agent_role_assignment(
     validate_assignment_hashes(&request)?;
     validate_assignment_authority(&request)?;
     validate_assignment_bindings(&request)?;
-    let assignment_hash = hash_parts(AGENT_ROLE_ASSIGNMENT_HASH_DOMAIN, &[
-        request.profile.role_id().to_string(),
-        request.profile.profile_hash().to_string(),
-        request.subject_hash.to_string(),
-        request.task_hash.to_string(),
-        request.actor_hash.to_string(),
-        request.parent_lineage_hash.to_string(),
-        request.run_thread_hash.to_string(),
-        request.session_hash.to_string(),
-        request.workspace_hash.to_string(),
-        request.mutation_lineage_hash.to_string(),
-        request.agent_definition_hash.to_string(),
-        request.model_plan.binding_hash().to_string(),
-        request.profile.policy_hash().to_string(),
-        request.grant_set_hash.to_string(),
-        request.separation.decision_hash().to_string(),
-        request.freshness_hash.to_string(),
-        request.output_contract_hash.to_string(),
-        request.assignment_receipt.receipt_hash().to_string(),
-        request.activation_receipt.receipt_hash().to_string(),
-    ]);
+    let assignment_hash = hash_parts(
+        AGENT_ROLE_ASSIGNMENT_HASH_DOMAIN,
+        &[
+            request.profile.role_id().to_string(),
+            request.profile.profile_hash().to_string(),
+            request.subject_hash.to_string(),
+            request.task_hash.to_string(),
+            request.actor_hash.to_string(),
+            request.parent_lineage_hash.to_string(),
+            request.run_thread_hash.to_string(),
+            request.session_hash.to_string(),
+            request.workspace_hash.to_string(),
+            request.mutation_lineage_hash.to_string(),
+            request.agent_definition_hash.to_string(),
+            request.model_plan.binding_hash().to_string(),
+            request.profile.policy_hash().to_string(),
+            request.grant_set_hash.to_string(),
+            request.separation.decision_hash().to_string(),
+            request.freshness_hash.to_string(),
+            request.output_contract_hash.to_string(),
+            request.assignment_receipt.receipt_hash().to_string(),
+            request.activation_receipt.receipt_hash().to_string(),
+        ],
+    );
     debug_assert!(request.activation_receipt.is_allowed());
     debug_assert!(!assignment_hash.is_empty());
     Ok(AgentRoleAssignment {
@@ -531,7 +567,9 @@ pub fn admit_agent_role_assignment(
     })
 }
 
-fn validate_assignment_bindings(request: &AgentRoleAssignmentRequest<'_>) -> Result<(), AgentRoleError> {
+fn validate_assignment_bindings(
+    request: &AgentRoleAssignmentRequest<'_>,
+) -> Result<(), AgentRoleError> {
     let is_model_binding_exact = [
         request.model_plan.role_profile_hash() == request.profile.profile_hash(),
         request.model_plan.plan().policy_hash() == request.profile.policy_hash(),
@@ -564,7 +602,9 @@ fn validate_assignment_bindings(request: &AgentRoleAssignmentRequest<'_>) -> Res
     Ok(())
 }
 
-fn validate_assignment_hashes(request: &AgentRoleAssignmentRequest<'_>) -> Result<(), AgentRoleError> {
+fn validate_assignment_hashes(
+    request: &AgentRoleAssignmentRequest<'_>,
+) -> Result<(), AgentRoleError> {
     for (field, value) in [
         ("subject_hash", request.subject_hash),
         ("task_hash", request.task_hash),
@@ -584,7 +624,9 @@ fn validate_assignment_hashes(request: &AgentRoleAssignmentRequest<'_>) -> Resul
     Ok(())
 }
 
-fn validate_assignment_authority(request: &AgentRoleAssignmentRequest<'_>) -> Result<(), AgentRoleError> {
+fn validate_assignment_authority(
+    request: &AgentRoleAssignmentRequest<'_>,
+) -> Result<(), AgentRoleError> {
     let resource_input = AgentRoleActivationResourceInput {
         profile: request.profile,
         model_plan: request.model_plan,
@@ -642,7 +684,9 @@ pub(super) fn role_authorization_is_exact(
     receipt: &animus_adapters::AuthorizationReceipt,
     expectation: RoleAuthorizationExpectation<'_>,
 ) -> bool {
-    let expected_resource_hash = blake3::hash(expectation.resource.as_bytes()).to_hex().to_string();
+    let expected_resource_hash = blake3::hash(expectation.resource.as_bytes())
+        .to_hex()
+        .to_string();
     let is_request_exact = request.action() == animus_adapters::GuardedAction::AgentRole
         && request.contract() == AGENT_ROLE_CAPABILITY_CONTRACT
         && request.resource() == expectation.resource
@@ -824,7 +868,10 @@ pub fn resolve_agent_role_capabilities(
     input: AgentRoleCapabilityResolutionInput<'_>,
 ) -> Result<AgentRoleCapabilityResolution, AgentRoleError> {
     validate_capability_input(&input)?;
-    let denial_slots = input.requested.len().saturating_mul(CAPABILITY_CEILING_COUNT);
+    let denial_slots = input
+        .requested
+        .len()
+        .saturating_mul(CAPABILITY_CEILING_COUNT);
     let mut effective = Vec::with_capacity(input.requested.len());
     let mut denied = Vec::with_capacity(denial_slots);
     for capability in input.requested {
@@ -839,7 +886,10 @@ pub fn resolve_agent_role_capabilities(
         }
     }
     for required in input.profile.required_capabilities() {
-        if !effective.iter().any(|capability| capability.stable_label() == required) {
+        if !effective
+            .iter()
+            .any(|capability| capability.stable_label() == required)
+        {
             return Err(error(
                 AgentRoleIssue::MissingRequiredCapability,
                 FIELD_CAPABILITY,
@@ -872,7 +922,9 @@ pub fn resolve_agent_role_capabilities(
     })
 }
 
-fn validate_capability_input(input: &AgentRoleCapabilityResolutionInput<'_>) -> Result<(), AgentRoleError> {
+fn validate_capability_input(
+    input: &AgentRoleCapabilityResolutionInput<'_>,
+) -> Result<(), AgentRoleError> {
     if input.assignment.role_profile_hash() != input.profile.profile_hash() {
         return Err(error(
             AgentRoleIssue::BindingMismatch,
@@ -883,10 +935,18 @@ fn validate_capability_input(input: &AgentRoleCapabilityResolutionInput<'_>) -> 
     for capabilities in all_capability_sets(input) {
         ensure_unique_capabilities(capabilities)?;
     }
-    let mut role_labels =
-        input.role_ceiling.iter().map(crate::TypedSubagentCapability::stable_label).collect::<Vec<_>>();
+    let mut role_labels = input
+        .role_ceiling
+        .iter()
+        .map(crate::TypedSubagentCapability::stable_label)
+        .collect::<Vec<_>>();
     role_labels.sort_unstable();
-    let mut profile_labels = input.profile.capability_ceiling().iter().map(String::as_str).collect::<Vec<_>>();
+    let mut profile_labels = input
+        .profile
+        .capability_ceiling()
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
     profile_labels.sort_unstable();
     if role_labels != profile_labels {
         return Err(error(
@@ -896,7 +956,10 @@ fn validate_capability_input(input: &AgentRoleCapabilityResolutionInput<'_>) -> 
         ));
     }
     debug_assert_eq!(role_labels, profile_labels);
-    debug_assert_eq!(input.assignment.role_profile_hash(), input.profile.profile_hash());
+    debug_assert_eq!(
+        input.assignment.role_profile_hash(),
+        input.profile.profile_hash()
+    );
     Ok(())
 }
 
@@ -922,7 +985,9 @@ fn all_capability_sets<'a>(
     ]
 }
 
-fn ensure_unique_capabilities(capabilities: &[crate::TypedSubagentCapability]) -> Result<(), AgentRoleError> {
+fn ensure_unique_capabilities(
+    capabilities: &[crate::TypedSubagentCapability],
+) -> Result<(), AgentRoleError> {
     if capabilities.is_empty() {
         return Err(error(
             AgentRoleIssue::InvalidCollection,
@@ -954,18 +1019,45 @@ fn missing_capability_sources(
     capability: &crate::TypedSubagentCapability,
 ) -> Vec<AgentRoleCapabilitySource> {
     let candidates = [
-        (AgentRoleCapabilitySource::VerifiedGrant, input.ceilings.verified_grants),
-        (AgentRoleCapabilitySource::HostPolicy, input.ceilings.host_policy),
-        (AgentRoleCapabilitySource::ParentDelegation, input.ceilings.parent_delegation),
-        (AgentRoleCapabilitySource::TaskScope, input.ceilings.task_scope),
-        (AgentRoleCapabilitySource::AgentDefinition, input.ceilings.agent_definition),
+        (
+            AgentRoleCapabilitySource::VerifiedGrant,
+            input.ceilings.verified_grants,
+        ),
+        (
+            AgentRoleCapabilitySource::HostPolicy,
+            input.ceilings.host_policy,
+        ),
+        (
+            AgentRoleCapabilitySource::ParentDelegation,
+            input.ceilings.parent_delegation,
+        ),
+        (
+            AgentRoleCapabilitySource::TaskScope,
+            input.ceilings.task_scope,
+        ),
+        (
+            AgentRoleCapabilitySource::AgentDefinition,
+            input.ceilings.agent_definition,
+        ),
         (AgentRoleCapabilitySource::SemanticRole, input.role_ceiling),
-        (AgentRoleCapabilitySource::ModelProfile, input.ceilings.model_profile),
-        (AgentRoleCapabilitySource::Workspace, input.ceilings.workspace),
-        (AgentRoleCapabilitySource::ToolExecutor, input.ceilings.tool_executor),
+        (
+            AgentRoleCapabilitySource::ModelProfile,
+            input.ceilings.model_profile,
+        ),
+        (
+            AgentRoleCapabilitySource::Workspace,
+            input.ceilings.workspace,
+        ),
+        (
+            AgentRoleCapabilitySource::ToolExecutor,
+            input.ceilings.tool_executor,
+        ),
         (AgentRoleCapabilitySource::Approval, input.ceilings.approval),
         (AgentRoleCapabilitySource::Sandbox, input.ceilings.sandbox),
-        (AgentRoleCapabilitySource::Cancellation, input.ceilings.cancellation),
+        (
+            AgentRoleCapabilitySource::Cancellation,
+            input.ceilings.cancellation,
+        ),
         (AgentRoleCapabilitySource::Timeout, input.ceilings.timeout),
         (AgentRoleCapabilitySource::Budget, input.ceilings.budget),
     ];
@@ -974,7 +1066,11 @@ fn missing_capability_sources(
         .filter_map(|(source, ceiling)| (!ceiling.contains(capability)).then_some(*source))
         .collect::<Vec<_>>();
     debug_assert!(missing.len() <= CAPABILITY_CEILING_COUNT);
-    debug_assert!(missing.iter().all(|source| candidates.iter().any(|(candidate, _)| candidate == source)));
+    debug_assert!(
+        missing
+            .iter()
+            .all(|source| candidates.iter().any(|(candidate, _)| candidate == source))
+    );
     missing
 }
 
@@ -1086,7 +1182,9 @@ pub struct AgentRolePlanInput<'a> {
 ///
 /// Returns [`AgentRoleError`] when assignment, model, capability, separation, or
 /// output identities do not match exactly.
-pub fn build_agent_role_plan(input: AgentRolePlanInput<'_>) -> Result<AgentRolePlan, AgentRoleError> {
+pub fn build_agent_role_plan(
+    input: AgentRolePlanInput<'_>,
+) -> Result<AgentRolePlan, AgentRoleError> {
     let AgentRolePlanInput {
         assignment,
         profile,
@@ -1242,14 +1340,17 @@ pub fn bind_agent_role_tool_action(
             "effective role capability does not authorize the returned native tool name",
         ));
     }
-    let binding_hash = hash_parts(AGENT_ROLE_TOOL_ACTION_HASH_DOMAIN, &[
-        assignment.assignment_hash().to_string(),
-        role_plan.plan_hash().to_string(),
-        model_plan.binding_hash().to_string(),
-        model_call.invocation_plan_hash().to_string(),
-        model_call.tool_name().to_string(),
-        capabilities.decision_hash().to_string(),
-    ]);
+    let binding_hash = hash_parts(
+        AGENT_ROLE_TOOL_ACTION_HASH_DOMAIN,
+        &[
+            assignment.assignment_hash().to_string(),
+            role_plan.plan_hash().to_string(),
+            model_plan.binding_hash().to_string(),
+            model_call.invocation_plan_hash().to_string(),
+            model_call.tool_name().to_string(),
+            capabilities.decision_hash().to_string(),
+        ],
+    );
     debug_assert!(!binding_hash.is_empty());
     Ok(AgentRoleToolActionBinding {
         tool_name: model_call.tool_name().to_string(),
@@ -1389,11 +1490,15 @@ pub fn evaluate_agent_role_transition(
     request: &AgentRoleTransitionRequest<'_>,
 ) -> Result<AgentRoleTransitionDecision, AgentRoleError> {
     validate_transition_snapshot(request)?;
-    debug_assert!(snapshot_matches_plan(&request.current_snapshot, request.current_plan));
+    debug_assert!(snapshot_matches_plan(
+        &request.current_snapshot,
+        request.current_plan
+    ));
     debug_assert!(!request.current_plan.plan_hash().is_empty());
     match request.kind {
         AgentRoleTransitionKind::Resume | AgentRoleTransitionKind::Replay => {
-            if request.next_role_profile_hash.is_some() || request.next_model_target_hash.is_some() {
+            if request.next_role_profile_hash.is_some() || request.next_model_target_hash.is_some()
+            {
                 return Err(error(
                     AgentRoleIssue::TransitionDenied,
                     FIELD_TRANSITION,
@@ -1449,7 +1554,9 @@ pub fn evaluate_agent_role_transition(
     }
 }
 
-fn validate_transition_snapshot(request: &AgentRoleTransitionRequest<'_>) -> Result<(), AgentRoleError> {
+fn validate_transition_snapshot(
+    request: &AgentRoleTransitionRequest<'_>,
+) -> Result<(), AgentRoleError> {
     validate_role_snapshot(&request.current_snapshot)?;
     if !snapshot_matches_plan(&request.current_snapshot, request.current_plan) {
         return Err(error(
@@ -1458,8 +1565,14 @@ fn validate_transition_snapshot(request: &AgentRoleTransitionRequest<'_>) -> Res
             "role transition snapshot is stale and requires explicit replanning",
         ));
     }
-    debug_assert!(snapshot_matches_plan(&request.current_snapshot, request.current_plan));
-    debug_assert_eq!(request.current_snapshot.plan_hash, request.current_plan.plan_hash());
+    debug_assert!(snapshot_matches_plan(
+        &request.current_snapshot,
+        request.current_plan
+    ));
+    debug_assert_eq!(
+        request.current_snapshot.plan_hash,
+        request.current_plan.plan_hash()
+    );
     Ok(())
 }
 
@@ -1475,7 +1588,10 @@ fn validate_role_snapshot(snapshot: &AgentRolePlanSnapshot<'_>) -> Result<(), Ag
         ("skill_plan_hash", snapshot.skill_plan_hash),
         ("memory_plan_hash", snapshot.memory_plan_hash),
         ("tool_plan_hash", snapshot.tool_plan_hash),
-        ("capability_decision_hash", snapshot.capability_decision_hash),
+        (
+            "capability_decision_hash",
+            snapshot.capability_decision_hash,
+        ),
         ("policy_hash", snapshot.policy_hash),
         ("grant_set_hash", snapshot.grant_set_hash),
         ("separation_hash", snapshot.separation_hash),
@@ -1551,7 +1667,9 @@ pub struct AgentRoleHandoffResourceInput<'a> {
 ///
 /// Returns [`AgentRoleError`] for same-role handoff, malformed identities,
 /// duplicate/unsafe labels, or over-bound metadata.
-pub fn agent_role_handoff_resource(input: AgentRoleHandoffResourceInput<'_>) -> Result<String, AgentRoleError> {
+pub fn agent_role_handoff_resource(
+    input: AgentRoleHandoffResourceInput<'_>,
+) -> Result<String, AgentRoleError> {
     lowercase_blake3(ValidationValue {
         field: "target_role_profile_hash",
         value: input.target_role_profile_hash,
@@ -1572,9 +1690,21 @@ pub fn agent_role_handoff_resource(input: AgentRoleHandoffResourceInput<'_>) -> 
         input.current_plan.subject_hash().to_string(),
         input.target_role_profile_hash.to_string(),
     ];
-    material.extend(evidence_refs.iter().map(|value| format!("evidence:{value}")));
-    material.extend(unresolved_intents.iter().map(|value| format!("intent:{value}")));
-    material.extend(requested_actions.iter().map(|value| format!("action:{value}")));
+    material.extend(
+        evidence_refs
+            .iter()
+            .map(|value| format!("evidence:{value}")),
+    );
+    material.extend(
+        unresolved_intents
+            .iter()
+            .map(|value| format!("intent:{value}")),
+    );
+    material.extend(
+        requested_actions
+            .iter()
+            .map(|value| format!("action:{value}")),
+    );
     let binding_hash = hash_parts(AGENT_ROLE_HANDOFF_AUTHORIZATION_HASH_DOMAIN, &material);
     debug_assert!(!binding_hash.is_empty());
     Ok(format!(
@@ -1664,7 +1794,9 @@ impl AgentRoleHandoff {
 /// Returns [`AgentRoleError`] for stale role identity, unbounded collections,
 /// unsafe labels, or any raw transcript, reasoning, credential, grant, or call.
 // r[impl agent_harness_runtime.agent_role_profiles.transition_binding.handoff]
-pub fn validate_agent_role_handoff(draft: AgentRoleHandoffDraft<'_>) -> Result<AgentRoleHandoff, AgentRoleError> {
+pub fn validate_agent_role_handoff(
+    draft: AgentRoleHandoffDraft<'_>,
+) -> Result<AgentRoleHandoff, AgentRoleError> {
     let expected_resource = agent_role_handoff_resource(AgentRoleHandoffResourceInput {
         current_plan: draft.current_plan,
         target_role_profile_hash: draft.target_role_profile_hash,
@@ -1672,10 +1804,14 @@ pub fn validate_agent_role_handoff(draft: AgentRoleHandoffDraft<'_>) -> Result<A
         unresolved_intents: draft.unresolved_intents,
         requested_actions: draft.requested_actions,
     })?;
-    if !role_authorization_is_exact(draft.handoff_request, draft.handoff_receipt, RoleAuthorizationExpectation {
-        resource: expected_resource.as_str(),
-        ability: AGENT_ROLE_HANDOFF_ABILITY,
-    }) {
+    if !role_authorization_is_exact(
+        draft.handoff_request,
+        draft.handoff_receipt,
+        RoleAuthorizationExpectation {
+            resource: expected_resource.as_str(),
+            ability: AGENT_ROLE_HANDOFF_ABILITY,
+        },
+    ) {
         return Err(error(
             AgentRoleIssue::AuthorityDenied,
             FIELD_HANDOFF,
@@ -1694,9 +1830,21 @@ pub fn validate_agent_role_handoff(draft: AgentRoleHandoffDraft<'_>) -> Result<A
         REDACTION_MARKER.to_string(),
         draft.handoff_receipt.receipt_hash().to_string(),
     ]);
-    hash_material.extend(evidence_refs.iter().map(|value| format!("evidence:{value}")));
-    hash_material.extend(unresolved_intents.iter().map(|value| format!("intent:{value}")));
-    hash_material.extend(requested_actions.iter().map(|value| format!("action:{value}")));
+    hash_material.extend(
+        evidence_refs
+            .iter()
+            .map(|value| format!("evidence:{value}")),
+    );
+    hash_material.extend(
+        unresolved_intents
+            .iter()
+            .map(|value| format!("intent:{value}")),
+    );
+    hash_material.extend(
+        requested_actions
+            .iter()
+            .map(|value| format!("action:{value}")),
+    );
     let handoff_hash = hash_parts(AGENT_ROLE_HANDOFF_HASH_DOMAIN, hash_material.as_slice());
     debug_assert!(!handoff_hash.is_empty());
     debug_assert!(evidence_refs.len() <= MAX_HANDOFF_REFERENCES);
@@ -1712,7 +1860,9 @@ pub fn validate_agent_role_handoff(draft: AgentRoleHandoffDraft<'_>) -> Result<A
     })
 }
 
-fn reject_handoff_sensitive(sensitive: AgentRoleHandoffSensitiveDraft<'_>) -> Result<(), AgentRoleError> {
+fn reject_handoff_sensitive(
+    sensitive: AgentRoleHandoffSensitiveDraft<'_>,
+) -> Result<(), AgentRoleError> {
     let has_sensitive_material = [
         sensitive.raw_transcript,
         sensitive.hidden_reasoning,
@@ -1750,7 +1900,11 @@ fn validate_handoff_labels(values: &[&str]) -> Result<Vec<String>, AgentRoleErro
             value,
         })?;
         if labels.contains(&label) {
-            return Err(error(AgentRoleIssue::DuplicateIdentity, FIELD_HANDOFF, "handoff labels must be unique"));
+            return Err(error(
+                AgentRoleIssue::DuplicateIdentity,
+                FIELD_HANDOFF,
+                "handoff labels must be unique",
+            ));
         }
         labels.push(label);
     }

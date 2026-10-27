@@ -19,9 +19,7 @@
 )]
 
 use crate::artifact::Hash;
-use crate::validation::AdapterContractError;
-use crate::validation::FieldName;
-use crate::validation::{self};
+use crate::validation::{self, AdapterContractError, FieldName};
 
 const DECK_ID_FIELD: FieldName = FieldName::new("lens_deck_id");
 const DECK_FAMILY_FIELD: FieldName = FieldName::new("lens_deck_family");
@@ -717,16 +715,27 @@ impl LensSynthesisReport {
 /// focus IDs, unsafe text, unsupported output contracts, or unbounded lists.
 pub fn validate_focus_deck(draft: &FocusDeckDraft<'_>) -> LensResult<FocusDeck> {
     if !draft.trusted {
-        return Err(diagnostic(LensDiagnosticCode::UntrustedDeck, None, "focus deck body is not trusted"));
+        return Err(diagnostic(
+            LensDiagnosticCode::UntrustedDeck,
+            None,
+            "focus deck body is not trusted",
+        ));
     }
     validate_non_empty_bound("focus_items", draft.items.len(), MAX_FOCUS_ITEMS)?;
-    validate_non_empty_bound("lens_review_criteria", draft.review_criteria.len(), MAX_REVIEW_CRITERIA)?;
+    validate_non_empty_bound(
+        "lens_review_criteria",
+        draft.review_criteria.len(),
+        MAX_REVIEW_CRITERIA,
+    )?;
     let deck_id = safe_text(DECK_ID_FIELD, draft.deck_id, None)?;
     let family = safe_text(DECK_FAMILY_FIELD, draft.family, None)?;
     let mut items = Collection::with_capacity(draft.items.len());
     for item in draft.items {
         let validated = validate_focus_item(item)?;
-        if items.iter().any(|existing: &FocusItem| existing.focus_id() == validated.focus_id()) {
+        if items
+            .iter()
+            .any(|existing: &FocusItem| existing.focus_id() == validated.focus_id())
+        {
             return Err(diagnostic(
                 LensDiagnosticCode::DuplicateFocus,
                 Some(validated.focus_id()),
@@ -739,11 +748,14 @@ pub fn validate_focus_deck(draft: &FocusDeckDraft<'_>) -> LensResult<FocusDeck> 
     let mut criteria = Collection::with_capacity(draft.review_criteria.len());
     for criterion in draft.review_criteria {
         let validated = validate_review_criterion(criterion)?;
-        if criteria
-            .iter()
-            .any(|existing: &LensReviewCriterion| existing.criterion_id() == validated.criterion_id())
-        {
-            return Err(diagnostic(LensDiagnosticCode::DuplicateCriterion, None, "duplicate review criterion id"));
+        if criteria.iter().any(|existing: &LensReviewCriterion| {
+            existing.criterion_id() == validated.criterion_id()
+        }) {
+            return Err(diagnostic(
+                LensDiagnosticCode::DuplicateCriterion,
+                None,
+                "duplicate review criterion id",
+            ));
         }
         criteria.push(validated);
     }
@@ -762,10 +774,17 @@ pub fn validate_focus_deck(draft: &FocusDeckDraft<'_>) -> LensResult<FocusDeck> 
 ///
 /// Returns [`LensDiagnostic`] for unknown focus IDs, unsafe context labels,
 /// missing evidence hashes, unsupported output contracts, or untrusted context.
-pub fn validate_lens_task_packet(deck: &FocusDeck, draft: &LensTaskPacketDraft<'_>) -> LensResult<LensTaskPacket> {
+pub fn validate_lens_task_packet(
+    deck: &FocusDeck,
+    draft: &LensTaskPacketDraft<'_>,
+) -> LensResult<LensTaskPacket> {
     let deck_id = safe_text(DECK_ID_FIELD, draft.deck_id, None)?;
     if deck_id != deck.deck_id() {
-        return Err(diagnostic(LensDiagnosticCode::UnknownFocus, None, "task packet deck id does not match deck"));
+        return Err(diagnostic(
+            LensDiagnosticCode::UnknownFocus,
+            None,
+            "task packet deck id does not match deck",
+        ));
     }
     let focus_id = safe_text(FOCUS_ID_FIELD, draft.focus_id, None)?;
     let focus_item = deck.items().iter().find(|item| item.focus_id() == focus_id);
@@ -776,7 +795,11 @@ pub fn validate_lens_task_packet(deck: &FocusDeck, draft: &LensTaskPacketDraft<'
             "task packet focus id is not in deck",
         ));
     };
-    validate_non_empty_bound("lens_context_refs", draft.context_refs.len(), MAX_CONTEXT_REFS)?;
+    validate_non_empty_bound(
+        "lens_context_refs",
+        draft.context_refs.len(),
+        MAX_CONTEXT_REFS,
+    )?;
     let retrieval_budget_ref = safe_text(RETRIEVAL_BUDGET_FIELD, draft.retrieval_budget_ref, None)?;
     if retrieval_budget_ref != focus_item.retrieval_budget_ref() {
         return Err(diagnostic(
@@ -857,7 +880,10 @@ pub fn plan_lens_execution(
 ///
 /// Returns [`LensDiagnostic`] for unknown focus IDs, unsafe assumptions, malformed
 /// evidence hashes, or unbounded evidence lists.
-pub fn validate_lens_report(deck: &FocusDeck, draft: &LensReportDraft<'_>) -> LensResult<LensReport> {
+pub fn validate_lens_report(
+    deck: &FocusDeck,
+    draft: &LensReportDraft<'_>,
+) -> LensResult<LensReport> {
     let report_id = safe_text(REPORT_ID_FIELD, draft.report_id, None)?;
     let focus_id = safe_text(FOCUS_ID_FIELD, draft.focus_id, None)?;
     if !deck.items().iter().any(|item| item.focus_id() == focus_id) {
@@ -872,7 +898,11 @@ pub fn validate_lens_report(deck: &FocusDeck, draft: &LensReportDraft<'_>) -> Le
     validate_collection_limit("lens_assumptions", draft.assumptions.len(), MAX_ASSUMPTIONS)?;
     let mut assumptions = Collection::with_capacity(draft.assumptions.len());
     for assumption in draft.assumptions {
-        assumptions.push(safe_text(ASSUMPTION_FIELD, assumption, Some(focus_id.as_str()))?);
+        assumptions.push(safe_text(
+            ASSUMPTION_FIELD,
+            assumption,
+            Some(focus_id.as_str()),
+        )?);
     }
     Ok(LensReport {
         report_id,
@@ -891,15 +921,34 @@ pub fn validate_lens_report(deck: &FocusDeck, draft: &LensReportDraft<'_>) -> Le
 ///
 /// Returns [`LensDiagnostic`] for malformed report/contradiction/gap metadata or
 /// if an unresolved contradiction is paired with a high-confidence final claim.
-pub fn validate_lens_synthesis(deck: &FocusDeck, draft: &LensSynthesisDraft<'_>) -> LensResult<LensSynthesisReport> {
+pub fn validate_lens_synthesis(
+    deck: &FocusDeck,
+    draft: &LensSynthesisDraft<'_>,
+) -> LensResult<LensSynthesisReport> {
     let deck_id = safe_text(DECK_ID_FIELD, draft.deck_id, None)?;
     if deck_id != deck.deck_id() {
-        return Err(diagnostic(LensDiagnosticCode::UnknownFocus, None, "synthesis deck id does not match deck"));
+        return Err(diagnostic(
+            LensDiagnosticCode::UnknownFocus,
+            None,
+            "synthesis deck id does not match deck",
+        ));
     }
     validate_non_empty_bound("lens_reports", draft.reports.len(), MAX_LENS_REPORTS)?;
-    validate_collection_limit("lens_contradictions", draft.contradictions.len(), MAX_CONTRADICTIONS)?;
-    validate_collection_limit("lens_skipped_focus_ids", draft.skipped_focus_ids.len(), MAX_SKIPPED_LENSES)?;
-    validate_collection_limit("lens_unresolved_gaps", draft.unresolved_gaps.len(), MAX_GAPS)?;
+    validate_collection_limit(
+        "lens_contradictions",
+        draft.contradictions.len(),
+        MAX_CONTRADICTIONS,
+    )?;
+    validate_collection_limit(
+        "lens_skipped_focus_ids",
+        draft.skipped_focus_ids.len(),
+        MAX_SKIPPED_LENSES,
+    )?;
+    validate_collection_limit(
+        "lens_unresolved_gaps",
+        draft.unresolved_gaps.len(),
+        MAX_GAPS,
+    )?;
 
     let mut reports = Collection::with_capacity(draft.reports.len());
     for report in draft.reports {
@@ -912,7 +961,11 @@ pub fn validate_lens_synthesis(deck: &FocusDeck, draft: &LensSynthesisDraft<'_>)
     let mut skipped_focus_ids = Collection::with_capacity(draft.skipped_focus_ids.len());
     for focus_id in draft.skipped_focus_ids {
         let safe_focus = safe_text(FOCUS_ID_FIELD, focus_id, None)?;
-        if !deck.items().iter().any(|item| item.focus_id() == safe_focus) {
+        if !deck
+            .items()
+            .iter()
+            .any(|item| item.focus_id() == safe_focus)
+        {
             return Err(diagnostic(
                 LensDiagnosticCode::UnknownFocus,
                 Some(safe_focus.as_str()),
@@ -925,8 +978,9 @@ pub fn validate_lens_synthesis(deck: &FocusDeck, draft: &LensSynthesisDraft<'_>)
     for gap in draft.unresolved_gaps {
         unresolved_gaps.push(safe_text(GAP_ID_FIELD, gap, None)?);
     }
-    let unresolved_contradiction =
-        contradictions.iter().any(|item| item.status() == LensContradictionStatus::Unresolved);
+    let unresolved_contradiction = contradictions
+        .iter()
+        .any(|item| item.status() == LensContradictionStatus::Unresolved);
     let supports_final_claim = !unresolved_contradiction && unresolved_gaps.is_empty();
     if unresolved_contradiction && draft.confidence == LensConfidence::High {
         return Err(diagnostic(
@@ -949,10 +1003,23 @@ pub fn validate_lens_synthesis(deck: &FocusDeck, draft: &LensSynthesisDraft<'_>)
 
 fn validate_focus_item(draft: &FocusItemDraft<'_>) -> LensResult<FocusItem> {
     let focus_id = safe_text(FOCUS_ID_FIELD, draft.focus_id, None)?;
-    let description =
-        safe_bounded_text(FOCUS_DESCRIPTION_FIELD, draft.description, MAX_DESCRIPTION_CHARS, Some(focus_id.as_str()))?;
-    let look_for = safe_bounded_text(LOOK_FOR_FIELD, draft.look_for, MAX_LOOK_FOR_CHARS, Some(focus_id.as_str()))?;
-    let retrieval_budget_ref = safe_text(RETRIEVAL_BUDGET_FIELD, draft.retrieval_budget_ref, Some(focus_id.as_str()))?;
+    let description = safe_bounded_text(
+        FOCUS_DESCRIPTION_FIELD,
+        draft.description,
+        MAX_DESCRIPTION_CHARS,
+        Some(focus_id.as_str()),
+    )?;
+    let look_for = safe_bounded_text(
+        LOOK_FOR_FIELD,
+        draft.look_for,
+        MAX_LOOK_FOR_CHARS,
+        Some(focus_id.as_str()),
+    )?;
+    let retrieval_budget_ref = safe_text(
+        RETRIEVAL_BUDGET_FIELD,
+        draft.retrieval_budget_ref,
+        Some(focus_id.as_str()),
+    )?;
     let evidence_expectation = safe_bounded_text(
         EVIDENCE_EXPECTATION_FIELD,
         draft.evidence_expectation,
@@ -970,7 +1037,9 @@ fn validate_focus_item(draft: &FocusItemDraft<'_>) -> LensResult<FocusItem> {
     })
 }
 
-fn validate_review_criterion(draft: &LensReviewCriterionDraft<'_>) -> LensResult<LensReviewCriterion> {
+fn validate_review_criterion(
+    draft: &LensReviewCriterionDraft<'_>,
+) -> LensResult<LensReviewCriterion> {
     let criterion_id = safe_text(CRITERION_ID_FIELD, draft.criterion_id, None)?;
     let label = safe_text(LOOK_FOR_FIELD, draft.label, None)?;
     Ok(LensReviewCriterion {
@@ -980,22 +1049,43 @@ fn validate_review_criterion(draft: &LensReviewCriterionDraft<'_>) -> LensResult
     })
 }
 
-fn validate_context_ref(draft: &LensContextRefDraft<'_>, focus_id: &str) -> LensResult<LensContextRef> {
+fn validate_context_ref(
+    draft: &LensContextRefDraft<'_>,
+    focus_id: &str,
+) -> LensResult<LensContextRef> {
     if !draft.trusted {
-        return Err(diagnostic(LensDiagnosticCode::UnsafeContext, Some(focus_id), "untrusted context reference"));
+        return Err(diagnostic(
+            LensDiagnosticCode::UnsafeContext,
+            Some(focus_id),
+            "untrusted context reference",
+        ));
     }
     let label = safe_text(CONTEXT_LABEL_FIELD, draft.label, Some(focus_id))?;
     let evidence_hash = safe_hash(SUMMARY_HASH_FIELD, draft.evidence_hash)?;
-    Ok(LensContextRef { label, evidence_hash })
+    Ok(LensContextRef {
+        label,
+        evidence_hash,
+    })
 }
 
-fn validate_contradiction(deck: &FocusDeck, draft: &LensContradictionDraft<'_>) -> LensResult<LensContradiction> {
+fn validate_contradiction(
+    deck: &FocusDeck,
+    draft: &LensContradictionDraft<'_>,
+) -> LensResult<LensContradiction> {
     let contradiction_id = safe_text(CONTRADICTION_ID_FIELD, draft.contradiction_id, None)?;
-    validate_non_empty_bound("lens_contradiction_focus_ids", draft.focus_ids.len(), MAX_FOCUS_ITEMS)?;
+    validate_non_empty_bound(
+        "lens_contradiction_focus_ids",
+        draft.focus_ids.len(),
+        MAX_FOCUS_ITEMS,
+    )?;
     let mut focus_ids = Collection::with_capacity(draft.focus_ids.len());
     for focus_id in draft.focus_ids {
         let safe_focus = safe_text(FOCUS_ID_FIELD, focus_id, None)?;
-        if !deck.items().iter().any(|item| item.focus_id() == safe_focus) {
+        if !deck
+            .items()
+            .iter()
+            .any(|item| item.focus_id() == safe_focus)
+        {
             return Err(diagnostic(
                 LensDiagnosticCode::UnknownFocus,
                 Some(safe_focus.as_str()),
@@ -1027,26 +1117,43 @@ fn validate_hashes(field: &'static str, hashes: &[&str]) -> LensResult<Collectio
 fn safe_output_contract(value: &str) -> LensResult<Text> {
     let contract = safe_text(OUTPUT_CONTRACT_FIELD, value, None)?;
     match contract.as_str() {
-        OUTPUT_CONTRACT_FINDING_LIST | OUTPUT_CONTRACT_VERDICT_MARKDOWN | OUTPUT_CONTRACT_PROPERTY_TABLE => {
-            Ok(contract)
-        }
-        _ => Err(diagnostic(LensDiagnosticCode::UnsupportedOutputContract, None, "unsupported output contract")),
+        OUTPUT_CONTRACT_FINDING_LIST
+        | OUTPUT_CONTRACT_VERDICT_MARKDOWN
+        | OUTPUT_CONTRACT_PROPERTY_TABLE => Ok(contract),
+        _ => Err(diagnostic(
+            LensDiagnosticCode::UnsupportedOutputContract,
+            None,
+            "unsupported output contract",
+        )),
     }
 }
 
-fn safe_bounded_text(field: FieldName, value: &str, max_chars: usize, focus_id: Option<&str>) -> LensResult<Text> {
+fn safe_bounded_text(
+    field: FieldName,
+    value: &str,
+    max_chars: usize,
+    focus_id: Option<&str>,
+) -> LensResult<Text> {
     let text = safe_text(field, value, focus_id)?;
     let actual_chars = text.chars().count();
     if actual_chars > max_chars {
-        return Err(diagnostic(LensDiagnosticCode::FieldTooLong, focus_id, field.as_str()));
+        return Err(diagnostic(
+            LensDiagnosticCode::FieldTooLong,
+            focus_id,
+            field.as_str(),
+        ));
     }
     Ok(text)
 }
 
 fn safe_text(field: FieldName, value: &str, focus_id: Option<&str>) -> LensResult<Text> {
-    let normalized = validation::normalized_adapter_field(field, value).map_err(|error| map_adapter_error(&error))?;
+    let normalized = validation::normalized_adapter_field(field, value)
+        .map_err(|error| map_adapter_error(&error))?;
     let lower = normalized.to_ascii_lowercase();
-    if UNSAFE_CONTEXT_MARKERS.iter().any(|marker| lower.contains(marker)) {
+    if UNSAFE_CONTEXT_MARKERS
+        .iter()
+        .any(|marker| lower.contains(marker))
+    {
         return Err(diagnostic(
             LensDiagnosticCode::UnsafeContext,
             focus_id,
@@ -1057,11 +1164,16 @@ fn safe_text(field: FieldName, value: &str, focus_id: Option<&str>) -> LensResul
 }
 
 fn safe_hash(field: FieldName, value: &str) -> LensResult<Text> {
-    let normalized = validation::normalized_adapter_field(field, value).map_err(|error| map_adapter_error(&error))?;
+    let normalized = validation::normalized_adapter_field(field, value)
+        .map_err(|error| map_adapter_error(&error))?;
     if Hash::new(&normalized).is_ok() {
         Ok(normalized)
     } else {
-        Err(diagnostic(LensDiagnosticCode::InvalidHash, None, field.as_str()))
+        Err(diagnostic(
+            LensDiagnosticCode::InvalidHash,
+            None,
+            field.as_str(),
+        ))
     }
 }
 
@@ -1089,13 +1201,21 @@ fn validate_collection_limit(field: &'static str, len: usize, max: usize) -> Len
 
 fn map_adapter_error(error: &AdapterContractError) -> LensDiagnostic {
     match error {
-        AdapterContractError::EmptyField { field } => diagnostic(LensDiagnosticCode::EmptyField, None, field),
-        AdapterContractError::FieldTooLong { field, .. } => diagnostic(LensDiagnosticCode::FieldTooLong, None, field),
-        AdapterContractError::NulCharacter { field, .. } => diagnostic(LensDiagnosticCode::NulCharacter, None, field),
+        AdapterContractError::EmptyField { field } => {
+            diagnostic(LensDiagnosticCode::EmptyField, None, field)
+        }
+        AdapterContractError::FieldTooLong { field, .. } => {
+            diagnostic(LensDiagnosticCode::FieldTooLong, None, field)
+        }
+        AdapterContractError::NulCharacter { field, .. } => {
+            diagnostic(LensDiagnosticCode::NulCharacter, None, field)
+        }
         AdapterContractError::InvalidEvidenceHash { field, .. } => {
             diagnostic(LensDiagnosticCode::InvalidHash, None, field)
         }
-        AdapterContractError::EmptyCollection { field } => diagnostic(LensDiagnosticCode::EmptyCollection, None, field),
+        AdapterContractError::EmptyCollection { field } => {
+            diagnostic(LensDiagnosticCode::EmptyCollection, None, field)
+        }
         AdapterContractError::UnsupportedStatusState { field, .. }
         | AdapterContractError::UnsupportedStatusObservationKind { field, .. }
         | AdapterContractError::UnsupportedSessionReferenceKind { field, .. }
@@ -1220,12 +1340,15 @@ mod tests {
             label: UNSAFE_CONTEXT,
             ..context_ref()
         }];
-        let unsafe_error =
-            validate_lens_task_packet(&deck, &task_draft(&unsafe_contexts)).expect_err("unsafe context must fail");
-        let unknown_error = validate_lens_task_packet(&deck, &LensTaskPacketDraft {
-            focus_id: "missing-focus",
-            ..task_draft(&contexts)
-        })
+        let unsafe_error = validate_lens_task_packet(&deck, &task_draft(&unsafe_contexts))
+            .expect_err("unsafe context must fail");
+        let unknown_error = validate_lens_task_packet(
+            &deck,
+            &LensTaskPacketDraft {
+                focus_id: "missing-focus",
+                ..task_draft(&contexts)
+            },
+        )
         .expect_err("unknown focus must fail");
 
         assert_eq!(valid_task.context_refs().len(), 1);
@@ -1237,8 +1360,8 @@ mod tests {
     fn duplicate_focus_and_untrusted_decks_fail_validation() {
         // r[verify agent_harness_runtime.hermes_multi_lens.verification]
         let duplicate_items = [focus(FOCUS_BOUNDARY), focus(FOCUS_BOUNDARY)];
-        let duplicate_error =
-            validate_focus_deck(&deck_draft(&duplicate_items)).expect_err("duplicate focus ids must fail");
+        let duplicate_error = validate_focus_deck(&deck_draft(&duplicate_items))
+            .expect_err("duplicate focus ids must fail");
         let untrusted_error = validate_focus_deck(&FocusDeckDraft {
             trusted: false,
             ..deck_draft(&[focus(FOCUS_BOUNDARY)])
@@ -1253,15 +1376,30 @@ mod tests {
     fn execution_planning_requires_host_services_for_parallel_modes() {
         // r[verify agent_harness_runtime.hermes_multi_lens.host_owned]
         let deck = deck();
-        let parallel_missing =
-            plan_lens_execution(&deck, LensExecutionMode::ParallelWorkers, LensWorkerServiceStatus::Missing);
-        let sequential =
-            plan_lens_execution(&deck, LensExecutionMode::SequentialChecklist, LensWorkerServiceStatus::Missing);
-        let external_ready =
-            plan_lens_execution(&deck, LensExecutionMode::ExternalService, LensWorkerServiceStatus::Available);
+        let parallel_missing = plan_lens_execution(
+            &deck,
+            LensExecutionMode::ParallelWorkers,
+            LensWorkerServiceStatus::Missing,
+        );
+        let sequential = plan_lens_execution(
+            &deck,
+            LensExecutionMode::SequentialChecklist,
+            LensWorkerServiceStatus::Missing,
+        );
+        let external_ready = plan_lens_execution(
+            &deck,
+            LensExecutionMode::ExternalService,
+            LensWorkerServiceStatus::Available,
+        );
 
-        assert_eq!(parallel_missing.status(), LensExecutionPlanStatus::MissingService);
-        assert_eq!(sequential.status(), LensExecutionPlanStatus::SequentialReady);
+        assert_eq!(
+            parallel_missing.status(),
+            LensExecutionPlanStatus::MissingService
+        );
+        assert_eq!(
+            sequential.status(),
+            LensExecutionPlanStatus::SequentialReady
+        );
         assert_eq!(external_ready.status(), LensExecutionPlanStatus::Ready);
         assert_eq!(sequential.tasks().len(), deck.items().len());
     }
@@ -1270,10 +1408,13 @@ mod tests {
     fn synthesis_preserves_unresolved_contradictions_and_skips_final_claim() {
         // r[verify agent_harness_runtime.hermes_multi_lens.synthesis]
         let deck = deck();
-        let reports = [report_draft(FOCUS_BOUNDARY), LensReportDraft {
-            report_id: "report-evidence",
-            ..report_draft(FOCUS_EVIDENCE)
-        }];
+        let reports = [
+            report_draft(FOCUS_BOUNDARY),
+            LensReportDraft {
+                report_id: "report-evidence",
+                ..report_draft(FOCUS_EVIDENCE)
+            },
+        ];
         let contradictions = [LensContradictionDraft {
             contradiction_id: CONTRADICTION_ID,
             focus_ids: &[FOCUS_BOUNDARY, FOCUS_EVIDENCE],
@@ -1281,14 +1422,17 @@ mod tests {
             status: LensContradictionStatus::Unresolved,
             summary_hash: HASH_B,
         }];
-        let synthesis = validate_lens_synthesis(&deck, &LensSynthesisDraft {
-            deck_id: DECK_ID,
-            reports: &reports,
-            contradictions: &contradictions,
-            skipped_focus_ids: &[FOCUS_EVIDENCE],
-            unresolved_gaps: &[GAP_ID],
-            confidence: LensConfidence::Medium,
-        })
+        let synthesis = validate_lens_synthesis(
+            &deck,
+            &LensSynthesisDraft {
+                deck_id: DECK_ID,
+                reports: &reports,
+                contradictions: &contradictions,
+                skipped_focus_ids: &[FOCUS_EVIDENCE],
+                unresolved_gaps: &[GAP_ID],
+                confidence: LensConfidence::Medium,
+            },
+        )
         .unwrap();
 
         assert_eq!(synthesis.contradictions().len(), 1);
@@ -1309,14 +1453,17 @@ mod tests {
             status: LensContradictionStatus::Unresolved,
             summary_hash: HASH_B,
         }];
-        let error = validate_lens_synthesis(&deck, &LensSynthesisDraft {
-            deck_id: DECK_ID,
-            reports: &reports,
-            contradictions: &contradictions,
-            skipped_focus_ids: &[],
-            unresolved_gaps: &[],
-            confidence: LensConfidence::High,
-        })
+        let error = validate_lens_synthesis(
+            &deck,
+            &LensSynthesisDraft {
+                deck_id: DECK_ID,
+                reports: &reports,
+                contradictions: &contradictions,
+                skipped_focus_ids: &[],
+                unresolved_gaps: &[],
+                confidence: LensConfidence::High,
+            },
+        )
         .expect_err("high-confidence unresolved contradiction must fail");
 
         assert_eq!(error.code(), LensDiagnosticCode::UnsupportedClaim);

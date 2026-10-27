@@ -3,6 +3,8 @@
 //! The persisted `NodeConfig` enum remains the data model; this module centralizes
 //! node-kind behavior needed by validation, format handlers, and TUI metadata.
 
+mod authoring;
+
 use crate::agent_node;
 use crate::control_flow;
 use crate::engine::workflow::NodeConfig;
@@ -81,6 +83,10 @@ pub trait NodeKindProvider {
     fn kind(&self) -> NodeKind;
     fn portable_kind(&self) -> &'static str;
     fn display_label(&self) -> &'static str;
+    /// Portable fields authored through this provider's typed drafts or admitted plan.
+    fn authoring_capabilities(&self) -> &'static [&'static str] {
+        authoring::for_kind(self.kind())
+    }
     fn property_lines(&self, config: &NodeConfig) -> Vec<NodePropertyLine>;
     fn validate_config(&self, node_label: &str, config: &NodeConfig) -> Vec<NodeKindValidationIssue>;
 }
@@ -139,6 +145,27 @@ pub fn provider_for_config(config: &NodeConfig) -> &'static dyn NodeKindProvider
 
 pub fn provider_for_portable_kind(kind: &str) -> Option<&'static dyn NodeKindProvider> {
     node_kind_for_portable_kind(kind).map(provider_for_kind)
+}
+
+/// Enumerate canonical field identities without allocating a second inventory.
+pub fn authoring_capabilities() -> impl Iterator<Item = (&'static dyn NodeKindProvider, &'static str)> {
+    [
+        NodeKind::Shell,
+        NodeKind::Http,
+        NodeKind::File,
+        NodeKind::ImageInput,
+        NodeKind::Agent,
+        NodeKind::Condition,
+        NodeKind::Merge,
+        NodeKind::Subworkflow,
+        NodeKind::Approval,
+        NodeKind::Operation,
+    ]
+    .into_iter()
+    .flat_map(|kind| {
+        let provider = provider_for_kind(kind);
+        provider.authoring_capabilities().iter().map(move |id| (provider, *id))
+    })
 }
 
 pub fn node_kind_for_config(config: &NodeConfig) -> NodeKind {

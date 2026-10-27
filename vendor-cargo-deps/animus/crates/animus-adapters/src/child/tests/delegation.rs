@@ -4,13 +4,17 @@ use super::support::*;
 #[test]
 fn recipe_backed_request_accepts_explicit_admitted_recipe() {
     let recipe = admitted_recipe();
-    let delegation = SubagentDelegation::validate(&valid_delegation(&recipe)).expect("delegation should validate");
+    let delegation = SubagentDelegation::validate(&valid_delegation(&recipe))
+        .expect("delegation should validate");
 
     assert_eq!(delegation.id(), CHILD_ID);
     assert_eq!(delegation.recipe_id(), Some(RECIPE_ID));
     assert_eq!(delegation.parameter_bindings()[0], PARAM_TOPIC);
     assert_eq!(delegation.tool_ceilings()[0], TOOL_READ);
-    assert_eq!(delegation.return_mode(), SubagentReturnMode::StatusPlusSummary);
+    assert_eq!(
+        delegation.return_mode(),
+        SubagentReturnMode::StatusPlusSummary
+    );
 }
 
 #[test]
@@ -69,6 +73,16 @@ fn capability_intersection_allows_only_everywhere_admitted_tools() {
 
     assert_eq!(resolution.effective(), &[Text::from(TOOL_READ)]);
     assert_eq!(resolution.denied().len(), 2);
-    assert!(resolution.denied().iter().any(|denial| denial.capability() == TOOL_WRITE));
-    assert!(resolution.denied().iter().any(|denial| denial.capability() == SECRET_READ));
+    assert!(
+        resolution
+            .denied()
+            .iter()
+            .any(|denial| denial.capability() == TOOL_WRITE)
+    );
+    assert!(
+        resolution
+            .denied()
+            .iter()
+            .any(|denial| denial.capability() == SECRET_READ)
+    );
 }

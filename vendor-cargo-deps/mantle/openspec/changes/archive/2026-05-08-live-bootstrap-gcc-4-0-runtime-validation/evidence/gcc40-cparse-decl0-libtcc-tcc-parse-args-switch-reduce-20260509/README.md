@@ -1,0 +1,115 @@
+# GCC 4.0 c-parse / libtcc `tcc_parse_args` switch reduction
+
+Date: 2026-05-09
+
+This evidence slice continues after the known-good post-`options_m` boundary:
+
+- remove `copy_linker_arg(&s->fini_symbol)` style calls
+- flatten the `options_m` `#ifdef TCC_TARGET_ARM` table island
+- simplify the `CONFIG_TCC_ASM` island
+
+## Scripts
+
+- `run-local-tcc-parse-args-switch-ifdef.sh`
+  - verifies that the early `tcc_parse_args` switch cases through `TCC_OPTION_c` compile after keeping balanced inactive `CONFIG_TCC_BACKTRACE` / `CONFIG_TCC_BCHECK` islands.
+- `run-local-tcc-parse-args-d-case-reduce.sh`
+  - verifies the `TCC_OPTION_d` body, including the `if`/`else if` chain and `goto unsupported_option`, compiles when the target label is present.
+- `run-local-tcc-parse-args-post-d-cumulative.sh`
+  - verifies cumulative switch cases from `static` through `m`, including `shared`/`r`/`run` gotos back to `set_output_type`, compile.
+- `run-local-tcc-parse-args-tail-cumulative.sh`
+  - verifies cumulative cases through `MF` compile, then the first real tail failure appears when adding `TCC_OPTION_dumpversion`.
+
+## Receipts
+
+- `focused-local-tcc-parse-args-switch-ifdef.txt`
+  - all generated variants compile (`rc=0`) for common and `-D ONE_SOURCE=1`.
+- `focused-local-tcc-parse-args-d-case-reduce.txt`
+  - all generated `d`-case reductions compile (`rc=0`) for common and `-D ONE_SOURCE=1`.
+- `focused-local-tcc-parse-args-post-d-cumulative.txt`
+  - all generated variants through `m` compile (`rc=0`) for common and `-D ONE_SOURCE=1`.
+- `focused-local-tcc-parse-args-tail-cumulative.txt`
+  - variants through `MF` compile (`rc=0`) for common and `-D ONE_SOURCE=1`.
+  - first tail failure is `10_through_dumpversion` (`rc=-11`) for both common and `-D ONE_SOURCE=1`.
+
+## Current narrowed frontier
+
+`TCC_OPTION_dumpversion` is the next frontier after the post-`options_m` normalization path. A valid cumulative switch body through `MF` compiles; adding:
+
+```c
+case TCC_OPTION_dumpversion:
+    printf ("%s\n", TCC_VERSION);
+    exit(0);
+    break;
+```
+
+causes the local Mes/TCC compiler to segfault (`rc=-11`).
+
+## Dumpversion split follow-up
+
+- `run-local-tcc-parse-args-dumpversion-split.sh`
+  - preserves the known-good manual cumulative body through `TCC_OPTION_MF` and varies only the next `TCC_OPTION_dumpversion` case.
+- `focused-local-tcc-parse-args-dumpversion-split.txt`
+  - `00_through_MF`: `rc=0` for common and `-D ONE_SOURCE=1`.
+  - `01_dump_case_only_break`: `rc=0` for common and `-D ONE_SOURCE=1`.
+  - `02_dump_printf_empty_break`: `rc=0` for common and `-D ONE_SOURCE=1`.
+  - `04_dump_exit_only`: `rc=0` for common and `-D ONE_SOURCE=1`.
+  - `03_dump_printf_version_break`: `rc=-11` for common and `-D ONE_SOURCE=1`.
+  - `05_dump_printf_version_exit`: `rc=-11` for common and `-D ONE_SOURCE=1`.
+
+The narrowed trigger is now specifically the `printf("%s\n", TCC_VERSION)` varargs call shape inside `TCC_OPTION_dumpversion`, not the case label or `exit(0)`.
+
+## Printf / macro shape follow-up
+
+- `run-local-tcc-parse-args-dumpversion-printf-shape.sh`
+  - literal calls compile: `printf("")`, `printf("0.9.27\n")`, and `printf("%s\n", "0.9.27")` all return `rc=0` under common and `-D ONE_SOURCE=1`.
+  - every direct `TCC_VERSION` expression form tested segfaults (`rc=-11`): `printf(TCC_VERSION)`, `printf("%s\n", TCC_VERSION)`, `fputs(TCC_VERSION, stdout)`, `fputs(TCC_VERSION, stderr)`, `puts(TCC_VERSION)`, and `tcc_warning("%s", TCC_VERSION)`.
+- `run-local-tcc-parse-args-dumpversion-macro-shape.sh`
+  - local literal macro use compiles: `#define CRUNCH_LOCAL_VERSION "0.9.27"` + `puts(CRUNCH_LOCAL_VERSION)` returns `rc=0`.
+  - aliasing through the original macro still fails: `#define CRUNCH_LOCAL_VERSION TCC_VERSION` + `puts(CRUNCH_LOCAL_VERSION)` returns `rc=-11`.
+  - top-level literal storage compiles: `static const char *... = "0.9.27"` and `static char ...[] = "0.9.27"` return `rc=0`.
+  - top-level storage initialized from the original `TCC_VERSION` macro fails (`rc=-11`), as does `sizeof(TCC_VERSION)`.
+  - explicitly `#undef`/redefining `TCC_VERSION` to a literal immediately before `tcc_parse_args` makes `puts(TCC_VERSION)` compile (`rc=0`), including both `"0.9.27"` and `"x"`.
+
+The narrowed trigger is now the original `TCC_VERSION` macro expansion path in the predecessor compiler context, not varargs, `printf`, string literal length, or use of stdout/stderr.
+
+## TCC_VERSION source audit
+
+- `run-local-tcc-version-source-audit.sh`
+  - checks the focused replay scripts instead of rebuilding the unavailable `/crunch/store` inputs.
+- `focused-local-tcc-version-source-audit.txt`
+  - both printf/macro-shape focused replay scripts clear generated `config.h` with `: > config.h`.
+  - both scripts' `flags_common` omit `-D TCC_VERSION=...`, and the extra-flag matrix only adds `-D ONE_SOURCE=1`.
+  - Crunch's full diagnostic derivation still defines `TCC_VERSION` on the command line as `-D TCC_VERSION=\"0.9.27-decl0-diag\"`; the normal `tcc-musl-v2` build uses `-D TCC_VERSION=\"0.9.27\"`.
+  - the focused replay's successful spelling is the local source-level `#undef TCC_VERSION` / `#define TCC_VERSION "0.9.27"` immediately before `tcc_parse_args`.
+
+Conclusion: the latest focused replay did **not** have an active original `TCC_VERSION` macro definition. Its failing `TCC_VERSION` cases exercised unresolved identifier tokens in the predecessor compiler, while the local redefine converted those tokens to a normal string literal.
+
+## Replay-faithful TCC_VERSION rerun
+
+- `run-local-tcc-parse-args-dumpversion-faithful-version.sh`
+  - restores the needed Crunch PathInfo/NAR entries into `/tmp` with `crunch store push` + `nix-store --restore` when `/crunch/store` is not writable/materialized.
+  - patches the printf-shape and macro-shape replay scripts to use the restored source/compiler/runtime and adds `-DTCC_VERSION="0.9.27-decl0-diag"` to `flags_common`.
+- `focused-local-tcc-parse-args-dumpversion-faithful-version.txt`
+  - mode: `crunch-cache-restored`.
+  - all 40 generated variants compile (`rc=0`) under common flags and `-D ONE_SOURCE=1`.
+  - previously failing direct macro-use variants now compile, including `printf("%s\\n", TCC_VERSION)`, `puts(TCC_VERSION)`, static storage initialized from `TCC_VERSION`, and `sizeof(TCC_VERSION)`.
+
+Conclusion: `TCC_VERSION` is not the next real `tcc_parse_args()` blocker once the replay carries the command-line definition used by the full diagnostic derivation. The next useful reduction is to keep `-DTCC_VERSION="0.9.27-decl0-diag"` in the local replay and continue the tail cumulative switch past `TCC_OPTION_dumpversion`.
+
+## Replay-faithful tail cumulative rerun
+
+- `run-local-tcc-parse-args-tail-faithful-version.sh`
+  - restores the same Crunch PathInfo/NAR entries into `/tmp` with `crunch store push` + `nix-store --restore` when needed.
+  - patches the tail cumulative replay to use the restored source/compiler/runtime and adds `-DTCC_VERSION="0.9.27-decl0-diag"` to `flags_common`.
+  - compiles the cumulative `tcc_parse_args` variants, then compiles the whole locally-normalized `libtcc.asm_simplified.c` file under common flags and `-D ONE_SOURCE=1`.
+- `focused-local-tcc-parse-args-tail-faithful-version.txt`
+  - `TCC_OPTION_dumpversion` now compiles (`rc=0`) under common flags and `-D ONE_SOURCE=1`.
+  - cumulative variants through `x` and `O` also compile (`rc=0`).
+  - the `print_search_dirs` and `impdef` prefix-only variants still return `rc=-11`, but those are incomplete-goto artifacts because the later `ar` chunk supplies the shared `extra_action:` label; cumulative variants through `ar`, `ignored`, `default`, and `99_full_switch_real_epilogue` compile (`rc=0`).
+  - the full locally-normalized `libtcc.asm_simplified.c` file compiles (`rc=0`) under both common flags and `-D ONE_SOURCE=1`.
+
+Conclusion: after applying the faithful `TCC_VERSION` definition, the local replay has no remaining `tcc_parse_args()` tail blocker, and the cumulatively-normalized full `libtcc.c` compiles in the predecessor context. The next useful reduction should move from `libtcc.c` local compile bisection back toward the broader diagnostic derivation/runtime-marker path.
+
+## Broader diagnostic path follow-up
+
+See `../V2-gcc40-gcc-c-parse-decl0-libtcc-derivation-normalized.md` and `../gcc40-cparse-decl0-libtcc-derivation-normalized-20260510/` for the first broader-path rerun. The diagnostic NCL now carries the accumulated local normalizations and evaluates successfully; the full Crunch build was blocked by a prerequisite `bash-2.05b-tcc.drv` failure before the target derivation ran. A restored-output local replay still compiles full normalized `libtcc.c` (`rc=0`) but the instrumented one-source TinyCC executable build fails at the link/add-file path (`rc=139`) with a malformed missing-file diagnostic, before any `diag-tcc-decl0-runtime:` markers can execute.

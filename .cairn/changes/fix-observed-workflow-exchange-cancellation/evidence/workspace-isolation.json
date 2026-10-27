@@ -1,0 +1,36 @@
+{
+  "schema": "lattice.native-workspace-isolation.v1",
+  "cargo": "/nix/store/665792zr2aksngyi2dfy7fvikvvlqmhb-rust-minimal-1.97.1/bin/cargo",
+  "command": [
+    "cargo",
+    "metadata",
+    "--offline",
+    "--no-deps",
+    "--format-version",
+    "1"
+  ],
+  "method": "Disposable outer root package depends on an explicitly workspace-bound native inner crate, which depends on another native workspace root. Only explicit versus implicit outer root membership changes.",
+  "results": [
+    {
+      "rootMembers": [
+        "."
+      ],
+      "exit_code": 101,
+      "stderr": "error: multiple workspace roots found in the same workspace:\n  /tmp/kiln-native-workspace-probe-1793121992849\n  /tmp/kiln-native-workspace-probe-1793121992849/vendor/nested\n",
+      "members": []
+    },
+    {
+      "rootMembers": [],
+      "exit_code": 0,
+      "stderr": "",
+      "members": [
+        "path+file:///tmp/kiln-native-workspace-probe-1793121992849#probe@0.1.0"
+      ]
+    }
+  ],
+  "correction": "Keep the root package as an implicit member; do not list dot in workspace.members. Preserve default-members dot and all product crates. Native imports remain excluded, not disabled or rewritten.",
+  "non_claims": [
+    "metadata admission does not prove application compilation, execution or qualification",
+    "No user-reported failure was rerun; this reproducer isolates a newly discovered Cargo membership defect."
+  ]
+}

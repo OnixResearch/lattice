@@ -1,19 +1,14 @@
 // Issuer-key resolution fixture and rotation verification:
 // r[verify ucan_token_flow.oidc.secretspec_fixtures]
-use super::IssuerKeyDeclaration;
-use super::IssuerResolutionReason;
-use super::RotationWindow;
-use super::build_resolve_request;
-use super::classify_resolution;
-use super::validate_declaration;
-use super::validate_rotation_window;
-use crate::secretspec_issuer::DEFAULT_MAX_RESOLVED_VALUE_BYTES;
-use crate::secretspec_issuer::IssuerResolutionFailure;
-use crate::secretspec_issuer::REQUIRED_ISSUER_NON_CLAIMS;
-use crate::secretspec_issuer::ResolutionBoundaries;
-use crate::secretspec_issuer::resolve_issuer_key;
-use crate::secretspec_issuer_identity::OIDC_EXCHANGE_SCOPE;
-use crate::secretspec_issuer_identity::SECRETSPEC_VERSION;
+use super::{
+    IssuerKeyDeclaration, IssuerResolutionReason, RotationWindow, build_resolve_request,
+    classify_resolution, validate_declaration, validate_rotation_window,
+};
+use crate::secretspec_issuer::{
+    DEFAULT_MAX_RESOLVED_VALUE_BYTES, IssuerResolutionFailure, REQUIRED_ISSUER_NON_CLAIMS,
+    ResolutionBoundaries, resolve_issuer_key,
+};
+use crate::secretspec_issuer_identity::{OIDC_EXCHANGE_SCOPE, SECRETSPEC_VERSION};
 
 fn declaration() -> IssuerKeyDeclaration {
     IssuerKeyDeclaration::new("production", "oidc-signing-key", "env://")
@@ -139,8 +134,11 @@ fn fails_closed_on_provider_failure_envelope() {
 #[test]
 fn preserves_non_claims_on_every_result() {
     let loaded = classify_resolution(&declaration(), &ok_envelope(), 256);
-    let rejected =
-        classify_resolution(&declaration(), r#"{"ok":false,"error":{"kind":"provider","message":"unavailable"}}"#, 256);
+    let rejected = classify_resolution(
+        &declaration(),
+        r#"{"ok":false,"error":{"kind":"provider","message":"unavailable"}}"#,
+        256,
+    );
 
     let expected = REQUIRED_ISSUER_NON_CLAIMS.map(str::to_owned).to_vec();
     assert_eq!(loaded.non_claims, expected);
@@ -156,7 +154,12 @@ fn declaration_reject_reports_deterministic_issues() {
 
     assert!(!result.is_allowed());
     assert_eq!(result.reason, IssuerResolutionReason::DeclarationRejected);
-    assert!(result.issues.iter().any(|issue| issue.code == "issuer.scope"));
+    assert!(
+        result
+            .issues
+            .iter()
+            .any(|issue| issue.code == "issuer.scope")
+    );
 }
 
 #[test]
@@ -167,7 +170,11 @@ fn pinned_version_identity_is_stable() {
 
 #[test]
 fn rotation_window_admits_public_verification_material() {
-    let window = RotationWindow::new("blake3:active", vec!["blake3:previous".to_owned()], "oidc-signing-key-2");
+    let window = RotationWindow::new(
+        "blake3:active",
+        vec!["blake3:previous".to_owned()],
+        "oidc-signing-key-2",
+    );
 
     assert!(validate_rotation_window(&window).is_empty());
     assert!(window.admits("oidc-signing-key-2"));
@@ -176,19 +183,33 @@ fn rotation_window_admits_public_verification_material() {
 
 #[test]
 fn rotation_window_rejects_duplicate_active_digest() {
-    let window = RotationWindow::new("blake3:active", vec!["blake3:active".to_owned()], "oidc-signing-key-2");
+    let window = RotationWindow::new(
+        "blake3:active",
+        vec!["blake3:active".to_owned()],
+        "oidc-signing-key-2",
+    );
 
     let issues = validate_rotation_window(&window);
-    assert!(issues.iter().any(|issue| issue.code == "issuer.rotation.active-duplicate"));
+    assert!(
+        issues
+            .iter()
+            .any(|issue| issue.code == "issuer.rotation.active-duplicate")
+    );
 }
 
 #[test]
 fn rotation_window_rejects_oversized_overlap() {
-    let overlap = (0..=super::MAX_ROTATION_OVERLAP_KEYS).map(|i| format!("digest-{i}")).collect();
+    let overlap = (0..=super::MAX_ROTATION_OVERLAP_KEYS)
+        .map(|i| format!("digest-{i}"))
+        .collect();
     let window = RotationWindow::new("blake3:active", overlap, "oidc-signing-key-2");
 
     let issues = validate_rotation_window(&window);
-    assert!(issues.iter().any(|issue| issue.code == "issuer.rotation.overlap-limit"));
+    assert!(
+        issues
+            .iter()
+            .any(|issue| issue.code == "issuer.rotation.overlap-limit")
+    );
 }
 
 #[test]

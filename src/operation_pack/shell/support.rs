@@ -62,7 +62,7 @@ fn validate_runtime_files(root: &std::path::Path, manifest: &super::model::Manif
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt as _;
-            if metadata.permissions().mode() & EXECUTABLE_MODE_MASK == 0 {
+            if runtime.kind == "bounded_process" && metadata.permissions().mode() & EXECUTABLE_MODE_MASK == 0 {
                 return Err(super::Error::Invalid("runtime executable mode"));
             }
         }

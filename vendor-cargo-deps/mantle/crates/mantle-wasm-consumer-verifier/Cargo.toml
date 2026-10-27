@@ -1,0 +1,19 @@
+[package]
+name = "mantle-wasm-consumer-verifier"
+workspace = "../.."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Published consumer contract for verifying Mantle WebAssembly component materialization bundles"
+
+[features]
+default = ["std"]
+std = ["blake3/std", "dep:cap-std", "dep:cap-fs-ext"]
+
+[dependencies]
+blake3 = { version = "=1.8.5", default-features = false }
+crunch-wasm-component-core = { path = "../crunch-wasm-component-core" }
+serde = { version = "1.0", default-features = false, features = ["alloc", "derive"] }
+serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
+cap-std = { version = "4.0.2", optional = true }
+cap-fs-ext = { version = "4.0.2", optional = true }

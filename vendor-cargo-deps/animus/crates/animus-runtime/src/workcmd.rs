@@ -7,7 +7,12 @@
 //! any host-owned side effect can start.
 
 #![allow(unknown_lints)]
-#![allow(assertion_density, excessive_file_length, no_panic, unbounded_collection_growth)]
+#![allow(
+    assertion_density,
+    excessive_file_length,
+    no_panic,
+    unbounded_collection_growth
+)]
 
 #[cfg(test)]
 const WORKFLOW_COMMAND_SCHEMA: &str = "animus.workflow-command.v1";
@@ -145,12 +150,12 @@ pub enum WorkflowCommandArgumentValueDraft<'a> {
 impl WorkflowCommandArgumentValueDraft<'_> {
     fn to_owned(self) -> Result<WorkflowCommandArgumentValue, WorkflowCommandError> {
         match self {
-            Self::Text(value) => {
-                Ok(WorkflowCommandArgumentValue::Text(String::from(validate_argument_text(FieldText {
+            Self::Text(value) => Ok(WorkflowCommandArgumentValue::Text(String::from(
+                validate_argument_text(FieldText {
                     field: ARGUMENT_VALUE_FIELD,
                     value,
-                })?)))
-            }
+                })?,
+            ))),
             Self::Boolean(value) => Ok(WorkflowCommandArgumentValue::Boolean(value)),
             Self::Integer(value) => Ok(WorkflowCommandArgumentValue::Integer(value)),
             Self::TextList(values) => {
@@ -278,9 +283,10 @@ impl WorkflowCommandSideEffectPosture {
             | WorkflowCommandCapability::CallModel
             | WorkflowCommandCapability::CallTool
             | WorkflowCommandCapability::ValidateOutput => true,
-            WorkflowCommandCapability::MutateWorkspace => {
-                matches!(self, Self::WorkspaceMutation | Self::VcsMutation | Self::HostSpecific)
-            }
+            WorkflowCommandCapability::MutateWorkspace => matches!(
+                self,
+                Self::WorkspaceMutation | Self::VcsMutation | Self::HostSpecific
+            ),
             WorkflowCommandCapability::MutateVcs => {
                 matches!(self, Self::VcsMutation | Self::HostSpecific)
             }
@@ -449,7 +455,9 @@ impl WorkflowCommandOutputContract {
     ///
     /// Returns [`WorkflowCommandError`] when the contract omits a structured
     /// schema label or supplies one for an unstructured output kind.
-    pub fn validate(draft: &WorkflowCommandOutputContractDraft<'_>) -> Result<Self, WorkflowCommandError> {
+    pub fn validate(
+        draft: &WorkflowCommandOutputContractDraft<'_>,
+    ) -> Result<Self, WorkflowCommandError> {
         let structured_schema = match (draft.kind, draft.structured_schema) {
             (WorkflowCommandOutputKind::StructuredDto, Some(schema)) => {
                 Some(String::from(validate_safe_label(FieldText {
@@ -535,7 +543,9 @@ impl WorkflowCommandManifest {
     ///
     /// Returns [`WorkflowCommandError`] when the manifest is unsafe, incomplete,
     /// untrusted, or internally inconsistent.
-    pub fn validate(draft: &WorkflowCommandManifestDraft<'_>) -> Result<Self, WorkflowCommandError> {
+    pub fn validate(
+        draft: &WorkflowCommandManifestDraft<'_>,
+    ) -> Result<Self, WorkflowCommandError> {
         let name = String::from(validate_command_name(draft.name)?);
         let summary = String::from(validate_safe_summary(FieldText {
             field: "summary",
@@ -761,7 +771,8 @@ pub fn build_workflow_command_registry(
     manifests: &[WorkflowCommandManifest],
     policy: WorkflowCommandRegistryPolicy,
 ) -> WorkflowCommandRegistry {
-    let mut groups: std::collections::BTreeMap<&str, Vec<&WorkflowCommandManifest>> = std::collections::BTreeMap::new();
+    let mut groups: std::collections::BTreeMap<&str, Vec<&WorkflowCommandManifest>> =
+        std::collections::BTreeMap::new();
     for manifest in manifests {
         groups.entry(manifest.name()).or_default().push(manifest);
     }
@@ -803,7 +814,10 @@ pub fn build_workflow_command_registry(
         }
     }
 
-    WorkflowCommandRegistry { commands, diagnostics }
+    WorkflowCommandRegistry {
+        commands,
+        diagnostics,
+    }
 }
 
 // r[impl agent_harness_runtime.claude_code_commands.binding]
@@ -877,7 +891,11 @@ pub fn bind_workflow_command_arguments(
     }
     let provided = collect_arguments(arguments)?;
     for name in provided.keys() {
-        if !manifest.input_schema().iter().any(|field| field.name() == name.as_str()) {
+        if !manifest
+            .input_schema()
+            .iter()
+            .any(|field| field.name() == name.as_str())
+        {
             return Err(WorkflowCommandError::new(
                 WorkflowCommandErrorKind::UnknownArgument,
                 ARGUMENT_NAME_FIELD,
@@ -1011,7 +1029,10 @@ pub fn prepare_workflow_command_invocation(
     policy: &WorkflowCommandPolicy,
 ) -> Result<WorkflowInvocationPlan, WorkflowCommandError> {
     let binding = bind_workflow_command_arguments(manifest, arguments)?;
-    if !policy.allowed_postures().contains(&manifest.side_effect_posture()) {
+    if !policy
+        .allowed_postures()
+        .contains(&manifest.side_effect_posture())
+    {
         return Err(WorkflowCommandError::new(
             WorkflowCommandErrorKind::PolicyDenied,
             SIDE_EFFECT_POSTURE_FIELD,
@@ -1229,7 +1250,9 @@ pub enum WorkflowCommandErrorKind {
 }
 
 fn count_chars_u64(value: &str) -> u64 {
-    value.chars().fold(0_u64, |count, _character| count.saturating_add(1))
+    value
+        .chars()
+        .fold(0_u64, |count, _character| count.saturating_add(1))
 }
 
 fn validate_input_schema(
@@ -1367,7 +1390,8 @@ fn validate_provenance(
 
 fn collect_arguments(
     arguments: &[WorkflowInvocationArgumentDraft<'_>],
-) -> Result<std::collections::BTreeMap<String, WorkflowCommandArgumentValue>, WorkflowCommandError> {
+) -> Result<std::collections::BTreeMap<String, WorkflowCommandArgumentValue>, WorkflowCommandError>
+{
     let mut provided = std::collections::BTreeMap::new();
     for argument in arguments {
         let name = validate_safe_label(FieldText {
@@ -1422,7 +1446,9 @@ fn validate_output_contract_match(
         }
         (None, None) => {}
     }
-    if contract.kind() == WorkflowCommandOutputKind::ValidationReport && draft.validation_status.is_none() {
+    if contract.kind() == WorkflowCommandOutputKind::ValidationReport
+        && draft.validation_status.is_none()
+    {
         return Err(WorkflowCommandError::new(
             WorkflowCommandErrorKind::OutputContractMismatch,
             OUTPUT_KIND_FIELD,
@@ -1447,25 +1473,38 @@ fn registry_diagnostic(
 }
 
 fn sorted_source_ids(manifests: &[&WorkflowCommandManifest]) -> Vec<String> {
-    let mut source_ids: Vec<String> =
-        manifests.iter().map(|manifest| String::from(manifest.provenance().source_id())).collect();
+    let mut source_ids: Vec<String> = manifests
+        .iter()
+        .map(|manifest| String::from(manifest.provenance().source_id()))
+        .collect();
     source_ids.sort();
     source_ids
 }
 
-fn select_precedence_winner<'a>(manifests: &[&'a WorkflowCommandManifest]) -> Option<&'a WorkflowCommandManifest> {
+fn select_precedence_winner<'a>(
+    manifests: &[&'a WorkflowCommandManifest],
+) -> Option<&'a WorkflowCommandManifest> {
     manifests.iter().copied().max_by(|left, right| {
         left.provenance()
             .source_scope()
             .precedence_rank()
             .cmp(&right.provenance().source_scope().precedence_rank())
-            .then_with(|| right.provenance().source_id().cmp(left.provenance().source_id()))
+            .then_with(|| {
+                right
+                    .provenance()
+                    .source_id()
+                    .cmp(left.provenance().source_id())
+            })
     })
 }
 
 fn validate_command_name(value: &str) -> Result<&str, WorkflowCommandError> {
     if value.is_empty() || value.len() > MAX_COMMAND_NAME_CHARS || !is_command_name(value) {
-        return Err(WorkflowCommandError::new(WorkflowCommandErrorKind::InvalidName, COMMAND_NAME_FIELD, value));
+        return Err(WorkflowCommandError::new(
+            WorkflowCommandErrorKind::InvalidName,
+            COMMAND_NAME_FIELD,
+            value,
+        ));
     }
     Ok(value)
 }
@@ -1477,7 +1516,9 @@ fn is_command_name(value: &str) -> bool {
     };
     first.is_ascii_lowercase()
         && chars.all(|character| {
-            character.is_ascii_lowercase() || character.is_ascii_digit() || matches!(character, '-' | '_')
+            character.is_ascii_lowercase()
+                || character.is_ascii_digit()
+                || matches!(character, '-' | '_')
         })
 }
 
@@ -1538,10 +1579,22 @@ fn validate_bounded_text(input: BoundedText<'_>) -> Result<&str, WorkflowCommand
 
 fn validate_blake3_hex(input: FieldText<'_>) -> Result<&str, WorkflowCommandError> {
     if input.value.len() != BLAKE3_HEX_CHARS {
-        return Err(WorkflowCommandError::new(WorkflowCommandErrorKind::InvalidProvenance, input.field, input.value));
+        return Err(WorkflowCommandError::new(
+            WorkflowCommandErrorKind::InvalidProvenance,
+            input.field,
+            input.value,
+        ));
     }
-    if !input.value.chars().all(|character| character.is_ascii_hexdigit()) {
-        return Err(WorkflowCommandError::new(WorkflowCommandErrorKind::InvalidProvenance, input.field, input.value));
+    if !input
+        .value
+        .chars()
+        .all(|character| character.is_ascii_hexdigit())
+    {
+        return Err(WorkflowCommandError::new(
+            WorkflowCommandErrorKind::InvalidProvenance,
+            input.field,
+            input.value,
+        ));
     }
     Ok(input.value)
 }
@@ -1553,12 +1606,19 @@ fn is_safe_label(value: &str) -> bool {
 }
 
 fn unsafe_text_error(input: FieldText<'_>) -> WorkflowCommandError {
-    WorkflowCommandError::new(WorkflowCommandErrorKind::UnsafeText, input.field, input.value)
+    WorkflowCommandError::new(
+        WorkflowCommandErrorKind::UnsafeText,
+        input.field,
+        input.value,
+    )
 }
 
 fn leak_marker(value: &str) -> Option<&'static str> {
     let lower = value.to_ascii_lowercase();
-    LEAK_MARKERS.iter().copied().find(|marker| lower.contains(marker))
+    LEAK_MARKERS
+        .iter()
+        .copied()
+        .find(|marker| lower.contains(marker))
 }
 
 fn blake3_hex(bytes: &[u8]) -> String {
@@ -1637,10 +1697,13 @@ mod tests {
         }
     }
 
-    fn output_contract(kind: WorkflowCommandOutputKind) -> WorkflowCommandOutputContractDraft<'static> {
+    fn output_contract(
+        kind: WorkflowCommandOutputKind,
+    ) -> WorkflowCommandOutputContractDraft<'static> {
         WorkflowCommandOutputContractDraft {
             kind,
-            structured_schema: (kind == WorkflowCommandOutputKind::StructuredDto).then_some(REVIEW_SCHEMA),
+            structured_schema: (kind == WorkflowCommandOutputKind::StructuredDto)
+                .then_some(REVIEW_SCHEMA),
         }
     }
 
@@ -1662,8 +1725,11 @@ mod tests {
     }
 
     fn valid_manifest() -> WorkflowCommandManifest {
-        WorkflowCommandManifest::validate(&manifest_draft(HOST_SOURCE_ID, WorkflowCommandSourceScope::Host))
-            .expect("valid workflow command manifest should validate")
+        WorkflowCommandManifest::validate(&manifest_draft(
+            HOST_SOURCE_ID,
+            WorkflowCommandSourceScope::Host,
+        ))
+        .expect("valid workflow command manifest should validate")
     }
 
     #[test]
@@ -1675,7 +1741,10 @@ mod tests {
         assert_eq!(manifest.input_schema().len(), INPUTS.len());
         assert_eq!(manifest.capabilities(), READ_ONLY_CAPABILITIES);
         assert_eq!(manifest.validation_gates()[0], VALIDATION_GATE);
-        assert_eq!(manifest.output_contract().kind(), WorkflowCommandOutputKind::Review);
+        assert_eq!(
+            manifest.output_contract().kind(),
+            WorkflowCommandOutputKind::Review
+        );
         assert_eq!(manifest.provenance().source_id(), HOST_SOURCE_ID);
     }
 
@@ -1713,15 +1782,25 @@ mod tests {
         let cases = [
             (invalid_name, WorkflowCommandErrorKind::InvalidName),
             (missing_schema, WorkflowCommandErrorKind::MissingInputSchema),
-            (missing_posture, WorkflowCommandErrorKind::MissingSideEffectPosture),
-            (undeclared_capability, WorkflowCommandErrorKind::UndeclaredCapability),
-            (missing_output, WorkflowCommandErrorKind::MissingOutputContract),
+            (
+                missing_posture,
+                WorkflowCommandErrorKind::MissingSideEffectPosture,
+            ),
+            (
+                undeclared_capability,
+                WorkflowCommandErrorKind::UndeclaredCapability,
+            ),
+            (
+                missing_output,
+                WorkflowCommandErrorKind::MissingOutputContract,
+            ),
             (untrusted_project, WorkflowCommandErrorKind::UntrustedSource),
         ];
 
         assert_eq!(cases.len(), INVALID_MANIFEST_CASES);
         for (draft, expected_kind) in cases {
-            let error = WorkflowCommandManifest::validate(&draft).expect_err("invalid manifest must not be advertised");
+            let error = WorkflowCommandManifest::validate(&draft)
+                .expect_err("invalid manifest must not be advertised");
             assert_eq!(error.kind(), expected_kind);
             assert!(!error.field().is_empty());
         }
@@ -1732,12 +1811,17 @@ mod tests {
         // r[verify agent_harness_runtime.claude_code_commands.registry]
         // r[verify agent_harness_runtime.claude_code_commands.registry.duplicate]
         let host = valid_manifest();
-        let user = WorkflowCommandManifest::validate(&manifest_draft(USER_SOURCE_ID, WorkflowCommandSourceScope::User))
-            .expect("user command should validate");
+        let user = WorkflowCommandManifest::validate(&manifest_draft(
+            USER_SOURCE_ID,
+            WorkflowCommandSourceScope::User,
+        ))
+        .expect("user command should validate");
         let manifests = [host.clone(), user.clone()];
 
-        let disabled =
-            build_workflow_command_registry(manifests.as_slice(), WorkflowCommandRegistryPolicy::fail_closed());
+        let disabled = build_workflow_command_registry(
+            manifests.as_slice(),
+            WorkflowCommandRegistryPolicy::fail_closed(),
+        );
         assert!(disabled.lookup(DUPLICATE_COMMAND_NAME).is_none());
         assert_eq!(disabled.diagnostics().len(), DUPLICATE_DIAGNOSTICS);
 
@@ -1745,7 +1829,9 @@ mod tests {
             manifests.as_slice(),
             WorkflowCommandRegistryPolicy::prefer_source_precedence(),
         );
-        let command = selected.lookup(DUPLICATE_COMMAND_NAME).expect("host source should win deterministic precedence");
+        let command = selected
+            .lookup(DUPLICATE_COMMAND_NAME)
+            .expect("host source should win deterministic precedence");
         assert_eq!(command.provenance().source_id(), HOST_SOURCE_ID);
         assert!(
             selected
@@ -1760,16 +1846,19 @@ mod tests {
     fn workflow_command_invocation_binding_accepts_schema_ordered_arguments() {
         // r[verify agent_harness_runtime.claude_code_commands.binding]
         let manifest = valid_manifest();
-        let binding = bind_workflow_command_arguments(&manifest, &[
-            WorkflowInvocationArgumentDraft {
-                name: INPUT_INCLUDE_TESTS,
-                value: WorkflowCommandArgumentValueDraft::Boolean(true),
-            },
-            WorkflowInvocationArgumentDraft {
-                name: INPUT_FOCUS,
-                value: WorkflowCommandArgumentValueDraft::Text(ARG_FOCUS),
-            },
-        ])
+        let binding = bind_workflow_command_arguments(
+            &manifest,
+            &[
+                WorkflowInvocationArgumentDraft {
+                    name: INPUT_INCLUDE_TESTS,
+                    value: WorkflowCommandArgumentValueDraft::Boolean(true),
+                },
+                WorkflowInvocationArgumentDraft {
+                    name: INPUT_FOCUS,
+                    value: WorkflowCommandArgumentValueDraft::Text(ARG_FOCUS),
+                },
+            ],
+        )
         .expect("valid arguments should bind before expansion");
 
         assert_eq!(binding.command_name(), COMMAND_NAME);
@@ -1803,8 +1892,12 @@ mod tests {
 
         assert_eq!(cases.len(), INVALID_BINDING_CASES);
         for (arguments, expected_kind) in cases {
-            let error = prepare_workflow_command_invocation(&manifest, arguments, &WorkflowCommandPolicy::read_only())
-                .expect_err("bad arguments must stop before workflow side effects");
+            let error = prepare_workflow_command_invocation(
+                &manifest,
+                arguments,
+                &WorkflowCommandPolicy::read_only(),
+            )
+            .expect_err("bad arguments must stop before workflow side effects");
             assert_eq!(error.kind(), expected_kind);
         }
     }
@@ -1841,24 +1934,36 @@ mod tests {
             (WorkflowCommandOutputKind::Explanation, None, None),
             (WorkflowCommandOutputKind::Review, None, None),
             (WorkflowCommandOutputKind::PatchSummary, None, None),
-            (WorkflowCommandOutputKind::ValidationReport, None, Some(WorkflowValidationStatus::Passed)),
+            (
+                WorkflowCommandOutputKind::ValidationReport,
+                None,
+                Some(WorkflowValidationStatus::Passed),
+            ),
             (WorkflowCommandOutputKind::CommitMessageProposal, None, None),
-            (WorkflowCommandOutputKind::StructuredDto, Some(REVIEW_SCHEMA), None),
+            (
+                WorkflowCommandOutputKind::StructuredDto,
+                Some(REVIEW_SCHEMA),
+                None,
+            ),
         ];
 
         assert_eq!(cases.len(), OUTPUT_KIND_COUNT);
         for (kind, schema, status) in cases {
-            let contract = WorkflowCommandOutputContract::validate(&WorkflowCommandOutputContractDraft {
-                kind,
-                structured_schema: schema,
-            })
-            .expect("contract should validate");
-            let output = validate_workflow_command_output(&contract, &WorkflowCommandOutputDraft {
-                kind,
-                body: REVIEW_BODY,
-                structured_schema: schema,
-                validation_status: status,
-            })
+            let contract =
+                WorkflowCommandOutputContract::validate(&WorkflowCommandOutputContractDraft {
+                    kind,
+                    structured_schema: schema,
+                })
+                .expect("contract should validate");
+            let output = validate_workflow_command_output(
+                &contract,
+                &WorkflowCommandOutputDraft {
+                    kind,
+                    body: REVIEW_BODY,
+                    structured_schema: schema,
+                    validation_status: status,
+                },
+            )
             .expect("matching output should validate");
             assert_eq!(output.kind(), kind);
             assert!(!output.body_hash().is_empty());
@@ -1868,12 +1973,14 @@ mod tests {
     #[test]
     fn workflow_command_output_contract_mismatches_are_not_successful_completion() {
         // r[verify agent_harness_runtime.claude_code_commands.outputs.mismatch]
-        let validation_contract =
-            WorkflowCommandOutputContract::validate(&output_contract(WorkflowCommandOutputKind::ValidationReport))
-                .expect("validation report contract should validate");
-        let structured_contract =
-            WorkflowCommandOutputContract::validate(&output_contract(WorkflowCommandOutputKind::StructuredDto))
-                .expect("structured contract should validate");
+        let validation_contract = WorkflowCommandOutputContract::validate(&output_contract(
+            WorkflowCommandOutputKind::ValidationReport,
+        ))
+        .expect("validation report contract should validate");
+        let structured_contract = WorkflowCommandOutputContract::validate(&output_contract(
+            WorkflowCommandOutputKind::StructuredDto,
+        ))
+        .expect("structured contract should validate");
         let wrong_kind = WorkflowCommandOutputDraft {
             kind: WorkflowCommandOutputKind::Explanation,
             body: REVIEW_BODY,
@@ -1900,16 +2007,26 @@ mod tests {
         };
 
         let errors = [
-            validate_workflow_command_output(&validation_contract, &wrong_kind).expect_err("wrong kind must fail"),
+            validate_workflow_command_output(&validation_contract, &wrong_kind)
+                .expect_err("wrong kind must fail"),
             validate_workflow_command_output(&validation_contract, &missing_status)
                 .expect_err("missing status must fail"),
-            validate_workflow_command_output(&structured_contract, &wrong_schema).expect_err("wrong schema must fail"),
+            validate_workflow_command_output(&structured_contract, &wrong_schema)
+                .expect_err("wrong schema must fail"),
             validate_workflow_command_output(&validation_contract, &leaking_body)
                 .expect_err("leaking output body must fail"),
         ];
 
-        assert!(errors.iter().any(|error| { error.kind() == WorkflowCommandErrorKind::OutputContractMismatch }));
-        assert!(errors.iter().any(|error| error.kind() == WorkflowCommandErrorKind::UnsafeText));
+        assert!(
+            errors
+                .iter()
+                .any(|error| { error.kind() == WorkflowCommandErrorKind::OutputContractMismatch })
+        );
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.kind() == WorkflowCommandErrorKind::UnsafeText)
+        );
     }
 
     #[test]
@@ -1923,7 +2040,8 @@ mod tests {
             },
             ..manifest_draft(HOST_SOURCE_ID, WorkflowCommandSourceScope::Host)
         };
-        let error = WorkflowCommandManifest::validate(&draft).expect_err("invalid content identity must fail");
+        let error = WorkflowCommandManifest::validate(&draft)
+            .expect_err("invalid content identity must fail");
 
         assert_eq!(error.kind(), WorkflowCommandErrorKind::InvalidProvenance);
         assert_eq!(error.field(), CONTENT_HASH_FIELD);

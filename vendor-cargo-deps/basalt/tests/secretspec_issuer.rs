@@ -1,9 +1,7 @@
-use basalt::secretspec_issuer::IssuerKeyDeclaration;
-use basalt::secretspec_issuer::IssuerResolutionReason;
-use basalt::secretspec_issuer::RotationWindow;
-use basalt::secretspec_issuer::classify_resolution;
-use basalt::secretspec_issuer::validate_declaration;
-use basalt::secretspec_issuer::validate_rotation_window;
+use basalt::secretspec_issuer::{
+    IssuerKeyDeclaration, IssuerResolutionReason, RotationWindow, classify_resolution,
+    validate_declaration, validate_rotation_window,
+};
 
 const POSITIVE_DECLARATION: &str =
     include_str!("../contracts/secretspec-issuer/fixtures/positive/issuer-key-declaration.json");
@@ -13,12 +11,14 @@ const NEGATIVE_MISSING_REQUIRED: &str =
     include_str!("../contracts/secretspec-issuer/fixtures/negative/missing-required-key.json");
 const NEGATIVE_MISSING_DECLARED: &str =
     include_str!("../contracts/secretspec-issuer/fixtures/negative/missing-declared-key.json");
-const NEGATIVE_WRONG_SCOPE: &str = include_str!("../contracts/secretspec-issuer/fixtures/negative/wrong-scope.json");
+const NEGATIVE_WRONG_SCOPE: &str =
+    include_str!("../contracts/secretspec-issuer/fixtures/negative/wrong-scope.json");
 const NEGATIVE_PROVIDER_FAILURE: &str =
     include_str!("../contracts/secretspec-issuer/fixtures/negative/provider-failure.json");
 
 fn declaration() -> IssuerKeyDeclaration {
-    serde_json::from_str(POSITIVE_DECLARATION).expect("positive issuer-key declaration fixture should parse")
+    serde_json::from_str(POSITIVE_DECLARATION)
+        .expect("positive issuer-key declaration fixture should parse")
 }
 
 #[test]
@@ -44,13 +44,19 @@ fn fails_closed_for_all_negative_resolution_fixtures() {
         (NEGATIVE_MISSING_REQUIRED, IssuerResolutionReason::Missing),
         (NEGATIVE_MISSING_DECLARED, IssuerResolutionReason::Missing),
         (NEGATIVE_WRONG_SCOPE, IssuerResolutionReason::WrongScope),
-        (NEGATIVE_PROVIDER_FAILURE, IssuerResolutionReason::ProviderFailure),
+        (
+            NEGATIVE_PROVIDER_FAILURE,
+            IssuerResolutionReason::ProviderFailure,
+        ),
     ];
 
     for (fixture, expected) in cases {
         let result = classify_resolution(&declaration, fixture, 256);
         assert!(!result.is_allowed());
-        assert_eq!(result.reason, expected, "fixture should fail closed as {expected:?}");
+        assert_eq!(
+            result.reason, expected,
+            "fixture should fail closed as {expected:?}"
+        );
     }
 }
 

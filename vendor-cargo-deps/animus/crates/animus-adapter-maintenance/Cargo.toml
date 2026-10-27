@@ -1,0 +1,23 @@
+[package]
+name = "animus-adapter-maintenance"
+description = "no_std dependency-maintenance planning and service-port contracts for Animus."
+edition = "2024"
+license = "MIT OR Apache-2.0"
+readme = "../../README.md"
+rust-version = "1.85"
+version = "0.1.0"
+
+[lints.rust]
+missing_docs = "deny"
+unsafe_code = "forbid"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(animus_octet)'] }
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+module_name_repetitions = { level = "allow", priority = 1 }
+pedantic = { level = "deny", priority = -1 }
+undocumented_unsafe_blocks = "deny"
+
+[dependencies]
+animus-adapter-change-request = { path = "../animus-adapter-change-request", version = "0.1.0" }
+blake3 = { version = "1.8.5", default-features = false }

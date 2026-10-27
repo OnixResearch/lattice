@@ -97,7 +97,10 @@ pub struct RejectedCandidate {
 }
 
 impl RejectedCandidate {
-    pub(super) fn new(observation: &animus_adapters::AgentStatusObservation, reason: RejectedReason) -> Self {
+    pub(super) fn new(
+        observation: &animus_adapters::AgentStatusObservation,
+        reason: RejectedReason,
+    ) -> Self {
         Self {
             authority: AuthoritySummary::from_observation(observation),
             reason,
@@ -129,7 +132,11 @@ impl RejectionCollector {
         }
     }
 
-    pub(super) fn push(&mut self, observation: &animus_adapters::AgentStatusObservation, reason: RejectedReason) {
+    pub(super) fn push(
+        &mut self,
+        observation: &animus_adapters::AgentStatusObservation,
+        reason: RejectedReason,
+    ) {
         self.items.push(RejectedCandidate::new(observation, reason));
     }
 

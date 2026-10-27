@@ -13,6 +13,7 @@ const DECLARATION_PREFIX: &str = "lattice-effect";
 const RESOURCE_FILE_PREFIX: &str = "lattice://file/";
 const RESOURCE_PROCESS_PREFIX: &str = "lattice://process/";
 const RESOURCE_NETWORK_PREFIX: &str = "lattice://network/";
+const RESOURCE_AGENT_PREFIX: &str = "lattice://agent/";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct SyntheticPortIdentity(u64);
@@ -78,6 +79,7 @@ pub(crate) fn effect_contract(config: &super::PortableNodeConfig) -> Option<(&'s
     match config.kind.as_str() {
         "shell" | "operation" => Some((RESOURCE_PROCESS_PREFIX, "process/execute")),
         "http" => Some((RESOURCE_NETWORK_PREFIX, "network/request")),
+        "agent" => Some((RESOURCE_AGENT_PREFIX, "agent/execute")),
         "file" => Some((RESOURCE_FILE_PREFIX, match config.file_operation.as_str() {
             "read" => "file/read",
             "append" => "file/append",

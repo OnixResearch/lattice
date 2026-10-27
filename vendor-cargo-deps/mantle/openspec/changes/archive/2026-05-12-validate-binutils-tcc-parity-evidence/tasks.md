@@ -1,0 +1,9 @@
+## Phase 1: Evidence Contract
+
+- [x] [serial] Add a `binutils.tcc` parity evidence check that keeps the row blocked without a checked transcript and documents the expected transcript fields. ✅ 12m (started: 2026-05-12T18:53:00Z → completed: 2026-05-12T19:05:00Z)
+- [x] [serial] Add parity-report regression coverage proving `--require live-bootstrap` and `--require guix` reject unevidenced `binutils.tcc` output. ✅ 6m (started: 2026-05-12T19:08:00Z → completed: 2026-05-12T19:14:00Z)
+
+## Phase 2: Runtime Probe
+
+- [x] [depends:binutils-evidence-check] Run a bounded `bootstrap/binutils-tcc.ncl` build/smoke probe, recording output path or blocker logs under this change's evidence directory. ✅ 18m (started: 2026-05-12T19:15:00Z → completed: 2026-05-12T19:33:00Z; evidence: evidence/binutils-tcc-runtime-probe-20260512.md)
+- [x] [depends:runtime-probe] Update the parity row status/notes only to the level justified by the probe, then rerun OpenSpec and parity CLI verification. ✅ 7m (started: 2026-05-12T19:35:00Z → completed: 2026-05-12T19:42:00Z)

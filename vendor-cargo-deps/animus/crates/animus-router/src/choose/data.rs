@@ -76,7 +76,10 @@ impl Budget {
     /// # Errors
     ///
     /// Returns [`crate::AdapterContractError`] when backend labels are invalid.
-    pub fn new(max_candidates: u32, allowed_backends: &[&str]) -> Result<Self, crate::AdapterContractError> {
+    pub fn new(
+        max_candidates: u32,
+        allowed_backends: &[&str],
+    ) -> Result<Self, crate::AdapterContractError> {
         let allowed_backends = allowed_backends
             .iter()
             .map(|backend| crate::normalized_adapter_field(BACKEND_FIELD, backend))
@@ -88,7 +91,9 @@ impl Budget {
     }
 
     pub(crate) fn allows_backend(&self, backend: &str) -> bool {
-        self.allowed_backends.iter().any(|allowed| allowed == backend)
+        self.allowed_backends
+            .iter()
+            .any(|allowed| allowed == backend)
     }
 
     /// Returns max candidates.

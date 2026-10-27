@@ -57,13 +57,16 @@ impl core::fmt::Display for Error {
             Self::MissingField { field } => write!(formatter, "{field} is required"),
             Self::InvalidField { error } => write!(formatter, "invalid retrieval field: {error}"),
             Self::EmptyConditionList { field } => write!(formatter, "{field} must not be empty"),
-            Self::ConditionLimit { field, max, actual } => {
-                write!(formatter, "{field} accepts at most {max} entries; got {actual}")
-            }
+            Self::ConditionLimit { field, max, actual } => write!(
+                formatter,
+                "{field} accepts at most {max} entries; got {actual}"
+            ),
             Self::InvalidLimit => write!(formatter, "max retrievals must be non-zero"),
-            Self::MissingBudget { capability } => {
-                write!(formatter, "retrieval budget is required for {}", capability.as_str())
-            }
+            Self::MissingBudget { capability } => write!(
+                formatter,
+                "retrieval budget is required for {}",
+                capability.as_str()
+            ),
             Self::MissingEvidenceNames => write!(formatter, "missing evidence names are required"),
             Self::RawBodyEmbedded => {
                 write!(formatter, "raw retrieved body is not receipt metadata")

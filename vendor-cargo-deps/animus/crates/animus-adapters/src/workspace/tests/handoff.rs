@@ -33,24 +33,33 @@ fn dirty_state_conflict_blocks_handoff_but_preserves_restore_evidence() {
         .expect("conflict record should still validate as review evidence");
 
     assert!(!record.handoff_allowed());
-    assert_eq!(record.conflict_status(), crate::WorkspaceHandoffConflictStatus::DirtyStateConflict);
+    assert_eq!(
+        record.conflict_status(),
+        crate::WorkspaceHandoffConflictStatus::DirtyStateConflict
+    );
     assert_eq!(record.restore_manifest_hash(), RESTORE_HASH);
 }
 
 #[test]
 fn handoff_rejects_empty_included_resource_manifest() {
-    let error = crate::WorkspaceSnapshotHandoffRecord::new(crate::WorkspaceSnapshotHandoffRecordDraft {
-        included_resources: &[],
-        ..valid_handoff_draft(CONFLICT_CLEAR)
-    })
-    .expect_err("handoff without included resource evidence should fail");
+    let error =
+        crate::WorkspaceSnapshotHandoffRecord::new(crate::WorkspaceSnapshotHandoffRecordDraft {
+            included_resources: &[],
+            ..valid_handoff_draft(CONFLICT_CLEAR)
+        })
+        .expect_err("handoff without included resource evidence should fail");
 
-    assert_eq!(error, crate::AdapterContractError::EmptyCollection {
-        field: "handoff_included_resources",
-    });
+    assert_eq!(
+        error,
+        crate::AdapterContractError::EmptyCollection {
+            field: "handoff_included_resources",
+        }
+    );
 }
 
-fn valid_handoff_draft(conflict_status: &'static str) -> crate::WorkspaceSnapshotHandoffRecordDraft<'static> {
+fn valid_handoff_draft(
+    conflict_status: &'static str,
+) -> crate::WorkspaceSnapshotHandoffRecordDraft<'static> {
     crate::WorkspaceSnapshotHandoffRecordDraft {
         thread_id: THREAD_ID,
         direction: DIRECTION_TO_FOREGROUND,

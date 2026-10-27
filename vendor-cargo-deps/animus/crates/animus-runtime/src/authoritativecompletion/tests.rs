@@ -1,5 +1,4 @@
-// Fixture builders return typed values for many tests; assertions remain concentrated in each
-// positive and negative case.
+// Fixture builders return typed values for many tests; assertions remain concentrated in each positive and negative case.
 #![allow(unknown_lints)]
 #![cfg_attr(
     animus_octet,
@@ -17,8 +16,10 @@ const HASH_C: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 const HASH_D: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
 const HASH_E: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 const TEST_COMMAND_HASH: &str = "108c657f5483b5a83731f413b62146dece87980abb850a1019b643bc9b37a55f";
-const CLIPPY_COMMAND_HASH: &str = "6abfeda462ce5dc98d1aac663c2de398f51bebd75a38bdbb7d01eba912df44e8";
-const CAIRN_SELECTION_HASH: &str = "b9da53c190687f8ff0bf2a465d6823056328363c7aa4b73f97ee0a10ff158581";
+const CLIPPY_COMMAND_HASH: &str =
+    "6abfeda462ce5dc98d1aac663c2de398f51bebd75a38bdbb7d01eba912df44e8";
+const CAIRN_SELECTION_HASH: &str =
+    "b9da53c190687f8ff0bf2a465d6823056328363c7aa4b73f97ee0a10ff158581";
 const TEST_COMMAND: &[&str] = &["cargo", "test", "--workspace"];
 const CLIPPY_COMMAND: &[&str] = &[
     "cargo",
@@ -227,11 +228,23 @@ fn registry_and_cairn_hash_parity_are_deterministic() {
     let registry = registry();
     assert!(super::validation::is_hash(registry.registry_hash()));
     assert_eq!(
-        cairn_command_hash(TEST_COMMAND.iter().map(|value| (*value).to_string()).collect::<Vec<_>>().as_slice()),
+        cairn_command_hash(
+            TEST_COMMAND
+                .iter()
+                .map(|value| (*value).to_string())
+                .collect::<Vec<_>>()
+                .as_slice()
+        ),
         TEST_COMMAND_HASH
     );
     assert_eq!(
-        cairn_command_hash(CLIPPY_COMMAND.iter().map(|value| (*value).to_string()).collect::<Vec<_>>().as_slice()),
+        cairn_command_hash(
+            CLIPPY_COMMAND
+                .iter()
+                .map(|value| (*value).to_string())
+                .collect::<Vec<_>>()
+                .as_slice()
+        ),
         CLIPPY_COMMAND_HASH
     );
     let selection = rust_selection();
@@ -266,8 +279,13 @@ fn registry_rejects_duplicate_unknown_cycle_unsafe_and_stale_rows() {
 
     let rows = [test_row(), clippy_row(), cairn_row()];
     let mut stale = registry_draft(&rows, FALLBACKS);
-    stale.cairn_policy_hash = HASH_A;
-    assert!(validate_agent_check_registry(&stale).is_err());
+    for rejected_policy in [
+        HASH_A,
+        "2c0b44345b9d2e2b3eff5fa7db7a14b9681c6bfcf7a4bb651f13bcadc1f91757",
+    ] {
+        stale.cairn_policy_hash = rejected_policy;
+        assert!(validate_agent_check_registry(&stale).is_err());
+    }
 }
 
 #[test]
@@ -277,9 +295,14 @@ fn registry_rejects_duplicate_unknown_cycle_unsafe_and_stale_rows() {
 // r[verify agent_harness_runtime.authoritative_completion.selection.pure]
 fn selector_adds_prerequisites_and_uses_conservative_unknown_fallback() {
     let direct = rust_selection();
-    assert_eq!(direct.required_checks().iter().map(CairnRequiredCheck::check_id).collect::<Vec<_>>(), vec![
-        "tests", "clippy"
-    ]);
+    assert_eq!(
+        direct
+            .required_checks()
+            .iter()
+            .map(CairnRequiredCheck::check_id)
+            .collect::<Vec<_>>(),
+        vec!["tests", "clippy"]
+    );
     let fallback = select_required_agent_checks(AgentCheckSelectionRequest {
         registry: &registry(),
         changed_artifacts: &[ChangedArtifactDraft {
@@ -292,9 +315,14 @@ fn selector_adds_prerequisites_and_uses_conservative_unknown_fallback() {
         final_subject_hash: HASH_C,
     });
     assert!(fallback.is_ready());
-    assert_eq!(fallback.required_checks().iter().map(CairnRequiredCheck::check_id).collect::<Vec<_>>(), vec![
-        "cairn", "tests"
-    ]);
+    assert_eq!(
+        fallback
+            .required_checks()
+            .iter()
+            .map(CairnRequiredCheck::check_id)
+            .collect::<Vec<_>>(),
+        vec!["cairn", "tests"]
+    );
 }
 
 #[test]
@@ -302,7 +330,7 @@ fn selector_keeps_unavailable_capability_and_tier_as_blockers() {
     let capability = select_required_agent_checks(AgentCheckSelectionRequest {
         registry: &registry(),
         changed_artifacts: &[ChangedArtifactDraft {
-            path: "cairn/specs/agent-harness-runtime/spec.md",
+            path: ".cairn/specs/agent-harness-runtime/spec.md",
             surface: "lifecycle",
             content_hash: HASH_A,
         }],
@@ -329,7 +357,11 @@ fn selector_keeps_unavailable_capability_and_tier_as_blockers() {
         final_subject_hash: HASH_C,
     });
     assert!(!tier.is_ready());
-    assert!(tier.blockers().iter().any(|issue| issue.code() == AgentCheckDiagnosticCode::TierUnavailable));
+    assert!(
+        tier.blockers()
+            .iter()
+            .any(|issue| issue.code() == AgentCheckDiagnosticCode::TierUnavailable)
+    );
 }
 
 #[test]
@@ -339,10 +371,13 @@ fn selector_keeps_unavailable_capability_and_tier_as_blockers() {
 // r[verify agent_harness_runtime.authoritative_completion.pass_only.complete]
 fn exact_execution_coverage_passes_only_when_every_required_row_passes() {
     let selection = rust_selection();
-    let report = admit_execution_results(&selection, &[
-        execution(&selection, "tests", CheckStatus::Passed),
-        execution(&selection, "clippy", CheckStatus::Passed),
-    ]);
+    let report = admit_execution_results(
+        &selection,
+        &[
+            execution(&selection, "tests", CheckStatus::Passed),
+            execution(&selection, "clippy", CheckStatus::Passed),
+        ],
+    );
     assert!(report.is_passing(), "{:?}", report.diagnostics());
     assert_eq!(report.passed_checks(), &["clippy", "tests"]);
 }
@@ -368,44 +403,71 @@ fn every_non_passing_status_remains_a_completion_blocker() {
     ];
     for status in statuses {
         let selection = rust_selection();
-        let report = admit_execution_results(&selection, &[
-            execution(&selection, "tests", status),
-            execution(&selection, "clippy", CheckStatus::Passed),
-        ]);
+        let report = admit_execution_results(
+            &selection,
+            &[
+                execution(&selection, "tests", status),
+                execution(&selection, "clippy", CheckStatus::Passed),
+            ],
+        );
         assert!(!report.is_passing(), "status {} passed", status.as_str());
-        assert!(report.non_passing_checks().iter().any(|(check, actual)| check == "tests" && *actual == status));
+        assert!(
+            report
+                .non_passing_checks()
+                .iter()
+                .any(|(check, actual)| check == "tests" && *actual == status)
+        );
     }
 }
 
 #[test]
 fn missing_duplicate_unknown_stale_and_contradictory_results_fail_closed() {
     let selection = rust_selection();
-    let missing = admit_execution_results(&selection, &[execution(&selection, "tests", CheckStatus::Passed)]);
+    let missing = admit_execution_results(
+        &selection,
+        &[execution(&selection, "tests", CheckStatus::Passed)],
+    );
     assert!(!missing.is_passing());
 
     let test = execution(&selection, "tests", CheckStatus::Passed);
-    let duplicate =
-        admit_execution_results(&selection, &[test, test, execution(&selection, "clippy", CheckStatus::Passed)]);
+    let duplicate = admit_execution_results(
+        &selection,
+        &[
+            test,
+            test,
+            execution(&selection, "clippy", CheckStatus::Passed),
+        ],
+    );
     assert!(!duplicate.is_passing());
 
     let unknown = execution(&selection, "unknown", CheckStatus::Passed);
-    let unknown_report = admit_execution_results(&selection, &[
-        execution(&selection, "tests", CheckStatus::Passed),
-        execution(&selection, "clippy", CheckStatus::Passed),
-        unknown,
-    ]);
+    let unknown_report = admit_execution_results(
+        &selection,
+        &[
+            execution(&selection, "tests", CheckStatus::Passed),
+            execution(&selection, "clippy", CheckStatus::Passed),
+            unknown,
+        ],
+    );
     assert!(!unknown_report.is_passing());
 
     let mut stale = execution(&selection, "tests", CheckStatus::Passed);
     stale.subject_hash = HASH_D;
-    let stale_report =
-        admit_execution_results(&selection, &[stale, execution(&selection, "clippy", CheckStatus::Passed)]);
+    let stale_report = admit_execution_results(
+        &selection,
+        &[stale, execution(&selection, "clippy", CheckStatus::Passed)],
+    );
     assert!(!stale_report.is_passing());
 
     let mut contradiction = execution(&selection, "tests", CheckStatus::Passed);
     contradiction.exit_code = Some(1);
-    let contradiction_report =
-        admit_execution_results(&selection, &[contradiction, execution(&selection, "clippy", CheckStatus::Passed)]);
+    let contradiction_report = admit_execution_results(
+        &selection,
+        &[
+            contradiction,
+            execution(&selection, "clippy", CheckStatus::Passed),
+        ],
+    );
     assert!(!contradiction_report.is_passing());
 }
 
@@ -427,14 +489,14 @@ fn unsafe_artifact_and_diagnostic_payloads_are_rejected() {
     let mut result = execution(&selection, "tests", CheckStatus::Passed);
     result.artifacts = UNSAFE_ARTIFACTS;
     result.diagnostic = Some(UNSAFE_DIAGNOSTIC);
-    let report = admit_execution_results(&selection, &[result, execution(&selection, "clippy", CheckStatus::Passed)]);
-    assert!(!report.is_passing());
-    assert!(
-        report
-            .diagnostics()
-            .iter()
-            .all(|issue| { !issue.summary().contains("credential") && !issue.summary().contains("raw prompt") })
+    let report = admit_execution_results(
+        &selection,
+        &[result, execution(&selection, "clippy", CheckStatus::Passed)],
     );
+    assert!(!report.is_passing());
+    assert!(report.diagnostics().iter().all(|issue| {
+        !issue.summary().contains("credential") && !issue.summary().contains("raw prompt")
+    }));
 }
 
 #[test]
@@ -445,7 +507,12 @@ fn exact_completion_candidate_is_advisory_and_incidental_substrings_fail() {
     let exact = candidate();
     assert_eq!(exact.request(), "COMPLETE");
     assert_eq!(exact.subject_hash(), HASH_C);
-    for request in ["not COMPLETE", "COMPLETE now", "quoted COMPLETE", "INCOMPLETE"] {
+    for request in [
+        "not COMPLETE",
+        "COMPLETE now",
+        "quoted COMPLETE",
+        "INCOMPLETE",
+    ] {
         let rejected = admit_completion_candidate(&AuthoritativeCompletionCandidateDraft {
             source: CompletionCandidateSource::SteelCompatibility,
             request,
@@ -462,10 +529,13 @@ fn exact_completion_candidate_is_advisory_and_incidental_substrings_fail() {
 // r[verify agent_harness_runtime.authoritative_completion.receipt_gate.host_adapter]
 fn matching_cairn_summary_is_the_only_verified_completion_path() {
     let selection = rust_selection();
-    let evidence = admit_execution_results(&selection, &[
-        execution(&selection, "tests", CheckStatus::Passed),
-        execution(&selection, "clippy", CheckStatus::Passed),
-    ]);
+    let evidence = admit_execution_results(
+        &selection,
+        &[
+            execution(&selection, "tests", CheckStatus::Passed),
+            execution(&selection, "clippy", CheckStatus::Passed),
+        ],
+    );
     let required = ["tests", "clippy"];
     let passed = ["clippy", "tests"];
     let summary = CairnCompletionSummaryDraft {
@@ -486,7 +556,8 @@ fn matching_cairn_summary_is_the_only_verified_completion_path() {
         input_hash: HASH_D,
         receipt_hash: HASH_E,
     };
-    let outcome = evaluate_authoritative_completion(&candidate(), &selection, &evidence, Some(&summary));
+    let outcome =
+        evaluate_authoritative_completion(&candidate(), &selection, &evidence, Some(&summary));
     let AuthoritativeCompletionOutcome::Verified(receipt) = outcome else {
         panic!("matching summary should verify");
     };
@@ -501,11 +572,16 @@ fn matching_cairn_summary_is_the_only_verified_completion_path() {
 // r[verify agent_harness_runtime.authoritative_completion.boundary.no_override]
 fn missing_stale_failing_and_incomplete_cairn_summaries_block() {
     let selection = rust_selection();
-    let evidence = admit_execution_results(&selection, &[
-        execution(&selection, "tests", CheckStatus::Passed),
-        execution(&selection, "clippy", CheckStatus::Passed),
-    ]);
-    assert!(!evaluate_authoritative_completion(&candidate(), &selection, &evidence, None).is_verified());
+    let evidence = admit_execution_results(
+        &selection,
+        &[
+            execution(&selection, "tests", CheckStatus::Passed),
+            execution(&selection, "clippy", CheckStatus::Passed),
+        ],
+    );
+    assert!(
+        !evaluate_authoritative_completion(&candidate(), &selection, &evidence, None).is_verified()
+    );
     let required = ["tests", "clippy"];
     let passed = ["tests"];
     let stale = CairnCompletionSummaryDraft {
@@ -526,7 +602,10 @@ fn missing_stale_failing_and_incomplete_cairn_summaries_block() {
         input_hash: HASH_D,
         receipt_hash: HASH_E,
     };
-    assert!(!evaluate_authoritative_completion(&candidate(), &selection, &evidence, Some(&stale)).is_verified());
+    assert!(
+        !evaluate_authoritative_completion(&candidate(), &selection, &evidence, Some(&stale))
+            .is_verified()
+    );
 }
 
 #[test]
@@ -544,12 +623,21 @@ fn post_check_mutation_invalidates_candidate_results_and_cairn_summary() {
         maximum_tier: CheckTier::Standard,
         final_subject_hash: HASH_D,
     });
-    let stale_evidence = admit_execution_results(&changed_selection, &[
-        execution(&selection, "tests", CheckStatus::Passed),
-        execution(&selection, "clippy", CheckStatus::Passed),
-    ]);
+    let stale_evidence = admit_execution_results(
+        &changed_selection,
+        &[
+            execution(&selection, "tests", CheckStatus::Passed),
+            execution(&selection, "clippy", CheckStatus::Passed),
+        ],
+    );
     assert!(!stale_evidence.is_passing());
-    assert!(!evaluate_authoritative_completion(&candidate(), &changed_selection, &stale_evidence, None,).is_verified());
+    assert!(!evaluate_authoritative_completion(
+        &candidate(),
+        &changed_selection,
+        &stale_evidence,
+        None,
+    )
+    .is_verified());
 }
 
 #[test]
@@ -560,7 +648,8 @@ fn post_check_mutation_invalidates_candidate_results_and_cairn_summary() {
 fn workspace_progress_and_archive_observations_have_no_completion_authority() {
     let selection = rust_selection();
     let incomplete_evidence = admit_execution_results(&selection, &[]);
-    let outcome = evaluate_authoritative_completion(&candidate(), &selection, &incomplete_evidence, None);
+    let outcome =
+        evaluate_authoritative_completion(&candidate(), &selection, &incomplete_evidence, None);
 
     assert!(!outcome.is_verified());
     assert!(!incomplete_evidence.is_passing());

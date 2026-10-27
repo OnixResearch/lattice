@@ -1,6 +1,4 @@
-use super::BLAKE3_ALGORITHM;
-use super::HASH_PART_SEPARATOR;
-use super::PROVIDER_HARDENING_HASH_DOMAIN;
+use super::{BLAKE3_ALGORITHM, HASH_PART_SEPARATOR, PROVIDER_HARDENING_HASH_DOMAIN};
 
 const PROVIDER_STREAM_HASH_LABEL: &str = "provider_stream";
 const PROVIDER_STREAM_PARSER_CLASS: &str = "provider-sse-json-model-stream";
@@ -9,7 +7,8 @@ const PROVIDER_STREAM_OUTPUT_TYPE: &str = "animus_adapters::ModelStreamFrame";
 const PROVIDER_STREAM_BUDGET_POLICY: &str =
     "frame, record, aggregate, record-count, event-count, completion-count pre-buffer budgets";
 const PROVIDER_STREAM_RECEIPT_PROJECTION: &str = "ProviderStreamParserReceipt";
-const RAW_BOUNDARY_REVIEW: &str = "byte chunks are budgeted before UTF-8 decode and line aggregation";
+const RAW_BOUNDARY_REVIEW: &str =
+    "byte chunks are budgeted before UTF-8 decode and line aggregation";
 const INPUT_FRAMING: &str = "UTF-8 chunks containing JSON lines or SSE data: JSON lines";
 const JSON_OBJECT_START: char = '{';
 const JSON_OBJECT_END: char = '}';
@@ -307,11 +306,31 @@ pub fn validate_provider_stream_parser_inventory(
     }
     for entry in entries {
         collect_blank_inventory_field(entry.entrypoint.as_str(), "entrypoint", &mut diagnostics);
-        collect_blank_inventory_field(entry.input_framing.as_str(), "input_framing", &mut diagnostics);
-        collect_blank_inventory_field(entry.normalized_output.as_str(), "normalized_output", &mut diagnostics);
-        collect_blank_inventory_field(entry.budget_policy.as_str(), "budget_policy", &mut diagnostics);
-        collect_blank_inventory_field(entry.receipt_projection.as_str(), "receipt_projection", &mut diagnostics);
-        collect_blank_inventory_field(entry.raw_boundary_review.as_str(), "raw_boundary_review", &mut diagnostics);
+        collect_blank_inventory_field(
+            entry.input_framing.as_str(),
+            "input_framing",
+            &mut diagnostics,
+        );
+        collect_blank_inventory_field(
+            entry.normalized_output.as_str(),
+            "normalized_output",
+            &mut diagnostics,
+        );
+        collect_blank_inventory_field(
+            entry.budget_policy.as_str(),
+            "budget_policy",
+            &mut diagnostics,
+        );
+        collect_blank_inventory_field(
+            entry.receipt_projection.as_str(),
+            "receipt_projection",
+            &mut diagnostics,
+        );
+        collect_blank_inventory_field(
+            entry.raw_boundary_review.as_str(),
+            "raw_boundary_review",
+            &mut diagnostics,
+        );
     }
     if diagnostics.is_empty() {
         Ok(())
@@ -361,11 +380,19 @@ pub fn validate_provider_stream_parser_receipt(
         || !is_safe_provider_family(receipt.provider_family.as_str())
         || !receipt.stream_identity.starts_with(RECEIPT_HASH_PREFIX)
     {
-        return Err(failure(ProviderStreamParseFailureKind::ReceiptLeak, None, DETAIL_RECEIPT_LEAK));
+        return Err(failure(
+            ProviderStreamParseFailureKind::ReceiptLeak,
+            None,
+            DETAIL_RECEIPT_LEAK,
+        ));
     }
     for marker in &receipt.redaction_markers {
         if !is_allowed_redaction_marker(marker.as_str()) {
-            return Err(failure(ProviderStreamParseFailureKind::ReceiptLeak, None, DETAIL_RECEIPT_LEAK));
+            return Err(failure(
+                ProviderStreamParseFailureKind::ReceiptLeak,
+                None,
+                DETAIL_RECEIPT_LEAK,
+            ));
         }
     }
     Ok(())
@@ -420,16 +447,29 @@ impl<'a> ParserState<'a> {
     }
 
     fn push_chunk(&mut self, chunk: &[u8]) -> Result<(), ProviderStreamParseFailure> {
-        Self::check_limit(chunk.len(), self.budget.frame_bytes, ProviderStreamBudgetKind::FrameBytes)?;
+        Self::check_limit(
+            chunk.len(),
+            self.budget.frame_bytes,
+            ProviderStreamBudgetKind::FrameBytes,
+        )?;
         let next_aggregate = self
             .aggregate_bytes
             .checked_add(chunk.len())
             .ok_or_else(|| budget_failure(ProviderStreamBudgetKind::AggregateBytes))?;
-        Self::check_limit(next_aggregate, self.budget.aggregate_bytes, ProviderStreamBudgetKind::AggregateBytes)?;
+        Self::check_limit(
+            next_aggregate,
+            self.budget.aggregate_bytes,
+            ProviderStreamBudgetKind::AggregateBytes,
+        )?;
         self.aggregate_bytes = next_aggregate;
         self.hasher.update(chunk);
-        let text = core::str::from_utf8(chunk)
-            .map_err(|_error| failure(ProviderStreamParseFailureKind::InvalidEncoding, None, DETAIL_INVALID_UTF8))?;
+        let text = core::str::from_utf8(chunk).map_err(|_error| {
+            failure(
+                ProviderStreamParseFailureKind::InvalidEncoding,
+                None,
+                DETAIL_INVALID_UTF8,
+            )
+        })?;
         self.push_text(text)
     }
 
@@ -454,7 +494,11 @@ impl<'a> ParserState<'a> {
             .len()
             .checked_add(segment.len())
             .ok_or_else(|| budget_failure(ProviderStreamBudgetKind::RecordBytes))?;
-        Self::check_limit(next_record_bytes, self.budget.record_bytes, ProviderStreamBudgetKind::RecordBytes)?;
+        Self::check_limit(
+            next_record_bytes,
+            self.budget.record_bytes,
+            ProviderStreamBudgetKind::RecordBytes,
+        )?;
         self.buffer.push_str(segment);
         if segment.as_bytes().last().copied() == Some(LINE_FEED) {
             self.finish_record()?;
@@ -463,7 +507,12 @@ impl<'a> ParserState<'a> {
     }
 
     fn finish_record(&mut self) -> Result<(), ProviderStreamParseFailure> {
-        let owned_record = self.buffer.trim_end_matches('\n').trim_end_matches(CARRIAGE_RETURN).trim().to_string();
+        let owned_record = self
+            .buffer
+            .trim_end_matches('\n')
+            .trim_end_matches(CARRIAGE_RETURN)
+            .trim()
+            .to_string();
         self.buffer.clear();
         if owned_record.is_empty() {
             return Ok(());
@@ -472,19 +521,34 @@ impl<'a> ParserState<'a> {
             .record_count
             .checked_add(ONE_RECORD)
             .ok_or_else(|| budget_failure(ProviderStreamBudgetKind::RecordCount))?;
-        Self::check_limit(next_record_count, self.budget.record_count, ProviderStreamBudgetKind::RecordCount)?;
+        Self::check_limit(
+            next_record_count,
+            self.budget.record_count,
+            ProviderStreamBudgetKind::RecordCount,
+        )?;
         self.record_count = next_record_count;
         let frame = record_frame(owned_record.as_str())?;
         self.push_frame(frame)
     }
 
-    fn push_frame(&mut self, frame: animus_adapters::ModelStreamFrame) -> Result<(), ProviderStreamParseFailure> {
+    fn push_frame(
+        &mut self,
+        frame: animus_adapters::ModelStreamFrame,
+    ) -> Result<(), ProviderStreamParseFailure> {
         let kind = frame.kind();
         if self.terminal_seen {
             return if kind.is_terminal() {
-                Err(failure(ProviderStreamParseFailureKind::DuplicateTerminal, None, DETAIL_DUPLICATE_TERMINAL))
+                Err(failure(
+                    ProviderStreamParseFailureKind::DuplicateTerminal,
+                    None,
+                    DETAIL_DUPLICATE_TERMINAL,
+                ))
             } else {
-                Err(failure(ProviderStreamParseFailureKind::InvalidOrder, None, DETAIL_LATE_DELTA))
+                Err(failure(
+                    ProviderStreamParseFailureKind::InvalidOrder,
+                    None,
+                    DETAIL_LATE_DELTA,
+                ))
             };
         }
         self.check_order(frame.order().value())?;
@@ -492,7 +556,11 @@ impl<'a> ParserState<'a> {
             .event_count
             .checked_add(ONE_EVENT)
             .ok_or_else(|| budget_failure(ProviderStreamBudgetKind::EventCount))?;
-        Self::check_limit(next_event_count, self.budget.event_count, ProviderStreamBudgetKind::EventCount)?;
+        Self::check_limit(
+            next_event_count,
+            self.budget.event_count,
+            ProviderStreamBudgetKind::EventCount,
+        )?;
         if kind.is_terminal() {
             let next_completion_count = self
                 .completion_count
@@ -517,7 +585,11 @@ impl<'a> ParserState<'a> {
         if self.previous_order.is_none_or(|previous| previous < order) {
             Ok(())
         } else {
-            Err(failure(ProviderStreamParseFailureKind::InvalidOrder, None, DETAIL_INVALID_ORDER))
+            Err(failure(
+                ProviderStreamParseFailureKind::InvalidOrder,
+                None,
+                DETAIL_INVALID_ORDER,
+            ))
         }
     }
 
@@ -540,9 +612,14 @@ impl<'a> ParserState<'a> {
 
     fn finish(&mut self) -> Result<ProviderStreamParseReport, ProviderStreamParseFailure> {
         if !self.buffer.is_empty() {
-            return Err(failure(ProviderStreamParseFailureKind::MalformedRecord, None, DETAIL_TRUNCATED_RECORD));
+            return Err(failure(
+                ProviderStreamParseFailureKind::MalformedRecord,
+                None,
+                DETAIL_TRUNCATED_RECORD,
+            ));
         }
-        animus_adapters::validate_model_stream_frames(&self.frames).map_err(|error| model_stream_failure(&error))?;
+        animus_adapters::validate_model_stream_frames(&self.frames)
+            .map_err(|error| model_stream_failure(&error))?;
         let status = terminal_status(&self.frames)?;
         let receipt = self.receipt(status, None, None);
         validate_provider_stream_parser_receipt(&receipt)?;
@@ -552,9 +629,16 @@ impl<'a> ParserState<'a> {
         })
     }
 
-    fn failure_report(&self, failure: ProviderStreamParseFailure) -> ProviderStreamParseFailureReport {
+    fn failure_report(
+        &self,
+        failure: ProviderStreamParseFailure,
+    ) -> ProviderStreamParseFailureReport {
         ProviderStreamParseFailureReport {
-            receipt: self.receipt(ProviderStreamParserStatus::ParserFailure, Some(failure.kind), failure.budget_kind),
+            receipt: self.receipt(
+                ProviderStreamParserStatus::ParserFailure,
+                Some(failure.kind),
+                failure.budget_kind,
+            ),
             failure,
         }
     }
@@ -581,7 +665,10 @@ impl<'a> ParserState<'a> {
     }
 
     fn stream_identity(&self) -> String {
-        format!("{BLAKE3_ALGORITHM}:{}", self.hasher.clone().finalize().to_hex())
+        format!(
+            "{BLAKE3_ALGORITHM}:{}",
+            self.hasher.clone().finalize().to_hex()
+        )
     }
 
     fn redaction_markers(&self) -> Vec<String> {
@@ -611,7 +698,9 @@ impl<'a> ParserState<'a> {
     }
 }
 
-fn record_frame(record: &str) -> Result<animus_adapters::ModelStreamFrame, ProviderStreamParseFailure> {
+fn record_frame(
+    record: &str,
+) -> Result<animus_adapters::ModelStreamFrame, ProviderStreamParseFailure> {
     let json = normalized_json_record(record)?;
     let event = json_string_field(json, JSON_KEY_EVENT)?;
     let normalized_event = if event == EVENT_TERMINAL {
@@ -622,11 +711,26 @@ fn record_frame(record: &str) -> Result<animus_adapters::ModelStreamFrame, Provi
     let call_id = json_string_field(json, JSON_KEY_CALL_ID)?;
     let order = json_u64_field(json, JSON_KEY_ORDER)?;
     match normalized_event {
-        EVENT_CONTENT => text_frame(call_id, order, json, animus_adapters::ModelStreamFrameKind::ContentDelta),
-        EVENT_THOUGHT => text_frame(call_id, order, json, animus_adapters::ModelStreamFrameKind::ThoughtDelta),
+        EVENT_CONTENT => text_frame(
+            call_id,
+            order,
+            json,
+            animus_adapters::ModelStreamFrameKind::ContentDelta,
+        ),
+        EVENT_THOUGHT => text_frame(
+            call_id,
+            order,
+            json,
+            animus_adapters::ModelStreamFrameKind::ThoughtDelta,
+        ),
         EVENT_TOOL => tool_frame(call_id, order, json),
         EVENT_USAGE => usage_frame(call_id, order, json),
-        EVENT_FINISH => terminal_frame(call_id, order, animus_adapters::ModelStreamFrameKind::Finish, None),
+        EVENT_FINISH => terminal_frame(
+            call_id,
+            order,
+            animus_adapters::ModelStreamFrameKind::Finish,
+            None,
+        ),
         EVENT_CANCELLED => terminal_frame(
             call_id,
             order,
@@ -639,19 +743,31 @@ fn record_frame(record: &str) -> Result<animus_adapters::ModelStreamFrame, Provi
             animus_adapters::ModelStreamFrameKind::Failure,
             Some(json_string_field(json, JSON_KEY_REASON)?),
         ),
-        _unknown if event == EVENT_TERMINAL => {
-            Err(failure(ProviderStreamParseFailureKind::UnknownTerminalState, None, DETAIL_UNKNOWN_TERMINAL))
-        }
-        _unknown => Err(failure(ProviderStreamParseFailureKind::UnsupportedEvent, None, DETAIL_UNSUPPORTED_EVENT)),
+        _unknown if event == EVENT_TERMINAL => Err(failure(
+            ProviderStreamParseFailureKind::UnknownTerminalState,
+            None,
+            DETAIL_UNKNOWN_TERMINAL,
+        )),
+        _unknown => Err(failure(
+            ProviderStreamParseFailureKind::UnsupportedEvent,
+            None,
+            DETAIL_UNSUPPORTED_EVENT,
+        )),
     }
 }
 
 fn normalized_json_record(record: &str) -> Result<&str, ProviderStreamParseFailure> {
-    let candidate = record.strip_prefix(SSE_DATA_PREFIX).map_or(record, str::trim);
+    let candidate = record
+        .strip_prefix(SSE_DATA_PREFIX)
+        .map_or(record, str::trim);
     if candidate.starts_with(JSON_OBJECT_START) && candidate.ends_with(JSON_OBJECT_END) {
         Ok(candidate)
     } else {
-        Err(failure(ProviderStreamParseFailureKind::MalformedRecord, None, DETAIL_MALFORMED_JSON))
+        Err(failure(
+            ProviderStreamParseFailureKind::MalformedRecord,
+            None,
+            DETAIL_MALFORMED_JSON,
+        ))
     }
 }
 
@@ -662,13 +778,17 @@ fn text_frame(
     kind: animus_adapters::ModelStreamFrameKind,
 ) -> Result<animus_adapters::ModelStreamFrame, ProviderStreamParseFailure> {
     let visibility = match kind {
-        animus_adapters::ModelStreamFrameKind::ContentDelta => animus_adapters::ModelStreamVisibility::AssistantVisible,
+        animus_adapters::ModelStreamFrameKind::ContentDelta => {
+            animus_adapters::ModelStreamVisibility::AssistantVisible
+        }
         animus_adapters::ModelStreamFrameKind::ThoughtDelta
         | animus_adapters::ModelStreamFrameKind::ToolCallDelta
         | animus_adapters::ModelStreamFrameKind::Usage
         | animus_adapters::ModelStreamFrameKind::Finish
         | animus_adapters::ModelStreamFrameKind::Cancelled
-        | animus_adapters::ModelStreamFrameKind::Failure => animus_adapters::ModelStreamVisibility::Redacted,
+        | animus_adapters::ModelStreamFrameKind::Failure => {
+            animus_adapters::ModelStreamVisibility::Redacted
+        }
     };
     animus_adapters::ModelStreamFrame::from_draft(animus_adapters::ModelStreamFrameDraft {
         call_id,
@@ -712,7 +832,10 @@ fn usage_frame(
         kind: animus_adapters::ModelStreamFrameKind::Usage,
         body: None,
         tool_call_id: None,
-        usage: Some(animus_adapters::ModelStreamUsage::new(input_tokens, output_tokens)),
+        usage: Some(animus_adapters::ModelStreamUsage::new(
+            input_tokens,
+            output_tokens,
+        )),
         visibility: animus_adapters::ModelStreamVisibility::Redacted,
     })
     .map_err(|error| model_frame_failure(&error))
@@ -749,16 +872,24 @@ fn json_string_field<'a>(json: &'a str, key: &str) -> Result<&'a str, ProviderSt
 }
 
 fn json_u64_field(json: &str, key: &str) -> Result<u64, ProviderStreamParseFailure> {
-    json_number_field(json, key).and_then(|raw| raw.parse::<u64>().map_err(|_error| missing_or_malformed_field()))
+    json_number_field(json, key).and_then(|raw| {
+        raw.parse::<u64>()
+            .map_err(|_error| missing_or_malformed_field())
+    })
 }
 
 fn json_u32_field(json: &str, key: &str) -> Result<u32, ProviderStreamParseFailure> {
-    json_number_field(json, key).and_then(|raw| raw.parse::<u32>().map_err(|_error| missing_or_malformed_field()))
+    json_number_field(json, key).and_then(|raw| {
+        raw.parse::<u32>()
+            .map_err(|_error| missing_or_malformed_field())
+    })
 }
 
 fn json_number_field<'a>(json: &'a str, key: &str) -> Result<&'a str, ProviderStreamParseFailure> {
     let value = json_field_value(json, key)?;
-    let end = value.find(|character: char| !character.is_ascii_digit()).unwrap_or(value.len());
+    let end = value
+        .find(|character: char| !character.is_ascii_digit())
+        .unwrap_or(value.len());
     if end == usize::default() {
         return Err(missing_or_malformed_field());
     }
@@ -786,31 +917,46 @@ fn terminal_status(
     frames: &[animus_adapters::ModelStreamFrame],
 ) -> Result<ProviderStreamParserStatus, ProviderStreamParseFailure> {
     let Some(frame) = frames.last() else {
-        return Err(failure(ProviderStreamParseFailureKind::MissingTerminal, None, DETAIL_MISSING_TERMINAL));
+        return Err(failure(
+            ProviderStreamParseFailureKind::MissingTerminal,
+            None,
+            DETAIL_MISSING_TERMINAL,
+        ));
     };
     match frame.kind() {
         animus_adapters::ModelStreamFrameKind::Finish => Ok(ProviderStreamParserStatus::Success),
-        animus_adapters::ModelStreamFrameKind::Cancelled => Ok(ProviderStreamParserStatus::Cancelled),
-        animus_adapters::ModelStreamFrameKind::Failure => Ok(ProviderStreamParserStatus::ProviderFailure),
+        animus_adapters::ModelStreamFrameKind::Cancelled => {
+            Ok(ProviderStreamParserStatus::Cancelled)
+        }
+        animus_adapters::ModelStreamFrameKind::Failure => {
+            Ok(ProviderStreamParserStatus::ProviderFailure)
+        }
         animus_adapters::ModelStreamFrameKind::ContentDelta
         | animus_adapters::ModelStreamFrameKind::ThoughtDelta
         | animus_adapters::ModelStreamFrameKind::ToolCallDelta
-        | animus_adapters::ModelStreamFrameKind::Usage => {
-            Err(failure(ProviderStreamParseFailureKind::MissingTerminal, None, DETAIL_MISSING_TERMINAL))
-        }
+        | animus_adapters::ModelStreamFrameKind::Usage => Err(failure(
+            ProviderStreamParseFailureKind::MissingTerminal,
+            None,
+            DETAIL_MISSING_TERMINAL,
+        )),
     }
 }
 
 fn model_stream_failure(error: &animus_adapters::ModelStreamError) -> ProviderStreamParseFailure {
     match error {
-        animus_adapters::ModelStreamError::EmptyStream | animus_adapters::ModelStreamError::MissingTerminalFrame => {
-            failure(ProviderStreamParseFailureKind::MissingTerminal, None, DETAIL_MISSING_TERMINAL)
-        }
+        animus_adapters::ModelStreamError::EmptyStream
+        | animus_adapters::ModelStreamError::MissingTerminalFrame => failure(
+            ProviderStreamParseFailureKind::MissingTerminal,
+            None,
+            DETAIL_MISSING_TERMINAL,
+        ),
         animus_adapters::ModelStreamError::OutOfOrderFrame { .. }
         | animus_adapters::ModelStreamError::TerminalFrameNotLast { .. }
-        | animus_adapters::ModelStreamError::MixedModelCall { .. } => {
-            failure(ProviderStreamParseFailureKind::InvalidOrder, None, DETAIL_INVALID_ORDER)
-        }
+        | animus_adapters::ModelStreamError::MixedModelCall { .. } => failure(
+            ProviderStreamParseFailureKind::InvalidOrder,
+            None,
+            DETAIL_INVALID_ORDER,
+        ),
         animus_adapters::ModelStreamError::MalformedFixture { .. }
         | animus_adapters::ModelStreamError::InvalidField { .. }
         | animus_adapters::ModelStreamError::InvalidOrder { .. }
@@ -820,12 +966,16 @@ fn model_stream_failure(error: &animus_adapters::ModelStreamError) -> ProviderSt
         | animus_adapters::ModelStreamError::UnexpectedToolCallId { .. }
         | animus_adapters::ModelStreamError::MissingUsage
         | animus_adapters::ModelStreamError::UnexpectedUsage { .. }
-        | animus_adapters::ModelStreamError::TerminalFrameNotFinish { .. } => {
-            failure(ProviderStreamParseFailureKind::MalformedRecord, None, DETAIL_MALFORMED_JSON)
-        }
-        animus_adapters::ModelStreamError::ThoughtVisibilityLeak => {
-            failure(ProviderStreamParseFailureKind::ReceiptLeak, None, DETAIL_RECEIPT_LEAK)
-        }
+        | animus_adapters::ModelStreamError::TerminalFrameNotFinish { .. } => failure(
+            ProviderStreamParseFailureKind::MalformedRecord,
+            None,
+            DETAIL_MALFORMED_JSON,
+        ),
+        animus_adapters::ModelStreamError::ThoughtVisibilityLeak => failure(
+            ProviderStreamParseFailureKind::ReceiptLeak,
+            None,
+            DETAIL_RECEIPT_LEAK,
+        ),
     }
 }
 
@@ -834,11 +984,19 @@ fn model_frame_failure(error: &animus_adapters::ModelStreamError) -> ProviderStr
 }
 
 fn budget_failure(kind: ProviderStreamBudgetKind) -> ProviderStreamParseFailure {
-    failure(ProviderStreamParseFailureKind::BudgetExceeded, Some(kind), DETAIL_BUDGET_OVERFLOW)
+    failure(
+        ProviderStreamParseFailureKind::BudgetExceeded,
+        Some(kind),
+        DETAIL_BUDGET_OVERFLOW,
+    )
 }
 
 fn missing_or_malformed_field() -> ProviderStreamParseFailure {
-    failure(ProviderStreamParseFailureKind::MalformedRecord, None, DETAIL_MISSING_FIELD)
+    failure(
+        ProviderStreamParseFailureKind::MalformedRecord,
+        None,
+        DETAIL_MISSING_FIELD,
+    )
 }
 
 fn failure(
@@ -866,14 +1024,23 @@ fn safe_provider_family(raw: &str) -> String {
 
 fn is_safe_provider_family(value: &str) -> bool {
     !value.trim().is_empty()
-        && value.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
 }
 
 fn is_allowed_redaction_marker(marker: &str) -> bool {
-    matches!(marker, REDACTION_THOUGHT | REDACTION_TOOL_CALL | REDACTION_PROVIDER_PAYLOAD)
+    matches!(
+        marker,
+        REDACTION_THOUGHT | REDACTION_TOOL_CALL | REDACTION_PROVIDER_PAYLOAD
+    )
 }
 
-fn collect_blank_inventory_field(value: &str, field: &str, diagnostics: &mut Vec<super::data::ProviderDiagnostic>) {
+fn collect_blank_inventory_field(
+    value: &str,
+    field: &str,
+    diagnostics: &mut Vec<super::data::ProviderDiagnostic>,
+) {
     if value.trim().is_empty() {
         diagnostics.push(inventory_diagnostic(field));
     }

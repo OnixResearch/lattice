@@ -230,11 +230,12 @@ pub fn score_actions(
         }
     }
     let matched_expected = matched_indices.len();
-    let unmatched_expected = if policy.mode == MatchMode::ContainsAny && matched_expected > EMPTY_COUNT {
-        EMPTY_COUNT
-    } else {
-        expected.len().saturating_sub(matched_expected)
-    };
+    let unmatched_expected =
+        if policy.mode == MatchMode::ContainsAny && matched_expected > EMPTY_COUNT {
+            EMPTY_COUNT
+        } else {
+            expected.len().saturating_sub(matched_expected)
+        };
     let extra_observed = observed.len().saturating_sub(matched_expected);
     if unmatched_expected > EMPTY_COUNT {
         issues.push(EvalIssue::UnmatchedAction);
@@ -242,7 +243,10 @@ pub fn score_actions(
     if policy.mode == MatchMode::Exact && extra_observed > EMPTY_COUNT {
         issues.push(EvalIssue::ExtraObservedAction);
     }
-    let malformed_observed = observed.iter().filter(|action| action.malformed_arguments).count();
+    let malformed_observed = observed
+        .iter()
+        .filter(|action| action.malformed_arguments)
+        .count();
     if malformed_observed > EMPTY_COUNT {
         issues.push(EvalIssue::MalformedArguments);
     }
@@ -278,7 +282,10 @@ pub fn aggregate_eval_scores(suite: &EvalSuite, scores: &[CaseScore]) -> EvalRes
         return Err(sorted_issues(issues));
     }
     let pass_count = scores.iter().filter(|score| score.passed).count();
-    let total_score = scores.iter().map(|score| u64::from(score.score_micro)).sum::<u64>();
+    let total_score = scores
+        .iter()
+        .map(|score| u64::from(score.score_micro))
+        .sum::<u64>();
     let average_score_micro = average_score(total_score, scores.len());
     let feedback_case_labels = suite
         .cases
@@ -303,12 +310,20 @@ pub fn aggregate_eval_scores(suite: &EvalSuite, scores: &[CaseScore]) -> EvalRes
     })
 }
 
-pub fn project_eval_receipt(suite: &EvalSuite, aggregate: &EvalAggregate, policy_hash: String) -> EvalReceipt {
+pub fn project_eval_receipt(
+    suite: &EvalSuite,
+    aggregate: &EvalAggregate,
+    policy_hash: String,
+) -> EvalReceipt {
     let mut receipt = EvalReceipt {
         schema: RECEIPT_SCHEMA.to_owned(),
         suite_label: suite.suite_label.clone(),
         suite_hash: suite.setup_hash.clone(),
-        case_labels: suite.cases.iter().map(|case| case.case_label.clone()).collect(),
+        case_labels: suite
+            .cases
+            .iter()
+            .map(|case| case.case_label.clone())
+            .collect(),
         run_count: aggregate.case_count,
         average_score_micro: aggregate.average_score_micro,
         policy_hash,
@@ -354,7 +369,10 @@ fn validate_eval_receipt(receipt: &EvalReceipt) -> EvalResult<()> {
         issues.push(EvalIssue::ReceiptLeak);
     }
     if let Some(marker) = &receipt.leak_marker {
-        if UNSAFE_MARKERS.iter().any(|unsafe_marker| marker.contains(unsafe_marker)) {
+        if UNSAFE_MARKERS
+            .iter()
+            .any(|unsafe_marker| marker.contains(unsafe_marker))
+        {
             issues.push(EvalIssue::ReceiptLeak);
         }
     }
@@ -405,7 +423,11 @@ fn validate_pattern(pattern: &BoundedPattern, issues: &mut Vec<EvalIssue>) {
     }
 }
 
-fn match_exact(expected: &[ExpectedAction], observed: &[ObservedAction], issues: &mut Vec<EvalIssue>) -> Vec<usize> {
+fn match_exact(
+    expected: &[ExpectedAction],
+    observed: &[ObservedAction],
+    issues: &mut Vec<EvalIssue>,
+) -> Vec<usize> {
     if expected.len() != observed.len() {
         issues.push(EvalIssue::UnmatchedAction);
     }
@@ -441,13 +463,19 @@ fn match_ordered_subset(
     matched
 }
 
-fn match_subset(expected: &[ExpectedAction], observed: &[ObservedAction], issues: &mut Vec<EvalIssue>) -> Vec<usize> {
+fn match_subset(
+    expected: &[ExpectedAction],
+    observed: &[ObservedAction],
+    issues: &mut Vec<EvalIssue>,
+) -> Vec<usize> {
     let mut used = Vec::new();
     for expected_action in expected {
         if let Some(index) = observed
             .iter()
             .enumerate()
-            .find(|(index, observed_action)| !used.contains(index) && action_matches(expected_action, observed_action))
+            .find(|(index, observed_action)| {
+                !used.contains(index) && action_matches(expected_action, observed_action)
+            })
             .map(|(index, _)| index)
         {
             used.push(index);
@@ -482,8 +510,12 @@ fn action_matches(expected: &ExpectedAction, observed: &ObservedAction) -> bool 
         && match &expected.matcher {
             ArgumentMatcher::Exact(value) => observed.argument_summary == *value,
             ArgumentMatcher::Pattern(pattern) => {
-                observed.argument_summary.starts_with(pattern.prefix.as_str())
-                    && observed.argument_summary.contains(pattern.contains.as_str())
+                observed
+                    .argument_summary
+                    .starts_with(pattern.prefix.as_str())
+                    && observed
+                        .argument_summary
+                        .contains(pattern.contains.as_str())
                     && observed.argument_summary.ends_with(pattern.suffix.as_str())
             }
             ArgumentMatcher::MalformedRawArguments => observed.malformed_arguments,
@@ -517,7 +549,10 @@ fn validate_hash(value: &str, issues: &mut Vec<EvalIssue>) {
 }
 
 fn issue_codes(issues: Vec<EvalIssue>) -> Vec<String> {
-    sorted_issues(issues).into_iter().map(|issue| issue.code().to_owned()).collect()
+    sorted_issues(issues)
+        .into_iter()
+        .map(|issue| issue.code().to_owned())
+        .collect()
 }
 
 fn sorted_issues(mut issues: Vec<EvalIssue>) -> Vec<EvalIssue> {
@@ -528,7 +563,11 @@ fn sorted_issues(mut issues: Vec<EvalIssue>) -> Vec<EvalIssue> {
 
 fn result_from_issues<T>(issues: Vec<EvalIssue>, value: T) -> EvalResult<T> {
     let issues = sorted_issues(issues);
-    if issues.is_empty() { Ok(value) } else { Err(issues) }
+    if issues.is_empty() {
+        Ok(value)
+    } else {
+        Err(issues)
+    }
 }
 
 fn receipt_hash(receipt: &EvalReceipt) -> String {
@@ -571,7 +610,12 @@ mod tests {
             expected_pattern(TOOL_WRITE, "file=", "src", ".rs"),
         ];
         let observed_actions = vec![observed(TOOL_READ, ARG_A), observed(TOOL_WRITE, ARG_B)];
-        let exact = score_actions(CASE_A, &expected, &observed_actions, policy(MatchMode::Exact));
+        let exact = score_actions(
+            CASE_A,
+            &expected,
+            &observed_actions,
+            policy(MatchMode::Exact),
+        );
         let ordered = score_actions(
             CASE_A,
             &expected,
@@ -588,7 +632,12 @@ mod tests {
             &[observed(TOOL_WRITE, ARG_B), observed(TOOL_READ, ARG_A)],
             policy(MatchMode::Subset),
         );
-        let any = score_actions(CASE_A, &expected, &[observed(TOOL_WRITE, ARG_B)], policy(MatchMode::ContainsAny));
+        let any = score_actions(
+            CASE_A,
+            &expected,
+            &[observed(TOOL_WRITE, ARG_B)],
+            policy(MatchMode::ContainsAny),
+        );
 
         assert!(exact.passed);
         assert!(ordered.passed);
@@ -661,15 +710,36 @@ mod tests {
                 empty_expectation: EmptyExpectationPolicy::FailClosed,
             },
         );
-        assert!(score.issue_codes.contains(&EvalIssue::InvalidPattern.code().to_owned()));
-        assert!(score.issue_codes.contains(&EvalIssue::UnsafeText.code().to_owned()));
-        assert!(score.issue_codes.contains(&EvalIssue::MalformedArguments.code().to_owned()));
+        assert!(
+            score
+                .issue_codes
+                .contains(&EvalIssue::InvalidPattern.code().to_owned())
+        );
+        assert!(
+            score
+                .issue_codes
+                .contains(&EvalIssue::UnsafeText.code().to_owned())
+        );
+        assert!(
+            score
+                .issue_codes
+                .contains(&EvalIssue::MalformedArguments.code().to_owned())
+        );
 
-        let empty = score_actions(CASE_A, &[], &[], ScorePolicy {
-            mode: MatchMode::Exact,
-            empty_expectation: EmptyExpectationPolicy::FailClosed,
-        });
-        assert!(empty.issue_codes.contains(&EvalIssue::EmptyExpectation.code().to_owned()));
+        let empty = score_actions(
+            CASE_A,
+            &[],
+            &[],
+            ScorePolicy {
+                mode: MatchMode::Exact,
+                empty_expectation: EmptyExpectationPolicy::FailClosed,
+            },
+        );
+        assert!(
+            empty
+                .issue_codes
+                .contains(&EvalIssue::EmptyExpectation.code().to_owned())
+        );
 
         let suite = suite();
         let impossible = CaseScore {
@@ -702,7 +772,11 @@ mod tests {
             leak_marker: Some("RAW_TRANSCRIPT:secret".to_owned()),
         };
         receipt.receipt_hash = receipt_hash(&receipt);
-        assert!(validate_eval_receipt(&receipt).expect_err("receipt leak").contains(&EvalIssue::ReceiptLeak));
+        assert!(
+            validate_eval_receipt(&receipt)
+                .expect_err("receipt leak")
+                .contains(&EvalIssue::ReceiptLeak)
+        );
     }
 
     fn suite() -> EvalSuite {
@@ -734,7 +808,12 @@ mod tests {
         }
     }
 
-    fn expected_pattern(tool_name: &str, prefix: &str, contains: &str, suffix: &str) -> ExpectedAction {
+    fn expected_pattern(
+        tool_name: &str,
+        prefix: &str,
+        contains: &str,
+        suffix: &str,
+    ) -> ExpectedAction {
         ExpectedAction {
             action_label: format!("{tool_name}-pattern"),
             tool_name: tool_name.to_owned(),

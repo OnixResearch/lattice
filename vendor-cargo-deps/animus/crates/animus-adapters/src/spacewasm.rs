@@ -5,9 +5,11 @@ use alloc::string::ToString;
 /// Exact reviewed NASA `SpaceWasm` revision.
 pub const SPACEWASM_REVISION: &str = "e24cf09355a90497148eb5029fdb8e3400bd63e3";
 /// Exact Octet runtime cohort identity.
-pub const SPACEWASM_COHORT: &str = "b3:7c537eef7bff66d0a90508715de08de79c9aaac23352e1007a6d47e7fb4674a2";
+pub const SPACEWASM_COHORT: &str =
+    "b3:7c537eef7bff66d0a90508715de08de79c9aaac23352e1007a6d47e7fb4674a2";
 /// Exact upstream lock identity.
-pub const SPACEWASM_LOCK: &str = "b3:4e6a07910125d4c921a62cec03d8bc9acb3bf341ebd1a11999df08d6c6c5c5f1";
+pub const SPACEWASM_LOCK: &str =
+    "b3:4e6a07910125d4c921a62cec03d8bc9acb3bf341ebd1a11999df08d6c6c5c5f1";
 /// Exact supported producer target.
 pub const PRODUCER_TARGET: &str = "wasm32v1-none";
 /// Exact required export.
@@ -207,7 +209,10 @@ fn validate_surface(profile: &Profile<'_>, artifact: &ArtifactFacts<'_>) -> Resu
     Ok(())
 }
 
-fn validate_resource_limits(profile: &Profile<'_>, artifact: &ArtifactFacts<'_>) -> Result<(), Error> {
+fn validate_resource_limits(
+    profile: &Profile<'_>,
+    artifact: &ArtifactFacts<'_>,
+) -> Result<(), Error> {
     if profile.max_artifact_bytes != MAX_ARTIFACT_BYTES {
         return Err(Error::ResourceLimit);
     }
@@ -231,7 +236,10 @@ fn validate_resource_limits(profile: &Profile<'_>, artifact: &ArtifactFacts<'_>)
     Ok(())
 }
 
-fn validate_artifact_evidence(profile: &Profile<'_>, artifact: &ArtifactFacts<'_>) -> Result<(), Error> {
+fn validate_artifact_evidence(
+    profile: &Profile<'_>,
+    artifact: &ArtifactFacts<'_>,
+) -> Result<(), Error> {
     if !safe_identity(artifact.artifact_identity) {
         return Err(Error::EvidenceMismatch);
     }
@@ -271,7 +279,10 @@ pub fn classify(
     if !safe_identity(observation.input_identity) {
         return Err(Error::EvidenceMismatch);
     }
-    if observation.output_identity.is_some_and(|value| !safe_identity(value)) {
+    if observation
+        .output_identity
+        .is_some_and(|value| !safe_identity(value))
+    {
         return Err(Error::EvidenceMismatch);
     }
     debug_assert_eq!(observation.artifact_identity, artifact.artifact_identity);
@@ -338,7 +349,9 @@ pub fn validate_receipt_text(text: &str) -> Result<(), Error> {
 fn safe_identity(value: &str) -> bool {
     value.starts_with(BLAKE3_PREFIX)
         && value.len() == BLAKE3_IDENTITY_BYTES
-        && value.as_bytes()[BLAKE3_PREFIX_BYTES..].iter().all(u8::is_ascii_hexdigit)
+        && value.as_bytes()[BLAKE3_PREFIX_BYTES..]
+            .iter()
+            .all(u8::is_ascii_hexdigit)
 }
 
 #[cfg(test)]
@@ -406,7 +419,12 @@ mod tests {
             fuel: 10,
             result: ResultClass::ExpectedTrap,
         };
-        assert_eq!(classify(&profile(), &artifact(), &observation).expect("trap").result, ResultClass::ExpectedTrap);
+        assert_eq!(
+            classify(&profile(), &artifact(), &observation)
+                .expect("trap")
+                .result,
+            ResultClass::ExpectedTrap
+        );
     }
 
     #[test]
@@ -421,7 +439,8 @@ mod tests {
         widened.imports = &["wasi_snapshot_preview1"];
         assert_eq!(admit(&profile(), &widened), Err(Error::SurfaceWidening));
         let mut stale = artifact();
-        stale.octet_artifact_identity = "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+        stale.octet_artifact_identity =
+            "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
         assert_eq!(admit(&profile(), &stale), Err(Error::EvidenceMismatch));
         let mut huge = artifact();
         huge.artifact_bytes = MAX_ARTIFACT_BYTES.saturating_add(1);
@@ -440,8 +459,17 @@ mod tests {
             fuel: 0,
             result: ResultClass::RuntimeFailure,
         };
-        assert_eq!(classify(&profile(), &artifact(), &failed), Err(Error::MalformedObservation));
-        assert_eq!(validate_receipt_text("credential=/home/user production-ready"), Err(Error::UnsafeReceipt));
-        assert_eq!(validate_receipt_text("artifact=b3:00 not-runtime-correctness"), Ok(()));
+        assert_eq!(
+            classify(&profile(), &artifact(), &failed),
+            Err(Error::MalformedObservation)
+        );
+        assert_eq!(
+            validate_receipt_text("credential=/home/user production-ready"),
+            Err(Error::UnsafeReceipt)
+        );
+        assert_eq!(
+            validate_receipt_text("artifact=b3:00 not-runtime-correctness"),
+            Ok(())
+        );
     }
 }

@@ -1,0 +1,18 @@
+{
+  "connections": [
+    {
+      "class": "built_in",
+      "credential_env": "",
+      "id": "mock"
+    }
+  ],
+  "models": [
+    {
+      "connection_id": "mock",
+      "id": "mock-text",
+      "model_id": "mock-text",
+      "provider_id": "mock"
+    }
+  ],
+  "schema": "animus.model-catalog.v1"
+}

@@ -1,23 +1,21 @@
-use basalt::ucan_semantics::BASALT_POLICY_BLAKE3;
-use basalt::ucan_semantics::REQUIRED_NON_CLAIMS;
-use basalt::ucan_semantics::SemanticsReasonClass;
-use basalt::ucan_semantics::UCAN_RUNTIME_REVISION;
-use basalt::ucan_semantics::UCAN_SUPPORT_CATALOG_BLAKE3;
-use basalt::ucan_semantics::UCAN_SUPPORT_CATALOG_REVISION;
-use basalt::ucan_semantics::UcanSemanticsFixture;
-use basalt::ucan_semantics::default_policy_blake3;
-use basalt::ucan_semantics::replay_semantics_fixture;
-use basalt::ucan_semantics::replay_semantics_fixture_json;
+use basalt::ucan_profile::BasaltUcanProtocolProfile;
+use basalt::ucan_semantics::{
+    BASALT_POLICY_BLAKE3, REQUIRED_NON_CLAIMS, SemanticsReasonClass, UCAN_RUNTIME_REVISION,
+    UCAN_SUPPORT_CATALOG_BLAKE3, UCAN_SUPPORT_CATALOG_REVISION, UcanSemanticsFixture,
+    default_policy_blake3, replay_semantics_fixture, replay_semantics_fixture_json,
+};
 
-const ALLOW_FIXTURE: &str = include_str!("../contracts/ucan-semantics/fixtures/generated/positive/allow.json");
+const ALLOW_FIXTURE: &str =
+    include_str!("../contracts/ucan-semantics/fixtures/generated/positive/allow.json");
 const CAPABILITY_DENY_FIXTURE: &str =
     include_str!("../contracts/ucan-semantics/fixtures/generated/positive/capability-deny.json");
 const OVER_DELEGATION_FIXTURE: &str =
     include_str!("../contracts/ucan-semantics/fixtures/generated/negative/over-delegation.json");
 const WILDCARD_REQUEST_FIXTURE: &str =
     include_str!("../contracts/ucan-semantics/fixtures/generated/negative/wildcard-request.json");
-const MISSING_CAVEAT_POLICY_FIXTURE: &str =
-    include_str!("../contracts/ucan-semantics/fixtures/generated/negative/missing-caveat-policy.json");
+const MISSING_CAVEAT_POLICY_FIXTURE: &str = include_str!(
+    "../contracts/ucan-semantics/fixtures/generated/negative/missing-caveat-policy.json"
+);
 const STALE_PROOF_FIXTURE: &str =
     include_str!("../contracts/ucan-semantics/fixtures/generated/negative/stale-proof.json");
 const REPLAY_DENIED_FIXTURE: &str =
@@ -39,16 +37,28 @@ fn replays_matching_policy_allow_and_capability_deny() {
 
     assert!(deny.is_accepted());
     assert!(deny.enforcement.is_denied());
-    assert_eq!(deny.reason_class, SemanticsReasonClass::UcanCapabilityDenied);
+    assert_eq!(
+        deny.reason_class,
+        SemanticsReasonClass::UcanCapabilityDenied
+    );
     assert!(deny.issues.is_empty());
 }
 
 #[test]
 fn fails_closed_for_all_supplied_ucan_denial_facts() {
     let cases = [
-        (OVER_DELEGATION_FIXTURE, SemanticsReasonClass::DelegationDenied),
-        (WILDCARD_REQUEST_FIXTURE, SemanticsReasonClass::WildcardRequestDenied),
-        (MISSING_CAVEAT_POLICY_FIXTURE, SemanticsReasonClass::CaveatDenied),
+        (
+            OVER_DELEGATION_FIXTURE,
+            SemanticsReasonClass::DelegationDenied,
+        ),
+        (
+            WILDCARD_REQUEST_FIXTURE,
+            SemanticsReasonClass::WildcardRequestDenied,
+        ),
+        (
+            MISSING_CAVEAT_POLICY_FIXTURE,
+            SemanticsReasonClass::CaveatDenied,
+        ),
         (STALE_PROOF_FIXTURE, SemanticsReasonClass::ProofDenied),
         (REPLAY_DENIED_FIXTURE, SemanticsReasonClass::ReplayDenied),
     ];
@@ -65,7 +75,7 @@ fn fails_closed_for_all_supplied_ucan_denial_facts() {
 
 #[test]
 fn rejects_malformed_json_with_deterministic_diagnostic() {
-    let malformed = r#"{"schema":"basalt.ucan-semantics-fixture.v1"}"#;
+    let malformed = r#"{"schema":"basalt.ucan-semantics-fixture.v2"}"#;
     let first = replay_semantics_fixture_json(malformed);
     let second = replay_semantics_fixture_json(malformed);
 
@@ -78,18 +88,52 @@ fn rejects_malformed_json_with_deterministic_diagnostic() {
 }
 
 #[test]
+fn rejects_missing_unknown_and_cross_profile_selection() {
+    let value: serde_json::Value =
+        serde_json::from_str(ALLOW_FIXTURE).expect("generated fixture must be JSON");
+    let mut missing = value.clone();
+    missing
+        .as_object_mut()
+        .expect("fixture must be an object")
+        .remove("protocol_profile");
+    let mut unknown = value;
+    unknown["protocol_profile"] = serde_json::Value::String("unknown-profile".to_owned());
+
+    for malformed in [missing, unknown] {
+        let report = replay_semantics_fixture_json(
+            &serde_json::to_string(&malformed).expect("fixture mutation must serialize"),
+        );
+        assert!(!report.is_accepted());
+        assert_eq!(report.issues[0].code, "semantics.fixture.json");
+    }
+
+    let mut substituted = parse_fixture(ALLOW_FIXTURE);
+    substituted.protocol_profile = BasaltUcanProtocolProfile::UcanWg100;
+    let report = replay_semantics_fixture(&substituted);
+    assert!(!report.is_accepted());
+    assert_eq!(report.issues[0].code, "semantics.profile.mismatch");
+}
+
+#[test]
 fn rejects_stale_identity_and_weakened_non_claims() {
     let mut fixture = parse_fixture(ALLOW_FIXTURE);
     fixture.support_catalog_blake3 = "stale".to_owned();
     fixture.non_claims.pop();
 
     let report = replay_semantics_fixture(&fixture);
-    let issue_codes = report.issues.iter().map(|issue| issue.code.as_str()).collect::<Vec<_>>();
+    let issue_codes = report
+        .issues
+        .iter()
+        .map(|issue| issue.code.as_str())
+        .collect::<Vec<_>>();
 
     assert!(!report.is_accepted());
     assert!(report.enforcement.is_denied());
     assert_eq!(report.reason_class, SemanticsReasonClass::FixtureInvalid);
-    assert_eq!(issue_codes, ["semantics.identity.catalog-blake3", "semantics.non-claims"]);
+    assert_eq!(
+        issue_codes,
+        ["semantics.identity.catalog-blake3", "semantics.non-claims"]
+    );
 }
 
 #[test]
@@ -128,7 +172,10 @@ fn binds_runtime_catalog_and_policy_identities() {
     let required_non_claims = REQUIRED_NON_CLAIMS.map(str::to_owned);
 
     assert_eq!(fixture.runtime_ucan_revision, UCAN_RUNTIME_REVISION);
-    assert_eq!(fixture.support_catalog_revision, UCAN_SUPPORT_CATALOG_REVISION);
+    assert_eq!(
+        fixture.support_catalog_revision,
+        UCAN_SUPPORT_CATALOG_REVISION
+    );
     assert_eq!(fixture.support_catalog_blake3, UCAN_SUPPORT_CATALOG_BLAKE3);
     assert_eq!(fixture.basalt_policy_blake3, BASALT_POLICY_BLAKE3);
     assert_eq!(default_policy_blake3(), BASALT_POLICY_BLAKE3);

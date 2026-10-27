@@ -73,7 +73,43 @@ exit status retains a failed node, skips dependent effects, and produces a faile
 terminal observation with `successful = false`. Ordinary graph execution outside
 this exchange snapshot path retains its existing exit-as-data behavior.
 
-Cancellation records the request and signals the bounded executor cancellation flag. A cancellation request does not by itself prove cancellation.
+Cancellation records the request and signals the bounded executor cancellation
+flag. A cancellation request does not by itself prove cancellation. Canonical
+`Cancelled` requires the owned local process runner's observed cancellation
+disposition, retained separately from redacted adapter errors. Once that owned
+execution stops, the exchange retains terminal `Cancelled`, `successful = false`,
+and cancellation receipts; pending dependent effects do not execute. The ordinary
+run-detail adapter error can remain `Failed`; it is not the canonical exchange
+outcome and is never parsed to infer cancellation.
+
+If local success or failure completes before cancellation is observed, its
+ordinary completed/failed outcome wins even if cancel intent was accepted before
+the exchange completion was persisted. A late request flag cannot rewrite it as
+`Cancelled`. Unknown/lost workers, persistence failures, timeouts and remote
+effects retain their existing recovery semantics; no remote cancellation or
+automatic redispatch is implied. Consumers need a corrected producer executable,
+not a contract-import refresh or consumer-side outcome relabeling.
+
+The compiler prerequisites are repaired without disabling Tile, component
+execution or asynchronous CI. Tile remains an exact Git dependency; the shared
+runtime, Mantle verifier/build contract and Basalt use native imported source
+cohorts with repository-owned `SOURCE` provenance. The component shell calls the
+actual named byte-method carrier and typed file/source-tree verifier rather
+than inventing the former `component::{Profile, Runtime, Prepared}` API.
+Valence validation remains the actual separately pinned producer validator.
+
+The complete application binary builds with all those integrations enabled.
+The started-child cancellation, dependent-effect and completion-before-cancel
+regressions pass. Kiln's unchanged strict native web-service exercise also
+passes for the measured immutable executable: ordinary success/failure,
+started-command cancellation, restart without redispatch, logs and real artifact
+transfer. `fix-observed-workflow-exchange-cancellation` retains the exact
+cohort and consumer receipt reference in `evidence/integrated-verification.json`.
+The producer's broader repository checks are not all green: nine library tests,
+three TUI PTY cases and Octet baseline findings remain recorded separately.
+Historical compiler failures remain in `evidence/verification.json`; no consumer
+relabeling, contract-import refresh, publication, lifecycle acceptance or
+production activation follows from this local qualification.
 
 Pause and resume fail closed. The current headless runtime cannot pause an active external effect safely.
 

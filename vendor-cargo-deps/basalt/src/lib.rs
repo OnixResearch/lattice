@@ -60,20 +60,36 @@ pub mod ast_grep_audit;
 pub mod authority_core;
 #[cfg(feature = "cli")]
 pub mod cli_fs;
+#[cfg(feature = "durable-authority")]
+pub mod durable_authority;
 pub mod license_consumption;
+pub mod mantle;
 pub mod nostr_identity;
+#[cfg(feature = "oidc-exchange")]
+pub mod oidc_exchange;
+pub mod peer_auth;
+pub mod policy_cache;
 pub mod policy_identity;
 pub mod policy_projection;
+pub mod runtime_effect;
 pub mod secretspec_issuer;
 pub mod ucan_enforcement;
+pub mod ucan_profile;
 pub mod ucan_semantics;
+pub mod ucan_v1_profile;
+pub mod world_branch_authority;
 
-use std::collections::BTreeMap;
+pub use policy_cache::{
+    CachePolicy, PolicyCacheKey, PolicyError, PolicyEvaluationCache, PromotionDecision,
+};
+#[cfg(feature = "durable-authority")]
+pub use revocation_view_core;
+pub use ucan;
 
 use serde::Deserialize;
 use serde::Serialize;
 use snafu::Snafu;
-pub use ucan;
+use std::collections::BTreeMap;
 
 /// Policy schema version supported by this crate.
 ///
@@ -310,7 +326,9 @@ pub struct SteelEvaluationReceipt {
 
 /// Validate a higher-order callable descriptor before invocation.
 #[must_use]
-pub fn validate_callable_descriptor(descriptor: &CallableContractDescriptor) -> ContractEnvelopeReceipt {
+pub fn validate_callable_descriptor(
+    descriptor: &CallableContractDescriptor,
+) -> ContractEnvelopeReceipt {
     if descriptor.callable_id.is_empty() {
         return ContractEnvelopeReceipt {
             accepted: false,
@@ -329,7 +347,9 @@ pub fn validate_callable_descriptor(descriptor: &CallableContractDescriptor) -> 
             reason: "missing callable content hash".to_owned(),
         };
     }
-    if descriptor.effect_class == ContractEffectClass::HostEffect && descriptor.required_capabilities.is_empty() {
+    if descriptor.effect_class == ContractEffectClass::HostEffect
+        && descriptor.required_capabilities.is_empty()
+    {
         return ContractEnvelopeReceipt {
             accepted: false,
             reason: "effectful callable lacks required UCAN capabilities".to_owned(),
@@ -343,7 +363,9 @@ pub fn validate_callable_descriptor(descriptor: &CallableContractDescriptor) -> 
 
 /// Validate a Steel evaluation request without granting any ambient host authority.
 #[must_use]
-pub fn validate_steel_evaluation_request(request: &SteelEvaluationRequest) -> ContractEnvelopeReceipt {
+pub fn validate_steel_evaluation_request(
+    request: &SteelEvaluationRequest,
+) -> ContractEnvelopeReceipt {
     let envelope_receipt = validate_contract_envelope(&request.envelope);
     if !envelope_receipt.accepted {
         return envelope_receipt;
@@ -407,13 +429,16 @@ pub fn steel_request_hash(request: &SteelEvaluationRequest) -> String {
 pub fn steel_receipt_hash(receipt: &SteelEvaluationReceipt) -> String {
     let mut hash_material = receipt.clone();
     hash_material.receipt_hash = None;
-    let bytes = serde_json::to_vec(&hash_material).expect("Steel receipt DTO serialization is infallible");
+    let bytes =
+        serde_json::to_vec(&hash_material).expect("Steel receipt DTO serialization is infallible");
     format!("blake3:{}", blake3::hash(bytes.as_slice()).to_hex())
 }
 
 /// Validate authority evidence and optional hash binding for a Steel receipt.
 #[must_use]
-pub fn validate_steel_evaluation_receipt(receipt: &SteelEvaluationReceipt) -> ContractEnvelopeReceipt {
+pub fn validate_steel_evaluation_receipt(
+    receipt: &SteelEvaluationReceipt,
+) -> ContractEnvelopeReceipt {
     if receipt.backend != ContractBackendKind::Steel.as_str() {
         return ContractEnvelopeReceipt {
             accepted: false,
@@ -421,10 +446,12 @@ pub fn validate_steel_evaluation_receipt(receipt: &SteelEvaluationReceipt) -> Co
         };
     }
     if receipt.allowed {
-        let all_required_checked = receipt
-            .required_capabilities
-            .iter()
-            .all(|required| receipt.checked_capabilities.iter().any(|checked| checked == required));
+        let all_required_checked = receipt.required_capabilities.iter().all(|required| {
+            receipt
+                .checked_capabilities
+                .iter()
+                .any(|checked| checked == required)
+        });
         if !all_required_checked {
             return ContractEnvelopeReceipt {
                 accepted: false,
@@ -497,13 +524,17 @@ impl ContractPolicy {
     /// Return true when `resource` is under one of the contract's permitted prefixes.
     #[must_use]
     pub fn permits_resource(&self, resource: &str) -> bool {
-        self.resource_prefixes.iter().any(|prefix| resource.starts_with(prefix))
+        self.resource_prefixes
+            .iter()
+            .any(|prefix| resource.starts_with(prefix))
     }
 
     /// Return true when `ability` is listed by this contract.
     #[must_use]
     pub fn permits_ability(&self, ability: &str) -> bool {
-        self.abilities.iter().any(|contract_ability| contract_ability == ability)
+        self.abilities
+            .iter()
+            .any(|contract_ability| contract_ability == ability)
     }
 }
 
@@ -555,7 +586,11 @@ pub struct EnforcementRequest {
 impl EnforcementRequest {
     /// Construct a request without any capability grants.
     #[must_use]
-    pub fn new(contract: impl Into<String>, resource: impl Into<String>, ability: impl Into<String>) -> Self {
+    pub fn new(
+        contract: impl Into<String>,
+        resource: impl Into<String>,
+        ability: impl Into<String>,
+    ) -> Self {
         Self {
             contract: contract.into(),
             resource: resource.into(),
@@ -659,7 +694,9 @@ pub enum EnforcementError {
     #[snafu(display("invalid UCAN capability: {source}"))]
     InvalidCapability { source: ucan::Error },
     #[snafu(display("UCAN authorization check failed: {source}"))]
-    UcanAuthorization { source: ucan::VerifiedPrimitiveError },
+    UcanAuthorization {
+        source: ucan::VerifiedPrimitiveError,
+    },
 }
 
 pub type EnforcementResult<T> = Result<T, EnforcementError>;
@@ -678,10 +715,10 @@ pub fn default_policy() -> EnforcementResult<Policy> {
 ///
 /// # Errors
 ///
-/// Returns [`EnforcementError`] when JSON parsing fails or the policy schema version is
-/// unsupported.
+/// Returns [`EnforcementError`] when JSON parsing fails or the policy schema version is unsupported.
 pub fn parse_policy_json(input: &str) -> EnforcementResult<Policy> {
-    let policy: Policy = serde_json::from_str(input).map_err(|source| EnforcementError::PolicyJson { source })?;
+    let policy: Policy =
+        serde_json::from_str(input).map_err(|source| EnforcementError::PolicyJson { source })?;
     if policy.schema_version != SUPPORTED_SCHEMA_VERSION {
         return Err(EnforcementError::UnsupportedSchema {
             version: policy.schema_version,
@@ -694,11 +731,16 @@ pub fn parse_policy_json(input: &str) -> EnforcementResult<Policy> {
 ///
 /// # Errors
 ///
-/// Returns [`EnforcementError`] when capability construction or UCAN authorization validation
-/// fails.
-pub fn enforce(policy: &Policy, request: &EnforcementRequest) -> EnforcementResult<EnforcementReceipt> {
+/// Returns [`EnforcementError`] when capability construction or UCAN authorization validation fails.
+pub fn enforce(
+    policy: &Policy,
+    request: &EnforcementRequest,
+) -> EnforcementResult<EnforcementReceipt> {
     let Some(contract) = policy.contracts.get(request.contract.as_str()) else {
-        return Ok(EnforcementReceipt::denied(format!("unknown contract {:?}", request.contract)));
+        return Ok(EnforcementReceipt::denied(format!(
+            "unknown contract {:?}",
+            request.contract
+        )));
     };
 
     if contract.id != request.contract {
@@ -708,14 +750,22 @@ pub fn enforce(policy: &Policy, request: &EnforcementRequest) -> EnforcementResu
         )));
     }
 
-    if !contract.abilities.iter().any(|ability| ability == &request.ability) {
+    if !contract
+        .abilities
+        .iter()
+        .any(|ability| ability == &request.ability)
+    {
         return Ok(EnforcementReceipt::denied(format!(
             "ability {:?} is outside contract {:?}",
             request.ability, request.contract
         )));
     }
 
-    if !contract.resource_prefixes.iter().any(|prefix| request.resource.starts_with(prefix)) {
+    if !contract
+        .resource_prefixes
+        .iter()
+        .any(|prefix| request.resource.starts_with(prefix))
+    {
         return Ok(EnforcementReceipt::denied(format!(
             "resource {:?} is outside contract {:?}",
             request.resource, request.contract
@@ -731,13 +781,19 @@ pub fn enforce(policy: &Policy, request: &EnforcementRequest) -> EnforcementResu
         })
         .collect::<EnforcementResult<Vec<_>>>()?;
 
-    let authorized = ucan::capability_set_authorizes(capabilities.as_slice(), &request.resource, &request.ability)
-        .map_err(|source| EnforcementError::UcanAuthorization { source })?;
+    let authorized = ucan::capability_set_authorizes(
+        capabilities.as_slice(),
+        &request.resource,
+        &request.ability,
+    )
+    .map_err(|source| EnforcementError::UcanAuthorization { source })?;
 
     if authorized {
         Ok(EnforcementReceipt::allowed())
     } else {
-        Ok(EnforcementReceipt::denied("ucan capability set does not authorize request"))
+        Ok(EnforcementReceipt::denied(
+            "ucan capability set does not authorize request",
+        ))
     }
 }
 
@@ -781,8 +837,11 @@ mod tests {
     #[test]
     fn allows_policy_and_ucan_authorized_request() {
         let policy = parse_policy_json(POLICY_JSON).expect("policy should parse");
-        let receipt = enforce(&policy, &request("did:key:z6Mkresource/docs/report", "document/write"))
-            .expect("enforcement should not error");
+        let receipt = enforce(
+            &policy,
+            &request("did:key:z6Mkresource/docs/report", "document/write"),
+        )
+        .expect("enforcement should not error");
 
         assert_eq!(receipt, EnforcementReceipt::allowed());
     }
@@ -790,8 +849,11 @@ mod tests {
     #[test]
     fn denies_resource_outside_nickel_contract() {
         let policy = parse_policy_json(POLICY_JSON).expect("policy should parse");
-        let receipt = enforce(&policy, &request("did:key:z6Mkresource/private/report", "document/write"))
-            .expect("enforcement should not error");
+        let receipt = enforce(
+            &policy,
+            &request("did:key:z6Mkresource/private/report", "document/write"),
+        )
+        .expect("enforcement should not error");
 
         assert!(!receipt.allowed);
         assert!(receipt.reason.contains("outside contract"));
@@ -800,8 +862,11 @@ mod tests {
     #[test]
     fn denies_ability_outside_nickel_contract() {
         let policy = parse_policy_json(POLICY_JSON).expect("policy should parse");
-        let receipt = enforce(&policy, &request("did:key:z6Mkresource/docs/report", "document/delete"))
-            .expect("enforcement should not error");
+        let receipt = enforce(
+            &policy,
+            &request("did:key:z6Mkresource/docs/report", "document/delete"),
+        )
+        .expect("enforcement should not error");
 
         assert!(!receipt.allowed);
         assert!(receipt.reason.contains("outside contract"));
@@ -825,8 +890,11 @@ mod tests {
     #[test]
     fn denies_resource_prefix_sibling_boundary() {
         let policy = parse_policy_json(POLICY_JSON).expect("policy should parse");
-        let receipt = enforce(&policy, &request("did:key:z6Mkresource/docs-private/report", "document/write"))
-            .expect("enforcement should not error");
+        let receipt = enforce(
+            &policy,
+            &request("did:key:z6Mkresource/docs-private/report", "document/write"),
+        )
+        .expect("enforcement should not error");
 
         assert!(receipt.is_denied());
         assert!(receipt.reason().contains("outside contract"));
@@ -835,11 +903,15 @@ mod tests {
     #[test]
     fn allows_when_one_of_many_capabilities_authorizes_request() {
         let policy = parse_policy_json(POLICY_JSON).expect("policy should parse");
-        let request = EnforcementRequest::new("document-write", "did:key:z6Mkresource/docs/report", "document/write")
-            .with_capabilities(vec![
-                CapabilityGrant::new("did:key:z6Mkresource/docs/other", "document/write"),
-                CapabilityGrant::new("did:key:z6Mkresource/docs/report", "document/write"),
-            ]);
+        let request = EnforcementRequest::new(
+            "document-write",
+            "did:key:z6Mkresource/docs/report",
+            "document/write",
+        )
+        .with_capabilities(vec![
+            CapabilityGrant::new("did:key:z6Mkresource/docs/other", "document/write"),
+            CapabilityGrant::new("did:key:z6Mkresource/docs/report", "document/write"),
+        ]);
 
         let receipt = enforce(&policy, &request).expect("enforcement should not error");
 
@@ -849,8 +921,12 @@ mod tests {
     #[test]
     fn denies_unknown_contract_without_ucan_check() {
         let policy = parse_policy_json(POLICY_JSON).expect("policy should parse");
-        let request = EnforcementRequest::new("unknown-contract", "did:key:z6Mkresource/docs/report", "document/write")
-            .with_capability(CapabilityGrant::new("", ""));
+        let request = EnforcementRequest::new(
+            "unknown-contract",
+            "did:key:z6Mkresource/docs/report",
+            "document/write",
+        )
+        .with_capability(CapabilityGrant::new("", ""));
 
         let receipt = enforce(&policy, &request).expect("unknown contract should deny");
 
@@ -873,8 +949,11 @@ mod tests {
         }"#;
         let policy = parse_policy_json(policy_json).expect("policy should parse");
 
-        let receipt = enforce(&policy, &request("did:key:z6Mkresource/docs/report", "document/write"))
-            .expect("id mismatch should deny");
+        let receipt = enforce(
+            &policy,
+            &request("did:key:z6Mkresource/docs/report", "document/write"),
+        )
+        .expect("id mismatch should deny");
 
         assert!(receipt.is_denied());
         assert!(receipt.reason().contains("does not match policy id"));

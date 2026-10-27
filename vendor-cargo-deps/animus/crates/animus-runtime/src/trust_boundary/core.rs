@@ -1,5 +1,4 @@
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven
-// validation compact while drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -7,7 +6,12 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
+#![allow(
+    compound_condition,
+    excessive_file_length,
+    function_length,
+    non_trait_imports
+)]
 #![allow(
     numeric_units,
     path_segment_repetition,
@@ -16,38 +20,19 @@
 )]
 use std::collections::BTreeSet;
 
-use super::BLAKE3_ALGORITHM;
-use super::FIELD_ACTION_ID;
-use super::FIELD_ACTION_KIND;
-use super::FIELD_APPROVAL;
-use super::FIELD_BOUNDARY_ID;
-use super::FIELD_EVIDENCE;
-use super::FIELD_MUTABLE_REQUEST;
-use super::FIELD_POLICY_HASH;
-use super::FIELD_RECEIPT_LEAK;
-use super::FIELD_RECEIPT_POLICY_HASH;
-use super::FIELD_SANCTIONED_TOOLS;
-use super::FIELD_SANDBOX;
-use super::FIELD_VERIFIER_HASH;
-use super::FIELD_VERIFIER_LABEL;
-use super::FIELD_WITHHELD_LABELS;
-use super::HASH_PART_SEPARATOR;
-use super::TRUST_BOUNDARY_HASH_DOMAIN;
-use super::data::TrustBoundaryAction;
-use super::data::TrustBoundaryActionKind;
-use super::data::TrustBoundaryDescriptor;
-use super::data::TrustBoundaryDiagnostic;
-use super::data::TrustBoundaryDiagnosticKind;
-use super::data::TrustBoundaryFingerprint;
-use super::data::TrustBoundaryIssueCode;
-use super::data::TrustBoundaryJudgeBinding;
-use super::data::TrustBoundaryJudgeOutcome;
-use super::data::TrustBoundaryJudgeVeto;
-use super::data::TrustBoundaryMonitorDecision;
-use super::data::TrustBoundaryReceiptLeak;
-use super::data::TrustBoundaryRedactionStatus;
-use super::data::TrustBoundaryValidationResult;
-use super::data::TrustBoundaryViolationReceipt;
+use super::{
+    BLAKE3_ALGORITHM, FIELD_ACTION_ID, FIELD_ACTION_KIND, FIELD_APPROVAL, FIELD_BOUNDARY_ID,
+    FIELD_EVIDENCE, FIELD_MUTABLE_REQUEST, FIELD_POLICY_HASH, FIELD_RECEIPT_LEAK,
+    FIELD_RECEIPT_POLICY_HASH, FIELD_SANCTIONED_TOOLS, FIELD_SANDBOX, FIELD_VERIFIER_HASH,
+    FIELD_VERIFIER_LABEL, FIELD_WITHHELD_LABELS, HASH_PART_SEPARATOR, TRUST_BOUNDARY_HASH_DOMAIN,
+    data::{
+        TrustBoundaryAction, TrustBoundaryActionKind, TrustBoundaryDescriptor,
+        TrustBoundaryDiagnostic, TrustBoundaryDiagnosticKind, TrustBoundaryFingerprint,
+        TrustBoundaryIssueCode, TrustBoundaryJudgeBinding, TrustBoundaryJudgeOutcome,
+        TrustBoundaryJudgeVeto, TrustBoundaryMonitorDecision, TrustBoundaryReceiptLeak,
+        TrustBoundaryRedactionStatus, TrustBoundaryValidationResult, TrustBoundaryViolationReceipt,
+    },
+};
 
 const PATH_SEPARATOR: char = '/';
 const WINDOWS_PATH_SEPARATOR: char = '\\';
@@ -74,17 +59,51 @@ pub fn blake3_trust_boundary_fingerprint(label: &str, bytes: &[u8]) -> TrustBoun
 /// Returns all deterministic descriptor diagnostics, including missing verifier
 /// hashes, duplicate labels, empty sanctioned tools, raw path serialization, and
 /// mutable-boundary requests.
-pub fn validate_trust_boundary_descriptor(boundary: &TrustBoundaryDescriptor) -> TrustBoundaryValidationResult {
+pub fn validate_trust_boundary_descriptor(
+    boundary: &TrustBoundaryDescriptor,
+) -> TrustBoundaryValidationResult {
     let mut diagnostics = Vec::new();
     require_text(&boundary.boundary_id, FIELD_BOUNDARY_ID, &mut diagnostics);
-    require_collection(&boundary.sanctioned_tools, FIELD_SANCTIONED_TOOLS, &mut diagnostics);
-    require_collection(&boundary.withheld_path_labels, FIELD_WITHHELD_LABELS, &mut diagnostics);
-    detect_duplicate_or_raw_labels(&boundary.withheld_path_labels, FIELD_WITHHELD_LABELS, &mut diagnostics);
-    require_text(&boundary.verifier.label, FIELD_VERIFIER_LABEL, &mut diagnostics);
-    detect_raw_label(&boundary.verifier.label, FIELD_VERIFIER_LABEL, &mut diagnostics);
-    require_blake3(&boundary.verifier.hash, FIELD_VERIFIER_HASH, &mut diagnostics);
-    require_text(&boundary.sandbox_profile_id, FIELD_SANDBOX, &mut diagnostics);
-    require_collection(&boundary.evidence_policy.accepted_evidence_labels, FIELD_EVIDENCE, &mut diagnostics);
+    require_collection(
+        &boundary.sanctioned_tools,
+        FIELD_SANCTIONED_TOOLS,
+        &mut diagnostics,
+    );
+    require_collection(
+        &boundary.withheld_path_labels,
+        FIELD_WITHHELD_LABELS,
+        &mut diagnostics,
+    );
+    detect_duplicate_or_raw_labels(
+        &boundary.withheld_path_labels,
+        FIELD_WITHHELD_LABELS,
+        &mut diagnostics,
+    );
+    require_text(
+        &boundary.verifier.label,
+        FIELD_VERIFIER_LABEL,
+        &mut diagnostics,
+    );
+    detect_raw_label(
+        &boundary.verifier.label,
+        FIELD_VERIFIER_LABEL,
+        &mut diagnostics,
+    );
+    require_blake3(
+        &boundary.verifier.hash,
+        FIELD_VERIFIER_HASH,
+        &mut diagnostics,
+    );
+    require_text(
+        &boundary.sandbox_profile_id,
+        FIELD_SANDBOX,
+        &mut diagnostics,
+    );
+    require_collection(
+        &boundary.evidence_policy.accepted_evidence_labels,
+        FIELD_EVIDENCE,
+        &mut diagnostics,
+    );
     detect_duplicate_or_raw_labels(
         &boundary.evidence_policy.accepted_evidence_labels,
         FIELD_EVIDENCE,
@@ -155,9 +174,15 @@ pub fn bind_trust_boundary_judge(
 ///
 /// Returns diagnostics when receipt metadata is missing, hashes are not BLAKE3,
 /// counts are empty, or sensitive leak classes appear.
-pub fn validate_trust_boundary_receipt(receipt: &TrustBoundaryViolationReceipt) -> TrustBoundaryValidationResult {
+pub fn validate_trust_boundary_receipt(
+    receipt: &TrustBoundaryViolationReceipt,
+) -> TrustBoundaryValidationResult {
     let mut diagnostics = Vec::new();
-    require_blake3(&receipt.policy_hash, FIELD_RECEIPT_POLICY_HASH, &mut diagnostics);
+    require_blake3(
+        &receipt.policy_hash,
+        FIELD_RECEIPT_POLICY_HASH,
+        &mut diagnostics,
+    );
     require_collection(&receipt.labels, FIELD_EVIDENCE, &mut diagnostics);
     detect_duplicate_or_raw_labels(&receipt.labels, FIELD_EVIDENCE, &mut diagnostics);
     if receipt.count < MIN_RECEIPT_COUNT {
@@ -184,7 +209,10 @@ pub fn validate_trust_boundary_receipt(receipt: &TrustBoundaryViolationReceipt) 
     to_validation_result(diagnostics)
 }
 
-fn append_descriptor_diagnostics(boundary: &TrustBoundaryDescriptor, diagnostics: &mut Vec<TrustBoundaryDiagnostic>) {
+fn append_descriptor_diagnostics(
+    boundary: &TrustBoundaryDescriptor,
+    diagnostics: &mut Vec<TrustBoundaryDiagnostic>,
+) {
     if let Err(mut descriptor_diagnostics) = validate_trust_boundary_descriptor(boundary) {
         diagnostics.append(&mut descriptor_diagnostics);
     }
@@ -258,7 +286,11 @@ fn collect_action_issues(
     }
 }
 
-fn detect_duplicate_or_raw_labels(labels: &[String], field: &str, diagnostics: &mut Vec<TrustBoundaryDiagnostic>) {
+fn detect_duplicate_or_raw_labels(
+    labels: &[String],
+    field: &str,
+    diagnostics: &mut Vec<TrustBoundaryDiagnostic>,
+) {
     let mut seen = BTreeSet::new();
     for label in labels {
         if !seen.insert(label.as_str()) {
@@ -318,8 +350,10 @@ fn monitor_evidence(
         );
         return;
     };
-    if !labels_contain(&boundary.evidence_policy.accepted_evidence_labels, evidence_label)
-        || (boundary.evidence_policy.require_monitor_clean && !action.approval_present)
+    if !labels_contain(
+        &boundary.evidence_policy.accepted_evidence_labels,
+        evidence_label,
+    ) || (boundary.evidence_policy.require_monitor_clean && !action.approval_present)
     {
         push_issue(
             TrustBoundaryIssueCode::EvidencePolicyBypass,
@@ -409,10 +443,18 @@ fn push_issue(
     diagnostics: &mut Vec<TrustBoundaryDiagnostic>,
 ) {
     issue_codes.push(issue_code);
-    diagnostics.push(TrustBoundaryDiagnostic::new(TrustBoundaryDiagnosticKind::MonitorDenied, field, detail));
+    diagnostics.push(TrustBoundaryDiagnostic::new(
+        TrustBoundaryDiagnosticKind::MonitorDenied,
+        field,
+        detail,
+    ));
 }
 
-fn require_blake3(fingerprint: &TrustBoundaryFingerprint, field: &str, diagnostics: &mut Vec<TrustBoundaryDiagnostic>) {
+fn require_blake3(
+    fingerprint: &TrustBoundaryFingerprint,
+    field: &str,
+    diagnostics: &mut Vec<TrustBoundaryDiagnostic>,
+) {
     if fingerprint.algorithm != BLAKE3_ALGORITHM || blank(&fingerprint.value_hex) {
         diagnostics.push(TrustBoundaryDiagnostic::new(
             TrustBoundaryDiagnosticKind::InvalidHash,
@@ -422,7 +464,11 @@ fn require_blake3(fingerprint: &TrustBoundaryFingerprint, field: &str, diagnosti
     }
 }
 
-fn require_collection(values: &[String], field: &str, diagnostics: &mut Vec<TrustBoundaryDiagnostic>) {
+fn require_collection(
+    values: &[String],
+    field: &str,
+    diagnostics: &mut Vec<TrustBoundaryDiagnostic>,
+) {
     if values.is_empty() || values.iter().any(|value| blank(value)) {
         diagnostics.push(TrustBoundaryDiagnostic::new(
             TrustBoundaryDiagnosticKind::EmptyCollection,
@@ -442,7 +488,9 @@ fn require_text(text: &str, field: &str, diagnostics: &mut Vec<TrustBoundaryDiag
     }
 }
 
-fn to_validation_result(diagnostics: Vec<TrustBoundaryDiagnostic>) -> TrustBoundaryValidationResult {
+fn to_validation_result(
+    diagnostics: Vec<TrustBoundaryDiagnostic>,
+) -> TrustBoundaryValidationResult {
     if diagnostics.is_empty() {
         Ok(())
     } else {

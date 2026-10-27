@@ -48,7 +48,11 @@ impl Hash {
             value.push(char::from(LOWER_HEX[high]));
             value.push(char::from(LOWER_HEX[low]));
         }
-        assert_eq!(value.len(), BLAKE3_HASH_HEX_CHARS, "BLAKE3 hex encoding must produce the configured length");
+        assert_eq!(
+            value.len(),
+            BLAKE3_HASH_HEX_CHARS,
+            "BLAKE3 hex encoding must produce the configured length"
+        );
         Self { value }
     }
 
@@ -75,7 +79,10 @@ impl core::str::FromStr for Hash {
 
 fn validate(value: &str) -> Result<(), super::Error> {
     let actual_chars = value.chars().count();
-    assert!(actual_chars <= value.len(), "hash char count must fit byte length");
+    assert!(
+        actual_chars <= value.len(),
+        "hash char count must fit byte length"
+    );
     validate_length(actual_chars)?;
     validate_alphabet(value)
 }
@@ -101,7 +108,9 @@ fn validate_alphabet(value: &str) -> Result<(), super::Error> {
 }
 
 fn has_lowercase_hex_only(value: &str) -> bool {
-    value.chars().all(|character| character.is_ascii_hexdigit() && !character.is_ascii_uppercase())
+    value
+        .chars()
+        .all(|character| character.is_ascii_hexdigit() && !character.is_ascii_uppercase())
 }
 
 #[cfg(test)]

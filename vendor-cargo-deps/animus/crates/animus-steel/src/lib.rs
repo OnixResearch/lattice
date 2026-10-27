@@ -66,15 +66,23 @@ pub type SteelHostAction = policy::HostAction;
 /// Steel policy receipt redaction mode.
 pub type SteelPolicyReceiptRedaction = policy::ReceiptRedaction;
 
+#[cfg(feature = "rlm-kernel")]
+pub use animus_adapter_rlm_kernel::{
+    STEEL_SKILL_MODULE_COHORT, STEEL_SKILL_MODULE_SCHEMA, SteelSkillModuleAuthority,
+    SteelSkillModuleBounds, SteelSkillModuleDependency, SteelSkillModuleDependencyDraft,
+    SteelSkillModuleDescriptor, SteelSkillModuleDescriptorDraft, SteelSkillModuleError,
+    SteelSkillModulePlan, SteelSkillModuleReceipt, SteelSkillModuleTrust,
+    resolve_steel_skill_modules, steel_skill_module_source_identity,
+};
 pub use policy::DEFAULT_RUNTIME_HOST_ACTIONS;
 #[cfg(feature = "rlm-kernel")]
-pub use rlm::SteelRlmError;
-#[cfg(feature = "rlm-kernel")]
-pub use rlm::SteelRlmEvaluation;
-#[cfg(feature = "rlm-kernel")]
-pub use rlm::SteelRlmKernel;
-#[cfg(feature = "rlm-kernel")]
-pub use rlm::SteelRlmToolAdapter;
+pub use rlm::{
+    STEEL_KERNEL_BRIDGE_SCHEMA, STEEL_KERNEL_COHORT, STEEL_KERNEL_EMPTY_HEAD,
+    STEEL_KERNEL_JOURNAL_SCHEMA, SteelKernelJournalError, SteelKernelPrivateJournal,
+    SteelKernelRecoveryPosture, SteelKernelRestoreAdmission, SteelKernelRestoreReceipt,
+    SteelKernelRestoreSensitiveDraft, SteelKernelRestoreStatus, SteelRlmBridgeStep, SteelRlmError,
+    SteelRlmEvaluation, SteelRlmKernel, SteelRlmToolAdapter, project_steel_kernel_restore_receipt,
+};
 
 /// Returns the canonical BLAKE3 hash for a Steel script body.
 #[must_use]

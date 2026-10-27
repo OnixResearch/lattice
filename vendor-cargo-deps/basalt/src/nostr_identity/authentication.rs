@@ -1,31 +1,18 @@
 use ucan_nostr::VerifiedNostrCredential;
 
-use super::AuthenticatedNostrSubject;
-use super::MAX_FIELD_BYTES;
-use super::NOSTR_AUTHENTICATION_RECEIPT_SCHEMA;
-use super::NostrAuthenticationDecision;
-use super::NostrAuthenticationReceipt;
-use super::NostrAuthenticationResult;
-use super::NostrBindingState;
-use super::NostrDigestRole;
-use super::NostrEvidenceRole;
-use super::NostrIdentityBindingRequest;
-use super::NostrIdentityBoundary;
-use super::NostrIdentityIssue;
-use super::NostrTypedDigest;
-use super::UCAN_NOSTR_CREDENTIAL_CONTRACT;
-use super::UCAN_SOURCE_REVISION;
-use super::ValidatedNostrIdentityPolicy;
 use super::authentication_model::CredentialFacts;
-use super::identity::authentication_profile_name;
-use super::identity::authentication_receipt_identity;
-use super::identity::binding_identity;
-use super::identity::check_digest;
-use super::identity::has_exact_non_claims;
-use super::identity::public_field_identity;
-use super::identity::required_non_claims;
-use super::identity::valid_digest;
-use super::identity::valid_public_text;
+use super::identity::{
+    authentication_profile_name, authentication_receipt_identity, binding_identity, check_digest,
+    has_exact_non_claims, public_field_identity, required_non_claims, valid_digest,
+    valid_public_text,
+};
+use super::{
+    AuthenticatedNostrSubject, MAX_FIELD_BYTES, NOSTR_AUTHENTICATION_RECEIPT_SCHEMA,
+    NostrAuthenticationDecision, NostrAuthenticationReceipt, NostrAuthenticationResult,
+    NostrBindingState, NostrDigestRole, NostrEvidenceRole, NostrIdentityBindingRequest,
+    NostrIdentityBoundary, NostrIdentityIssue, NostrTypedDigest, UCAN_NOSTR_CREDENTIAL_CONTRACT,
+    UCAN_SOURCE_REVISION, ValidatedNostrIdentityPolicy,
+};
 
 /// Resolve one opaque reviewed UCAN credential against one validated policy.
 // r[impl nostr_identity_bindings.verified_input]
@@ -73,7 +60,10 @@ pub(super) fn resolve_credential_facts(
         credential_contract: UCAN_NOSTR_CREDENTIAL_CONTRACT.to_owned(),
         producer_schema_identity: super::nostr_identity_schema_identity(),
         producer_implementation_identity: super::nostr_identity_implementation_identity(),
-        event_identity: NostrTypedDigest::new(NostrDigestRole::NostrEventSha256, &credential.event_identity),
+        event_identity: NostrTypedDigest::new(
+            NostrDigestRole::NostrEventSha256,
+            &credential.event_identity,
+        ),
         public_key: credential.public_key.clone(),
         adapter_profile_identity: NostrTypedDigest::new(
             NostrDigestRole::UcanAdapterBlake3,
@@ -83,7 +73,10 @@ pub(super) fn resolve_credential_facts(
             NostrDigestRole::UcanAdapterBlake3,
             &credential.adapter_implementation_identity,
         ),
-        request_identity: NostrTypedDigest::new(NostrDigestRole::UcanAdapterBlake3, &credential.request_identity),
+        request_identity: NostrTypedDigest::new(
+            NostrDigestRole::UcanAdapterBlake3,
+            &credential.request_identity,
+        ),
         audience_identity: public_field_identity("audience", &credential.audience),
         purpose_identity: public_field_identity("purpose", &credential.purpose),
         policy_identity: policy.policy_identity.clone(),
@@ -123,8 +116,10 @@ fn authentication_denial_reason(
     {
         return Some("policy-identity-mismatch");
     }
-    if !valid_digest(&request.request_identity, NostrDigestRole::UcanAdapterBlake3)
-        || request.request_identity.hex != credential.request_identity
+    if !valid_digest(
+        &request.request_identity,
+        NostrDigestRole::UcanAdapterBlake3,
+    ) || request.request_identity.hex != credential.request_identity
     {
         return Some("request-identity-mismatch");
     }
@@ -150,7 +145,9 @@ fn authentication_denial_reason(
 /// Validate a closed authentication receipt without granting authority.
 // r[impl nostr_identity_bindings.receipts]
 #[must_use]
-pub fn verify_nostr_authentication_receipt(receipt: &NostrAuthenticationReceipt) -> Vec<NostrIdentityIssue> {
+pub fn verify_nostr_authentication_receipt(
+    receipt: &NostrAuthenticationReceipt,
+) -> Vec<NostrIdentityIssue> {
     let mut issues = Vec::new();
     if receipt.schema != NOSTR_AUTHENTICATION_RECEIPT_SCHEMA {
         issues.push(NostrIdentityIssue::new("receipt.schema", "schema-mismatch"));
@@ -158,25 +155,44 @@ pub fn verify_nostr_authentication_receipt(receipt: &NostrAuthenticationReceipt)
     if receipt.ucan_source_revision != UCAN_SOURCE_REVISION
         || receipt.credential_contract != UCAN_NOSTR_CREDENTIAL_CONTRACT
     {
-        issues.push(NostrIdentityIssue::new("receipt.producer", "producer-identity-mismatch"));
+        issues.push(NostrIdentityIssue::new(
+            "receipt.producer",
+            "producer-identity-mismatch",
+        ));
     }
     check_authentication_receipt_digests(receipt, &mut issues);
     if receipt.producer_schema_identity != super::nostr_identity_schema_identity()
-        || receipt.producer_implementation_identity != super::nostr_identity_implementation_identity()
+        || receipt.producer_implementation_identity
+            != super::nostr_identity_implementation_identity()
     {
-        issues.push(NostrIdentityIssue::new("receipt.producer_identity", "producer-identity-mismatch"));
+        issues.push(NostrIdentityIssue::new(
+            "receipt.producer_identity",
+            "producer-identity-mismatch",
+        ));
     }
     if ucan_nostr::NostrPublicKey::parse(&receipt.public_key).is_err() {
-        issues.push(NostrIdentityIssue::new("receipt.public_key", "invalid-nostr-public-key"));
+        issues.push(NostrIdentityIssue::new(
+            "receipt.public_key",
+            "invalid-nostr-public-key",
+        ));
     }
     if receipt.verification_role != NostrEvidenceRole::RecordedOnly {
-        issues.push(NostrIdentityIssue::new("receipt.verification_role", "role-promotion-denied"));
+        issues.push(NostrIdentityIssue::new(
+            "receipt.verification_role",
+            "role-promotion-denied",
+        ));
     }
     if !has_exact_non_claims(&receipt.non_claims) {
-        issues.push(NostrIdentityIssue::new("receipt.non_claims", "required-non-claims-mismatch"));
+        issues.push(NostrIdentityIssue::new(
+            "receipt.non_claims",
+            "required-non-claims-mismatch",
+        ));
     }
     if !valid_authentication_reason(receipt.decision, &receipt.reason) {
-        issues.push(NostrIdentityIssue::new("receipt.reason", "reason-decision-mismatch"));
+        issues.push(NostrIdentityIssue::new(
+            "receipt.reason",
+            "reason-decision-mismatch",
+        ));
     }
     for (value, field) in [
         (receipt.subject_id.as_deref(), "receipt.subject_id"),
@@ -186,17 +202,25 @@ pub fn verify_nostr_authentication_receipt(receipt: &NostrAuthenticationReceipt)
             issues.push(NostrIdentityIssue::new(field, "invalid-public-identity"));
         }
     }
-    let successful_shape =
-        receipt.subject_id.is_some() && receipt.binding_id.is_some() && receipt.binding_identity.is_some();
-    let denied_shape =
-        receipt.subject_id.is_none() && receipt.binding_id.is_none() && receipt.binding_identity.is_none();
+    let successful_shape = receipt.subject_id.is_some()
+        && receipt.binding_id.is_some()
+        && receipt.binding_identity.is_some();
+    let denied_shape = receipt.subject_id.is_none()
+        && receipt.binding_id.is_none()
+        && receipt.binding_identity.is_none();
     if (receipt.decision == NostrAuthenticationDecision::Authenticated && !successful_shape)
         || (receipt.decision == NostrAuthenticationDecision::Denied && !denied_shape)
     {
-        issues.push(NostrIdentityIssue::new("receipt.decision", "decision-shape-mismatch"));
+        issues.push(NostrIdentityIssue::new(
+            "receipt.decision",
+            "decision-shape-mismatch",
+        ));
     }
     if receipt.receipt_identity != authentication_receipt_identity(receipt) {
-        issues.push(NostrIdentityIssue::new("receipt.receipt_identity", "receipt-identity-mismatch"));
+        issues.push(NostrIdentityIssue::new(
+            "receipt.receipt_identity",
+            "receipt-identity-mismatch",
+        ));
     }
     issues.sort();
     issues.dedup();
@@ -222,10 +246,22 @@ fn valid_authentication_reason(decision: NostrAuthenticationDecision, reason: &s
     )
 }
 
-fn check_authentication_receipt_digests(receipt: &NostrAuthenticationReceipt, issues: &mut Vec<NostrIdentityIssue>) {
-    check_digest(&receipt.event_identity, NostrDigestRole::NostrEventSha256, "receipt.event_identity", issues);
+fn check_authentication_receipt_digests(
+    receipt: &NostrAuthenticationReceipt,
+    issues: &mut Vec<NostrIdentityIssue>,
+) {
+    check_digest(
+        &receipt.event_identity,
+        NostrDigestRole::NostrEventSha256,
+        "receipt.event_identity",
+        issues,
+    );
     for (digest, field, role) in [
-        (&receipt.producer_schema_identity, "receipt.producer_schema_identity", NostrDigestRole::BasaltBlake3),
+        (
+            &receipt.producer_schema_identity,
+            "receipt.producer_schema_identity",
+            NostrDigestRole::BasaltBlake3,
+        ),
         (
             &receipt.producer_implementation_identity,
             "receipt.producer_implementation_identity",
@@ -241,11 +277,31 @@ fn check_authentication_receipt_digests(receipt: &NostrAuthenticationReceipt, is
             "receipt.adapter_implementation_identity",
             NostrDigestRole::UcanAdapterBlake3,
         ),
-        (&receipt.request_identity, "receipt.request_identity", NostrDigestRole::UcanAdapterBlake3),
-        (&receipt.audience_identity, "receipt.audience_identity", NostrDigestRole::BasaltBlake3),
-        (&receipt.purpose_identity, "receipt.purpose_identity", NostrDigestRole::BasaltBlake3),
-        (&receipt.policy_identity, "receipt.policy_identity", NostrDigestRole::BasaltBlake3),
-        (&receipt.receipt_identity, "receipt.receipt_identity", NostrDigestRole::BasaltBlake3),
+        (
+            &receipt.request_identity,
+            "receipt.request_identity",
+            NostrDigestRole::UcanAdapterBlake3,
+        ),
+        (
+            &receipt.audience_identity,
+            "receipt.audience_identity",
+            NostrDigestRole::BasaltBlake3,
+        ),
+        (
+            &receipt.purpose_identity,
+            "receipt.purpose_identity",
+            NostrDigestRole::BasaltBlake3,
+        ),
+        (
+            &receipt.policy_identity,
+            "receipt.policy_identity",
+            NostrDigestRole::BasaltBlake3,
+        ),
+        (
+            &receipt.receipt_identity,
+            "receipt.receipt_identity",
+            NostrDigestRole::BasaltBlake3,
+        ),
     ] {
         check_digest(digest, role, field, issues);
     }
@@ -254,6 +310,9 @@ fn check_authentication_receipt_digests(receipt: &NostrAuthenticationReceipt, is
         .as_ref()
         .is_some_and(|digest| !valid_digest(digest, NostrDigestRole::BasaltBlake3))
     {
-        issues.push(NostrIdentityIssue::new("receipt.binding_identity", "digest-role-mismatch"));
+        issues.push(NostrIdentityIssue::new(
+            "receipt.binding_identity",
+            "digest-role-mismatch",
+        ));
     }
 }

@@ -1,9 +1,20 @@
 use super::model::{
-    PRIVATE_PUBLISH_SETTING, REQUIRED_LICENSE, REQUIRED_PACKAGE_FILES,
-    REQUIRED_PRIVATE_SOURCE_FILES,
+    NICKEL_EVALUATOR_IDENTITY, PRIVATE_PUBLISH_SETTING, REQUIRED_LICENSE,
+    REQUIRED_PACKAGE_FILES, REQUIRED_PRIVATE_SOURCE_FILES,
 };
 use std::fs;
 use std::path::Path;
+
+pub(super) fn validate_nickel_identity(output: &str) -> Result<(), String> {
+    if output.trim() == NICKEL_EVALUATOR_IDENTITY {
+        Ok(())
+    } else {
+        Err(format!(
+            "Nickel evaluator identity mismatch: expected {NICKEL_EVALUATOR_IDENTITY}, got {}",
+            output.trim()
+        ))
+    }
+}
 
 pub(super) fn validate_package_contents(package_list: &str) -> Result<(), String> {
     let missing = REQUIRED_PACKAGE_FILES

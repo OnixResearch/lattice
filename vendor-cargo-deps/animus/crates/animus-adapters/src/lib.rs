@@ -60,30 +60,53 @@ pub mod node;
 mod runstate;
 /// Compatibility facade for the dedicated observability adapter-family crate.
 pub mod observability {
-    pub use animus_adapter_observability::DeliveryPolicy;
-    pub use animus_adapter_observability::Error;
-    pub use animus_adapter_observability::GuardDecision;
-    pub use animus_adapter_observability::LogLevel;
-    pub use animus_adapter_observability::LogRecord;
-    pub use animus_adapter_observability::LogRecordDraft;
-    pub use animus_adapter_observability::LoggingAdapter;
-    pub use animus_adapter_observability::MetricKind;
-    pub use animus_adapter_observability::MetricLabel;
-    pub use animus_adapter_observability::MetricLabelDraft;
-    pub use animus_adapter_observability::MetricSample;
-    pub use animus_adapter_observability::MetricSampleDraft;
-    pub use animus_adapter_observability::MetricUnit;
-    pub use animus_adapter_observability::MetricsAdapter;
-    pub use animus_adapter_observability::SinkFailureClass;
-    pub use animus_adapter_observability::SinkOutcome;
-    pub use animus_adapter_observability::evaluate_delivery;
+    pub use animus_adapter_observability::{
+        DeliveryPolicy, Error, GuardDecision, LogLevel, LogRecord, LogRecordDraft, LoggingAdapter,
+        MetricKind, MetricLabel, MetricLabelDraft, MetricSample, MetricSampleDraft, MetricUnit,
+        MetricsAdapter, SinkFailureClass, SinkOutcome, evaluate_delivery,
+    };
+}
+/// Compatibility facade for pure continual-harness refinement contracts.
+pub mod continual {
+    pub use animus_adapter_continual::*;
+}
+/// Compatibility facade for pure daemon client, supervisor, and worker contracts.
+pub mod daemon_workers {
+    pub use animus_adapter_daemon::*;
+}
+/// Non-default compatibility facade for forge-neutral change-request contracts.
+#[cfg(feature = "change-request")]
+pub mod change_request {
+    pub use animus_adapter_change_request::*;
+}
+/// Non-default compatibility facade for dependency-maintenance contracts.
+#[cfg(feature = "maintenance")]
+pub mod maintenance {
+    pub use animus_adapter_maintenance::*;
+}
+/// Non-default compatibility facade for native evaluation adapter contracts.
+#[cfg(feature = "evaluation")]
+pub mod evaluation {
+    pub use animus_adapter_eval::*;
+}
+/// Non-default compatibility facade for ATIF-v1.7 adapter contracts.
+#[cfg(feature = "harbor-atif")]
+pub mod atif {
+    pub use animus_adapter_atif::*;
 }
 /// Compatibility facade for pure model-facing RLM kernel contracts.
 pub mod rlm_kernel {
     pub use animus_adapter_rlm_kernel::*;
 }
+mod bus;
+#[cfg(test)]
+mod compatibility;
 #[cfg(test)]
 mod familycrates;
+/// Pure family-scoped messaging modes, routing, limits, and receipts.
+pub mod messaging {
+    pub use super::bus::*;
+}
 /// OpenClaw-inspired security audit and plugin guardrail DTOs.
 #[path = "openclaw/guardrails.rs"]
 pub mod openclaw_guardrails;
@@ -93,6 +116,12 @@ pub mod openclaw_session;
 /// Public orchestration adapter-family DTOs and service contracts.
 pub mod orchestration;
 mod outputguard;
+mod pinnedvcs;
+/// Implementation-free contracts for the optional Pijul CLI adapter.
+pub mod pijul {
+    pub use super::pinnedvcs::*;
+}
+mod credentials;
 mod port;
 mod profile;
 mod prompt;
@@ -104,15 +133,29 @@ mod roi;
 /// Transition shim for the dedicated `animus-router` crate.
 pub mod router;
 mod safe;
+/// Authority-free credential-resolution admission contracts.
+pub mod secret_resolution {
+    pub use super::credentials::*;
+}
+mod packs;
 mod security;
 #[cfg(test)]
 mod security_tests;
 mod skill;
+/// Pure frozen and tracked-candidate skill-source lifecycle contracts.
+pub mod skill_source {
+    pub use super::packs::*;
+}
+mod normalization;
 /// Pure opt-in SpaceWasm diagnostic admission and receipt contracts.
 pub mod spacewasm;
 mod status;
 mod timed;
 pub mod tool;
+/// Authority-free contracts for optional transcript normalization.
+pub mod trajectory {
+    pub use super::normalization::*;
+}
 /// Adapter field validation helpers shared by `animus-adapters` and
 /// downstream crates such as `animus-router`.
 pub mod validation;
@@ -121,590 +164,217 @@ mod vcssnapshot;
 mod versioning;
 mod workspace;
 
-pub use agent_comms::AgentCommsAdmission;
-pub use agent_comms::AgentCommsError;
-pub use agent_comms::AgentCommsFrame;
-pub use agent_comms::AgentCommsFrameDraft;
-pub use agent_comms::AgentCommsFrameKind;
-pub use agent_comms::AgentCommsReceipt;
-pub use agent_comms::AgentCommsReceiptDraft;
-pub use agent_comms::AgentCommsReceiptStatus;
-pub use agent_comms::AgentCommsRedaction;
-pub use agent_comms::AgentCommsRoute;
-pub use agent_comms::AgentCommsRouteDraft;
-pub use agent_comms::AgentCommsTransport;
-pub use agent_comms::AgentCommsTransportFamily;
-pub use agent_comms::admit_agent_comms_scope;
-pub use agent_comms::project_assertion_frame;
-pub use agent_comms::project_headless_command_frame;
-pub use agent_comms::project_headless_event_frame;
-pub use agent_comms::project_orchestration_event_frame;
-pub use agent_comms::project_subagent_lifecycle_frame;
-pub use aliases::DEFAULT_MODEL_PROMPT_IMAGE_BYTE_BUDGET;
-pub use aliases::MAX_MODEL_IMAGE_BYTE_COUNT;
-pub use aliases::ModelContentPart;
-pub use aliases::ModelContentPartDraft;
-pub use aliases::ModelImageDetailPreference;
-pub use aliases::ModelImageMediaType;
-pub use aliases::ModelImageMetadata;
-pub use aliases::ModelImageMetadataDraft;
-pub use aliases::ModelImageOutcome;
-pub use aliases::ModelImageOutcomeStatus;
-pub use aliases::ModelImagePart;
-pub use aliases::ModelImagePartDraft;
-pub use aliases::ModelImagePayloadError;
-pub use aliases::ModelImagePayloadHandle;
-pub use aliases::ModelImagePayloadHandleDraft;
-pub use aliases::ModelImagePayloadHandleKind;
-pub use aliases::ModelImagePayloadService;
-pub use aliases::ModelImageReceipt;
-pub use aliases::ModelImageReceiptDraft;
-pub use aliases::ModelImageSourceTrust;
-pub use aliases::ModelInputModality;
-pub use aliases::ModelMultimodalDispatchPlan;
-pub use aliases::ModelMultimodalError;
-pub use aliases::ModelPromptAssembly;
-pub use aliases::ModelPromptAssemblyPolicy;
-pub use aliases::ModelProviderNativePart;
-pub use aliases::ModelProviderNativeRequest;
-pub use aliases::ModelProviderSerializationMode;
-pub use aliases::ModelProviderSerializationPolicy;
-pub use aliases::ModelProviderSerializationPolicyDraft;
-pub use aliases::ModelTextPart;
-pub use aliases::ModelUnsafeContentReason;
-pub use aliases::SelectedModelInputCapabilities;
-pub use aliases::SelectedModelInputCapabilitiesDraft;
-pub use aliases::assemble_model_content_parts;
-pub use aliases::prepare_model_multimodal_dispatch;
-pub use aliases::serialize_model_provider_native_fixture;
+pub use agent_comms::{
+    AgentCommsAdmission, AgentCommsError, AgentCommsFrame, AgentCommsFrameDraft,
+    AgentCommsFrameKind, AgentCommsReceipt, AgentCommsReceiptDraft, AgentCommsReceiptStatus,
+    AgentCommsRedaction, AgentCommsRoute, AgentCommsRouteDraft, AgentCommsTransport,
+    AgentCommsTransportFamily, admit_agent_comms_scope, project_assertion_frame,
+    project_headless_command_frame, project_headless_event_frame,
+    project_orchestration_event_frame, project_subagent_lifecycle_frame,
+};
 pub use aliases::*;
-pub use asset::HostAssetAction;
-pub use asset::HostAssetActionKind;
-pub use asset::HostAssetDiagnostic;
-pub use asset::HostAssetDiagnosticCode;
-pub use asset::HostAssetDriftClass;
-pub use asset::HostAssetDriftReport;
-pub use asset::HostAssetEnablement;
-pub use asset::HostAssetInventory;
-pub use asset::HostAssetInventoryDraft;
-pub use asset::HostAssetKind;
-pub use asset::HostAssetManifestEntry;
-pub use asset::HostAssetManifestEntryDraft;
-pub use asset::HostAssetMutationAdmission;
-pub use asset::HostAssetMutationRequest;
-pub use asset::HostAssetMutationRequestDraft;
-pub use asset::HostAssetMutationStatus;
-pub use asset::HostAssetObservation;
-pub use asset::HostAssetObservationDraft;
-pub use asset::HostAssetPlanStatus;
-pub use asset::HostAssetReconciliationPlan;
-pub use asset::HostAssetReconciliationReceipt;
-pub use asset::HostAssetReconciliationReceiptDraft;
-pub use asset::HostAssetServiceStatus;
-pub use asset::HostAssetTrust;
-pub use asset::PROHIBITED_ASSET_RECONCILIATION_EFFECTS;
-pub use asset::admit_host_asset_mutation;
-pub use asset::classify_host_asset_drift;
-pub use asset::plan_host_asset_reconciliation;
-pub use asset::validate_host_asset_inventory;
-pub use asset::validate_host_asset_receipt;
-pub use bridge::AcpDescriptor;
-pub use bridge::AcpDescriptorDraft;
-pub use bridge::AcpPermissionMode;
-pub use bridge::AcpSessionCorrelation;
-pub use bridge::AcpToolPassThroughPolicy;
-pub use bridge::InteropError;
-pub use bridge::InteropOperationKind;
-pub use bridge::InteropReceipt;
-pub use bridge::InteropReceiptDraft;
-pub use bridge::McpAdvertisementDecision;
-pub use bridge::McpAdvertisementInput;
-pub use bridge::McpArgumentStatus;
-pub use bridge::McpDescriptor;
-pub use bridge::McpDescriptorDraft;
-pub use bridge::McpDispatchDecision;
-pub use bridge::McpDispatchRequest;
-pub use bridge::McpMutationStatus;
-pub use bridge::McpReceipt;
-pub use bridge::McpReceiptDraft;
-pub use bridge::McpReceiptTruncationState;
-pub use bridge::McpServerTrust;
-pub use bridge::McpToolMapping;
-pub use bridge::McpToolMappingDraft;
-pub use bridge::McpTransportDecision;
-pub use bridge::McpTransportFailureClass;
-pub use bridge::McpTransportKind;
-pub use bridge::McpTransportState;
-pub use bridge::PROHIBITED_INTEROP_EFFECTS;
-pub use bridge::ToolPassThroughInput;
-pub use bridge::ToolPassThroughResolution;
-pub use bridge::evaluate_mcp_dispatch;
-pub use bridge::evaluate_mcp_transport;
-pub use bridge::plan_mcp_advertisement;
-pub use bridge::resolve_tool_pass_through;
-pub use bridge::validate_interop_receipt_text;
-pub use bridge::validate_mcp_receipt_text;
-pub use codex::DiffReviewActionKind;
-pub use codex::DiffReviewDenialReason;
-pub use codex::DiffReviewError;
-pub use codex::DiffReviewEvidence;
-pub use codex::DiffReviewEvidenceDraft;
-pub use codex::DiffReviewEvidenceKind;
-pub use codex::DiffReviewFinding;
-pub use codex::DiffReviewFindingCategory;
-pub use codex::DiffReviewFindingDraft;
-pub use codex::DiffReviewFindingSeverity;
-pub use codex::DiffReviewFindingState;
-pub use codex::DiffReviewFindingStateRecord;
-pub use codex::DiffReviewPolicyDecision;
-pub use codex::DiffReviewPolicyProfile;
-pub use codex::DiffReviewReport;
-pub use codex::DiffReviewReportDraft;
-pub use codex::DiffReviewRequest;
-pub use codex::DiffReviewRequestDraft;
-pub use codex::DiffReviewSelector;
-pub use codex::DiffReviewSelectorDraft;
-pub use codex::DiffReviewSelectorKind;
-pub use codex::DiffReviewSpan;
-pub use codex::DiffReviewSpanDraft;
-pub use codex::PROHIBITED_DIFF_REVIEW_EFFECTS;
-pub use codex::compare_diff_review_rerun;
-pub use dataspace::ActorKind;
-pub use dataspace::AdapterService;
-pub use dataspace::Assertion;
-pub use dataspace::AssertionDraft;
-pub use dataspace::AssertionKind;
-pub use dataspace::AssertionRedaction;
-pub use dataspace::AssertionStatus;
-pub use dataspace::OrchestrationEvent;
-pub use dataspace::OrchestrationEventDraft;
-pub use dataspace::OrchestrationEventKind;
-pub use dataspace::Scope;
-pub use dataspace::ScopeDraft;
-pub use dataspace::Subscription;
-pub use dataspace::SubscriptionDraft;
-pub use dataspace::SubscriptionIssue;
-pub use document::DocumentContentTrust;
-pub use document::DocumentFormat;
-pub use document::DocumentIngestDiagnostic;
-pub use document::DocumentIngestError;
-pub use document::DocumentIngestNonClaim;
-pub use document::DocumentIngestReport;
-pub use document::DocumentIngestReportDraft;
-pub use document::DocumentIngestStatus;
-pub use document::DocumentIngestValidationIssue;
-pub use document::DocumentIsolationStatus;
-pub use document::DocumentMetadata;
-pub use document::DocumentMetadataDraft;
-pub use document::DocumentRedactionLabel;
-pub use document::DocumentSection;
-pub use document::DocumentSectionDraft;
-pub use document::DocumentSourceIdentity;
-pub use document::DocumentSourceIdentityDraft;
-pub use document::DocumentTableCell;
-pub use document::DocumentTableCellDraft;
-pub use document::DocumentTruncationStatus;
-pub use document::PROHIBITED_DOCUMENT_INGEST_EFFECTS;
-pub use document::validate_document_ingest_report;
-pub use effect::AuthorizationContext;
-pub use effect::AuthorizationIssue;
-pub use effect::AuthorizationLeak;
-pub use effect::AuthorizationReceipt;
-pub use effect::AuthorizationStatus;
-pub use effect::CancellationCheck;
-pub use effect::CancellationDecision;
-pub use effect::CancellationService;
-pub use effect::CapabilityClass;
-pub use effect::CapabilityDecision;
-pub use effect::CapabilityDecisionRequest;
-pub use effect::CapabilityDecisionService;
-pub use effect::CapabilityPolicyContract;
-pub use effect::CapabilityRequest;
-pub use effect::CaveatSummary;
-pub use effect::ConfirmationActionKind;
-pub use effect::ConfirmationBinding;
-pub use effect::ConfirmationBindingDraft;
-pub use effect::ConfirmationBroker;
-pub use effect::ConfirmationBrokerClass;
-pub use effect::ConfirmationDecision;
-pub use effect::ConfirmationEvaluation;
-pub use effect::ConfirmationExpiry;
-pub use effect::ConfirmationExpiryClass;
-pub use effect::ConfirmationIssue;
-pub use effect::ConfirmationLevel;
-pub use effect::ConfirmationReceipt;
-pub use effect::ConfirmationReceiptDraft;
-pub use effect::ConfirmationReceiptLeak;
-pub use effect::ConfirmationRequest;
-pub use effect::ConfirmationRequestDraft;
-pub use effect::ConfirmationStatus;
-pub use effect::ConfirmationTick;
-pub use effect::ConfirmationTimingClass;
-pub use effect::ExecPolicyCommandIntent;
-pub use effect::ExecPolicyCommandIntentDraft;
-pub use effect::ExecPolicyDecision;
-pub use effect::ExecPolicyError;
-pub use effect::ExecPolicyEvaluation;
-pub use effect::ExecPolicyRequest;
-pub use effect::ExecPolicyRule;
-pub use effect::ExecPolicyRuleDraft;
-pub use effect::ExecPolicyRuleEvidence;
-pub use effect::ExecPolicySandboxContext;
-pub use effect::ExecPolicySandboxContextDraft;
-pub use effect::ExecPolicyShellAnalysis;
-pub use effect::ExecPolicyShellAnalysisKind;
-pub use effect::GuardedAction;
-pub use effect::HostRequest;
-pub use effect::HostService;
-pub use effect::LocalCaveat;
-pub use effect::LocalCaveatDecision;
-pub use effect::LocalPolicyLayer;
-pub use effect::ModelProviderService;
-pub use effect::OutcomeKind;
-pub use effect::PermissionDecisionReason;
-pub use effect::PermissionDecisionStatus;
-pub use effect::PermissionKernelReceipt;
-pub use effect::PermissionKernelReceiptDraft;
-pub use effect::PermissionMode;
-pub use effect::PermissionModeDefaultReason;
-pub use effect::PermissionModeDefaultRequest;
-pub use effect::PermissionModeDefaultResolution;
-pub use effect::PermissionOutcome;
-pub use effect::PermissionPatternMatchKind;
-pub use effect::PermissionPatternRule;
-pub use effect::PermissionPatternRuleDraft;
-pub use effect::PermissionPolicy;
-pub use effect::PermissionPolicyDraft;
-pub use effect::PermissionPolicyError;
-pub use effect::PermissionPromptDecision;
-pub use effect::PermissionPromptDecisionDraft;
-pub use effect::PermissionPromptRequest;
-pub use effect::PermissionPromptRequestDraft;
-pub use effect::PermissionPromptStatus;
-pub use effect::PermissionReceipt;
-pub use effect::PermissionReceiptDraft;
-pub use effect::PermissionReceiptLeak;
-pub use effect::PermissionRepeatedActionInput;
-pub use effect::PermissionRepeatedActionPolicy;
-pub use effect::PermissionRepeatedActionResolution;
-pub use effect::PermissionRepeatedActionStatus;
-pub use effect::PermissionResolution;
-pub use effect::PermissionResolutionRequest;
-pub use effect::PermissionSessionAllowlistEntry;
-pub use effect::PermissionSessionAllowlistEntryDraft;
-pub use effect::PermissionSessionAllowlistStatus;
-pub use effect::PermissionSessionAllowlistValidation;
-pub use effect::PermissionTrustScope;
-pub use effect::PermissionTrustStatus;
-pub use effect::PromptDecisionOutcome;
-pub use effect::PromptSummaryPolicy;
-pub use effect::Reason;
-pub use effect::Receipt;
-pub use effect::ReceiptDraft;
-pub use effect::RedactionMarker;
-pub use effect::RuntimePolicyDecision;
-pub use effect::RuntimePolicyRequest;
-pub use effect::RuntimePolicyService;
-pub use effect::SAFE_HASH_HEX_CHARS;
-pub use effect::SAFE_RECEIPT_CONTRACT_IDENTITY;
-pub use effect::SafeHash;
-pub use effect::SandboxConstraint;
-pub use effect::SandboxConstraintClass;
-pub use effect::SandboxCowDisposition;
-pub use effect::SandboxDescriptor;
-pub use effect::SandboxDescriptorDraft;
-pub use effect::SandboxDeterminismPolicy;
-pub use effect::SandboxDispatchDecision;
-pub use effect::SandboxDispatchIssue;
-pub use effect::SandboxDispatchReceipt;
-pub use effect::SandboxDispatchReceiptDraft;
-pub use effect::SandboxDispatchStatus;
-pub use effect::SandboxEnforcementRequirement;
-pub use effect::SandboxEnvironmentPolicy;
-pub use effect::SandboxFilesystemMode;
-pub use effect::SandboxHttpPolicy;
-pub use effect::SandboxNetworkPolicy;
-pub use effect::SandboxPlatformCapability;
-pub use effect::SandboxPlatformSupport;
-pub use effect::SandboxPlatformSupportDraft;
-pub use effect::SandboxPolicy;
-pub use effect::SandboxPolicyDraft;
-pub use effect::SandboxProcessProfile;
-pub use effect::SandboxReceiptLeak;
-pub use effect::SandboxState;
-pub use effect::SandboxWorkdirMode;
-pub use effect::ServiceKind;
-pub use effect::ServiceOutcome;
-pub use effect::ToolExecutionService;
-pub use effect::UcanGrant;
-pub use effect::analyze_exec_policy_shell_wrapper;
-pub use effect::authorize_capability;
-pub use effect::default_deny_confirmation;
-pub use effect::detect_permission_repeated_action;
-pub use effect::evaluate_confirmation_decision;
-pub use effect::evaluate_confirmation_outcome;
-pub use effect::evaluate_exec_policy;
-pub use effect::evaluate_sandbox_dispatch;
-pub use effect::resolve_permission;
-pub use effect::resolve_permission_mode_default;
-pub use effect::validate_authorization_receipt_text;
-pub use effect::validate_confirmation_receipt_text;
-pub use effect::validate_permission_receipt_text;
-pub use effect::validate_permission_session_allowlist;
-pub use effect::validate_sandbox_receipt_text;
+pub use aliases::{
+    DEFAULT_MODEL_PROMPT_IMAGE_BYTE_BUDGET, MAX_MODEL_IMAGE_BYTE_COUNT, ModelContentPart,
+    ModelContentPartDraft, ModelImageDetailPreference, ModelImageMediaType, ModelImageMetadata,
+    ModelImageMetadataDraft, ModelImageOutcome, ModelImageOutcomeStatus, ModelImagePart,
+    ModelImagePartDraft, ModelImagePayloadError, ModelImagePayloadHandle,
+    ModelImagePayloadHandleDraft, ModelImagePayloadHandleKind, ModelImagePayloadService,
+    ModelImageReceipt, ModelImageReceiptDraft, ModelImageSourceTrust, ModelInputModality,
+    ModelMultimodalDispatchPlan, ModelMultimodalError, ModelPromptAssembly,
+    ModelPromptAssemblyPolicy, ModelProviderNativePart, ModelProviderNativeRequest,
+    ModelProviderSerializationMode, ModelProviderSerializationPolicy,
+    ModelProviderSerializationPolicyDraft, ModelTextPart, ModelUnsafeContentReason,
+    SelectedModelInputCapabilities, SelectedModelInputCapabilitiesDraft,
+    assemble_model_content_parts, prepare_model_multimodal_dispatch,
+    serialize_model_provider_native_fixture,
+};
+pub use asset::{
+    HostAssetAction, HostAssetActionKind, HostAssetDiagnostic, HostAssetDiagnosticCode,
+    HostAssetDriftClass, HostAssetDriftReport, HostAssetEnablement, HostAssetInventory,
+    HostAssetInventoryDraft, HostAssetKind, HostAssetManifestEntry, HostAssetManifestEntryDraft,
+    HostAssetMutationAdmission, HostAssetMutationRequest, HostAssetMutationRequestDraft,
+    HostAssetMutationStatus, HostAssetObservation, HostAssetObservationDraft, HostAssetPlanStatus,
+    HostAssetReconciliationPlan, HostAssetReconciliationReceipt,
+    HostAssetReconciliationReceiptDraft, HostAssetServiceStatus, HostAssetTrust,
+    PROHIBITED_ASSET_RECONCILIATION_EFFECTS, admit_host_asset_mutation, classify_host_asset_drift,
+    plan_host_asset_reconciliation, validate_host_asset_inventory, validate_host_asset_receipt,
+};
+pub use bridge::{
+    AcpDescriptor, AcpDescriptorDraft, AcpPermissionMode, AcpSessionCorrelation,
+    AcpToolPassThroughPolicy, InteropError, InteropOperationKind, InteropReceipt,
+    InteropReceiptDraft, McpAdvertisementDecision, McpAdvertisementInput, McpArgumentStatus,
+    McpDescriptor, McpDescriptorDraft, McpDispatchDecision, McpDispatchRequest, McpMutationStatus,
+    McpReceipt, McpReceiptDraft, McpReceiptTruncationState, McpServerTrust, McpToolMapping,
+    McpToolMappingDraft, McpTransportDecision, McpTransportFailureClass, McpTransportKind,
+    McpTransportState, PROHIBITED_INTEROP_EFFECTS, ToolPassThroughInput, ToolPassThroughResolution,
+    evaluate_mcp_dispatch, evaluate_mcp_transport, plan_mcp_advertisement,
+    resolve_tool_pass_through, validate_interop_receipt_text, validate_mcp_receipt_text,
+};
+pub use codex::{
+    DiffReviewActionKind, DiffReviewDenialReason, DiffReviewError, DiffReviewEvidence,
+    DiffReviewEvidenceDraft, DiffReviewEvidenceKind, DiffReviewFinding, DiffReviewFindingCategory,
+    DiffReviewFindingDraft, DiffReviewFindingSeverity, DiffReviewFindingState,
+    DiffReviewFindingStateRecord, DiffReviewPolicyDecision, DiffReviewPolicyProfile,
+    DiffReviewReport, DiffReviewReportDraft, DiffReviewRequest, DiffReviewRequestDraft,
+    DiffReviewSelector, DiffReviewSelectorDraft, DiffReviewSelectorKind, DiffReviewSpan,
+    DiffReviewSpanDraft, PROHIBITED_DIFF_REVIEW_EFFECTS, compare_diff_review_rerun,
+};
+pub use dataspace::{
+    ActorKind, AdapterService, Assertion, AssertionDraft, AssertionKind, AssertionRedaction,
+    AssertionStatus, OrchestrationEvent, OrchestrationEventDraft, OrchestrationEventKind, Scope,
+    ScopeDraft, Subscription, SubscriptionDraft, SubscriptionIssue,
+};
+pub use document::{
+    DocumentContentTrust, DocumentFormat, DocumentIngestDiagnostic, DocumentIngestError,
+    DocumentIngestNonClaim, DocumentIngestReport, DocumentIngestReportDraft, DocumentIngestStatus,
+    DocumentIngestValidationIssue, DocumentIsolationStatus, DocumentMetadata,
+    DocumentMetadataDraft, DocumentRedactionLabel, DocumentSection, DocumentSectionDraft,
+    DocumentSourceIdentity, DocumentSourceIdentityDraft, DocumentTableCell, DocumentTableCellDraft,
+    DocumentTruncationStatus, PROHIBITED_DOCUMENT_INGEST_EFFECTS, validate_document_ingest_report,
+};
 pub use front::*;
-pub use hostcontrol::HostControlEnvelope;
-pub use hostcontrol::HostControlError;
-pub use hostcontrol::HostEvent;
-pub use hostcontrol::HostEventKind;
-pub use hostcontrol::HostEventSubscription;
-pub use hostcontrol::HostOperation;
-pub use hostcontrol::HostOutputReadDraft;
-pub use hostcontrol::HostOutputSource;
-pub use hostcontrol::HostOutputView;
-pub use hostcontrol::HostRedactionStatus;
-pub use hostcontrol::HostResourceKind;
-pub use hostcontrol::HostSelector;
-pub use hostcontrol::HostSelectorDraft;
-pub use hostcontrol::HostSemanticStatus;
-pub use hostcontrol::HostTopologyResource;
-pub use hostcontrol::HostTopologyResourceDraft;
-pub use hostcontrol::HostTopologySnapshot;
-pub use hostcontrol::HostTopologySnapshotDraft;
-pub use hostcontrol::HostTruncationStatus;
-pub use hostcontrol::HostTypedError;
-pub use hostcontrol::HostUnknownFields;
-pub use hostcontrol::HostWaitOutcome;
-pub use hostcontrol::HostWaitOutcomeKind;
-pub use hostcontrol::HostWaitRequest;
-pub use hostcontrol::LayoutApplyRequest;
-pub use hostcontrol::LayoutApplyResponse;
-pub use hostcontrol::LayoutAxis;
-pub use hostcontrol::LayoutCommandDescriptor;
-pub use hostcontrol::LayoutCommandDescriptorDraft;
-pub use hostcontrol::LayoutNode;
-pub use hostcontrol::LayoutPaneDraft;
-pub use hostcontrol::SelectorLifetime;
-pub use hostcontrol::TopologyCommand;
-pub use hostcontrol::TopologyCommandDraft;
-pub use hostcontrol::filter_host_events;
-pub use hostcontrol::resolve_host_wait;
-pub use intent::IntentActionClass;
-pub use intent::IntentBatchAdmission;
-pub use intent::IntentBatchAdmissionStatus;
-pub use intent::IntentDetectorTier;
-pub use intent::IntentDiagnostic;
-pub use intent::IntentDiagnosticCode;
-pub use intent::IntentHeuristicRule;
-pub use intent::IntentHeuristicRuleDraft;
-pub use intent::IntentLatencyBucket;
-pub use intent::IntentMatchClass;
-pub use intent::IntentReceipt;
-pub use intent::IntentReceiptDraft;
-pub use intent::IntentRecommendation;
-pub use intent::IntentRiskLevel;
-pub use intent::IntentVerdict;
-pub use intent::IntentVerdictDraft;
-pub use intent::PROHIBITED_INTENT_VALIDATION_EFFECTS;
-pub use intent::PendingIntentCall;
-pub use intent::PendingIntentCallDraft;
-pub use intent::evaluate_intent_batch;
-pub use intent::evaluate_intent_heuristics;
-pub use intent::merge_intent_reviewer_verdict;
-pub use intent::validate_intent_heuristic_rule;
-pub use intent::validate_intent_receipt;
-pub use intent::validate_intent_verdict;
-pub use intent::validate_pending_intent_call;
-pub use invocation::ADAPTER_CALL_OUTCOME_CONTRACT_IDENTITY;
-pub use invocation::AdapterCallFailureClass;
-pub use invocation::AdapterCallFailureMetadata;
-pub use invocation::AdapterCallFailureMetadataDraft;
-pub use invocation::AdapterCallOutcome;
-pub use invocation::ComponentOutcomeAdapter;
-pub use invocation::ModelOutcomeAdapter;
-pub use invocation::ToolOutcomeAdapter;
-pub use lens::FocusDeck;
-pub use lens::FocusDeckDraft;
-pub use lens::FocusItem;
-pub use lens::FocusItemDraft;
-pub use lens::LensConfidence;
-pub use lens::LensContextRef;
-pub use lens::LensContextRefDraft;
-pub use lens::LensContradiction;
-pub use lens::LensContradictionDraft;
-pub use lens::LensContradictionStatus;
-pub use lens::LensDiagnostic;
-pub use lens::LensDiagnosticCode;
-pub use lens::LensExecutionMode;
-pub use lens::LensExecutionPlan;
-pub use lens::LensExecutionPlanStatus;
-pub use lens::LensReport;
-pub use lens::LensReportDraft;
-pub use lens::LensReportStatus;
-pub use lens::LensReviewCriterion;
-pub use lens::LensReviewCriterionDraft;
-pub use lens::LensSynthesisDraft;
-pub use lens::LensSynthesisReport;
-pub use lens::LensTaskPacket;
-pub use lens::LensTaskPacketDraft;
-pub use lens::LensWorkerServiceStatus;
-pub use lens::PROHIBITED_MULTI_LENS_EFFECTS;
-pub use lens::plan_lens_execution;
-pub use lens::validate_focus_deck;
-pub use lens::validate_lens_report;
-pub use lens::validate_lens_synthesis;
-pub use lens::validate_lens_task_packet;
-pub use manifest::LaunchPolicy;
-pub use manifest::LaunchPolicyDraft;
-pub use manifest::NetworkPolicy;
-pub use manifest::PROHIBITED_PLUGIN_MANIFEST_EFFECTS;
-pub use manifest::PluginCompatibility;
-pub use manifest::PluginCompatibilityDraft;
-pub use manifest::PluginDescriptor;
-pub use manifest::PluginDescriptorDraft;
-pub use manifest::PluginDescriptorError;
-pub use manifest::PluginDiagnostic;
-pub use manifest::PluginDiagnosticKind;
-pub use manifest::PluginDiagnosticSeverity;
-pub use manifest::PluginHostCompatibilityDraft;
-pub use manifest::PluginInvocationContext;
-pub use manifest::PluginInvocationContextDraft;
-pub use manifest::PluginInvocationContextLeak;
-pub use manifest::PluginRegistryOperationDraft;
-pub use manifest::PluginRegistryOperationKind;
-pub use manifest::PluginRegistryPlan;
-pub use manifest::PluginRegistryPlanStatus;
-pub use manifest::PluginRole;
-pub use manifest::PluginRoleDraft;
-pub use manifest::PluginRoleKind;
-pub use manifest::RedactionPolicy;
-pub use manifest::RedactionPolicyDraft;
-pub use manifest::RuntimeKind;
-pub use manifest::SandboxMode;
-pub use manifest::SandboxRequirements;
-pub use manifest::SandboxRequirementsDraft;
-pub use manifest::ToolDescriptor;
-pub use manifest::ToolDescriptorDraft;
-pub use manifest::WorkingDirectoryMode;
-pub use modefsm::BreakoutAckStatus;
-pub use modefsm::BreakoutAcknowledgement;
-pub use modefsm::BreakoutAcknowledgementDraft;
-pub use modefsm::LoopConditionDraft;
-pub use modefsm::LoopWorkItem;
-pub use modefsm::ModeControllerPlan;
-pub use modefsm::ModeControllerPlanStatus;
-pub use modefsm::ModeControllerStatus;
-pub use modefsm::ModeDescriptor;
-pub use modefsm::ModeDescriptorDraft;
-pub use modefsm::ModeDiagnostic;
-pub use modefsm::ModeDiagnosticCode;
-pub use modefsm::ModePosture;
-pub use modefsm::ModeReceipt;
-pub use modefsm::ModeReceiptDraft;
-pub use modefsm::ModeRetryClass;
-pub use modefsm::ModeRuntimeState;
-pub use modefsm::ModeState;
-pub use modefsm::PROHIBITED_PLAN_LOOP_EFFECTS;
-pub use modefsm::PlanExtraction;
-pub use modefsm::PlanExtractionStatus;
-pub use modefsm::PlanStep;
-pub use modefsm::SelectedStepUpdateDraft;
-pub use modefsm::StepSelectionStatus;
-pub use modefsm::apply_selected_step_update;
-pub use modefsm::extract_plan_steps;
-pub use modefsm::mode_state_from_extraction;
-pub use modefsm::plan_mode_controller;
-pub use modefsm::start_loop_work;
-pub use modefsm::validate_breakout_acknowledgement;
-pub use modefsm::validate_mode_descriptor;
-pub use modefsm::validate_mode_receipt;
-pub use modelevidence::ModelArtifactIdentity;
-pub use modelevidence::ModelArtifactIdentityDraft;
-pub use modelevidence::ModelEvidenceCapabilityLabel;
-pub use modelevidence::ModelEvidenceDiagnostic;
-pub use modelevidence::ModelEvidenceError;
-pub use modelevidence::ModelEvidenceFreshness;
-pub use modelevidence::ModelEvidenceKind;
-pub use modelevidence::ModelEvidenceNonClaim;
-pub use modelevidence::ModelEvidenceReport;
-pub use modelevidence::ModelEvidenceReportDraft;
-pub use modelevidence::ModelEvidenceResultStatus;
-pub use modelevidence::ModelEvidenceValidationIssue;
-pub use modelevidence::ModelEvidenceVerifierKind;
-pub use modelevidence::PROHIBITED_MODEL_EVIDENCE_EFFECTS;
-pub use modelevidence::validate_model_evidence_report;
-pub use observability::LogLevel;
-pub use observability::LogRecord;
-pub use observability::LogRecordDraft;
-pub use observability::LoggingAdapter;
-pub use observability::MetricKind;
-pub use observability::MetricLabel;
-pub use observability::MetricLabelDraft;
-pub use observability::MetricSample;
-pub use observability::MetricSampleDraft;
-pub use observability::MetricUnit;
-pub use observability::MetricsAdapter;
-pub use outputguard::OutputAssessment;
-pub use outputguard::OutputAssessmentDraft;
-pub use outputguard::OutputDetectorFlag;
-pub use outputguard::OutputDetectorTier;
-pub use outputguard::OutputGuardDiagnostic;
-pub use outputguard::OutputGuardDiagnosticCode;
-pub use outputguard::OutputGuardReceipt;
-pub use outputguard::OutputGuardReceiptDraft;
-pub use outputguard::OutputProjectionPlan;
-pub use outputguard::OutputProjectionPolicy;
-pub use outputguard::OutputProjectionStatus;
-pub use outputguard::OutputRedactionState;
-pub use outputguard::OutputRiskLevel;
-pub use outputguard::OutputScanInputDraft;
-pub use outputguard::PROHIBITED_OUTPUT_GUARD_EFFECTS;
-pub use outputguard::merge_output_assessments;
-pub use outputguard::plan_output_projection;
-pub use outputguard::scan_output_summary;
-pub use outputguard::validate_output_assessment;
-pub use outputguard::validate_output_guard_receipt;
-pub use recover::CheckpointBackendKind;
-pub use recover::CheckpointDraft;
-pub use recover::CheckpointError;
-pub use recover::CheckpointFailureClass;
-pub use recover::CheckpointHash;
-pub use recover::CheckpointOperation;
-pub use recover::CheckpointPolicy;
-pub use recover::CheckpointReceipt;
-pub use recover::CheckpointReceiptDraft;
-pub use recover::CheckpointReceiptLeak;
-pub use recover::CheckpointRecord;
-pub use recover::CheckpointService;
-pub use recover::CheckpointServiceRequest;
-pub use recover::CheckpointServiceResponse;
-pub use recover::CheckpointServiceState;
-pub use recover::CheckpointStatus;
-pub use recover::MutationProtection;
-pub use recover::ProtectedMutationDecision;
-pub use recover::ProtectedMutationInput;
-pub use recover::RollbackConfirmationStatus;
-pub use recover::RollbackValidation;
-pub use recover::RollbackValidationInput;
-pub use recover::evaluate_protected_mutation;
-pub use recover::validate_checkpoint_receipt_text;
-pub use recover::validate_rollback;
-pub use runstate::AgentControlAction;
-pub use runstate::AgentControlCheckpoint;
-pub use runstate::AgentControlCheckpointKind;
-pub use runstate::AgentControlCommand;
-pub use runstate::AgentControlCommandId;
-pub use runstate::AgentControlEvent;
-pub use runstate::AgentControlEventKind;
-pub use runstate::AgentControlIdentityError;
-pub use runstate::AgentControlPermit;
-pub use runstate::AgentControlPhase;
-pub use runstate::AgentControlRunId;
-pub use runstate::AgentControlWait;
-pub use runstate::AgentControlWaitError;
-pub use runstate::MAX_AGENT_CONTROL_ID_BYTES;
-pub use versioning::BoundaryContractIdentity;
-pub use versioning::parse_boundary_contract_identity;
+pub use hostcontrol::{
+    HostControlEnvelope, HostControlError, HostEvent, HostEventKind, HostEventSubscription,
+    HostOperation, HostOutputReadDraft, HostOutputSource, HostOutputView, HostRedactionStatus,
+    HostResourceKind, HostSelector, HostSelectorDraft, HostSemanticStatus, HostTopologyResource,
+    HostTopologyResourceDraft, HostTopologySnapshot, HostTopologySnapshotDraft,
+    HostTruncationStatus, HostTypedError, HostUnknownFields, HostWaitOutcome, HostWaitOutcomeKind,
+    HostWaitRequest, LayoutApplyRequest, LayoutApplyResponse, LayoutAxis, LayoutCommandDescriptor,
+    LayoutCommandDescriptorDraft, LayoutNode, LayoutPaneDraft, SelectorLifetime, TopologyCommand,
+    TopologyCommandDraft, filter_host_events, resolve_host_wait,
+};
+pub use intent::{
+    IntentActionClass, IntentBatchAdmission, IntentBatchAdmissionStatus, IntentDetectorTier,
+    IntentDiagnostic, IntentDiagnosticCode, IntentHeuristicRule, IntentHeuristicRuleDraft,
+    IntentLatencyBucket, IntentMatchClass, IntentReceipt, IntentReceiptDraft, IntentRecommendation,
+    IntentRiskLevel, IntentVerdict, IntentVerdictDraft, PROHIBITED_INTENT_VALIDATION_EFFECTS,
+    PendingIntentCall, PendingIntentCallDraft, evaluate_intent_batch, evaluate_intent_heuristics,
+    merge_intent_reviewer_verdict, validate_intent_heuristic_rule, validate_intent_receipt,
+    validate_intent_verdict, validate_pending_intent_call,
+};
+pub use invocation::{
+    ADAPTER_CALL_OUTCOME_CONTRACT_IDENTITY, AdapterCallFailureClass, AdapterCallFailureMetadata,
+    AdapterCallFailureMetadataDraft, AdapterCallOutcome, ComponentOutcomeAdapter,
+    ModelOutcomeAdapter, ToolOutcomeAdapter,
+};
+pub use lens::{
+    FocusDeck, FocusDeckDraft, FocusItem, FocusItemDraft, LensConfidence, LensContextRef,
+    LensContextRefDraft, LensContradiction, LensContradictionDraft, LensContradictionStatus,
+    LensDiagnostic, LensDiagnosticCode, LensExecutionMode, LensExecutionPlan,
+    LensExecutionPlanStatus, LensReport, LensReportDraft, LensReportStatus, LensReviewCriterion,
+    LensReviewCriterionDraft, LensSynthesisDraft, LensSynthesisReport, LensTaskPacket,
+    LensTaskPacketDraft, LensWorkerServiceStatus, PROHIBITED_MULTI_LENS_EFFECTS,
+    plan_lens_execution, validate_focus_deck, validate_lens_report, validate_lens_synthesis,
+    validate_lens_task_packet,
+};
+pub use modefsm::{
+    BreakoutAckStatus, BreakoutAcknowledgement, BreakoutAcknowledgementDraft, LoopConditionDraft,
+    LoopWorkItem, ModeControllerPlan, ModeControllerPlanStatus, ModeControllerStatus,
+    ModeDescriptor, ModeDescriptorDraft, ModeDiagnostic, ModeDiagnosticCode, ModePosture,
+    ModeReceipt, ModeReceiptDraft, ModeRetryClass, ModeRuntimeState, ModeState,
+    PROHIBITED_PLAN_LOOP_EFFECTS, PlanExtraction, PlanExtractionStatus, PlanStep,
+    SelectedStepUpdateDraft, StepSelectionStatus, apply_selected_step_update, extract_plan_steps,
+    mode_state_from_extraction, plan_mode_controller, start_loop_work,
+    validate_breakout_acknowledgement, validate_mode_descriptor, validate_mode_receipt,
+};
+pub use modelevidence::{
+    ModelArtifactIdentity, ModelArtifactIdentityDraft, ModelEvidenceCapabilityLabel,
+    ModelEvidenceDiagnostic, ModelEvidenceError, ModelEvidenceFreshness, ModelEvidenceKind,
+    ModelEvidenceNonClaim, ModelEvidenceReport, ModelEvidenceReportDraft,
+    ModelEvidenceResultStatus, ModelEvidenceValidationIssue, ModelEvidenceVerifierKind,
+    PROHIBITED_MODEL_EVIDENCE_EFFECTS, validate_model_evidence_report,
+};
+pub use recover::{
+    CheckpointBackendKind, CheckpointDraft, CheckpointError, CheckpointFailureClass,
+    CheckpointHash, CheckpointOperation, CheckpointPolicy, CheckpointReceipt,
+    CheckpointReceiptDraft, CheckpointReceiptLeak, CheckpointRecord, CheckpointService,
+    CheckpointServiceRequest, CheckpointServiceResponse, CheckpointServiceState, CheckpointStatus,
+    MutationProtection, ProtectedMutationDecision, ProtectedMutationInput,
+    RollbackConfirmationStatus, RollbackValidation, RollbackValidationInput,
+    evaluate_protected_mutation, validate_checkpoint_receipt_text, validate_rollback,
+};
+pub use runstate::{
+    AgentControlAction, AgentControlCheckpoint, AgentControlCheckpointKind, AgentControlCommand,
+    AgentControlCommandId, AgentControlEvent, AgentControlEventKind, AgentControlIdentityError,
+    AgentControlPermit, AgentControlPhase, AgentControlRunId, AgentControlWait,
+    AgentControlWaitError, MAX_AGENT_CONTROL_ID_BYTES,
+};
+pub use versioning::{BoundaryContractIdentity, parse_boundary_contract_identity};
+
+pub use effect::{
+    AgentAuthorityBinding, AgentAuthorityBindingDraft, AuthorizationContext, AuthorizationIssue,
+    AuthorizationLeak, AuthorizationReceipt, AuthorizationStatus, BindingFreshness,
+    CancellationCheck, CancellationDecision, CancellationService, CapabilityClass,
+    CapabilityDecision, CapabilityDecisionRequest, CapabilityDecisionService,
+    CapabilityPolicyContract, CapabilityRequest, CaveatSummary, ConfirmationActionKind,
+    ConfirmationBinding, ConfirmationBindingDraft, ConfirmationBroker, ConfirmationBrokerClass,
+    ConfirmationDecision, ConfirmationEvaluation, ConfirmationExpiry, ConfirmationExpiryClass,
+    ConfirmationIssue, ConfirmationLevel, ConfirmationReceipt, ConfirmationReceiptDraft,
+    ConfirmationReceiptLeak, ConfirmationRequest, ConfirmationRequestDraft, ConfirmationStatus,
+    ConfirmationTick, ConfirmationTimingClass, EffectiveAuthorityDecision, ExecPolicyCommandIntent,
+    ExecPolicyCommandIntentDraft, ExecPolicyDecision, ExecPolicyError, ExecPolicyEvaluation,
+    ExecPolicyRequest, ExecPolicyRule, ExecPolicyRuleDraft, ExecPolicyRuleEvidence,
+    ExecPolicySandboxContext, ExecPolicySandboxContextDraft, ExecPolicyShellAnalysis,
+    ExecPolicyShellAnalysisKind, GuardedAction, HOST_AUTHORITY_NON_CLAIMS, HostAuthorityBounds,
+    HostAuthorityDecision, HostAuthorityDecisionDraft, HostAuthorityFreshnessClass,
+    HostAuthorityIssue, HostAuthorityReceipt, HostAuthorityReceiptDraft, HostAuthorityReceiptLeak,
+    HostAuthorityReplayClass, HostAuthorityRequest, HostAuthorityRequestDraft,
+    HostAuthorityService, HostAuthorityStatus, HostGateStatus, HostRequest, HostService,
+    LocalCaveat, LocalCaveatDecision, LocalPolicyLayer, ModelProviderService, OutcomeKind,
+    PermissionDecisionReason, PermissionDecisionStatus, PermissionKernelReceipt,
+    PermissionKernelReceiptDraft, PermissionMode, PermissionModeDefaultReason,
+    PermissionModeDefaultRequest, PermissionModeDefaultResolution, PermissionOutcome,
+    PermissionPatternMatchKind, PermissionPatternRule, PermissionPatternRuleDraft,
+    PermissionPolicy, PermissionPolicyDraft, PermissionPolicyError, PermissionPromptDecision,
+    PermissionPromptDecisionDraft, PermissionPromptRequest, PermissionPromptRequestDraft,
+    PermissionPromptStatus, PermissionReceipt, PermissionReceiptDraft, PermissionReceiptLeak,
+    PermissionRepeatedActionInput, PermissionRepeatedActionPolicy,
+    PermissionRepeatedActionResolution, PermissionRepeatedActionStatus, PermissionResolution,
+    PermissionResolutionRequest, PermissionSessionAllowlistEntry,
+    PermissionSessionAllowlistEntryDraft, PermissionSessionAllowlistStatus,
+    PermissionSessionAllowlistValidation, PermissionTrustScope, PermissionTrustStatus,
+    PromptDecisionOutcome, PromptSummaryPolicy, Reason, Receipt, ReceiptDraft, RedactionMarker,
+    RequiredHostGates, RuntimePolicyDecision, RuntimePolicyRequest, RuntimePolicyService,
+    SAFE_HASH_HEX_CHARS, SAFE_RECEIPT_CONTRACT_IDENTITY, SafeHash, SandboxConstraint,
+    SandboxConstraintClass, SandboxCowDisposition, SandboxDescriptor, SandboxDescriptorDraft,
+    SandboxDeterminismPolicy, SandboxDispatchDecision, SandboxDispatchIssue,
+    SandboxDispatchReceipt, SandboxDispatchReceiptDraft, SandboxDispatchStatus,
+    SandboxEnforcementRequirement, SandboxEnvironmentPolicy, SandboxFilesystemMode,
+    SandboxHttpPolicy, SandboxNetworkPolicy, SandboxPlatformCapability, SandboxPlatformSupport,
+    SandboxPlatformSupportDraft, SandboxPolicy, SandboxPolicyDraft, SandboxProcessProfile,
+    SandboxReceiptLeak, SandboxState, SandboxWorkdirMode, ServiceKind, ServiceOutcome,
+    ToolExecutionService, UcanGrant, admit_agent_authority_binding, admit_host_authority_request,
+    analyze_exec_policy_shell_wrapper, authorize_capability, build_host_authority_decision,
+    build_host_authority_receipt, default_deny_confirmation, detect_permission_repeated_action,
+    evaluate_confirmation_decision, evaluate_confirmation_outcome, evaluate_exec_policy,
+    evaluate_sandbox_dispatch, intersect_host_authority, resolve_permission,
+    resolve_permission_mode_default, validate_agent_authority_binding_set,
+    validate_authorization_receipt_text, validate_confirmation_receipt_text,
+    validate_host_authority_receipt_text, validate_permission_receipt_text,
+    validate_permission_session_allowlist, validate_sandbox_receipt_text,
+};
+pub use manifest::{
+    LaunchPolicy, LaunchPolicyDraft, NetworkPolicy, PROHIBITED_PLUGIN_MANIFEST_EFFECTS,
+    PluginCompatibility, PluginCompatibilityDraft, PluginDescriptor, PluginDescriptorDraft,
+    PluginDescriptorError, PluginDiagnostic, PluginDiagnosticKind, PluginDiagnosticSeverity,
+    PluginHostCompatibilityDraft, PluginInvocationContext, PluginInvocationContextDraft,
+    PluginInvocationContextLeak, PluginRegistryOperationDraft, PluginRegistryOperationKind,
+    PluginRegistryPlan, PluginRegistryPlanStatus, PluginRole, PluginRoleDraft, PluginRoleKind,
+    RedactionPolicy, RedactionPolicyDraft, RuntimeKind, SandboxMode, SandboxRequirements,
+    SandboxRequirementsDraft, ToolDescriptor, ToolDescriptorDraft, WorkingDirectoryMode,
+};
+pub use observability::{
+    LogLevel, LogRecord, LogRecordDraft, LoggingAdapter, MetricKind, MetricLabel, MetricLabelDraft,
+    MetricSample, MetricSampleDraft, MetricUnit, MetricsAdapter,
+};
+pub use outputguard::{
+    OutputAssessment, OutputAssessmentDraft, OutputDetectorFlag, OutputDetectorTier,
+    OutputGuardDiagnostic, OutputGuardDiagnosticCode, OutputGuardReceipt, OutputGuardReceiptDraft,
+    OutputProjectionPlan, OutputProjectionPolicy, OutputProjectionStatus, OutputRedactionState,
+    OutputRiskLevel, OutputScanInputDraft, PROHIBITED_OUTPUT_GUARD_EFFECTS,
+    merge_output_assessments, plan_output_projection, scan_output_summary,
+    validate_output_assessment, validate_output_guard_receipt,
+};
 /// Observability delivery policy for root-facade consumers.
 pub type ObservabilityDeliveryPolicy = observability::DeliveryPolicy;
 /// Observability validation error for root-facade consumers.
@@ -723,363 +393,132 @@ pub fn evaluate_observability_delivery(
 ) -> ObservabilityGuardDecision {
     observability::evaluate_delivery(policy, outcome)
 }
-pub use port::ComponentAdapter;
-pub use port::HostStatusAdapter;
-pub use port::ModelAdapter;
-pub use port::ToolAdapter;
-pub use review::CorrectiveAdmissionDecision;
-pub use review::CorrectiveAdmissionPolicy;
-pub use review::CorrectiveAdmissionReason;
-pub use review::CorrectiveAdmissionStatus;
-pub use review::CorrectiveAppendRequest;
-pub use review::CorrectiveAppendRequestDraft;
-pub use review::CorrectiveFreshness;
-pub use review::CorrectiveHostActionKind;
-pub use review::CorrectiveHostActionReceipt;
-pub use review::CorrectiveHostActionReceiptDraft;
-pub use review::CorrectiveHostActionReceiptStatus;
-pub use review::CorrectiveInclusionPolicy;
-pub use review::CorrectivePromoteRequest;
-pub use review::CorrectivePromoteRequestDraft;
-pub use review::CorrectivePromotionCandidate;
-pub use review::CorrectivePromotionTarget;
-pub use review::CorrectiveRecord;
-pub use review::CorrectiveRecordDraft;
-pub use review::CorrectiveRecordKind;
-pub use review::CorrectiveRedactionState;
-pub use review::CorrectiveStoreStatus;
-pub use review::CorrectiveTrustScope;
-pub use review::ReviewAttemptPlan;
-pub use review::ReviewAttemptPlanDraft;
-pub use review::ReviewContinuationIntent;
-pub use review::ReviewDiagnostic;
-pub use review::ReviewDiagnosticCode;
-pub use review::ReviewDispatchPlan;
-pub use review::ReviewDispatchStatus;
-pub use review::ReviewEvidence;
-pub use review::ReviewEvidenceDraft;
-pub use review::ReviewEvidenceKind;
-pub use review::ReviewEvidenceRedaction;
-pub use review::ReviewFinding;
-pub use review::ReviewLifecycleOutcome;
-pub use review::ReviewLifecycleReceipt;
-pub use review::ReviewLifecycleReceiptDraft;
-pub use review::ReviewLifecycleRequest;
-pub use review::ReviewLifecycleRequestDraft;
-pub use review::ReviewLifecycleStatus;
-pub use review::ReviewLifecycleSubject;
-pub use review::ReviewLifecycleSubjectDraft;
-pub use review::ReviewLifecycleSubjectKind;
-pub use review::ReviewMetricFinding;
-pub use review::ReviewMetricRecord;
-pub use review::ReviewMetricRecordDraft;
-pub use review::ReviewMetricsSummary;
-pub use review::ReviewPromotionCandidate;
-pub use review::ReviewRailDescriptor;
-pub use review::ReviewRailDescriptorDraft;
-pub use review::ReviewRailRequirement;
-pub use review::ReviewRailResult;
-pub use review::ReviewRailResultDraft;
-pub use review::ReviewRailStatus;
-pub use review::ReviewReport;
-pub use review::ReviewReportDraft;
-pub use review::ReviewReportError;
-pub use review::ReviewSection;
-pub use review::ReviewServiceStatus;
-pub use review::ReviewVerdict;
-pub use review::admit_corrective_record;
-pub use review::append_review_metric_record;
-pub use review::corrective_promotion_candidates;
-pub use review::parse_review_report;
-pub use review::plan_review_lifecycle_dispatch;
-pub use review::reduce_review_lifecycle_outcome;
-pub use review::review_promotion_candidates;
-pub use review::summarize_review_metrics;
-pub use review::validate_corrective_append_request;
-pub use review::validate_corrective_host_action_receipt;
-pub use review::validate_corrective_promote_request;
-pub use review::validate_corrective_record;
-pub use review::validate_review_lifecycle_receipt;
-pub use review::validate_review_lifecycle_request;
-pub use roi::PROHIBITED_ROI_EFFECTS;
-pub use roi::RoiActionAdmission;
-pub use roi::RoiActionAdmissionStatus;
-pub use roi::RoiActionDescriptor;
-pub use roi::RoiDiagnostic;
-pub use roi::RoiDiagnosticCode;
-pub use roi::RoiHostServiceStatus;
-pub use roi::RoiLifecycleRouteKind;
-pub use roi::RoiMissingContext;
-pub use roi::RoiMissingContextDraft;
-pub use roi::RoiReceipt;
-pub use roi::RoiReceiptDraft;
-pub use roi::RoiRecommendationReport;
-pub use roi::RoiRecommendationReportDraft;
-pub use roi::RoiRecommendedAction;
-pub use roi::RoiRunnerUp;
-pub use roi::RoiRunnerUpDraft;
-pub use roi::RoiScoreInput;
-pub use roi::RoiScoreInputDraft;
-pub use roi::RoiWorkflowPlan;
-pub use roi::RoiWorkflowStatus;
-pub use roi::admit_roi_action;
-pub use roi::parse_roi_action_label;
-pub use roi::plan_roi_workflow;
-pub use roi::reduce_roi_action_descriptor;
-pub use roi::validate_roi_receipt;
-pub use roi::validate_roi_report;
+pub use port::{ComponentAdapter, HostStatusAdapter, ModelAdapter, ToolAdapter};
+pub use review::{
+    CorrectiveAdmissionDecision, CorrectiveAdmissionPolicy, CorrectiveAdmissionReason,
+    CorrectiveAdmissionStatus, CorrectiveAppendRequest, CorrectiveAppendRequestDraft,
+    CorrectiveFreshness, CorrectiveHostActionKind, CorrectiveHostActionReceipt,
+    CorrectiveHostActionReceiptDraft, CorrectiveHostActionReceiptStatus, CorrectiveInclusionPolicy,
+    CorrectivePromoteRequest, CorrectivePromoteRequestDraft, CorrectivePromotionCandidate,
+    CorrectivePromotionTarget, CorrectiveRecord, CorrectiveRecordDraft, CorrectiveRecordKind,
+    CorrectiveRedactionState, CorrectiveStoreStatus, CorrectiveTrustScope, ReviewAttemptPlan,
+    ReviewAttemptPlanDraft, ReviewContinuationIntent, ReviewDiagnostic, ReviewDiagnosticCode,
+    ReviewDispatchPlan, ReviewDispatchStatus, ReviewEvidence, ReviewEvidenceDraft,
+    ReviewEvidenceKind, ReviewEvidenceRedaction, ReviewFinding, ReviewLifecycleOutcome,
+    ReviewLifecycleReceipt, ReviewLifecycleReceiptDraft, ReviewLifecycleRequest,
+    ReviewLifecycleRequestDraft, ReviewLifecycleStatus, ReviewLifecycleSubject,
+    ReviewLifecycleSubjectDraft, ReviewLifecycleSubjectKind, ReviewMetricFinding,
+    ReviewMetricRecord, ReviewMetricRecordDraft, ReviewMetricsSummary, ReviewPromotionCandidate,
+    ReviewRailDescriptor, ReviewRailDescriptorDraft, ReviewRailRequirement, ReviewRailResult,
+    ReviewRailResultDraft, ReviewRailStatus, ReviewReport, ReviewReportDraft, ReviewReportError,
+    ReviewSection, ReviewServiceStatus, ReviewVerdict, admit_corrective_record,
+    append_review_metric_record, corrective_promotion_candidates, parse_review_report,
+    plan_review_lifecycle_dispatch, reduce_review_lifecycle_outcome, review_promotion_candidates,
+    summarize_review_metrics, validate_corrective_append_request,
+    validate_corrective_host_action_receipt, validate_corrective_promote_request,
+    validate_corrective_record, validate_review_lifecycle_receipt,
+    validate_review_lifecycle_request,
+};
+pub use roi::{
+    PROHIBITED_ROI_EFFECTS, RoiActionAdmission, RoiActionAdmissionStatus, RoiActionDescriptor,
+    RoiDiagnostic, RoiDiagnosticCode, RoiHostServiceStatus, RoiLifecycleRouteKind,
+    RoiMissingContext, RoiMissingContextDraft, RoiReceipt, RoiReceiptDraft,
+    RoiRecommendationReport, RoiRecommendationReportDraft, RoiRecommendedAction, RoiRunnerUp,
+    RoiRunnerUpDraft, RoiScoreInput, RoiScoreInputDraft, RoiWorkflowPlan, RoiWorkflowStatus,
+    admit_roi_action, parse_roi_action_label, plan_roi_workflow, reduce_roi_action_descriptor,
+    validate_roi_receipt, validate_roi_report,
+};
 /// Plugin manifest toolset-kind descriptor label.
 pub type PluginToolsetKind = manifest::ToolsetKind;
 /// Plugin manifest host trust status.
 pub type PluginTrustStatus = manifest::TrustStatus;
-pub use child::ExternalSubagentDescriptor;
-pub use child::ExternalSubagentDescriptorDraft;
-pub use child::ExternalSubagentProtocol;
-pub use child::SubagentAggregateReport;
-pub use child::SubagentCapabilityDenial;
-pub use child::SubagentCapabilityInput;
-pub use child::SubagentCapabilityResolution;
-pub use child::SubagentDelegation;
-pub use child::SubagentDelegationDraft;
-pub use child::SubagentDelegationSource;
-pub use child::SubagentError;
-pub use child::SubagentEvent;
-pub use child::SubagentEventDraft;
-pub use child::SubagentEventKind;
-pub use child::SubagentHandoff;
-pub use child::SubagentHandoffDraft;
-pub use child::SubagentOutcomeDraft;
-pub use child::SubagentOutcomeKind;
-pub use child::SubagentReturnMode;
-pub use child::aggregate_subagent_outcomes;
-pub use child::build_subagent_handoff;
-pub use child::resolve_subagent_capabilities;
-pub use flow::RecipeAutomationOutcome;
-pub use flow::RecipeAutomationStatus;
-pub use flow::RecipeBinding;
-pub use flow::RecipeBindingDraft;
-pub use flow::RecipeDagAdmission;
-pub use flow::RecipeDagBatch;
-pub use flow::RecipeDagBlockReason;
-pub use flow::RecipeDagBlockedStep;
-pub use flow::RecipeDagPlan;
-pub use flow::RecipeDagReceipt;
-pub use flow::RecipeDagStep;
-pub use flow::RecipeDagStepDraft;
-pub use flow::RecipeDagStepKind;
-pub use flow::RecipeHostEffectKind;
-pub use flow::RecipeInfluence;
-pub use flow::RecipeInfluenceStatus;
-pub use flow::RecipeOutputDraft;
-pub use flow::RecipeOutputFailure;
-pub use flow::RecipeOutputFieldDraft;
-pub use flow::RecipeParameter;
-pub use flow::RecipeParameterDraft;
-pub use flow::RecipeParameterInput;
-pub use flow::RecipeParameterInputDraft;
-pub use flow::RecipeParameterInputKind;
-pub use flow::RecipeParameterKind;
-pub use flow::RecipeProvenanceDraft;
-pub use flow::RecipeResponseField;
-pub use flow::RecipeResponseFieldDraft;
-pub use flow::RecipeResponseFieldKind;
-pub use flow::RecipeResponseSchema;
-pub use flow::RecipeResponseSchemaDraft;
-pub use flow::RecipeRetryCheck;
-pub use flow::RecipeRetryCheckDraft;
-pub use flow::RecipeRetryDenialReason;
-pub use flow::RecipeRetryPlan;
-pub use flow::RecipeRetryPlanDraft;
-pub use flow::RecipeRetryPolicy;
-pub use flow::RecipeRetryPolicyDraft;
-pub use flow::RecipeRetryRequest;
-pub use flow::RecipeRetryRequestStatus;
-pub use flow::RecipeSourceKind;
-pub use flow::RecipeTrustReceipt;
-pub use flow::RecipeTrustStatus;
-pub use flow::RecipeWorkflow;
-pub use flow::RecipeWorkflowDraft;
-pub use flow::RecipeWorkflowError;
-pub use flow::SAFE_TEMPLATE_BUILTINS;
-pub use flow::bind_recipe_parameters;
-pub use flow::plan_recipe_dag;
-pub use flow::plan_recipe_retry;
-pub use flow::validate_recipe_output;
-pub use prompt::ContextAdapterAvailability;
-pub use prompt::ContextAdapterFamilyManifest;
-pub use prompt::ContextAdapterOutcomeClass;
-pub use prompt::ContextAdapterPolicyDecision;
-pub use prompt::ContextAdapterRole;
-pub use prompt::ContextAdapterRoleDraft;
-pub use prompt::ContextAdapterRoleRecord;
-pub use prompt::ContextLineRange;
-pub use prompt::ContextOversizedPolicy;
-pub use prompt::ContextReference;
-pub use prompt::ContextReferenceBudget;
-pub use prompt::ContextReferenceCounts;
-pub use prompt::ContextReferenceError;
-pub use prompt::ContextReferenceFragment;
-pub use prompt::ContextReferenceKind;
-pub use prompt::ContextReferencePolicy;
-pub use prompt::ContextReferencePolicyDecision;
-pub use prompt::ContextReferenceProvenance;
-pub use prompt::ContextReferenceProvenanceDraft;
-pub use prompt::ContextReferenceStatus;
-pub use prompt::ContextRenderMode;
-pub use prompt::ContextResolutionPlan;
-pub use prompt::ContextResolverKind;
-pub use prompt::ContextResolverSet;
-pub use prompt::ContextSourceTrust;
-pub use prompt::ContextTruncationState;
-pub use prompt::DiffContextResolver;
-pub use prompt::DirectoryContextResolver;
-pub use prompt::FileContextResolver;
-pub use prompt::ImageContextResolver;
-pub use prompt::ProfileAssembly;
-pub use prompt::ProfileAssemblyDiagnostic;
-pub use prompt::ProfileAssemblyPolicy;
-pub use prompt::ProfileCapability;
-pub use prompt::ProfileCapabilityBinding;
-pub use prompt::ProfileCapabilityBindingStatus;
-pub use prompt::ProfileChainDecision;
-pub use prompt::ProfileChainPlan;
-pub use prompt::ProfileChainRequest;
-pub use prompt::ProfileDescriptor;
-pub use prompt::ProfileDescriptorDraft;
-pub use prompt::ProfileDirectiveDiagnostic;
-pub use prompt::ProfileDirectiveIssue;
-pub use prompt::ProfileDirectiveReport;
-pub use prompt::ProfileError;
-pub use prompt::ProfileInclusionPolicy;
-pub use prompt::ProfileMode;
-pub use prompt::ProfileModeBinding;
-pub use prompt::ProfileModeBindingRequest;
-pub use prompt::ProfileOmittedReason;
-pub use prompt::ProfileReceipt;
-pub use prompt::ProfileReceiptRedaction;
-pub use prompt::ProfileSegment;
-pub use prompt::ProfileSourceAdmission;
-pub use prompt::ProfileSourceTrust;
-pub use prompt::ProfileTrustScope;
-pub use prompt::ResolvedContextCandidate;
-pub use prompt::UrlContextResolver;
-pub use prompt::apply_context_budget;
-pub use prompt::assemble_profiles;
-pub use prompt::bind_profile_mode;
-pub use prompt::expand_context_reference;
-pub use prompt::parse_context_reference;
-pub use prompt::parse_profile_directives;
-pub use prompt::plan_context_resolution;
-pub use prompt::validate_context_resolver_role;
-pub use queue::BackgroundQueueService;
-pub use queue::QueueCapabilities;
-pub use queue::QueueCapabilityKind;
-pub use queue::QueueContractError;
-pub use queue::QueueControlDraft;
-pub use queue::QueueControlRequest;
-pub use queue::QueueEnqueueDraft;
-pub use queue::QueueEnqueueRequest;
-pub use queue::QueueGroupStatus;
-pub use queue::QueueGroupStatusDraft;
-pub use queue::QueueInteractionDraft;
-pub use queue::QueueInteractionKind;
-pub use queue::QueueInteractionRequest;
-pub use queue::QueueLogBounds;
-pub use queue::QueueLogRequest;
-pub use queue::QueueLogRequestDraft;
-pub use queue::QueueLogViewport;
-pub use queue::QueueLogViewportDraft;
-pub use queue::QueueOperationKind;
-pub use queue::QueueServiceRequest;
-pub use queue::QueueServiceResponse;
-pub use queue::QueueStatusCountDraft;
-pub use queue::QueueStatusCounts;
-pub use queue::QueueTarget;
-pub use queue::QueueTargetDraft;
-pub use queue::QueueTargetKind;
-pub use queue::QueueTaskObservation;
-pub use queue::QueueTaskObservationDraft;
-pub use queue::QueueTaskStatus;
-pub use timed::NextRunInput;
-pub use timed::NextRunPlan;
-pub use timed::PROHIBITED_SCHEDULE_EFFECTS;
-pub use timed::ScheduleCadence;
-pub use timed::ScheduleConcurrencyPolicy;
-pub use timed::ScheduleControlAction;
-pub use timed::ScheduleControlDraft;
-pub use timed::ScheduleControlRequest;
-pub use timed::ScheduleError;
-pub use timed::ScheduleExecutionMode;
-pub use timed::ScheduledConcurrencyDecision;
-pub use timed::ScheduledConcurrencyInput;
-pub use timed::ScheduledRunAdmissionDraft;
-pub use timed::ScheduledRunAdmissionStatus;
-pub use timed::ScheduledRunDenial;
-pub use timed::ScheduledRunPolicyAdmission;
-pub use timed::ScheduledRunRecord;
-pub use timed::ScheduledRunRecordDraft;
-pub use timed::ScheduledRunRuntimeAdmission;
-pub use timed::ScheduledWorkflow;
-pub use timed::ScheduledWorkflowDraft;
-pub use timed::admit_scheduled_run;
-pub use timed::evaluate_scheduled_concurrency;
-pub use timed::plan_next_run;
-pub use timed::validate_scheduled_record_text;
-pub use validation::AdapterContractError;
-pub use validation::FieldName;
-pub use validation::MAX_ADAPTER_FIELD_CHARS;
-pub use validation::MIN_ADAPTER_FIELD_CHARS;
-pub use validation::normalized_adapter_field;
-pub use validationplanner::ChangedArtifactSummary;
-pub use validationplanner::ChangedArtifactSummaryDraft;
-pub use validationplanner::PROHIBITED_VALIDATION_PLANNER_EFFECTS;
-pub use validationplanner::ScopedValidationPlan;
-pub use validationplanner::ValidationArtifactKind;
-pub use validationplanner::ValidationFollowUpIntent;
-pub use validationplanner::ValidationFollowUpStatus;
-pub use validationplanner::ValidationPlanItem;
-pub use validationplanner::ValidationPlanStatus;
-pub use validationplanner::ValidationPlannerDiagnostic;
-pub use validationplanner::ValidationPlannerDiagnosticCode;
-pub use validationplanner::ValidationPlannerPolicyDraft;
-pub use validationplanner::ValidationPlannerReceipt;
-pub use validationplanner::ValidationPlannerReceiptDraft;
-pub use validationplanner::ValidationProfileCandidate;
-pub use validationplanner::ValidationProfileCandidateDraft;
-pub use validationplanner::ValidationResultStatus;
-pub use validationplanner::ValidationResultSummary;
-pub use validationplanner::ValidationResultSummaryDraft;
-pub use validationplanner::ValidationServiceStatus;
-pub use validationplanner::plan_scoped_validation;
-pub use validationplanner::reduce_validation_follow_up;
-pub use validationplanner::validate_validation_planner_receipt;
-pub use validationplanner::validate_validation_result_summary;
-pub use vcssnapshot::PROHIBITED_VCS_SNAPSHOT_EFFECTS;
-pub use vcssnapshot::SnapshotBackendKind;
-pub use vcssnapshot::SnapshotConfirmationStatus;
-pub use vcssnapshot::SnapshotDiagnostic;
-pub use vcssnapshot::SnapshotDiagnosticCode;
-pub use vcssnapshot::SnapshotFreshnessProof;
-pub use vcssnapshot::SnapshotFreshnessProofDraft;
-pub use vcssnapshot::SnapshotIntentKind;
-pub use vcssnapshot::SnapshotLineage;
-pub use vcssnapshot::SnapshotOperationKind;
-pub use vcssnapshot::SnapshotOperationPlan;
-pub use vcssnapshot::SnapshotOperationPlanDraft;
-pub use vcssnapshot::SnapshotPlanStatus;
-pub use vcssnapshot::SnapshotPolicyPlan;
-pub use vcssnapshot::SnapshotPolicyPlanStatus;
-pub use vcssnapshot::SnapshotProtectionClass;
-pub use vcssnapshot::SnapshotReceipt;
-pub use vcssnapshot::SnapshotReceiptDraft;
-pub use vcssnapshot::SnapshotRecord;
-pub use vcssnapshot::SnapshotRecordDraft;
-pub use vcssnapshot::SnapshotServiceStatus;
-pub use vcssnapshot::plan_snapshot_operation;
-pub use vcssnapshot::plan_snapshot_policy;
-pub use vcssnapshot::validate_snapshot_lineage;
-pub use vcssnapshot::validate_snapshot_receipt;
-pub use vcssnapshot::validate_snapshot_record;
+pub use child::{
+    ExternalSubagentDescriptor, ExternalSubagentDescriptorDraft, ExternalSubagentProtocol,
+    SubagentAggregateReport, SubagentCapabilityDenial, SubagentCapabilityInput,
+    SubagentCapabilityResolution, SubagentDelegation, SubagentDelegationDraft,
+    SubagentDelegationSource, SubagentError, SubagentEvent, SubagentEventDraft, SubagentEventKind,
+    SubagentHandoff, SubagentHandoffDraft, SubagentOutcomeDraft, SubagentOutcomeKind,
+    SubagentReturnMode, aggregate_subagent_outcomes, build_subagent_handoff,
+    resolve_subagent_capabilities,
+};
+pub use flow::{
+    RecipeAutomationOutcome, RecipeAutomationStatus, RecipeBinding, RecipeBindingDraft,
+    RecipeDagAdmission, RecipeDagBatch, RecipeDagBlockReason, RecipeDagBlockedStep, RecipeDagPlan,
+    RecipeDagReceipt, RecipeDagStep, RecipeDagStepDraft, RecipeDagStepKind, RecipeHostEffectKind,
+    RecipeInfluence, RecipeInfluenceStatus, RecipeOutputDraft, RecipeOutputFailure,
+    RecipeOutputFieldDraft, RecipeParameter, RecipeParameterDraft, RecipeParameterInput,
+    RecipeParameterInputDraft, RecipeParameterInputKind, RecipeParameterKind,
+    RecipeProvenanceDraft, RecipeResponseField, RecipeResponseFieldDraft, RecipeResponseFieldKind,
+    RecipeResponseSchema, RecipeResponseSchemaDraft, RecipeRetryCheck, RecipeRetryCheckDraft,
+    RecipeRetryDenialReason, RecipeRetryPlan, RecipeRetryPlanDraft, RecipeRetryPolicy,
+    RecipeRetryPolicyDraft, RecipeRetryRequest, RecipeRetryRequestStatus, RecipeSourceKind,
+    RecipeTrustReceipt, RecipeTrustStatus, RecipeWorkflow, RecipeWorkflowDraft,
+    RecipeWorkflowError, SAFE_TEMPLATE_BUILTINS, bind_recipe_parameters, plan_recipe_dag,
+    plan_recipe_retry, validate_recipe_output,
+};
+pub use prompt::{
+    ContextAdapterAvailability, ContextAdapterFamilyManifest, ContextAdapterOutcomeClass,
+    ContextAdapterPolicyDecision, ContextAdapterRole, ContextAdapterRoleDraft,
+    ContextAdapterRoleRecord, ContextLineRange, ContextOversizedPolicy, ContextReference,
+    ContextReferenceBudget, ContextReferenceCounts, ContextReferenceError,
+    ContextReferenceFragment, ContextReferenceKind, ContextReferencePolicy,
+    ContextReferencePolicyDecision, ContextReferenceProvenance, ContextReferenceProvenanceDraft,
+    ContextReferenceStatus, ContextRenderMode, ContextResolutionPlan, ContextResolverKind,
+    ContextResolverSet, ContextSourceTrust, ContextTruncationState, DiffContextResolver,
+    DirectoryContextResolver, FileContextResolver, ImageContextResolver, ProfileAssembly,
+    ProfileAssemblyDiagnostic, ProfileAssemblyPolicy, ProfileCapability, ProfileCapabilityBinding,
+    ProfileCapabilityBindingStatus, ProfileChainDecision, ProfileChainPlan, ProfileChainRequest,
+    ProfileDescriptor, ProfileDescriptorDraft, ProfileDirectiveDiagnostic, ProfileDirectiveIssue,
+    ProfileDirectiveReport, ProfileError, ProfileInclusionPolicy, ProfileMode, ProfileModeBinding,
+    ProfileModeBindingRequest, ProfileOmittedReason, ProfileReceipt, ProfileReceiptRedaction,
+    ProfileSegment, ProfileSourceAdmission, ProfileSourceTrust, ProfileTrustScope,
+    ResolvedContextCandidate, UrlContextResolver, apply_context_budget, assemble_profiles,
+    bind_profile_mode, expand_context_reference, parse_context_reference, parse_profile_directives,
+    plan_context_resolution, validate_context_resolver_role,
+};
+pub use queue::{
+    BackgroundQueueService, QueueCapabilities, QueueCapabilityKind, QueueContractError,
+    QueueControlDraft, QueueControlRequest, QueueEnqueueDraft, QueueEnqueueRequest,
+    QueueGroupStatus, QueueGroupStatusDraft, QueueInteractionDraft, QueueInteractionKind,
+    QueueInteractionRequest, QueueLogBounds, QueueLogRequest, QueueLogRequestDraft,
+    QueueLogViewport, QueueLogViewportDraft, QueueOperationKind, QueueServiceRequest,
+    QueueServiceResponse, QueueStatusCountDraft, QueueStatusCounts, QueueTarget, QueueTargetDraft,
+    QueueTargetKind, QueueTaskObservation, QueueTaskObservationDraft, QueueTaskStatus,
+};
+pub use timed::{
+    NextRunInput, NextRunPlan, PROHIBITED_SCHEDULE_EFFECTS, ScheduleCadence,
+    ScheduleConcurrencyPolicy, ScheduleControlAction, ScheduleControlDraft, ScheduleControlRequest,
+    ScheduleError, ScheduleExecutionMode, ScheduledConcurrencyDecision, ScheduledConcurrencyInput,
+    ScheduledRunAdmissionDraft, ScheduledRunAdmissionStatus, ScheduledRunDenial,
+    ScheduledRunPolicyAdmission, ScheduledRunRecord, ScheduledRunRecordDraft,
+    ScheduledRunRuntimeAdmission, ScheduledWorkflow, ScheduledWorkflowDraft, admit_scheduled_run,
+    evaluate_scheduled_concurrency, plan_next_run, validate_scheduled_record_text,
+};
+pub use validation::{
+    AdapterContractError, FieldName, MAX_ADAPTER_FIELD_CHARS, MIN_ADAPTER_FIELD_CHARS,
+    normalized_adapter_field,
+};
+pub use validationplanner::{
+    ChangedArtifactSummary, ChangedArtifactSummaryDraft, PROHIBITED_VALIDATION_PLANNER_EFFECTS,
+    ScopedValidationPlan, ValidationArtifactKind, ValidationFollowUpIntent,
+    ValidationFollowUpStatus, ValidationPlanItem, ValidationPlanStatus,
+    ValidationPlannerDiagnostic, ValidationPlannerDiagnosticCode, ValidationPlannerPolicyDraft,
+    ValidationPlannerReceipt, ValidationPlannerReceiptDraft, ValidationProfileCandidate,
+    ValidationProfileCandidateDraft, ValidationResultStatus, ValidationResultSummary,
+    ValidationResultSummaryDraft, ValidationServiceStatus, plan_scoped_validation,
+    reduce_validation_follow_up, validate_validation_planner_receipt,
+    validate_validation_result_summary,
+};
+pub use vcssnapshot::{
+    PROHIBITED_VCS_SNAPSHOT_EFFECTS, SnapshotBackendKind, SnapshotConfirmationStatus,
+    SnapshotDiagnostic, SnapshotDiagnosticCode, SnapshotFreshnessProof,
+    SnapshotFreshnessProofDraft, SnapshotIntentKind, SnapshotLineage, SnapshotOperationKind,
+    SnapshotOperationPlan, SnapshotOperationPlanDraft, SnapshotPlanStatus, SnapshotPolicyPlan,
+    SnapshotPolicyPlanStatus, SnapshotProtectionClass, SnapshotReceipt, SnapshotReceiptDraft,
+    SnapshotRecord, SnapshotRecordDraft, SnapshotServiceStatus, plan_snapshot_operation,
+    plan_snapshot_policy, validate_snapshot_lineage, validate_snapshot_receipt,
+    validate_snapshot_record,
+};
 
 #[cfg(test)]
 extern crate std;

@@ -31,8 +31,10 @@ pub(super) const COMPATIBILITY_CAPABILITY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("plugin_required_host_capability");
 pub(super) const COMPATIBILITY_PLATFORM_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("plugin_supported_platform");
-pub(super) const ROLE_KIND_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("plugin_role_kind");
-pub(super) const ROLE_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("plugin_role_id");
+pub(super) const ROLE_KIND_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("plugin_role_kind");
+pub(super) const ROLE_ID_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("plugin_role_id");
 pub(super) const ROLE_TITLE_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("plugin_role_title");
 pub(super) const ROLE_CONTEXT_FIELD: crate::validation::FieldName =
@@ -47,10 +49,12 @@ pub(super) const ROLE_EVENT_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("plugin_role_event_name");
 pub(super) const ROLE_LINK_SCHEME_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("plugin_role_link_scheme");
-pub(super) const HOST_VERSION_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("host_version");
+pub(super) const HOST_VERSION_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("host_version");
 pub(super) const HOST_CAPABILITY_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("host_capability");
-pub(super) const HOST_PLATFORM_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("host_platform");
+pub(super) const HOST_PLATFORM_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("host_platform");
 pub(super) const CONTEXT_WORKSPACE_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("invocation_workspace_label");
 pub(super) const CONTEXT_TAB_FIELD: crate::validation::FieldName =

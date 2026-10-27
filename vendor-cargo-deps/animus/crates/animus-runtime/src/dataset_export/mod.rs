@@ -1,7 +1,6 @@
 //! Pure Animus-to-Hugging Face dataset export contracts.
 
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while
-// drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -9,7 +8,12 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
+#![allow(
+    compound_condition,
+    excessive_file_length,
+    function_length,
+    non_trait_imports
+)]
 #![allow(
     numeric_units,
     path_segment_repetition,
@@ -20,34 +24,18 @@ mod core;
 mod data;
 mod jsonl;
 
-pub use core::blake3_dataset_export_fingerprint;
-pub use core::export_chat_messages_row;
-pub use core::export_preference_row;
-pub use core::export_rl_trajectory_row;
-pub use core::inspect_dataset_exports;
-
-pub use data::DatasetChatMessage;
-pub use data::DatasetChatRow;
-pub use data::DatasetDiagnostic;
-pub use data::DatasetDiagnosticKind;
-pub use data::DatasetExportPolicy;
-pub use data::DatasetExportResult;
-pub use data::DatasetFingerprint;
-pub use data::DatasetInspectionReport;
-pub use data::DatasetMetadataProjection;
-pub use data::DatasetPreferenceExample;
-pub use data::DatasetPreferenceRow;
-pub use data::DatasetReplayEntry;
-pub use data::DatasetReplayRole;
-pub use data::DatasetRlStep;
-pub use data::DatasetRlStepKind;
-pub use data::DatasetRlTrajectory;
-pub use data::DatasetRlTrajectoryRow;
-pub use data::DatasetSessionSource;
-pub use data::DatasetSkippedRow;
-pub use data::DatasetTarget;
-pub use jsonl::render_chat_row_jsonl;
-pub use jsonl::render_chat_rows_jsonl;
+pub use core::{
+    blake3_dataset_export_fingerprint, export_chat_messages_row, export_preference_row,
+    export_rl_trajectory_row, inspect_dataset_exports,
+};
+pub use data::{
+    DatasetChatMessage, DatasetChatRow, DatasetDiagnostic, DatasetDiagnosticKind,
+    DatasetExportPolicy, DatasetExportResult, DatasetFingerprint, DatasetInspectionReport,
+    DatasetMetadataProjection, DatasetPreferenceExample, DatasetPreferenceRow, DatasetReplayEntry,
+    DatasetReplayRole, DatasetRlStep, DatasetRlStepKind, DatasetRlTrajectory,
+    DatasetRlTrajectoryRow, DatasetSessionSource, DatasetSkippedRow, DatasetTarget,
+};
+pub use jsonl::{render_chat_row_jsonl, render_chat_rows_jsonl};
 
 pub(crate) const BLAKE3_ALGORITHM: &str = "BLAKE3";
 pub(crate) const BLAKE3_HEX_LENGTH: usize = 64;

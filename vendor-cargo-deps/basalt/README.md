@@ -22,7 +22,7 @@ The repository uses a small functional core and imperative shell. Nickel owns po
 
 Basalt is under active development. Its UCAN dependency uses a checked-in reviewed snapshot.
 
-The snapshot records integrated UCAN commit `277ab768eb532ac0c715a3bbff2a7dc37a702f11`.
+The snapshot records integrated UCAN commit `3a2aa043068a82663cf72ec05ed5d56a7d65ecd5`.
 That revision is published on the UCAN `main` branch. The repository-owned snapshot remains the durable build boundary.
 
 `Cargo.toml` contains package metadata for downstream discovery. The crate retains the `AGPL-3.0-or-later` license.
@@ -57,6 +57,13 @@ The sample request produces this output:
 {"allowed":true,"reason":"allowed"}
 ```
 
+## Nickel toolchain
+
+Basalt pins Nickel `1.17.0` at upstream commit `1320a983e6c3d1e2fb53dd2464b084b4903b1426`.
+The exact evaluator owns policy shape checks and deterministic exports only.
+Basalt Rust retains runtime authority decisions.
+See [`docs/nickel-toolchain.md`](docs/nickel-toolchain.md).
+
 ## Policy artifacts
 
 The crate includes these policy artifacts:
@@ -81,6 +88,17 @@ nix build .#checks.$(nix eval --raw --impure --expr builtins.currentSystem).poli
 
 ## Library API
 
+The `oidc-exchange` and `durable-authority` features are enabled by default. They
+preserve the existing public modules. Explicit `default-features = false` omits
+Basalt's OIDC and durable-state adapters, not signature, revocation or replay checks.
+Basalt disables UCAN defaults and forwards its default-on durable-authority feature
+explicitly. The minimal profile passes library and enforcement tests on Rust 1.95;
+full defaults retain their Rust 1.96 dependency requirements. No compiler-version
+bypass is supported. Check the minimal profile with
+`nix develop .#enforcement-compat -c cargo test --no-default-features --lib --test ucan_enforcement --locked`.
+The release verifier also rejects any of the four HTTP/durable-state libraries in
+the selected minimal normal dependency graph.
+
 Applications can use the enforcement API with default features:
 
 ```rust
@@ -102,6 +120,30 @@ assert!(receipt.is_allowed());
 assert_eq!(receipt.reason(), "allowed");
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
+
+### Mantle authority SDK
+
+`basalt::mantle` supplies the owner-maintained holder-invocation boundary for
+Mantle's gateway. `Verifier::enforcement` derives the exact operation resource;
+`Verifier::verify` checks the signed UCAN, holder invocation, trusted issuer
+roots, current policy and replay before returning an opaque `Session`.
+Build submission, input upload, store read, project declaration, individual
+read operations, owned-attempt cancellation, publication and administration
+remain distinct grants. A serialized `Request` or receipt cannot mint a session.
+
+Call `Verifier::revalidate` with fresh verification, revocation and caveat
+observations before each effect. Revalidation does not consume replay again.
+The consumer owns monotonic time across observations, durable replay storage,
+proof/key resolution, request normalization and execution. Tokens are not exposed
+through Debug or serde; public denials remain `gateway-authority-denied`.
+Basalt maintains this API; Mantle maintains its receiver integration and effects.
+Neither API success nor the test-only signed fixtures establish deployment
+safety, upstream correctness or release eligibility.
+
+The repeatable owner checks are the signed positive and substitution/replay/
+revocation negatives in `tests/ucan_enforcement/mantle.rs` and the repository
+release verifier. The SDK is available with both the default and minimal feature
+profiles; disabling durable adapters does not disable signature or replay checks.
 
 ## CLI feature
 
@@ -168,6 +210,38 @@ It does not grant transport, storage, persistence, replay-store, key-resolution,
 
 Read [`docs/authority-core.md`](docs/authority-core.md) for the full boundary.
 
+### Mantle operation boundary
+
+`basalt::mantle` verifies the signed `onix-compact-ed25519-v1` UCAN profile;
+it does not relabel compact tokens as final UCAN WG 1.0.0. Its reviewed Nickel
+contracts distinguish build submission, admitted input upload, project
+declaration, store/status/log/event/result/usage reads, owned-attempt cancellation,
+publication, and administration. A build-submission grant does not authorize
+project declaration; a compatibility ticket is not accepted by this verifier.
+
+`Verifier::enforcement` constructs the exact resource for the issuer and holder
+signer. Subject (the UCAN holder DID), account, project, endpoint, deployment
+audience, policy artifact identity, authority generation, target and request
+digest are bound by the resource and distinct ability. Root issuers must be
+explicitly operator-admitted; registering a holder verification key does not
+authorize that holder to mint root grants.
+
+`Verifier::verify` uses the existing signature/proof/revocation/caveat/holder
+verification and final replay boundary, returning a private non-serializable
+`Session`. Every operation must call `Session::require` with its exact target
+and normalized request digest, then `Verifier::revalidate` with current local
+time, keys, proof store, revocations and policy. Revalidation uses UCAN's
+non-consuming live-holder authorization check, rejects times before the
+session's initial admission, and does not spend replay a second time. Consumers
+must retain monotonic time across subsequent observations.
+The session retains its token in UCAN's zeroizing owner. Errors expose only
+`gateway-authority-denied`; public projections expose policy and admission
+decision references, not the token, proof or credential hash.
+
+Mantle owns the registered `mantle/filter-v1` decoder and bounded rewrite
+semantics. Basalt consumes its non-consuming caveat policy; neither component
+may treat a payload DTO or persisted receipt as live verified authority.
+
 ## Nostr identity bindings
 
 `basalt::nostr_identity` maps one reviewed opaque `VerifiedNostrCredential` to one stable subject in typed Nickel policy.
@@ -180,6 +254,58 @@ Authentication and composition receipts are redacted, BLAKE3-bound, and `recorde
 
 Read [`docs/nostr-identity-bindings.md`](docs/nostr-identity-bindings.md) for policy, rotation, privacy, receipt, and authority boundaries.
 
+## Peer authentication policy
+
+`basalt::peer_auth` evaluates reviewed policy over `ucan-core`'s opaque authenticated-message verdict.
+The pure core binds one peer message to one action without owning transport, keys, clocks, replay storage, or end-user authority.
+Receipts contain public BLAKE3 identities and no message bodies or secrets.
+See [`docs/peer-auth-policy.md`](docs/peer-auth-policy.md).
+
+## Runtime effect permissions
+
+`basalt::runtime_effect` evaluates closed filesystem, network, process, environment, and binding policy facts.
+It uses deny-by-default profiles, explicit priorities, and ambiguity denial.
+Consumers retain parsing, normalization, approval, currentness, native enforcement, and effect execution.
+See [`docs/runtime-effect-permissions.md`](docs/runtime-effect-permissions.md).
+
+## World-branch authority policy
+
+`basalt::world_branch_authority` maps normalized branch facts to closed copyable, attenuated, linear, simulation-only, promotion-gated, replacement, and denial obligations.
+
+Basalt owns portable policy meaning. Molten retains token handling, currentness, derivation, durable transfer, adapters, activation, promotion, and effects.
+
+Receipts contain metadata identities and no bearer capability material. See [`docs/world-branch-authority.md`](docs/world-branch-authority.md).
+
+## UCAN protocol profiles
+
+Every UCAN enforcement request selects a closed `BasaltUcanProtocolProfile` value.
+The compact adapter accepts only `onix-compact-ed25519-v1` and rejects cross-profile substitution before token parsing or replay.
+Receipts bind the profile, exact UCAN cohort, support catalog, policy, operation, token, request, reason, and non-claims.
+See [`docs/ucan-protocol-profiles.md`](docs/ucan-protocol-profiles.md).
+
+## Final UCAN 1.0 application adapter
+
+The final adapter accepts only `ucan-wg-1.0.0` live authorization.
+It maps exact final commands through reviewed Nickel policy and caller-owned resource-owner observations.
+All Basalt checks finish before one caller-owned final replay commit.
+The compact adapter remains separate and unchanged.
+See [`docs/ucan-v1-profile.md`](docs/ucan-v1-profile.md).
+
+## OIDC-to-UCAN exchange
+
+`basalt::oidc_exchange` verifies bounded GitHub Actions OIDC identity evidence and maps it to one narrow Mantle UCAN issuance plan.
+The pure core uses explicit time and public JWK inputs.
+Bounded HTTP owns discovery and JWKS transport mechanics.
+A caller-owned replay port and UCAN signer retain mutation and key authority.
+See [`docs/oidc-exchange.md`](docs/oidc-exchange.md) and [`docs/oidc-dependency-review.md`](docs/oidc-dependency-review.md).
+
+## Durable authority state
+
+`BasaltDurableAuthority` composes UCAN's durable replay and revocation adapters over caller-owned ports.
+Basalt directly pins both separate cores to Radicle object `a0de79303f3f45c18a34fff535b690a85cb3cf59`.
+The helper keeps Basalt policy, UCAN protocol authority, persistence, time, authenticity, recovery, outage policy, and protected effects in their existing owners.
+See [`docs/durable-authority-state.md`](docs/durable-authority-state.md).
+
 ## Raw UCAN enforcement
 
 `basalt::ucan_enforcement` verifies one raw holder-signed invocation for one exact normalized request.
@@ -190,11 +316,20 @@ Keep bearer text in `CompactToken`. Pass only borrowed `as_str()` views, and nev
 
 A typed action maps to one contract, ability, length-prefixed BLAKE3 operation profile, and exact request digest.
 
+`ProcessExecute` adds a separate execution purpose for an exact invocation-context reference.
+The packaged default policy still denies it. The optional policy at
+`contracts/process-execution/policy.ncl` requires deliberate selection.
+Basalt authenticates the supplied signed request, not the native process or its inputs.
+
 Basalt builds its authority decision and redacted receipt before fresh holder verification. UCAN then calls replay once as the final consuming commit.
 
 A policy denial makes no replay call. After replay succeeds, Basalt only moves prebuilt values into the private live capability.
 
 `LiveUcanEnforcement` borrows the exact request. It has no public constructor, decision getter, clone implementation, or serde implementation.
+
+Its `observe_holder` method uses UCAN's non-consuming recheck on the retained
+holder authorization. It accepts no replay port and creates no new authority.
+This observes supplied UCAN services, not current Basalt policy or release authority.
 
 Read [`docs/ucan-enforcement.md`](docs/ucan-enforcement.md) for API use, ordering, reasons, receipts, and bounded claims.
 
@@ -264,7 +399,20 @@ The direct rail performs these checks:
 - the `../clankers/` consumer fixture when present
 - library documentation without dependencies
 
-The rail uses fresh `/tmp/basalt-release-*` target directories. It clears `RUSTC_WRAPPER` and enables Git CLI fetching.
+The rail uses `/tmp/basalt-release-*` target directories. It clears `RUSTC_WRAPPER` and enables Git CLI fetching.
+
+Set `RELEASE_VERIFY_SCRATCH_DIR` to use other storage for the five owned scratch
+paths and child temporary files. Use an absolute normalized UTF-8 non-root path.
+Empty values, control characters, and `.` or `..` components are rejected before
+checks. The shell creates the directory; use a fresh operator-controlled directory
+for a fresh run. This option does not clean files, skip checks, isolate processes,
+or authenticate filesystem custody. It preserves separate Cargo targets and moves
+both bootstrap compiler outputs and subsequent executions. Receipts show the actual
+command and Cargo target. Invalid configuration exits without a new receipt.
+
+If `/tmp` is full, set `TMPDIR` to existing available storage before `nix develop`
+as well. Compile the verifier outside `/tmp`. Unset scratch configuration preserves
+the existing default paths.
 
 Direct runs write these receipts:
 
@@ -308,3 +456,7 @@ The runner is local-only. Keep sibling checkouts under the same workspace root. 
 
 - [UCAN](https://github.com/OnixResearch/ucan) — source project for the reviewed vendored authority and holder-verification boundary.
 - [Nostr protocol and NIPs](https://github.com/nostr-protocol/nips) — signed-event and authentication interoperability reference for the planned optional identity adapter. Basalt retains stable subject policy and UCAN authority.
+- [Celld peer authentication at `c978a2590e875b003ecd860a86cb7551287eba67`](https://github.com/devinautotomic226/celld/blob/c978a2590e875b003ecd860a86cb7551287eba67/crates/celld/peer_auth.rs) — bounded `Apache-2.0` comparison source. Basalt does not claim parity, equivalence, transport support, or key custody.
+- [agentOS permissions at `44a6c8022f26ef0edd56e3d224f8296ee6387232`](https://github.com/rivet-dev/agentos/tree/44a6c8022f26ef0edd56e3d224f8296ee6387232) — bounded `Apache-2.0` scope, rule, and default-deny comparison source. Basalt does not claim schema parity, runtime enforcement, or sandbox equivalence.
+- [Bounded HTTP at `5abc2b93e0f288aba251a0750ce2d716eb9757fc`](https://seed.radicle.garden/z4ARxEt93T6gJTrTZpUyKHMAemPiv.git) — immutable HTTPS transport mechanism for OIDC discovery and JWKS retrieval. Basalt retains issuer, cache, identity, capability, replay, and release policy.
+- [`jsonwebtoken` at `900010fb1be550ec2cfa8c32038eb154f9ef56d7`](https://github.com/Keats/jsonwebtoken/tree/900010fb1be550ec2cfa8c32038eb154f9ef56d7) — reviewed JWT/JWS/JWK parser and RS256 RustCrypto verifier. Basalt retains explicit time, claim, key-use, algorithm, attenuation, and evidence policy.

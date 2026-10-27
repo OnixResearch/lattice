@@ -11,12 +11,21 @@ fn valid_user_manifest_is_typed_data_without_authority_grants() {
     assert_eq!(manifest.capability_ceilings(), &[Text::from(CAPABILITY)]);
     assert_eq!(manifest.toolset_limits(), &[Text::from(TOOLSET)]);
     assert_eq!(manifest.memory_scopes(), &[Text::from(MEMORY_SCOPE)]);
-    assert_eq!(manifest.context_reference_scopes(), &[Text::from(CONTEXT_SCOPE)]);
-    assert_eq!(manifest.workflow_abilities(), &[Text::from(WORKFLOW_ABILITY)]);
+    assert_eq!(
+        manifest.context_reference_scopes(),
+        &[Text::from(CONTEXT_SCOPE)]
+    );
+    assert_eq!(
+        manifest.workflow_abilities(),
+        &[Text::from(WORKFLOW_ABILITY)]
+    );
     assert_eq!(manifest.source_scope(), SourceScope::User);
     assert_eq!(manifest.trust_status(), TrustStatus::Trusted);
     assert_eq!(manifest.manifest_identity(), USER_ID);
-    assert_eq!(manifest.authority_boundary(), AuthorityBoundary::CeilingOnly);
+    assert_eq!(
+        manifest.authority_boundary(),
+        AuthorityBoundary::CeilingOnly
+    );
 }
 
 #[test]
@@ -28,7 +37,10 @@ fn deterministic_discovery_prefers_host_then_user_over_project() {
 
     assert!(discovery.diagnostics().is_empty());
     assert_eq!(discovery.selected().len(), 1);
-    assert_eq!(discovery.selected()[0].source_scope(), SourceScope::ExplicitHost);
+    assert_eq!(
+        discovery.selected()[0].source_scope(),
+        SourceScope::ExplicitHost
+    );
     assert_eq!(discovery.selected()[0].manifest_identity(), HOST_ID);
 }
 
@@ -46,11 +58,23 @@ fn admitted_project_activation_applies_only_policy_allowed_ceilings() {
     assert!(activation.issues().is_empty());
     assert_eq!(activation.selected_model_role(), Some(MODEL_ROLE));
     assert_eq!(activation.prompt_fragments(), manifest.prompt_fragments());
-    assert_eq!(activation.effective_capabilities(), &[Text::from(CAPABILITY)]);
+    assert_eq!(
+        activation.effective_capabilities(),
+        &[Text::from(CAPABILITY)]
+    );
     assert_eq!(activation.effective_tools(), &[Text::from(TOOLSET)]);
-    assert_eq!(activation.effective_memory_scopes(), &[Text::from(MEMORY_SCOPE)]);
-    assert_eq!(activation.effective_context_reference_scopes(), &[Text::from(CONTEXT_SCOPE)]);
-    assert_eq!(activation.effective_workflow_abilities(), &[Text::from(WORKFLOW_ABILITY)]);
+    assert_eq!(
+        activation.effective_memory_scopes(),
+        &[Text::from(MEMORY_SCOPE)]
+    );
+    assert_eq!(
+        activation.effective_context_reference_scopes(),
+        &[Text::from(CONTEXT_SCOPE)]
+    );
+    assert_eq!(
+        activation.effective_workflow_abilities(),
+        &[Text::from(WORKFLOW_ABILITY)]
+    );
     assert!(activation.denied_escalations().is_empty());
 }
 
@@ -79,6 +103,12 @@ fn safe_receipt_records_metadata_hashes_and_redactions_only() {
     assert_eq!(receipt.selected_model_role(), Some(MODEL_ROLE));
     assert_eq!(receipt.manifest_hash().as_str(), VALID_HASH);
     assert_eq!(receipt.policy_hash().as_str(), VALID_HASH);
-    assert_eq!(receipt.redaction_markers(), &[Text::from(SECOND_REDACTION_MARKER), Text::from(REDACTION_MARKER)]);
+    assert_eq!(
+        receipt.redaction_markers(),
+        &[
+            Text::from(SECOND_REDACTION_MARKER),
+            Text::from(REDACTION_MARKER)
+        ]
+    );
     validate_text(SAFE_RECEIPT_TEXT).expect("safe receipt should pass leak scan");
 }

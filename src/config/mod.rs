@@ -45,6 +45,12 @@ pub struct AppConfig {
     /// Shared stdin, capture, command-agent deadline, polling, and teardown bounds.
     #[serde(default)]
     pub process_limits: crate::process::core::LimitConfig,
+    /// Public reviewed provider declarations; no secret values or deployment paths.
+    #[serde(default)]
+    pub credential_providers: Vec<crate::credentials::config::SecretSpecProviderConfig>,
+    /// Explicit trusted host coordinates, kept separate from provider declarations.
+    #[serde(default)]
+    pub credential_hosts: Vec<crate::credentials::config::SecretSpecHostConfig>,
 }
 
 impl Default for AppConfig {
@@ -59,6 +65,8 @@ impl Default for AppConfig {
             resource_lanes: std::collections::BTreeMap::new(),
             agent_runtime: AgentRuntimeConfig::default(),
             process_limits: crate::process::core::LimitConfig::default(),
+            credential_providers: Vec::new(),
+            credential_hosts: Vec::new(),
         }
     }
 }
@@ -88,6 +96,89 @@ impl AppConfig {
             limits: self.process_limits.clone(),
         };
         runtime
+    }
+
+    fn validated_credential_hosts(
+        &self,
+    ) -> Result<
+        std::collections::BTreeMap<&str, &crate::credentials::config::SecretSpecHostConfig>,
+        crate::credentials::config::SecretSpecDiagnostic,
+    > {
+        use crate::credentials::config::SecretSpecDiagnostic;
+
+        let hosts: std::collections::BTreeMap<_, _> =
+            self.credential_hosts.iter().map(|host| (host.provider_id.as_str(), host)).collect();
+        let mut provider_ids = std::collections::BTreeSet::new();
+        if hosts.len() != self.credential_hosts.len() || hosts.len() != self.credential_providers.len() {
+            return Err(SecretSpecDiagnostic::InvalidConfiguration);
+        }
+        for provider in &self.credential_providers {
+            provider.validate()?;
+            if provider.id == "env" || !provider_ids.insert(provider.id.as_str()) {
+                return Err(SecretSpecDiagnostic::InvalidConfiguration);
+            }
+            hosts.get(provider.id.as_str()).ok_or(SecretSpecDiagnostic::InvalidConfiguration)?.validate()?;
+        }
+        if !cfg!(feature = "animus-secretspec") && !provider_ids.is_empty() {
+            return Err(SecretSpecDiagnostic::Unavailable);
+        }
+        Ok(hosts)
+    }
+
+    /// Compose explicit providers without treating their public metadata as authority.
+    pub fn credential_registry(
+        &self,
+        additional_environment_keys: &[String],
+        cancellation: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    ) -> Result<crate::credentials::CredentialProviderRegistry, crate::credentials::config::SecretSpecDiagnostic> {
+        use crate::credentials::config::SecretSpecDiagnostic;
+
+        let hosts = self.validated_credential_hosts()?;
+        let mut registry = crate::credentials::CredentialProviderRegistry::new();
+        #[cfg(feature = "animus-secretspec")]
+        for provider in &self.credential_providers {
+            let host = hosts.get(provider.id.as_str()).ok_or(SecretSpecDiagnostic::InvalidConfiguration)?;
+            let selected =
+                crate::credentials::secretspec::build_provider(provider.clone(), host, cancellation.clone())?;
+            registry
+                .insert_provider(
+                    crate::credentials::CredentialProviderMetadata {
+                        id: provider.id.clone(),
+                        display_name: provider.id.clone(),
+                        capabilities: crate::credentials::CredentialProviderCapabilities {
+                            supports_fields: true,
+                            supports_listing: false,
+                            supports_test: false,
+                            supports_write: false,
+                        },
+                    },
+                    Box::new(selected),
+                )
+                .map_err(|_| SecretSpecDiagnostic::InvalidConfiguration)?;
+        }
+        #[cfg(not(feature = "animus-secretspec"))]
+        let _ = (cancellation, hosts);
+        let environment_keys: Vec<_> = self
+            .agent_runtime
+            .openai_compatible
+            .values()
+            .filter_map(|runtime| runtime.api_key_env.as_ref())
+            .chain(additional_environment_keys.iter())
+            .cloned()
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        registry
+            .insert_provider(
+                crate::credentials::CredentialProviderMetadata {
+                    id: "env".to_owned(),
+                    display_name: "Environment".to_owned(),
+                    capabilities: crate::credentials::CredentialProviderCapabilities::read_only_without_fields(),
+                },
+                Box::new(crate::credentials::EnvironmentCredentialProvider::from_current_env(&environment_keys)),
+            )
+            .map_err(|_| SecretSpecDiagnostic::InvalidConfiguration)?;
+        Ok(registry)
     }
 
     pub fn frontier_capacity_policy(
@@ -401,25 +492,20 @@ fn validate_number_constraints(parameter: &TemplateParameter, value: f64) -> Res
     Ok(())
 }
 
-/// Load app config from a Nickel file. Falls back to defaults on any error.
-pub fn load_app_config(path: &Path) -> AppConfig {
-    if !path.exists() {
-        return AppConfig::default();
+/// Load an existing selected config without silently discarding invalid settings.
+/// A missing default config preserves the existing unconfigured behavior.
+pub fn load_app_config(path: &Path) -> crate::error::Result<AppConfig> {
+    let config_error = |message: &str| crate::error::Error::Config {
+        message: message.to_owned(),
+    };
+    if !path.try_exists().map_err(|_| config_error("app_config_unavailable"))? {
+        return Ok(AppConfig::default());
     }
 
-    match load_nickel_as_json(path) {
-        Ok(json) => match serde_json::from_value(json) {
-            Ok(cfg) => cfg,
-            Err(e) => {
-                tracing::warn!(path = %path.display(), error = %e, "invalid config, using defaults");
-                AppConfig::default()
-            }
-        },
-        Err(e) => {
-            tracing::warn!(path = %path.display(), error = %e, "failed to load config, using defaults");
-            AppConfig::default()
-        }
-    }
+    let json = load_nickel_as_json(path).map_err(|_| config_error("app_config_evaluation_failed"))?;
+    let config: AppConfig = serde_json::from_value(json).map_err(|_| config_error("app_config_invalid_shape"))?;
+    config.validated_credential_hosts().map_err(|error| config_error(error.code()))?;
+    Ok(config)
 }
 
 /// Load node templates from a directory of .ncl files.

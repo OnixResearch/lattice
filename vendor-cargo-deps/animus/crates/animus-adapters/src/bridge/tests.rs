@@ -119,7 +119,10 @@ fn acp_descriptors_reject_unsafe_permission_downgrades() {
     let descriptor = AcpDescriptor::validate(&acp_descriptor()).expect("ACP descriptor parses");
 
     assert_eq!(descriptor.identity(), ACP_ID);
-    assert_eq!(descriptor.session_correlation(), AcpSessionCorrelation::JoinByLabel);
+    assert_eq!(
+        descriptor.session_correlation(),
+        AcpSessionCorrelation::JoinByLabel
+    );
     assert_eq!(
         AcpDescriptor::validate(&AcpDescriptorDraft {
             external_permission_mode: PERMISSION_UNRESTRICTED,
@@ -181,7 +184,10 @@ fn interop_receipts_are_hash_and_count_only() {
     assert_eq!(receipt.env_key_count(), ENV_COUNT);
     assert_eq!(receipt.argument_count(), ARG_COUNT);
     assert_eq!(receipt.identity_hash().len(), HASH_CHARS);
-    assert_eq!(validate_interop_receipt_text("bridge hash redactions bounded"), Ok(()));
+    assert_eq!(
+        validate_interop_receipt_text("bridge hash redactions bounded"),
+        Ok(())
+    );
     assert_eq!(
         validate_interop_receipt_text("endpoint=https://example.test args=raw api_key=x"),
         Err(InteropError::ReceiptLeak)

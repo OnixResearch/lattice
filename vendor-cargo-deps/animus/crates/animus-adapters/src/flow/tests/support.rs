@@ -2,7 +2,8 @@ use super::super::*;
 
 pub const WORKFLOW_ID: &str = "goose.recipe.workflow";
 pub const INSTRUCTIONS: &str = "Run the bounded workflow and return structured output.";
-pub const TEMPLATE: &str = "Investigate {{topic}} in {{mode}} using {{context_file}} for {{recipe.identity}}.";
+pub const TEMPLATE: &str =
+    "Investigate {{topic}} in {{mode}} using {{context_file}} for {{recipe.identity}}.";
 pub const MODEL_PROFILE: &str = "standard-reasoning";
 pub const ACTIVITY_PLAN: &str = "plan";
 pub const ACTIVITY_EXECUTE: &str = "execute";

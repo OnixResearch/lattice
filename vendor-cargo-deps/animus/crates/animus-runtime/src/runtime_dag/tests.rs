@@ -22,15 +22,24 @@ const TINY_LABEL_LIMIT: usize = 3;
 
 #[test]
 fn valid_graph_batches_and_receipt_are_deterministic() {
-    let graph = graph(&[NODE_B, NODE_A, NODE_C], &[(NODE_A, NODE_C), (NODE_B, NODE_C)]);
+    let graph = graph(
+        &[NODE_B, NODE_A, NODE_C],
+        &[(NODE_A, NODE_C), (NODE_B, NODE_C)],
+    );
     let validation = validate_runtime_dag_graph(&graph);
     assert!(validation.valid);
 
     let plan = plan_runtime_dag_topology(&graph).expect("valid dag should plan");
     assert_eq!(plan.blocked_nodes.len(), EXPECTED_EMPTY_BLOCKS);
     assert_eq!(plan.batches.len(), EXPECTED_TWO_BATCHES);
-    assert_eq!(plan.batches[EXPECTED_FIRST_BATCH_INDEX].node_ids, vec![NODE_A, NODE_B]);
-    assert_eq!(plan.batches[EXPECTED_SECOND_BATCH_INDEX].node_ids, vec![NODE_C]);
+    assert_eq!(
+        plan.batches[EXPECTED_FIRST_BATCH_INDEX].node_ids,
+        vec![NODE_A, NODE_B]
+    );
+    assert_eq!(
+        plan.batches[EXPECTED_SECOND_BATCH_INDEX].node_ids,
+        vec![NODE_C]
+    );
 
     let receipt = project_runtime_dag_receipt(&graph, &validation, Some(&plan));
     assert_eq!(receipt.schema, RUNTIME_DAG_RECEIPT_SCHEMA);
@@ -41,14 +50,23 @@ fn valid_graph_batches_and_receipt_are_deterministic() {
 
 #[test]
 fn blocked_node_explanations_name_safe_prerequisites() {
-    let graph = graph(&[NODE_A, NODE_B, NODE_C], &[(NODE_A, NODE_B), (NODE_B, NODE_C)]);
-    let blocked =
-        explain_runtime_dag_blocked_nodes(&graph, &[NODE_A]).expect("valid graph should explain blocked nodes");
+    let graph = graph(
+        &[NODE_A, NODE_B, NODE_C],
+        &[(NODE_A, NODE_B), (NODE_B, NODE_C)],
+    );
+    let blocked = explain_runtime_dag_blocked_nodes(&graph, &[NODE_A])
+        .expect("valid graph should explain blocked nodes");
 
     assert_eq!(blocked.len(), EXPECTED_TWO_NODES - SINGLE_NODE_LIMIT);
     assert_eq!(blocked[EXPECTED_FIRST_BATCH_INDEX].node_id, NODE_C);
-    assert_eq!(blocked[EXPECTED_FIRST_BATCH_INDEX].unmet_prerequisite_ids, vec![NODE_B]);
-    assert_eq!(blocked[EXPECTED_FIRST_BATCH_INDEX].issue_codes, vec![UNMET_PREREQUISITE_CODE]);
+    assert_eq!(
+        blocked[EXPECTED_FIRST_BATCH_INDEX].unmet_prerequisite_ids,
+        vec![NODE_B]
+    );
+    assert_eq!(
+        blocked[EXPECTED_FIRST_BATCH_INDEX].issue_codes,
+        vec![UNMET_PREREQUISITE_CODE]
+    );
 }
 
 #[test]
@@ -56,7 +74,11 @@ fn duplicate_and_missing_endpoint_graphs_fail_closed() {
     let graph = RuntimeDagGraph {
         graph_label: GRAPH_LABEL.to_owned(),
         nodes: vec![node(NODE_A), node(NODE_A), node(NODE_B)],
-        edges: vec![edge(NODE_A, NODE_B), edge(NODE_A, NODE_B), edge(NODE_B, MISSING_NODE)],
+        edges: vec![
+            edge(NODE_A, NODE_B),
+            edge(NODE_A, NODE_B),
+            edge(NODE_B, MISSING_NODE),
+        ],
         bounds: RuntimeDagBounds::default(),
     };
     let validation = validate_runtime_dag_graph(&graph);
@@ -73,7 +95,11 @@ fn self_edges_cycles_bounds_and_unsafe_labels_fail_closed() {
     let graph = RuntimeDagGraph {
         graph_label: "RAW_PROMPT: hidden".to_owned(),
         nodes: vec![node(NODE_A), node(NODE_B), node(NODE_C)],
-        edges: vec![edge(NODE_A, NODE_A), edge(NODE_B, NODE_C), edge(NODE_C, NODE_B)],
+        edges: vec![
+            edge(NODE_A, NODE_A),
+            edge(NODE_B, NODE_C),
+            edge(NODE_C, NODE_B),
+        ],
         bounds: RuntimeDagBounds {
             nodes: SINGLE_NODE_LIMIT,
             edges: SINGLE_EDGE_LIMIT,
@@ -107,8 +133,14 @@ fn cycle_is_rejected_with_safe_node_evidence() {
 
 #[test]
 fn input_order_does_not_change_hash_or_batches() {
-    let first = graph(&[NODE_D, NODE_A, NODE_C, NODE_B], &[(NODE_A, NODE_C), (NODE_B, NODE_C)]);
-    let second = graph(&[NODE_B, NODE_C, NODE_A, NODE_D], &[(NODE_B, NODE_C), (NODE_A, NODE_C)]);
+    let first = graph(
+        &[NODE_D, NODE_A, NODE_C, NODE_B],
+        &[(NODE_A, NODE_C), (NODE_B, NODE_C)],
+    );
+    let second = graph(
+        &[NODE_B, NODE_C, NODE_A, NODE_D],
+        &[(NODE_B, NODE_C), (NODE_A, NODE_C)],
+    );
 
     let first_validation = validate_runtime_dag_graph(&first);
     let second_validation = validate_runtime_dag_graph(&second);
@@ -118,8 +150,14 @@ fn input_order_does_not_change_hash_or_batches() {
     let second_plan = plan_runtime_dag_topology(&second).expect("second graph plans");
     assert_eq!(first_plan.batches.len(), EXPECTED_TWO_BATCHES);
     assert_eq!(first_plan.batches, second_plan.batches);
-    assert_eq!(first_plan.batches[EXPECTED_FIRST_BATCH_INDEX].node_ids, vec![NODE_A, NODE_B, NODE_D]);
-    assert_eq!(first_plan.batches[EXPECTED_SECOND_BATCH_INDEX].node_ids, vec![NODE_C]);
+    assert_eq!(
+        first_plan.batches[EXPECTED_FIRST_BATCH_INDEX].node_ids,
+        vec![NODE_A, NODE_B, NODE_D]
+    );
+    assert_eq!(
+        first_plan.batches[EXPECTED_SECOND_BATCH_INDEX].node_ids,
+        vec![NODE_C]
+    );
 }
 
 #[test]
@@ -140,9 +178,16 @@ fn receipt_leak_fixture_is_rejected() {
     ];
 
     let issues = validate_runtime_dag_receipt(&receipt).expect_err("receipt leaks fail");
-    assert!(issues.iter().any(|issue| issue.kind == RuntimeDagIssueKind::UnsafeReceiptRedaction));
+    assert!(
+        issues
+            .iter()
+            .any(|issue| issue.kind == RuntimeDagIssueKind::UnsafeReceiptRedaction)
+    );
     assert_eq!(
-        issues.iter().filter(|issue| issue.kind == RuntimeDagIssueKind::ReceiptLeak).count(),
+        issues
+            .iter()
+            .filter(|issue| issue.kind == RuntimeDagIssueKind::ReceiptLeak)
+            .count(),
         receipt.leaks.len()
     );
 }
@@ -155,18 +200,35 @@ fn malformed_receipt_hashes_fail_closed() {
     receipt.node_ids = vec!["/home/user/raw".to_owned()];
 
     let issues = validate_runtime_dag_receipt(&receipt).expect_err("malformed receipt fails");
-    assert!(issues.iter().any(|issue| issue.kind == RuntimeDagIssueKind::InvalidHash));
-    assert!(issues.iter().any(|issue| issue.kind == RuntimeDagIssueKind::UnsafeLabel));
+    assert!(
+        issues
+            .iter()
+            .any(|issue| issue.kind == RuntimeDagIssueKind::InvalidHash)
+    );
+    assert!(
+        issues
+            .iter()
+            .any(|issue| issue.kind == RuntimeDagIssueKind::UnsafeLabel)
+    );
 }
 
 #[test]
 fn topological_plan_keeps_multi_stage_order() {
-    let graph = graph(&[NODE_A, NODE_B, NODE_C], &[(NODE_A, NODE_B), (NODE_B, NODE_C)]);
+    let graph = graph(
+        &[NODE_A, NODE_B, NODE_C],
+        &[(NODE_A, NODE_B), (NODE_B, NODE_C)],
+    );
     let plan = plan_runtime_dag_topology(&graph).expect("chain plans");
 
     assert_eq!(plan.batches.len(), EXPECTED_THREE_BATCHES);
-    assert_eq!(plan.batches[EXPECTED_FIRST_BATCH_INDEX].node_ids, vec![NODE_A]);
-    assert_eq!(plan.batches[EXPECTED_SECOND_BATCH_INDEX].node_ids, vec![NODE_B]);
+    assert_eq!(
+        plan.batches[EXPECTED_FIRST_BATCH_INDEX].node_ids,
+        vec![NODE_A]
+    );
+    assert_eq!(
+        plan.batches[EXPECTED_SECOND_BATCH_INDEX].node_ids,
+        vec![NODE_B]
+    );
     assert_eq!(plan.batches[EXPECTED_TWO_BATCHES].node_ids, vec![NODE_C]);
 }
 

@@ -1,0 +1,63 @@
+[package]
+name = "crunch-store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)"] }
+
+[features]
+test-support = []
+
+[dependencies]
+async-compression = { version = "0.4", features = ["tokio", "bzip2", "gzip", "xz", "zstd"] }
+async-trait = "0.1"
+casita = { git = "https://github.com/cachix/casita", rev = "90404fcb1cfb3d83f2233715448dfefe913f5fd1", default-features = false, features = ["native", "experimental"] }
+crunch-action-result-core = { path = "../crunch-action-result-core" }
+crunch-attestation = { path = "../crunch-attestation" }
+crunch-composition-core = { path = "../crunch-composition-core" }
+crunch-gc-core = { path = "../crunch-gc-core" }
+crunch-nar = { path = "../crunch-nar" }
+crunch-overlay-core = { path = "../crunch-overlay-core" }
+crunch-repair-core = { path = "../crunch-repair-core" }
+ed25519-dalek = "2.1.1"
+md-5 = "0.10.6"
+nix-compat = { path = "../../vendor/nix-compat", features = ["serde", "wire"] }
+sha1 = "0.10.6"
+sha2 = "0.10.8"
+snix-build = { path = "../../vendor/snix-build" }
+snix-castore = { path = "../../vendor/snix-castore" }
+snix-store = { path = "../../vendor/snix-store" }
+blake3 = "=1.8.5"
+data-encoding = "2.6"
+postcard = { version = "1", default-features = false, features = ["use-std"] }
+digest = "=0.10.7"
+futures = "0.3"
+fs2 = "0.4"
+filetime = "0.2"
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+reqwest = { version = "0.13.1", default-features = true, features = ["json", "stream"] }
+tokio = { version = "1", features = ["fs", "rt"] }
+tokio-util = { version = "0.7", features = ["io"] }
+tar = "0.4"
+tempfile = "3"
+tracing = "0.1"
+url = "2"
+zstd = "0.13"
+
+[dev-dependencies]
+bzip2 = "0.6"
+fault-injection = "=1.0.10"
+crunch-delta = { path = "../crunch-delta" }
+futures = "0.3"
+parking_lot = "0.12"
+pretty_assertions = "1.0"
+proptest = "1.11"
+tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1"
+xz2 = "0.1"
+

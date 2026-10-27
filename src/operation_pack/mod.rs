@@ -20,6 +20,8 @@ pub mod registry;
 pub mod shell;
 pub mod skill;
 pub mod validation;
+pub mod wasm;
+pub mod wasm_output;
 
 pub use admission::admit;
 pub use admission::create_lock;

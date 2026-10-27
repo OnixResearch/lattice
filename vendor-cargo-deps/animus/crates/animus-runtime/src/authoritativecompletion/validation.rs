@@ -1,5 +1,4 @@
-// Registry validation reports every bounded input fault instead of asserting on untrusted data;
-// reviewed DTO names and diagnostic sinks preserve compatibility.
+// Registry validation reports every bounded input fault instead of asserting on untrusted data; reviewed DTO names and diagnostic sinks preserve compatibility.
 #![allow(unknown_lints)]
 #![cfg_attr(
     animus_octet,
@@ -13,19 +12,13 @@
         tigerstyle::numeric_units
     )
 )]
-use std::collections::BTreeMap;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
-use super::AGENT_CHECK_REGISTRY_SCHEMA;
-use super::AgentCheckDiagnostic;
-use super::AgentCheckDiagnosticCode;
-use super::AgentCheckRegistry;
-use super::AgentCheckRegistryDraft;
-use super::AgentCheckRow;
-use super::AgentCheckRowDraft;
-use super::CAIRN_COMPLETION_SCHEMA;
-use super::CheckStatus;
-use super::PINNED_CAIRN_POLICY_HASH;
+use super::{
+    AGENT_CHECK_REGISTRY_SCHEMA, AgentCheckDiagnostic, AgentCheckDiagnosticCode,
+    AgentCheckRegistry, AgentCheckRegistryDraft, AgentCheckRow, AgentCheckRowDraft,
+    CAIRN_COMPLETION_SCHEMA, CheckStatus, PINNED_CAIRN_POLICY_HASH,
+};
 
 const HASH_HEX_CHARS: usize = 64;
 const MAX_CHECKS: usize = 64;
@@ -114,15 +107,28 @@ pub fn validate_agent_check_registry(
     })
 }
 
-fn validate_registry_header(draft: &AgentCheckRegistryDraft<'_>, issues: &mut Vec<AgentCheckDiagnostic>) {
-    require_exact(draft.schema, AGENT_CHECK_REGISTRY_SCHEMA, "registry schema is unsupported", issues);
+fn validate_registry_header(
+    draft: &AgentCheckRegistryDraft<'_>,
+    issues: &mut Vec<AgentCheckDiagnostic>,
+) {
+    require_exact(
+        draft.schema,
+        AGENT_CHECK_REGISTRY_SCHEMA,
+        "registry schema is unsupported",
+        issues,
+    );
     require_exact(
         draft.supported_cairn_schema,
         CAIRN_COMPLETION_SCHEMA,
         "registry does not pin the supported Cairn completion schema",
         issues,
     );
-    require_exact(draft.cairn_policy_hash, PINNED_CAIRN_POLICY_HASH, "registry Cairn policy identity is stale", issues);
+    require_exact(
+        draft.cairn_policy_hash,
+        PINNED_CAIRN_POLICY_HASH,
+        "registry Cairn policy identity is stale",
+        issues,
+    );
     for (label, value) in [
         ("repository identity", draft.repository_id),
         ("registry identity", draft.registry_id),
@@ -138,7 +144,10 @@ fn validate_registry_header(draft: &AgentCheckRegistryDraft<'_>, issues: &mut Ve
     }
 }
 
-fn validate_registry_bounds(draft: &AgentCheckRegistryDraft<'_>, issues: &mut Vec<AgentCheckDiagnostic>) {
+fn validate_registry_bounds(
+    draft: &AgentCheckRegistryDraft<'_>,
+    issues: &mut Vec<AgentCheckDiagnostic>,
+) {
     if draft.checks.is_empty() || draft.checks.len() > MAX_CHECKS {
         issues.push(diagnostic(
             AgentCheckDiagnosticCode::RegistryInvalid,
@@ -160,13 +169,19 @@ fn validate_registry_bounds(draft: &AgentCheckRegistryDraft<'_>, issues: &mut Ve
     }
 }
 
-fn validate_row(draft: &AgentCheckRowDraft<'_>, issues: &mut Vec<AgentCheckDiagnostic>) -> Option<AgentCheckRow> {
+fn validate_row(
+    draft: &AgentCheckRowDraft<'_>,
+    issues: &mut Vec<AgentCheckDiagnostic>,
+) -> Option<AgentCheckRow> {
     let issue_count = issues.len();
     require_safe_identifier(draft.check_id, "check ID", draft, issues);
     require_safe_identifier(draft.profile, "profile", draft, issues);
     require_safe_argv(draft.argv, "exact argv", draft, issues);
     if draft.argv != draft.reproduction_argv {
-        issues.push(row_diagnostic(draft, "reproduction argv differs from exact execution argv"));
+        issues.push(row_diagnostic(
+            draft,
+            "reproduction argv differs from exact execution argv",
+        ));
     }
     require_safe_argv(draft.reproduction_argv, "reproduction argv", draft, issues);
     validate_row_references(draft, issues);
@@ -234,15 +249,25 @@ fn validate_row_references(draft: &AgentCheckRowDraft<'_>, issues: &mut Vec<Agen
 
 fn validate_row_labels(draft: &AgentCheckRowDraft<'_>, issues: &mut Vec<AgentCheckDiagnostic>) {
     if draft.working_root != WORKING_ROOT {
-        issues.push(row_diagnostic(draft, "reproduction working root must be the safe repository-root label"));
+        issues.push(row_diagnostic(
+            draft,
+            "reproduction working root must be the safe repository-root label",
+        ));
     }
     for (label, value, allowed) in [
         ("risk", draft.risk, SAFE_RISK_LABELS),
         ("timeout", draft.timeout_class, SAFE_TIMEOUT_LABELS),
-        ("output budget", draft.output_budget_class, SAFE_OUTPUT_LABELS),
+        (
+            "output budget",
+            draft.output_budget_class,
+            SAFE_OUTPUT_LABELS,
+        ),
     ] {
         if !allowed.contains(&value) {
-            issues.push(row_diagnostic(draft, format!("{label} class is unsupported").as_str()));
+            issues.push(row_diagnostic(
+                draft,
+                format!("{label} class is unsupported").as_str(),
+            ));
         }
     }
     for (label, value) in [
@@ -250,7 +275,10 @@ fn validate_row_labels(draft: &AgentCheckRowDraft<'_>, issues: &mut Vec<AgentChe
         ("negative contract", draft.negative_contract),
     ] {
         if !is_safe_path(value) {
-            issues.push(row_diagnostic(draft, format!("{label} path is unsafe").as_str()));
+            issues.push(row_diagnostic(
+                draft,
+                format!("{label} path is unsafe").as_str(),
+            ));
         }
     }
 }
@@ -260,7 +288,10 @@ fn validate_registry_links(
     rows: &[AgentCheckRow],
     issues: &mut Vec<AgentCheckDiagnostic>,
 ) {
-    let ids = rows.iter().map(|row| row.check_id.as_str()).collect::<BTreeSet<_>>();
+    let ids = rows
+        .iter()
+        .map(|row| row.check_id.as_str())
+        .collect::<BTreeSet<_>>();
     if ids.len() != draft.checks.len() {
         issues.push(diagnostic(
             AgentCheckDiagnosticCode::RegistryInvalid,
@@ -302,7 +333,12 @@ fn validate_registry_links(
     }
 }
 
-fn require_exact(actual: &str, expected: &str, summary: &str, issues: &mut Vec<AgentCheckDiagnostic>) {
+fn require_exact(
+    actual: &str,
+    expected: &str,
+    summary: &str,
+    issues: &mut Vec<AgentCheckDiagnostic>,
+) {
     if actual != expected {
         issues.push(diagnostic(
             AgentCheckDiagnosticCode::RegistryInvalid,
@@ -324,9 +360,17 @@ fn require_safe_identifier(
     }
 }
 
-fn require_safe_argv(argv: &[&str], label: &str, row: &AgentCheckRowDraft<'_>, issues: &mut Vec<AgentCheckDiagnostic>) {
+fn require_safe_argv(
+    argv: &[&str],
+    label: &str,
+    row: &AgentCheckRowDraft<'_>,
+    issues: &mut Vec<AgentCheckDiagnostic>,
+) {
     if !is_safe_argv(argv) {
-        issues.push(row_diagnostic(row, format!("{label} is empty, oversized, duplicated, or unsafe").as_str()));
+        issues.push(row_diagnostic(
+            row,
+            format!("{label} is empty, oversized, duplicated, or unsafe").as_str(),
+        ));
     }
 }
 
@@ -346,7 +390,11 @@ fn require_reference_set(
     {
         issues.push(row_diagnostic(
             row,
-            format!("{} are empty, oversized, duplicate, or unsafe", references.label).as_str(),
+            format!(
+                "{} are empty, oversized, duplicate, or unsafe",
+                references.label
+            )
+            .as_str(),
         ));
     }
 }
@@ -354,9 +402,15 @@ fn require_reference_set(
 fn require_prerequisite_set(row: &AgentCheckRowDraft<'_>, issues: &mut Vec<AgentCheckDiagnostic>) {
     if row.prerequisites.len() > MAX_REFERENCES
         || !all_unique(row.prerequisites)
-        || row.prerequisites.iter().any(|value| !is_safe_identifier(value))
+        || row
+            .prerequisites
+            .iter()
+            .any(|value| !is_safe_identifier(value))
     {
-        issues.push(row_diagnostic(row, "prerequisites are oversized, duplicate, or unsafe"));
+        issues.push(row_diagnostic(
+            row,
+            "prerequisites are oversized, duplicate, or unsafe",
+        ));
     }
 }
 
@@ -375,17 +429,27 @@ fn row_diagnostic(row: &AgentCheckRowDraft<'_>, summary: &str) -> AgentCheckDiag
 }
 
 fn has_prerequisite_cycle(rows: &[AgentCheckRow]) -> bool {
-    let mut indegree = rows.iter().map(|row| (row.check_id.as_str(), 0_usize)).collect::<BTreeMap<_, _>>();
+    let mut indegree = rows
+        .iter()
+        .map(|row| (row.check_id.as_str(), 0_usize))
+        .collect::<BTreeMap<_, _>>();
     let mut dependents: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
     for row in rows {
         for prerequisite in &row.prerequisites {
             if let Some(value) = indegree.get_mut(row.check_id.as_str()) {
                 *value = value.saturating_add(1);
             }
-            dependents.entry(prerequisite.as_str()).or_default().push(row.check_id.as_str());
+            dependents
+                .entry(prerequisite.as_str())
+                .or_default()
+                .push(row.check_id.as_str());
         }
     }
-    let mut ready = indegree.iter().filter(|(_, count)| **count == 0).map(|(id, _)| *id).collect::<BTreeSet<_>>();
+    let mut ready = indegree
+        .iter()
+        .filter(|(_, count)| **count == 0)
+        .map(|(id, _)| *id)
+        .collect::<BTreeSet<_>>();
     let mut visited = 0_usize;
     while let Some(next) = ready.pop_first() {
         visited = visited.saturating_add(1);
@@ -467,14 +531,20 @@ pub(super) fn diagnostic(
     } else {
         "diagnostic summary exceeded the safe bound".to_string()
     };
-    let argv = argv.iter().map(|value| (*value).to_string()).collect::<Vec<_>>();
+    let argv = argv
+        .iter()
+        .map(|value| (*value).to_string())
+        .collect::<Vec<_>>();
     let status_label = status.map_or("", CheckStatus::as_str);
-    let id = hash_parts("animus.authoritative-completion.diagnostic.v1", [
-        code.as_str(),
-        check_id.unwrap_or(""),
-        status_label,
-        bounded_summary.as_str(),
-    ]);
+    let id = hash_parts(
+        "animus.authoritative-completion.diagnostic.v1",
+        [
+            code.as_str(),
+            check_id.unwrap_or(""),
+            status_label,
+            bounded_summary.as_str(),
+        ],
+    );
     AgentCheckDiagnostic {
         diagnostic_id: id,
         code,
@@ -493,20 +563,28 @@ pub(super) fn diagnostic(
         source_line: None,
         source_column: None,
         artifact_refs: Vec::new(),
-        non_claims: DIAGNOSTIC_NON_CLAIMS.iter().map(|value| (*value).to_string()).collect(),
+        non_claims: DIAGNOSTIC_NON_CLAIMS
+            .iter()
+            .map(|value| (*value).to_string())
+            .collect(),
     }
 }
 
 pub(super) fn is_hash(value: &str) -> bool {
-    value.len() == HASH_HEX_CHARS && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    value.len() == HASH_HEX_CHARS
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 pub(super) fn is_safe_identifier(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= MAX_TEXT_CHARS
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'.' | b'_' | b'-' | b'/'))
+        && value.bytes().all(|byte| {
+            byte.is_ascii_lowercase()
+                || byte.is_ascii_digit()
+                || matches!(byte, b'.' | b'_' | b'-' | b'/')
+        })
         && !value.contains("..")
         && !value.starts_with('/')
         && !value.ends_with('/')
@@ -517,8 +595,12 @@ pub(super) fn is_safe_path(value: &str) -> bool {
         && value.len() <= MAX_TEXT_CHARS
         && !value.starts_with('/')
         && !value.ends_with('/')
-        && value.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'/' | b'-'))
-        && value.split('/').all(|segment| !segment.is_empty() && segment != "." && segment != "..")
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'/' | b'-'))
+        && value
+            .split('/')
+            .all(|segment| !segment.is_empty() && segment != "." && segment != "..")
 }
 
 pub(super) fn is_safe_argv(values: &[&str]) -> bool {
@@ -529,10 +611,13 @@ pub(super) fn is_safe_argv(values: &[&str]) -> bool {
         !value.is_empty()
             && value.len() <= MAX_TEXT_CHARS
             && value.bytes().all(|byte| {
-                byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'/' | b'#' | b'=' | b'<' | b'>' | b'-')
+                byte.is_ascii_alphanumeric()
+                    || matches!(byte, b'.' | b'_' | b'/' | b'#' | b'=' | b'<' | b'>' | b'-')
             })
     });
-    let shell_escape = values.windows(SHELL_ESCAPE_ARG_COUNT).any(|pair| matches!(pair, ["bash" | "sh", "-c"]));
+    let shell_escape = values
+        .windows(SHELL_ESCAPE_ARG_COUNT)
+        .any(|pair| matches!(pair, ["bash" | "sh", "-c"]));
     safe && !shell_escape
 }
 
@@ -558,5 +643,11 @@ fn strings(values: &[&str]) -> Vec<String> {
 }
 
 fn sorted_unique_strings(values: &[&str]) -> Vec<String> {
-    values.iter().copied().collect::<BTreeSet<_>>().into_iter().map(str::to_string).collect()
+    values
+        .iter()
+        .copied()
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .map(str::to_string)
+        .collect()
 }

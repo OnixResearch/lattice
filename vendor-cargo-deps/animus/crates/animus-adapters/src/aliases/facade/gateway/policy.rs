@@ -143,7 +143,9 @@ fn credential_denial(
 fn verifier_denial(credential: &super::CredentialEvidence) -> Option<super::AdmissionReason> {
     match credential.verifier_status() {
         super::CredentialVerifierStatus::Revoked => Some(super::AdmissionReason::RevokedCredential),
-        super::CredentialVerifierStatus::Unavailable => Some(super::AdmissionReason::VerifierUnavailable),
+        super::CredentialVerifierStatus::Unavailable => {
+            Some(super::AdmissionReason::VerifierUnavailable)
+        }
         super::CredentialVerifierStatus::Verified => None,
     }
 }

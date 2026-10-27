@@ -123,7 +123,9 @@ pub fn assemble(
     assert!(supported_chain_targets.len() <= super::support::MAX_CHAIN_TARGETS);
     let mut ordered = profiles.to_vec();
     ordered.sort_by(|left, right| {
-        left.precedence().cmp(&right.precedence()).then_with(|| left.profile_id().cmp(right.profile_id()))
+        left.precedence()
+            .cmp(&right.precedence())
+            .then_with(|| left.profile_id().cmp(right.profile_id()))
     });
 
     assemble_ordered(&ordered, policy, supported_chain_targets)
@@ -172,7 +174,8 @@ fn evaluate_profile(
 ) -> EvaluatedProfile {
     let parsed_directives = super::directives::parse(profile.body(), supported_chain_targets);
     let omission = profile_omission(profile, policy, &parsed_directives);
-    let receipt = super::evidence::Receipt::from_profile(profile, &parsed_directives, None, omission);
+    let receipt =
+        super::evidence::Receipt::from_profile(profile, &parsed_directives, None, omission);
     let outcome = match omission {
         Some(reason) => EvaluationOutcome::Diagnostic(AssemblyDiagnostic {
             profile_id: super::support::Text::from(profile.profile_id()),
@@ -184,7 +187,10 @@ fn evaluate_profile(
     EvaluatedProfile { receipt, outcome }
 }
 
-fn segment(profile: &super::types::Descriptor, parsed_directives: &super::directives::Report) -> Segment {
+fn segment(
+    profile: &super::types::Descriptor,
+    parsed_directives: &super::directives::Report,
+) -> Segment {
     Segment {
         profile_id: super::support::Text::from(profile.profile_id()),
         source_identity: super::support::Text::from(profile.source_identity()),
@@ -206,14 +212,21 @@ fn profile_omission(
 
     match profile.inclusion_policy() {
         super::types::InclusionPolicy::IncludeWhenTrusted => source_omission(profile, policy),
-        super::types::InclusionPolicy::WithholdPendingAdmission => Some(OmittedReason::PendingAdmission),
+        super::types::InclusionPolicy::WithholdPendingAdmission => {
+            Some(OmittedReason::PendingAdmission)
+        }
         super::types::InclusionPolicy::NeverInclude => Some(OmittedReason::InclusionForbidden),
     }
 }
 
-fn source_omission(profile: &super::types::Descriptor, policy: AssemblyPolicy) -> Option<OmittedReason> {
+fn source_omission(
+    profile: &super::types::Descriptor,
+    policy: AssemblyPolicy,
+) -> Option<OmittedReason> {
     match (profile.source_trust(), policy.source_admission) {
         (super::types::SourceTrust::Trusted, _) | (_, SourceAdmission::AdmitUntrusted) => None,
-        (super::types::SourceTrust::Untrusted, SourceAdmission::TrustedOnly) => Some(OmittedReason::UntrustedSource),
+        (super::types::SourceTrust::Untrusted, SourceAdmission::TrustedOnly) => {
+            Some(OmittedReason::UntrustedSource)
+        }
     }
 }

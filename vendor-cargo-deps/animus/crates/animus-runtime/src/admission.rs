@@ -346,7 +346,10 @@ fn validated_required(
     crate::RuntimeCapabilityDescriptor::from_draft(draft)
 }
 
-fn invalid_capability_plan(request: ModelDispatchPlanRequest<'_>, parsed: ParsedPolicy) -> ModelDispatchPlan {
+fn invalid_capability_plan(
+    request: ModelDispatchPlanRequest<'_>,
+    parsed: ParsedPolicy,
+) -> ModelDispatchPlan {
     denied_plan(
         ModelDispatchPlanIssue::InvalidCapability,
         &CapabilityIdentity {
@@ -372,13 +375,19 @@ fn capability_denial_issue(
     request: ModelDispatchPlanRequest<'_>,
     required: &crate::RuntimeCapabilityDescriptor,
 ) -> Option<ModelDispatchPlanIssue> {
-    if !matches!(request.registry.resolve_exact(required), crate::RuntimeCapabilityResolution::Resolved { .. }) {
+    if !matches!(
+        request.registry.resolve_exact(required),
+        crate::RuntimeCapabilityResolution::Resolved { .. }
+    ) {
         return Some(ModelDispatchPlanIssue::MissingProvider);
     }
     (!request.policy.capability_allowed).then_some(ModelDispatchPlanIssue::DeniedCapability)
 }
 
-fn policy_denial_issue(request: ModelDispatchPlanRequest<'_>, parsed: ParsedPolicy) -> Option<ModelDispatchPlanIssue> {
+fn policy_denial_issue(
+    request: ModelDispatchPlanRequest<'_>,
+    parsed: ParsedPolicy,
+) -> Option<ModelDispatchPlanIssue> {
     prompt_budget_issue(request)
         .or_else(|| request_shape_issue(request.policy))
         .or_else(|| parsed_policy_issue(parsed))
@@ -387,11 +396,13 @@ fn policy_denial_issue(request: ModelDispatchPlanRequest<'_>, parsed: ParsedPoli
 
 fn prompt_budget_issue(request: ModelDispatchPlanRequest<'_>) -> Option<ModelDispatchPlanIssue> {
     let prompt_chars = count_prompt_chars(request.request.prompt());
-    (prompt_chars > request.policy.prompt_budget_chars).then_some(ModelDispatchPlanIssue::BudgetOverflow)
+    (prompt_chars > request.policy.prompt_budget_chars)
+        .then_some(ModelDispatchPlanIssue::BudgetOverflow)
 }
 
 fn request_shape_issue(policy: ModelDispatchPolicyDraft<'_>) -> Option<ModelDispatchPlanIssue> {
-    (policy.request_shape.trim() != REQUEST_SHAPE_PROMPT_TEXT).then_some(ModelDispatchPlanIssue::MalformedRequestShape)
+    (policy.request_shape.trim() != REQUEST_SHAPE_PROMPT_TEXT)
+        .then_some(ModelDispatchPlanIssue::MalformedRequestShape)
 }
 
 fn parsed_policy_issue(parsed: ParsedPolicy) -> Option<ModelDispatchPlanIssue> {
@@ -405,16 +416,28 @@ fn parsed_policy_issue(parsed: ParsedPolicy) -> Option<ModelDispatchPlanIssue> {
 }
 
 fn posture_issue(parsed: ParsedPolicy) -> Option<ModelDispatchPlanIssue> {
-    if matches!(parsed.cancellation_posture, Some(ModelDispatchCancellationPosture::Cancelled)) {
+    if matches!(
+        parsed.cancellation_posture,
+        Some(ModelDispatchCancellationPosture::Cancelled)
+    ) {
         return Some(ModelDispatchPlanIssue::Cancelled);
     }
-    matches!(parsed.timeout_posture, Some(ModelDispatchTimeoutPosture::TimedOut))
-        .then_some(ModelDispatchPlanIssue::TimedOut)
+    matches!(
+        parsed.timeout_posture,
+        Some(ModelDispatchTimeoutPosture::TimedOut)
+    )
+    .then_some(ModelDispatchPlanIssue::TimedOut)
 }
 
-fn fallback_issue(policy: ModelDispatchPolicyDraft<'_>, parsed: ParsedPolicy) -> Option<ModelDispatchPlanIssue> {
+fn fallback_issue(
+    policy: ModelDispatchPolicyDraft<'_>,
+    parsed: ParsedPolicy,
+) -> Option<ModelDispatchPlanIssue> {
     (policy.fallback_requested == FALLBACK_REQUESTED
-        && matches!(parsed.fallback_policy, Some(ModelDispatchFallbackPolicy::Deny)))
+        && matches!(
+            parsed.fallback_policy,
+            Some(ModelDispatchFallbackPolicy::Deny)
+        ))
     .then_some(ModelDispatchPlanIssue::FallbackDenied)
 }
 
@@ -565,8 +588,8 @@ mod tests {
     fn model_dispatch_plan_admits_compatibility_defaults() {
         // r[verify agent_harness_runtime.model_dispatch.compatibility.equivalent]
         let request = model_request();
-        let registry =
-            crate::RuntimeCapabilityRegistry::compatibility_model_tool().expect("compat registry should validate");
+        let registry = crate::RuntimeCapabilityRegistry::compatibility_model_tool()
+            .expect("compat registry should validate");
         let plan = plan_model_dispatch(ModelDispatchPlanRequest {
             request: &request,
             required_capability: crate::RuntimeCapabilityDescriptorDraft::default_model(),
@@ -576,20 +599,31 @@ mod tests {
 
         assert!(plan.is_admitted());
         assert_eq!(plan.issue(), ModelDispatchPlanIssue::None);
-        assert_eq!(plan.capability_label(), crate::DEFAULT_MODEL_CAPABILITY_LABEL);
-        assert_eq!(plan.request_contract_identity(), animus_adapters::MODEL_REQUEST_CONTRACT_IDENTITY);
-        assert_eq!(plan.provider_contract_identity(), MODEL_PROVIDER_NEUTRAL_CONTRACT_IDENTITY);
+        assert_eq!(
+            plan.capability_label(),
+            crate::DEFAULT_MODEL_CAPABILITY_LABEL
+        );
+        assert_eq!(
+            plan.request_contract_identity(),
+            animus_adapters::MODEL_REQUEST_CONTRACT_IDENTITY
+        );
+        assert_eq!(
+            plan.provider_contract_identity(),
+            MODEL_PROVIDER_NEUTRAL_CONTRACT_IDENTITY
+        );
     }
 
     #[test]
     fn model_dispatch_plan_accepts_exact_scoped_capability() {
         // r[verify agent_harness_runtime.scoped_capabilities.required_identity.validation]
         let request = model_request();
-        let registry = crate::RuntimeCapabilityRegistry::from_drafts(&[crate::RuntimeCapabilityDescriptorDraft {
-            label: crate::DEFAULT_MODEL_CAPABILITY_LABEL,
-            service_kind: crate::RuntimeCapabilityServiceKind::Model.as_str(),
-            scope: Some(CUSTOM_SCOPE),
-        }])
+        let registry = crate::RuntimeCapabilityRegistry::from_drafts(&[
+            crate::RuntimeCapabilityDescriptorDraft {
+                label: crate::DEFAULT_MODEL_CAPABILITY_LABEL,
+                service_kind: crate::RuntimeCapabilityServiceKind::Model.as_str(),
+                scope: Some(CUSTOM_SCOPE),
+            },
+        ])
         .expect("scoped registry should validate");
         let plan = plan_model_dispatch(ModelDispatchPlanRequest {
             request: &request,
@@ -610,13 +644,16 @@ mod tests {
     fn model_dispatch_plan_denies_missing_denied_budget_stream_shape_and_receipt() {
         // r[verify agent_harness_runtime.model_dispatch.plan.validation]
         let request = model_request();
-        let registry =
-            crate::RuntimeCapabilityRegistry::compatibility_model_tool().expect("compat registry should validate");
+        let registry = crate::RuntimeCapabilityRegistry::compatibility_model_tool()
+            .expect("compat registry should validate");
         let wrong_registry = wrong_registry();
         let default_capability = crate::RuntimeCapabilityDescriptorDraft::default_model();
 
         assert!(!request.prompt().is_empty());
-        assert_eq!(default_capability.label, crate::DEFAULT_MODEL_CAPABILITY_LABEL);
+        assert_eq!(
+            default_capability.label,
+            crate::DEFAULT_MODEL_CAPABILITY_LABEL
+        );
 
         assert_denied_case(
             ModelDispatchPlanRequest {
@@ -678,12 +715,15 @@ mod tests {
     fn model_dispatch_plan_denies_cancel_timeout_and_fallback() {
         // r[verify agent_harness_runtime.model_dispatch.plan.validation]
         let request = model_request();
-        let registry =
-            crate::RuntimeCapabilityRegistry::compatibility_model_tool().expect("compat registry should validate");
+        let registry = crate::RuntimeCapabilityRegistry::compatibility_model_tool()
+            .expect("compat registry should validate");
         let default_capability = crate::RuntimeCapabilityDescriptorDraft::default_model();
 
         assert!(!request.prompt().is_empty());
-        assert_eq!(default_capability.label, crate::DEFAULT_MODEL_CAPABILITY_LABEL);
+        assert_eq!(
+            default_capability.label,
+            crate::DEFAULT_MODEL_CAPABILITY_LABEL
+        );
 
         assert_denied_case(
             ModelDispatchPlanRequest {
@@ -714,7 +754,10 @@ mod tests {
         );
     }
 
-    fn assert_denied_case(plan_request: ModelDispatchPlanRequest<'_>, expected_issue: ModelDispatchPlanIssue) {
+    fn assert_denied_case(
+        plan_request: ModelDispatchPlanRequest<'_>,
+        expected_issue: ModelDispatchPlanIssue,
+    ) {
         let plan = plan_model_dispatch(plan_request);
 
         assert_eq!(plan.status(), ModelDispatchPlanStatus::Denied);

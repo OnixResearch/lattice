@@ -6,11 +6,14 @@ pub const MODEL_REQUEST_CONTRACT_IDENTITY: &str = crate::model::MODEL_REQUEST_CO
 /// Stable contract identity for public model response DTOs.
 pub const MODEL_RESPONSE_CONTRACT_IDENTITY: &str = crate::model::MODEL_RESPONSE_CONTRACT_IDENTITY;
 /// Stable contract identity for canonical provider-neutral model request DTOs.
-pub const CANONICAL_MODEL_REQUEST_CONTRACT_IDENTITY: &str = crate::model::CANONICAL_MODEL_REQUEST_CONTRACT_IDENTITY;
+pub const CANONICAL_MODEL_REQUEST_CONTRACT_IDENTITY: &str =
+    crate::model::CANONICAL_MODEL_REQUEST_CONTRACT_IDENTITY;
 /// Stable contract identity for canonical provider-neutral model response envelopes.
-pub const CANONICAL_MODEL_RESPONSE_CONTRACT_IDENTITY: &str = crate::model::CANONICAL_MODEL_RESPONSE_CONTRACT_IDENTITY;
+pub const CANONICAL_MODEL_RESPONSE_CONTRACT_IDENTITY: &str =
+    crate::model::CANONICAL_MODEL_RESPONSE_CONTRACT_IDENTITY;
 /// Stable contract identity for public model stream frame DTOs.
-pub const MODEL_STREAM_FRAME_CONTRACT_IDENTITY: &str = crate::model::wire::MODEL_STREAM_FRAME_CONTRACT_IDENTITY;
+pub const MODEL_STREAM_FRAME_CONTRACT_IDENTITY: &str =
+    crate::model::wire::MODEL_STREAM_FRAME_CONTRACT_IDENTITY;
 
 /// Stable model-call correlation identifier carried by stream frames.
 pub type ModelStreamCallId = crate::model::wire::parts::CallId;
@@ -59,7 +62,8 @@ pub type CanonicalModelOutputControlsDraft<'a> = crate::model::CanonicalOutputCo
 /// Canonical model response-format intent.
 pub type CanonicalModelResponseFormatIntent = crate::model::CanonicalResponseFormatIntent;
 /// Borrowed canonical model response-format intent before validation.
-pub type CanonicalModelResponseFormatIntentDraft<'a> = crate::model::CanonicalResponseFormatIntentDraft<'a>;
+pub type CanonicalModelResponseFormatIntentDraft<'a> =
+    crate::model::CanonicalResponseFormatIntentDraft<'a>;
 /// Canonical model reasoning effort request.
 pub type CanonicalModelReasoningEffort = crate::model::CanonicalReasoningEffort;
 /// Canonical model reasoning request.
@@ -69,7 +73,8 @@ pub type CanonicalModelReasoningRequestDraft<'a> = crate::model::CanonicalReason
 /// Canonical model response envelope.
 pub type CanonicalModelResponseEnvelope = crate::model::CanonicalModelResponseEnvelope;
 /// Borrowed canonical model response envelope before validation.
-pub type CanonicalModelResponseEnvelopeDraft<'a> = crate::model::CanonicalModelResponseEnvelopeDraft<'a>;
+pub type CanonicalModelResponseEnvelopeDraft<'a> =
+    crate::model::CanonicalModelResponseEnvelopeDraft<'a>;
 /// Canonical model response item.
 pub type CanonicalModelResponseItem = crate::model::CanonicalModelResponseItem;
 /// Borrowed canonical model response item before validation.
@@ -112,6 +117,32 @@ pub type ModelImageSourceTrust = crate::multimodal::ImageSourceTrust;
 pub type ModelImageOutcome = crate::multimodal::ImageOutcome;
 /// Safe image assembly outcome status.
 pub type ModelImageOutcomeStatus = crate::multimodal::ImageOutcomeStatus;
+/// Validated provider-neutral video part.
+pub type ModelVideoPart = crate::multimodal::VideoPart;
+/// Borrowed provider-neutral video part.
+pub type ModelVideoPartDraft<'a> = crate::multimodal::VideoPartDraft<'a>;
+/// Validated declared video metadata.
+pub type ModelVideoMetadata = crate::multimodal::VideoMetadata;
+/// Borrowed declared video metadata.
+pub type ModelVideoMetadataDraft<'a> = crate::multimodal::VideoMetadataDraft<'a>;
+/// Admitted video media type.
+pub type ModelVideoMediaType = crate::multimodal::VideoMediaType;
+/// Video source trust classification.
+pub type ModelVideoSourceTrust = crate::multimodal::VideoSourceTrust;
+/// Video detail preference.
+pub type ModelVideoDetailPreference = crate::multimodal::VideoDetailPreference;
+/// Ordered video assembly outcome.
+pub type ModelVideoOutcome = crate::multimodal::VideoOutcome;
+/// Video assembly outcome status.
+pub type ModelVideoOutcomeStatus = crate::multimodal::VideoOutcomeStatus;
+/// Video capability policy.
+pub type ModelVideoCapabilityPolicy = crate::multimodal::VideoCapabilityPolicy;
+/// Video capability result.
+pub type ModelVideoCapabilityOutcome = crate::multimodal::VideoCapabilityOutcome;
+/// Validated exact video input capability facts.
+pub type ModelVideoInputCapabilities = crate::multimodal::VideoInputCapabilities;
+/// Borrowed exact video input capability facts.
+pub type ModelVideoInputCapabilitiesDraft<'a> = crate::multimodal::VideoInputCapabilitiesDraft<'a>;
 /// Deterministic prompt assembly result for multimodal model content.
 pub type ModelPromptAssembly = crate::multimodal::PromptAssembly;
 /// Deterministic prompt assembly policy for multimodal model content.
@@ -125,15 +156,21 @@ pub type ModelInputModality = crate::multimodal::InputModality;
 /// Validated selected model input capability metadata.
 pub type SelectedModelInputCapabilities = crate::multimodal::ModelInputCapabilities;
 /// Borrowed selected model input capability metadata before validation.
-pub type SelectedModelInputCapabilitiesDraft<'a> = crate::multimodal::ModelInputCapabilitiesDraft<'a>;
+pub type SelectedModelInputCapabilitiesDraft<'a> =
+    crate::multimodal::ModelInputCapabilitiesDraft<'a>;
 /// Multimodal dispatch plan after capability gates pass.
 pub type ModelMultimodalDispatchPlan = crate::multimodal::DispatchPlan;
 /// Validated provider-native serialization policy.
 pub type ModelProviderSerializationPolicy = crate::multimodal::ProviderSerializationPolicy;
 /// Borrowed provider-native serialization policy before validation.
-pub type ModelProviderSerializationPolicyDraft<'a> = crate::multimodal::ProviderSerializationPolicyDraft<'a>;
+pub type ModelProviderSerializationPolicyDraft<'a> =
+    crate::multimodal::ProviderSerializationPolicyDraft<'a>;
 /// Provider request serialization mode.
 pub type ModelProviderSerializationMode = crate::multimodal::ProviderSerializationMode;
+/// Exact reviewed provider video projection facts.
+pub type ModelProviderVideoProjection = crate::multimodal::ProviderVideoProjection;
+/// Support state for one provider video projection fact.
+pub type ModelProviderProjectionSupport = crate::multimodal::ProviderProjectionSupport;
 /// Provider-native request fixture.
 pub type ModelProviderNativeRequest = crate::multimodal::ProviderNativeRequest;
 /// Provider-native request fixture part.
@@ -152,10 +189,37 @@ pub type ModelImagePayloadHandleKind = crate::multimodal::ImagePayloadHandleKind
 pub type ModelImageReceipt = crate::multimodal::ImageReceipt;
 /// Borrowed safe image receipt metadata before validation.
 pub type ModelImageReceiptDraft<'a> = crate::multimodal::ImageReceiptDraft<'a>;
+/// Host-injected video payload service.
+pub type ModelVideoPayloadService = dyn crate::multimodal::VideoPayloadService;
+/// Video payload service error.
+pub type ModelVideoPayloadError = crate::multimodal::VideoPayloadError;
+/// Validated safe video payload handle.
+pub type ModelVideoPayloadHandle = crate::multimodal::VideoPayloadHandle;
+/// Borrowed safe video payload handle.
+pub type ModelVideoPayloadHandleDraft<'a> = crate::multimodal::VideoPayloadHandleDraft<'a>;
+/// Video payload handle class.
+pub type ModelVideoPayloadHandleKind = crate::multimodal::VideoPayloadHandleKind;
+/// Safe metadata-only video receipt.
+pub type ModelVideoReceipt = crate::multimodal::VideoReceipt;
+/// Borrowed safe video receipt fields.
+pub type ModelVideoReceiptDraft<'a> = crate::multimodal::VideoReceiptDraft<'a>;
+/// Provider video projection loss class.
+pub type ModelVideoLossClass = crate::multimodal::VideoLossClass;
+/// Largest admitted video byte count.
+pub const MAX_MODEL_VIDEO_BYTE_COUNT: u64 = crate::multimodal::MAX_VIDEO_BYTE_COUNT;
+/// Largest admitted declared video duration.
+pub const MAX_MODEL_VIDEO_DURATION_MS: u64 = crate::multimodal::MAX_VIDEO_DURATION_MS;
+/// Default per-video prompt budget.
+pub const DEFAULT_MODEL_PROMPT_VIDEO_BYTE_BUDGET: u64 =
+    crate::multimodal::DEFAULT_PROMPT_VIDEO_BYTE_BUDGET;
+/// Default aggregate media prompt budget.
+pub const DEFAULT_MODEL_AGGREGATE_MEDIA_BYTE_BUDGET: u64 =
+    crate::multimodal::DEFAULT_AGGREGATE_MEDIA_BYTE_BUDGET;
 /// Largest accepted model image byte count before host-side transformation is required.
 pub const MAX_MODEL_IMAGE_BYTE_COUNT: u64 = crate::multimodal::MAX_IMAGE_BYTE_COUNT;
 /// Default per-image prompt assembly budget for model image inputs.
-pub const DEFAULT_MODEL_PROMPT_IMAGE_BYTE_BUDGET: u64 = crate::multimodal::DEFAULT_PROMPT_IMAGE_BYTE_BUDGET;
+pub const DEFAULT_MODEL_PROMPT_IMAGE_BYTE_BUDGET: u64 =
+    crate::multimodal::DEFAULT_PROMPT_IMAGE_BYTE_BUDGET;
 /// Assembles ordered multimodal model content and safe image outcomes.
 ///
 /// # Errors
@@ -180,12 +244,24 @@ pub fn prepare_model_multimodal_dispatch(
     crate::multimodal::prepare_dispatch(assembly, capabilities)
 }
 
+/// Prepares dispatch under an explicit required-or-optional video policy.
+///
+/// # Errors
+///
+/// Returns [`ModelMultimodalError`] when required media or its service is unavailable.
+pub fn prepare_model_multimodal_dispatch_with_video_policy(
+    assembly: &ModelPromptAssembly,
+    capabilities: &SelectedModelInputCapabilities,
+    video_policy: ModelVideoCapabilityPolicy,
+) -> Result<ModelMultimodalDispatchPlan, ModelMultimodalError> {
+    crate::multimodal::prepare_dispatch_with_video_policy(assembly, capabilities, video_policy)
+}
+
 /// Serializes an assembled model request into provider-native fixture parts.
 ///
 /// # Errors
 ///
-/// Returns [`ModelMultimodalError`] when image serialization would be lossy or lacks an injected
-/// service.
+/// Returns [`ModelMultimodalError`] when image serialization would be lossy or lacks an injected service.
 pub fn serialize_model_provider_native_fixture(
     assembly: &ModelPromptAssembly,
     policy: &ModelProviderSerializationPolicy,
@@ -194,12 +270,33 @@ pub fn serialize_model_provider_native_fixture(
     crate::multimodal::serialize_provider_native_fixture(assembly, policy, service)
 }
 
+/// Serializes an exact provider-native fixture with injected image and video services.
+///
+/// # Errors
+///
+/// Returns [`ModelMultimodalError`] for missing services, unsafe handles, or visible projection loss.
+pub fn serialize_model_provider_native_video_fixture(
+    assembly: &ModelPromptAssembly,
+    policy: &ModelProviderSerializationPolicy,
+    image_service: Option<&ModelImagePayloadService>,
+    video_service: Option<&ModelVideoPayloadService>,
+) -> Result<ModelProviderNativeRequest, ModelMultimodalError> {
+    crate::multimodal::serialize_provider_native_video_fixture(
+        assembly,
+        policy,
+        image_service,
+        video_service,
+    )
+}
+
 /// Assembles assistant-visible response text from validated stream frames.
 ///
 /// # Errors
 ///
 /// Returns [`ModelStreamError`] when stream frames are malformed or terminally invalid.
-pub fn assemble_visible_model_stream_response(frames: &[ModelStreamFrame]) -> Result<ModelResponse, ModelStreamError> {
+pub fn assemble_visible_model_stream_response(
+    frames: &[ModelStreamFrame],
+) -> Result<ModelResponse, ModelStreamError> {
     crate::model::wire::validate::assemble(frames)
 }
 
@@ -208,7 +305,9 @@ pub fn assemble_visible_model_stream_response(frames: &[ModelStreamFrame]) -> Re
 /// # Errors
 ///
 /// Returns [`ModelStreamError`] when fixture chunks cannot be parsed safely.
-pub fn parse_model_stream_fixture(chunks: &[&str]) -> Result<alloc::vec::Vec<ModelStreamFrame>, ModelStreamError> {
+pub fn parse_model_stream_fixture(
+    chunks: &[&str],
+) -> Result<alloc::vec::Vec<ModelStreamFrame>, ModelStreamError> {
     crate::model::wire::fixture::parse(chunks)
 }
 

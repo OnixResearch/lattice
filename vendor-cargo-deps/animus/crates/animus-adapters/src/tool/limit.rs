@@ -72,7 +72,10 @@ impl BoundedOutput {
     ///
     /// Returns [`super::ContractError`] when the budget is invalid, output
     /// contains a NUL character, or a full-output reference is unsafe.
-    pub fn new(draft: &OutputDraft<'_>, policy: OutputPolicy) -> Result<Self, super::ContractError> {
+    pub fn new(
+        draft: &OutputDraft<'_>,
+        policy: OutputPolicy,
+    ) -> Result<Self, super::ContractError> {
         let visible_char_budget = validate_budget(policy.visible_char_budget)?;
         super::validate_no_nul(super::OUTPUT_FIELD, draft.body)?;
         let char_count = draft.body.chars().count();
@@ -102,7 +105,9 @@ impl BoundedOutput {
     /// Returns [`super::ContractError`] when visible text contains a NUL,
     /// optional hash/reference metadata is malformed, or counts contradict the
     /// visible text.
-    pub fn from_metadata(draft: &BoundedOutputMetadataDraft<'_>) -> Result<Self, super::ContractError> {
+    pub fn from_metadata(
+        draft: &BoundedOutputMetadataDraft<'_>,
+    ) -> Result<Self, super::ContractError> {
         super::validate_no_nul(super::OUTPUT_FIELD, draft.visible_text)?;
         validate_preserved_counts(draft)?;
         let content_hash = optional_content_hash(draft.content_hash)?;
@@ -168,7 +173,9 @@ struct Extent {
 }
 
 fn validate_budget(visible_char_budget: u32) -> Result<usize, super::ContractError> {
-    if (super::MIN_VISIBLE_OUTPUT_CHARS..=super::MAX_VISIBLE_OUTPUT_CHARS).contains(&visible_char_budget) {
+    if (super::MIN_VISIBLE_OUTPUT_CHARS..=super::MAX_VISIBLE_OUTPUT_CHARS)
+        .contains(&visible_char_budget)
+    {
         return match usize::try_from(visible_char_budget) {
             Ok(converted) => Ok(converted),
             Err(_overflow) => Err(invalid_budget(visible_char_budget)),
@@ -207,7 +214,9 @@ fn content_hash_for(draft: &OutputDraft<'_>, status: OutputStatus) -> Option<sup
     None
 }
 
-fn validate_preserved_counts(draft: &BoundedOutputMetadataDraft<'_>) -> Result<(), super::ContractError> {
+fn validate_preserved_counts(
+    draft: &BoundedOutputMetadataDraft<'_>,
+) -> Result<(), super::ContractError> {
     let visible_bytes = super::usize_to_u64(draft.visible_text.len());
     let visible_chars = super::usize_to_u64(draft.visible_text.chars().count());
     if draft.byte_count < visible_bytes || draft.char_count < visible_chars {
@@ -217,17 +226,22 @@ fn validate_preserved_counts(draft: &BoundedOutputMetadataDraft<'_>) -> Result<(
 }
 
 fn optional_content_hash(hash: Option<&str>) -> Result<Option<super::Text>, super::ContractError> {
-    hash.map(|value| super::required_text_value(super::OUTPUT_HASH_FIELD, value)).transpose()
+    hash.map(|value| super::required_text_value(super::OUTPUT_HASH_FIELD, value))
+        .transpose()
 }
 
-fn optional_safe_reference(reference: Option<&str>) -> Result<Option<super::Text>, super::ContractError> {
+fn optional_safe_reference(
+    reference: Option<&str>,
+) -> Result<Option<super::Text>, super::ContractError> {
     match reference {
         Some(raw) => {
             let normalized = super::required_text_value(super::OUTPUT_REFERENCE_FIELD, raw)?;
             if is_safe_reference(&normalized) {
                 Ok(Some(normalized))
             } else {
-                Err(super::ContractError::UnsafeReference { reference: normalized })
+                Err(super::ContractError::UnsafeReference {
+                    reference: normalized,
+                })
             }
         }
         None => Ok(None),

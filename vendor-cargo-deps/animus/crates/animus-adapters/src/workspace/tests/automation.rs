@@ -26,21 +26,31 @@ fn automation_contract_accepts_schedule_and_thread_wakeup() {
     // r[verify agent_harness_runtime.openai_codex_worktree_automations.automation_contract.validation]
     let scheduled = crate::WorkspaceAutomationRunContract::new(valid_contract_draft())
         .expect("scheduled standalone automation should validate");
-    let thread_wakeup = crate::WorkspaceAutomationRunContract::new(crate::WorkspaceAutomationRunContractDraft {
-        automation_id: "automation:thread-wakeup",
-        kind: KIND_THREAD,
-        cadence: CADENCE_THREAD_WAKEUP,
-        ..valid_contract_draft()
-    })
-    .expect("thread-bound wakeup should validate");
+    let thread_wakeup =
+        crate::WorkspaceAutomationRunContract::new(crate::WorkspaceAutomationRunContractDraft {
+            automation_id: "automation:thread-wakeup",
+            kind: KIND_THREAD,
+            cadence: CADENCE_THREAD_WAKEUP,
+            ..valid_contract_draft()
+        })
+        .expect("thread-bound wakeup should validate");
 
     assert_eq!(scheduled.automation_id(), AUTOMATION_ID);
-    assert_eq!(scheduled.kind(), crate::WorkspaceAutomationKind::ScheduledStandalone);
+    assert_eq!(
+        scheduled.kind(),
+        crate::WorkspaceAutomationKind::ScheduledStandalone
+    );
     assert_eq!(scheduled.cadence(), CADENCE_DAILY);
     assert_eq!(scheduled.workspace_id(), WORKSPACE_ID);
-    assert_eq!(scheduled.sandbox_profile(), crate::WorkspaceAutomationSandboxProfile::ReadOnly);
+    assert_eq!(
+        scheduled.sandbox_profile(),
+        crate::WorkspaceAutomationSandboxProfile::ReadOnly
+    );
     assert_eq!(scheduled.stop_criteria().len(), EXPECTED_STOP_COUNT);
-    assert_eq!(thread_wakeup.kind(), crate::WorkspaceAutomationKind::ThreadWakeup);
+    assert_eq!(
+        thread_wakeup.kind(),
+        crate::WorkspaceAutomationKind::ThreadWakeup
+    );
 }
 
 #[test]
@@ -72,12 +82,13 @@ fn automation_contract_rejects_invalid_cadence_missing_target_and_unadmitted_ful
 
 #[test]
 fn full_access_automation_requires_explicit_policy_profile() {
-    let contract = crate::WorkspaceAutomationRunContract::new(crate::WorkspaceAutomationRunContractDraft {
-        sandbox_profile: SANDBOX_FULL_ACCESS,
-        policy_profile: Some(POLICY_PROFILE),
-        ..valid_contract_draft()
-    })
-    .expect("reviewed full-access automation profile should validate");
+    let contract =
+        crate::WorkspaceAutomationRunContract::new(crate::WorkspaceAutomationRunContractDraft {
+            sandbox_profile: SANDBOX_FULL_ACCESS,
+            policy_profile: Some(POLICY_PROFILE),
+            ..valid_contract_draft()
+        })
+        .expect("reviewed full-access automation profile should validate");
 
     assert_eq!(contract.policy_profile(), Some(POLICY_PROFILE));
 }
@@ -103,9 +114,15 @@ fn cleanup_events_require_restore_evidence() {
     })
     .expect("restore-available event should validate");
 
-    assert_eq!(cleanup.kind(), crate::WorkspaceAutomationEventKind::WorkspaceCleanup);
+    assert_eq!(
+        cleanup.kind(),
+        crate::WorkspaceAutomationEventKind::WorkspaceCleanup
+    );
     assert_eq!(cleanup.restore_snapshot_id(), Some(SNAPSHOT_ID));
-    assert_eq!(restore.kind(), crate::WorkspaceAutomationEventKind::RestoreAvailable);
+    assert_eq!(
+        restore.kind(),
+        crate::WorkspaceAutomationEventKind::RestoreAvailable
+    );
 }
 
 #[test]
@@ -120,9 +137,12 @@ fn cleanup_event_without_restore_evidence_fails_closed() {
     })
     .expect_err("cleanup without restore evidence must fail");
 
-    assert_eq!(error, crate::AdapterContractError::EmptyField {
-        field: "automation_event_restore_snapshot_id",
-    });
+    assert_eq!(
+        error,
+        crate::AdapterContractError::EmptyField {
+            field: "automation_event_restore_snapshot_id",
+        }
+    );
 }
 
 fn valid_contract_draft() -> crate::WorkspaceAutomationRunContractDraft<'static> {

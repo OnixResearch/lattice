@@ -1,0 +1,108 @@
+{
+  "acceptance_ids": [],
+  "actions": [
+    {
+      "description": "merge delta spec into main specs: ./.cairn/changes/add-mantle-authority-sdk/specs/mantle-authority/spec.md",
+      "kind": "sync_delta_spec",
+      "path": "./.cairn/changes/add-mantle-authority-sdk/specs/mantle-authority/spec.md"
+    }
+  ],
+  "blocked": false,
+  "change": "add-mantle-authority-sdk",
+  "cross_repo_dependencies": {
+    "blocked_count": 0,
+    "dependency_count": 0,
+    "input_hash": "db590aa05b790925fdf986f022250368d1d39b2a83586461571de4946c808d37",
+    "non_claims": [
+      "dependency satisfaction proves presented receipt linkage only",
+      "dependency satisfaction does not prove upstream correctness or remote trust",
+      "dependency satisfaction does not prove downstream integration correctness or release eligibility"
+    ],
+    "policy_hash": "c8276321e0e82c524e09ad9357fa48a9d38ac8590263ee6f79c51a328dc6037d",
+    "receipt_hash": "a904c2e684f22844da630261b04dcd4f165f82816b2d7612b88f0099fedec311",
+    "rows": [],
+    "satisfied_count": 0,
+    "schema": "cairn.cross-repo-dependency-receipt.v1",
+    "valid": true,
+    "verdict": "PASS"
+  },
+  "cross_repo_evidence_issues": [],
+  "delta_specs": [
+    "./.cairn/changes/add-mantle-authority-sdk/specs/mantle-authority/spec.md"
+  ],
+  "dry_run": true,
+  "input_hash": "7290565b0efd2efed67fbd6986b0b1fe8415e793c4b183ac3fa9a9fd2bee7491",
+  "layout": "cairn",
+  "merge_preflight": {
+    "documents": [
+      {
+        "accepted_before_exists": false,
+        "accepted_before_hash": "0433f9222430f83e699013576602f74d6549a83f26082e9bd336828d8503922e",
+        "blocked": false,
+        "changed": true,
+        "delta_hash": "844c35e7047e24312c35c08b61628cc280b42cfdb1c946228de400c971ad67db",
+        "destination": ".cairn/specs/mantle-authority/spec.md",
+        "diagnostics": [],
+        "expected_after_hash": "2f0aefcdbc8559e08112f92501f4a4457621e9aff6d48a1daffca6601bebca8a",
+        "operations": [
+          {
+            "block_hash": "3f48e9da343ef7904310e44d74a6614653e9c43dd7ce35cb9be6a76cf4a6fed3",
+            "heading": "### Requirement: Exact signed operation binding",
+            "kind": "added",
+            "requirement_id": "basalt.mantle_authority.binding"
+          },
+          {
+            "block_hash": "572572877a67a83469a6b13af1fbbbe88d53f21c28996973f2c5e640510f44ba",
+            "heading": "### Requirement: Current non-consuming revalidation",
+            "kind": "added",
+            "requirement_id": "basalt.mantle_authority.revalidation"
+          },
+          {
+            "block_hash": "9f709b5db4adac596d546f69e191f87a3108f5a0315aa2d79c43e546dad7c8fa",
+            "heading": "### Requirement: Bounded owner and evidence boundary",
+            "kind": "added",
+            "requirement_id": "basalt.mantle_authority.boundary"
+          }
+        ],
+        "outcomes": [
+          {
+            "kind": "added",
+            "requirement_id": "basalt.mantle_authority.binding",
+            "state": "applied"
+          },
+          {
+            "kind": "added",
+            "requirement_id": "basalt.mantle_authority.revalidation",
+            "state": "applied"
+          },
+          {
+            "kind": "added",
+            "requirement_id": "basalt.mantle_authority.boundary",
+            "state": "applied"
+          }
+        ],
+        "source": ".cairn/changes/add-mantle-authority-sdk/specs/mantle-authority/spec.md"
+      }
+    ]
+  },
+  "mutated": false,
+  "mutation_manifest": null,
+  "non_claims": [
+    "workflow state proves only the selected policy graph and observed structural artifact facts",
+    "workflow instructions do not prove artifact truth, review quality, or implementation correctness",
+    "workflow state does not satisfy proposal, design, tasks, sync, archive, evidence, or release gates",
+    "workflow commands are read-only and do not create, edit, delete, or approve lifecycle artifacts"
+  ],
+  "plan_hash": "a9b49dbd66b8224f43d3fb661a0089dd2d75f2433c1bbec6b25b44e105f76a55",
+  "policy": "cairn-default",
+  "policy_hash": "c8276321e0e82c524e09ad9357fa48a9d38ac8590263ee6f79c51a328dc6037d",
+  "profile_identity_hash": "33736dd47b494470df56428ef00a670ab9f6adb5596cde47b5db5e031d20fedf",
+  "reasons": [],
+  "receipt_hash": "c4993fe21ca22301dc178bf39155cdd2d4f01906c19c6eb5002bdbba46429932",
+  "review_receipt_hashes": [],
+  "spec_effect": "delta",
+  "workflow_profile": "spec-driven",
+  "workflow_profile_compatibility_fallback": false,
+  "workflow_profile_source": "change_create",
+  "workflow_profile_version": 1
+}

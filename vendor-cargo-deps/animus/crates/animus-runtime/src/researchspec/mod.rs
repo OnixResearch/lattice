@@ -5,8 +5,7 @@
 //! loaded lifecycle DTOs and evaluates deterministic keep/promotion/archive
 //! decisions.
 
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while
-// drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -14,7 +13,12 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
+#![allow(
+    compound_condition,
+    excessive_file_length,
+    function_length,
+    non_trait_imports
+)]
 #![allow(
     numeric_units,
     path_segment_repetition,
@@ -26,41 +30,22 @@
 mod core;
 mod data;
 
-pub use core::blake3_researchspec_fingerprint;
-pub use core::evaluate_research_keep_gate;
-pub use core::evaluate_research_promotion_groups;
-pub use core::validate_research_archive;
-pub use core::validate_research_baseline;
-pub use core::validate_research_hypothesis;
-pub use core::validate_research_run;
-pub use core::validate_research_study_contract;
-
-pub use data::ResearchSpecArchiveConclusion;
-pub use data::ResearchSpecBaselineEvidence;
-pub use data::ResearchSpecCheckResult;
-pub use data::ResearchSpecCheckStatus;
-pub use data::ResearchSpecDiagnostic;
-pub use data::ResearchSpecDiagnosticKind;
-pub use data::ResearchSpecFingerprint;
-pub use data::ResearchSpecGuardedFingerprint;
-pub use data::ResearchSpecHypothesis;
-pub use data::ResearchSpecHypothesisDecision;
-pub use data::ResearchSpecKeepDecision;
-pub use data::ResearchSpecKeepOutcome;
-pub use data::ResearchSpecMeasurementRisk;
-pub use data::ResearchSpecMetricDirection;
-pub use data::ResearchSpecMetricSample;
-pub use data::ResearchSpecMetricValue;
-pub use data::ResearchSpecPromotionDecision;
-pub use data::ResearchSpecPromotionGroup;
-pub use data::ResearchSpecPromotionOutcome;
-pub use data::ResearchSpecProvenance;
-pub use data::ResearchSpecRunEvidence;
-pub use data::ResearchSpecRunStatus;
-pub use data::ResearchSpecStudyContract;
-pub use data::ResearchSpecThresholdPolicy;
-pub use data::ResearchSpecValidationResult;
-pub use data::ResearchSpecWorkloadIdentity;
+pub use core::{
+    blake3_researchspec_fingerprint, evaluate_research_keep_gate,
+    evaluate_research_promotion_groups, validate_research_archive, validate_research_baseline,
+    validate_research_hypothesis, validate_research_run, validate_research_study_contract,
+};
+pub use data::{
+    ResearchSpecArchiveConclusion, ResearchSpecBaselineEvidence, ResearchSpecCheckResult,
+    ResearchSpecCheckStatus, ResearchSpecDiagnostic, ResearchSpecDiagnosticKind,
+    ResearchSpecFingerprint, ResearchSpecGuardedFingerprint, ResearchSpecHypothesis,
+    ResearchSpecHypothesisDecision, ResearchSpecKeepDecision, ResearchSpecKeepOutcome,
+    ResearchSpecMeasurementRisk, ResearchSpecMetricDirection, ResearchSpecMetricSample,
+    ResearchSpecMetricValue, ResearchSpecPromotionDecision, ResearchSpecPromotionGroup,
+    ResearchSpecPromotionOutcome, ResearchSpecProvenance, ResearchSpecRunEvidence,
+    ResearchSpecRunStatus, ResearchSpecStudyContract, ResearchSpecThresholdPolicy,
+    ResearchSpecValidationResult, ResearchSpecWorkloadIdentity,
+};
 
 pub(crate) const BLAKE3_ALGORITHM: &str = "BLAKE3";
 pub(crate) const RESEARCHSPEC_HASH_DOMAIN: &str = "animus.researchspec.v1";

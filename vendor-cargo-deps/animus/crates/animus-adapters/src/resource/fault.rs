@@ -56,9 +56,15 @@ impl core::fmt::Display for Error {
             Self::DescriptionTooLong {
                 max_chars,
                 actual_chars,
-            } => write!(formatter, "resource description supports at most {max_chars} characters; got {actual_chars}"),
+            } => write!(
+                formatter,
+                "resource description supports at most {max_chars} characters; got {actual_chars}"
+            ),
             Self::MalformedProvenance { value } => {
-                write!(formatter, "resource provenance must be a safe label: {value}")
+                write!(
+                    formatter,
+                    "resource provenance must be a safe label: {value}"
+                )
             }
             Self::InvalidContentIdentity { field, reason } => {
                 write!(formatter, "{field} is invalid: {reason}")

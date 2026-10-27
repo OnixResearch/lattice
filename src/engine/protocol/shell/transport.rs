@@ -99,10 +99,26 @@ impl ProtocolAdapter for HttpAdapter<'_> {
                 AdapterDispatch::Started
             }
             Ok(_) => AdapterDispatch::ObservedFailure,
-            Err(crate::http::HttpError::InvalidRequest(_)) => AdapterDispatch::RejectedBeforeStart,
-            Err(crate::http::HttpError::Timeout(_) | crate::http::HttpError::Transport(_)) => {
-                AdapterDispatch::UnknownAfterStart
-            }
+            Err(
+                crate::http::HttpError::InvalidRequest(_)
+                | crate::http::HttpError::LimitExceeded(
+                    crate::http::HttpLimit::Url
+                    | crate::http::HttpLimit::RequestBody
+                    | crate::http::HttpLimit::RequestHeaderCount
+                    | crate::http::HttpLimit::RequestHeaderBytes
+                    | crate::http::HttpLimit::Deadline,
+                ),
+            ) => AdapterDispatch::RejectedBeforeStart,
+            Err(
+                crate::http::HttpError::Timeout(_)
+                | crate::http::HttpError::Transport(_)
+                | crate::http::HttpError::Cancelled
+                | crate::http::HttpError::LimitExceeded(
+                    crate::http::HttpLimit::ResponseBody
+                    | crate::http::HttpLimit::ResponseHeaderCount
+                    | crate::http::HttpLimit::ResponseHeaderBytes,
+                ),
+            ) => AdapterDispatch::UnknownAfterStart,
         }
     }
 }

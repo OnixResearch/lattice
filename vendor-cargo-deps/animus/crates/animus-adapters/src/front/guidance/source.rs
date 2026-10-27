@@ -2,11 +2,9 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use core::num::NonZeroU32;
 
-use super::GUIDANCE_NAME_FIELD;
-use super::GUIDANCE_ORIGIN_FIELD;
-use super::GuidanceError;
-use super::PromptResourceScope;
-use super::normalize;
+use super::{
+    GUIDANCE_NAME_FIELD, GUIDANCE_ORIGIN_FIELD, GuidanceError, PromptResourceScope, normalize,
+};
 
 /// Ordering rank for layered guidance sources.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -79,9 +77,12 @@ impl GuidanceSource {
     pub fn validate(draft: &GuidanceSourceDraft<'_>) -> Result<Self, GuidanceError> {
         let name = normalize(GUIDANCE_NAME_FIELD, draft.name)?;
         let origin = normalize(GUIDANCE_ORIGIN_FIELD, draft.origin)?;
-        let content_hash = crate::artifact::Hash::new(draft.content_hash).map_err(GuidanceError::InvalidHash)?;
-        let budget_units = NonZeroU32::new(draft.budget_units)
-            .ok_or_else(|| GuidanceError::ZeroBudgetCost { source: name.clone() })?;
+        let content_hash =
+            crate::artifact::Hash::new(draft.content_hash).map_err(GuidanceError::InvalidHash)?;
+        let budget_units =
+            NonZeroU32::new(draft.budget_units).ok_or_else(|| GuidanceError::ZeroBudgetCost {
+                source: name.clone(),
+            })?;
         Ok(Self {
             name,
             scope: draft.scope,

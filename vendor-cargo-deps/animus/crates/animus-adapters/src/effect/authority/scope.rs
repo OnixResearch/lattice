@@ -166,6 +166,9 @@ impl SandboxConstraint {
     /// Builds a required sandbox descriptor constraint.
     #[must_use]
     pub fn required(descriptor_hash: super::super::SafeHash, state: SandboxState) -> Self {
-        Self::Required { descriptor_hash, state }
+        Self::Required {
+            descriptor_hash,
+            state,
+        }
     }
 }

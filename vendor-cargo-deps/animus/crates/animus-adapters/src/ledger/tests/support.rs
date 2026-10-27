@@ -26,7 +26,8 @@ pub(super) const UNSUPPORTED_KIND: &str = "opaque-entry";
 pub(super) const ADAPTER_KIND: &str = "adapter-owned-entry";
 pub(super) const INPUT_TOKENS: u32 = 5;
 pub(super) const OUTPUT_TOKENS: u32 = 8;
-pub(super) const HASH_TEXT: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+pub(super) const HASH_TEXT: &str =
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 pub(super) const LINEAR_CONTEXT_ITEMS: usize = 4;
 pub(super) const LINEAR_ENTRY_COUNT: u32 = 6;
 pub(super) const LINEAR_CONTEXT_COUNT: u32 = 4;
@@ -40,7 +41,9 @@ pub(super) const SECOND_CONTEXT_INDEX: usize = 1;
 pub(super) const THIRD_CONTEXT_INDEX: usize = 2;
 pub(super) const FOURTH_CONTEXT_INDEX: usize = 3;
 
-pub(super) fn branch_snapshot(active_leaf: &str) -> Result<super::super::Snapshot, crate::AdapterContractError> {
+pub(super) fn branch_snapshot(
+    active_leaf: &str,
+) -> Result<super::super::Snapshot, crate::AdapterContractError> {
     super::super::Snapshot::new(branch_nodes(), active_leaf, alloc::vec![])
 }
 
@@ -52,8 +55,11 @@ pub(super) fn branch_nodes() -> alloc::vec::Vec<super::super::Node> {
             USER_ID,
         )
         .expect("node should build"),
-        super::super::Node::child(super::super::Entry::assistant(SIBLING_ID, SIBLING_TEXT).expect("entry"), USER_ID,)
-            .expect("node should build"),
+        super::super::Node::child(
+            super::super::Entry::assistant(SIBLING_ID, SIBLING_TEXT).expect("entry"),
+            USER_ID,
+        )
+        .expect("node should build"),
     ]
 }
 

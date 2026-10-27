@@ -1,8 +1,7 @@
 #![allow(unknown_lints, path_segment_repetition)]
 
 use super::Bounds;
-use crate::BudgetExhausted;
-use crate::BudgetKind;
+use crate::{BudgetExhausted, BudgetKind};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BudgetLedger {
@@ -75,9 +74,13 @@ impl BudgetLedger {
     ///
     /// Returns [`BudgetExhausted`] when no parallelism budget remains.
     pub fn consume_parallelism(&self) -> Result<Self, BudgetExhausted> {
-        self.consume(self.remaining_parallelism, BudgetKind::Parallelism, |next| {
-            next.remaining_parallelism -= 1;
-        })
+        self.consume(
+            self.remaining_parallelism,
+            BudgetKind::Parallelism,
+            |next| {
+                next.remaining_parallelism -= 1;
+            },
+        )
     }
 
     /// Consumes one synthesis-attempt budget unit.
@@ -86,9 +89,13 @@ impl BudgetLedger {
     ///
     /// Returns [`BudgetExhausted`] when no synthesis-attempt budget remains.
     pub fn consume_synthesis_attempt(&self) -> Result<Self, BudgetExhausted> {
-        self.consume(self.remaining_synthesis_attempts, BudgetKind::Synthesis, |next| {
-            next.remaining_synthesis_attempts -= 1;
-        })
+        self.consume(
+            self.remaining_synthesis_attempts,
+            BudgetKind::Synthesis,
+            |next| {
+                next.remaining_synthesis_attempts -= 1;
+            },
+        )
     }
 
     /// Consumes one repair-attempt budget unit.
@@ -109,14 +116,24 @@ impl BudgetLedger {
     /// Returns [`BudgetExhausted`] when recording a new tried model would exceed
     /// the candidate budget cap.
     pub fn record_tried_model(&self, label: &str) -> Result<Self, BudgetExhausted> {
-        if self.tried_models.iter().any(|tried| tried.as_str() == label) {
+        if self
+            .tried_models
+            .iter()
+            .any(|tried| tried.as_str() == label)
+        {
             return Ok(self.clone());
         }
         let Ok(candidate_limit) = usize::try_from(self.candidate_limit) else {
-            return Err(BudgetExhausted::new(BudgetKind::Candidate, self.remaining_candidates));
+            return Err(BudgetExhausted::new(
+                BudgetKind::Candidate,
+                self.remaining_candidates,
+            ));
         };
         if self.tried_models.len() >= candidate_limit {
-            return Err(BudgetExhausted::new(BudgetKind::Candidate, self.remaining_candidates));
+            return Err(BudgetExhausted::new(
+                BudgetKind::Candidate,
+                self.remaining_candidates,
+            ));
         }
         let mut next = self.clone();
         next.tried_models.push(alloc::string::String::from(label));

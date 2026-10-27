@@ -1,0 +1,16 @@
+{
+  "iss": "https://token.actions.githubusercontent.com",
+  "sub": "repo:OnixResearch/mantle:ref:refs/heads/main",
+  "aud": "mantle-ci",
+  "exp": 1700000300,
+  "nbf": 1699999970,
+  "iat": 1700000000,
+  "jti": "fixture-exchange-1",
+  "repository_owner": "OnixResearch",
+  "repository": "OnixResearch/mantle",
+  "job_workflow_ref": "OnixResearch/mantle/.github/workflows/build.yml@refs/heads/main",
+  "sha": "1111111111111111111111111111111111111111",
+  "ref": "refs/heads/main",
+  "actor": "fixture-actor",
+  "event_name": "push"
+}

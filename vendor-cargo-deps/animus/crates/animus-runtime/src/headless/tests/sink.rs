@@ -16,9 +16,12 @@ fn final_output_comes_from_terminal_completion_not_progress_logs() {
 
     assert_eq!(final_output.content(), FINAL_BODY);
     assert_ne!(final_output.content(), PROGRESS_BODY);
-    assert_eq!(failed, AutomationError::RunFailed {
-        reason: Text::from(FAILURE_BODY),
-    });
+    assert_eq!(
+        failed,
+        AutomationError::RunFailed {
+            reason: Text::from(FAILURE_BODY),
+        }
+    );
     assert_eq!(missing, AutomationError::MissingTerminalResponse);
 }
 
@@ -54,21 +57,31 @@ fn completion_receipts_validate_success_and_safe_failure_statuses() {
     assert!(success.status().allows_guarded_dispatch());
     assert_eq!(denied.status(), CompletionStatus::Denied);
     assert!(!denied.status().allows_guarded_dispatch());
-    assert_eq!(missing_final, AutomationError::EmptyField {
-        field: FINAL_RESPONSE_FIELD
-    });
-    assert_eq!(duplicate_evidence, AutomationError::DuplicateValue {
-        field: EVIDENCE_REFERENCE_FIELD,
-        value: Text::from(EVIDENCE_REFERENCE),
-    });
+    assert_eq!(
+        missing_final,
+        AutomationError::EmptyField {
+            field: FINAL_RESPONSE_FIELD
+        }
+    );
+    assert_eq!(
+        duplicate_evidence,
+        AutomationError::DuplicateValue {
+            field: EVIDENCE_REFERENCE_FIELD,
+            value: Text::from(EVIDENCE_REFERENCE),
+        }
+    );
 }
 
 #[test]
 fn unresolved_permission_ask_becomes_prompt_required_without_guarded_dispatch() {
-    let receipt = prompt_required_completion(EVIDENCE_REFERENCE).expect("prompt-required receipt should validate");
+    let receipt = prompt_required_completion(EVIDENCE_REFERENCE)
+        .expect("prompt-required receipt should validate");
 
     assert_eq!(receipt.status(), CompletionStatus::PromptRequired);
-    assert_eq!(receipt.evidence_references(), &[Text::from(EVIDENCE_REFERENCE)]);
+    assert_eq!(
+        receipt.evidence_references(),
+        &[Text::from(EVIDENCE_REFERENCE)]
+    );
     assert_eq!(receipt.final_response(), None);
     assert!(!receipt.status().allows_guarded_dispatch());
 }

@@ -6,16 +6,21 @@ Basalt maps one reviewed UCAN Nostr credential to one policy-owned stable subjec
 
 The public adapter accepts only `ucan_nostr::VerifiedNostrCredential` from reviewed Nostr credential revision `c9d43a7c11dd2fab4d5cb3d100012fa9a2e5b026`.
 
-Basalt builds from integrated UCAN revision `277ab768eb532ac0c715a3bbff2a7dc37a702f11`. This revision contains the Nostr adapter, peer authentication, and holder-signed invocation admission.
+Basalt builds from integrated UCAN revision `3a2aa043068a82663cf72ec05ed5d56a7d65ecd5`. This revision contains the Nostr adapter, peer authentication, and holder-signed invocation admission.
 
 The adapter does not accept `signature_valid`, `authenticated`, or similar caller booleans.
 
 The published producer identities are:
 
 - schema BLAKE3: `45824d99ae765e885f085ef2c8c8294343415af8e5489c35509c3e255476e258`;
-- implementation-profile BLAKE3: `ced0ffcfe006a48ffd8f2b856ad0da9641a03a24e6ebda3877163c398252897c`.
+- implementation-profile BLAKE3: `bdb5cb4641de3ddd9005521f4f6396ea94d44e446fa7a031a12ffaec30f9a6d2`.
 
 `contracts/nostr-identity/generated/identities.json` records these values for downstream pinning. The implementation profile is not a source-code proof.
+
+Regenerate this inspection projection with `cargo run --example nostr_identities --quiet`.
+The exporter calls the public Rust identity functions and embeds the checked policy.
+Capture stdout to a temporary file before replacing the checked projection. Nickel's
+`identity` field alone is not this producer record and lacks its computed digests.
 
 ## Policy
 

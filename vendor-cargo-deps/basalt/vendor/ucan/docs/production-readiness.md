@@ -12,13 +12,14 @@ The section below is generated structurally from `production_readiness_report()`
 
 <!-- BEGIN GENERATED UCAN SUPPORT CATALOG -->
 
-Catalog BLAKE3: `d46317f0a99645a40f799fa6644873d785d2af87c8f68d6668bbec4a77bce5ee`
+Catalog BLAKE3: `2bd91f2d23540781ded43e409130bb23dd77785ac641a33394f8514edd2c6f25`
 
 Catalog schema: `ucan.support-catalog.v1`
 
 | Surface ID | Label | Evidence | Retained boundary |
 | --- | --- | --- | --- |
 | `ed25519-did-key-compact-token` | `controlled-integration-ready` | issue/parse/verify APIs, signer abstraction, examples, tests, and nix flake checks cover Ed25519 did:key compact tokens | caller owns key custody, key provenance, request policy, and deployment hardening |
+| `ucan-wg-1.0.0-authorization` | `controlled-integration-ready` | pinned final-profile wire fixtures, command and policy matrices, ordered CID-bound Delegation chains, exact executor admission, one replay commit, private live values, and redacted receipt tests pass | callers own key truth, proof transport and availability, executor identity, clock truth, revocation freshness, replay durability, policy completeness, transport security, resource ownership, and effect correctness |
 | `caller-supplied-key-resolution` | `controlled-integration-ready` | KeyResolver injection and KeyResolutionContext support deterministic local resolution; backend errors fail closed | remote DID method support, trust roots, freshness, and cache behavior are application-owned |
 | `caller-supplied-proof-store` | `controlled-integration-ready` | ProofStore injection, ProofCollection, bounded traversal, proof-link checks, and cycle/limit failures are tested | network, filesystem, database, IPFS, content-addressed freshness, and proof provenance are application-owned |
 | `caller-supplied-revocation` | `controlled-integration-ready` | RevocationChecker injection, NoRevocations, RevocationList, and leaf/proof-chain denial failures are covered | registry truth, persistence, duplicate semantics, freshness, and backend availability are application-owned |
@@ -95,3 +96,15 @@ cargo run --locked --bin check-production-readiness -- generate --root .
 Nickel is never discovered or evaluated by token issuance, parsing, verification, invocation, caveat, revocation, replay, or authorization APIs. Applications may consume a checked export in their own shell, but UCAN runtime decisions continue to receive explicit typed Rust inputs.
 
 For Aspen, this means implementing Aspen-owned resource, ability, identity, revocation, replay, and RPC mappings. Other consumers likewise own their application policy and backend semantics; no consumer-specific adapter belongs in this crate.
+
+## Dependency advisory posture
+
+Assessment date: 2026-08-16. Result: zero exploitable vulnerabilities in the
+locked dependency set at the assessment revision.
+
+Two applicable advisories are pinned with explicit non-exploitable rationale
+in `deny.toml`: `RUSTSEC-2024-0436` (paste, dev-only via
+hegeltest) and `RUSTSEC-2026-0190` (anyhow `downcast_mut`, vendored
+`repo_index` module). The `dependency-posture` Nix check enforces the policy
+against the committed `Cargo.lock`; it never resolves a fresh dependency set.
+See `docs/dependency-posture.md` for the full audit record and non-claims.

@@ -1,5 +1,4 @@
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 
 const GIT_REVISION_HEX_CHARS: usize = 40;
 const POLICY_IDENTITY_DOMAIN: &str = "animus.rlm-kernel-policy.v1";
@@ -51,24 +50,63 @@ pub struct ResourceBounds {
     pub max_child_wall_time_ms: u64,
     /// Maximum model-visible child result characters.
     pub max_child_result_chars: u32,
+    /// Maximum admitted host calls in one bridged cell.
+    pub max_host_calls_per_cell: u32,
+    /// Maximum characters in one bridged host result.
+    pub max_host_result_chars: u32,
+    /// Maximum cumulative host-result characters in one bridged cell.
+    pub max_cumulative_host_result_chars: u32,
+    /// Maximum nested bridge depth.
+    pub max_bridge_nesting: u32,
+    /// Maximum cumulative deterministic evaluator fuel for one bridged cell.
+    pub max_bridge_evaluation_fuel: u64,
+    /// Maximum elapsed wall time for one bridged cell.
+    pub max_bridge_wall_time_ms: u64,
 }
 
 impl ResourceBounds {
     fn validate(self) -> Result<(), crate::Error> {
         let bounds = [
             ("max_source_chars", u64::from(self.max_source_chars)),
-            ("max_environment_chars", u64::from(self.max_environment_chars)),
+            (
+                "max_environment_chars",
+                u64::from(self.max_environment_chars),
+            ),
             ("max_bindings", u64::from(self.max_bindings)),
             ("max_definitions", u64::from(self.max_definitions)),
             ("max_evaluation_fuel", self.max_evaluation_fuel),
             ("max_recursion_depth", u64::from(self.max_recursion_depth)),
             ("max_allocation_bytes", self.max_allocation_bytes),
-            ("max_host_request_chars", u64::from(self.max_host_request_chars)),
+            (
+                "max_host_request_chars",
+                u64::from(self.max_host_request_chars),
+            ),
             ("max_child_depth", u64::from(self.max_child_depth)),
             ("max_child_fan_out", u64::from(self.max_child_fan_out)),
             ("max_child_tokens", self.max_child_tokens),
             ("max_child_wall_time_ms", self.max_child_wall_time_ms),
-            ("max_child_result_chars", u64::from(self.max_child_result_chars)),
+            (
+                "max_child_result_chars",
+                u64::from(self.max_child_result_chars),
+            ),
+            (
+                "max_host_calls_per_cell",
+                u64::from(self.max_host_calls_per_cell),
+            ),
+            (
+                "max_host_result_chars",
+                u64::from(self.max_host_result_chars),
+            ),
+            (
+                "max_cumulative_host_result_chars",
+                u64::from(self.max_cumulative_host_result_chars),
+            ),
+            ("max_bridge_nesting", u64::from(self.max_bridge_nesting)),
+            (
+                "max_bridge_evaluation_fuel",
+                self.max_bridge_evaluation_fuel,
+            ),
+            ("max_bridge_wall_time_ms", self.max_bridge_wall_time_ms),
         ];
         for (field, value) in bounds {
             crate::ensure_positive(field, value)?;
@@ -129,12 +167,17 @@ impl RlmKernelPolicy {
         }
         let profile = crate::required_text("profile", draft.profile, MAX_PROFILE_LABEL_CHARS)?;
         let admitted_operations = canonical_operations(draft.admitted_operations)?;
-        let admitted_child_profiles =
-            canonical_labels("admitted_child_profiles", draft.admitted_child_profiles, MAX_CHILD_PROFILES)?;
+        let admitted_child_profiles = canonical_labels(
+            "admitted_child_profiles",
+            draft.admitted_child_profiles,
+            MAX_CHILD_PROFILES,
+        )?;
         let non_claims = canonical_labels("non_claims", draft.non_claims, MAX_NON_CLAIMS)?;
         for required in REQUIRED_NON_CLAIMS {
             if !non_claims.iter().any(|value| value == required) {
-                return Err(crate::Error::MissingNonClaim { non_claim: required });
+                return Err(crate::Error::MissingNonClaim {
+                    non_claim: required,
+                });
             }
         }
         let identity = policy_identity(&IdentityInputs {
@@ -215,11 +258,15 @@ impl RlmKernelPolicy {
     /// Returns true when the policy admits a child profile.
     #[must_use]
     pub fn admits_child_profile(&self, profile: &str) -> bool {
-        self.admitted_child_profiles.binary_search_by(|candidate| candidate.as_str().cmp(profile)).is_ok()
+        self.admitted_child_profiles
+            .binary_search_by(|candidate| candidate.as_str().cmp(profile))
+            .is_ok()
     }
 }
 
-fn canonical_operations(values: &[crate::HostOperationClass]) -> Result<Vec<crate::HostOperationClass>, crate::Error> {
+fn canonical_operations(
+    values: &[crate::HostOperationClass],
+) -> Result<Vec<crate::HostOperationClass>, crate::Error> {
     if values.is_empty() {
         return Err(crate::Error::EmptyField {
             field: "admitted_operations",
@@ -242,11 +289,19 @@ fn canonical_operations(values: &[crate::HostOperationClass]) -> Result<Vec<crat
     Ok(canonical)
 }
 
-fn canonical_labels(field: &'static str, values: &[&str], max_items: usize) -> Result<Vec<String>, crate::Error> {
+fn canonical_labels(
+    field: &'static str,
+    values: &[&str],
+    max_items: usize,
+) -> Result<Vec<String>, crate::Error> {
     if values.is_empty() {
         return Err(crate::Error::EmptyField { field });
     }
-    crate::ensure_at_most(field, crate::usize_to_u64(values.len()), crate::usize_to_u64(max_items))?;
+    crate::ensure_at_most(
+        field,
+        crate::usize_to_u64(values.len()),
+        crate::usize_to_u64(max_items),
+    )?;
     let mut canonical = values
         .iter()
         .map(|value| crate::required_text(field, value, MAX_PROFILE_LABEL_CHARS))
@@ -273,7 +328,7 @@ struct IdentityInputs<'a> {
 fn policy_identity(inputs: &IdentityInputs<'_>) -> String {
     let bounds = inputs.bounds;
     let bounds_text = alloc::format!(
-        "{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}",
+        "{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}:{}",
         bounds.max_source_chars,
         bounds.max_environment_chars,
         bounds.max_bindings,
@@ -287,17 +342,31 @@ fn policy_identity(inputs: &IdentityInputs<'_>) -> String {
         bounds.max_child_tokens,
         bounds.max_child_wall_time_ms,
         bounds.max_child_result_chars,
+        bounds.max_host_calls_per_cell,
+        bounds.max_host_result_chars,
+        bounds.max_cumulative_host_result_chars,
+        bounds.max_bridge_nesting,
+        bounds.max_bridge_evaluation_fuel,
+        bounds.max_bridge_wall_time_ms,
     );
-    let operation_text = inputs.operations.iter().map(|operation| operation.as_str()).collect::<Vec<_>>().join(",");
+    let operation_text = inputs
+        .operations
+        .iter()
+        .map(|operation| operation.as_str())
+        .collect::<Vec<_>>()
+        .join(",");
     let child_text = inputs.child_profiles.join(",");
     let non_claim_text = inputs.non_claims.join(",");
-    crate::hash_parts(POLICY_IDENTITY_DOMAIN, &[
-        inputs.cohort,
-        inputs.revision,
-        inputs.profile,
-        bounds_text.as_str(),
-        operation_text.as_str(),
-        child_text.as_str(),
-        non_claim_text.as_str(),
-    ])
+    crate::hash_parts(
+        POLICY_IDENTITY_DOMAIN,
+        &[
+            inputs.cohort,
+            inputs.revision,
+            inputs.profile,
+            bounds_text.as_str(),
+            operation_text.as_str(),
+            child_text.as_str(),
+            non_claim_text.as_str(),
+        ],
+    )
 }

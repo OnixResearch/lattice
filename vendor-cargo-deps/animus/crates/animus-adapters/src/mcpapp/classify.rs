@@ -48,15 +48,24 @@ const POLICY_RULES: &[Rule] = &[
 ];
 
 pub(super) fn descriptor(descriptor: &super::Descriptor) -> super::matrix::Decision {
-    assert!(!descriptor.resource_uri.is_empty(), "validated descriptor keeps resource identity");
-    assert!(!descriptor.mime_profile.is_empty(), "validated descriptor keeps MIME profile");
+    assert!(
+        !descriptor.resource_uri.is_empty(),
+        "validated descriptor keeps resource identity"
+    );
+    assert!(
+        !descriptor.mime_profile.is_empty(),
+        "validated descriptor keeps MIME profile"
+    );
     if let Some(risk_reason) = first_reason(descriptor, REJECTION_RULES) {
         return decision(super::AdoptionDecision::RejectDefault, risk_reason);
     }
     if let Some(risk_reason) = first_reason(descriptor, POLICY_RULES) {
         return decision(super::AdoptionDecision::NeedsHostPolicy, risk_reason);
     }
-    decision(super::AdoptionDecision::DataOnlyAdoptable, super::RiskReason::SafeMetadata)
+    decision(
+        super::AdoptionDecision::DataOnlyAdoptable,
+        super::RiskReason::SafeMetadata,
+    )
 }
 
 fn first_reason(descriptor: &super::Descriptor, rules: &[Rule]) -> Option<super::RiskReason> {
@@ -68,7 +77,10 @@ fn first_reason(descriptor: &super::Descriptor, rules: &[Rule]) -> Option<super:
     None
 }
 
-fn decision(adoption_decision: super::AdoptionDecision, risk_reason: super::RiskReason) -> super::matrix::Decision {
+fn decision(
+    adoption_decision: super::AdoptionDecision,
+    risk_reason: super::RiskReason,
+) -> super::matrix::Decision {
     super::matrix::Decision {
         adoption_decision,
         risk_reason,
@@ -80,21 +92,39 @@ fn claims_runtime_execution(descriptor: &super::Descriptor) -> bool {
 }
 
 fn has_broad_domain(descriptor: &super::Descriptor) -> bool {
-    descriptor.csp_domains.iter().any(|domain| broad_domain(domain))
+    descriptor
+        .csp_domains
+        .iter()
+        .any(|domain| broad_domain(domain))
 }
 
 fn has_ambient_host_control(descriptor: &super::Descriptor) -> bool {
-    descriptor.host_context_sync.iter().any(|context| ambient_host_control(context))
+    descriptor
+        .host_context_sync
+        .iter()
+        .any(|context| ambient_host_control(context))
 }
 
 fn has_unadmitted_direct_chat(descriptor: &super::Descriptor) -> bool {
-    descriptor.callback_channels.iter().any(|callback| direct_chat_callback(callback))
-        && !descriptor.policy_admission.direct_chat_messages.is_admitted()
+    descriptor
+        .callback_channels
+        .iter()
+        .any(|callback| direct_chat_callback(callback))
+        && !descriptor
+            .policy_admission
+            .direct_chat_messages
+            .is_admitted()
 }
 
 fn has_unadmitted_sensitive_permission(descriptor: &super::Descriptor) -> bool {
-    descriptor.permission_requests.iter().any(|permission| sensitive_permission(permission))
-        && !descriptor.policy_admission.browser_permissions.is_admitted()
+    descriptor
+        .permission_requests
+        .iter()
+        .any(|permission| sensitive_permission(permission))
+        && !descriptor
+            .policy_admission
+            .browser_permissions
+            .is_admitted()
 }
 
 fn has_unbounded_callback(descriptor: &super::Descriptor) -> bool {
@@ -107,11 +137,16 @@ fn needs_remote_domain_policy(descriptor: &super::Descriptor) -> bool {
 }
 
 fn needs_browser_permission_policy(descriptor: &super::Descriptor) -> bool {
-    !descriptor.permission_requests.is_empty() && !descriptor.policy_admission.browser_permissions.is_admitted()
+    !descriptor.permission_requests.is_empty()
+        && !descriptor
+            .policy_admission
+            .browser_permissions
+            .is_admitted()
 }
 
 fn needs_host_callback_policy(descriptor: &super::Descriptor) -> bool {
-    !descriptor.callback_channels.is_empty() && !descriptor.policy_admission.host_callbacks.is_admitted()
+    !descriptor.callback_channels.is_empty()
+        && !descriptor.policy_admission.host_callbacks.is_admitted()
 }
 
 fn broad_domain(domain: &str) -> bool {
@@ -131,9 +166,15 @@ fn sensitive_permission(permission: &str) -> bool {
 }
 
 fn direct_chat_callback(callback: &str) -> bool {
-    matches!(callback, super::DIRECT_CHAT_CALLBACK | super::APPEND_MODEL_MESSAGE_CALLBACK)
+    matches!(
+        callback,
+        super::DIRECT_CHAT_CALLBACK | super::APPEND_MODEL_MESSAGE_CALLBACK
+    )
 }
 
 fn ambient_host_control(context: &str) -> bool {
-    matches!(context, super::AMBIENT_HOST_CONTROL_CONTEXT | super::HOST_COMMAND_CONTEXT | super::SHELL_CONTEXT)
+    matches!(
+        context,
+        super::AMBIENT_HOST_CONTROL_CONTEXT | super::HOST_COMMAND_CONTEXT | super::SHELL_CONTEXT
+    )
 }

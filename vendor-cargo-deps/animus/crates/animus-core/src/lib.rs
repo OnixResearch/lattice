@@ -4,6 +4,8 @@
 //! inputs, environment handling, logging, async work, and I/O in `animus-std`.
 
 #![no_std]
+#![cfg_attr(animus_octet, feature(register_tool))]
+#![cfg_attr(animus_octet, register_tool(tigerstyle))]
 #![deny(missing_docs)]
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
@@ -12,6 +14,9 @@
 #![forbid(unsafe_code)]
 
 extern crate alloc;
+
+/// Pure bounded tool-result identity and retention decisions.
+pub mod retention;
 
 const SUMMARY_PREFIX: &str = "intent: ";
 
@@ -111,10 +116,14 @@ impl core::fmt::Display for CoreError {
             Self::IntentTooLong {
                 max_chars,
                 actual_chars,
-            } => write!(formatter, "intent must be at most {max_chars} characters; got {actual_chars}"),
-            Self::ControlCharacter { byte_index } => {
-                write!(formatter, "intent contains a control character at byte index {byte_index}")
-            }
+            } => write!(
+                formatter,
+                "intent must be at most {max_chars} characters; got {actual_chars}"
+            ),
+            Self::ControlCharacter { byte_index } => write!(
+                formatter,
+                "intent contains a control character at byte index {byte_index}"
+            ),
         }
     }
 }
@@ -137,7 +146,9 @@ fn validate_intent(value: &str) -> Result<(), CoreError> {
         });
     }
 
-    if let Some((byte_index, _character)) = value.char_indices().find(|(_byte_index, character)| character.is_control())
+    if let Some((byte_index, _character)) = value
+        .char_indices()
+        .find(|(_byte_index, character)| character.is_control())
     {
         return Err(CoreError::ControlCharacter { byte_index });
     }
@@ -179,19 +190,26 @@ mod tests {
         let raw = "a".repeat(too_long_intent_chars);
         let error = Intent::new(&raw).expect_err("overlong intent should fail");
 
-        assert_eq!(error, CoreError::IntentTooLong {
-            max_chars: MAX_INTENT_CHARS,
-            actual_chars: too_long_intent_chars,
-        });
+        assert_eq!(
+            error,
+            CoreError::IntentTooLong {
+                max_chars: MAX_INTENT_CHARS,
+                actual_chars: too_long_intent_chars,
+            }
+        );
     }
 
     #[test]
     fn intent_rejects_control_characters() {
-        let error = Intent::new(CONTROL_CHARACTER_INTENT).expect_err("control characters should fail validation");
+        let error = Intent::new(CONTROL_CHARACTER_INTENT)
+            .expect_err("control characters should fail validation");
 
-        assert_eq!(error, CoreError::ControlCharacter {
-            byte_index: CONTROL_CHARACTER_BYTE_INDEX,
-        });
+        assert_eq!(
+            error,
+            CoreError::ControlCharacter {
+                byte_index: CONTROL_CHARACTER_BYTE_INDEX,
+            }
+        );
     }
 
     #[test]

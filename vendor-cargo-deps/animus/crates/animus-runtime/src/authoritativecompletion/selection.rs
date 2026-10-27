@@ -1,6 +1,5 @@
 // r[impl agent_harness_runtime.authoritative_completion.selection]
-// Selection rejects untrusted facts through diagnostics; public compatibility names and bounded
-// mutable sinks remain stable for embedders.
+// Selection rejects untrusted facts through diagnostics; public compatibility names and bounded mutable sinks remain stable for embedders.
 #![allow(unknown_lints)]
 #![cfg_attr(
     animus_octet,
@@ -12,23 +11,15 @@
         tigerstyle::path_segment_repetition
     )
 )]
-use std::collections::BTreeMap;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
-use super::AgentCheckDiagnostic;
-use super::AgentCheckDiagnosticCode;
-use super::AgentCheckRegistry;
-use super::AgentCheckSelection;
-use super::CairnRequiredCheck;
-use super::ChangedArtifactDraft;
-use super::CheckCapability;
-use super::CheckTier;
-use super::validation::DiagnosticContext;
-use super::validation::diagnostic;
-use super::validation::hash_parts;
-use super::validation::is_hash;
-use super::validation::is_safe_identifier;
-use super::validation::is_safe_path;
+use super::validation::{
+    DiagnosticContext, diagnostic, hash_parts, is_hash, is_safe_identifier, is_safe_path,
+};
+use super::{
+    AgentCheckDiagnostic, AgentCheckDiagnosticCode, AgentCheckRegistry, AgentCheckSelection,
+    CairnRequiredCheck, ChangedArtifactDraft, CheckCapability, CheckTier,
+};
 
 const CHANGED_ARTIFACT_HASH_DOMAIN: &str = "animus.authoritative-completion.changed-artifacts.v1";
 const EMPTY_ARGV: &[&str] = &[];
@@ -63,7 +54,9 @@ struct PolicyBlockerRequest<'a> {
 /// and tier restrictions remain blockers rather than silently removing required
 /// checks.
 #[must_use]
-pub fn select_required_agent_checks(request: AgentCheckSelectionRequest<'_>) -> AgentCheckSelection {
+pub fn select_required_agent_checks(
+    request: AgentCheckSelectionRequest<'_>,
+) -> AgentCheckSelection {
     let AgentCheckSelectionRequest {
         registry,
         changed_artifacts,
@@ -94,8 +87,15 @@ pub fn select_required_agent_checks(request: AgentCheckSelectionRequest<'_>) -> 
             EMPTY_ARGV,
         ));
     }
-    let all_ids = registry.checks.iter().map(|row| row.check_id.clone()).collect::<BTreeSet<_>>();
-    let not_selected = all_ids.difference(&selected_ids).cloned().collect::<Vec<_>>();
+    let all_ids = registry
+        .checks
+        .iter()
+        .map(|row| row.check_id.clone())
+        .collect::<BTreeSet<_>>();
+    let not_selected = all_ids
+        .difference(&selected_ids)
+        .cloned()
+        .collect::<Vec<_>>();
     let selection_hash = cairn_selection_hash(required_checks.as_slice());
     AgentCheckSelection {
         repository_id: registry.repository_id.clone(),
@@ -130,7 +130,13 @@ pub fn cairn_selection_hash(required_checks: &[CairnRequiredCheck]) -> String {
         })
         .collect::<Vec<_>>();
     rows.sort_by(|left, right| left.0.cmp(&right.0));
-    let canonical = format!("[{}]", rows.iter().map(|(_, row)| row.as_str()).collect::<Vec<_>>().join(","));
+    let canonical = format!(
+        "[{}]",
+        rows.iter()
+            .map(|(_, row)| row.as_str())
+            .collect::<Vec<_>>()
+            .join(",")
+    );
     blake3::hash(canonical.as_bytes()).to_hex().to_string()
 }
 
@@ -156,7 +162,10 @@ fn validate_selection_input(
         ));
     }
     for artifact in artifacts {
-        if !is_safe_path(artifact.path) || !is_safe_identifier(artifact.surface) || !is_hash(artifact.content_hash) {
+        if !is_safe_path(artifact.path)
+            || !is_safe_identifier(artifact.surface)
+            || !is_hash(artifact.content_hash)
+        {
             blockers.push(diagnostic(
                 AgentCheckDiagnosticCode::ChangedArtifactInvalid,
                 DiagnosticContext::NONE,
@@ -167,7 +176,10 @@ fn validate_selection_input(
     }
 }
 
-fn selected_check_ids(registry: &AgentCheckRegistry, artifacts: &[ChangedArtifactDraft<'_>]) -> BTreeSet<String> {
+fn selected_check_ids(
+    registry: &AgentCheckRegistry,
+    artifacts: &[ChangedArtifactDraft<'_>],
+) -> BTreeSet<String> {
     let mut selected = BTreeSet::new();
     for artifact in artifacts {
         let direct = registry
@@ -186,16 +198,31 @@ fn selected_check_ids(registry: &AgentCheckRegistry, artifacts: &[ChangedArtifac
 }
 
 fn row_matches(row: &super::AgentCheckRow, artifact: &ChangedArtifactDraft<'_>) -> bool {
-    row.affected_paths.iter().any(|prefix| path_matches(prefix, artifact.path))
-        || row.affected_surfaces.iter().any(|surface| surface == artifact.surface)
+    row.affected_paths
+        .iter()
+        .any(|prefix| path_matches(prefix, artifact.path))
+        || row
+            .affected_surfaces
+            .iter()
+            .any(|surface| surface == artifact.surface)
 }
 
 fn path_matches(prefix: &str, path: &str) -> bool {
-    path == prefix || path.strip_prefix(prefix).is_some_and(|suffix| suffix.starts_with('/'))
+    path == prefix
+        || path
+            .strip_prefix(prefix)
+            .is_some_and(|suffix| suffix.starts_with('/'))
 }
 
-fn prerequisite_closure(registry: &AgentCheckRegistry, initial: &BTreeSet<String>) -> BTreeSet<String> {
-    let rows = registry.checks.iter().map(|row| (row.check_id.as_str(), row)).collect::<BTreeMap<_, _>>();
+fn prerequisite_closure(
+    registry: &AgentCheckRegistry,
+    initial: &BTreeSet<String>,
+) -> BTreeSet<String> {
+    let rows = registry
+        .checks
+        .iter()
+        .map(|row| (row.check_id.as_str(), row))
+        .collect::<BTreeMap<_, _>>();
     let mut selected = initial.clone();
     let mut pending = initial.iter().cloned().collect::<Vec<_>>();
     while let Some(check_id) = pending.pop() {
@@ -210,14 +237,20 @@ fn prerequisite_closure(registry: &AgentCheckRegistry, initial: &BTreeSet<String
     selected
 }
 
-fn required_checks(registry: &AgentCheckRegistry, selected_ids: &BTreeSet<String>) -> Vec<CairnRequiredCheck> {
+fn required_checks(
+    registry: &AgentCheckRegistry,
+    selected_ids: &BTreeSet<String>,
+) -> Vec<CairnRequiredCheck> {
     let rows = registry
         .checks
         .iter()
         .filter(|row| selected_ids.contains(&row.check_id))
         .map(|row| (row.check_id.as_str(), row))
         .collect::<BTreeMap<_, _>>();
-    let mut indegree = rows.keys().map(|id| (*id, 0_usize)).collect::<BTreeMap<_, _>>();
+    let mut indegree = rows
+        .keys()
+        .map(|id| (*id, 0_usize))
+        .collect::<BTreeMap<_, _>>();
     let mut dependents: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
     for row in rows.values() {
         for prerequisite in &row.prerequisites {
@@ -225,11 +258,18 @@ fn required_checks(registry: &AgentCheckRegistry, selected_ids: &BTreeSet<String
                 if let Some(value) = indegree.get_mut(row.check_id.as_str()) {
                     *value = value.saturating_add(1);
                 }
-                dependents.entry(prerequisite.as_str()).or_default().push(row.check_id.as_str());
+                dependents
+                    .entry(prerequisite.as_str())
+                    .or_default()
+                    .push(row.check_id.as_str());
             }
         }
     }
-    let mut ready = indegree.iter().filter(|(_, count)| **count == 0).map(|(id, _)| *id).collect::<BTreeSet<_>>();
+    let mut ready = indegree
+        .iter()
+        .filter(|(_, count)| **count == 0)
+        .map(|(id, _)| *id)
+        .collect::<BTreeSet<_>>();
     let mut ordered = Vec::with_capacity(rows.len());
     while let Some(next) = ready.pop_first() {
         if let Some(row) = rows.get(next) {
@@ -255,7 +295,10 @@ fn required_checks(registry: &AgentCheckRegistry, selected_ids: &BTreeSet<String
     ordered
 }
 
-fn append_policy_blockers(request: PolicyBlockerRequest<'_>, blockers: &mut Vec<AgentCheckDiagnostic>) {
+fn append_policy_blockers(
+    request: PolicyBlockerRequest<'_>,
+    blockers: &mut Vec<AgentCheckDiagnostic>,
+) {
     for row in &request.registry.checks {
         if !request.selected_ids.contains(&row.check_id) {
             continue;
@@ -283,10 +326,18 @@ fn append_policy_blockers(request: PolicyBlockerRequest<'_>, blockers: &mut Vec<
 fn changed_artifact_hash(artifacts: &[ChangedArtifactDraft<'_>]) -> String {
     let mut rows = artifacts
         .iter()
-        .map(|artifact| format!("{}\u{1f}{}\u{1f}{}", artifact.path, artifact.surface, artifact.content_hash))
+        .map(|artifact| {
+            format!(
+                "{}\u{1f}{}\u{1f}{}",
+                artifact.path, artifact.surface, artifact.content_hash
+            )
+        })
         .collect::<Vec<_>>();
     rows.sort();
-    hash_parts(CHANGED_ARTIFACT_HASH_DOMAIN, rows.iter().map(String::as_str))
+    hash_parts(
+        CHANGED_ARTIFACT_HASH_DOMAIN,
+        rows.iter().map(String::as_str),
+    )
 }
 
 fn canonical_selection_row(check: &CairnRequiredCheck) -> String {
@@ -302,7 +353,14 @@ fn canonical_selection_row(check: &CairnRequiredCheck) -> String {
 }
 
 fn json_string_array(values: &[String]) -> String {
-    format!("[{}]", values.iter().map(|value| json_string(value.as_str())).collect::<Vec<_>>().join(","))
+    format!(
+        "[{}]",
+        values
+            .iter()
+            .map(|value| json_string(value.as_str()))
+            .collect::<Vec<_>>()
+            .join(",")
+    )
 }
 
 fn json_string(value: &str) -> String {

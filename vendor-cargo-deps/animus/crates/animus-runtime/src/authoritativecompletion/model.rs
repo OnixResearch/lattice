@@ -1,12 +1,10 @@
-// Public completion DTO names intentionally retain their domain prefix and standard owned aliases
-// as an embedder compatibility surface.
+// Public completion DTO names intentionally retain their domain prefix and standard owned aliases as an embedder compatibility surface.
 #![allow(unknown_lints)]
 #![cfg_attr(
     animus_octet,
     allow(tigerstyle::non_trait_imports, tigerstyle::path_segment_repetition)
 )]
-use std::string::String;
-use std::vec::Vec;
+use std::{string::String, vec::Vec};
 
 /// Host capability class required by a repository-owned check.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]

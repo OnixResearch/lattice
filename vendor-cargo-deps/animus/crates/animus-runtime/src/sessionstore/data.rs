@@ -3,7 +3,8 @@
 /// Generated policy schema.
 pub const DURABLE_SESSION_STORE_POLICY_SCHEMA: &str = "animus.durable-session-store-policy.v1";
 /// BLAKE3 domain for generated policy content.
-pub const DURABLE_SESSION_STORE_POLICY_HASH_DOMAIN: &str = "animus.durable-session-store-policy-content.v1";
+pub const DURABLE_SESSION_STORE_POLICY_HASH_DOMAIN: &str =
+    "animus.durable-session-store-policy-content.v1";
 /// BLAKE3 domain for private frame identities.
 pub const DURABLE_SESSION_FRAME_HASH_DOMAIN: &str = "animus.durable-session-frame.v1";
 /// BLAKE3 domain for transaction identities.
@@ -17,7 +18,8 @@ pub const DURABLE_SESSION_RECEIPT_HASH_DOMAIN: &str = "animus.durable-session-re
 /// Receipt schema.
 pub const DURABLE_SESSION_RECEIPT_SCHEMA: &str = "animus.durable-session-receipt.v1";
 /// Empty-store committed head identity.
-pub const DURABLE_SESSION_EMPTY_HEAD_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
+pub const DURABLE_SESSION_EMPTY_HEAD_HASH: &str =
+    "0000000000000000000000000000000000000000000000000000000000000000";
 
 pub(super) const BLAKE3_HEX_CHARS: usize = 64;
 pub(super) const HASH_SEPARATOR: &[u8] = b"\x1f";
@@ -209,6 +211,9 @@ pub struct DurableSessionStoreDescriptor {
     pub receipt_policy: String,
 }
 
+const MODEL_REQUEST_SNAPSHOT_WIRE_CODE: u8 = 9;
+const MODEL_REQUEST_TERMINAL_WIRE_CODE: u8 = 10;
+
 /// Private replay record kind.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DurableSessionRecordKind {
@@ -226,6 +231,12 @@ pub enum DurableSessionRecordKind {
     BranchMove,
     /// Metadata-only session authority-profile binding.
     AuthorityProfileBinding,
+    /// Private committed Steel kernel safe-point snapshot.
+    SteelKernelState,
+    /// Private complete provider-neutral model-request snapshot.
+    ModelRequestSnapshot,
+    /// Private correlated terminal provider observation.
+    ModelRequestTerminal,
 }
 
 impl DurableSessionRecordKind {
@@ -240,6 +251,9 @@ impl DurableSessionRecordKind {
             Self::Repair => 5,
             Self::BranchMove => 6,
             Self::AuthorityProfileBinding => 7,
+            Self::SteelKernelState => 8,
+            Self::ModelRequestSnapshot => MODEL_REQUEST_SNAPSHOT_WIRE_CODE,
+            Self::ModelRequestTerminal => MODEL_REQUEST_TERMINAL_WIRE_CODE,
         }
     }
 
@@ -254,6 +268,9 @@ impl DurableSessionRecordKind {
             5 => Some(Self::Repair),
             6 => Some(Self::BranchMove),
             7 => Some(Self::AuthorityProfileBinding),
+            8 => Some(Self::SteelKernelState),
+            MODEL_REQUEST_SNAPSHOT_WIRE_CODE => Some(Self::ModelRequestSnapshot),
+            MODEL_REQUEST_TERMINAL_WIRE_CODE => Some(Self::ModelRequestTerminal),
             _other => None,
         }
     }
@@ -269,6 +286,9 @@ impl DurableSessionRecordKind {
             Self::Repair => "repair",
             Self::BranchMove => "branch_move",
             Self::AuthorityProfileBinding => "authority_profile_binding",
+            Self::SteelKernelState => "steel_kernel_state",
+            Self::ModelRequestSnapshot => "model_request_snapshot",
+            Self::ModelRequestTerminal => "model_request_terminal",
         }
     }
 }
@@ -365,6 +385,12 @@ impl DurableSessionFrame {
     #[must_use]
     pub fn private_payload(&self) -> &[u8] {
         self.payload.as_slice()
+    }
+
+    /// Returns the prior durable frame or commit identity.
+    #[must_use]
+    pub fn previous_frame_hash(&self) -> &str {
+        self.previous_frame_hash.as_str()
     }
 
     /// Returns frame identity.

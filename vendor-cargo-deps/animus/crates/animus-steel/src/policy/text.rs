@@ -22,7 +22,10 @@ pub(crate) fn validate_profile_name(name: &str) -> Result<String, super::Error> 
 
 pub(crate) fn validate_script_label(label: &str) -> Result<String, super::Error> {
     if !is_safe_script_label(label) {
-        return Err(super::Error::new(super::DenyReason::PathEscape, "script_label"));
+        return Err(super::Error::new(
+            super::DenyReason::PathEscape,
+            "script_label",
+        ));
     }
 
     Ok(String::from(label))
@@ -30,7 +33,10 @@ pub(crate) fn validate_script_label(label: &str) -> Result<String, super::Error>
 
 pub(crate) fn validate_hash(hash: &str, field: FieldName) -> Result<String, super::Error> {
     if blake3::Hash::from_hex(hash).is_err() {
-        return Err(super::Error::new(super::DenyReason::HashMismatch, field.as_str()));
+        return Err(super::Error::new(
+            super::DenyReason::HashMismatch,
+            field.as_str(),
+        ));
     }
 
     Ok(String::from(hash))
@@ -38,7 +44,10 @@ pub(crate) fn validate_hash(hash: &str, field: FieldName) -> Result<String, supe
 
 pub(crate) fn validate_turn_budget(max_turns: u32) -> Result<u32, super::Error> {
     if max_turns < super::config::MIN_RUNTIME_TURNS {
-        return Err(super::Error::new(super::DenyReason::InvalidBudget, "max_turns"));
+        return Err(super::Error::new(
+            super::DenyReason::InvalidBudget,
+            "max_turns",
+        ));
     }
 
     Ok(max_turns)
@@ -52,7 +61,10 @@ pub(crate) fn parse_allowed_actions(
         parsed.insert(super::HostAction::parse(action)?);
     }
     if parsed.is_empty() {
-        return Err(super::Error::new(super::DenyReason::HostActionDenied, "allowed_host_actions"));
+        return Err(super::Error::new(
+            super::DenyReason::HostActionDenied,
+            "allowed_host_actions",
+        ));
     }
 
     Ok(parsed)
@@ -82,6 +94,8 @@ pub(crate) fn is_safe_script_label(label: &str) -> bool {
 
 fn has_profile_name_characters(name: &str) -> bool {
     name.chars().all(|character| {
-        character.is_ascii_lowercase() || character.is_ascii_digit() || character == PROFILE_NAME_SEPARATOR
+        character.is_ascii_lowercase()
+            || character.is_ascii_digit()
+            || character == PROFILE_NAME_SEPARATOR
     })
 }

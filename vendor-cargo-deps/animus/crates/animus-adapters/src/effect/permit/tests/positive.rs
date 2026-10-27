@@ -12,7 +12,10 @@ fn trusted_allow_policy_executes_after_authority_passes() {
     assert_eq!(policy.trust_scope(), TrustScope::User);
     assert_eq!(policy.trust_status(), TrustStatus::Trusted);
     assert_eq!(policy.precedence(), MIN_PRECEDENCE);
-    assert_eq!(policy.prompt_summary_policy(), PromptSummaryPolicy::Redacted);
+    assert_eq!(
+        policy.prompt_summary_policy(),
+        PromptSummaryPolicy::Redacted
+    );
     assert!(!policy.policy_hash().is_empty());
     assert_eq!(resolution.status(), DecisionStatus::Execute);
     assert_eq!(resolution.reason(), DecisionReason::None);
@@ -74,12 +77,18 @@ fn safe_permission_receipt_records_hashes_and_markers_only() {
 
     assert_eq!(receipt.action(), ACTION);
     assert_eq!(receipt.resource_hash().as_str(), HASH);
-    assert_eq!(receipt.authority_status(), crate::AuthorizationStatus::Allowed);
+    assert_eq!(
+        receipt.authority_status(),
+        crate::AuthorizationStatus::Allowed
+    );
     assert_eq!(receipt.authority_issue(), crate::AuthorizationIssue::None);
     assert_eq!(receipt.local_outcome(), Some(Outcome::Allow));
     assert_eq!(receipt.prompt_status(), PromptStatus::NotRequired);
     assert_eq!(receipt.policy_hash().as_str(), HASH);
     assert_eq!(receipt.reason(), "none");
-    assert_eq!(receipt.redaction_markers(), &[Text::from(REDACTION), Text::from(SECOND_REDACTION)]);
+    assert_eq!(
+        receipt.redaction_markers(),
+        &[Text::from(REDACTION), Text::from(SECOND_REDACTION)]
+    );
     validate_text(SAFE_RECEIPT_TEXT).expect("safe receipt should pass leak scan");
 }

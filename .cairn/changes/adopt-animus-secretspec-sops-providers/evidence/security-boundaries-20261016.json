@@ -1,0 +1,343 @@
+{
+  "schema": "lattice.credential-security-observation.v1",
+  "observed_on": "2026-10-16",
+  "status": "scoped-observations-with-consumer-build-blocked",
+  "maintenance_owner": "Lattice credential and Agent runtime maintainers",
+  "policy": {
+    "export": {
+      "argv": [
+        "/nix/store/ck3a4k9az87z5rjwgy8nmpcs34xp9cc5-nickel-lang-rev-fixup-1.17.0/bin/nickel",
+        "export",
+        "--format",
+        "json",
+        "/home/brittonr/git/OnixResearch/lattice/policy/choregraph-effect-authority.ncl"
+      ],
+      "exit": 0,
+      "stdout": "{\n  \"contracts\": {\n    \"lattice-agent\": {\n      \"abilities\": [\n        \"agent/execute\"\n      ],\n      \"description\": \"Admit one exact Agent request bound to its selected backend and credential policy.\",\n      \"id\": \"lattice-agent\",\n      \"resource_prefixes\": [\n        \"lattice://agent/\"\n      ]\n    },\n    \"lattice-file\": {\n      \"abilities\": [\n        \"file/read\",\n        \"file/write\",\n        \"file/append\"\n      ],\n      \"description\": \"Admit one capability-relative local file effect.\",\n      \"id\": \"lattice-file\",\n      \"resource_prefixes\": [\n        \"lattice://file/\"\n      ]\n    },\n    \"lattice-network\": {\n      \"abilities\": [\n        \"network/request\"\n      ],\n      \"description\": \"Admit one selected bounded network effect.\",\n      \"id\": \"lattice-network\",\n      \"resource_prefixes\": [\n        \"lattice://network/\"\n      ]\n    },\n    \"lattice-process\": {\n      \"abilities\": [\n        \"process/execute\"\n      ],\n      \"description\": \"Admit one bounded local process effect.\",\n      \"id\": \"lattice-process\",\n      \"resource_prefixes\": [\n        \"lattice://process/\"\n      ]\n    },\n    \"lattice-role-protocol\": {\n      \"abilities\": [\n        \"protocol/transport\",\n        \"protocol/external-role\"\n      ],\n      \"description\": \"Admit one exact projected role-protocol dispatch.\",\n      \"id\": \"lattice-role-protocol\",\n      \"resource_prefixes\": [\n        \"lattice://role-protocol/\"\n      ]\n    }\n  },\n  \"schema_version\": \"ucan-nickel-contracts.policy.v1\"\n}\n",
+      "stderr": ""
+    },
+    "blake3": "0f63ce4bb3e707f53ea634a48211dad5215e1aeeec1209b25992020d6d2459ec"
+  },
+  "external_nickel_profile_admission": [
+    {
+      "name": "agent",
+      "argv": [
+        "/nix/store/ck3a4k9az87z5rjwgy8nmpcs34xp9cc5-nickel-lang-rev-fixup-1.17.0/bin/nickel",
+        "export",
+        "--format",
+        "json",
+        "/tmp/lattice-agent-profile-agent-20261016.ncl"
+      ],
+      "expected_admission": true,
+      "exit": 0,
+      "passed": true,
+      "diagnostic_first_line": ""
+    },
+    {
+      "name": "process-substitution",
+      "argv": [
+        "/nix/store/ck3a4k9az87z5rjwgy8nmpcs34xp9cc5-nickel-lang-rev-fixup-1.17.0/bin/nickel",
+        "export",
+        "--format",
+        "json",
+        "/tmp/lattice-agent-profile-process-substitution-20261016.ncl"
+      ],
+      "expected_admission": false,
+      "exit": 1,
+      "passed": true,
+      "diagnostic_first_line": "error: contract broken by the value of `grants`"
+    },
+    {
+      "name": "wrong-resource",
+      "argv": [
+        "/nix/store/ck3a4k9az87z5rjwgy8nmpcs34xp9cc5-nickel-lang-rev-fixup-1.17.0/bin/nickel",
+        "export",
+        "--format",
+        "json",
+        "/tmp/lattice-agent-profile-wrong-resource-20261016.ncl"
+      ],
+      "expected_admission": false,
+      "exit": 1,
+      "passed": true,
+      "diagnostic_first_line": "error: contract broken by the value of `grants`"
+    },
+    {
+      "name": "stale-policy",
+      "argv": [
+        "/nix/store/ck3a4k9az87z5rjwgy8nmpcs34xp9cc5-nickel-lang-rev-fixup-1.17.0/bin/nickel",
+        "export",
+        "--format",
+        "json",
+        "/tmp/lattice-agent-profile-stale-policy-20261016.ncl"
+      ],
+      "expected_admission": false,
+      "exit": 1,
+      "passed": true,
+      "diagnostic_first_line": "error: contract broken by the value of `policy_ref`"
+    },
+    {
+      "name": "duplicate-node",
+      "argv": [
+        "/nix/store/ck3a4k9az87z5rjwgy8nmpcs34xp9cc5-nickel-lang-rev-fixup-1.17.0/bin/nickel",
+        "export",
+        "--format",
+        "json",
+        "/tmp/lattice-agent-profile-duplicate-node-20261016.ncl"
+      ],
+      "expected_admission": false,
+      "exit": 1,
+      "passed": true,
+      "diagnostic_first_line": "error: contract broken by a value"
+    },
+    {
+      "name": "unknown-grant-field",
+      "argv": [
+        "/nix/store/ck3a4k9az87z5rjwgy8nmpcs34xp9cc5-nickel-lang-rev-fixup-1.17.0/bin/nickel",
+        "export",
+        "--format",
+        "json",
+        "/tmp/lattice-agent-profile-unknown-grant-field-20261016.ncl"
+      ],
+      "expected_admission": false,
+      "exit": 1,
+      "passed": true,
+      "diagnostic_first_line": "error: contract broken by the value of `grants`"
+    },
+    {
+      "name": "zero-expiry",
+      "argv": [
+        "/nix/store/ck3a4k9az87z5rjwgy8nmpcs34xp9cc5-nickel-lang-rev-fixup-1.17.0/bin/nickel",
+        "export",
+        "--format",
+        "json",
+        "/tmp/lattice-agent-profile-zero-expiry-20261016.ncl"
+      ],
+      "expected_admission": false,
+      "exit": 1,
+      "passed": true,
+      "diagnostic_first_line": "error: contract broken by the value of `expires_at_unix_ms`"
+    }
+  ],
+  "isolated_native_ownership": {
+    "selection": "Exact ast-grep-selected production struct and Drop implementations; no-Drop variants are controls, not whole prior checkouts.",
+    "observation": "Initialized string value bytes inspected immediately before allocator deallocation, never after free.",
+    "resolved_secret_env": {
+      "source": "src/credentials.rs",
+      "ast": {
+        "owner": "pub struct ResolvedSecretEnv {\n    pub env: HashMap<String, String>,\n    pub secret_values: Vec<String>,\n}",
+        "drop": "impl Drop for ResolvedSecretEnv {\n    fn drop(&mut self) {\n        for value in self.env.values_mut() {\n            zeroize::Zeroize::zeroize(value);\n        }\n        zeroize::Zeroize::zeroize(&mut self.secret_values);\n    }\n}",
+        "debug": "impl std::fmt::Debug for ResolvedSecretEnv {\n    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {\n        f.write_str(\"ResolvedSecretEnv(<redacted>)\")\n    }\n}"
+      },
+      "results": [
+        {
+          "variant": "before",
+          "compile": {
+            "argv": [
+              "/nix/store/6vrrjl1mckj4g5pj9p5d8minyr0mfhqg-rust-minimal-1.99.0-nightly-2026-07-17/bin/rustc",
+              "--edition=2024",
+              "/tmp/lattice-credential-owner-before-20261016.rs",
+              "-L",
+              "dependency=/home/brittonr/git/OnixResearch/lattice/target/debug/deps",
+              "--extern",
+              "zeroize=/home/brittonr/git/OnixResearch/lattice/target/debug/deps/libzeroize-69fb79e89af26314.rlib",
+              "-o",
+              "/tmp/lattice-credential-owner-before-20261016"
+            ],
+            "exit": 0,
+            "stdout": "",
+            "stderr": ""
+          },
+          "run": {
+            "exit": 1,
+            "stdout": "ordinary-return: observed=[2, 2] cleared=false\nerror-return: observed=[2, 2] cleared=false\nunwinding: observed=[2, 2] cleared=false\nowner-transfer: observed=[2, 2, 2, 2] cleared=false\n",
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "after",
+          "compile": {
+            "argv": [
+              "/nix/store/6vrrjl1mckj4g5pj9p5d8minyr0mfhqg-rust-minimal-1.99.0-nightly-2026-07-17/bin/rustc",
+              "--edition=2024",
+              "/tmp/lattice-credential-owner-after-20261016.rs",
+              "-L",
+              "dependency=/home/brittonr/git/OnixResearch/lattice/target/debug/deps",
+              "--extern",
+              "zeroize=/home/brittonr/git/OnixResearch/lattice/target/debug/deps/libzeroize-69fb79e89af26314.rlib",
+              "-o",
+              "/tmp/lattice-credential-owner-after-20261016"
+            ],
+            "exit": 0,
+            "stdout": "",
+            "stderr": ""
+          },
+          "run": {
+            "exit": 0,
+            "stdout": "ordinary-return: observed=[1, 1] cleared=true\nerror-return: observed=[1, 1] cleared=true\nunwinding: observed=[1, 1] cleared=true\nowner-transfer: observed=[1, 1, 1, 1] cleared=true\n",
+            "stderr": ""
+          }
+        }
+      ]
+    },
+    "agent_execution_context": {
+      "source": "src/agent_node.rs",
+      "ast": {
+        "owner": "pub struct ExecutionContext {\n    secret_env: BTreeMap<String, String>,\n    secret_values: Vec<String>,\n}",
+        "drop": "impl Drop for ExecutionContext {\n    fn drop(&mut self) {\n        for value in self.secret_env.values_mut() { value.zeroize(); }\n        self.secret_values.zeroize();\n    }\n}"
+      },
+      "results": [
+        {
+          "variant": "before",
+          "path": "/tmp/lattice-agent-context-before-20261016.rs",
+          "compile": {
+            "argv": [
+              "/nix/store/6vrrjl1mckj4g5pj9p5d8minyr0mfhqg-rust-minimal-1.99.0-nightly-2026-07-17/bin/rustc",
+              "--edition=2024",
+              "/tmp/lattice-agent-context-before-20261016.rs",
+              "-L",
+              "dependency=/home/brittonr/git/OnixResearch/lattice/target/debug/deps",
+              "--extern",
+              "zeroize=/home/brittonr/git/OnixResearch/lattice/target/debug/deps/libzeroize-69fb79e89af26314.rlib",
+              "-o",
+              "/tmp/lattice-agent-context-before-20261016"
+            ],
+            "exit": 0,
+            "stdout": "",
+            "stderr": "warning: unused import: `zeroize::Zeroize`\n --> /tmp/lattice-agent-context-before-20261016.rs:2:5\n  |\n2 | use zeroize::Zeroize;\n  |     ^^^^^^^^^^^^^^^^\n  |\n  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default\n\nwarning: 1 warning emitted\n\n"
+          },
+          "run": {
+            "exit": 1,
+            "stdout": "ordinary-return: observed=[2, 2] cleared=false\nerror-return: observed=[2, 2] cleared=false\nunwinding: observed=[2, 2] cleared=false\nowner-transfer: observed=[2, 2, 2, 2] cleared=false\n",
+            "stderr": ""
+          }
+        },
+        {
+          "variant": "after",
+          "path": "/tmp/lattice-agent-context-after-20261016.rs",
+          "compile": {
+            "argv": [
+              "/nix/store/6vrrjl1mckj4g5pj9p5d8minyr0mfhqg-rust-minimal-1.99.0-nightly-2026-07-17/bin/rustc",
+              "--edition=2024",
+              "/tmp/lattice-agent-context-after-20261016.rs",
+              "-L",
+              "dependency=/home/brittonr/git/OnixResearch/lattice/target/debug/deps",
+              "--extern",
+              "zeroize=/home/brittonr/git/OnixResearch/lattice/target/debug/deps/libzeroize-69fb79e89af26314.rlib",
+              "-o",
+              "/tmp/lattice-agent-context-after-20261016"
+            ],
+            "exit": 0,
+            "stdout": "",
+            "stderr": ""
+          },
+          "run": {
+            "exit": 0,
+            "stdout": "ordinary-return: observed=[1, 1] cleared=true\nerror-return: observed=[1, 1] cleared=true\nunwinding: observed=[1, 1] cleared=true\nowner-transfer: observed=[1, 1, 1, 1] cleared=true\n",
+            "stderr": ""
+          }
+        }
+      ]
+    }
+  },
+  "consumer_regression_attempt": {
+    "argv": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib"
+    ],
+    "cwd": "/home/brittonr/git/OnixResearch/lattice",
+    "exit": 101,
+    "missing_manifest": "vendor-cargo-deps/animus/crates/animus-std-secretspec/Cargo.toml",
+    "classification": "blocked-before-compilation",
+    "overrides_used": false
+  },
+  "cairn_structural_checks": [
+    {
+      "stage": "proposal",
+      "argv": [
+        "/nix/store/kp30jr43dplxzlrgmkq3f3q380mvdgks-cairn-0.1.0/bin/cairn",
+        "gate",
+        "proposal",
+        "adopt-animus-secretspec-sops-providers",
+        "--root",
+        "/home/brittonr/git/OnixResearch/lattice",
+        "--policy",
+        "/home/brittonr/git/OnixResearch/lattice/cairn-policy/generated/cairn-policy.json"
+      ],
+      "exit": 0,
+      "valid": true,
+      "verdict": "PASS",
+      "issues": [],
+      "input_hash": "f4ef55839b67f4de62b22ef48a52a1fb26370760d2f6cd270d6f8a84c248d1da",
+      "policy_hash": "a88e98316e48fb6e54901fd7a88dd890c86d1ab7c830098084fe5dfaa70d1a4a",
+      "receipt_hash": "ea46ffa72fb35b74845a3a7d4b7ef4b003cd552cc1775c5a4c52a29769f9ee9e",
+      "stderr": ""
+    },
+    {
+      "stage": "design",
+      "argv": [
+        "/nix/store/kp30jr43dplxzlrgmkq3f3q380mvdgks-cairn-0.1.0/bin/cairn",
+        "gate",
+        "design",
+        "adopt-animus-secretspec-sops-providers",
+        "--root",
+        "/home/brittonr/git/OnixResearch/lattice",
+        "--policy",
+        "/home/brittonr/git/OnixResearch/lattice/cairn-policy/generated/cairn-policy.json"
+      ],
+      "exit": 0,
+      "valid": true,
+      "verdict": "PASS",
+      "issues": [],
+      "input_hash": "5a3c950d7109d7de73e15f757e3fbf9f518fe358b844c14a80696daf1c7d5052",
+      "policy_hash": "a88e98316e48fb6e54901fd7a88dd890c86d1ab7c830098084fe5dfaa70d1a4a",
+      "receipt_hash": "f00f7b0231a65be1f67c09e1a3a50098940d96745fa86af79c8fad43597aff95",
+      "stderr": ""
+    },
+    {
+      "stage": "tasks",
+      "argv": [
+        "/nix/store/kp30jr43dplxzlrgmkq3f3q380mvdgks-cairn-0.1.0/bin/cairn",
+        "gate",
+        "tasks",
+        "adopt-animus-secretspec-sops-providers",
+        "--root",
+        "/home/brittonr/git/OnixResearch/lattice",
+        "--policy",
+        "/home/brittonr/git/OnixResearch/lattice/cairn-policy/generated/cairn-policy.json"
+      ],
+      "exit": 0,
+      "valid": true,
+      "verdict": "PASS",
+      "issues": [],
+      "input_hash": "9aa7705b8316d0c93455015d71b3ed91aa986cc92f11d1447e486d48f11637c3",
+      "policy_hash": "a88e98316e48fb6e54901fd7a88dd890c86d1ab7c830098084fe5dfaa70d1a4a",
+      "receipt_hash": "5c76412275c9ae3526e3274cbb513ad648b30814cb2ca372c8b5f5397315c3d4",
+      "stderr": ""
+    },
+    {
+      "stage": "validate",
+      "argv": [
+        "/nix/store/kp30jr43dplxzlrgmkq3f3q380mvdgks-cairn-0.1.0/bin/cairn",
+        "validate",
+        "--root",
+        "/home/brittonr/git/OnixResearch/lattice",
+        "--policy",
+        "/home/brittonr/git/OnixResearch/lattice/cairn-policy/generated/cairn-policy.json"
+      ],
+      "exit": 0,
+      "valid": true,
+      "issues": [],
+      "stderr": ""
+    }
+  ],
+  "non_claims": [
+    "Isolated owner observations do not compile or execute the full Lattice consumer.",
+    "External Nickel profile admission does not verify embedded evaluator compatibility or Agent runtime dispatch.",
+    "Agent provider/transport denial, cancellation and delivery regressions remain unexecuted pending exact producer source admission.",
+    "Ownership observations do not establish erasure of transport-library, child-process, allocator or OS copies.",
+    "Structural Cairn gates do not establish runtime correctness, public acquisition, lifecycle completion or release eligibility."
+  ]
+}

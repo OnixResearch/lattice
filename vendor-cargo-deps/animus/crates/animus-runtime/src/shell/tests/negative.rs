@@ -8,9 +8,12 @@ fn invalid_steel_decision_fails_before_adapter_dispatch() {
         &mut tool,
     );
 
-    assert!(matches!(result.status(), crate::RuntimeStatus::Failed {
-        failure: crate::RuntimeFailure::Fabric { .. }
-    }));
+    assert!(matches!(
+        result.status(),
+        crate::RuntimeStatus::Failed {
+            failure: crate::RuntimeFailure::Fabric { .. }
+        }
+    ));
     assert_eq!(model.calls, super::support::NO_ADAPTER_CALLS);
     assert_eq!(tool.calls, super::support::NO_ADAPTER_CALLS);
 }
@@ -25,9 +28,12 @@ fn invalid_steel_load_fails_before_adapter_dispatch() {
         &mut tool,
     );
 
-    assert!(matches!(result.status(), crate::RuntimeStatus::Failed {
-        failure: crate::RuntimeFailure::Fabric { .. }
-    }));
+    assert!(matches!(
+        result.status(),
+        crate::RuntimeStatus::Failed {
+            failure: crate::RuntimeFailure::Fabric { .. }
+        }
+    ));
     assert_eq!(model.calls, super::support::NO_ADAPTER_CALLS);
     assert_eq!(tool.calls, super::support::NO_ADAPTER_CALLS);
 }
@@ -54,7 +60,12 @@ fn steel_policy_denial_fails_before_adapter_dispatch() {
         event,
         crate::RuntimeEvent::SteelPolicyDenied { reason, .. } if reason == "profile_mismatch"
     )));
-    assert!(result.events().iter().all(|event| !matches!(event, crate::RuntimeEvent::ModelRequested { .. })));
+    assert!(
+        result
+            .events()
+            .iter()
+            .all(|event| !matches!(event, crate::RuntimeEvent::ModelRequested { .. }))
+    );
 }
 
 #[test]
@@ -100,8 +111,10 @@ fn tool_adapter_failure_stops_safely() {
 #[test]
 fn missing_model_service_fails_closed_before_tool_dispatch() {
     let mut tool = super::support::ToolStub::ok();
-    let result =
-        super::support::run_program_with_missing_model_service(super::support::MODEL_THEN_RESPOND_PROGRAM, &mut tool);
+    let result = super::support::run_program_with_missing_model_service(
+        super::support::MODEL_THEN_RESPOND_PROGRAM,
+        &mut tool,
+    );
 
     assert!(matches!(
         result.status(),
@@ -110,14 +123,21 @@ fn missing_model_service_fails_closed_before_tool_dispatch() {
         } if message == super::support::ABSENT_SERVICE
     ));
     assert_eq!(tool.calls, super::support::NO_ADAPTER_CALLS);
-    assert!(result.events().iter().all(|event| !matches!(event, crate::RuntimeEvent::ModelResponded { .. })));
+    assert!(
+        result
+            .events()
+            .iter()
+            .all(|event| !matches!(event, crate::RuntimeEvent::ModelResponded { .. }))
+    );
 }
 
 #[test]
 fn missing_tool_service_fails_closed_before_model_dispatch() {
     let mut model = super::support::ModelStub::ok();
-    let result =
-        super::support::run_program_with_missing_tool_service(super::support::TOOL_THEN_RESPOND_PROGRAM, &mut model);
+    let result = super::support::run_program_with_missing_tool_service(
+        super::support::TOOL_THEN_RESPOND_PROGRAM,
+        &mut model,
+    );
 
     assert!(matches!(
         result.status(),
@@ -126,7 +146,12 @@ fn missing_tool_service_fails_closed_before_model_dispatch() {
         } if message == super::support::ABSENT_SERVICE
     ));
     assert_eq!(model.calls, super::support::NO_ADAPTER_CALLS);
-    assert!(result.events().iter().all(|event| !matches!(event, crate::RuntimeEvent::ToolResponded { .. })));
+    assert!(
+        result
+            .events()
+            .iter()
+            .all(|event| !matches!(event, crate::RuntimeEvent::ToolResponded { .. }))
+    );
 }
 
 #[test]
@@ -149,11 +174,14 @@ fn unrelated_model_capability_fails_before_adapter_call() {
     ));
     assert_eq!(model.calls, super::support::NO_ADAPTER_CALLS);
     assert_eq!(tool.calls, super::support::NO_ADAPTER_CALLS);
-    assert!(result.events().iter().any(|event| matches!(event, crate::RuntimeEvent::AdapterOutcomeClassified {
-        component: crate::AdapterComponent::Model,
-        class: animus_adapters::AdapterCallFailureClass::Absent,
-        ..
-    })));
+    assert!(result.events().iter().any(|event| matches!(
+        event,
+        crate::RuntimeEvent::AdapterOutcomeClassified {
+            component: crate::AdapterComponent::Model,
+            class: animus_adapters::AdapterCallFailureClass::Absent,
+            ..
+        }
+    )));
 }
 
 #[test]
@@ -176,20 +204,26 @@ fn unrelated_tool_capability_fails_before_adapter_call() {
     ));
     assert_eq!(model.calls, super::support::NO_ADAPTER_CALLS);
     assert_eq!(tool.calls, super::support::NO_ADAPTER_CALLS);
-    assert!(result.events().iter().any(|event| matches!(event, crate::RuntimeEvent::AdapterOutcomeClassified {
-        component: crate::AdapterComponent::Tool,
-        class: animus_adapters::AdapterCallFailureClass::DeniedCapability,
-        ..
-    })));
+    assert!(result.events().iter().any(|event| matches!(
+        event,
+        crate::RuntimeEvent::AdapterOutcomeClassified {
+            component: crate::AdapterComponent::Tool,
+            class: animus_adapters::AdapterCallFailureClass::DeniedCapability,
+            ..
+        }
+    )));
 }
 
 #[test]
 fn blocked_adapter_outcome_stops_without_success_receipt() {
     let state = crate::TurnState::new(&super::support::runtime_input());
-    let step = crate::apply_adapter_outcome(state, crate::AdapterOutcome::Blocked {
-        component: crate::AdapterComponent::Tool,
-        outcome: animus_adapters::OutcomeKind::Denied,
-    });
+    let step = crate::apply_adapter_outcome(
+        state,
+        crate::AdapterOutcome::Blocked {
+            component: crate::AdapterComponent::Tool,
+            outcome: animus_adapters::OutcomeKind::Denied,
+        },
+    );
 
     let crate::AdapterStep::Complete { report } = step else {
         panic!("blocked adapter outcome should complete the run");
@@ -200,7 +234,12 @@ fn blocked_adapter_outcome_stops_without_success_receipt() {
             failure: crate::RuntimeFailure::ToolAdapter { message }
         } if message == super::support::DENIED_SERVICE
     ));
-    assert!(report.events().iter().all(|event| !matches!(event, crate::RuntimeEvent::ToolResponded { .. })));
+    assert!(
+        report
+            .events()
+            .iter()
+            .all(|event| !matches!(event, crate::RuntimeEvent::ToolResponded { .. }))
+    );
 }
 
 #[test]
@@ -216,15 +255,16 @@ fn typed_adapter_outcome_classes_are_preserved_in_failure_events() {
     ];
 
     for class in classes {
-        let outcome = animus_adapters::AdapterCallOutcome::<animus_adapters::ModelResponse>::failed(
-            class,
-            animus_adapters::AdapterCallFailureMetadataDraft {
-                message: class.as_str(),
-                correlation_id: None,
-                receipt_reference: None,
-            },
-        )
-        .expect("safe typed outcome should build");
+        let outcome =
+            animus_adapters::AdapterCallOutcome::<animus_adapters::ModelResponse>::failed(
+                class,
+                animus_adapters::AdapterCallFailureMetadataDraft {
+                    message: class.as_str(),
+                    correlation_id: None,
+                    receipt_reference: None,
+                },
+            )
+            .expect("safe typed outcome should build");
         let step = crate::apply_adapter_outcome(
             crate::TurnState::new(&super::support::runtime_input()),
             crate::AdapterOutcome::ModelCall { outcome },
@@ -232,9 +272,12 @@ fn typed_adapter_outcome_classes_are_preserved_in_failure_events() {
         let crate::AdapterStep::Complete { report } = step else {
             panic!("typed failure should complete");
         };
-        assert!(matches!(report.status(), crate::RuntimeStatus::Failed {
-            failure: crate::RuntimeFailure::ModelAdapter { .. }
-        }));
+        assert!(matches!(
+            report.status(),
+            crate::RuntimeStatus::Failed {
+                failure: crate::RuntimeFailure::ModelAdapter { .. }
+            }
+        ));
         assert!(report.events().iter().any(|event| matches!(
             event,
             crate::RuntimeEvent::AdapterOutcomeClassified {
@@ -243,7 +286,12 @@ fn typed_adapter_outcome_classes_are_preserved_in_failure_events() {
                 ..
             } if *event_class == class
         )));
-        assert!(report.events().iter().all(|event| { !matches!(event, crate::RuntimeEvent::ModelResponded { .. }) }));
+        assert!(
+            report
+                .events()
+                .iter()
+                .all(|event| { !matches!(event, crate::RuntimeEvent::ModelResponded { .. }) })
+        );
     }
 }
 
@@ -257,16 +305,20 @@ fn max_turn_exhaustion_fails_closed_without_extra_adapter_call() {
         &mut tool,
     );
 
-    assert_eq!(result.status(), &crate::RuntimeStatus::MaxTurnsExceeded {
-        max_turns: super::support::FOLLOWUP_TURN_BUDGET,
-    });
+    assert_eq!(
+        result.status(),
+        &crate::RuntimeStatus::MaxTurnsExceeded {
+            max_turns: super::support::FOLLOWUP_TURN_BUDGET,
+        }
+    );
     assert_eq!(model.calls, super::support::FOLLOWUP_TURN_BUDGET);
     assert_eq!(tool.calls, super::support::NO_ADAPTER_CALLS);
 }
 
 #[test]
 fn runtime_input_rejects_empty_summary() {
-    let error = crate::RuntimeInput::new(super::support::BLANK_TEXT).expect_err("blank summary should fail");
+    let error = crate::RuntimeInput::new(super::support::BLANK_TEXT)
+        .expect_err("blank summary should fail");
 
     assert!(matches!(error, crate::RuntimeError::EmptyInput { .. }));
 }

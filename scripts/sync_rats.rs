@@ -20,6 +20,7 @@ const STAGING_PREFIX: &str = ".rats-sync-stage";
 const WORKTREE_PREFIX: &str = "lattice-rats-sync-worktree";
 const SOURCE_METADATA_FILE_NAME: &str = "SOURCE";
 const SOURCE_REPOSITORY: &str = "https://github.com/brittonr/rats";
+const IMPORT_WORKSPACE_MANIFEST: &str = include_str!("../vendor-cargo-deps/rats/Cargo.toml");
 const SNAPSHOT_PATHS: &[&str] = &[
     "docs/generated",
     "meteorite/crates/met-core/generated",
@@ -87,6 +88,7 @@ fn run() -> Result<(), String> {
     clean_path(&staging_root)?;
     add_worktree(&source_root, &worktree_root)?;
     let snapshot_result = stage_snapshot(&worktree_root, &staging_root)
+        .and_then(|()| write_import_workspace(destination_parent))
         .and_then(|()| replace_destination(&staging_root, &destination_root));
     let remove_result = remove_worktree(&source_root, &worktree_root);
     snapshot_result?;
@@ -189,6 +191,20 @@ fn stage_snapshot(worktree_root: &Path, staging_root: &Path) -> Result<(), Strin
     fs::write(staging_root.join(SOURCE_METADATA_FILE_NAME), source_metadata())
         .map_err(|error| format!("write Rats source metadata: {error}"))?;
     Ok(())
+}
+
+fn write_import_workspace(destination_parent: &Path) -> Result<(), String> {
+    let manifest_path = destination_parent.join("Cargo.toml");
+    if manifest_path.exists() {
+        let existing = fs::read_to_string(&manifest_path)
+            .map_err(|error| format!("read Rats import workspace: {error}"))?;
+        if existing != IMPORT_WORKSPACE_MANIFEST {
+            return Err(format!("refusing to overwrite unrelated workspace {}", manifest_path.display()));
+        }
+        return Ok(());
+    }
+    fs::write(&manifest_path, IMPORT_WORKSPACE_MANIFEST)
+        .map_err(|error| format!("write Rats import workspace: {error}"))
 }
 
 fn replace_destination(staging_root: &Path, destination_root: &Path) -> Result<(), String> {

@@ -28,7 +28,9 @@ pub type ModelContextRole = crate::ledger::ContextRole;
 
 /// Builds the fail-closed outcome for an absent session-ledger service.
 #[must_use]
-pub fn missing_session_ledger_service(request: &LedgerReplayRequest) -> crate::ServiceOutcome<LedgerReplayReport> {
+pub fn missing_session_ledger_service(
+    request: &LedgerReplayRequest,
+) -> crate::ServiceOutcome<LedgerReplayReport> {
     crate::ledger::missing_service(request)
 }
 
@@ -46,7 +48,9 @@ pub fn missing_session_ledger_session_error(request: &LedgerReplayRequest) -> Le
 
 /// Builds the typed error for an unavailable session-ledger service.
 #[must_use]
-pub fn unavailable_session_ledger_service_error(request: &LedgerReplayRequest) -> LedgerReplayError {
+pub fn unavailable_session_ledger_service_error(
+    request: &LedgerReplayRequest,
+) -> LedgerReplayError {
     crate::ledger::unavailable_service_error(request)
 }
 
@@ -67,6 +71,8 @@ pub fn replay_ledger(entries: &[LedgerEntry]) -> Result<LedgerReplayReport, Ledg
 /// Returns [`LedgerReplayError`] when tree shape validation fails, the active
 /// branch contains unsupported entries, a tool result is orphaned, or a summary
 /// has no prior model-visible span to replace.
-pub fn replay_session_tree(snapshot: &LedgerSnapshot) -> Result<LedgerReplayReport, LedgerReplayError> {
+pub fn replay_session_tree(
+    snapshot: &LedgerSnapshot,
+) -> Result<LedgerReplayReport, LedgerReplayError> {
     crate::ledger::replay_snapshot(snapshot)
 }

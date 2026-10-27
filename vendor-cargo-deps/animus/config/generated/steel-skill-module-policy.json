@@ -1,0 +1,48 @@
+{
+  "ambient_discovery": false,
+  "automatic_activation": false,
+  "bounds": {
+    "capability_requests_per_module_max": 32,
+    "dependencies_per_module_max": 64,
+    "evaluation_fuel_max": 16777216,
+    "exports_per_module_max": 64,
+    "modules_max": 64,
+    "source_chars_max": 1048576
+  },
+  "capability_intersection": [
+    "session",
+    "model-profile",
+    "skill",
+    "current-host"
+  ],
+  "denied_source_forms": [
+    "native-module",
+    "dynamic-library",
+    "arbitrary-path",
+    "package-manager",
+    "network-fetch",
+    "ambient-environment",
+    "dynamic-evaluation",
+    "forged-bridge-request",
+    "undeclared-bridge-operation"
+  ],
+  "dynamic_libraries": false,
+  "language_cohort": "steel-source-v1",
+  "native_modules": false,
+  "non_claims": [
+    "source-authenticity",
+    "skill-correctness",
+    "native-extension-safety",
+    "sandboxing",
+    "task-success",
+    "production-readiness"
+  ],
+  "package_manager": false,
+  "schema": "animus.steel-skill-module-policy.v1",
+  "source_forms": [
+    "complete-steel-source-unit"
+  ],
+  "trust_states": [
+    "trusted"
+  ]
+}

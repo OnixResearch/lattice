@@ -85,9 +85,9 @@ pub(super) fn run(input: WorkerInput) {
 fn completion_facts(
     store: &crate::store::Store,
     record: &ExecutionRecord,
-    result: Result<crate::headless::HeadlessRunSummary, crate::headless::HeadlessRunError>,
+    result: Result<crate::headless::SnapshotRunOutcome, crate::headless::HeadlessRunError>,
 ) -> CompletionFacts {
-    let Ok(summary) = result else {
+    let Ok(outcome) = result else {
         return CompletionFacts {
             cancelled: false,
             suspended: false,
@@ -95,6 +95,7 @@ fn completion_facts(
             nodes: Vec::new(),
         };
     };
+    let summary = outcome.summary;
     let details = store.load_run_details(crate::engine::RunId(record.run_id)).ok().flatten();
     let nodes = details
         .map(|details| {
@@ -116,7 +117,7 @@ fn completion_facts(
         })
         .unwrap_or_default();
     CompletionFacts {
-        cancelled: false,
+        cancelled: outcome.cancelled,
         suspended: summary.status == crate::headless::HeadlessRunStatus::Suspended,
         failed_before_results: nodes.is_empty() && summary.node_count != 0,
         nodes,
@@ -161,4 +162,71 @@ pub(in crate::workflow_exchange) fn workflow_facts(
         node_ids,
         edges,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn real_completion_wins_late_durable_and_atomic_cancel_intent() {
+        for (command, expected) in [
+            ("printf completed", crate::workflow_exchange::DurableExecutionState::Completed),
+            ("exit 23", crate::workflow_exchange::DurableExecutionState::Failed),
+        ] {
+            for late_cancel in [false, true] {
+                let (_directory, store, workflow, _contract, request, profile) =
+                    crate::workflow_exchange::tests::fixture(command);
+                let route = &profile.routes[0];
+                let handler_identity = crate::workflow_exchange::handler_profile_identity(&profile).unwrap();
+                let admission = store
+                    .admit_workflow_exchange(request, route, route.workflow_revision.clone(), handler_identity)
+                    .unwrap();
+                let crate::workflow_exchange::AdmissionResolution::Inserted(admitted) = admission else {
+                    panic!("fresh fixture must admit once");
+                };
+                let running = crate::workflow_exchange::mark_running(&admitted).unwrap();
+                store.save_workflow_exchange_transition(&admitted, &running).unwrap();
+                let authority = crate::workflow_exchange::RouteExactAuthorityProvider::new(
+                    &running.handler_profile_identity,
+                    &running.request.identity,
+                    &running.workflow_revision,
+                    crate::engine::RunId(running.run_id),
+                );
+                let cancellation = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+                let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+                let outcome = runtime
+                    .block_on(crate::headless::run_workflow_snapshot_with_authority_provider_and_cancellation(
+                        &store,
+                        crate::headless::SnapshotRunRequest {
+                            workflow,
+                            run_id: crate::engine::RunId(running.run_id),
+                            owner: crate::store::RunOwner::Unscoped,
+                            agent_runtime: crate::agent_node::AgentRuntimeConfig::default(),
+                            cancellation: std::sync::Arc::clone(&cancellation),
+                        },
+                        &authority,
+                    ))
+                    .expect("real process completion is retained");
+                assert!(!outcome.cancelled, "a completed process is not cancelled");
+                let current = if late_cancel {
+                    cancellation.store(true, std::sync::atomic::Ordering::Release);
+                    let requested = crate::workflow_exchange::request_cancellation(&running, running.sequence).unwrap();
+                    store.save_workflow_exchange_transition(&running, &requested).unwrap();
+                    requested
+                } else {
+                    running
+                };
+                let facts = super::completion_facts(&store, &current, Ok(outcome));
+                let completed = crate::workflow_exchange::complete(&current, &facts).unwrap();
+                store.save_workflow_exchange_transition(&current, &completed).unwrap();
+                let durable = store.load_workflow_exchange(&completed.accepted.execution_identity).unwrap().unwrap();
+                assert_eq!(durable.state, expected, "late intent must not replace the observed process outcome");
+                let expected_node = if expected == crate::workflow_exchange::DurableExecutionState::Completed {
+                    lattice_workflow_contract::NodeState::Completed
+                } else {
+                    lattice_workflow_contract::NodeState::Failed
+                };
+                assert_eq!(durable.nodes[0].state, expected_node);
+            }
+        }
+    }
 }

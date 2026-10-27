@@ -44,7 +44,8 @@ impl McpAdvertisementDecision {
 /// Plans model advertisement without server discovery, process launch, or network probes.
 #[must_use]
 pub const fn plan_mcp_advertisement(input: McpAdvertisementInput<'_>) -> McpAdvertisementDecision {
-    let is_advertised = matches!(input.trust, McpServerTrust::Registered) && input.descriptor.is_some();
+    let is_advertised =
+        matches!(input.trust, McpServerTrust::Registered) && input.descriptor.is_some();
     McpAdvertisementDecision {
         is_advertised,
         did_start_transport_probe: false,

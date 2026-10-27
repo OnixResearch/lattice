@@ -1,12 +1,15 @@
 #![allow(unknown_lints, path_segment_repetition)]
 
-const HANDOFF_THREAD_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("handoff_thread_id");
-const HANDOFF_DIRECTION_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("handoff_direction");
+const HANDOFF_THREAD_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("handoff_thread_id");
+const HANDOFF_DIRECTION_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("handoff_direction");
 const HANDOFF_SOURCE_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("handoff_source_workspace_id");
 const HANDOFF_TARGET_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("handoff_target_workspace_id");
-const HANDOFF_SNAPSHOT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("handoff_snapshot_id");
+const HANDOFF_SNAPSHOT_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("handoff_snapshot_id");
 const HANDOFF_INCLUDED_RESOURCE_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("handoff_included_resource");
 const HANDOFF_INCLUDED_RESOURCES_FIELD: crate::validation::FieldName =
@@ -37,11 +40,15 @@ impl HandoffDirection {
     ///
     /// Returns [`crate::AdapterContractError`] for empty, malformed, or unknown values.
     pub fn parse(value: &str) -> Result<Self, crate::AdapterContractError> {
-        super::text::parse_value(HANDOFF_DIRECTION_FIELD, value, |normalized| match normalized {
-            DIRECTION_FOREGROUND_TO_ISOLATED => Some(Self::ForegroundToIsolated),
-            DIRECTION_ISOLATED_TO_FOREGROUND => Some(Self::IsolatedToForeground),
-            _ => None,
-        })
+        super::text::parse_value(
+            HANDOFF_DIRECTION_FIELD,
+            value,
+            |normalized| match normalized {
+                DIRECTION_FOREGROUND_TO_ISOLATED => Some(Self::ForegroundToIsolated),
+                DIRECTION_ISOLATED_TO_FOREGROUND => Some(Self::IsolatedToForeground),
+                _ => None,
+            },
+        )
     }
 
     /// Returns the stable direction label.
@@ -70,11 +77,15 @@ impl HandoffConflictStatus {
     ///
     /// Returns [`crate::AdapterContractError`] for empty, malformed, or unknown values.
     pub fn parse(value: &str) -> Result<Self, crate::AdapterContractError> {
-        super::text::parse_value(HANDOFF_CONFLICT_FIELD, value, |normalized| match normalized {
-            CONFLICT_CLEAR => Some(Self::Clear),
-            CONFLICT_DIRTY_STATE => Some(Self::DirtyStateConflict),
-            _ => None,
-        })
+        super::text::parse_value(
+            HANDOFF_CONFLICT_FIELD,
+            value,
+            |normalized| match normalized {
+                CONFLICT_CLEAR => Some(Self::Clear),
+                CONFLICT_DIRTY_STATE => Some(Self::DirtyStateConflict),
+                _ => None,
+            },
+        )
     }
 
     /// Returns the stable conflict-status label.
@@ -108,21 +119,29 @@ impl SnapshotHandoffRecord {
     /// Returns [`crate::AdapterContractError`] when required labels are empty,
     /// unsupported, or the included resource manifest is empty.
     pub fn new(draft: SnapshotHandoffRecordDraft<'_>) -> Result<Self, crate::AdapterContractError> {
-        let thread_id = crate::validation::normalized_adapter_field(HANDOFF_THREAD_FIELD, draft.thread_id)?;
+        let thread_id =
+            crate::validation::normalized_adapter_field(HANDOFF_THREAD_FIELD, draft.thread_id)?;
         let direction = HandoffDirection::parse(draft.direction)?;
-        let source_workspace_id =
-            crate::validation::normalized_adapter_field(HANDOFF_SOURCE_FIELD, draft.source_workspace_id)?;
-        let target_workspace_id =
-            crate::validation::normalized_adapter_field(HANDOFF_TARGET_FIELD, draft.target_workspace_id)?;
-        let snapshot_id = crate::validation::normalized_adapter_field(HANDOFF_SNAPSHOT_FIELD, draft.snapshot_id)?;
+        let source_workspace_id = crate::validation::normalized_adapter_field(
+            HANDOFF_SOURCE_FIELD,
+            draft.source_workspace_id,
+        )?;
+        let target_workspace_id = crate::validation::normalized_adapter_field(
+            HANDOFF_TARGET_FIELD,
+            draft.target_workspace_id,
+        )?;
+        let snapshot_id =
+            crate::validation::normalized_adapter_field(HANDOFF_SNAPSHOT_FIELD, draft.snapshot_id)?;
         let included_resources = super::text::required_texts(
             HANDOFF_INCLUDED_RESOURCES_FIELD,
             HANDOFF_INCLUDED_RESOURCE_FIELD,
             draft.included_resources,
         )?;
         let conflict_status = HandoffConflictStatus::parse(draft.conflict_status)?;
-        let restore_manifest_hash =
-            crate::validation::normalized_adapter_field(HANDOFF_RESTORE_HASH_FIELD, draft.restore_manifest_hash)?;
+        let restore_manifest_hash = crate::validation::normalized_adapter_field(
+            HANDOFF_RESTORE_HASH_FIELD,
+            draft.restore_manifest_hash,
+        )?;
         Ok(Self {
             thread_id,
             direction,

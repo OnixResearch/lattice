@@ -1,0 +1,221 @@
+{
+  "schema": "lattice.observed-cancellation.verification.v1",
+  "change": "fix-observed-workflow-exchange-cancellation",
+  "status": "blocked",
+  "application_check": {
+    "command": [
+      "nix",
+      "develop",
+      "path:$PWD",
+      "--builders",
+      "",
+      "-c",
+      "bash",
+      "-c",
+      "cargo fmt --package lattice && cargo test --locked --package lattice --lib workflow_exchange:: -- --test-threads=1 && cargo build --locked --package lattice --bin lattice"
+    ],
+    "exit_code": 101,
+    "failed_stage": "cargo test --locked --package lattice --lib workflow_exchange:: -- --test-threads=1",
+    "compiler_error_count": 55,
+    "examples": [
+      {
+        "path": "src/compose_surface.rs",
+        "undeclared_crates": [
+          "tile_sdk",
+          "tile_protocol"
+        ]
+      },
+      {
+        "path": "src/operation_pack/shell/component/verification.rs",
+        "undeclared_crates": [
+          "hardened_wasmtime_runtime",
+          "hardened_wasmtime_shell"
+        ],
+        "missing_symbol": "super::RUNTIME_REVISION"
+      },
+      {
+        "path": "src/operation_pack/shell/component/observation.rs",
+        "missing_symbol": "super::RUNTIME_REVISION"
+      }
+    ]
+  },
+  "transport_check": {
+    "command": [
+      "nix",
+      "develop",
+      "path:$PWD",
+      "--builders",
+      "",
+      "-c",
+      "cargo",
+      "test",
+      "--locked",
+      "--package",
+      "lattice-workflow-transport",
+      "--all-targets",
+      "--all-features"
+    ],
+    "exit_code": 0,
+    "passed": 24,
+    "failed": 0
+  },
+  "dependency_repair": {
+    "status": "tile-repaired-component-contract-blocked",
+    "owner": "Lattice maintainers own dependency admission and adapter compatibility; Tile, Mantle and hardened-runtime maintainers retain their producer contracts.",
+    "immediate_outcome": "The existing Tile adapter now resolves against its reviewed exact source without deleting integrations or introducing sibling dependencies.",
+    "durable_capability": "Cargo declares and locks the reviewed Tile SDK/protocol/core cohort; existing repository-owned positive/negative adapter tests cover admission and metadata-only projection.",
+    "tile": {
+      "source": "ssh://git@github.com/brittonr/tile.git",
+      "revision": "5e703953840bff72a91fec3e928682e9efb607ab",
+      "packages": [
+        "tile-sdk",
+        "tile-protocol",
+        "tile-core"
+      ],
+      "acquisition": "Authenticated SSH acquisition succeeded; anonymous HTTPS availability was not established.",
+      "lock_update_command": [
+        "nix",
+        "develop",
+        "path:$PWD",
+        "--builders",
+        "",
+        "-c",
+        "cargo",
+        "update",
+        "-p",
+        "regex"
+      ],
+      "lock_update_exit_code": 0,
+      "required_registry_updates": {
+        "regex": "1.12.3 -> 1.13.1",
+        "regex-automata": "0.4.14 -> 0.4.18",
+        "regex-syntax": "0.8.10 -> 0.8.11"
+      },
+      "initial_application_check": "The first check after adding the exact source stopped at the old locked regex version; the targeted Cargo-owned update resolved that dependency conflict."
+    },
+    "isolated_adapter_exercise": {
+      "command": "nix develop path:$PWD --builders '' -c bash -c 'cargo test --manifest-path /tmp/lattice-compose-smoke-20261027/Cargo.toml && cargo run --manifest-path /tmp/lattice-compose-smoke-20261027/Cargo.toml'",
+      "exit_code": 0,
+      "method": "A disposable consumer imports the actual src/compose_surface.rs and the real exact Tile Git dependencies. Local Lattice core paths are throwaway verification inputs only, not delivered dependency overrides.",
+      "tests_passed": 3,
+      "tests_failed": 0,
+      "tests": [
+        "request_decoder_bounds_bytes_before_dto_admission",
+        "actual_tile_projection_produces_only_identity_lifecycle_and_focus",
+        "stale_unredacted_unknown_and_unprivileged_projections_reject"
+      ],
+      "native_program_stdout": "exact Tile projection validated; private title/cwd omitted; Lattice request admitted; incomplete request rejected",
+      "repeatable_repository_tests": "cargo test --locked --package lattice --lib compose_surface:: (requires the remaining application dependency closure)",
+      "limits": [
+        "No Tile daemon was started or contacted.",
+        "This is not a complete Lattice executable, cancellation regression, or Kiln qualification run.",
+        "The temporary consumer resolves its own registry versions and does not qualify every application-locked dependency."
+      ]
+    },
+    "remaining_component_contracts": {
+      "runtime_expected": [
+        "hardened_wasmtime_runtime::component::{Profile, Limits, admit}",
+        "hardened_wasmtime_shell::component::{Runtime, Prepared, InvocationControl, Observation}",
+        "an exact RUNTIME_REVISION bound to the compiled producer"
+      ],
+      "runtime_inspected": "The hardened-runtime checkout exports BoundedRuntime and ComponentInvocation, not the called component module. Its documented run carrier is a root (list<u8>) -> result<list<u8>, string>, not Lattice's nested interface invoke(method: string, input: list<u8>) -> list<u8>.",
+      "runtime_acquisition_attempts": [
+        "Canonical seed.radicle.garden HTTPS returned HTTP 500.",
+        "The alternate git.onix.computer RID route returned repository not found.",
+        "GitHub SSH returned repository not found; HTTPS clone could not acquire the repository."
+      ],
+      "verifier_source": "ssh://git@github.com/OnixResearch/mantle.git",
+      "verifier_revision": "da00f58425740adea559ef926c9dfa97b2cb8240",
+      "verifier_acquired": true,
+      "verifier_inspected": "ConsumerRoot::verify_bundle accepts MaterializationBundle, not serde_json::Value; ConsumerMemberObservation lacks ConsumerMemberKind/kind and source-tree observations. The byte shell remeasures regular files only. Both verifier crates pin blake3 =1.8.2, whereas the application declares >=1.8.3; dependency resolution of this candidate was not attempted.",
+      "admission_boundary": "The operation-pack proposal requires completed shared-runtime and Mantle-verifier publications plus a matching bundle; its shell specification requires the published exact verifier/runtime closure. An inspected checkout is not a compatible immutable producer publication.",
+      "prohibited_shortcuts": [
+        "Inventing a runtime revision",
+        "Treating source-tree identities as file hashes",
+        "Removing or feature-disabling existing integrations merely to compile",
+        "Copying producer implementations or adding sibling dependency overrides"
+      ]
+    },
+    "application_check_after_tile": {
+      "command": [
+        "nix",
+        "develop",
+        "path:$PWD",
+        "--builders",
+        "",
+        "-c",
+        "cargo",
+        "check",
+        "--locked",
+        "--package",
+        "lattice",
+        "--all-targets"
+      ],
+      "exit_code": 101,
+      "lib_errors": 40,
+      "lib_test_errors": 42,
+      "blockers": [
+        "Undeclared hardened_wasmtime_runtime, hardened_wasmtime_shell and mantle_wasm_consumer_verifier crates plus missing RUNTIME_REVISION",
+        "Current github_ci code also imports undeclared mantle_build_contract::async_api",
+        "Current vendored Basalt does not export oidc_exchange, and the referenced generated OIDC policy JSON is absent"
+      ],
+      "scope_note": "The async-CI integration has its own active change requiring separately admitted immutable Mantle/Basalt cohorts; its source and vendor snapshot were not removed or casually rewritten. Error counts are separate compiler build units, not a count of unique bugs."
+    },
+    "format_check": {
+      "command": "nix develop path:$PWD --builders '' -c cargo fmt --check --package lattice",
+      "exit_code": 0
+    },
+    "pre_evidence_lifecycle_validation": {
+      "command": "cairn validate --root . --policy cairn-policy/generated/cairn-policy.json",
+      "exit_code": 0,
+      "valid": true
+    },
+    "contract_gates": {
+      "change": "fix-observed-workflow-exchange-cancellation",
+      "proposal": "PASS",
+      "design": "PASS",
+      "tasks": "PASS"
+    },
+    "final_lifecycle_validation": {
+      "command": [
+        "cairn",
+        "validate",
+        "--root",
+        ".",
+        "--policy",
+        "cairn-policy/generated/cairn-policy.json"
+      ],
+      "exit_code": 0,
+      "valid": true,
+      "issues": [],
+      "task_gates": [
+        {
+          "change": "fix-observed-workflow-exchange-cancellation",
+          "exit_code": 0,
+          "verdict": "PASS"
+        },
+        {
+          "change": "compose-surface-pane-binding",
+          "exit_code": 0,
+          "verdict": "PASS"
+        }
+      ]
+    },
+    "disposable_inputs_removed": true
+  },
+  "unexecuted": [
+    "new application cancellation and completion-race regressions",
+    "corrected native executable build",
+    "Kiln strict native cancellation qualification",
+    "scripts/check.rs",
+    "octet-precommit-check",
+    "full producer nix flake check"
+  ],
+  "next_prerequisite": "Admit compatible immutable shared-runtime and Mantle-verifier contracts plus the matching component bundle, and complete the separately owned current Mantle/Basalt async-CI dependency admission; then build the corrected producer and exercise the unchanged strict cancellation rail. The reviewed Tile dependency gap is repaired.",
+  "non_claims": [
+    "Transport tests do not qualify application cancellation.",
+    "Source changes and structural gates are not a passing native cohort.",
+    "No unrelated source was removed to obtain a narrower passing build.",
+    "No acceptance, archive, publication or production activation."
+  ]
+}

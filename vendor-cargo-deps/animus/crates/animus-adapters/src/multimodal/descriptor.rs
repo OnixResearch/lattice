@@ -101,10 +101,10 @@ impl ImagePart {
     ///
     /// # Errors
     ///
-    /// Returns [`super::Error`] when required metadata is missing, unsupported, oversized, or
-    /// unsafe.
+    /// Returns [`super::Error`] when required metadata is missing, unsupported, oversized, or unsafe.
     pub fn from_draft(draft: ImagePartDraft<'_>) -> Result<Self, super::Error> {
-        let safe_label = super::check::normalized_safe_text(super::SAFE_LABEL_FIELD, draft.safe_label)?;
+        let safe_label =
+            super::check::normalized_safe_text(super::SAFE_LABEL_FIELD, draft.safe_label)?;
         let media_type = super::ImageMediaType::parse(draft.media_type)?;
         super::check::validate_byte_count(super::check::ByteLimitInput {
             byte_count: draft.byte_count,

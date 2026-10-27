@@ -91,12 +91,14 @@ impl core::fmt::Display for EvidenceError {
             Self::SummaryTooLong {
                 max_chars,
                 actual_chars,
-            } => {
-                write!(formatter, "status evidence summary must be at most {max_chars} characters; got {actual_chars}")
-            }
-            Self::UnsafeEvidenceMarker { marker } => {
-                write!(formatter, "status evidence summary contains unsafe marker {marker}")
-            }
+            } => write!(
+                formatter,
+                "status evidence summary must be at most {max_chars} characters; got {actual_chars}"
+            ),
+            Self::UnsafeEvidenceMarker { marker } => write!(
+                formatter,
+                "status evidence summary contains unsafe marker {marker}"
+            ),
         }
     }
 }

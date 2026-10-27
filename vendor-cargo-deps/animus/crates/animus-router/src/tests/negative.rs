@@ -81,9 +81,18 @@ fn request_projection_rejects_malformed_metadata() {
     });
 
     assert_eq!(empty, Err(crate::SignalProjectionError::EmptyMetadata));
-    assert_eq!(missing_privacy, Err(crate::SignalProjectionError::MissingPrivacyPolicy));
-    assert!(matches!(unsafe_payload, Err(crate::SignalProjectionError::UnsafePayload { .. })));
-    assert!(matches!(invalid_context, Err(crate::SignalProjectionError::ContextWindowOutOfRange { .. })));
+    assert_eq!(
+        missing_privacy,
+        Err(crate::SignalProjectionError::MissingPrivacyPolicy)
+    );
+    assert!(matches!(
+        unsafe_payload,
+        Err(crate::SignalProjectionError::UnsafePayload { .. })
+    ));
+    assert!(matches!(
+        invalid_context,
+        Err(crate::SignalProjectionError::ContextWindowOutOfRange { .. })
+    ));
 }
 #[test]
 fn oversized_but_bounded_metadata_projects_safely() {
@@ -111,7 +120,10 @@ fn signal_projection_rejects_unsupported_labels() {
     })
     .expect_err("unsupported task shape should fail");
 
-    assert!(matches!(error, crate::AdapterContractError::UnsupportedRouterValue { .. }));
+    assert!(matches!(
+        error,
+        crate::AdapterContractError::UnsupportedRouterValue { .. }
+    ));
 }
 
 #[test]
@@ -179,13 +191,18 @@ fn router_receipt_leak_fixtures_fail_closed() {
         ("hidden reasoning text", crate::ReceiptLeak::HiddenReasoning),
         ("api_key=secret", crate::ReceiptLeak::Credential),
         ("/home/user/private", crate::ReceiptLeak::FullPath),
-        ("unbounded trace follows", crate::ReceiptLeak::UnboundedTrace),
+        (
+            "unbounded trace follows",
+            crate::ReceiptLeak::UnboundedTrace,
+        ),
     ];
 
     for (text, expected) in cases {
         assert_eq!(crate::validate_receipt_text(text), Err(expected));
     }
-    assert!(crate::validate_receipt_text("recipe=remom quorum=met redactions=trace_bounded").is_ok());
+    assert!(
+        crate::validate_receipt_text("recipe=remom quorum=met redactions=trace_bounded").is_ok()
+    );
 }
 
 fn assert_bounds_error(case: &BoundsCase) {

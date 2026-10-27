@@ -17,9 +17,7 @@
 )]
 
 use crate::artifact::Hash;
-use crate::validation::AdapterContractError;
-use crate::validation::FieldName;
-use crate::validation::{self};
+use crate::validation::{self, AdapterContractError, FieldName};
 
 const ARTIFACT_ID_FIELD: FieldName = FieldName::new("validation_artifact_id");
 const ARTIFACT_LABEL_FIELD: FieldName = FieldName::new("validation_artifact_label");
@@ -650,7 +648,10 @@ pub fn plan_scoped_validation(
     service_status: ValidationServiceStatus,
 ) -> ScopedValidationPlan {
     if service_status == ValidationServiceStatus::Missing {
-        return rejected_plan(ValidationPlannerDiagnosticCode::ServiceUnavailable, "validation service unavailable");
+        return rejected_plan(
+            ValidationPlannerDiagnosticCode::ServiceUnavailable,
+            "validation service unavailable",
+        );
     }
     let prepared = prepare_inputs(artifacts, profiles, policy);
     let (mut artifacts, profiles) = match prepared {
@@ -667,7 +668,9 @@ pub fn plan_scoped_validation(
     let mut items = Collection::new();
     let mut diagnostics = Collection::new();
     for artifact in &artifacts {
-        let selected = profiles.iter().find(|profile| profile_matches(profile, artifact));
+        let selected = profiles
+            .iter()
+            .find(|profile| profile_matches(profile, artifact));
         let selected = selected.or_else(|| fallback_profile(policy, profiles.as_slice()));
         match selected {
             Some(profile) => items.push(plan_item(artifact, profile)),
@@ -701,11 +704,20 @@ pub fn validate_validation_result_summary(
     draft: &ValidationResultSummaryDraft<'_>,
 ) -> PlannerResult<ValidationResultSummary> {
     let item_id = safe_text(RESULT_ID_FIELD, draft.item_id, None)?;
-    let profile_label = safe_text(PROFILE_LABEL_FIELD, draft.profile_label, Some(item_id.as_str()))?;
+    let profile_label = safe_text(
+        PROFILE_LABEL_FIELD,
+        draft.profile_label,
+        Some(item_id.as_str()),
+    )?;
     let failure_summary = draft
         .failure_summary
         .map(|summary| {
-            safe_bounded_text(FAILURE_SUMMARY_FIELD, summary, MAX_FAILURE_SUMMARY_CHARS, Some(item_id.as_str()))
+            safe_bounded_text(
+                FAILURE_SUMMARY_FIELD,
+                summary,
+                MAX_FAILURE_SUMMARY_CHARS,
+                Some(item_id.as_str()),
+            )
         })
         .transpose()?;
     let output_hash = safe_hash(draft.output_hash)?;
@@ -772,7 +784,10 @@ fn prepare_inputs(
     artifacts: &[ChangedArtifactSummaryDraft<'_>],
     profiles: &[ValidationProfileCandidateDraft<'_>],
     policy: &ValidationPlannerPolicyDraft<'_>,
-) -> PlannerResult<(Collection<ChangedArtifactSummary>, Collection<ValidationProfileCandidate>)> {
+) -> PlannerResult<(
+    Collection<ChangedArtifactSummary>,
+    Collection<ValidationProfileCandidate>,
+)> {
     validate_non_empty_bound("validation_artifacts", artifacts.len(), MAX_ARTIFACTS)?;
     validate_non_empty_bound("validation_profiles", profiles.len(), MAX_PROFILES)?;
     let mut validated_artifacts = Collection::with_capacity(artifacts.len());
@@ -816,7 +831,9 @@ fn validate_artifact(
     })
 }
 
-fn validate_profile(draft: &ValidationProfileCandidateDraft<'_>) -> PlannerResult<ValidationProfileCandidate> {
+fn validate_profile(
+    draft: &ValidationProfileCandidateDraft<'_>,
+) -> PlannerResult<ValidationProfileCandidate> {
     if !draft.trusted {
         return Err(diagnostic(
             ValidationPlannerDiagnosticCode::MissingProfile,
@@ -842,7 +859,10 @@ fn reject_raw_command(command: &str) -> PlannerResult<()> {
     let normalized = validation::normalized_adapter_field(PROFILE_LABEL_FIELD, command)
         .map_err(|error| map_adapter_error(&error))?;
     let lower = normalized.to_ascii_lowercase();
-    if RAW_COMMAND_MARKERS.iter().any(|marker| lower.contains(marker)) {
+    if RAW_COMMAND_MARKERS
+        .iter()
+        .any(|marker| lower.contains(marker))
+    {
         return Err(diagnostic(
             ValidationPlannerDiagnosticCode::UnsafeCommand,
             None,
@@ -856,8 +876,12 @@ fn reject_raw_command(command: &str) -> PlannerResult<()> {
     ))
 }
 
-fn plan_item(artifact: &ChangedArtifactSummary, profile: &ValidationProfileCandidate) -> ValidationPlanItem {
-    let mut item_id = Text::with_capacity(artifact.artifact_id().len() + profile.profile_label().len() + 1);
+fn plan_item(
+    artifact: &ChangedArtifactSummary,
+    profile: &ValidationProfileCandidate,
+) -> ValidationPlanItem {
+    let mut item_id =
+        Text::with_capacity(artifact.artifact_id().len() + profile.profile_label().len() + 1);
     item_id.push_str(artifact.artifact_id());
     item_id.push(':');
     item_id.push_str(profile.profile_label());
@@ -871,9 +895,13 @@ fn plan_item(artifact: &ChangedArtifactSummary, profile: &ValidationProfileCandi
     }
 }
 
-fn profile_matches(profile: &ValidationProfileCandidate, artifact: &ChangedArtifactSummary) -> bool {
+fn profile_matches(
+    profile: &ValidationProfileCandidate,
+    artifact: &ChangedArtifactSummary,
+) -> bool {
     profile.artifact_kind() == artifact.kind()
-        && (profile.workspace_label() == artifact.workspace_label() || profile.workspace_label() == WORKSPACE_WILDCARD)
+        && (profile.workspace_label() == artifact.workspace_label()
+            || profile.workspace_label() == WORKSPACE_WILDCARD)
 }
 
 fn fallback_profile<'a>(
@@ -881,7 +909,9 @@ fn fallback_profile<'a>(
     profiles: &'a [ValidationProfileCandidate],
 ) -> Option<&'a ValidationProfileCandidate> {
     let label = policy.fallback_profile_label?;
-    profiles.iter().find(|profile| profile.profile_label() == label)
+    profiles
+        .iter()
+        .find(|profile| profile.profile_label() == label)
 }
 
 fn rejected_plan(code: ValidationPlannerDiagnosticCode, message: &str) -> ScopedValidationPlan {
@@ -931,18 +961,31 @@ fn validate_non_empty_bound(field: &'static str, len: usize, max: usize) -> Plan
     Ok(())
 }
 
-fn safe_bounded_text(field: FieldName, value: &str, max_chars: usize, subject_id: Option<&str>) -> PlannerResult<Text> {
+fn safe_bounded_text(
+    field: FieldName,
+    value: &str,
+    max_chars: usize,
+    subject_id: Option<&str>,
+) -> PlannerResult<Text> {
     let text = safe_text(field, value, subject_id)?;
     if text.chars().count() > max_chars {
-        return Err(diagnostic(ValidationPlannerDiagnosticCode::FieldTooLong, subject_id, field.as_str()));
+        return Err(diagnostic(
+            ValidationPlannerDiagnosticCode::FieldTooLong,
+            subject_id,
+            field.as_str(),
+        ));
     }
     Ok(text)
 }
 
 fn safe_text(field: FieldName, value: &str, subject_id: Option<&str>) -> PlannerResult<Text> {
-    let normalized = validation::normalized_adapter_field(field, value).map_err(|error| map_adapter_error(&error))?;
+    let normalized = validation::normalized_adapter_field(field, value)
+        .map_err(|error| map_adapter_error(&error))?;
     let lower = normalized.to_ascii_lowercase();
-    if UNSAFE_VALIDATION_MARKERS.iter().any(|marker| lower.contains(marker)) {
+    if UNSAFE_VALIDATION_MARKERS
+        .iter()
+        .any(|marker| lower.contains(marker))
+    {
         return Err(diagnostic(
             ValidationPlannerDiagnosticCode::UnsafeMetadata,
             subject_id,
@@ -953,12 +996,16 @@ fn safe_text(field: FieldName, value: &str, subject_id: Option<&str>) -> Planner
 }
 
 fn safe_hash(value: &str) -> PlannerResult<Text> {
-    let normalized =
-        validation::normalized_adapter_field(HASH_FIELD, value).map_err(|error| map_adapter_error(&error))?;
+    let normalized = validation::normalized_adapter_field(HASH_FIELD, value)
+        .map_err(|error| map_adapter_error(&error))?;
     if Hash::new(&normalized).is_ok() {
         Ok(normalized)
     } else {
-        Err(diagnostic(ValidationPlannerDiagnosticCode::InvalidHash, None, HASH_FIELD.as_str()))
+        Err(diagnostic(
+            ValidationPlannerDiagnosticCode::InvalidHash,
+            None,
+            HASH_FIELD.as_str(),
+        ))
     }
 }
 
@@ -976,9 +1023,11 @@ fn map_adapter_error(error: &AdapterContractError) -> ValidationPlannerDiagnosti
         AdapterContractError::InvalidEvidenceHash { field, .. } => {
             diagnostic(ValidationPlannerDiagnosticCode::InvalidHash, None, field)
         }
-        AdapterContractError::EmptyCollection { field } => {
-            diagnostic(ValidationPlannerDiagnosticCode::EmptyCollection, None, field)
-        }
+        AdapterContractError::EmptyCollection { field } => diagnostic(
+            ValidationPlannerDiagnosticCode::EmptyCollection,
+            None,
+            field,
+        ),
         AdapterContractError::UnsupportedStatusState { field, .. }
         | AdapterContractError::UnsupportedStatusObservationKind { field, .. }
         | AdapterContractError::UnsupportedSessionReferenceKind { field, .. }
@@ -1081,27 +1130,54 @@ mod tests {
         // r[verify agent_harness_runtime.hermes_validation_planner.plan]
         // r[verify agent_harness_runtime.hermes_validation_planner.pure_planner]
         let artifacts = [
-            artifact(ARTIFACT_DOC, LABEL_DOC, ValidationArtifactKind::Documentation),
+            artifact(
+                ARTIFACT_DOC,
+                LABEL_DOC,
+                ValidationArtifactKind::Documentation,
+            ),
             artifact(ARTIFACT_RUST, LABEL_RUST, ValidationArtifactKind::Rust),
         ];
         let profiles = [
-            profile(PROFILE_RUST, GATE_RUST, ValidationArtifactKind::Rust, REASON_RUST),
-            profile(PROFILE_DOC, GATE_DOC, ValidationArtifactKind::Documentation, REASON_DOC),
+            profile(
+                PROFILE_RUST,
+                GATE_RUST,
+                ValidationArtifactKind::Rust,
+                REASON_RUST,
+            ),
+            profile(
+                PROFILE_DOC,
+                GATE_DOC,
+                ValidationArtifactKind::Documentation,
+                REASON_DOC,
+            ),
         ];
-        let plan = plan_scoped_validation(&artifacts, &profiles, &policy(), ValidationServiceStatus::Available);
+        let plan = plan_scoped_validation(
+            &artifacts,
+            &profiles,
+            &policy(),
+            ValidationServiceStatus::Available,
+        );
 
         assert_eq!(plan.status(), ValidationPlanStatus::Ready);
         assert_eq!(plan.items().len(), 2);
         assert_eq!(plan.items()[0].artifact_id(), ARTIFACT_DOC);
         assert_eq!(plan.items()[1].artifact_id(), ARTIFACT_RUST);
-        assert!(plan.items().iter().any(|item| item.profile_label() == PROFILE_RUST));
+        assert!(
+            plan.items()
+                .iter()
+                .any(|item| item.profile_label() == PROFILE_RUST)
+        );
         assert!(PROHIBITED_VALIDATION_PLANNER_EFFECTS.contains(&"process execution"));
     }
 
     #[test]
     fn fallback_profile_is_deterministic_for_unmatched_supported_artifacts() {
         // r[verify agent_harness_runtime.hermes_validation_planner.pure_planner]
-        let artifacts = [artifact(ARTIFACT_RUST, LABEL_RUST, ValidationArtifactKind::Rust)];
+        let artifacts = [artifact(
+            ARTIFACT_RUST,
+            LABEL_RUST,
+            ValidationArtifactKind::Rust,
+        )];
         let profiles = [ValidationProfileCandidateDraft {
             profile_label: PROFILE_FALLBACK,
             gate_label: "fallback-gate",
@@ -1112,8 +1188,18 @@ mod tests {
             trusted: true,
             raw_command_payload: None,
         }];
-        let first = plan_scoped_validation(&artifacts, &profiles, &policy(), ValidationServiceStatus::Available);
-        let second = plan_scoped_validation(&artifacts, &profiles, &policy(), ValidationServiceStatus::Available);
+        let first = plan_scoped_validation(
+            &artifacts,
+            &profiles,
+            &policy(),
+            ValidationServiceStatus::Available,
+        );
+        let second = plan_scoped_validation(
+            &artifacts,
+            &profiles,
+            &policy(),
+            ValidationServiceStatus::Available,
+        );
 
         assert_eq!(first, second);
         assert_eq!(first.items()[0].profile_label(), PROFILE_FALLBACK);
@@ -1122,29 +1208,59 @@ mod tests {
     #[test]
     fn missing_service_raw_command_and_stale_artifact_fail_closed() {
         // r[verify agent_harness_runtime.hermes_validation_planner.fail_closed]
-        let artifacts = [artifact(ARTIFACT_RUST, LABEL_RUST, ValidationArtifactKind::Rust)];
+        let artifacts = [artifact(
+            ARTIFACT_RUST,
+            LABEL_RUST,
+            ValidationArtifactKind::Rust,
+        )];
         let profiles = [profile(
             PROFILE_RUST,
             GATE_RUST,
             ValidationArtifactKind::Rust,
             REASON_RUST,
         )];
-        let missing = plan_scoped_validation(&artifacts, &profiles, &policy(), ValidationServiceStatus::Missing);
+        let missing = plan_scoped_validation(
+            &artifacts,
+            &profiles,
+            &policy(),
+            ValidationServiceStatus::Missing,
+        );
         let raw_profile = [ValidationProfileCandidateDraft {
             raw_command_payload: Some("bash -c cargo test"),
-            ..profile(PROFILE_RUST, GATE_RUST, ValidationArtifactKind::Rust, REASON_RUST)
+            ..profile(
+                PROFILE_RUST,
+                GATE_RUST,
+                ValidationArtifactKind::Rust,
+                REASON_RUST,
+            )
         }];
-        let raw = plan_scoped_validation(&artifacts, &raw_profile, &policy(), ValidationServiceStatus::Available);
+        let raw = plan_scoped_validation(
+            &artifacts,
+            &raw_profile,
+            &policy(),
+            ValidationServiceStatus::Available,
+        );
         let stale_artifacts = [ChangedArtifactSummaryDraft {
             observed_epoch: STALE_EPOCH,
             ..artifact(ARTIFACT_RUST, LABEL_RUST, ValidationArtifactKind::Rust)
         }];
-        let stale = plan_scoped_validation(&stale_artifacts, &profiles, &policy(), ValidationServiceStatus::Available);
+        let stale = plan_scoped_validation(
+            &stale_artifacts,
+            &profiles,
+            &policy(),
+            ValidationServiceStatus::Available,
+        );
 
         assert_eq!(missing.status(), ValidationPlanStatus::ServiceUnavailable);
         assert_eq!(raw.status(), ValidationPlanStatus::Rejected);
-        assert_eq!(raw.diagnostics()[0].code(), ValidationPlannerDiagnosticCode::UnsafeCommand);
-        assert_eq!(stale.diagnostics()[0].code(), ValidationPlannerDiagnosticCode::StaleArtifact);
+        assert_eq!(
+            raw.diagnostics()[0].code(),
+            ValidationPlannerDiagnosticCode::UnsafeCommand
+        );
+        assert_eq!(
+            stale.diagnostics()[0].code(),
+            ValidationPlannerDiagnosticCode::StaleArtifact
+        );
     }
 
     #[test]
@@ -1238,8 +1354,14 @@ mod tests {
         })
         .expect_err("receipt issue code must be safe");
 
-        assert_eq!(unsafe_result.code(), ValidationPlannerDiagnosticCode::UnsafeMetadata);
+        assert_eq!(
+            unsafe_result.code(),
+            ValidationPlannerDiagnosticCode::UnsafeMetadata
+        );
         assert_eq!(receipt.plan_hash(), HASH_A);
-        assert_eq!(leaking_receipt.code(), ValidationPlannerDiagnosticCode::UnsafeMetadata);
+        assert_eq!(
+            leaking_receipt.code(),
+            ValidationPlannerDiagnosticCode::UnsafeMetadata
+        );
     }
 }

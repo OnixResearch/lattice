@@ -32,7 +32,7 @@ fn admitted() -> pack::AdmittedPack {
         trusted_pack_identity: candidate.pack_identity.clone(),
         platform: pack::shell::platform_label(),
         dependency_identities: BTreeMap::new(),
-        allowed_licenses: vec!["MIT".to_string()],
+        allowed_licenses: vec!["AGPL-3.0-or-later".to_string()],
         allowed_capabilities: candidate.manifest.admission.allowed_capabilities.clone(),
         evidence: BTreeMap::new(),
     };
@@ -238,7 +238,7 @@ fn declared_no_effect_probe_runs_without_credentials_mutation_or_network_authori
         trusted_pack_identity: candidate.pack_identity.clone(),
         platform: pack::shell::platform_label(),
         dependency_identities: BTreeMap::new(),
-        allowed_licenses: vec!["MIT".to_string()],
+        allowed_licenses: vec!["AGPL-3.0-or-later".to_string()],
         allowed_capabilities: candidate.manifest.admission.allowed_capabilities.clone(),
         evidence: BTreeMap::new(),
     };
@@ -268,7 +268,7 @@ fn doctor_reports_distinct_cache_registry_platform_and_admission_states() {
             trusted_pack_identity: admitted.candidate.pack_identity.clone(),
             platform: pack::shell::platform_label(),
             dependency_identities: BTreeMap::new(),
-            allowed_licenses: vec!["MIT".to_string()],
+            allowed_licenses: vec!["AGPL-3.0-or-later".to_string()],
             allowed_capabilities: admitted.candidate.manifest.admission.allowed_capabilities.clone(),
             evidence: BTreeMap::new(),
         }),
@@ -363,7 +363,7 @@ fn execute_with_analyzer(
         trusted_pack_identity: candidate.pack_identity.clone(),
         platform: pack::shell::platform_label(),
         dependency_identities: BTreeMap::new(),
-        allowed_licenses: vec!["MIT".to_string()],
+        allowed_licenses: vec!["AGPL-3.0-or-later".to_string()],
         allowed_capabilities: candidate.manifest.admission.allowed_capabilities.clone(),
         evidence: BTreeMap::new(),
     };

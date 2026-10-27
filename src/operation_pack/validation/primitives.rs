@@ -28,7 +28,7 @@ pub fn validate_safe_relative_path(value: &str) -> Result<(), super::super::Erro
     Ok(())
 }
 
-pub(super) fn validate_id(value: &str) -> Result<(), super::super::Error> {
+pub(crate) fn validate_id(value: &str) -> Result<(), super::super::Error> {
     let has_valid_length = !value.is_empty() && value.len() <= crate::operation::model::MAXIMUM_ID_BYTES;
     let has_valid_bytes = value
         .bytes()
@@ -39,7 +39,7 @@ pub(super) fn validate_id(value: &str) -> Result<(), super::super::Error> {
     Ok(())
 }
 
-pub(super) fn validate_scoped_id(value: &str) -> Result<(), super::super::Error> {
+pub(crate) fn validate_scoped_id(value: &str) -> Result<(), super::super::Error> {
     if value.split('.').count() < 2 {
         return Err(super::super::Error::Invalid("scoped identifier"));
     }
@@ -74,7 +74,7 @@ pub(super) fn content_map(
     manifest.contents.iter().map(|content| (content.id.as_str(), content)).collect()
 }
 
-pub(super) fn sort_unique<T: Ord>(values: &mut [T]) -> Result<(), super::super::Error> {
+pub(crate) fn sort_unique<T: Ord>(values: &mut [T]) -> Result<(), super::super::Error> {
     values.sort();
     if values.windows(2).any(|pair| pair[0] == pair[1]) {
         return Err(super::super::Error::Invalid("duplicate normalized value"));

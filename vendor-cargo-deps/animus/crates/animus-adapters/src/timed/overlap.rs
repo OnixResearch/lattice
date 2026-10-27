@@ -28,7 +28,9 @@ pub struct ScheduledConcurrencyInput {
 
 /// Evaluates overlapping scheduled-run concurrency.
 #[must_use]
-pub const fn evaluate_scheduled_concurrency(input: ScheduledConcurrencyInput) -> ScheduledConcurrencyDecision {
+pub const fn evaluate_scheduled_concurrency(
+    input: ScheduledConcurrencyInput,
+) -> ScheduledConcurrencyDecision {
     if !input.active_run || !input.active_run_writes || !input.new_run_writes {
         return ScheduledConcurrencyDecision::Start;
     }

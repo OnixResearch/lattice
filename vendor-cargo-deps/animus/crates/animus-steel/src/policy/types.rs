@@ -36,7 +36,10 @@ impl HostAction {
             ACTION_RESPOND => Ok(Self::Respond),
             ACTION_COMPLETION_CANDIDATE => Ok(Self::CompletionCandidate),
             ACTION_STOP => Ok(Self::Stop),
-            _unknown => Err(Error::new(DenyReason::UnknownHostAction, "allowed_host_actions")),
+            _unknown => Err(Error::new(
+                DenyReason::UnknownHostAction,
+                "allowed_host_actions",
+            )),
         }
     }
 
@@ -105,7 +108,10 @@ impl ReceiptRedaction {
         match label {
             REDACTION_HASH_ONLY => Ok(Self::HashOnly),
             REDACTION_METADATA_ONLY => Ok(Self::MetadataOnly),
-            _unknown => Err(Error::new(DenyReason::UnsupportedReceiptRedaction, "receipt_redaction")),
+            _unknown => Err(Error::new(
+                DenyReason::UnsupportedReceiptRedaction,
+                "receipt_redaction",
+            )),
         }
     }
 
@@ -193,7 +199,12 @@ impl Error {
 
 impl core::fmt::Display for Error {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(formatter, "steel policy field {} failed: {}", self.field, self.reason.as_str())
+        write!(
+            formatter,
+            "steel policy field {} failed: {}",
+            self.field,
+            self.reason.as_str()
+        )
     }
 }
 

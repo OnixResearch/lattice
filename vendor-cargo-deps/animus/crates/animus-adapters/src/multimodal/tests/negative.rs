@@ -8,14 +8,20 @@ fn image_descriptor_rejects_malformed_or_unsafe_fields() {
         ..valid_image_draft()
     })
     .expect_err("unsupported media type should fail");
-    assert!(matches!(invalid_media, super::super::Error::UnsupportedMediaType { .. }));
+    assert!(matches!(
+        invalid_media,
+        super::super::Error::UnsupportedMediaType { .. }
+    ));
 
     let missing_hash = super::super::ImagePart::from_draft(super::super::ImagePartDraft {
         content_hash: "",
         ..valid_image_draft()
     })
     .expect_err("missing hash should fail");
-    assert!(matches!(missing_hash, super::super::Error::AdapterField { .. }));
+    assert!(matches!(
+        missing_hash,
+        super::super::Error::AdapterField { .. }
+    ));
 
     let missing_count = super::super::ImagePart::from_draft(super::super::ImagePartDraft {
         byte_count: 0,
@@ -30,10 +36,13 @@ fn image_descriptor_rejects_malformed_or_unsafe_fields() {
             ..valid_image_draft()
         })
         .expect_err("unsafe descriptor hint should fail");
-        assert_eq!(error, super::super::Error::UnsafeDescriptor {
-            field: super::super::SOURCE_HINT_FIELD.as_str(),
-            reason,
-        });
+        assert_eq!(
+            error,
+            super::super::Error::UnsafeDescriptor {
+                field: super::super::SOURCE_HINT_FIELD.as_str(),
+                reason,
+            }
+        );
     }
 }
 
@@ -68,65 +77,99 @@ fn dispatch_rejects_unsupported_model_and_unavailable_adapter() {
     let assembly = valid_mixed_assembly();
     let denied_dispatch = super::super::prepare_dispatch(&assembly, &text_only_capabilities())
         .expect_err("text-only model should fail closed");
-    assert_eq!(denied_dispatch, super::super::Error::UnsupportedModality {
-        model_label: alloc::string::String::from(TEXT_ONLY_MODEL_LABEL),
-        modality: super::super::InputModality::Image,
-    });
+    assert_eq!(
+        denied_dispatch,
+        super::super::Error::UnsupportedModality {
+            model_label: alloc::string::String::from(TEXT_ONLY_MODEL_LABEL),
+            modality: super::super::InputModality::Image,
+        }
+    );
 
     let unavailable = super::super::prepare_dispatch(
         &assembly,
-        &super::super::ModelInputCapabilities::from_draft(super::super::ModelInputCapabilitiesDraft {
-            model_label: MODEL_LABEL,
-            supports_text: true,
-            supports_images: true,
-            image_adapter_available: false,
-        })
+        &super::super::ModelInputCapabilities::from_draft(
+            super::super::ModelInputCapabilitiesDraft {
+                model_label: MODEL_LABEL,
+                supports_text: true,
+                supports_images: true,
+                image_adapter_available: false,
+                video: super::super::VideoInputCapabilitiesDraft {
+                    supported: false,
+                    service_available: false,
+                    projection_available: false,
+                    media_types: &[],
+                    byte_limit: 0,
+                    duration_limit_ms: 0,
+                },
+            },
+        )
         .expect("capabilities should validate"),
     )
     .expect_err("missing image adapter should fail closed");
-    assert_eq!(unavailable, super::super::Error::AdapterUnavailable {
-        label: alloc::string::String::from(MODEL_LABEL),
-    });
+    assert_eq!(
+        unavailable,
+        super::super::Error::AdapterUnavailable {
+            label: alloc::string::String::from(MODEL_LABEL),
+        }
+    );
 }
 
 #[test]
 fn provider_native_fixture_rejects_lossy_missing_invalid_and_live_call_paths() {
     // r[verify agent_harness_runtime.multimodal_image_payloads.adapter_serialization.fixtures]
     let assembly = valid_mixed_assembly();
-    let generic_policy =
-        super::super::ProviderSerializationPolicy::from_draft(super::super::ProviderSerializationPolicyDraft {
+    let generic_policy = super::super::ProviderSerializationPolicy::from_draft(
+        super::super::ProviderSerializationPolicyDraft {
             provider_label: PROVIDER_LABEL,
             mode: super::super::ProviderSerializationMode::GenericJson,
-        })
-        .expect("policy should validate");
-    let service = StaticImageService { handle: valid_handle() };
-    let lossy = super::super::serialize_provider_native_fixture(&assembly, &generic_policy, Some(&service))
-        .expect_err("generic conversion should fail for images");
+            video_projection: None,
+        },
+    )
+    .expect("policy should validate");
+    let service = StaticImageService {
+        handle: valid_handle(),
+    };
+    let lossy =
+        super::super::serialize_provider_native_fixture(&assembly, &generic_policy, Some(&service))
+            .expect_err("generic conversion should fail for images");
     assert_eq!(lossy, super::super::Error::LossyGenericConversion);
 
-    let missing = super::super::serialize_provider_native_fixture(&assembly, &native_policy(), None)
-        .expect_err("missing image service should fail");
+    let missing =
+        super::super::serialize_provider_native_fixture(&assembly, &native_policy(), None)
+            .expect_err("missing image service should fail");
     assert_eq!(missing, super::super::Error::MissingImageService);
 
     let mismatched_service = StaticImageService {
-        handle: super::super::ImagePayloadHandle::from_draft(super::super::ImagePayloadHandleDraft {
-            content_hash: OTHER_VALID_HASH,
-            ..valid_handle_draft()
-        })
+        handle: super::super::ImagePayloadHandle::from_draft(
+            super::super::ImagePayloadHandleDraft {
+                content_hash: OTHER_VALID_HASH,
+                ..valid_handle_draft()
+            },
+        )
         .expect("handle should validate"),
     };
-    let mismatched =
-        super::super::serialize_provider_native_fixture(&assembly, &native_policy(), Some(&mismatched_service))
-            .expect_err("mismatched handle should fail");
-    assert_eq!(mismatched, super::super::Error::MismatchedImageHandle {
-        field: super::super::CONTENT_HASH_FIELD.as_str(),
-    });
+    let mismatched = super::super::serialize_provider_native_fixture(
+        &assembly,
+        &native_policy(),
+        Some(&mismatched_service),
+    )
+    .expect_err("mismatched handle should fail");
+    assert_eq!(
+        mismatched,
+        super::super::Error::MismatchedImageHandle {
+            field: super::super::CONTENT_HASH_FIELD.as_str(),
+        }
+    );
 
     let live_service = FailingImageService {
         error: super::super::ImagePayloadError::LiveProviderCallRequired,
     };
-    let live = super::super::serialize_provider_native_fixture(&assembly, &native_policy(), Some(&live_service))
-        .expect_err("live-call service should fail fixture serialization");
+    let live = super::super::serialize_provider_native_fixture(
+        &assembly,
+        &native_policy(),
+        Some(&live_service),
+    )
+    .expect_err("live-call service should fail fixture serialization");
     assert_eq!(live, super::super::Error::LiveProviderCallRequired);
 }
 
@@ -139,9 +182,12 @@ fn receipt_rejects_image_metadata_leaks() {
             ..valid_receipt_draft()
         })
         .expect_err("receipt leak should fail");
-        assert_eq!(error, super::super::Error::UnsafeDescriptor {
-            field: super::super::METADATA_FRAGMENT_FIELD.as_str(),
-            reason,
-        });
+        assert_eq!(
+            error,
+            super::super::Error::UnsafeDescriptor {
+                field: super::super::METADATA_FRAGMENT_FIELD.as_str(),
+                reason,
+            }
+        );
     }
 }

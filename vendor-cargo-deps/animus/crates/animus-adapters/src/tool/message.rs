@@ -111,8 +111,10 @@ impl Request {
             field: super::ARGUMENT_NAME_FIELD.as_str(),
         })?;
         validate_output_policy(draft.output_policy)?;
-        let mutation_targets = super::normalized_label_set(super::MUTATION_TARGET_FIELD, draft.mutation_targets)?;
-        let required_capability_labels = required_capability_labels(draft.required_capability_labels)?;
+        let mutation_targets =
+            super::normalized_label_set(super::MUTATION_TARGET_FIELD, draft.mutation_targets)?;
+        let required_capability_labels =
+            required_capability_labels(draft.required_capability_labels)?;
         Ok(Self {
             name,
             schema_identity: super::Text::from(arguments.schema_identity()),
@@ -196,7 +198,9 @@ impl Request {
 }
 
 fn validate_output_policy(policy: super::OutputPolicy) -> Result<(), super::ContractError> {
-    if (super::MIN_VISIBLE_OUTPUT_CHARS..=super::MAX_VISIBLE_OUTPUT_CHARS).contains(&policy.visible_char_budget) {
+    if (super::MIN_VISIBLE_OUTPUT_CHARS..=super::MAX_VISIBLE_OUTPUT_CHARS)
+        .contains(&policy.visible_char_budget)
+    {
         return Ok(());
     }
     Err(super::ContractError::InvalidVisibleBudget {
@@ -206,7 +210,9 @@ fn validate_output_policy(policy: super::OutputPolicy) -> Result<(), super::Cont
     })
 }
 
-fn required_capability_labels(labels: &[&str]) -> Result<super::Collection<super::Text>, super::ContractError> {
+fn required_capability_labels(
+    labels: &[&str],
+) -> Result<super::Collection<super::Text>, super::ContractError> {
     if labels.is_empty() {
         return Err(crate::AdapterContractError::EmptyCollection {
             field: super::CAPABILITY_FIELD.as_str(),

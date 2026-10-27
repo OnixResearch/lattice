@@ -1,0 +1,12 @@
+{
+  "schema": "lattice.tile-pane-observation.v1",
+  "source": {
+    "producer_revision": "5e703953840bff72a91fec3e928682e9efb607ab",
+    "daemon_identity": "b3:1111111111111111111111111111111111111111111111111111111111111111",
+    "session_id": 1,
+    "pane_id": 1,
+    "workspace_revision": 1
+  },
+  "lifecycle": "running",
+  "focused": true
+}

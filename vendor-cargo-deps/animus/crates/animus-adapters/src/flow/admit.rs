@@ -1,6 +1,9 @@
-const SOURCE_KIND_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_source_kind");
-const SOURCE_LABEL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_source_label");
-const CONTENT_HASH_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_content_hash");
+const SOURCE_KIND_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_source_kind");
+const SOURCE_LABEL_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_source_label");
+const CONTENT_HASH_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_content_hash");
 
 const SOURCE_FIRST_RUN: &str = "first_run";
 const SOURCE_CHANGED: &str = "changed";
@@ -80,7 +83,11 @@ pub enum RecipeTrustStatus {
 
 impl RecipeTrustStatus {
     fn from_admitted(admitted: bool) -> Self {
-        if admitted { Self::Admitted } else { Self::Pending }
+        if admitted {
+            Self::Admitted
+        } else {
+            Self::Pending
+        }
     }
 
     fn as_str(self) -> &'static str {

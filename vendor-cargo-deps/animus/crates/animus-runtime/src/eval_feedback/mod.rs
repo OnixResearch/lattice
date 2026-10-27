@@ -5,8 +5,7 @@
 //! and scaffold admission. Runtime core only validates DTOs and classifies safe
 //! evidence freshness.
 
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while
-// drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -14,7 +13,12 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
+#![allow(
+    compound_condition,
+    excessive_file_length,
+    function_length,
+    non_trait_imports
+)]
 #![allow(
     numeric_units,
     path_segment_repetition,
@@ -24,32 +28,19 @@
 mod core;
 mod data;
 
-pub use core::blake3_eval_feedback_fingerprint;
-pub use core::classify_eval_feedback_freshness;
-pub use core::evaluate_feedback_review;
-pub use core::validate_eval_feedback_plan;
-pub use core::validate_eval_feedback_receipt;
-
-pub use data::EvalFeedbackCandidate;
-pub use data::EvalFeedbackCandidateKind;
-pub use data::EvalFeedbackDiagnostic;
-pub use data::EvalFeedbackDiagnosticKind;
-pub use data::EvalFeedbackFingerprint;
-pub use data::EvalFeedbackFreshnessDecision;
-pub use data::EvalFeedbackFreshnessPolicy;
-pub use data::EvalFeedbackOutputFormat;
-pub use data::EvalFeedbackPlan;
-pub use data::EvalFeedbackReceipt;
-pub use data::EvalFeedbackReceiptLeak;
-pub use data::EvalFeedbackRedactionState;
-pub use data::EvalFeedbackReviewDecision;
-pub use data::EvalFeedbackReviewOutcome;
-pub use data::EvalFeedbackRunStatus;
-pub use data::EvalFeedbackScopeRequest;
-pub use data::EvalFeedbackTaskSet;
-pub use data::EvalFeedbackTaskSetKind;
-pub use data::EvalFeedbackValidationResult;
-pub use data::EvalFeedbackVerifierIdentity;
+pub use core::{
+    blake3_eval_feedback_fingerprint, classify_eval_feedback_freshness, evaluate_feedback_review,
+    validate_eval_feedback_plan, validate_eval_feedback_receipt,
+};
+pub use data::{
+    EvalFeedbackCandidate, EvalFeedbackCandidateKind, EvalFeedbackDiagnostic,
+    EvalFeedbackDiagnosticKind, EvalFeedbackFingerprint, EvalFeedbackFreshnessDecision,
+    EvalFeedbackFreshnessPolicy, EvalFeedbackOutputFormat, EvalFeedbackPlan, EvalFeedbackReceipt,
+    EvalFeedbackReceiptLeak, EvalFeedbackRedactionState, EvalFeedbackReviewDecision,
+    EvalFeedbackReviewOutcome, EvalFeedbackRunStatus, EvalFeedbackScopeRequest,
+    EvalFeedbackTaskSet, EvalFeedbackTaskSetKind, EvalFeedbackValidationResult,
+    EvalFeedbackVerifierIdentity,
+};
 
 pub(crate) const BLAKE3_ALGORITHM: &str = "BLAKE3";
 pub(crate) const EVAL_FEEDBACK_HASH_DOMAIN: &str = "animus.eval-feedback.v1";

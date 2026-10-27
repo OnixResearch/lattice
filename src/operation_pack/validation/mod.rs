@@ -14,7 +14,7 @@
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
-mod primitives;
+pub(crate) mod primitives;
 
 use primitives::content_map;
 use primitives::sort_unique;
@@ -40,6 +40,7 @@ pub fn validate_manifest(mut manifest: super::model::Manifest) -> Result<super::
     validate_contents(&manifest)?;
     validate_runtimes(&manifest)?;
     validate_operations(&manifest)?;
+    super::wasm::validate_method_closure(&manifest)?;
     validate_analyzers(&manifest)?;
     validate_skills(&manifest)?;
     validate_dependencies(&manifest)?;
@@ -106,6 +107,9 @@ fn normalize(manifest: &mut super::model::Manifest) -> Result<(), super::Error> 
         sort_unique(&mut runtime.launch_labels)?;
         sort_unique(&mut runtime.platforms)?;
         sort_unique(&mut runtime.capabilities)?;
+        if let Some(descriptor) = &mut runtime.wasm {
+            super::wasm::normalize(descriptor)?;
+        }
     }
     for analyzer in &mut manifest.analyzers {
         sort_unique(&mut analyzer.data_view)?;
@@ -146,14 +150,27 @@ fn validate_runtimes(manifest: &super::model::Manifest) -> Result<(), super::Err
     let mut ids = BTreeSet::new();
     for runtime in &manifest.runtimes {
         validate_id(&runtime.id)?;
-        if !ids.insert(&runtime.id) || runtime.kind != RUNTIME_KIND || !runtime.clear_environment {
+        if !ids.insert(&runtime.id) || !runtime.clear_environment {
             return Err(super::Error::Invalid("runtime class"));
         }
+        match runtime.kind.as_str() {
+            RUNTIME_KIND if runtime.wasm.is_none() => {}
+            super::wasm::RUNTIME_KIND => super::wasm::validate_descriptor(manifest, runtime)?,
+            _ => return Err(super::Error::Invalid("runtime class")),
+        }
         let artifact = content.get(runtime.content_id.as_str()).ok_or(super::Error::Invalid("runtime content"))?;
-        if artifact.role != super::model::ContentRole::RuntimeArtifact {
+        let expected_role = if runtime.kind == super::wasm::RUNTIME_KIND {
+            super::model::ContentRole::WasmComponent
+        } else {
+            super::model::ContentRole::RuntimeArtifact
+        };
+        if artifact.role != expected_role {
             return Err(super::Error::Invalid("runtime content role"));
         }
-        if runtime.launch_labels.is_empty() || runtime.platforms.is_empty() || runtime.capabilities.is_empty() {
+        if runtime.launch_labels.is_empty()
+            || runtime.platforms.is_empty()
+            || (runtime.kind == RUNTIME_KIND && runtime.capabilities.is_empty())
+        {
             return Err(super::Error::Invalid("runtime declaration"));
         }
         if runtime.timeout_seconds < MINIMUM_TIMEOUT_SECONDS

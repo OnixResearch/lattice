@@ -1,0 +1,42 @@
+{
+  "schema": "mantle-oci-registry-push-report-v2",
+  "schema_version": 2,
+  "published": true,
+  "registry": "https://registry.example.test",
+  "repository": "onix/kernel-bundle",
+  "reference": "reviewed",
+  "metadata_reference": "reviewed.mantle-metadata",
+  "signature_reference": "reviewed.mantle-signature",
+  "manifest_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "metadata_manifest_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "signature_manifest_digest": "sha256:6cddbb1a26110692cb528c110396291cea7c02127595400e9f11d905613c3739",
+  "trust_domain": "onix-kernel-bundle",
+  "policy_blake3": "ad45c4728f086ed75a4e8e625847126a24437842cfe5bca80dba88a7d9ef39ab",
+  "verified_signers": [
+    "cache.example.com-1"
+  ],
+  "verified_public_key_blake3": [
+    "cad153db7d4f564bbfab4e10b6f31460ec672cdd5f296ab1a33d19371f028fab"
+  ],
+  "layout_blake3": "1111111111111111111111111111111111111111111111111111111111111111",
+  "projection_blake3": "2222222222222222222222222222222222222222222222222222222222222222",
+  "export_receipt_blake3": "3333333333333333333333333333333333333333333333333333333333333333",
+  "uploaded_blobs": 2,
+  "reused_blobs": 3,
+  "transferred_bytes": 42,
+  "credential_mode": "explicit-bearer-file",
+  "non_claims": [
+    "credential possession is not authorization proof",
+    "no bootability claim",
+    "no deployability claim",
+    "no exactly-once publication",
+    "no kernel compatibility decision",
+    "no registry authorization claim",
+    "no release eligibility claim",
+    "no revocation freshness or transparency claim",
+    "no tag immutability claim",
+    "no upload resumption",
+    "signature verification authenticates only the immutable digest pair under supplied local policy"
+  ],
+  "receipt_blake3": "7f5fed1960229272032dcd0123fd5195c4786fded89ab7bbfc86ba2882721408"
+}

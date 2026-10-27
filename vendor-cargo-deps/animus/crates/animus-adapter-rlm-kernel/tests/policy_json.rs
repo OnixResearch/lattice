@@ -1,9 +1,8 @@
 #![allow(missing_docs)]
 
-use animus_adapter_rlm_kernel::HostOperationClass;
-use animus_adapter_rlm_kernel::ResourceBounds;
-use animus_adapter_rlm_kernel::RlmKernelPolicy;
-use animus_adapter_rlm_kernel::RlmKernelPolicyDraft;
+use animus_adapter_rlm_kernel::{
+    HostOperationClass, ResourceBounds, RlmKernelPolicy, RlmKernelPolicyDraft,
+};
 
 const GENERATED_POLICY: &str = include_str!("../../../config/generated/rlm-kernel-profile.json");
 
@@ -11,10 +10,14 @@ const GENERATED_POLICY: &str = include_str!("../../../config/generated/rlm-kerne
 fn generated_nickel_policy_is_revalidated_by_rust() {
     // r[verify agent_harness_runtime.rlm_kernel.profile.valid]
     // r[verify agent_harness_runtime.rlm_kernel.verification.positive]
-    let value: serde_json::Value = serde_json::from_str(GENERATED_POLICY).expect("generated policy must be JSON");
+    let value: serde_json::Value =
+        serde_json::from_str(GENERATED_POLICY).expect("generated policy must be JSON");
     let bounds = &value["bounds"];
     let operation_labels = strings(&value["admitted_operations"]);
-    let operations = operation_labels.iter().map(|label| operation(label)).collect::<Vec<_>>();
+    let operations = operation_labels
+        .iter()
+        .map(|label| operation(label))
+        .collect::<Vec<_>>();
     let child_profiles = strings(&value["admitted_child_profiles"]);
     let child_profile_refs = refs(&child_profiles);
     let non_claims = strings(&value["non_claims"]);
@@ -38,13 +41,24 @@ fn generated_nickel_policy_is_revalidated_by_rust() {
             max_child_tokens: number_u64(&bounds["max_child_tokens"]),
             max_child_wall_time_ms: number_u64(&bounds["max_child_wall_time_ms"]),
             max_child_result_chars: number_u32(&bounds["max_child_result_chars"]),
+            max_host_calls_per_cell: number_u32(&bounds["max_host_calls_per_cell"]),
+            max_host_result_chars: number_u32(&bounds["max_host_result_chars"]),
+            max_cumulative_host_result_chars: number_u32(
+                &bounds["max_cumulative_host_result_chars"],
+            ),
+            max_bridge_nesting: number_u32(&bounds["max_bridge_nesting"]),
+            max_bridge_evaluation_fuel: number_u64(&bounds["max_bridge_evaluation_fuel"]),
+            max_bridge_wall_time_ms: number_u64(&bounds["max_bridge_wall_time_ms"]),
         },
         admitted_operations: operations.as_slice(),
         admitted_child_profiles: child_profile_refs.as_slice(),
         non_claims: non_claim_refs.as_slice(),
     })
     .expect("Rust must admit the checked Nickel policy");
-    assert_eq!(policy.cohort_revision(), "c5991bc853d27754aed345c13ff4d2e05c40f1f4");
+    assert_eq!(
+        policy.cohort_revision(),
+        "c5991bc853d27754aed345c13ff4d2e05c40f1f4"
+    );
     assert_eq!(policy.identity().len(), 64);
 }
 
@@ -57,7 +71,9 @@ fn number_u32(value: &serde_json::Value) -> u32 {
 }
 
 fn number_u64(value: &serde_json::Value) -> u64 {
-    value.as_u64().expect("field must be a non-negative integer")
+    value
+        .as_u64()
+        .expect("field must be a non-negative integer")
 }
 
 fn strings(value: &serde_json::Value) -> Vec<String> {

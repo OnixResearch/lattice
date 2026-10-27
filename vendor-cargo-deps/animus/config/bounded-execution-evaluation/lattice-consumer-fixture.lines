@@ -1,0 +1,9 @@
+schema|animus.bounded-execution-lattice-consumer.v1
+consumer|lattice
+revision|5c9902f777412296c13e2347e45b3bede335b828
+accepted_status|blocked
+accepted_status|incubate
+requires_new_change_for_extract|true
+consumes|status,profile_blake3,decision_blake3,blocker_count,next_action,non_claims
+rejects|commands,environment_values,host_paths,credentials,raw_diagnostics
+non_claim|fixture mapping does not execute or authorize a Lattice workflow

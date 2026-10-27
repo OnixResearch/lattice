@@ -26,7 +26,10 @@ impl SandboxContext {
     /// invalid.
     pub fn new(draft: &SandboxContextDraft<'_>) -> Result<Self, super::super::Error> {
         Ok(Self {
-            active_sandbox: super::super::required_text(super::super::ACTIVE_SANDBOX_FIELD, draft.active_sandbox)?,
+            active_sandbox: super::super::required_text(
+                super::super::ACTIVE_SANDBOX_FIELD,
+                draft.active_sandbox,
+            )?,
             requested_capability: super::super::required_text(
                 super::super::REQUESTED_CAPABILITY_FIELD,
                 draft.requested_capability,

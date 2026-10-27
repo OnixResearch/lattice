@@ -15,13 +15,21 @@ fn identity_is_deterministic_for_dependency_order() {
     let right_dependencies = [first.clone(), second.clone()];
 
     let left = super::Envelope::new(
-        super::Draft::new(super::Kind::RuntimeReceipt, super::RedactionClass::MetadataOnly, PUBLIC_PAYLOAD)
-            .with_dependencies(&left_dependencies),
+        super::Draft::new(
+            super::Kind::RuntimeReceipt,
+            super::RedactionClass::MetadataOnly,
+            PUBLIC_PAYLOAD,
+        )
+        .with_dependencies(&left_dependencies),
     )
     .expect("left envelope should build");
     let right = super::Envelope::new(
-        super::Draft::new(super::Kind::RuntimeReceipt, super::RedactionClass::MetadataOnly, PUBLIC_PAYLOAD)
-            .with_dependencies(&right_dependencies),
+        super::Draft::new(
+            super::Kind::RuntimeReceipt,
+            super::RedactionClass::MetadataOnly,
+            PUBLIC_PAYLOAD,
+        )
+        .with_dependencies(&right_dependencies),
     )
     .expect("right envelope should build");
 
@@ -55,9 +63,12 @@ fn non_public_outputs_hide_payloads() {
     ];
 
     for redaction in classes {
-        let envelope =
-            super::Envelope::new(super::Draft::new(super::Kind::ProvenanceObservation, redaction, SECRET_PAYLOAD))
-                .expect("non-public envelope should build");
+        let envelope = super::Envelope::new(super::Draft::new(
+            super::Kind::ProvenanceObservation,
+            redaction,
+            SECRET_PAYLOAD,
+        ))
+        .expect("non-public envelope should build");
         let summary = envelope.review_summary();
 
         assert!(!redaction.allows_payload_display());
@@ -85,9 +96,12 @@ fn uppercase_hash_is_rejected() {
     let uppercase = LETTER_HASH_TEXT.to_ascii_uppercase();
     let error = super::Hash::new(&uppercase).expect_err("uppercase hash should fail");
 
-    assert_eq!(error, super::Error::InvalidHash {
-        field: super::digest::test_support::FIELD,
-        reason: super::digest::test_support::NOT_HEX_REASON,
-    });
+    assert_eq!(
+        error,
+        super::Error::InvalidHash {
+            field: super::digest::test_support::FIELD,
+            reason: super::digest::test_support::NOT_HEX_REASON,
+        }
+    );
     assert_eq!(uppercase.len(), super::BLAKE3_HASH_HEX_CHARS);
 }

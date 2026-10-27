@@ -1,0 +1,271 @@
+{
+  "acceptance_ids": [],
+  "actions": [
+    {
+      "description": "move active change to archive: add-mantle-authority-sdk",
+      "kind": "archive_change",
+      "path": "./.cairn/archive/2026-10-20-add-mantle-authority-sdk"
+    }
+  ],
+  "blocked": false,
+  "change": "add-mantle-authority-sdk",
+  "cross_repo_dependencies": {
+    "blocked_count": 0,
+    "dependency_count": 0,
+    "input_hash": "db590aa05b790925fdf986f022250368d1d39b2a83586461571de4946c808d37",
+    "non_claims": [
+      "dependency satisfaction proves presented receipt linkage only",
+      "dependency satisfaction does not prove upstream correctness or remote trust",
+      "dependency satisfaction does not prove downstream integration correctness or release eligibility"
+    ],
+    "policy_hash": "c8276321e0e82c524e09ad9357fa48a9d38ac8590263ee6f79c51a328dc6037d",
+    "receipt_hash": "a904c2e684f22844da630261b04dcd4f165f82816b2d7612b88f0099fedec311",
+    "rows": [],
+    "satisfied_count": 0,
+    "schema": "cairn.cross-repo-dependency-receipt.v1",
+    "valid": true,
+    "verdict": "PASS"
+  },
+  "cross_repo_evidence_issues": [],
+  "dry_run": false,
+  "input_hash": "d46e6df835fb35b4b10797894d35e2d653b08c341bad9c50dff323bad05f844c",
+  "layout": "cairn",
+  "mutated": true,
+  "mutation_manifest": {
+    "after": {
+      "entries": [
+        {
+          "content_hash": "d87bba8cf4ae9edae4a6e6a0153f671fef923e5a622e4a0ecd58b345ae09cdaa",
+          "exists": true,
+          "path": "./.cairn/archive/2026-10-20-add-mantle-authority-sdk/design.md"
+        },
+        {
+          "content_hash": "d6da92d78ea214537b1dc65f5f2f5647987507dde7363e55f6f99e3b46929ece",
+          "exists": true,
+          "path": "./.cairn/archive/2026-10-20-add-mantle-authority-sdk/evidence/current-observations.md"
+        },
+        {
+          "content_hash": "8767e9ef5059380a05694e50b656e3e9ab2cc504f27a34592c2bb0bd23c5add1",
+          "exists": true,
+          "path": "./.cairn/archive/2026-10-20-add-mantle-authority-sdk/evidence/native-admission-v1/complete.json"
+        },
+        {
+          "content_hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
+          "exists": true,
+          "path": "./.cairn/archive/2026-10-20-add-mantle-authority-sdk/evidence/native-admission-v1/native-archive-preview.stderr"
+        },
+        {
+          "content_hash": "5123f2d0c4bcd4b3af879f72c2a1975eaef3c7ccbd49f2c86ea994372eb45d2a",
+          "exists": true,
+          "path": "./.cairn/archive/2026-10-20-add-mantle-authority-sdk/evidence/native-admission-v1/native-archive-preview.stdout"
+        },
+        {
+          "content_hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
+          "exists": true,
+          "path": "./.cairn/archive/2026-10-20-add-mantle-authority-sdk/evidence/native-admission-v1/native-gate-design.stderr"
+        },
+        {
+          "content_hash": "b7ea4cbefa0c1fdabc7f310fb5d9352ba8c0a906f4ed9f44595d4b640a9c447f",
+          "exists": true,
+          "path": "./.cairn/archive/2026-10-20-add-mantle-authority-sdk/evidence/native-admission-v1/native-gate-design.stdout"
+        },
+        {
+          "content_hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
+          "exists": true,
+          "path": "./.cairn/archive/2026-10-20-add-mantle-authority-sdk/evidence/native-admission-v1/native-gate-proposal.stderr"
+        },
+        {
+          "content_hash": "b827fb4dd91ee1a59c1d4e3c1b6c60004ea47622bc48a31fcdc572ff68c95587",
+          "exists": true,
+          "path": "./.cairn/archive/2026-10-20-add-mantle-authority-sdk/evidence/native-admission-v1/native-gate-proposal.stdout"
+        },
+        {
+          "content_hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
+          "exists": true,
+          "path": "./.cairn/archive/2026-10-20-add-mantle-authority-sdk/evidence/native-admission-v1/native-gate-tasks.stderr"
+        },
+        {
+          "content_hash": "355d08282ecf6d9aff5e2545edcc350ba00b3732a212a301ea3293e482416d0d",
+          "exists": true,
+          "path": "./.cairn/archive/2026-10-20-add-mantle-authority-sdk/evidence/native-admission-v1/native-gate-tasks.stdout"
+        },
+        {
+          "content_hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
+          "exists": true,
+          "path": "./.cairn/archive/2026-10-20-add-mantle-authority-sdk/evidence/native-admission-v1/native-sync-preview.stderr"
+        },
+        {
+          "content_hash": "202e892eeb3fbf3a01d27851f003e9ac5462926e0fd574cd5cdb0e691f5b0c24",
+          "exists": true,
+          "path": "./.cairn/archive/2026-10-20-add-mantle-authority-sdk/evidence/native-admission-v1/native-sync-preview.stdout"
+        },
+        {
+          "content_hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
+          "exists": true,
+          "path": "./.cairn/archive/2026-10-20-add-mantle-authority-sdk/evidence/native-admission-v1/native-validate.stderr"
+        },
+        {
+          "content_hash": "2662861d302adcca27df99ba2122d2e13701a282ab4b6a26abda1ed1ea815f7a",
+          "exists": true,
+          "path": "./.cairn/archive/2026-10-20-add-mantle-authority-sdk/evidence/native-admission-v1/native-validate.stdout"
+        },
+        {
+          "content_hash": "fd32db67956bfb66183e741dfe02c0969adcf480ac3c3bb49f9967fdce3bbdba",
+          "exists": true,
+          "path": "./.cairn/archive/2026-10-20-add-mantle-authority-sdk/evidence/native-admission-v1/results.json"
+        },
+        {
+          "content_hash": "df8b71bae570eb5accd702e7370a816b8ea9f2e4521254c5d75ea82a9cfcf4db",
+          "exists": true,
+          "path": "./.cairn/archive/2026-10-20-add-mantle-authority-sdk/metadata.json"
+        },
+        {
+          "content_hash": "5f1b5cadf5aeaba8b73ba86afe486391016cf32bd9ec5566ade5f902e8724915",
+          "exists": true,
+          "path": "./.cairn/archive/2026-10-20-add-mantle-authority-sdk/proposal.md"
+        },
+        {
+          "content_hash": "844c35e7047e24312c35c08b61628cc280b42cfdb1c946228de400c971ad67db",
+          "exists": true,
+          "path": "./.cairn/archive/2026-10-20-add-mantle-authority-sdk/specs/mantle-authority/spec.md"
+        },
+        {
+          "content_hash": "143129999cee84296b67410128f61cc152ad306df15900fa1f3681839194af07",
+          "exists": true,
+          "path": "./.cairn/archive/2026-10-20-add-mantle-authority-sdk/tasks.md"
+        },
+        {
+          "content_hash": null,
+          "exists": false,
+          "path": "./.cairn/changes/add-mantle-authority-sdk"
+        }
+      ],
+      "manifest_hash": "c2936481fcfdd33aef5062c14bd187fedac89e4cb117d0639e609a770a5350e5"
+    },
+    "before": {
+      "entries": [
+        {
+          "content_hash": "d87bba8cf4ae9edae4a6e6a0153f671fef923e5a622e4a0ecd58b345ae09cdaa",
+          "exists": true,
+          "path": "./.cairn/changes/add-mantle-authority-sdk/design.md"
+        },
+        {
+          "content_hash": "d6da92d78ea214537b1dc65f5f2f5647987507dde7363e55f6f99e3b46929ece",
+          "exists": true,
+          "path": "./.cairn/changes/add-mantle-authority-sdk/evidence/current-observations.md"
+        },
+        {
+          "content_hash": "8767e9ef5059380a05694e50b656e3e9ab2cc504f27a34592c2bb0bd23c5add1",
+          "exists": true,
+          "path": "./.cairn/changes/add-mantle-authority-sdk/evidence/native-admission-v1/complete.json"
+        },
+        {
+          "content_hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
+          "exists": true,
+          "path": "./.cairn/changes/add-mantle-authority-sdk/evidence/native-admission-v1/native-archive-preview.stderr"
+        },
+        {
+          "content_hash": "5123f2d0c4bcd4b3af879f72c2a1975eaef3c7ccbd49f2c86ea994372eb45d2a",
+          "exists": true,
+          "path": "./.cairn/changes/add-mantle-authority-sdk/evidence/native-admission-v1/native-archive-preview.stdout"
+        },
+        {
+          "content_hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
+          "exists": true,
+          "path": "./.cairn/changes/add-mantle-authority-sdk/evidence/native-admission-v1/native-gate-design.stderr"
+        },
+        {
+          "content_hash": "b7ea4cbefa0c1fdabc7f310fb5d9352ba8c0a906f4ed9f44595d4b640a9c447f",
+          "exists": true,
+          "path": "./.cairn/changes/add-mantle-authority-sdk/evidence/native-admission-v1/native-gate-design.stdout"
+        },
+        {
+          "content_hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
+          "exists": true,
+          "path": "./.cairn/changes/add-mantle-authority-sdk/evidence/native-admission-v1/native-gate-proposal.stderr"
+        },
+        {
+          "content_hash": "b827fb4dd91ee1a59c1d4e3c1b6c60004ea47622bc48a31fcdc572ff68c95587",
+          "exists": true,
+          "path": "./.cairn/changes/add-mantle-authority-sdk/evidence/native-admission-v1/native-gate-proposal.stdout"
+        },
+        {
+          "content_hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
+          "exists": true,
+          "path": "./.cairn/changes/add-mantle-authority-sdk/evidence/native-admission-v1/native-gate-tasks.stderr"
+        },
+        {
+          "content_hash": "355d08282ecf6d9aff5e2545edcc350ba00b3732a212a301ea3293e482416d0d",
+          "exists": true,
+          "path": "./.cairn/changes/add-mantle-authority-sdk/evidence/native-admission-v1/native-gate-tasks.stdout"
+        },
+        {
+          "content_hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
+          "exists": true,
+          "path": "./.cairn/changes/add-mantle-authority-sdk/evidence/native-admission-v1/native-sync-preview.stderr"
+        },
+        {
+          "content_hash": "202e892eeb3fbf3a01d27851f003e9ac5462926e0fd574cd5cdb0e691f5b0c24",
+          "exists": true,
+          "path": "./.cairn/changes/add-mantle-authority-sdk/evidence/native-admission-v1/native-sync-preview.stdout"
+        },
+        {
+          "content_hash": "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262",
+          "exists": true,
+          "path": "./.cairn/changes/add-mantle-authority-sdk/evidence/native-admission-v1/native-validate.stderr"
+        },
+        {
+          "content_hash": "2662861d302adcca27df99ba2122d2e13701a282ab4b6a26abda1ed1ea815f7a",
+          "exists": true,
+          "path": "./.cairn/changes/add-mantle-authority-sdk/evidence/native-admission-v1/native-validate.stdout"
+        },
+        {
+          "content_hash": "fd32db67956bfb66183e741dfe02c0969adcf480ac3c3bb49f9967fdce3bbdba",
+          "exists": true,
+          "path": "./.cairn/changes/add-mantle-authority-sdk/evidence/native-admission-v1/results.json"
+        },
+        {
+          "content_hash": "df8b71bae570eb5accd702e7370a816b8ea9f2e4521254c5d75ea82a9cfcf4db",
+          "exists": true,
+          "path": "./.cairn/changes/add-mantle-authority-sdk/metadata.json"
+        },
+        {
+          "content_hash": "5f1b5cadf5aeaba8b73ba86afe486391016cf32bd9ec5566ade5f902e8724915",
+          "exists": true,
+          "path": "./.cairn/changes/add-mantle-authority-sdk/proposal.md"
+        },
+        {
+          "content_hash": "844c35e7047e24312c35c08b61628cc280b42cfdb1c946228de400c971ad67db",
+          "exists": true,
+          "path": "./.cairn/changes/add-mantle-authority-sdk/specs/mantle-authority/spec.md"
+        },
+        {
+          "content_hash": "143129999cee84296b67410128f61cc152ad306df15900fa1f3681839194af07",
+          "exists": true,
+          "path": "./.cairn/changes/add-mantle-authority-sdk/tasks.md"
+        }
+      ],
+      "manifest_hash": "c3a0ebe99545f73f79a8aca1eedf34536714902c92e9c5ac0a378426a557ccda"
+    },
+    "kind": "archive",
+    "manifest_hash": "6623eb4ae1c8fc4cb42bc0252394c11332a21a3213179d0f13654f9598634b08"
+  },
+  "non_claims": [
+    "workflow state proves only the selected policy graph and observed structural artifact facts",
+    "workflow instructions do not prove artifact truth, review quality, or implementation correctness",
+    "workflow state does not satisfy proposal, design, tasks, sync, archive, evidence, or release gates",
+    "workflow commands are read-only and do not create, edit, delete, or approve lifecycle artifacts"
+  ],
+  "plan_hash": "ca68768bd05e72847f53f973ca5c233e95b53982150b98aabc4798cb17c2a8d2",
+  "policy": "cairn-default",
+  "policy_hash": "c8276321e0e82c524e09ad9357fa48a9d38ac8590263ee6f79c51a328dc6037d",
+  "profile_identity_hash": "33736dd47b494470df56428ef00a670ab9f6adb5596cde47b5db5e031d20fedf",
+  "reasons": [],
+  "receipt_hash": "54e69f66d556d95018f01a13316d180200b2f5426eaed9374b23b4c8a855a6f7",
+  "review_receipt_hashes": [],
+  "spec_effect": "delta",
+  "workflow_profile": "spec-driven",
+  "workflow_profile_compatibility_fallback": false,
+  "workflow_profile_source": "change_create",
+  "workflow_profile_version": 1
+}

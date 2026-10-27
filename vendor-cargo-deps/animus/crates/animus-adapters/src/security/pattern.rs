@@ -92,7 +92,16 @@ fn push_if_matches(
     rule: &Rule,
     evidence_hash: &str,
 ) {
-    if rule.patterns.iter().any(|pattern| searchable.contains(pattern)) {
-        findings.push(super::Finding::new(rule.category, rule.confidence, rule.disposition, evidence_hash));
+    if rule
+        .patterns
+        .iter()
+        .any(|pattern| searchable.contains(pattern))
+    {
+        findings.push(super::Finding::new(
+            rule.category,
+            rule.confidence,
+            rule.disposition,
+            evidence_hash,
+        ));
     }
 }

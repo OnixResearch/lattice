@@ -1,8 +1,13 @@
-const REQUEST_ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("confirmation_request_id");
-const RESOURCE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("confirmation_resource");
-const ABILITY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("confirmation_ability");
-const SUMMARY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("confirmation_summary");
-const SESSION_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("confirmation_session_identity");
+const REQUEST_ID_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("confirmation_request_id");
+const RESOURCE_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("confirmation_resource");
+const ABILITY_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("confirmation_ability");
+const SUMMARY_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("confirmation_summary");
+const SESSION_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("confirmation_session_identity");
 const DEFAULT_REQUEST_ID: &str = "compat-confirmation-request";
 const DEFAULT_RESOURCE_LABEL: &str = "compat-resource";
 const DEFAULT_ABILITY_LABEL: &str = "confirm";
@@ -59,7 +64,10 @@ impl ConfirmationRequest {
     ///
     /// Returns [`crate::AdapterContractError`] when the summary fails adapter
     /// field validation.
-    pub fn new(capability: super::super::CapabilityClass, summary: &str) -> Result<Self, crate::AdapterContractError> {
+    pub fn new(
+        capability: super::super::CapabilityClass,
+        summary: &str,
+    ) -> Result<Self, crate::AdapterContractError> {
         let policy_hash = super::gate::record::evidence::safe_hash_text(DEFAULT_POLICY_IDENTITY);
         Self::from_draft(ConfirmationRequestDraft {
             request_id: DEFAULT_REQUEST_ID,
@@ -81,7 +89,9 @@ impl ConfirmationRequest {
     ///
     /// Returns [`crate::AdapterContractError`] when a required string field is
     /// empty, too long, or contains a NUL character.
-    pub fn from_draft(draft: ConfirmationRequestDraft<'_>) -> Result<Self, crate::AdapterContractError> {
+    pub fn from_draft(
+        draft: ConfirmationRequestDraft<'_>,
+    ) -> Result<Self, crate::AdapterContractError> {
         Ok(Self {
             request_id: required_text(REQUEST_ID_FIELD, draft.request_id)?,
             action_kind: draft.action_kind,

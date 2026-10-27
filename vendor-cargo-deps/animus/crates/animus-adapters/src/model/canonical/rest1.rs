@@ -1,21 +1,11 @@
 #![allow(non_trait_imports)]
-use super::CONTENT_PART_KIND_FIELD;
-use super::CONTENT_TEXT_FIELD;
-use super::CanonicalModelContractError;
-use super::CanonicalModelRole;
-use super::CanonicalUnsafeTextReason;
-use super::IMAGE_DESCRIPTOR_FIELD;
-use super::IMAGE_HASH_FIELD;
-use super::IMAGE_MEDIA_TYPE_FIELD;
-use super::MAX_CONTENT_PARTS_PER_MESSAGE;
-use super::RAW_PROVIDER_PAYLOAD_FIELD;
-use super::TOOL_DESCRIPTION_FIELD;
-use super::TOOL_NAME_FIELD;
-use super::TOOL_SCHEMA_FIELD;
-use super::require_collection;
-use super::safe_text;
-use super::validate_content_parts;
-use super::validate_tool_call_id;
+use super::{
+    CONTENT_PART_KIND_FIELD, CONTENT_TEXT_FIELD, CanonicalModelContractError, CanonicalModelRole,
+    CanonicalUnsafeTextReason, IMAGE_DESCRIPTOR_FIELD, IMAGE_HASH_FIELD, IMAGE_MEDIA_TYPE_FIELD,
+    MAX_CONTENT_PARTS_PER_MESSAGE, RAW_PROVIDER_PAYLOAD_FIELD, TOOL_DESCRIPTION_FIELD,
+    TOOL_NAME_FIELD, TOOL_SCHEMA_FIELD, require_collection, safe_text, validate_content_parts,
+    validate_tool_call_id,
+};
 
 /// Borrowed canonical content part before validation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -71,7 +61,9 @@ impl CanonicalContentPart {
     /// # Errors
     ///
     /// Returns [`CanonicalModelContractError`] when content is empty, unsupported, or unsafe.
-    pub fn from_draft(draft: CanonicalContentPartDraft<'_>) -> Result<Self, CanonicalModelContractError> {
+    pub fn from_draft(
+        draft: CanonicalContentPartDraft<'_>,
+    ) -> Result<Self, CanonicalModelContractError> {
         match draft {
             CanonicalContentPartDraft::Text { text } => Ok(Self::Text {
                 text: safe_text(CONTENT_TEXT_FIELD, text)?,
@@ -93,7 +85,8 @@ impl CanonicalContentPart {
                 })
             }
             CanonicalContentPartDraft::RawProviderPayload { label } => {
-                let _label = crate::validation::normalized_adapter_field(RAW_PROVIDER_PAYLOAD_FIELD, label)?;
+                let _label =
+                    crate::validation::normalized_adapter_field(RAW_PROVIDER_PAYLOAD_FIELD, label)?;
                 Err(CanonicalModelContractError::UnsafeText {
                     field: RAW_PROVIDER_PAYLOAD_FIELD.as_str(),
                     reason: CanonicalUnsafeTextReason::RawProviderPayload,
@@ -142,11 +135,16 @@ impl CanonicalModelMessage {
     ///
     /// # Errors
     ///
-    /// Returns [`CanonicalModelContractError`] when the role, content, or tool correlation is
-    /// invalid.
-    pub fn from_draft(draft: CanonicalModelMessageDraft<'_>) -> Result<Self, CanonicalModelContractError> {
+    /// Returns [`CanonicalModelContractError`] when the role, content, or tool correlation is invalid.
+    pub fn from_draft(
+        draft: CanonicalModelMessageDraft<'_>,
+    ) -> Result<Self, CanonicalModelContractError> {
         let role = CanonicalModelRole::parse(draft.role)?;
-        require_collection(CONTENT_PART_KIND_FIELD, draft.content.len(), MAX_CONTENT_PARTS_PER_MESSAGE)?;
+        require_collection(
+            CONTENT_PART_KIND_FIELD,
+            draft.content.len(),
+            MAX_CONTENT_PARTS_PER_MESSAGE,
+        )?;
         let content = validate_content_parts(draft.content)?;
         let tool_call_id = validate_tool_call_id(role, draft.tool_call_id)?;
         Ok(Self {
@@ -200,7 +198,9 @@ impl CanonicalToolDeclaration {
     /// # Errors
     ///
     /// Returns [`CanonicalModelContractError`] when a tool field is empty or unsafe.
-    pub fn from_draft(draft: CanonicalToolDeclarationDraft<'_>) -> Result<Self, CanonicalModelContractError> {
+    pub fn from_draft(
+        draft: CanonicalToolDeclarationDraft<'_>,
+    ) -> Result<Self, CanonicalModelContractError> {
         Ok(Self {
             name: safe_text(TOOL_NAME_FIELD, draft.name)?,
             description: safe_text(TOOL_DESCRIPTION_FIELD, draft.description)?,

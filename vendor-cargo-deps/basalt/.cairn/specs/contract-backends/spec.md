@@ -205,3 +205,175 @@ Basalt MUST validate ast-grep policy audits with rule tests, fixture scans, rele
 - GIVEN ast-grep policy-boundary audit behavior changes
 - WHEN validation evidence is assembled
 - THEN evidence MUST include positive fixtures, negative fixtures, release receipt output, lifecycle gates, and focused Basalt verifier results.
+
+### Requirement: Runtime effect permissions are portable policy facts
+
+r[contract_backends.runtime_effect_permissions.boundary] Basalt MUST define runtime effect permissions as deterministic decisions over supplied normalized requests, reviewed policy, and explicit authority facts. The core MUST NOT read files, open networks, inspect environments, spawn processes, invoke bindings, or execute allowed effects.
+
+#### Scenario: Normalized request is evaluated
+
+- GIVEN a consumer supplies a complete normalized effect request and current policy facts
+- WHEN Basalt evaluates the request
+- THEN it returns a bounded allow or deny decision without host effects
+
+### Requirement: Effect policy uses closed scopes and operations
+
+r[contract_backends.runtime_effect_permissions.policy] Basalt MUST define versioned filesystem, network, process, environment, and binding scopes with closed operation vocabularies. Profiles MUST declare a default decision, rule match mode, subject pattern, explicit priority, policy identity, and non-claims.
+
+#### Scenario: Known scope is admitted
+
+- GIVEN a profile contains a supported scope, operation, match mode, and normalized subject
+- WHEN policy validation runs
+- THEN Basalt admits the rule into deterministic evaluation
+
+#### Scenario: Unknown operation fails closed
+
+- GIVEN a profile contains an unsupported scope, operation, or match mode
+- WHEN policy validation runs
+- THEN Basalt denies the profile instead of ignoring the unknown value
+
+### Requirement: Secure profiles deny by default and reject ambiguity
+
+r[contract_backends.runtime_effect_permissions.decision] Basalt MUST support exact and declared prefix matching with explicit priorities. The secure baseline MUST deny by default. Equal-priority conflicting matches, malformed subjects, and incomplete profiles MUST deny as ambiguous or invalid.
+
+#### Scenario: Exact allow rule passes
+
+- GIVEN a deny-by-default profile has one exact allow rule for the normalized request
+- WHEN the decision core evaluates the request
+- THEN it returns allow with the selected rule identity
+
+#### Scenario: Conflicting rules deny
+
+- GIVEN equal-priority matching rules produce conflicting decisions
+- WHEN the decision core evaluates the request
+- THEN it returns an ambiguity denial and no allow capability
+
+### Requirement: Contract, UCAN, and approval boundaries remain separate
+
+r[contract_backends.runtime_effect_permissions.authority] A runtime effect allow MUST require the configured Basalt contract decision and explicit verified UCAN facts when the profile requires them. Human approval MAY add a consumer gate, but it MUST NOT override a Basalt denial or missing authority.
+
+#### Scenario: Approval cannot widen denial
+
+- GIVEN a client or operator approves an effect that Basalt denies
+- WHEN the consumer combines the decisions
+- THEN the final admission remains denied
+
+### Requirement: Consumer mappings retain native enforcement
+
+r[contract_backends.runtime_effect_permissions.consumer] Consumers MUST own native request parsing, path admission, endpoint parsing, executable identity, environment access, binding implementation, currentness checks, and effect execution. Filesystem prefix policy MUST NOT replace Cap Root or capability-relative I/O.
+
+#### Scenario: Lossy mapping is rejected
+
+- GIVEN a consumer cannot map a native effect request to the portable subject without losing behavior-relevant facts
+- WHEN mapping validation runs
+- THEN the consumer denies before calling the permission core
+
+### Requirement: Permission receipts are metadata-only
+
+r[contract_backends.runtime_effect_permissions.evidence] Basalt MUST emit deterministic BLAKE3-bound permission receipts with policy, request, selected rule, authority input, decision, diagnostic, and non-claim identities. Receipts MUST exclude credentials, environment values, bearer tokens, raw host paths, and effect payloads.
+
+#### Scenario: Receipt does not prove enforcement
+
+- GIVEN a passing permission receipt exists
+- WHEN a consumer prepares an effect
+- THEN the consumer still rechecks current policy, capability, adapter, and native subject facts
+
+### Requirement: Permission policy has positive and negative verification
+
+r[contract_backends.runtime_effect_permissions.verification] The focused rail MUST cover all supported scopes and negative unknown, malformed, ambiguous, stale, missing-authority, lossy-mapping, and overclaim cases.
+
+#### Scenario: Focused rail passes
+
+- GIVEN policy freshness, Rust parity, decision fixtures, receipts, and consumer mappings are current
+- WHEN the focused rail runs
+- THEN it reports the supported decision boundary and non-claims
+
+## World-branch authority requirements
+
+### Requirement: World-branch authority is a pure policy boundary
+
+r[contract_backends.world_branch_authority.boundary] Basalt MUST decide world-branch authority only from supplied normalized requests, reviewed policy, and explicit authority facts. It MUST NOT mint tokens, move ownership, bind adapters, mutate heads, activate branches, promote commits, or execute effects.
+
+#### Scenario: Complete request is evaluated
+
+- GIVEN a caller supplies a complete normalized request and current policy facts
+- WHEN Basalt evaluates the request
+- THEN it MUST return a bounded decision and obligations without host effects
+
+### Requirement: Policy uses closed branch modes
+
+r[contract_backends.world_branch_authority.policy] Basalt MUST define closed copyable, attenuated, linear, simulation-only, promotion-gated, replace-before-activation, and non-branchable modes. Profiles MUST deny by default and reject unknown or incomplete values.
+
+#### Scenario: Known mode is admitted
+
+- GIVEN a valid rule uses a supported mode and complete normalized fields
+- WHEN policy validation runs
+- THEN Basalt MUST admit the rule into deterministic evaluation
+
+#### Scenario: Unknown mode is supplied
+
+- GIVEN a rule contains an unsupported mode
+- WHEN policy validation runs
+- THEN Basalt MUST reject the profile instead of treating the mode as copyable
+
+### Requirement: Decisions reject ambiguity and widening
+
+r[contract_backends.world_branch_authority.decision] Basalt MUST use deterministic rule selection and reject equal-priority conflicts, incompatible obligations, lossy mappings, wider destination limits, and missing required authority facts.
+
+#### Scenario: Exact narrower attenuation passes
+
+- GIVEN one selected rule permits attenuation and the destination limits are no wider than the source limits
+- WHEN decision evaluation runs
+- THEN Basalt MAY return an attenuated decision with exact obligations
+
+#### Scenario: Destination widens authority
+
+- GIVEN requested destination limits exceed the admitted source limits
+- WHEN decision evaluation runs
+- THEN Basalt MUST deny the request
+
+### Requirement: Stateful modes bind currentness obligations
+
+r[contract_backends.world_branch_authority.currentness] Linear, promotion-gated, and current-grant decisions MUST bind supplied generation, policy, UCAN, revocation, replay, and scope observations required by the selected profile. Consumers MUST reevaluate before realization.
+
+#### Scenario: Linear facts are current
+
+- GIVEN policy selects linear mode and all required currentness facts are present
+- WHEN Basalt constructs the decision
+- THEN it MUST require durable source deactivation before destination activation
+
+#### Scenario: Generation fact is stale
+
+- GIVEN the request carries an older durable generation than the current supplied observation
+- WHEN evaluation runs
+- THEN Basalt MUST deny the request as stale
+
+### Requirement: Consumers retain native realization and enforcement
+
+r[contract_backends.world_branch_authority.consumer] Consumers MUST own capability parsing, token issuance, attenuation proof, durable transfer, secret access, simulation adapters, branch storage, activation, promotion, effect dispatch, observation, and recovery.
+
+#### Scenario: Passing decision lacks realization evidence
+
+- GIVEN Basalt returns a passing mode and obligations
+- WHEN the consumer cannot prove those obligations occurred
+- THEN branch activation MUST remain denied
+
+### Requirement: Receipts exclude bearer material and enforcement claims
+
+r[contract_backends.world_branch_authority.evidence] Basalt MUST emit metadata-only domain-separated BLAKE3 receipts. They MUST exclude tokens, keys, credentials, raw host paths, secret entropy, private policy bodies, and claims of transfer or enforcement completion.
+
+#### Scenario: Private token is present in caller input
+
+- GIVEN evaluation inputs include bearer material outside the normalized policy request
+- WHEN receipt projection runs
+- THEN the receipt MUST omit that material
+
+### Requirement: Verification covers every mode and denial boundary
+
+r[contract_backends.world_branch_authority.verification] Basalt MUST test each supported mode and negative unknown, malformed, ambiguous, stale, widening, missing-authority, linear-copy, simulation-escape, promotion-bypass, lossy-mapping, secret, and overclaim cases.
+
+#### Scenario: Focused policy rail runs
+
+- GIVEN Nickel, generated JSON, Rust parity, decisions, receipts, and frozen consumer mappings are current
+- WHEN the focused verification rail runs
+- THEN it MUST report supported policy facts and runtime-enforcement non-claims

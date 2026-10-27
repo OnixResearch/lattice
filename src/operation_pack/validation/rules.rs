@@ -9,6 +9,9 @@ fn validate_analyzers(manifest: &super::model::Manifest) -> Result<(), super::Er
             return Err(super::Error::Invalid("analyzer declaration"));
         }
         let runtime = runtimes.get(&analyzer.runtime_id).ok_or(super::Error::Invalid("analyzer runtime"))?;
+        if runtime.kind == super::wasm::RUNTIME_KIND {
+            return Err(super::Error::Invalid("component analyzer unsupported"));
+        }
         if !runtime.launch_labels.contains(&analyzer.launch_label) {
             return Err(super::Error::Invalid("analyzer launch label"));
         }
@@ -93,7 +96,7 @@ fn validate_dependencies(manifest: &super::model::Manifest) -> Result<(), super:
 
 fn validate_profile(manifest: &super::model::Manifest) -> Result<(), super::Error> {
     validate_identity(&manifest.admission.identity)?;
-    if manifest.admission.allowed_licenses.is_empty() || manifest.admission.allowed_capabilities.is_empty() {
+    if manifest.admission.allowed_licenses.is_empty() {
         return Err(super::Error::Invalid("admission profile"));
     }
     for license in manifest.licenses.iter().chain(&manifest.admission.allowed_licenses) {
@@ -143,6 +146,9 @@ fn validate_probe(manifest: &super::model::Manifest) -> Result<(), super::Error>
         .iter()
         .find(|runtime| runtime.id == probe.runtime_id)
         .ok_or(super::Error::Invalid("doctor probe runtime"))?;
+    if runtime.kind == super::wasm::RUNTIME_KIND {
+        return Err(super::Error::Invalid("component probe unsupported"));
+    }
     if !runtime.launch_labels.contains(&probe.launch_label) {
         return Err(super::Error::Invalid("doctor probe launch label"));
     }

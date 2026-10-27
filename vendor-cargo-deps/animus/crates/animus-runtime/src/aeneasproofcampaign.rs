@@ -664,11 +664,17 @@ pub struct CampaignReceipt {
 ///
 /// Returns a deterministic diagnostic for malformed identities, roles, budgets,
 /// artifacts, or authority-promoting profile references.
-pub fn validate_campaign_plan(draft: &CampaignPlanDraft) -> Result<CampaignPlan, CampaignDiagnostic> {
+pub fn validate_campaign_plan(
+    draft: &CampaignPlanDraft,
+) -> Result<CampaignPlan, CampaignDiagnostic> {
     require_exact(&draft.profile_id, PROFILE_ID, "profile_id")?;
     require_exact(&draft.skill_identity, SKILL_IDENTITY, "skill_identity")?;
     require_exact(&draft.recipe_identity, RECIPE_ID, "recipe_identity")?;
-    require_exact(&draft.completion_gate_identity, COMPLETION_GATE_ID, "completion_gate_identity")?;
+    require_exact(
+        &draft.completion_gate_identity,
+        COMPLETION_GATE_ID,
+        "completion_gate_identity",
+    )?;
     require_hash(&draft.subject_identity, "subject_identity")?;
     require_hash(&draft.source_identity, "source_identity")?;
     require_hash(&draft.model_identity, "model_identity")?;
@@ -682,8 +688,18 @@ pub fn validate_campaign_plan(draft: &CampaignPlanDraft) -> Result<CampaignPlan,
             .chain(std::iter::once(draft.subject_identity.as_str()))
             .chain(std::iter::once(draft.source_identity.as_str()))
             .chain(std::iter::once(draft.model_identity.as_str()))
-            .chain(draft.assignments.iter().map(|assignment| assignment.assignment_id.as_str()))
-            .chain(draft.artifacts.iter().map(|artifact| artifact.identity.as_str())),
+            .chain(
+                draft
+                    .assignments
+                    .iter()
+                    .map(|assignment| assignment.assignment_id.as_str()),
+            )
+            .chain(
+                draft
+                    .artifacts
+                    .iter()
+                    .map(|artifact| artifact.identity.as_str()),
+            ),
     );
     Ok(CampaignPlan {
         identity,
@@ -702,11 +718,26 @@ pub fn validate_campaign_plan(draft: &CampaignPlanDraft) -> Result<CampaignPlan,
 #[must_use]
 pub fn evaluate_campaign_separation(observation: &SeparationObservation) -> SeparationDecision {
     let checks = [
-        (observation.prior_assignment != observation.current_assignment, SeparationDimension::Assignment),
-        (observation.prior_actor != observation.current_actor, SeparationDimension::Actor),
-        (observation.prior_run != observation.current_run, SeparationDimension::Run),
-        (observation.prior_context != observation.current_context, SeparationDimension::Context),
-        (observation.prior_workspace != observation.current_workspace, SeparationDimension::Workspace),
+        (
+            observation.prior_assignment != observation.current_assignment,
+            SeparationDimension::Assignment,
+        ),
+        (
+            observation.prior_actor != observation.current_actor,
+            SeparationDimension::Actor,
+        ),
+        (
+            observation.prior_run != observation.current_run,
+            SeparationDimension::Run,
+        ),
+        (
+            observation.prior_context != observation.current_context,
+            SeparationDimension::Context,
+        ),
+        (
+            observation.prior_workspace != observation.current_workspace,
+            SeparationDimension::Workspace,
+        ),
         (
             observation.prior_model_profile != observation.current_model_profile,
             SeparationDimension::ModelProfile,
@@ -715,10 +746,19 @@ pub fn evaluate_campaign_separation(observation: &SeparationObservation) -> Sepa
             observation.prior_mutation_lineage != observation.current_mutation_lineage,
             SeparationDimension::MutationLineage,
         ),
-        (observation.statement_unchanged, SeparationDimension::Statement),
+        (
+            observation.statement_unchanged,
+            SeparationDimension::Statement,
+        ),
         (observation.model_unchanged, SeparationDimension::Model),
-        (observation.producer_service != observation.verifier_check, SeparationDimension::VerifierCheck),
-        (!observation.subject_mutated, SeparationDimension::SubjectImmutable),
+        (
+            observation.producer_service != observation.verifier_check,
+            SeparationDimension::VerifierCheck,
+        ),
+        (
+            !observation.subject_mutated,
+            SeparationDimension::SubjectImmutable,
+        ),
     ];
     let failed_dimensions = checks
         .into_iter()
@@ -761,8 +801,14 @@ pub fn evaluate_campaign_separation(observation: &SeparationObservation) -> Sepa
 ///
 /// Returns a statement diagnostic for vacuity, proof holes, malformed/stale
 /// identities, duplicate trust entries, or incomplete required trust kinds.
-pub fn approve_campaign_statement(draft: &StatementApprovalDraft) -> Result<StatementApproval, CampaignDiagnostic> {
-    require_label(&draft.requirement_id, "requirement_id", CampaignIssue::Statement)?;
+pub fn approve_campaign_statement(
+    draft: &StatementApprovalDraft,
+) -> Result<StatementApproval, CampaignDiagnostic> {
+    require_label(
+        &draft.requirement_id,
+        "requirement_id",
+        CampaignIssue::Statement,
+    )?;
     require_hash(&draft.statement_identity, "statement_identity")?;
     require_label(&draft.claim_class, "claim_class", CampaignIssue::Statement)?;
     require_hash(&draft.source_identity, "source_identity")?;
@@ -795,11 +841,19 @@ pub fn approve_campaign_statement(draft: &StatementApprovalDraft) -> Result<Stat
         require_label(&input.label, "trust_label", CampaignIssue::Statement)?;
         require_hash(&input.identity, "trust_identity")?;
         if !entries.insert((input.kind, input.label.as_str())) {
-            return Err(CampaignDiagnostic::new(CampaignIssue::Statement, "trust_closure", "duplicate trust input"));
+            return Err(CampaignDiagnostic::new(
+                CampaignIssue::Statement,
+                "trust_closure",
+                "duplicate trust input",
+            ));
         }
         kinds.insert(input.kind);
     }
-    if draft.required_trust_kinds.iter().any(|required| !kinds.contains(required)) {
+    if draft
+        .required_trust_kinds
+        .iter()
+        .any(|required| !kinds.contains(required))
+    {
         return Err(CampaignDiagnostic::new(
             CampaignIssue::Statement,
             "trust_closure",
@@ -837,15 +891,34 @@ pub fn admit_proof_service_request(
     request: &ProofServiceRequest,
 ) -> Result<String, CampaignDiagnostic> {
     require_label(&request.service_id, "service_id", CampaignIssue::Service)?;
-    if !matches!(request.service_id.as_str(), "octet-aeneas-proof" | "octet-artifact-verify") {
-        return Err(CampaignDiagnostic::new(CampaignIssue::Service, "service_id", "unknown proof/evidence service"));
+    if !matches!(
+        request.service_id.as_str(),
+        "octet-aeneas-proof" | "octet-artifact-verify"
+    ) {
+        return Err(CampaignDiagnostic::new(
+            CampaignIssue::Service,
+            "service_id",
+            "unknown proof/evidence service",
+        ));
     }
     require_hash(&request.budget_identity, "budget_identity")?;
     require_hash(&request.capability_identity, "capability_identity")?;
     require_exact(&request.plan_identity, &plan.identity, "plan_identity")?;
-    require_exact(&request.subject_identity, &plan.subject_identity, "subject_identity")?;
-    require_exact(&request.statement_identity, &approval.statement_identity, "statement_identity")?;
-    require_exact(&request.model_identity, &plan.model_identity, "model_identity")?;
+    require_exact(
+        &request.subject_identity,
+        &plan.subject_identity,
+        "subject_identity",
+    )?;
+    require_exact(
+        &request.statement_identity,
+        &approval.statement_identity,
+        "statement_identity",
+    )?;
+    require_exact(
+        &request.model_identity,
+        &plan.model_identity,
+        "model_identity",
+    )?;
     if approval.source_identity != plan.source_identity
         || approval.model_identity != plan.model_identity
         || approval.type_model_identity != plan.type_model_identity
@@ -860,7 +933,9 @@ pub fn admit_proof_service_request(
         .assignments
         .iter()
         .find(|assignment| assignment.assignment_id == request.assignment_id)
-        .ok_or_else(|| CampaignDiagnostic::new(CampaignIssue::Role, "assignment_id", "unknown assignment"))?;
+        .ok_or_else(|| {
+            CampaignDiagnostic::new(CampaignIssue::Role, "assignment_id", "unknown assignment")
+        })?;
     let required_role = if request.service_id == "octet-artifact-verify" {
         CampaignRole::Verifier
     } else {
@@ -895,7 +970,11 @@ pub fn validate_proof_service_observation(
     request: &ProofServiceRequest,
     observation: &ProofServiceObservation,
 ) -> Result<(), CampaignDiagnostic> {
-    require_exact(&observation.request_identity, admitted_request_identity, "request_identity")?;
+    require_exact(
+        &observation.request_identity,
+        admitted_request_identity,
+        "request_identity",
+    )?;
     require_exact(&observation.service_id, &request.service_id, "service_id")?;
     require_hash(&observation.evidence_identity, "evidence_identity")?;
     if !observation.passed {
@@ -914,16 +993,23 @@ pub fn validate_proof_service_observation(
 /// Budget overrun always becomes [`CampaignOutcome::BudgetExhausted`]. A proved
 /// outcome is only a completion candidate when verification passed and exact
 /// evidence identities are present.
-pub fn evaluate_campaign_terminal(budgets: CampaignBudgets, observation: &TerminalObservation) -> TerminalDecision {
+pub fn evaluate_campaign_terminal(
+    budgets: CampaignBudgets,
+    observation: &TerminalObservation,
+) -> TerminalDecision {
     let budget_exhausted = usage_exceeds(budgets, observation.usage);
     let evidence_valid = !observation.evidence_identities.is_empty()
-        && observation.evidence_identities.iter().all(|identity| is_hash(identity));
+        && observation
+            .evidence_identities
+            .iter()
+            .all(|identity| is_hash(identity));
     let outcome = if budget_exhausted {
         CampaignOutcome::BudgetExhausted
     } else {
         observation.outcome
     };
-    let completion_candidate = outcome == CampaignOutcome::Proved && observation.verification_passed && evidence_valid;
+    let completion_candidate =
+        outcome == CampaignOutcome::Proved && observation.verification_passed && evidence_valid;
     let decision_identity = hash_parts(
         std::iter::once(outcome_label(outcome))
             .chain(std::iter::once(if completion_candidate {
@@ -947,7 +1033,9 @@ pub fn evaluate_campaign_terminal(budgets: CampaignBudgets, observation: &Termin
 ///
 /// Returns a receipt diagnostic for malformed identities, unsafe metadata,
 /// missing redactions, duplicate evidence, or authoritative-completion claims.
-pub fn project_campaign_receipt(draft: &CampaignReceiptDraft) -> Result<CampaignReceipt, CampaignDiagnostic> {
+pub fn project_campaign_receipt(
+    draft: &CampaignReceiptDraft,
+) -> Result<CampaignReceipt, CampaignDiagnostic> {
     for (field, value) in [
         ("profile_identity", draft.profile_identity.as_str()),
         ("skill_identity", draft.skill_identity.as_str()),
@@ -974,7 +1062,11 @@ pub fn project_campaign_receipt(draft: &CampaignReceiptDraft) -> Result<Campaign
     validate_receipt_counts(draft)?;
     validate_redaction_markers(&draft.redaction_markers)?;
     for required in REQUIRED_REDACTIONS {
-        if !draft.redaction_markers.iter().any(|marker| marker == required) {
+        if !draft
+            .redaction_markers
+            .iter()
+            .any(|marker| marker == required)
+        {
             return Err(CampaignDiagnostic::new(
                 CampaignIssue::Receipt,
                 "redaction_markers",
@@ -1034,9 +1126,16 @@ pub fn project_campaign_receipt(draft: &CampaignReceiptDraft) -> Result<Campaign
 }
 
 fn validate_receipt_counts(draft: &CampaignReceiptDraft) -> Result<(), CampaignDiagnostic> {
-    let counts_match = count_matches(draft.bounded_counts.evidence_identities, draft.evidence_identities.len())
-        && count_matches(draft.bounded_counts.issue_classes, draft.issue_classes.len())
-        && count_matches(draft.bounded_counts.redaction_markers, draft.redaction_markers.len());
+    let counts_match = count_matches(
+        draft.bounded_counts.evidence_identities,
+        draft.evidence_identities.len(),
+    ) && count_matches(
+        draft.bounded_counts.issue_classes,
+        draft.issue_classes.len(),
+    ) && count_matches(
+        draft.bounded_counts.redaction_markers,
+        draft.redaction_markers.len(),
+    );
     if !counts_match {
         return Err(CampaignDiagnostic::new(
             CampaignIssue::Receipt,
@@ -1070,10 +1169,20 @@ fn validate_assignments(assignments: &[CampaignAssignment]) -> Result<(), Campai
     let mut actor_ids = BTreeSet::new();
     let mut model_profile_identities = BTreeSet::new();
     for assignment in assignments {
-        require_label(&assignment.assignment_id, "assignment_id", CampaignIssue::Role)?;
+        require_label(
+            &assignment.assignment_id,
+            "assignment_id",
+            CampaignIssue::Role,
+        )?;
         require_label(&assignment.actor_id, "actor_id", CampaignIssue::Role)?;
-        require_label(&assignment.model_profile_identity, "model_profile_identity", CampaignIssue::Role)?;
-        if !roles.insert(assignment.role) || !assignment_ids.insert(assignment.assignment_id.as_str()) {
+        require_label(
+            &assignment.model_profile_identity,
+            "model_profile_identity",
+            CampaignIssue::Role,
+        )?;
+        if !roles.insert(assignment.role)
+            || !assignment_ids.insert(assignment.assignment_id.as_str())
+        {
             return Err(CampaignDiagnostic::new(
                 CampaignIssue::Role,
                 "assignments",
@@ -1094,8 +1203,16 @@ fn validate_assignments(assignments: &[CampaignAssignment]) -> Result<(), Campai
                 "specialized assignments require distinct model-profile invocation identities",
             ));
         }
-        require_label(&assignment.input_contract, "input_contract", CampaignIssue::Role)?;
-        require_label(&assignment.output_contract, "output_contract", CampaignIssue::Role)?;
+        require_label(
+            &assignment.input_contract,
+            "input_contract",
+            CampaignIssue::Role,
+        )?;
+        require_label(
+            &assignment.output_contract,
+            "output_contract",
+            CampaignIssue::Role,
+        )?;
         for service in &assignment.service_ceiling {
             require_label(service, "service_ceiling", CampaignIssue::Role)?;
         }
@@ -1141,7 +1258,10 @@ fn assignment_matches_role_contract(assignment: &CampaignAssignment) -> bool {
             assignment.mutation == CampaignMutation::MaintainedTheorem
                 && assignment.input_contract == "approved-statement-and-model"
                 && assignment.output_contract == "proof-candidate"
-                && labels_match(&assignment.service_ceiling, &["octet-aeneas-generation", "octet-aeneas-proof"])
+                && labels_match(
+                    &assignment.service_ceiling,
+                    &["octet-aeneas-generation", "octet-aeneas-proof"],
+                )
                 && assignment.evidence_ceiling
                     == [
                         CampaignArtifactRole::GeneratedModel,
@@ -1162,27 +1282,41 @@ fn assignment_matches_role_contract(assignment: &CampaignAssignment) -> bool {
 }
 
 fn labels_match(observed: &[String], expected: &[&str]) -> bool {
-    observed.len() == expected.len() && observed.iter().zip(expected).all(|(observed, expected)| observed == expected)
+    observed.len() == expected.len()
+        && observed
+            .iter()
+            .zip(expected)
+            .all(|(observed, expected)| observed == expected)
 }
 
 fn role_contract(role: CampaignRole) -> (CampaignRoleClass, Vec<CampaignCapability>) {
     match role {
-        CampaignRole::StatementAuthor => (CampaignRoleClass::Implementation, vec![
-            CampaignCapability::Read,
-            CampaignCapability::WriteStatement,
-        ]),
-        CampaignRole::StatementReviewer => {
-            (CampaignRoleClass::Review, vec![CampaignCapability::Read, CampaignCapability::ReviewStatement])
-        }
-        CampaignRole::Prover => (CampaignRoleClass::Implementation, vec![
-            CampaignCapability::Read,
-            CampaignCapability::WriteMaintainedTheorem,
-            CampaignCapability::RequestProof,
-        ]),
-        CampaignRole::Verifier => (CampaignRoleClass::Verification, vec![
-            CampaignCapability::Read,
-            CampaignCapability::RequestVerification,
-        ]),
+        CampaignRole::StatementAuthor => (
+            CampaignRoleClass::Implementation,
+            vec![CampaignCapability::Read, CampaignCapability::WriteStatement],
+        ),
+        CampaignRole::StatementReviewer => (
+            CampaignRoleClass::Review,
+            vec![
+                CampaignCapability::Read,
+                CampaignCapability::ReviewStatement,
+            ],
+        ),
+        CampaignRole::Prover => (
+            CampaignRoleClass::Implementation,
+            vec![
+                CampaignCapability::Read,
+                CampaignCapability::WriteMaintainedTheorem,
+                CampaignCapability::RequestProof,
+            ],
+        ),
+        CampaignRole::Verifier => (
+            CampaignRoleClass::Verification,
+            vec![
+                CampaignCapability::Read,
+                CampaignCapability::RequestVerification,
+            ],
+        ),
     }
 }
 
@@ -1222,7 +1356,11 @@ fn validate_artifacts(artifacts: &[CampaignArtifact]) -> Result<(), CampaignDiag
 }
 
 fn validate_artifact(artifact: &CampaignArtifact) -> Result<(), CampaignDiagnostic> {
-    require_label(&artifact.locator, "artifact_locator", CampaignIssue::Artifact)?;
+    require_label(
+        &artifact.locator,
+        "artifact_locator",
+        CampaignIssue::Artifact,
+    )?;
     require_hash(&artifact.identity, "artifact_identity")?;
     validate_artifact_generation(artifact)?;
     validate_artifact_owner(artifact)
@@ -1237,7 +1375,11 @@ fn validate_artifact_generation(artifact: &CampaignArtifact) -> Result<(), Campa
                 "generated artifact lacks a freshness identity",
             )
         })?;
-        require_exact(generation_identity, &artifact.identity, "generation_identity")?;
+        require_exact(
+            generation_identity,
+            &artifact.identity,
+            "generation_identity",
+        )?;
         if artifact.mutable_by.is_some() {
             return Err(CampaignDiagnostic::new(
                 CampaignIssue::Artifact,
@@ -1305,7 +1447,10 @@ fn usage_exceeds(budget: CampaignBudgets, usage: CampaignUsage) -> bool {
         || usage.retained_artifacts > budget.retained_artifacts
 }
 
-fn validate_unique_hashes(values: &[String], field: &'static str) -> Result<(), CampaignDiagnostic> {
+fn validate_unique_hashes(
+    values: &[String],
+    field: &'static str,
+) -> Result<(), CampaignDiagnostic> {
     if values.is_empty() {
         return Err(CampaignDiagnostic::new(
             CampaignIssue::Receipt,
@@ -1317,7 +1462,11 @@ fn validate_unique_hashes(values: &[String], field: &'static str) -> Result<(), 
     for value in values {
         require_hash(value, field)?;
         if !seen.insert(value.as_str()) {
-            return Err(CampaignDiagnostic::new(CampaignIssue::Receipt, field, "duplicate evidence identity"));
+            return Err(CampaignDiagnostic::new(
+                CampaignIssue::Receipt,
+                field,
+                "duplicate evidence identity",
+            ));
         }
     }
     Ok(())
@@ -1353,13 +1502,21 @@ fn validate_redaction_markers(values: &[String]) -> Result<(), CampaignDiagnosti
 
 fn validate_safe_labels(values: &[String], field: &'static str) -> Result<(), CampaignDiagnostic> {
     if values.is_empty() {
-        return Err(CampaignDiagnostic::new(CampaignIssue::Receipt, field, "safe label collection must be non-empty"));
+        return Err(CampaignDiagnostic::new(
+            CampaignIssue::Receipt,
+            field,
+            "safe label collection must be non-empty",
+        ));
     }
     let mut seen = BTreeSet::new();
     for value in values {
         require_label(value, field, CampaignIssue::Receipt)?;
         if !seen.insert(value.as_str()) {
-            return Err(CampaignDiagnostic::new(CampaignIssue::Receipt, field, "duplicate safe label"));
+            return Err(CampaignDiagnostic::new(
+                CampaignIssue::Receipt,
+                field,
+                "duplicate safe label",
+            ));
         }
     }
     Ok(())
@@ -1378,10 +1535,17 @@ fn require_hash(value: &str, field: &'static str) -> Result<(), CampaignDiagnost
 
 fn is_hash(value: &str) -> bool {
     value.len() == BLAKE3_HEX_CHARS
-        && value.as_bytes().iter().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        && value
+            .as_bytes()
+            .iter()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
-fn require_exact(value: &str, expected: &str, field: &'static str) -> Result<(), CampaignDiagnostic> {
+fn require_exact(
+    value: &str,
+    expected: &str,
+    field: &'static str,
+) -> Result<(), CampaignDiagnostic> {
     if value != expected {
         return Err(CampaignDiagnostic::new(
             CampaignIssue::Identity,
@@ -1392,10 +1556,24 @@ fn require_exact(value: &str, expected: &str, field: &'static str) -> Result<(),
     Ok(())
 }
 
-fn require_label(value: &str, field: &'static str, issue: CampaignIssue) -> Result<(), CampaignDiagnostic> {
-    let forbidden = FORBIDDEN_SAFE_TEXT.iter().any(|fragment| value.contains(fragment));
-    if value.is_empty() || value.len() > MAX_SAFE_LABEL_BYTES || value.chars().any(char::is_control) || forbidden {
-        return Err(CampaignDiagnostic::new(issue, field, "unsafe or unbounded metadata label"));
+fn require_label(
+    value: &str,
+    field: &'static str,
+    issue: CampaignIssue,
+) -> Result<(), CampaignDiagnostic> {
+    let forbidden = FORBIDDEN_SAFE_TEXT
+        .iter()
+        .any(|fragment| value.contains(fragment));
+    if value.is_empty()
+        || value.len() > MAX_SAFE_LABEL_BYTES
+        || value.chars().any(char::is_control)
+        || forbidden
+    {
+        return Err(CampaignDiagnostic::new(
+            issue,
+            field,
+            "unsafe or unbounded metadata label",
+        ));
     }
     Ok(())
 }
@@ -1476,18 +1654,28 @@ mod tests {
 
     fn assignment_boundaries(
         role: CampaignRole,
-    ) -> (CampaignMutation, &'static str, &'static str, Vec<&'static str>, Vec<CampaignArtifactRole>) {
+    ) -> (
+        CampaignMutation,
+        &'static str,
+        &'static str,
+        Vec<&'static str>,
+        Vec<CampaignArtifactRole>,
+    ) {
         match role {
-            CampaignRole::StatementAuthor => {
-                (CampaignMutation::Statement, "requirement-and-source", "statement-candidate", vec![], vec![
-                    CampaignArtifactRole::StatementCandidate,
-                ])
-            }
-            CampaignRole::StatementReviewer => {
-                (CampaignMutation::None, "statement-candidate", "statement-approval", vec![], vec![
-                    CampaignArtifactRole::StatementReview,
-                ])
-            }
+            CampaignRole::StatementAuthor => (
+                CampaignMutation::Statement,
+                "requirement-and-source",
+                "statement-candidate",
+                vec![],
+                vec![CampaignArtifactRole::StatementCandidate],
+            ),
+            CampaignRole::StatementReviewer => (
+                CampaignMutation::None,
+                "statement-candidate",
+                "statement-approval",
+                vec![],
+                vec![CampaignArtifactRole::StatementReview],
+            ),
             CampaignRole::Prover => (
                 CampaignMutation::MaintainedTheorem,
                 "approved-statement-and-model",
@@ -1501,11 +1689,13 @@ mod tests {
                     CampaignArtifactRole::BoundedLog,
                 ],
             ),
-            CampaignRole::Verifier => {
-                (CampaignMutation::None, "proof-receipt", "verification-report", vec!["octet-artifact-verify"], vec![
-                    CampaignArtifactRole::VerificationReceipt,
-                ])
-            }
+            CampaignRole::Verifier => (
+                CampaignMutation::None,
+                "proof-receipt",
+                "verification-report",
+                vec!["octet-artifact-verify"],
+                vec![CampaignArtifactRole::VerificationReceipt],
+            ),
         }
     }
 
@@ -1566,11 +1756,19 @@ mod tests {
             type_model_identity: HASH_D.into(),
             assignments: vec![
                 assignment(CampaignRole::StatementAuthor, "statement-author", "actor-a"),
-                assignment(CampaignRole::StatementReviewer, "statement-reviewer", "actor-b"),
+                assignment(
+                    CampaignRole::StatementReviewer,
+                    "statement-reviewer",
+                    "actor-b",
+                ),
                 assignment(CampaignRole::Prover, "prover", "actor-c"),
                 assignment(CampaignRole::Verifier, "verifier", "actor-d"),
             ],
-            artifacts: roles.into_iter().enumerate().map(|(index, role)| artifact(role, index)).collect(),
+            artifacts: roles
+                .into_iter()
+                .enumerate()
+                .map(|(index, role)| artifact(role, index))
+                .collect(),
             budgets: budgets(),
         }
     }
@@ -1640,7 +1838,10 @@ mod tests {
             },
             outcome: CampaignOutcome::Proved,
             evidence_identities: vec![HASH_D.into()],
-            redaction_markers: REQUIRED_REDACTIONS.iter().map(ToString::to_string).collect(),
+            redaction_markers: REQUIRED_REDACTIONS
+                .iter()
+                .map(ToString::to_string)
+                .collect(),
             issue_classes: vec!["none".into()],
             claims_authoritative_completion: false,
         }
@@ -1660,7 +1861,9 @@ mod tests {
     #[test]
     fn plan_rejects_capability_widening() {
         let mut draft = plan_draft();
-        draft.assignments[1].capabilities.push(CampaignCapability::WriteMaintainedTheorem);
+        draft.assignments[1]
+            .capabilities
+            .push(CampaignCapability::WriteMaintainedTheorem);
         let error = validate_campaign_plan(&draft).expect_err("widening must fail");
         assert_eq!(error.issue, CampaignIssue::Role);
     }
@@ -1669,20 +1872,38 @@ mod tests {
     fn plan_rejects_input_output_service_and_evidence_widening() {
         let mut input = plan_draft();
         input.assignments[1].input_contract = "mutable-prover-context".into();
-        assert_eq!(validate_campaign_plan(&input).expect_err("input widening must fail").issue, CampaignIssue::Role);
+        assert_eq!(
+            validate_campaign_plan(&input)
+                .expect_err("input widening must fail")
+                .issue,
+            CampaignIssue::Role
+        );
         let mut output = plan_draft();
         output.assignments[1].output_contract = "authoritative-completion".into();
-        assert_eq!(validate_campaign_plan(&output).expect_err("output widening must fail").issue, CampaignIssue::Role);
-        let mut service = plan_draft();
-        service.assignments[1].service_ceiling.push("octet-aeneas-proof".into());
         assert_eq!(
-            validate_campaign_plan(&service).expect_err("service widening must fail").issue,
+            validate_campaign_plan(&output)
+                .expect_err("output widening must fail")
+                .issue,
+            CampaignIssue::Role
+        );
+        let mut service = plan_draft();
+        service.assignments[1]
+            .service_ceiling
+            .push("octet-aeneas-proof".into());
+        assert_eq!(
+            validate_campaign_plan(&service)
+                .expect_err("service widening must fail")
+                .issue,
             CampaignIssue::Role
         );
         let mut evidence = plan_draft();
-        evidence.assignments[1].evidence_ceiling.push(CampaignArtifactRole::MaintainedTheorem);
+        evidence.assignments[1]
+            .evidence_ceiling
+            .push(CampaignArtifactRole::MaintainedTheorem);
         assert_eq!(
-            validate_campaign_plan(&evidence).expect_err("evidence widening must fail").issue,
+            validate_campaign_plan(&evidence)
+                .expect_err("evidence widening must fail")
+                .issue,
             CampaignIssue::Role
         );
     }
@@ -1691,17 +1912,28 @@ mod tests {
     fn plan_rejects_role_alias_and_inherited_actor() {
         let mut alias = plan_draft();
         alias.assignments[1].role = CampaignRole::StatementAuthor;
-        assert_eq!(validate_campaign_plan(&alias).expect_err("role alias must fail").issue, CampaignIssue::Role);
+        assert_eq!(
+            validate_campaign_plan(&alias)
+                .expect_err("role alias must fail")
+                .issue,
+            CampaignIssue::Role
+        );
         let mut inherited_actor = plan_draft();
         inherited_actor.assignments[1].actor_id = inherited_actor.assignments[0].actor_id.clone();
-        assert_eq!(validate_campaign_plan(&inherited_actor).expect_err("actor overlap must fail").field, "actor_id");
+        assert_eq!(
+            validate_campaign_plan(&inherited_actor)
+                .expect_err("actor overlap must fail")
+                .field,
+            "actor_id"
+        );
     }
 
     #[test]
     fn plan_rejects_generated_artifact_mutation() {
         let mut draft = plan_draft();
         draft.artifacts[TEST_GENERATED_MODEL_INDEX].mutable_by = Some(CampaignRole::Prover);
-        let error = validate_campaign_plan(&draft).expect_err("generated artifact mutation must fail");
+        let error =
+            validate_campaign_plan(&draft).expect_err("generated artifact mutation must fail");
         assert_eq!(error.issue, CampaignIssue::Artifact);
     }
 
@@ -1710,13 +1942,18 @@ mod tests {
         let mut stale = plan_draft();
         stale.artifacts[TEST_GENERATED_MODEL_INDEX].generation_identity = Some(HASH_D.into());
         assert_eq!(
-            validate_campaign_plan(&stale).expect_err("stale generation must fail").field,
+            validate_campaign_plan(&stale)
+                .expect_err("stale generation must fail")
+                .field,
             "generation_identity"
         );
         let mut overlap = plan_draft();
-        overlap.artifacts[TEST_GENERATED_MODEL_INDEX].locator = overlap.artifacts[0].locator.clone();
+        overlap.artifacts[TEST_GENERATED_MODEL_INDEX].locator =
+            overlap.artifacts[0].locator.clone();
         assert_eq!(
-            validate_campaign_plan(&overlap).expect_err("overlapping destination must fail").field,
+            validate_campaign_plan(&overlap)
+                .expect_err("overlapping destination must fail")
+                .field,
             "artifact_locator"
         );
     }
@@ -1731,11 +1968,19 @@ mod tests {
     #[test]
     fn separation_reports_exact_overlap_and_subject_mutation() {
         let mut observation = separation();
-        observation.current_actor.clone_from(&observation.prior_actor);
+        observation
+            .current_actor
+            .clone_from(&observation.prior_actor);
         observation.subject_mutated = true;
         let decision = evaluate_campaign_separation(&observation);
         assert!(!decision.admitted);
-        assert_eq!(decision.failed_dimensions, vec![SeparationDimension::Actor, SeparationDimension::SubjectImmutable]);
+        assert_eq!(
+            decision.failed_dimensions,
+            vec![
+                SeparationDimension::Actor,
+                SeparationDimension::SubjectImmutable
+            ]
+        );
     }
 
     #[test]
@@ -1785,11 +2030,18 @@ mod tests {
     fn statement_approval_rejects_vacuity_and_undeclared_opaque_dependency() {
         let mut vacuous = approval_draft();
         vacuous.adequacy = StatementAdequacy::Vacuous;
-        assert_eq!(approve_campaign_statement(&vacuous).expect_err("vacuity must fail").field, "adequacy");
+        assert_eq!(
+            approve_campaign_statement(&vacuous)
+                .expect_err("vacuity must fail")
+                .field,
+            "adequacy"
+        );
         let mut opaque = approval_draft();
         opaque.required_trust_kinds = vec![TrustInputKind::OpaqueDefinition];
         assert_eq!(
-            approve_campaign_statement(&opaque).expect_err("undeclared opaque dependency must fail").field,
+            approve_campaign_statement(&opaque)
+                .expect_err("undeclared opaque dependency must fail")
+                .field,
             "trust_closure"
         );
     }
@@ -1816,14 +2068,16 @@ mod tests {
             budget_identity: HASH_A.into(),
             capability_identity: HASH_B.into(),
         };
-        let request_identity = admit_proof_service_request(&plan, &approval, &request).expect("admitted request");
+        let request_identity =
+            admit_proof_service_request(&plan, &approval, &request).expect("admitted request");
         let observation = ProofServiceObservation {
             request_identity: request_identity.clone(),
             service_id: request.service_id.clone(),
             evidence_identity: HASH_C.into(),
             passed: true,
         };
-        validate_proof_service_observation(&request_identity, &request, &observation).expect("bound evidence");
+        validate_proof_service_observation(&request_identity, &request, &observation)
+            .expect("bound evidence");
         let changed = ProofServiceObservation {
             request_identity,
             service_id: "octet-artifact-verify".into(),
@@ -1853,13 +2107,17 @@ mod tests {
             capability_identity: HASH_B.into(),
         };
         assert_eq!(
-            admit_proof_service_request(&plan, &approval, &request).expect_err("subject drift must fail").field,
+            admit_proof_service_request(&plan, &approval, &request)
+                .expect_err("subject drift must fail")
+                .field,
             "subject_identity"
         );
         request.subject_identity = plan.subject_identity.clone();
         request.model_identity = HASH_D.into();
         assert_eq!(
-            admit_proof_service_request(&plan, &approval, &request).expect_err("model drift must fail").field,
+            admit_proof_service_request(&plan, &approval, &request)
+                .expect_err("model drift must fail")
+                .field,
             "model_identity"
         );
     }
@@ -1878,7 +2136,8 @@ mod tests {
             budget_identity: HASH_A.into(),
             capability_identity: HASH_B.into(),
         };
-        let error = admit_proof_service_request(&plan, &approval, &request).expect_err("wrong role must fail");
+        let error = admit_proof_service_request(&plan, &approval, &request)
+            .expect_err("wrong role must fail");
         assert_eq!(error.issue, CampaignIssue::Role);
     }
 
@@ -1908,7 +2167,10 @@ mod tests {
             },
             ..observation
         };
-        assert_eq!(evaluate_campaign_terminal(budgets(), &overrun).outcome, CampaignOutcome::BudgetExhausted);
+        assert_eq!(
+            evaluate_campaign_terminal(budgets(), &overrun).outcome,
+            CampaignOutcome::BudgetExhausted
+        );
     }
 
     #[test]
@@ -1951,17 +2213,22 @@ mod tests {
         ] {
             let mut unsafe_draft = receipt_draft();
             unsafe_draft.issue_classes = vec![unsafe_label.into()];
-            let unsafe_error = project_campaign_receipt(&unsafe_draft).expect_err("unsafe metadata must fail");
+            let unsafe_error =
+                project_campaign_receipt(&unsafe_draft).expect_err("unsafe metadata must fail");
             assert_eq!(unsafe_error.issue, CampaignIssue::Receipt);
         }
         let mut count_draft = receipt_draft();
-        count_draft.bounded_counts.evidence_identities =
-            count_draft.bounded_counts.evidence_identities.saturating_add(1);
-        let count_error = project_campaign_receipt(&count_draft).expect_err("count mismatch must fail");
+        count_draft.bounded_counts.evidence_identities = count_draft
+            .bounded_counts
+            .evidence_identities
+            .saturating_add(1);
+        let count_error =
+            project_campaign_receipt(&count_draft).expect_err("count mismatch must fail");
         assert_eq!(count_error.field, "bounded_counts");
         let mut authority_draft = receipt_draft();
         authority_draft.claims_authoritative_completion = true;
-        let authority_error = project_campaign_receipt(&authority_draft).expect_err("authority claim must fail");
+        let authority_error =
+            project_campaign_receipt(&authority_draft).expect_err("authority claim must fail");
         assert_eq!(authority_error.field, "authoritative_completion");
     }
 }

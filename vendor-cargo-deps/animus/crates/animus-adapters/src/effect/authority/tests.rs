@@ -29,13 +29,15 @@ const GUARDED_ACTION_COUNT: usize = 7;
 
 macro_rules! capability_request {
     ($action:expr, $resource:expr, $ability:expr) => {
-        CapabilityRequest::new($action, CONTRACT, $resource, $ability).expect("request should build")
+        CapabilityRequest::new($action, CONTRACT, $resource, $ability)
+            .expect("request should build")
     };
 }
 
 macro_rules! policy_contract {
     ($action:expr, $resource_prefix:expr, $ability:expr) => {
-        CapabilityPolicyContract::new($action, CONTRACT, $resource_prefix, $ability).expect("contract should build")
+        CapabilityPolicyContract::new($action, CONTRACT, $resource_prefix, $ability)
+            .expect("contract should build")
     };
 }
 

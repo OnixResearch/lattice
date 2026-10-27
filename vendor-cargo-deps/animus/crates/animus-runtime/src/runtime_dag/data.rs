@@ -1,9 +1,9 @@
 //! Runtime DAG DTOs.
 
-use super::DEFAULT_MAX_DAG_EDGES;
-use super::DEFAULT_MAX_DAG_LABEL_CHARS;
-use super::DEFAULT_MAX_DAG_NODES;
-use super::RUNTIME_DAG_RECEIPT_SCHEMA;
+use super::{
+    DEFAULT_MAX_DAG_EDGES, DEFAULT_MAX_DAG_LABEL_CHARS, DEFAULT_MAX_DAG_NODES,
+    RUNTIME_DAG_RECEIPT_SCHEMA,
+};
 
 /// Safe DAG node identity with no domain payload.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -68,8 +68,7 @@ pub enum RuntimeDagIssueKind {
     TooManyNodes,
     /// Graph edge count exceeded the configured limit.
     TooManyEdges,
-    /// Text contained raw prompt, credential, provider payload, path, diff, or unbounded output
-    /// markers.
+    /// Text contained raw prompt, credential, provider payload, path, diff, or unbounded output markers.
     UnsafeLabel,
     /// Two nodes used the same identity.
     DuplicateNode,

@@ -2,7 +2,8 @@ mod branch;
 
 pub use branch::replay_snapshot;
 
-const LABEL_TEXT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("ledger_label_text");
+const LABEL_TEXT_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("ledger_label_text");
 
 /// One append-only ledger entry with an optional parent link.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -15,7 +16,10 @@ impl Node {
     /// Builds a root node with no parent link.
     #[must_use]
     pub const fn root(entry: super::Entry) -> Self {
-        Self { entry, parent_id: None }
+        Self {
+            entry,
+            parent_id: None,
+        }
     }
 
     /// Builds a child node linked to a parent entry identifier.
@@ -24,7 +28,10 @@ impl Node {
     ///
     /// Returns [`crate::AdapterContractError`] when the parent identifier is
     /// empty, overlong, or contains a NUL character.
-    pub fn child(entry: super::Entry, parent_id: &str) -> Result<Self, crate::AdapterContractError> {
+    pub fn child(
+        entry: super::Entry,
+        parent_id: &str,
+    ) -> Result<Self, crate::AdapterContractError> {
         Ok(Self {
             entry,
             parent_id: Some(super::EntryId::new(parent_id)?),
@@ -124,7 +131,12 @@ impl Snapshot {
     }
 
     /// Iterates labels attached to one entry.
-    pub fn labels_for<'a>(&'a self, target_id: &'a super::EntryId) -> impl Iterator<Item = &'a Label> + 'a {
-        self.labels.iter().filter(move |label| label.target_id() == target_id)
+    pub fn labels_for<'a>(
+        &'a self,
+        target_id: &'a super::EntryId,
+    ) -> impl Iterator<Item = &'a Label> + 'a {
+        self.labels
+            .iter()
+            .filter(move |label| label.target_id() == target_id)
     }
 }

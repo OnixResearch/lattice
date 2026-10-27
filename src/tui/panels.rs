@@ -128,9 +128,88 @@ pub fn render(app: &mut App, area: Rect, buf: &mut Buffer) {
         render_add_node_flow(app, area, buf);
     }
 
+    if app.authoring.is_some() {
+        render_authoring(app, area, buf);
+    }
+
     if app.is_confirming_quit() {
         render_quit_confirmation(area, buf);
     }
+}
+
+fn render_authoring(app: &App, area: Rect, buf: &mut Buffer) {
+    let Some(state) = &app.authoring else {
+        return;
+    };
+    Clear.render(area, buf);
+    if area.width < 4 || area.height < 4 {
+        Paragraph::new("Esc back").render(area, buf);
+        return;
+    }
+    let block = Block::default().borders(Borders::ALL).title(" Typed Authoring ");
+    let inner = block.inner(area);
+    block.render(area, buf);
+    let footer = Rect::new(inner.x, inner.y.saturating_add(inner.height.saturating_sub(1)), inner.width, 1);
+    let body = Rect::new(inner.x, inner.y, inner.width, inner.height.saturating_sub(1));
+    if let Some(draft) = &state.draft {
+        let mut lines = vec![Line::styled(
+            draft.field.label.clone(),
+            Style::default().fg(Color::Yellow),
+        )];
+        // Reserve room for validation/recovery even when the terminal is short.
+        let visible = usize::from(body.width).saturating_mul(usize::from(body.height.saturating_sub(2)));
+        let chars = draft.text.chars().count();
+        let tail: String = draft.text.chars().skip(chars.saturating_sub(visible)).collect();
+        if body.height > 2 {
+            lines.push(Line::from(format!("{tail}▏")));
+        }
+        lines.push(Line::styled(
+            state.error.as_deref().unwrap_or(&draft.field.help).to_string(),
+            Style::default().fg(if state.error.is_some() { Color::Red } else { Color::Cyan }),
+        ));
+        Paragraph::new(lines).wrap(ratatui::widgets::Wrap { trim: false }).render(body, buf);
+        Paragraph::new(if inner.width < 60 {
+            "Esc back / Enter save / C-U clear"
+        } else {
+            "Enter: validate/apply │ Esc: cancel │ Ctrl-U: clear │ Ctrl-J: newline"
+        })
+        .render(footer, buf);
+        return;
+    }
+    let list_height = body.height.saturating_sub(2).max(1);
+    let start = state.selected.saturating_sub(usize::from(list_height.saturating_sub(1)));
+    let mut lines: Vec<Line<'static>> = state
+        .fields
+        .iter()
+        .enumerate()
+        .skip(start)
+        .take(usize::from(list_height))
+        .map(|(index, field)| {
+            Line::styled(
+                format!("{} {}", if index == state.selected { "▶" } else { " " }, field.label),
+                Style::default().fg(if index == state.selected {
+                    Color::Yellow
+                } else {
+                    Color::White
+                }),
+            )
+        })
+        .collect();
+    if state.fields.is_empty() {
+        lines.push(Line::from("Select one node for node-owned fields; Esc returns"));
+    } else if body.height > list_height {
+        if let Some(field) = state.fields.get(state.selected) {
+            lines.push(Line::styled(field.id.clone(), Style::default().fg(Color::Cyan)));
+            lines.push(Line::from(field.help.clone()));
+        }
+    }
+    Paragraph::new(lines).render(body, buf);
+    Paragraph::new(if inner.width < 60 {
+        "Esc back / ↑↓ select / Enter edit"
+    } else {
+        "↑/↓: select │ PgUp/PgDn/Home/End │ Enter: edit/add/remove │ Esc: close"
+    })
+    .render(footer, buf);
 }
 
 /// Render the node graph canvas.
@@ -269,6 +348,7 @@ fn render_properties(app: &App, area: Rect, buf: &mut Buffer) {
             Span::styled(format!("{}", node_id), Style::default().fg(Color::Gray)),
         ]),
         Line::from(""),
+        Line::styled("Ctrl-W: all typed fields / rows", Style::default().fg(Color::Yellow)),
     ];
 
     if let Some(status) = app.run_state.node_statuses.get(&node_id.0).copied() {
@@ -519,8 +599,8 @@ fn contextual_help_text(context: FooterHelpContext) -> &'static str {
     }
 
     match context.focus {
-        FocusPanel::Canvas => " e: cmd │ l: label │ t: timeout │ C-D: diagnostics │ C-R: run │ C-P: palette ",
-        FocusPanel::Properties => " e: cmd │ l: label │ i: image │ p/r/o: agent │ k: creds ",
+        FocusPanel::Canvas => " C-W: author fields │ C-N: add │ C-P: palette │ C-R: run ",
+        FocusPanel::Properties => " C-W: config/ports/runner/creds │ C-P: palette ",
         FocusPanel::Output => " ↑/↓: scroll │ C-P: palette │ A-Tab: focus ",
     }
 }
@@ -551,8 +631,8 @@ fn compact_contextual_help_text(context: FooterHelpContext) -> &'static str {
     }
 
     match context.focus {
-        FocusPanel::Canvas => " e cmd │ l label ",
-        FocusPanel::Properties => " e cmd │ p agent ",
+        FocusPanel::Canvas => " C-W fields │ C-P menu ",
+        FocusPanel::Properties => " C-W fields │ C-P menu ",
         FocusPanel::Output => " ↑/↓ scroll │ A-Tab ",
     }
 }

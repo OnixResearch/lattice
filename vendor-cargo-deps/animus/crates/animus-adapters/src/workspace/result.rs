@@ -1,5 +1,7 @@
-const OUTCOME_KIND_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("workspace_outcome_kind");
-const ISSUE_CODE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("workspace_issue_code");
+const OUTCOME_KIND_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("workspace_outcome_kind");
+const ISSUE_CODE_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("workspace_issue_code");
 
 const OUTCOME_CREATED: &str = "created";
 const OUTCOME_COMMITTED: &str = "committed";
@@ -79,7 +81,10 @@ impl Outcome {
     /// or unknown.
     pub fn new(draft: OutcomeDraft<'_>) -> Result<Self, crate::AdapterContractError> {
         let kind = Kind::parse(draft.kind)?;
-        crate::validation::validate_required_adapter_field(super::intent::WORKSPACE_ID_FIELD_NAME, draft.workspace_id)?;
+        crate::validation::validate_required_adapter_field(
+            super::intent::WORKSPACE_ID_FIELD_NAME,
+            draft.workspace_id,
+        )?;
         let issue_code = super::text::optional_field(ISSUE_CODE_FIELD, draft.issue_code)?;
         Ok(Self {
             kind,

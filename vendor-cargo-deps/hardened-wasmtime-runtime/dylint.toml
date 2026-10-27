@@ -1,0 +1,9 @@
+# The official Octet deny-all hook owns severity. Do not add disabled lints,
+# warning levels, finding baselines, or broad exceptions.
+
+[octet]
+# Only this crate is the pure decision core. Wasmtime stores, limit callbacks,
+# epoch engines and concurrency permits belong to hardened-wasmtime-shell.
+core_source_scopes = ["crates/hardened-wasmtime-runtime/src/"]
+module_file_count_max = 12
+sealed_enum_marker = "hardened_wasmtime_sealed"

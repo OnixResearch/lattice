@@ -37,7 +37,17 @@ fn validate_type_shape(
     validate_execution_requirements(definition, path, diagnostics);
     validate_capabilities(&definition.capabilities, &format!("{path}.capabilities"), diagnostics);
     validate_credentials(&definition.credential_bindings, path, diagnostics);
-    validate_cairn_profile(definition, path, diagnostics);
+    if super::runtime::component::runtime_is_component(&definition.runtime) {
+        if !super::runtime::component::type_is_supported(definition) {
+            diagnostics.push(super::diagnostic(
+                super::model::DiagnosticCode::RuntimeUnavailable,
+                format!("{path}.runtime"),
+                "component operation exceeds the import-free adapter profile",
+            ));
+        }
+    } else {
+        validate_cairn_profile(definition, path, diagnostics);
+    }
     validate_bounds(definition.bounds, path, diagnostics);
     if definition.required_non_claims
         != super::model::REQUIRED_NON_CLAIMS.iter().map(|claim| (*claim).to_string()).collect::<Vec<_>>()
@@ -126,7 +136,9 @@ fn validate_runtime(
             "runtime kind or key is not canonical",
         ));
     }
-    if runtime.kind != super::runtime::CAIRN_RUNTIME_KIND || runtime.key != super::runtime::CAIRN_RUNTIME_KEY {
+    let is_cairn = runtime.kind == super::runtime::CAIRN_RUNTIME_KIND
+        && runtime.key == super::runtime::CAIRN_RUNTIME_KEY;
+    if !is_cairn && !super::runtime::component::runtime_is_component(runtime) {
         diagnostics.push(super::diagnostic(
             super::model::DiagnosticCode::RuntimeUnavailable,
             format!("{path}.runtime"),

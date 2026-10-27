@@ -1,36 +1,24 @@
-use std::fmt;
-
-use ucan::AuthorizationDecision;
-use ucan::HolderInvocationAuthorized;
-use ucan::HolderInvocationPolicyContext;
-use ucan::HolderInvocationRequest;
-use ucan::HolderTokenVerificationContext;
-use ucan::OperationBinding;
-use ucan::OperationProfileAdmission;
-use ucan::verify_compact_token_str_with_resolvers_and_revocations;
-use ucan::verify_holder_signed_invocation;
-
-use super::core::ExactOperationProfile;
-use super::core::bind_enforcement_action;
-use super::core::build_authority_decision;
-use super::core::decode_blake3_reference;
-use super::core::operation_profile_digest;
-use super::error::UcanEnforcementFailure;
-use super::error::authorization_error_reason;
-use super::error::failure;
-use super::error::holder_error_reason;
-use super::error::profile_error_reason;
-use super::error::token_error_reason;
-use super::receipt::ReceiptContext;
-use super::receipt::UcanEnforcementReceipt;
-use super::receipt::build_receipt;
-use super::types::UcanEnforcementBoundaries;
-use super::types::UcanEnforcementReason;
-use super::types::UcanEnforcementRequest;
+use super::core::{
+    ExactOperationProfile, bind_enforcement_action, build_authority_decision,
+    decode_blake3_reference, operation_profile_digest,
+};
+use super::error::{
+    UcanEnforcementFailure, authorization_error_reason, failure, holder_error_reason,
+    profile_error_reason, token_error_reason,
+};
+use super::receipt::{ReceiptContext, UcanEnforcementReceipt, build_receipt};
+use super::types::{UcanEnforcementBoundaries, UcanEnforcementReason, UcanEnforcementRequest};
 use crate::EnforcementRequest;
 use crate::Policy;
-use crate::authority_core::AuthorityDecision;
-use crate::authority_core::BasaltPolicyRef;
+use crate::authority_core::{AuthorityDecision, BasaltPolicyRef};
+use crate::ucan_profile::{VerifiedUcanAuthorityInput, admit_compact_profile};
+use std::fmt;
+use ucan::{
+    AuthorizationDecision, HolderInvocationAuthorized, HolderInvocationPolicyContext,
+    HolderInvocationRequest, HolderTokenVerificationContext, OperationBinding,
+    OperationProfileAdmission, verify_compact_token_str_with_resolvers_and_revocations,
+    verify_holder_signed_invocation,
+};
 
 /// Live exact-request authority after final UCAN replay admission.
 ///
@@ -65,10 +53,43 @@ impl<'request> LiveUcanEnforcement<'request> {
         &self.receipt
     }
 
+    /// Observe the retained holder using UCAN's non-consuming recheck.
+    ///
+    /// This does not refresh Basalt policy, establish continuous authority, or
+    /// authorize release. Consumers retain current policy and atomic effect checks.
+    /// No replay port is accepted and no new live enforcement value is created.
+    ///
+    /// # Errors
+    /// Returns UCAN binding, token, proof, revocation, profile, or caveat failures.
+    ///
+    /// ```compile_fail
+    /// fn dispatch(_: basalt::ucan_enforcement::LiveUcanEnforcement<'_>) {}
+    /// fn reuse(observation: basalt::ucan::HolderAuthorizationObservation<'_>) {
+    ///     dispatch(observation);
+    /// }
+    /// ```
+    pub fn observe_holder(
+        &self,
+        compact_token: &str,
+        verification: &ucan::HolderTokenVerificationContext<'_>,
+        policies: &ucan::HolderRecheckPolicies<'_>,
+    ) -> Result<ucan::HolderAuthorizationObservation<'_>, ucan::HolderRecheckError> {
+        ucan::recheck_holder_authorization(
+            &self.holder_authorization,
+            compact_token,
+            verification,
+            policies,
+        )
+    }
+
     /// Return the final live UCAN holder authorization.
     #[must_use]
     pub const fn holder_authorization(&self) -> &HolderInvocationAuthorized {
         &self.holder_authorization
+    }
+
+    pub(crate) fn into_parts(self) -> (HolderInvocationAuthorized, UcanEnforcementReceipt) {
+        (self.holder_authorization, self.receipt)
     }
 }
 
@@ -99,7 +120,8 @@ pub fn verify_ucan_enforcement_request<'request>(
     boundaries: &UcanEnforcementBoundaries<'_>,
 ) -> Result<LiveUcanEnforcement<'request>, UcanEnforcementFailure> {
     let prepared = prepare_bounded_request(trusted_policy_ref, request, boundaries)?;
-    let prospective = prepare_prospective_authority(policy, trusted_policy_ref, request, boundaries, &prepared)?;
+    let prospective =
+        prepare_prospective_authority(policy, trusted_policy_ref, request, boundaries, &prepared)?;
     let holder_request = HolderInvocationRequest::new(
         request.compact_token,
         request.enforcement.resource(),
@@ -129,7 +151,10 @@ pub fn verify_ucan_enforcement_request<'request>(
             receipt: prospective.receipt,
             holder_authorization,
         }),
-        Err(error) => Err(failure(holder_error_reason(&error), prospective.receipt_context)),
+        Err(error) => Err(failure(
+            holder_error_reason(&error),
+            prospective.receipt_context,
+        )),
     }
 }
 
@@ -142,17 +167,30 @@ fn prepare_bounded_request(
     let policy = decode_blake3_reference(trusted_policy_ref.artifact_ref.as_str());
     let credential_bytes = u64::try_from(request.compact_token.len()).ok();
     let initial_context = ReceiptContext {
+        protocol_profile: request.profile,
         credential_bytes,
         credential: None,
         request_binding: None,
         operation_profile,
         policy,
     };
+    if admit_compact_profile(request.profile).is_err() {
+        return Err(failure(
+            UcanEnforcementReason::ProtocolProfileDenied,
+            initial_context,
+        ));
+    }
     if credential_bytes.is_none() {
-        return Err(failure(UcanEnforcementReason::LimitExceeded, initial_context));
+        return Err(failure(
+            UcanEnforcementReason::LimitExceeded,
+            initial_context,
+        ));
     }
     if request.compact_token.len() > boundaries.verification_limits.max_compact_token_bytes() {
-        return Err(failure(UcanEnforcementReason::OversizedCredential, initial_context));
+        return Err(failure(
+            UcanEnforcementReason::OversizedCredential,
+            initial_context,
+        ));
     }
     let credential = *blake3::hash(request.compact_token.as_bytes()).as_bytes();
     let bounded_context = ReceiptContext {
@@ -202,21 +240,51 @@ fn prepare_prospective_authority(
         boundaries.caveat_policies,
     );
     let AuthorizationDecision::Allowed { .. } = authorization else {
-        let reason =
-            authorization.denial_reason().map_or(UcanEnforcementReason::ScopeDenied, authorization_error_reason);
+        let reason = authorization.denial_reason().map_or(
+            UcanEnforcementReason::ScopeDenied,
+            authorization_error_reason,
+        );
         return Err(failure(reason, receipt_context));
     };
+    let Some(credential) = receipt_context.credential else {
+        return Err(failure(
+            UcanEnforcementReason::InternalAuthorityDenied,
+            receipt_context,
+        ));
+    };
+    let Some(request_binding) = receipt_context.request_binding else {
+        return Err(failure(
+            UcanEnforcementReason::InternalAuthorityDenied,
+            receipt_context,
+        ));
+    };
+    let verified_input = VerifiedUcanAuthorityInput::from_compact_verified(
+        request.profile,
+        verified.audience().as_str(),
+        receipt_context.operation_profile,
+        request_binding,
+        credential,
+        !verified.proofs().as_slice().is_empty(),
+    )
+    .map_err(|_| {
+        failure(
+            UcanEnforcementReason::ProtocolProfileDenied,
+            receipt_context,
+        )
+    })?;
     let decision = build_authority_decision(
         policy,
         trusted_policy_ref,
         request.enforcement,
-        &verified,
+        &verified_input,
         boundaries.verification_time,
-        &receipt_context,
     )
     .map_err(|reason| failure(reason, receipt_context))?;
     if !decision.is_allowed() {
-        return Err(failure(UcanEnforcementReason::PolicyDenied, receipt_context));
+        return Err(failure(
+            UcanEnforcementReason::PolicyDenied,
+            receipt_context,
+        ));
     }
     let receipt = build_receipt(UcanEnforcementReason::Allowed, true, receipt_context);
     Ok(ProspectiveAuthority {

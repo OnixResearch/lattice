@@ -3,7 +3,9 @@ pub(super) fn required_text(
     value: Option<&str>,
 ) -> Result<super::Text, super::EvaluationError> {
     match value {
-        Some(text) => Ok(crate::validation::normalized_adapter_field(field_name, text)?),
+        Some(text) => Ok(crate::validation::normalized_adapter_field(
+            field_name, text,
+        )?),
         None => Err(crate::AdapterContractError::EmptyField {
             field: field_name.as_str(),
         }
@@ -27,7 +29,9 @@ pub(super) fn normalize_collection(
     }
     let mut normalized = super::Collection::with_capacity(actual_items);
     for value in values {
-        normalized.push(crate::validation::normalized_adapter_field(field_name, value)?);
+        normalized.push(crate::validation::normalized_adapter_field(
+            field_name, value,
+        )?);
     }
     Ok(normalized)
 }
@@ -44,7 +48,9 @@ pub(super) fn parse_lifecycle_policy(value: &str) -> Option<super::LifecyclePoli
     match value {
         super::LIFECYCLE_POLICY_PASSIVE => Some(super::LifecyclePolicy::Passive),
         super::LIFECYCLE_POLICY_BOUNDED_CALLBACKS => Some(super::LifecyclePolicy::BoundedCallbacks),
-        super::LIFECYCLE_POLICY_UNBOUNDED_CALLBACKS => Some(super::LifecyclePolicy::UnboundedCallbacks),
+        super::LIFECYCLE_POLICY_UNBOUNDED_CALLBACKS => {
+            Some(super::LifecyclePolicy::UnboundedCallbacks)
+        }
         _unsupported => None,
     }
 }

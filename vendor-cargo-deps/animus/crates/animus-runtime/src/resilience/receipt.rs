@@ -27,7 +27,9 @@ pub fn project_provider_retry_receipt(
 ) -> Result<ProviderRetryReceipt, ProviderRetryError> {
     validate_receipt_input(&input)?;
     reject_sensitive(input.sensitive)?;
-    let timer_label = input.timer_outcome.map_or("none", super::data::ProviderRetryTimerOutcome::as_str);
+    let timer_label = input
+        .timer_outcome
+        .map_or("none", super::data::ProviderRetryTimerOutcome::as_str);
     let mut parts = Vec::with_capacity(receipt_hash_part_capacity(input.reason_classes.len()));
     parts.extend([
         PROVIDER_RETRY_RECEIPT_SCHEMA.to_string(),
@@ -39,9 +41,18 @@ pub fn project_provider_retry_receipt(
         REDACTION_MARKER.to_string(),
         NON_CLAIM.to_string(),
     ]);
-    parts.extend(input.reason_classes.iter().map(|reason| reason.as_str().to_string()));
-    let receipt_hash = super::core::hash_owned_parts(PROVIDER_RETRY_RECEIPT_HASH_DOMAIN, parts.as_slice());
-    debug_assert_eq!(parts.len(), receipt_hash_part_capacity(input.reason_classes.len()));
+    parts.extend(
+        input
+            .reason_classes
+            .iter()
+            .map(|reason| reason.as_str().to_string()),
+    );
+    let receipt_hash =
+        super::core::hash_owned_parts(PROVIDER_RETRY_RECEIPT_HASH_DOMAIN, parts.as_slice());
+    debug_assert_eq!(
+        parts.len(),
+        receipt_hash_part_capacity(input.reason_classes.len())
+    );
     debug_assert_eq!(receipt_hash.len(), BLAKE3_HEX_CHARS);
     Ok(ProviderRetryReceipt {
         schema: PROVIDER_RETRY_RECEIPT_SCHEMA,
@@ -60,16 +71,25 @@ pub fn project_provider_retry_receipt(
 fn validate_receipt_input(input: &ProviderRetryReceiptInput<'_>) -> Result<(), ProviderRetryError> {
     super::core::lowercase_blake3(input.policy_hash, FIELD_RECEIPT)?;
     super::core::lowercase_blake3(input.exact_plan_hash, FIELD_RECEIPT)?;
-    let is_invalid_attempt_count =
-        input.completed_attempt_count == u32::default() || input.completed_attempt_count > MAX_ATTEMPT_COUNT;
+    let is_invalid_attempt_count = input.completed_attempt_count == u32::default()
+        || input.completed_attempt_count > MAX_ATTEMPT_COUNT;
     if is_invalid_attempt_count {
-        return Err(super::core::error(ProviderRetryIssue::InvalidInput, FIELD_RECEIPT));
+        return Err(super::core::error(
+            ProviderRetryIssue::InvalidInput,
+            FIELD_RECEIPT,
+        ));
     }
     if input.reason_classes.is_empty() {
-        return Err(super::core::error(ProviderRetryIssue::InvalidInput, FIELD_RECEIPT));
+        return Err(super::core::error(
+            ProviderRetryIssue::InvalidInput,
+            FIELD_RECEIPT,
+        ));
     }
     if input.reason_classes.len() > MAX_REASON_COUNT {
-        return Err(super::core::error(ProviderRetryIssue::InvalidInput, FIELD_RECEIPT));
+        return Err(super::core::error(
+            ProviderRetryIssue::InvalidInput,
+            FIELD_RECEIPT,
+        ));
     }
     debug_assert!(input.completed_attempt_count <= MAX_ATTEMPT_COUNT);
     debug_assert!(input.reason_classes.len() <= MAX_REASON_COUNT);
@@ -92,7 +112,10 @@ fn reject_sensitive(sensitive: ProviderRetrySensitiveDraft<'_>) -> Result<(), Pr
     .into_iter()
     .any(|value| value.is_some());
     if has_private_material {
-        return Err(super::core::error(ProviderRetryIssue::ReceiptLeak, FIELD_RECEIPT));
+        return Err(super::core::error(
+            ProviderRetryIssue::ReceiptLeak,
+            FIELD_RECEIPT,
+        ));
     }
     debug_assert!(!has_private_material);
     debug_assert!(sensitive.raw_request.is_none());

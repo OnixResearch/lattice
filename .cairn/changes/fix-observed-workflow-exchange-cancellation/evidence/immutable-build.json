@@ -1,0 +1,68 @@
+{
+  "source": "/nix/store/l0b1bvjspdr7mk1rch047cys2m3ywplp-lattice-observed-cancellation-source",
+  "executable": "/nix/store/vmnxaklv4frgzmny25cb3lnfw6rh58kg-lattice-observed-cancellation",
+  "source_freeze": {
+    "argv": [
+      "nix",
+      "eval",
+      "--raw",
+      "--impure",
+      "--expr",
+      "let root = /home/brittonr/git/OnixResearch/lattice; prefix = toString root + \"/\"; allowed = [\"Cargo.toml\" \"Cargo.lock\" \"rust-toolchain.toml\" \"rustfmt.toml\" \"clippy.toml\" \"dylint.toml\" \"flake.nix\" \"flake.lock\" \"README.md\" \"LICENSE\" \".gitignore\" \".cargo\" \".config\" \".github\" \".cairn\" \"cairn-policy\" \"contracts\" \"builtins\" \"crates\" \"docs\" \"evidence\" \"examples\" \"fixtures\" \"patches\" \"policy\" \"profiles\" \"scripts\" \"src\" \"tests\" \"vendor-cargo-deps\" \"verus\" \"octet-baseline.json\"]; in toString (builtins.path { path = root; name = \"lattice-observed-cancellation-source\"; filter = path: type: path == toString root || (let relative = builtins.substring (builtins.stringLength prefix) (builtins.stringLength path) path; top = builtins.head (builtins.split \"/\" relative); base = builtins.baseNameOf path; in builtins.elem top allowed && !(builtins.elem base [\".git\" \".jj\" \"target\" \".direnv\" \"_native_component_cli_smoke.rs\"])); })"
+    ],
+    "stdout": "/nix/store/l0b1bvjspdr7mk1rch047cys2m3ywplp-lattice-observed-cancellation-source",
+    "stderr": "",
+    "exit_code": 0
+  },
+  "build": {
+    "argv": [
+      "cargo",
+      "build",
+      "--locked",
+      "--package",
+      "lattice",
+      "--bin",
+      "lattice",
+      "--target-dir",
+      "/home/brittonr/.cargo-target"
+    ],
+    "stdout": "",
+    "stderr": "    Blocking waiting for file lock on build directory\n[kache] the cache index could not be opened after retries (opening index database /var/cache/kache-nix/user-brittonr/index.db: disk I/O error: Error code 4618: disk I/O error).\n[kache] Caching is disabled for this build — compilation still succeeds,\n[kache] just without cache hits or stores (everything builds uncached).\n[kache] This is usually a storage issue: the cache directory is on a\n[kache] filesystem that doesn't support reliable file locking, or it is\n[kache] being accessed from more than one machine at the same time.\n[kache] → set KACHE_CACHE_DIR to a fast, local, single-machine path\n[kache] the cache index could not be opened after retries (opening index database /var/cache/kache-nix/user-brittonr/index.db: disk I/O error: Error code 4618: disk I/O error).\n[kache] Caching is disabled for this build — compilation still succeeds,\n[kache] just without cache hits or stores (everything builds uncached).\n[kache] This is usually a storage issue: the cache directory is on a\n[kache] filesystem that doesn't support reliable file locking, or it is\n[kache] being accessed from more than one machine at the same time.\n[kache] → set KACHE_CACHE_DIR to a fast, local, single-machine path\n[kache] the cache index could not be opened after retries (opening index database /var/cache/kache-nix/user-brittonr/index.db: disk I/O error: Error code 4618: disk I/O error).\n[kache] Caching is disabled for this build — compilation still succeeds,\n[kache] just without cache hits or stores (everything builds uncached).\n[kache] This is usually a storage issue: the cache directory is on a\n[kache] filesystem that doesn't support reliable file locking, or it is\n[kache] being accessed from more than one machine at the same time.\n[kache] → set KACHE_CACHE_DIR to a fast, local, single-machine path\n[kache] the cache index could not be opened after retries (opening index database /var/cache/kache-nix/user-brittonr/index.db: disk I/O error: Error code 4618: disk I/O error).\n[kache] Caching is disabled for this build — compilation still succeeds,\n[kache] just without cache hits or stores (everything builds uncached).\n[kache] This is usually a storage issue: the cache directory is on a\n[kache] filesystem that doesn't support reliable file locking, or it is\n[kache] being accessed from more than one machine at the same time.\n[kache] → set KACHE_CACHE_DIR to a fast, local, single-machine path\n[kache] the cache index could not be opened after retries (opening index database /var/cache/kache-nix/user-brittonr/index.db: disk I/O error: Error code 4618: disk I/O error).\n[kache] Caching is disabled for this build — compilation still succeeds,\n[kache] just without cache hits or stores (everything builds uncached).\n[kache] This is usually a storage issue: the cache directory is on a\n[kache] filesystem that doesn't support reliable file locking, or it is\n[kache] being accessed from more than one machine at the same time.\n[kache] → set KACHE_CACHE_DIR to a fast, local, single-machine path\nwarning: use of deprecated method `std::sync::atomic::Atomic::<u32>::fetch_update`: renamed to `try_update` for consistency\n  --> vendor-cargo-deps/hardened-wasmtime-runtime/crates/hardened-wasmtime-shell/src/concurrency.rs:20:10\n   |\n20 |         .fetch_update(\n   |          ^^^^^^^^^^^^\n   |\n   = note: `#[warn(deprecated)]` on by default\nhelp: replace the use of the deprecated method\n   |\n20 -         .fetch_update(\n20 +         .try_update(\n   |\n\nwarning: `hardened-wasmtime-shell` (lib) generated 1 warning (run `cargo fix --lib -p hardened-wasmtime-shell` to apply 1 suggestion)\n[kache] the cache index could not be opened after retries (opening index database /var/cache/kache-nix/user-brittonr/index.db: disk I/O error: Error code 4618: disk I/O error).\n[kache] Caching is disabled for this build — compilation still succeeds,\n[kache] just without cache hits or stores (everything builds uncached).\n[kache] This is usually a storage issue: the cache directory is on a\n[kache] filesystem that doesn't support reliable file locking, or it is\n[kache] being accessed from more than one machine at the same time.\n[kache] → set KACHE_CACHE_DIR to a fast, local, single-machine path\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 42.02s\nwarning: the following packages contain code that will be rejected by a future version of Rust: nix v0.30.1, nix v0.31.3\nnote: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 4`\n",
+    "exit_code": 0
+  },
+  "executable_freeze": {
+    "argv": [
+      "nix",
+      "store",
+      "add-path",
+      "--name",
+      "lattice-observed-cancellation",
+      "/home/brittonr/.cargo-target/debug/lattice"
+    ],
+    "stdout": "/nix/store/vmnxaklv4frgzmny25cb3lnfw6rh58kg-lattice-observed-cancellation\n",
+    "stderr": "",
+    "exit_code": 0
+  },
+  "qualified_cohort": {
+    "lattice": {
+      "path": "/nix/store/vmnxaklv4frgzmny25cb3lnfw6rh58kg-lattice-observed-cancellation",
+      "blake3": "61c0ffb899a820a0eace7faf5a368b9fb7a54763a4a322cc775e0bc5e7f57925"
+    },
+    "service": {
+      "path": "/nix/store/6kr50bd924c3x56jhqycdfxn7ipzbyvg-kiln-web-service-0.1.0/bin/kiln-web-service",
+      "blake3": "e0668c2d0eec0836f72baeeb8c2aefaf072116fcf3bbbe64a9e5eafc15c7ee62"
+    },
+    "lattice_source": "/nix/store/l0b1bvjspdr7mk1rch047cys2m3ywplp-lattice-observed-cancellation-source"
+  },
+  "historical_consumer_path_measurement": {
+    "argv": [
+      "b3sum",
+      "/nix/store/vmnxaklv4frgzmny25cb3lnfw6rh58kg-lattice-observed-cancellation",
+      "/nix/store/66gpkj0asani6jl01sl7ga09mvf71z3c-kiln-web-service-0.1.0/bin/kiln-web-service"
+    ],
+    "stdout": "61c0ffb899a820a0eace7faf5a368b9fb7a54763a4a322cc775e0bc5e7f57925  /nix/store/vmnxaklv4frgzmny25cb3lnfw6rh58kg-lattice-observed-cancellation\n",
+    "stderr": "b3sum: /nix/store/66gpkj0asani6jl01sl7ga09mvf71z3c-kiln-web-service-0.1.0/bin/kiln-web-service: No such file or directory (os error 2)\n",
+    "exit_code": 1
+  },
+  "scope": "Complete native application, not a reduced or feature-disabled build. Source precedes later verification receipts and documentation-only closeout; the native exercise records actual executable identities. The historical measurement failed only because a merely evaluated earlier consumer output had not been built."
+}

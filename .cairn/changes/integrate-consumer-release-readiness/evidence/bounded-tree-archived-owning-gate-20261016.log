@@ -1,0 +1,53 @@
+bg_466 [bash] — completed — devenv --offline --nix-option min-free 0 --nix-option max-free 0 --no-tui test
+warning: unknown experimental feature 'wasm-builtin'
+  ✨ devenv 2.2.2 is newer than devenv input (2.2.0) in devenv.lock. Run 'devenv update' to sync.
+  [kache] the cache index could not be opened after retries (opening index database /var/cache/kache-nix/user-brittonr/index.db: disk I/O error: Error code 4618: disk I/O error).
+  [kache] Caching is disabled for this build — compilation still succeeds,
+  [kache] just without cache hits or stores (everything builds uncached).
+  [kache] This is usually a storage issue: the cache directory is on a
+  [kache] filesystem that doesn't support reliable file locking, or it is
+  [kache] being accessed from more than one machine at the same time.
+  [kache] → set KACHE_CACHE_DIR to a fast, local, single-machine path
+      Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s
+       Running unittests src/lib.rs (/home/brittonr/.cargo-target/debug/deps/bounded_tree_cap-8fc85464e778726e)
+       Running tests/capability-root.rs (/home/brittonr/.cargo-target/debug/deps/capability_root-f5c7d74a51ce3da2)
+       Running tests/conformance.rs (/home/brittonr/.cargo-target/debug/deps/conformance-a21ac198a529d346)
+       Running unittests src/lib.rs (/home/brittonr/.cargo-target/debug/deps/bounded_tree_core-b0d706ba42e4a40d)
+       Running tests/conformance.rs (/home/brittonr/.cargo-target/debug/deps/conformance-4aad8a587bd906b5)
+       Running tests/limits.rs (/home/brittonr/.cargo-target/debug/deps/limits-ff21c4a44c34fffd)
+  [kache] the cache index could not be opened after retries (opening index database /var/cache/kache-nix/user-brittonr/index.db: disk I/O error: Error code 4618: disk I/O error).
+  [kache] Caching is disabled for this build — compilation still succeeds,
+  [kache] just without cache hits or stores (everything builds uncached).
+  [kache] This is usually a storage issue: the cache directory is on a
+  [kache] filesystem that doesn't support reliable file locking, or it is
+  [kache] being accessed from more than one machine at the same time.
+  [kache] → set KACHE_CACHE_DIR to a fast, local, single-machine path
+      Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.05s
+      Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.07s
+      Checking bounded-tree-core v0.1.0 (/home/brittonr/git/OnixResearch/bounded-tree-lattice-mantle-compat/crates/bounded-tree-core)
+     Compiling bounded_tree_core v0.1.0
+      Checking bounded-tree-cap v0.1.0 (/home/brittonr/git/OnixResearch/bounded-tree-lattice-mantle-compat/crates/bounded-tree-cap)
+     Compiling bounded_tree_core v0.1.0
+     Compiling limits v0.1.0
+     Compiling conformance v0.1.0
+     Compiling bounded_tree_cap v0.1.0
+     Compiling bounded_tree_cap v0.1.0
+     Compiling capability-root v0.1.0
+     Compiling conformance v0.1.0
+      Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.96s
+      Finished checking
+  --- octet summary ---
+  Status: clean
+  Findings: 0
+  Warnings: 0
+  Errors: 0
+  Autofixable: 0
+  Tool: cargo-octet 0.1.0
+  Toolchain: nightly-2026-03-21-x86_64-unknown-linux-gnu
+  Profile: workspace-metadata
+  Config hash: b3:11dddcb43cb3064f297f273127be5a3fef4f9943d9c8bd6c180ef5dfd303237b
+  Profile hash: b3:2a4d17c732ac8fcedee4fe1bde5fddf0ca1f8f6f418a64d8fbce2ee728d19b88
+  ---
+
+
+Wall time: 1.85 seconds

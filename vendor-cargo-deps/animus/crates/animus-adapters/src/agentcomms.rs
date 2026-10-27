@@ -6,46 +6,24 @@
 
 #![cfg_attr(
     animus_octet,
-    allow(tigerstyle::non_trait_imports, tigerstyle::underscore_in_module_filename)
+    allow(
+        tigerstyle::non_trait_imports,
+        tigerstyle::underscore_in_module_filename
+    )
 )]
 
 use alloc::format;
-use alloc::string::String;
-use alloc::string::ToString;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::convert::TryFrom;
 
-#[cfg_attr(animus_octet, allow(tigerstyle::non_trait_imports))]
-use crate::AdapterContractError;
-#[cfg_attr(animus_octet, allow(tigerstyle::non_trait_imports))]
-use crate::Assertion;
-#[cfg_attr(animus_octet, allow(tigerstyle::non_trait_imports))]
-use crate::AssertionRedaction;
-#[cfg_attr(animus_octet, allow(tigerstyle::non_trait_imports))]
-use crate::AssertionStatus;
-#[cfg_attr(animus_octet, allow(tigerstyle::non_trait_imports))]
-use crate::HostControlEnvelope;
-#[cfg_attr(animus_octet, allow(tigerstyle::non_trait_imports))]
-use crate::HostEvent;
-#[cfg_attr(animus_octet, allow(tigerstyle::non_trait_imports))]
-use crate::HostSelector;
-#[cfg_attr(animus_octet, allow(tigerstyle::non_trait_imports))]
-use crate::HostSemanticStatus;
-#[cfg_attr(animus_octet, allow(tigerstyle::non_trait_imports))]
-use crate::HostTypedError;
-#[cfg_attr(animus_octet, allow(tigerstyle::non_trait_imports))]
-use crate::OrchestrationEvent;
-#[cfg_attr(animus_octet, allow(tigerstyle::non_trait_imports))]
-use crate::SafeHash;
-#[cfg_attr(animus_octet, allow(tigerstyle::non_trait_imports))]
-use crate::Scope;
-#[cfg_attr(animus_octet, allow(tigerstyle::non_trait_imports))]
-use crate::SubagentEvent;
-#[cfg_attr(animus_octet, allow(tigerstyle::non_trait_imports))]
-use crate::Subscription;
-#[cfg_attr(animus_octet, allow(tigerstyle::non_trait_imports))]
-use crate::normalized_adapter_field;
 use crate::validation::FieldName;
+#[cfg_attr(animus_octet, allow(tigerstyle::non_trait_imports))]
+use crate::{
+    AdapterContractError, Assertion, AssertionRedaction, AssertionStatus, HostControlEnvelope,
+    HostEvent, HostSelector, HostSemanticStatus, HostTypedError, OrchestrationEvent, SafeHash,
+    Scope, SubagentEvent, Subscription, normalized_adapter_field,
+};
 
 const ROUTE_LABEL_FIELD: FieldName = FieldName::new("agent_comms_route_label");
 const TRANSPORT_FAMILY_FIELD: FieldName = FieldName::new("agent_comms_transport_family");
@@ -171,15 +149,19 @@ impl AgentCommsTransportFamily {
     ///
     /// Returns [`AgentCommsError`] when the family label is empty or unsupported.
     pub fn parse(value: &str) -> Result<Self, AgentCommsError> {
-        parse_value(TRANSPORT_FAMILY_FIELD, value, |normalized| match normalized {
-            IROH_FAMILY => Some(Self::Iroh),
-            LOCAL_IPC_FAMILY => Some(Self::LocalIpc),
-            WEBSOCKET_FAMILY => Some(Self::WebSocket),
-            MATRIX_FAMILY => Some(Self::Matrix),
-            MCP_FAMILY => Some(Self::Mcp),
-            DATASPACE_FAMILY => Some(Self::Dataspace),
-            _unsupported => None,
-        })
+        parse_value(
+            TRANSPORT_FAMILY_FIELD,
+            value,
+            |normalized| match normalized {
+                IROH_FAMILY => Some(Self::Iroh),
+                LOCAL_IPC_FAMILY => Some(Self::LocalIpc),
+                WEBSOCKET_FAMILY => Some(Self::WebSocket),
+                MATRIX_FAMILY => Some(Self::Matrix),
+                MCP_FAMILY => Some(Self::Mcp),
+                DATASPACE_FAMILY => Some(Self::Dataspace),
+                _unsupported => None,
+            },
+        )
     }
 
     /// Returns the stable transport-family label.
@@ -485,18 +467,28 @@ impl core::fmt::Display for AgentCommsError {
             }
             Self::UnsafeRoute { reason } => write!(formatter, "unsafe agent-comms route: {reason}"),
             Self::UnsafeFrame { reason } => write!(formatter, "unsafe agent-comms frame: {reason}"),
-            Self::MissingPolicyEvidence => formatter.write_str("agent-comms policy evidence is missing"),
-            Self::MissingRedactionEvidence => formatter.write_str("agent-comms frame requires redaction evidence"),
-            Self::ReceiptLeak { field, marker } => {
-                write!(formatter, "agent-comms receipt {field} leaks marker {marker}")
+            Self::MissingPolicyEvidence => {
+                formatter.write_str("agent-comms policy evidence is missing")
             }
+            Self::MissingRedactionEvidence => {
+                formatter.write_str("agent-comms frame requires redaction evidence")
+            }
+            Self::ReceiptLeak { field, marker } => write!(
+                formatter,
+                "agent-comms receipt {field} leaks marker {marker}"
+            ),
             Self::AdmissionRequired => formatter.write_str("agent-comms route requires admission"),
             Self::ScopeMismatch => formatter.write_str("agent-comms route scope mismatch"),
             Self::FrameTooLarge {
                 max_bytes,
                 actual_bytes,
-            } => write!(formatter, "agent-comms frame is too large: max {max_bytes} bytes, got {actual_bytes}"),
-            Self::LiveBackendUnavailable => formatter.write_str("agent-comms transport unavailable"),
+            } => write!(
+                formatter,
+                "agent-comms frame is too large: max {max_bytes} bytes, got {actual_bytes}"
+            ),
+            Self::LiveBackendUnavailable => {
+                formatter.write_str("agent-comms transport unavailable")
+            }
             Self::Transport { reason } => {
                 write!(formatter, "agent-comms transport failed: {reason}")
             }
@@ -555,8 +547,9 @@ impl AgentCommsRoute {
     /// endpoint hash, or admission data is missing or unsafe.
     #[cfg_attr(animus_octet, allow(tigerstyle::numeric_units))]
     pub fn new(draft: AgentCommsRouteDraft<'_>) -> Result<Self, AgentCommsError> {
-        let route_label =
-            required_safe_text(ROUTE_LABEL_FIELD, draft.route_label, |reason| AgentCommsError::UnsafeRoute { reason })?;
+        let route_label = required_safe_text(ROUTE_LABEL_FIELD, draft.route_label, |reason| {
+            AgentCommsError::UnsafeRoute { reason }
+        })?;
         let transport_family = AgentCommsTransportFamily::parse(draft.transport_family)?;
         let policy_hash = match draft.policy_hash {
             Some(value) => {
@@ -694,8 +687,7 @@ impl AgentCommsFrame {
     ///
     /// # Errors
     ///
-    /// Returns [`AgentCommsError`] when the frame id, payload hash, or redaction evidence is
-    /// missing or unsafe.
+    /// Returns [`AgentCommsError`] when the frame id, payload hash, or redaction evidence is missing or unsafe.
     pub fn new(draft: AgentCommsFrameDraft<'_>) -> Result<Self, AgentCommsError> {
         if !draft.route.allows_effects() {
             return Err(AgentCommsError::AdmissionRequired);
@@ -710,8 +702,9 @@ impl AgentCommsFrame {
             return Err(AgentCommsError::MissingRedactionEvidence);
         }
 
-        let frame_id =
-            required_safe_text(FRAME_ID_FIELD, draft.frame_id, |reason| AgentCommsError::UnsafeFrame { reason })?;
+        let frame_id = required_safe_text(FRAME_ID_FIELD, draft.frame_id, |reason| {
+            AgentCommsError::UnsafeFrame { reason }
+        })?;
         validate_no_receipt_leaks(PAYLOAD_HASH_FIELD.as_str(), draft.payload_hash)?;
         let payload_hash = SafeHash::new(draft.payload_hash).map_err(AgentCommsError::from)?;
         let redactions = draft
@@ -848,12 +841,12 @@ impl AgentCommsReceipt {
     ///
     /// # Errors
     ///
-    /// Returns [`AgentCommsError`] when a label, hash, redaction, or policy field is unsafe or
-    /// missing.
+    /// Returns [`AgentCommsError`] when a label, hash, redaction, or policy field is unsafe or missing.
     #[cfg_attr(animus_octet, allow(tigerstyle::numeric_units))]
     pub fn new(draft: &AgentCommsReceiptDraft<'_>) -> Result<Self, AgentCommsError> {
-        let route_label =
-            required_safe_text(ROUTE_LABEL_FIELD, draft.route_label, |reason| AgentCommsError::UnsafeRoute { reason })?;
+        let route_label = required_safe_text(ROUTE_LABEL_FIELD, draft.route_label, |reason| {
+            AgentCommsError::UnsafeRoute { reason }
+        })?;
         let transport_family = AgentCommsTransportFamily::parse(draft.transport_family)?;
         let policy_hash = match draft.policy_hash {
             Some(value) => {
@@ -875,8 +868,9 @@ impl AgentCommsReceipt {
                 reason: "agent-comms max frame bytes must be greater than zero",
             });
         }
-        let frame_id =
-            required_safe_text(FRAME_ID_FIELD, draft.frame_id, |reason| AgentCommsError::UnsafeFrame { reason })?;
+        let frame_id = required_safe_text(FRAME_ID_FIELD, draft.frame_id, |reason| {
+            AgentCommsError::UnsafeFrame { reason }
+        })?;
         let frame_kind = AgentCommsFrameKind::parse(draft.frame_kind)?;
         validate_no_receipt_leaks(PAYLOAD_HASH_FIELD.as_str(), draft.payload_hash)?;
         let payload_hash = SafeHash::new(draft.payload_hash).map_err(AgentCommsError::from)?;
@@ -944,7 +938,10 @@ impl AgentCommsReceipt {
     /// # Errors
     ///
     /// Returns [`AgentCommsError`] when the route metadata is invalid.
-    pub fn from_route(route: &AgentCommsRoute, status: AgentCommsReceiptStatus) -> Result<Self, AgentCommsError> {
+    pub fn from_route(
+        route: &AgentCommsRoute,
+        status: AgentCommsReceiptStatus,
+    ) -> Result<Self, AgentCommsError> {
         let redactions = [AgentCommsRedaction::RouteMetadataOnly.as_str()];
         Self::new(&AgentCommsReceiptDraft {
             route_label: route.route_label(),
@@ -974,7 +971,12 @@ impl AgentCommsReceipt {
         frame: &AgentCommsFrame,
         status: AgentCommsReceiptStatus,
     ) -> Result<Self, AgentCommsError> {
-        let redactions = frame.redactions().iter().copied().map(AgentCommsRedaction::as_str).collect::<Vec<_>>();
+        let redactions = frame
+            .redactions()
+            .iter()
+            .copied()
+            .map(AgentCommsRedaction::as_str)
+            .collect::<Vec<_>>();
         Self::new(&AgentCommsReceiptDraft {
             route_label: route.route_label(),
             transport_family: route.transport_family().as_str(),
@@ -1113,7 +1115,10 @@ pub trait AgentCommsTransport {
 ///
 /// Returns [`AgentCommsError`] when admission is missing or the tenant/workspace boundary differs.
 #[cfg_attr(animus_octet, allow(tigerstyle::path_segment_repetition))]
-pub fn admit_agent_comms_scope(route: &AgentCommsRoute, scope: &Scope) -> Result<(), AgentCommsError> {
+pub fn admit_agent_comms_scope(
+    route: &AgentCommsRoute,
+    scope: &Scope,
+) -> Result<(), AgentCommsError> {
     ensure_admitted(route)?;
     if route.scope().same_tenant_workspace(scope) {
         return Ok(());
@@ -1230,7 +1235,11 @@ pub fn project_subagent_lifecycle_frame(
     ensure_admitted(route)?;
     let payload = subagent_event_payload_summary(event);
     let payload_hash = SafeHash::from_blake3_bytes(payload.as_bytes());
-    let frame_id = format!("{SUBAGENT_FRAME_ID_PREFIX}{}:{}", event.parent_id(), event.child_id());
+    let frame_id = format!(
+        "{SUBAGENT_FRAME_ID_PREFIX}{}:{}",
+        event.parent_id(),
+        event.child_id()
+    );
     AgentCommsFrame::new(AgentCommsFrameDraft {
         frame_id: frame_id.as_str(),
         kind: AgentCommsFrameKind::SubagentLifecycle,
@@ -1337,8 +1346,12 @@ fn selector_summary(selector: &HostSelector) -> String {
 #[cfg_attr(animus_octet, allow(tigerstyle::assertion_density))]
 fn host_control_payload_summary(envelope: &HostControlEnvelope) -> String {
     let command = envelope.command();
-    let selector = command.selector().map_or_else(|| String::from(NO_SELECTOR), selector_summary);
-    let label = command.label().map_or_else(|| String::from(NO_LABEL), String::from);
+    let selector = command
+        .selector()
+        .map_or_else(|| String::from(NO_SELECTOR), selector_summary);
+    let label = command
+        .label()
+        .map_or_else(|| String::from(NO_LABEL), String::from);
     let accepted = if envelope.accepted_features().is_empty() {
         String::from(NO_LABEL)
     } else {
@@ -1403,9 +1416,13 @@ fn subagent_event_payload_summary(event: &SubagentEvent) -> String {
 fn assertion_payload_summary(assertion: &Assertion) -> String {
     let scope = scope_summary(assertion.scope());
     let redactions = assertion_redaction_labels(assertion).join(",");
-    let content_hash = assertion.content_hash().map_or(NO_ENDPOINT_HASH, SafeHash::as_str);
+    let content_hash = assertion
+        .content_hash()
+        .map_or(NO_ENDPOINT_HASH, SafeHash::as_str);
     let item_count = assertion.item_count().to_string();
-    let lease = assertion.lease_expires_at().map_or_else(|| String::from(NO_EVIDENCE), |lease| lease.to_string());
+    let lease = assertion
+        .lease_expires_at()
+        .map_or_else(|| String::from(NO_EVIDENCE), |lease| lease.to_string());
     format!(
         "{}|{}|{}|{}|{}|{}|{}|{}",
         assertion.stable_id(),
@@ -1461,12 +1478,20 @@ fn assertion_redaction_labels(assertion: &Assertion) -> Vec<&'static str> {
         .iter()
         .map(|redaction| match redaction {
             AssertionRedaction::PromptOmitted => AgentCommsRedaction::PromptOmitted.as_str(),
-            AssertionRedaction::ProviderPayloadOmitted => AgentCommsRedaction::ProviderPayloadOmitted.as_str(),
-            AssertionRedaction::CredentialOmitted => AgentCommsRedaction::CredentialOmitted.as_str(),
+            AssertionRedaction::ProviderPayloadOmitted => {
+                AgentCommsRedaction::ProviderPayloadOmitted.as_str()
+            }
+            AssertionRedaction::CredentialOmitted => {
+                AgentCommsRedaction::CredentialOmitted.as_str()
+            }
             AssertionRedaction::PathRedacted => AgentCommsRedaction::PathRedacted.as_str(),
             AssertionRedaction::FileBodyOmitted => AgentCommsRedaction::FileBodyOmitted.as_str(),
-            AssertionRedaction::ToolPayloadOmitted => AgentCommsRedaction::ToolPayloadOmitted.as_str(),
-            AssertionRedaction::ModelOutputOmitted => AgentCommsRedaction::ModelOutputOmitted.as_str(),
+            AssertionRedaction::ToolPayloadOmitted => {
+                AgentCommsRedaction::ToolPayloadOmitted.as_str()
+            }
+            AssertionRedaction::ModelOutputOmitted => {
+                AgentCommsRedaction::ModelOutputOmitted.as_str()
+            }
             AssertionRedaction::LogsBounded => AgentCommsRedaction::LogsBounded.as_str(),
         })
         .collect()
@@ -1493,7 +1518,9 @@ struct RouteHashInput<'a> {
 #[cfg_attr(animus_octet, allow(tigerstyle::assertion_density))]
 fn build_route_hash(input: &RouteHashInput<'_>) -> SafeHash {
     let scope_summary = scope_summary(input.scope);
-    let endpoint = input.endpoint_hash.map_or(NO_ENDPOINT_HASH, SafeHash::as_str);
+    let endpoint = input
+        .endpoint_hash
+        .map_or(NO_ENDPOINT_HASH, SafeHash::as_str);
     let max_frame_bytes = input.max_frame_bytes.to_string();
     safe_hash_parts(&[
         ROUTE_HASH_SCHEMA,
@@ -1523,7 +1550,13 @@ struct FrameHashInput<'a> {
 fn build_frame_hash(summary: &FrameHashInput<'_>) -> SafeHash {
     let payload_bytes = summary.payload_bytes.to_string();
     let item_count = summary.item_count.to_string();
-    let redactions = summary.redactions.iter().copied().map(AgentCommsRedaction::as_str).collect::<Vec<_>>().join(",");
+    let redactions = summary
+        .redactions
+        .iter()
+        .copied()
+        .map(AgentCommsRedaction::as_str)
+        .collect::<Vec<_>>()
+        .join(",");
     safe_hash_parts(&[
         FRAME_HASH_SCHEMA,
         summary.frame_id,
@@ -1556,7 +1589,13 @@ struct ReceiptHashInput<'a> {
 fn build_receipt_hash(summary: &ReceiptHashInput<'_>) -> SafeHash {
     let payload_bytes = summary.payload_bytes.to_string();
     let item_count = summary.item_count.to_string();
-    let redactions = summary.redactions.iter().copied().map(AgentCommsRedaction::as_str).collect::<Vec<_>>().join(",");
+    let redactions = summary
+        .redactions
+        .iter()
+        .copied()
+        .map(AgentCommsRedaction::as_str)
+        .collect::<Vec<_>>()
+        .join(",");
     safe_hash_parts(&[
         RECEIPT_HASH_SCHEMA,
         summary.route_hash.as_str(),
@@ -1585,16 +1624,16 @@ const HEADLESS_EVENT_FRAME_ID_PREFIX: &str = "agent-comms-frame:headless-event:"
 const SUBAGENT_FRAME_ID_PREFIX: &str = "agent-comms-frame:subagent-lifecycle:";
 
 #[cfg(test)]
-#[cfg_attr(animus_octet, allow(tigerstyle::non_trait_imports, tigerstyle::numeric_units))]
+#[cfg_attr(
+    animus_octet,
+    allow(tigerstyle::non_trait_imports, tigerstyle::numeric_units)
+)]
 mod tests {
     use super::*;
-    use crate::HostControlEnvelope;
-    use crate::HostSelector;
-    use crate::HostSelectorDraft;
-    use crate::HostTypedError;
-    use crate::SelectorLifetime;
-    use crate::TopologyCommand;
-    use crate::TopologyCommandDraft;
+    use crate::{
+        HostControlEnvelope, HostSelector, HostSelectorDraft, HostTypedError, SelectorLifetime,
+        TopologyCommand, TopologyCommandDraft,
+    };
 
     const TENANT: &str = "tenant:local";
     const WORKSPACE: &str = "workspace:main";
@@ -1681,7 +1720,11 @@ mod tests {
             Ok(self
                 .assertions
                 .iter()
-                .filter(|assertion| assertion.scope().same_tenant_workspace(subscription.scope()))
+                .filter(|assertion| {
+                    assertion
+                        .scope()
+                        .same_tenant_workspace(subscription.scope())
+                })
                 .filter(|assertion| subscription.allows(assertion.kind()))
                 .cloned()
                 .collect())
@@ -1714,7 +1757,11 @@ mod tests {
     }
 
     #[cfg_attr(animus_octet, allow(tigerstyle::ambiguous_params))]
-    fn route(workspace: &str, admission: &str, policy_hash: Option<&str>) -> TestResult<AgentCommsRoute> {
+    fn route(
+        workspace: &str,
+        admission: &str,
+        policy_hash: Option<&str>,
+    ) -> TestResult<AgentCommsRoute> {
         test_ok(AgentCommsRoute::new(AgentCommsRouteDraft {
             route_label: ROUTE_LABEL,
             transport_family: IROH_FAMILY,
@@ -1772,19 +1819,29 @@ mod tests {
             lifetime: SelectorLifetime::Live.as_str(),
             revision: HOST_TOPOLOGY_REVISION,
         }))?;
-        let snapshot = test_ok(crate::HostTopologySnapshot::validate(crate::HostTopologySnapshotDraft {
-            host_id: HOST_ID,
-            revision: HOST_TOPOLOGY_REVISION,
-            selectors: core::slice::from_ref(&selector),
-            labels: &[],
-            supported_operations: &[COMMAND_KIND],
-        }))?;
-        let command = test_ok(TopologyCommand::validate(&snapshot, TopologyCommandDraft {
-            operation: COMMAND_KIND,
-            selector: Some(&selector),
-            label: Some(COMMAND_LABEL),
-        }))?;
-        test_ok(HostControlEnvelope::new(COMMAND_CORRELATION, "animus-host-control-v1", command, &["layout"]))
+        let snapshot = test_ok(crate::HostTopologySnapshot::validate(
+            crate::HostTopologySnapshotDraft {
+                host_id: HOST_ID,
+                revision: HOST_TOPOLOGY_REVISION,
+                selectors: core::slice::from_ref(&selector),
+                labels: &[],
+                supported_operations: &[COMMAND_KIND],
+            },
+        ))?;
+        let command = test_ok(TopologyCommand::validate(
+            &snapshot,
+            TopologyCommandDraft {
+                operation: COMMAND_KIND,
+                selector: Some(&selector),
+                label: Some(COMMAND_LABEL),
+            },
+        ))?;
+        test_ok(HostControlEnvelope::new(
+            COMMAND_CORRELATION,
+            "animus-host-control-v1",
+            command,
+            &["layout"],
+        ))
     }
 
     fn host_event() -> TestResult<HostEvent> {
@@ -1796,7 +1853,11 @@ mod tests {
             revision: HOST_TOPOLOGY_REVISION,
         }))?;
         let typed_error = test_ok(HostTypedError::new(EVENT_ERROR_CODE, EVENT_ERROR_MESSAGE))?;
-        test_ok(HostEvent::host_error(EVENT_CORRELATION, selector, typed_error))
+        test_ok(HostEvent::host_error(
+            EVENT_CORRELATION,
+            selector,
+            typed_error,
+        ))
     }
 
     fn subagent_event() -> TestResult<SubagentEvent> {
@@ -1824,7 +1885,10 @@ mod tests {
 
         assert_eq!(matches.len(), 1);
         assert_eq!(transport.frames.len(), EXPECTED_TRANSPORT_FRAME_COUNT);
-        assert_eq!(assertion_frame.kind(), AgentCommsFrameKind::DataspaceAssertion);
+        assert_eq!(
+            assertion_frame.kind(),
+            AgentCommsFrameKind::DataspaceAssertion
+        );
         assert_eq!(event_frame.kind(), AgentCommsFrameKind::OrchestrationEvent);
         Ok(())
     }
@@ -1852,8 +1916,14 @@ mod tests {
         })
         .expect_err("unsupported family should fail");
 
-        assert!(matches!(missing_policy, AgentCommsError::MissingPolicyEvidence));
-        assert!(matches!(bad_family, AgentCommsError::UnsupportedValue { .. }));
+        assert!(matches!(
+            missing_policy,
+            AgentCommsError::MissingPolicyEvidence
+        ));
+        assert!(matches!(
+            bad_family,
+            AgentCommsError::UnsupportedValue { .. }
+        ));
         Ok(())
     }
 
@@ -1863,8 +1933,10 @@ mod tests {
         let admitted = route(WORKSPACE, ADMITTED, Some(SAFE_HASH))?;
         let other_scope = scope(OTHER_WORKSPACE)?;
         let assertion = assertion_for(WORKSPACE, ASSERTION_ID)?;
-        let denied_error = admit_agent_comms_scope(&denied, assertion.scope()).expect_err("denied route should fail");
-        let scope_error = admit_agent_comms_scope(&admitted, &other_scope).expect_err("cross scope should fail");
+        let denied_error = admit_agent_comms_scope(&denied, assertion.scope())
+            .expect_err("denied route should fail");
+        let scope_error =
+            admit_agent_comms_scope(&admitted, &other_scope).expect_err("cross scope should fail");
 
         assert_eq!(denied_error, AgentCommsError::AdmissionRequired);
         assert_eq!(scope_error, AgentCommsError::ScopeMismatch);
@@ -1924,7 +1996,10 @@ mod tests {
         })
         .expect_err("oversized frame should fail");
 
-        assert_eq!(missing_redactions, AgentCommsError::MissingRedactionEvidence);
+        assert_eq!(
+            missing_redactions,
+            AgentCommsError::MissingRedactionEvidence
+        );
         assert!(matches!(invalid_hash, AgentCommsError::Contract(_)));
         assert!(matches!(too_large, AgentCommsError::FrameTooLarge { .. }));
         assert_eq!(oversized.kind(), AgentCommsFrameKind::DataspaceAssertion);
@@ -1953,11 +2028,24 @@ mod tests {
             redactions: &[ROUTE_METADATA_ONLY],
         })
         .expect_err("raw ticket marker should fail");
-        let route_receipt = test_ok(AgentCommsReceipt::from_route(&route, AgentCommsReceiptStatus::Admitted))?;
-        let receipt = test_ok(AgentCommsReceipt::from_frame(&route, &frame, AgentCommsReceiptStatus::Completed))?;
+        let route_receipt = test_ok(AgentCommsReceipt::from_route(
+            &route,
+            AgentCommsReceiptStatus::Admitted,
+        ))?;
+        let receipt = test_ok(AgentCommsReceipt::from_frame(
+            &route,
+            &frame,
+            AgentCommsReceiptStatus::Completed,
+        ))?;
 
-        assert!(matches!(leak, AgentCommsError::UnsafeRoute { .. } | AgentCommsError::ReceiptLeak { .. }));
-        assert_eq!(route_receipt.frame_kind(), AgentCommsFrameKind::RouteMetadata);
+        assert!(matches!(
+            leak,
+            AgentCommsError::UnsafeRoute { .. } | AgentCommsError::ReceiptLeak { .. }
+        ));
+        assert_eq!(
+            route_receipt.frame_kind(),
+            AgentCommsFrameKind::RouteMetadata
+        );
         assert_eq!(route_receipt.status(), AgentCommsReceiptStatus::Admitted);
         assert_eq!(receipt.transport_family(), AgentCommsTransportFamily::Iroh);
         assert_eq!(receipt.status(), AgentCommsReceiptStatus::Completed);
@@ -1977,10 +2065,25 @@ mod tests {
 
         assert_eq!(command_frame.kind(), AgentCommsFrameKind::HeadlessCommand);
         assert_eq!(event_frame.kind(), AgentCommsFrameKind::HeadlessEvent);
-        assert_eq!(subagent_frame.kind(), AgentCommsFrameKind::SubagentLifecycle);
-        assert!(command_frame.redactions().contains(&AgentCommsRedaction::CommandPayloadOmitted));
-        assert!(event_frame.redactions().contains(&AgentCommsRedaction::EventPayloadOmitted));
-        assert!(subagent_frame.redactions().contains(&AgentCommsRedaction::SubagentPayloadOmitted));
+        assert_eq!(
+            subagent_frame.kind(),
+            AgentCommsFrameKind::SubagentLifecycle
+        );
+        assert!(
+            command_frame
+                .redactions()
+                .contains(&AgentCommsRedaction::CommandPayloadOmitted)
+        );
+        assert!(
+            event_frame
+                .redactions()
+                .contains(&AgentCommsRedaction::EventPayloadOmitted)
+        );
+        assert!(
+            subagent_frame
+                .redactions()
+                .contains(&AgentCommsRedaction::SubagentPayloadOmitted)
+        );
         Ok(())
     }
 }

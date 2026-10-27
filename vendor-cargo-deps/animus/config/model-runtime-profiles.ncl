@@ -2,7 +2,7 @@
 # r[impl agent_harness_runtime.model_runtime_profiles.contract]
 let contracts = import "../policy/contracts/primitives.ncl" in
 
-let schema_identity = "animus.model-runtime-profiles.v1" in
+let schema_identity = "animus.model-runtime-profiles.v2" in
 let required_mode = "required" in
 let exact_binding = "exact" in
 let default_binding = "default" in
@@ -22,6 +22,8 @@ let disabled_tool_mode = "disabled" in
 let optional_tool_mode = "optional" in
 let required_tool_mode = "capability_required" in
 let standard_budget_id = "standard-budget" in
+let mock_dialect_id = "mock-text-v1" in
+let generic_dialect_id = "generic-responses-v1" in
 let standard_context_units = 4096 in
 let standard_tool_calls = 8 in
 let standard_parallel_calls = 2 in
@@ -32,9 +34,9 @@ let maximum_safe_label_chars = 128 in
 let policy_hash_value = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" in
 let capability_hash = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" in
 let memory_policy_hash_value = "9999999999999999999999999999999999999999999999999999999999999999" in
-let mock_standard_hash = "dba2fff3a916d9b631208f1dae89c7e30591add42e33c0568223432a4fb97428" in
-let mock_balanced_hash = "6c55a406c8b9e0855adcf189156bcf1b8e49c6ec03402b2d45d52f46a920c91f" in
-let compatibility_default_hash = "afbe344c0f904052774b59c2cf1419de8c5ae445470a04d89a7300acdd48726b" in
+let mock_standard_hash = "ad975d519178913e933730c88e13935629cc2a4d4ab49d771c616e711efa252a" in
+let mock_balanced_hash = "31d6c27efddea3f6b9b0973fe52e24ec44560b7a093f4aac60200878552b2f30" in
+let compatibility_default_hash = "24fdac2e38776b01b3bf6088b3a070b960156ae9e0f472b0ff98938d5129ec56" in
 
 let _lower_label_predicate = fun value =>
   std.is_string value
@@ -81,6 +83,7 @@ let Toolset = {
 } in
 let Profile = {
   profile_id | LowerLabel,
+  dialect_id | LowerLabel,
   binding | Binding,
   source_scope | contracts.enum "MODEL_PROFILE_SOURCE_SCOPE" [host_scope, project_scope],
   trust_status | contracts.enum "MODEL_PROFILE_TRUST_STATUS" [trusted_status, untrusted_status],
@@ -205,6 +208,7 @@ in
 let host_policy_prompt = { label = "host-policy", required = true } in
 let model_guidance_prompt = { label = "model-guidance", required = false } in
 let common_profile = {
+  dialect_id = mock_dialect_id,
   source_scope = host_scope,
   trust_status = trusted_status,
   admission_status = admitted_status,
@@ -269,6 +273,7 @@ let common_profile = {
       },
       common_profile & {
         profile_id = "compat-default",
+        dialect_id | force = generic_dialect_id,
         binding = {
           kind = default_binding,
           provider_id = "",

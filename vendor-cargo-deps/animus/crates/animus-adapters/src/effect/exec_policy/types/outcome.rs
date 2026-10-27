@@ -35,6 +35,10 @@ impl Decision {
     }
 
     pub(in crate::effect::exec_policy) const fn most_restrictive(self, other: Self) -> Self {
-        if self.rank() >= other.rank() { self } else { other }
+        if self.rank() >= other.rank() {
+            self
+        } else {
+            other
+        }
     }
 }

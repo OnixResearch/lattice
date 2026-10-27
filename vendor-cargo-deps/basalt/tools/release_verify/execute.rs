@@ -6,8 +6,10 @@ use super::model::{
 };
 use super::plan::steps;
 use super::receipts::write_receipts;
+use super::scratch;
 use super::validators::{
-    validate_license_metadata, validate_package_contents, validate_private_source,
+    validate_license_metadata, validate_nickel_identity, validate_package_contents,
+    validate_private_source,
 };
 use std::env;
 use std::ffi::OsString;
@@ -21,6 +23,13 @@ pub(super) fn run() -> ExitCode {
         eprintln!("failed to read current directory: {error}");
         std::process::exit(1);
     });
+    let scratch = match scratch_directory() {
+        Ok(value) => value,
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::from(1);
+        }
+    };
     let receipt_dir = env::var_os(RECEIPT_DIR_ENV)
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from(DEFAULT_RECEIPT_DIR));
@@ -35,7 +44,7 @@ pub(super) fn run() -> ExitCode {
     let mut receipts = Vec::new();
     let mut failed = false;
     for step in steps() {
-        let receipt = run_step(&root, &step);
+        let receipt = run_step(&root, &step, scratch.as_deref());
         if !receipt.success {
             eprintln!("release verification failed at {}", step.name);
             failed = true;
@@ -73,7 +82,20 @@ fn prevalidated_receipt(step: &Step, environment_name: &str) -> StepReceipt {
     }
 }
 
-fn run_step(root: &Path, step: &Step) -> StepReceipt {
+fn scratch_directory() -> Result<Option<String>, String> {
+    let Some(value) = env::var_os(scratch::ENV) else {
+        return Ok(None);
+    };
+    let value = value
+        .into_string()
+        .map_err(|_| "release scratch directory must be UTF-8")?;
+    scratch::validate(&value)?;
+    fs::create_dir_all(&value)
+        .map_err(|error| format!("cannot create release scratch directory: {error}"))?;
+    Ok(Some(value))
+}
+
+fn run_step(root: &Path, step: &Step, scratch: Option<&str>) -> StepReceipt {
     if matches!(step.kind, StepKind::PolicyFreshness) && env_flag(POLICY_FRESH_ENV) {
         return prevalidated_receipt(step, POLICY_FRESH_ENV);
     }
@@ -123,7 +145,13 @@ fn run_step(root: &Path, step: &Step) -> StepReceipt {
         };
     }
 
-    let mut args: Vec<OsString> = step.args.iter().map(OsString::from).collect();
+    let program = scratch::relocate(scratch, step.program);
+    let target = scratch::relocate(scratch, step.target_dir);
+    let mut args: Vec<OsString> = step
+        .args
+        .iter()
+        .map(|arg| OsString::from(scratch::relocate(scratch, arg)))
+        .collect();
     let check_name = match step.kind {
         StepKind::PolicyFreshness => Some("policy-export"),
         StepKind::AuthorityFixtureFreshness => Some("authority-core-fixtures"),
@@ -134,12 +162,12 @@ fn run_step(root: &Path, step: &Step) -> StepReceipt {
         _ => None,
     };
     if let Some(check_name) = check_name {
-        match check_attr(check_name) {
+        match check_attr(check_name, scratch) {
             Ok(attr) => args.push(attr),
             Err(error) => {
                 return StepReceipt {
                     name: step.name,
-                    command: format_command(step.program, &args),
+                    command: format_command(&program, &args),
                     status: None,
                     success: false,
                     elapsed: Duration::ZERO,
@@ -152,20 +180,28 @@ fn run_step(root: &Path, step: &Step) -> StepReceipt {
 
     println!("==> {}", step.name);
     let start = Instant::now();
-    let mut command = Command::new(step.program);
+    let mut command = Command::new(&program);
     command.current_dir(root).args(&args);
-    if step.cargo_env {
+    if let Some(scratch) = scratch {
         command
-            .env(TARGET_ENV, step.target_dir)
+            .env("TMPDIR", scratch)
+            .env("TMP", scratch)
+            .env("TEMP", scratch);
+    }
+    let mut description = format_command(&program, &args);
+    if step.cargo_env {
+        description = format!("{TARGET_ENV}={target:?} {description}");
+        command
+            .env(TARGET_ENV, &target)
             .env(WRAPPER_ENV, "")
             .env(GIT_FETCH_ENV, "true");
     }
 
     match command.output() {
-        Ok(output) => receipt_from_output(root, step, &args, start, output),
+        Ok(output) => receipt_from_output(root, step, description, start, output),
         Err(error) => StepReceipt {
             name: step.name,
-            command: format_command(step.program, &args),
+            command: description,
             status: None,
             success: false,
             elapsed: start.elapsed(),
@@ -178,7 +214,7 @@ fn run_step(root: &Path, step: &Step) -> StepReceipt {
 fn receipt_from_output(
     root: &Path,
     step: &Step,
-    args: &[OsString],
+    description: String,
     start: Instant,
     output: std::process::Output,
 ) -> StepReceipt {
@@ -188,6 +224,10 @@ fn receipt_from_output(
         validate_package_contents(&stdout).and_then(|()| validate_private_source(root))
     } else if matches!(step.kind, StepKind::LicenseMetadata) && output.status.success() {
         validate_license_metadata(&root.join("Cargo.toml"), &stdout)
+    } else if matches!(step.kind, StepKind::NickelCohortIdentity) && output.status.success() {
+        validate_nickel_identity(&stdout)
+    } else if matches!(step.kind, StepKind::EnforcementDependencies) && output.status.success() {
+        super::enforcement_profile::validate(&stdout)
     } else {
         Ok(())
     };
@@ -207,7 +247,7 @@ fn receipt_from_output(
     }
     StepReceipt {
         name: step.name,
-        command: format_command(step.program, args),
+        command: description,
         status: output.status.code(),
         success,
         elapsed: start.elapsed(),
@@ -216,8 +256,12 @@ fn receipt_from_output(
     }
 }
 
-fn check_attr(check_name: &str) -> Result<OsString, String> {
-    let output = Command::new("nix")
+fn check_attr(check_name: &str, scratch: Option<&str>) -> Result<OsString, String> {
+    let mut command = Command::new("nix");
+    if let Some(scratch) = scratch {
+        command.env("TMPDIR", scratch);
+    }
+    let output = command
         .args([
             "eval",
             "--raw",

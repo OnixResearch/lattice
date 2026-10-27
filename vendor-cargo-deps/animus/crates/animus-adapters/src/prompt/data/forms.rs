@@ -1,12 +1,8 @@
+use crate::prompt::base::{
+    KIND_DIFF_BIT, KIND_DIRECTORY_BIT, KIND_FILE_BIT, KIND_IMAGE_BIT, KIND_URL_BIT,
+    MALFORMED_RANGE_REASON, MIN_LINE_NUMBER,
+};
 use alloc::string::ToString;
-
-use crate::prompt::base::KIND_DIFF_BIT;
-use crate::prompt::base::KIND_DIRECTORY_BIT;
-use crate::prompt::base::KIND_FILE_BIT;
-use crate::prompt::base::KIND_IMAGE_BIT;
-use crate::prompt::base::KIND_URL_BIT;
-use crate::prompt::base::MALFORMED_RANGE_REASON;
-use crate::prompt::base::MIN_LINE_NUMBER;
 
 /// Kind of prompt context reference requested by a turn.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -113,7 +109,10 @@ impl ContextLineRange {
     ///
     /// Returns [`super::failure::ContextReferenceError`] when the start is zero or the end is
     /// lower than the start.
-    pub const fn new(start_line: u32, end_line: Option<u32>) -> Result<Self, super::failure::ContextReferenceError> {
+    pub const fn new(
+        start_line: u32,
+        end_line: Option<u32>,
+    ) -> Result<Self, super::failure::ContextReferenceError> {
         if start_line < MIN_LINE_NUMBER {
             return Err(super::failure::ContextReferenceError::MalformedRange {
                 reason: MALFORMED_RANGE_REASON,
@@ -126,7 +125,10 @@ impl ContextLineRange {
                 });
             }
         }
-        Ok(Self { start_line, end_line })
+        Ok(Self {
+            start_line,
+            end_line,
+        })
     }
 
     /// Returns the inclusive one-based start line.

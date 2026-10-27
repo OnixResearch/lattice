@@ -91,7 +91,7 @@ fn omitted_policy_is_serial_and_generated_nickel_policy_is_typed() {
     let directory = tempfile::tempdir().expect("temporary config directory");
     let path = directory.path().join("config.ncl");
     std::fs::write(&path, lattice::config::default_config_ncl()).expect("write default config");
-    let generated = lattice::config::load_app_config(&path);
+    let generated = lattice::config::load_app_config(&path).expect("typed frontier config imports");
     let policy = generated.frontier_capacity_policy().expect("generated frontier policy");
     assert_eq!(policy.total_slots, GENERATED_CONFIG_SLOT_COUNT);
     assert!(policy.lane_slots.values().all(|slots| *slots == GENERATED_CONFIG_SLOT_COUNT));

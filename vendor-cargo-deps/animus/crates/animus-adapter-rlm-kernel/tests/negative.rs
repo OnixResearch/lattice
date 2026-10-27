@@ -2,25 +2,12 @@
 
 mod support;
 
-use animus_adapter_rlm_kernel::ChildSpawnRequest;
-use animus_adapter_rlm_kernel::CompactionCause;
-use animus_adapter_rlm_kernel::CompactionRequest;
-use animus_adapter_rlm_kernel::ContextBinding;
-use animus_adapter_rlm_kernel::EnvironmentState;
-use animus_adapter_rlm_kernel::Error;
-use animus_adapter_rlm_kernel::EvaluationMetrics;
-use animus_adapter_rlm_kernel::EvaluationRequest;
-use animus_adapter_rlm_kernel::HostOperationClass;
-use animus_adapter_rlm_kernel::HostRequest;
-use animus_adapter_rlm_kernel::Receipt;
-use animus_adapter_rlm_kernel::ReceiptDraft;
-use animus_adapter_rlm_kernel::ReceiptLeakClass;
-use animus_adapter_rlm_kernel::RlmKernelPolicy;
-use animus_adapter_rlm_kernel::RlmKernelPolicyDraft;
-use animus_adapter_rlm_kernel::RlmKernelStatus;
-use animus_adapter_rlm_kernel::bind_prompt_context;
-use animus_adapter_rlm_kernel::plan_compaction;
-use animus_adapter_rlm_kernel::plan_evaluation;
+use animus_adapter_rlm_kernel::{
+    ChildSpawnRequest, CompactionCause, CompactionRequest, ContextBinding, EnvironmentState, Error,
+    EvaluationMetrics, EvaluationRequest, HostOperationClass, HostRequest, Receipt, ReceiptDraft,
+    ReceiptLeakClass, RlmKernelPolicy, RlmKernelPolicyDraft, RlmKernelStatus, bind_prompt_context,
+    plan_compaction, plan_evaluation,
+};
 
 const SAFE_SOURCE: &str = "(+ 1 2)";
 const EXCESS_FUEL: u64 = support::FUEL_LIMIT + 1;
@@ -30,9 +17,10 @@ const EXCESS_DEPTH: u32 = support::CHILD_DEPTH_LIMIT + 1;
 fn bound_failures_are_atomic_and_ambient_requests_fail_closed() {
     let policy = support::policy();
     let initial = EnvironmentState::default();
-    let binding =
-        ContextBinding::new("task_context", "unchanged", support::ENVIRONMENT_CHAR_LIMIT).expect("binding must parse");
-    let bound = bind_prompt_context(&initial, &[binding], &policy).expect("binding must be admitted");
+    let binding = ContextBinding::new("task_context", "unchanged", support::ENVIRONMENT_CHAR_LIMIT)
+        .expect("binding must parse");
+    let bound =
+        bind_prompt_context(&initial, &[binding], &policy).expect("binding must be admitted");
     let snapshot = bound.clone();
 
     let error = plan_evaluation(
@@ -48,10 +36,13 @@ fn bound_failures_are_atomic_and_ambient_requests_fail_closed() {
         &policy,
     )
     .expect_err("excess fuel must fail");
-    assert!(matches!(error, Error::BoundExceeded {
-        field: "evaluation_fuel",
-        ..
-    }));
+    assert!(matches!(
+        error,
+        Error::BoundExceeded {
+            field: "evaluation_fuel",
+            ..
+        }
+    ));
     assert_eq!(bound, snapshot, "failed planning must not mutate state");
 
     let ambient_child = ChildSpawnRequest::new(
@@ -72,7 +63,8 @@ fn bound_failures_are_atomic_and_ambient_requests_fail_closed() {
     ));
 
     let restricted = restricted_policy();
-    let shell = HostRequest::shell("cargo test", support::HOST_REQUEST_CHAR_LIMIT).expect("shell request must parse");
+    let shell = HostRequest::shell("cargo test", support::HOST_REQUEST_CHAR_LIMIT)
+        .expect("shell request must parse");
     assert!(matches!(
         animus_adapter_rlm_kernel::admit_host_request(&restricted, &shell),
         Err(Error::OperationNotAdmitted {
@@ -86,10 +78,13 @@ fn implicit_clears_and_receipt_payloads_or_overclaims_are_rejected() {
     let policy = support::policy();
     let state = EnvironmentState::default();
     assert!(matches!(
-        plan_compaction(&state, CompactionRequest {
-            cause: CompactionCause::Compaction,
-            clear_kernel: true,
-        }),
+        plan_compaction(
+            &state,
+            CompactionRequest {
+                cause: CompactionCause::Compaction,
+                clear_kernel: true,
+            }
+        ),
         Err(Error::ImplicitKernelClearDenied)
     ));
 
@@ -100,11 +95,46 @@ fn implicit_clears_and_receipt_payloads_or_overclaims_are_rejected() {
 
 fn assert_receipt_leaks_rejected(policy: &RlmKernelPolicy) {
     for (variable_value, code_body, child_transcript, credential, raw_path, expected) in [
-        (Some("private value"), None, None, None, None, ReceiptLeakClass::VariableValue),
-        (None, Some("model code"), None, None, None, ReceiptLeakClass::CodeBody),
-        (None, None, Some("child transcript"), None, None, ReceiptLeakClass::ChildTranscript),
-        (None, None, None, Some("credential"), None, ReceiptLeakClass::Credential),
-        (None, None, None, None, Some("private/path"), ReceiptLeakClass::RawPath),
+        (
+            Some("private value"),
+            None,
+            None,
+            None,
+            None,
+            ReceiptLeakClass::VariableValue,
+        ),
+        (
+            None,
+            Some("model code"),
+            None,
+            None,
+            None,
+            ReceiptLeakClass::CodeBody,
+        ),
+        (
+            None,
+            None,
+            Some("child transcript"),
+            None,
+            None,
+            ReceiptLeakClass::ChildTranscript,
+        ),
+        (
+            None,
+            None,
+            None,
+            Some("credential"),
+            None,
+            ReceiptLeakClass::Credential,
+        ),
+        (
+            None,
+            None,
+            None,
+            None,
+            Some("private/path"),
+            ReceiptLeakClass::RawPath,
+        ),
     ] {
         let leaked = Receipt::from_draft(&ReceiptDraft {
             status: RlmKernelStatus::Completed,
@@ -161,7 +191,10 @@ fn assert_schema_drift_rejected() {
         admitted_child_profiles: &[support::CHILD_PROFILE],
         non_claims: animus_adapter_rlm_kernel::REQUIRED_NON_CLAIMS,
     });
-    assert!(matches!(schema_drift, Err(Error::EmptyField { field: "schema" })));
+    assert!(matches!(
+        schema_drift,
+        Err(Error::EmptyField { field: "schema" })
+    ));
 }
 
 fn restricted_policy() -> RlmKernelPolicy {

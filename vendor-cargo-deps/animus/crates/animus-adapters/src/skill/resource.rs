@@ -106,7 +106,10 @@ impl Diagnostic {
 #[must_use]
 pub fn advertise(manifests: &[super::Descriptor]) -> Catalog {
     let manifest_count = manifests.len();
-    assert!(manifest_count <= super::MAX_ITEMS, "manifest inputs stay within the descriptor item bound");
+    assert!(
+        manifest_count <= super::MAX_ITEMS,
+        "manifest inputs stay within the descriptor item bound"
+    );
     let diagnostic_slots_count = manifest_count.saturating_mul(super::MAX_ITEMS);
     assert!(
         diagnostic_slots_count >= manifest_count,
@@ -125,8 +128,15 @@ pub fn advertise(manifests: &[super::Descriptor]) -> Catalog {
     }
 
     summaries.sort_by(|left, right| left.name.cmp(&right.name));
-    diagnostics.sort_by(|left, right| left.name.cmp(&right.name).then(left.related_skill.cmp(&right.related_skill)));
-    Catalog { summaries, diagnostics }
+    diagnostics.sort_by(|left, right| {
+        left.name
+            .cmp(&right.name)
+            .then(left.related_skill.cmp(&right.related_skill))
+    });
+    Catalog {
+        summaries,
+        diagnostics,
+    }
 }
 
 fn push_related_diagnostics(
@@ -145,7 +155,10 @@ fn push_related_diagnostics(
     }
 }
 
-fn push_duplicate_diagnostic(manifest: &super::Descriptor, diagnostics: &mut super::Collection<Diagnostic>) {
+fn push_duplicate_diagnostic(
+    manifest: &super::Descriptor,
+    diagnostics: &mut super::Collection<Diagnostic>,
+) {
     if diagnostics.iter().any(|diagnostic| {
         diagnostic.issue == Issue::DuplicateSkillName
             && diagnostic.name == manifest.name()
@@ -161,7 +174,11 @@ fn push_duplicate_diagnostic(manifest: &super::Descriptor, diagnostics: &mut sup
 }
 
 pub(super) fn duplicate_name(name: &str, manifests: &[super::Descriptor]) -> bool {
-    manifests.iter().filter(|manifest| manifest.name() == name).count() > 1
+    manifests
+        .iter()
+        .filter(|manifest| manifest.name() == name)
+        .count()
+        > 1
 }
 
 fn contains_manifest_name(manifests: &[super::Descriptor], name: &str) -> bool {

@@ -1,0 +1,71 @@
+{
+  "schema": "lattice.tile-exact-source-acquisition-observation.v1",
+  "observed_on": "2026-10-16",
+  "status": "anonymous-acquisition-not-admitted",
+  "maintenance_owner": "Lattice dependency integration maintainers",
+  "revision": "5e703953840bff72a91fec3e928682e9efb607ab",
+  "endpoint": "https://github.com/brittonr/tile.git",
+  "endpoint_basis": "Tile existing .git/config origin git@github.com:brittonr/tile.git, preserving owner/repository identity.",
+  "environment": {
+    "PATH": "/nix/store/7yvcckar1lzhqnr0xx2n19nsdjd4qa4d-git-2.53.0/bin:/run/current-system/sw/bin",
+    "HOME": "/tmp/lattice-tile-exact-source-20261016.xsSwNyLY/home",
+    "XDG_CONFIG_HOME": "/tmp/lattice-tile-exact-source-20261016.xsSwNyLY/xdg",
+    "GIT_CONFIG_NOSYSTEM": "1",
+    "GIT_CONFIG_SYSTEM": "/dev/null",
+    "GIT_CONFIG_GLOBAL": "/dev/null",
+    "GIT_TERMINAL_PROMPT": "0",
+    "GIT_ASKPASS": "/run/current-system/sw/bin/false",
+    "SSH_ASKPASS": "/run/current-system/sw/bin/false",
+    "GIT_SSH_COMMAND": "/run/current-system/sw/bin/false",
+    "GIT_ALLOW_PROTOCOL": "https",
+    "LC_ALL": "C"
+  },
+  "cwd": "/tmp/lattice-tile-exact-source-20261016.xsSwNyLY",
+  "process_deadline_seconds": 120,
+  "results": [
+    {
+      "argv": [
+        "/nix/store/7yvcckar1lzhqnr0xx2n19nsdjd4qa4d-git-2.53.0/bin/git",
+        "init",
+        "--bare",
+        "--template=/tmp/lattice-tile-exact-source-20261016.xsSwNyLY/template",
+        "/tmp/lattice-tile-exact-source-20261016.xsSwNyLY/repo"
+      ],
+      "exit": 0,
+      "stdout": "Initialized empty Git repository in /tmp/lattice-tile-exact-source-20261016.xsSwNyLY/repo/\n",
+      "stderr": "hint: Using 'master' as the name for the initial branch. This default branch name\nhint: will change to \"main\" in Git 3.0. To configure the initial branch name\nhint: to use in all of your new repositories, which will suppress this warning,\nhint: call:\nhint:\nhint: \tgit config --global init.defaultBranch <name>\nhint:\nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint:\nhint: \tgit branch -m <name>\nhint:\nhint: Disable this message with \"git config set advice.defaultBranchName false\"\n"
+    },
+    {
+      "argv": [
+        "/nix/store/7yvcckar1lzhqnr0xx2n19nsdjd4qa4d-git-2.53.0/bin/git",
+        "-C",
+        "/tmp/lattice-tile-exact-source-20261016.xsSwNyLY/repo",
+        "-c",
+        "credential.helper=",
+        "-c",
+        "credential.interactive=false",
+        "-c",
+        "core.hooksPath=/dev/null",
+        "-c",
+        "http.extraHeader=",
+        "-c",
+        "http.followRedirects=false",
+        "fetch",
+        "--no-tags",
+        "--depth=1",
+        "https://github.com/brittonr/tile.git",
+        "5e703953840bff72a91fec3e928682e9efb607ab"
+      ],
+      "exit": 128,
+      "stdout": "",
+      "stderr": "fatal: unable to get password from user\n"
+    }
+  ],
+  "scope": "New empty bare repository/template/HOME/XDG; no credentials, SSH, hooks, user/system Git config, redirects, source overrides or native cached objects.",
+  "non_claims": [
+    "Password acquisition failure is not proof of repository visibility or absence",
+    "No immutable object was fetched or admitted",
+    "No Tile SDK/protocol manifest pin or runtime acceptance follows",
+    "No alternate route is inferred from the native RID"
+  ]
+}

@@ -1,37 +1,18 @@
 #![allow(unknown_lints, non_trait_imports, usize_in_public_api)]
-use super::CanonicalModelContractError;
-use super::CanonicalModelResponseItem;
-use super::CanonicalModelRole;
-use super::CanonicalReasoningEffort;
-use super::CanonicalSafeMetadata;
-use super::CanonicalSafeMetadataDraft;
-use super::CanonicalUnsafeTextReason;
-use super::INVALID_MALFORMED_COMBINATION;
-use super::INVALID_NON_TOOL_WITH_CALL;
-use super::INVALID_REASONING_DISABLED_EFFORT;
-use super::INVALID_REASONING_ENABLED_EFFORT;
-use super::INVALID_REFUSAL_COMBINATION;
-use super::INVALID_TEMPERATURE;
-use super::INVALID_TOKEN_BUDGET;
-use super::INVALID_TOOL_ROLE_WITHOUT_CALL;
-use super::LEAK_MARKER_AUTHORIZATION_PREFIX;
-use super::LEAK_MARKER_BEARER_PREFIX;
-use super::LEAK_MARKER_CREDENTIAL_PREFIX;
-use super::LEAK_MARKER_HIDDEN_REASONING;
-use super::LEAK_MARKER_PROVIDER_PAYLOAD_PREFIX;
-use super::LEAK_MARKER_RAW_PROVIDER_PAYLOAD;
-use super::LEAK_MARKER_SECRET_PREFIX;
-use super::LOSSY_LEGACY_REQUEST;
-use super::LOSSY_LEGACY_RESPONSE;
-use super::MAX_SAFE_METADATA_ITEMS;
-use super::MAX_TEMPERATURE_MILLIS;
-use super::MAX_TOKEN_BUDGET;
-use super::METADATA_KEY_FIELD;
-use super::METADATA_VALUE_FIELD;
-use super::MIN_TOKEN_BUDGET;
-use super::REASONING_SUMMARY_FIELD;
-use super::RESPONSE_TEXT_FIELD;
-use super::TOOL_CALL_ID_FIELD;
+use super::{
+    CanonicalModelContractError, CanonicalModelResponseItem, CanonicalModelRole,
+    CanonicalReasoningEffort, CanonicalSafeMetadata, CanonicalSafeMetadataDraft,
+    CanonicalUnsafeTextReason, INVALID_MALFORMED_COMBINATION, INVALID_NON_TOOL_WITH_CALL,
+    INVALID_REASONING_DISABLED_EFFORT, INVALID_REASONING_ENABLED_EFFORT,
+    INVALID_REFUSAL_COMBINATION, INVALID_TEMPERATURE, INVALID_TOKEN_BUDGET,
+    INVALID_TOOL_ROLE_WITHOUT_CALL, LEAK_MARKER_AUTHORIZATION_PREFIX, LEAK_MARKER_BEARER_PREFIX,
+    LEAK_MARKER_CREDENTIAL_PREFIX, LEAK_MARKER_HIDDEN_REASONING,
+    LEAK_MARKER_PROVIDER_PAYLOAD_PREFIX, LEAK_MARKER_RAW_PROVIDER_PAYLOAD,
+    LEAK_MARKER_SECRET_PREFIX, LOSSY_LEGACY_REQUEST, LOSSY_LEGACY_RESPONSE,
+    MAX_SAFE_METADATA_ITEMS, MAX_TEMPERATURE_MILLIS, MAX_TOKEN_BUDGET, METADATA_KEY_FIELD,
+    METADATA_VALUE_FIELD, MIN_TOKEN_BUDGET, REASONING_SUMMARY_FIELD, RESPONSE_TEXT_FIELD,
+    TOOL_CALL_ID_FIELD,
+};
 
 pub fn validate_metadata(
     drafts: &[CanonicalSafeMetadataDraft<'_>],
@@ -92,9 +73,12 @@ pub fn validate_reasoning_effort(
 ) -> Result<(), CanonicalModelContractError> {
     match (enabled, effort) {
         (false, CanonicalReasoningEffort::None)
-        | (true, CanonicalReasoningEffort::Low | CanonicalReasoningEffort::Medium | CanonicalReasoningEffort::High) => {
-            Ok(())
-        }
+        | (
+            true,
+            CanonicalReasoningEffort::Low
+            | CanonicalReasoningEffort::Medium
+            | CanonicalReasoningEffort::High,
+        ) => Ok(()),
         (false, _) => Err(CanonicalModelContractError::InvalidField {
             field: REASONING_SUMMARY_FIELD.as_str(),
             reason: INVALID_REASONING_DISABLED_EFFORT,
@@ -106,7 +90,9 @@ pub fn validate_reasoning_effort(
     }
 }
 
-pub fn validate_response_combination(items: &[CanonicalModelResponseItem]) -> Result<(), CanonicalModelContractError> {
+pub fn validate_response_combination(
+    items: &[CanonicalModelResponseItem],
+) -> Result<(), CanonicalModelContractError> {
     let mut success_count = 0usize;
     let mut refusal_count = 0usize;
     let mut malformed_count = 0usize;
@@ -117,7 +103,8 @@ pub fn validate_response_combination(items: &[CanonicalModelResponseItem]) -> Re
             | CanonicalModelResponseItem::ToolCall { .. } => {
                 success_count = success_count.saturating_add(1);
             }
-            CanonicalModelResponseItem::Refusal { .. } | CanonicalModelResponseItem::Safety { .. } => {
+            CanonicalModelResponseItem::Refusal { .. }
+            | CanonicalModelResponseItem::Safety { .. } => {
                 refusal_count = refusal_count.saturating_add(1);
             }
             CanonicalModelResponseItem::MalformedOutput { .. } => {
@@ -144,7 +131,9 @@ pub fn require_collection(
     max_items: usize,
 ) -> Result<(), CanonicalModelContractError> {
     if actual == 0 {
-        return Err(CanonicalModelContractError::EmptyCollection { field: field.as_str() });
+        return Err(CanonicalModelContractError::EmptyCollection {
+            field: field.as_str(),
+        });
     }
     validate_collection_len(field, actual, max_items)
 }
@@ -198,7 +187,10 @@ fn safe_text(
 
 fn contains_leak_marker(value: &str, marker: &str) -> bool {
     assert!(!marker.is_empty(), "leak marker must not be empty");
-    value.as_bytes().windows(marker.len()).any(|window| ascii_case_eq(window, marker.as_bytes()))
+    value
+        .as_bytes()
+        .windows(marker.len())
+        .any(|window| ascii_case_eq(window, marker.as_bytes()))
 }
 
 fn ascii_case_eq(left: &[u8], right: &[u8]) -> bool {

@@ -27,7 +27,7 @@ fn facts(candidate: &pack::Candidate) -> pack::AdmissionFacts {
         trusted_pack_identity: candidate.pack_identity.clone(),
         platform: pack::shell::platform_label(),
         dependency_identities: BTreeMap::new(),
-        allowed_licenses: vec!["MIT".to_string()],
+        allowed_licenses: vec!["AGPL-3.0-or-later".to_string()],
         allowed_capabilities: candidate.manifest.admission.allowed_capabilities.clone(),
         evidence: BTreeMap::new(),
     }

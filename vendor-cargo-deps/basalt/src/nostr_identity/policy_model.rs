@@ -2,8 +2,7 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
 
-use serde::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// Digest algorithm and ownership role.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -29,7 +28,10 @@ pub struct NostrTypedDigest {
 
 impl NostrTypedDigest {
     pub(super) fn new(role: NostrDigestRole, hex: impl Into<String>) -> Self {
-        Self { role, hex: hex.into() }
+        Self {
+            role,
+            hex: hex.into(),
+        }
     }
 }
 
@@ -115,7 +117,11 @@ impl fmt::Display for NostrIdentityPolicyError {
             Self::Decode(message) => {
                 write!(formatter, "Nostr identity policy decode failed: {message}")
             }
-            Self::Invalid(issues) => write!(formatter, "Nostr identity policy has {} issue(s)", issues.len()),
+            Self::Invalid(issues) => write!(
+                formatter,
+                "Nostr identity policy has {} issue(s)",
+                issues.len()
+            ),
         }
     }
 }

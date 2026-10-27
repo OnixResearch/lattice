@@ -70,7 +70,14 @@ pub(crate) fn evaluate<'request>(
     request_nonce: HolderInvocationNonce,
     services: TestServices<'_>,
 ) -> Result<LiveUcanEnforcement<'request>, UcanEnforcementFailure> {
-    evaluate_action(compact_token, request, EnforcementAction::DocumentWrite, signature, request_nonce, &services)
+    evaluate_action(
+        compact_token,
+        request,
+        EnforcementAction::DocumentWrite,
+        signature,
+        request_nonce,
+        &services,
+    )
 }
 
 pub(crate) fn evaluate_action<'request>(
@@ -81,9 +88,36 @@ pub(crate) fn evaluate_action<'request>(
     request_nonce: HolderInvocationNonce,
     services: &TestServices<'_>,
 ) -> Result<LiveUcanEnforcement<'request>, UcanEnforcementFailure> {
+    evaluate_action_with_profile(
+        compact_token,
+        request,
+        BasaltUcanProtocolProfile::OnixCompactEd25519V1,
+        action,
+        signature,
+        request_nonce,
+        services,
+    )
+}
+
+pub(crate) fn evaluate_action_with_profile<'request>(
+    compact_token: &str,
+    request: &'request EnforcementRequest,
+    profile: BasaltUcanProtocolProfile,
+    action: EnforcementAction,
+    signature: &SignerSignature,
+    request_nonce: HolderInvocationNonce,
+    services: &TestServices<'_>,
+) -> Result<LiveUcanEnforcement<'request>, UcanEnforcementFailure> {
     let policy = default_policy().expect("embedded policy must parse");
     let policy_ref = default_authority_policy_ref(request.contract());
-    let raw_request = UcanEnforcementRequest::new(request, compact_token, action, request_nonce, signature);
+    let raw_request = UcanEnforcementRequest::new(
+        request,
+        compact_token,
+        profile,
+        action,
+        request_nonce,
+        signature,
+    );
     let boundaries = UcanEnforcementBoundaries {
         verification_time: services.verification_time,
         key_resolver: services.key_resolver,

@@ -1,0 +1,30 @@
+{
+  "change": "adopt-owned-source-agpl",
+  "kind": "source-preparation-observations",
+  "final_verification": "pending-parent-coordinated-checks",
+  "preimplementation_gates": {
+    "cwd": "/home/brittonr/git/OnixResearch/lattice",
+    "tool": "/etc/profiles/per-user/brittonr/bin/cairn",
+    "command_pattern": "cairn gate STAGE adopt-owned-source-agpl --root . --policy cairn-policy/generated/cairn-policy.json",
+    "policy": "lattice-default",
+    "policy_hash": "a88e98316e48fb6e54901fd7a88dd890c86d1ab7c830098084fe5dfaa70d1a4a",
+    "proposal": {"verdict": "PASS", "receipt_hash": "efbc5ab21814be92385a16877bec73a669a2acc07f21ef596241f1cce5f11f18"},
+    "design": {"verdict": "PASS", "receipt_hash": "570adb794e7cb0246298a4655d83a6d77eaed6881ce24bfd297f4bda141a7d63"},
+    "tasks": {"verdict": "PASS", "receipt_hash": "91c6418bba036d4e4ad204afe522adb5de0dc13de114def464bbd7f3d992e56e"},
+    "scope": "These receipts precede product metadata edits. Subsequent design clarification isolates imported Rats inheritance and keeps the existing importer responsible for its wrapper; lifecycle acceptance remains pending."
+  },
+  "projection": {
+    "command": "target/debug/lattice pack inspect --pack /home/brittonr/git/OnixResearch/lattice/tests/fixtures/operation-packs/valid",
+    "tool_kind": "existing-local-binary-not-rebuilt",
+    "exit_status": 0,
+    "observed_license": "AGPL-3.0-or-later",
+    "observed_allowed_licenses": ["AGPL-3.0-or-later"],
+    "manifest_identity": "b3:1f61e381f80b997dce8b8a9f4ff76f20c08419b50fbacb3253cd659c32018da8",
+    "pack_identity": "b3:dd1c4242a5639134b19251fdc8a9e9e8aa7b65c8f25686bd4eb55cc84d09b1ba",
+    "registry_projection": "tests/fixtures/operation-packs/registry-valid.ncl now selects the observed current pack identity",
+    "limit": "This exercises inert current manifest parsing, measurement and identity projection only. No guest/provider/skill content executed. A relative-path attempt was rejected because the pack root must be absolute."
+  },
+  "preserved": ["immutable imported source bytes", "historical grant texts and attribution", "old dependency license assertions", "source pins and locks", "generated runtime plans", "Kiln immutable contract import", "credential URLs"],
+  "not_run": ["builds", "tests", "linters", "formatters", "broad validation", "Cargo metadata/package lists", "Rats importer"],
+  "publication": "not attempted or authorized by this preparation"
+}

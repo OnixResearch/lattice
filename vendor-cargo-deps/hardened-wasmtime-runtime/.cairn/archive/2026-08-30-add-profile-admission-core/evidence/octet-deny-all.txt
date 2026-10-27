@@ -1,0 +1,17 @@
+    Checking hardened-wasmtime-runtime v0.1.0 (/home/brittonr/git/OnixResearch/hardened-wasmtime-runtime/crates/hardened-wasmtime-runtime)
+   Compiling hardened_wasmtime_runtime v0.1.0
+   Compiling hardened_wasmtime_runtime v0.1.0
+    Finished checking
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.29s
+--- octet summary ---
+Status: clean
+Findings: 0
+Warnings: 0
+Errors: 0
+Autofixable: 0
+Tool: cargo-octet 0.1.0
+Toolchain: nightly-2026-03-21-x86_64-unknown-linux-gnu
+Profile: workspace-metadata
+Config hash: b3:daebe9c430113823f2439f0b0c1e4087dffbd901eaf782a61f7f264526d73443
+Profile hash: b3:a2ecfe7e68fb9dedcea2db4c4d371f253ee495aadbce50b20f617fc6a35a6a49
+---

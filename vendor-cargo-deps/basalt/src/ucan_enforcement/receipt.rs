@@ -1,14 +1,13 @@
-use serde::Deserialize;
-use serde::Serialize;
-
 use super::core::format_digest;
 use super::types::UcanEnforcementReason;
-use crate::ucan_semantics_identity::UCAN_RUNTIME_REVISION;
+use crate::ucan_profile::BasaltUcanProtocolProfile;
+use crate::ucan_semantics_identity::{UCAN_RUNTIME_REVISION, UCAN_SUPPORT_CATALOG_BLAKE3};
+use serde::{Deserialize, Serialize};
 
 pub(super) const BLAKE3_DIGEST_BYTES: usize = 32;
-const RECEIPT_SCHEMA: &str = "basalt.ucan-enforcement-receipt.v1";
-const RECEIPT_HASH_DOMAIN: &[u8] = b"basalt/ucan-enforcement-receipt/v1";
-const RECEIPT_NON_CLAIM_COUNT: usize = 8;
+const RECEIPT_SCHEMA: &str = "basalt.ucan-enforcement-receipt.v2";
+const RECEIPT_HASH_DOMAIN: &[u8] = b"basalt/ucan-enforcement-receipt/v2";
+const RECEIPT_NON_CLAIM_COUNT: usize = 9;
 const OPTION_TAG_BYTES: usize = 1;
 const OPTIONAL_LENGTH_FIELD_BYTES: usize = OPTION_TAG_BYTES + size_of::<u64>();
 const OPTIONAL_DIGEST_FIELD_BYTES: usize = OPTION_TAG_BYTES + BLAKE3_DIGEST_BYTES;
@@ -26,6 +25,7 @@ pub const UCAN_ENFORCEMENT_NON_CLAIMS: [&str; RECEIPT_NON_CLAIM_COUNT] = [
     "policy-truth",
     "request-canonicalizer-truth",
     "effect-correctness",
+    "protocol-profile-equivalence",
     "whole-system-safety",
 ];
 
@@ -39,9 +39,11 @@ pub struct UcanEnforcementReceipt {
     pub credential_bytes: Option<u64>,
     pub credential_blake3: Option<String>,
     pub request_binding_blake3: Option<String>,
+    pub protocol_profile: String,
     pub operation_profile_blake3: String,
     pub policy_blake3: Option<String>,
     pub ucan_revision: String,
+    pub ucan_support_catalog_blake3: String,
     pub non_claims: Vec<String>,
     pub receipt_blake3: String,
 }
@@ -56,6 +58,7 @@ impl UcanEnforcementReceipt {
 
 #[derive(Clone, Copy)]
 pub(super) struct ReceiptContext {
+    pub(super) protocol_profile: BasaltUcanProtocolProfile,
     pub(super) credential_bytes: Option<u64>,
     pub(super) credential: Option<[u8; BLAKE3_DIGEST_BYTES]>,
     pub(super) request_binding: Option<[u8; BLAKE3_DIGEST_BYTES]>,
@@ -76,15 +79,21 @@ pub(super) fn build_receipt(
         credential_bytes: context.credential_bytes,
         credential_blake3: context.credential.map(format_digest),
         request_binding_blake3: context.request_binding.map(format_digest),
+        protocol_profile: context.protocol_profile.as_str().to_owned(),
         operation_profile_blake3: format_digest(context.operation_profile),
         policy_blake3: context.policy.map(format_digest),
         ucan_revision: UCAN_RUNTIME_REVISION.to_owned(),
+        ucan_support_catalog_blake3: UCAN_SUPPORT_CATALOG_BLAKE3.to_owned(),
         non_claims: UCAN_ENFORCEMENT_NON_CLAIMS.map(str::to_owned).to_vec(),
         receipt_blake3: format_digest(receipt_digest),
     }
 }
 
-fn receipt_digest(reason: UcanEnforcementReason, allowed: bool, context: &ReceiptContext) -> [u8; BLAKE3_DIGEST_BYTES] {
+fn receipt_digest(
+    reason: UcanEnforcementReason,
+    allowed: bool,
+    context: &ReceiptContext,
+) -> [u8; BLAKE3_DIGEST_BYTES] {
     let mut hasher = blake3::Hasher::new();
     hash_field(&mut hasher, RECEIPT_HASH_DOMAIN);
     hash_field(&mut hasher, RECEIPT_SCHEMA.as_bytes());
@@ -93,9 +102,11 @@ fn receipt_digest(reason: UcanEnforcementReason, allowed: bool, context: &Receip
     hash_optional_length(&mut hasher, context.credential_bytes);
     hash_optional_digest(&mut hasher, context.credential.as_ref());
     hash_optional_digest(&mut hasher, context.request_binding.as_ref());
+    hash_field(&mut hasher, context.protocol_profile.as_str().as_bytes());
     hash_field(&mut hasher, &context.operation_profile);
     hash_optional_digest(&mut hasher, context.policy.as_ref());
     hash_field(&mut hasher, UCAN_RUNTIME_REVISION.as_bytes());
+    hash_field(&mut hasher, UCAN_SUPPORT_CATALOG_BLAKE3.as_bytes());
     hash_field(&mut hasher, &(RECEIPT_NON_CLAIM_COUNT as u64).to_be_bytes());
     for non_claim in UCAN_ENFORCEMENT_NON_CLAIMS {
         hash_field(&mut hasher, non_claim.as_bytes());
@@ -138,9 +149,7 @@ pub(super) const fn receipt_schema() -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::BLAKE3_DIGEST_BYTES;
-    use super::hash_field;
-    use super::hash_optional_digest;
+    use super::{BLAKE3_DIGEST_BYTES, hash_field, hash_optional_digest};
 
     fn digest_fields(fields: &[&[u8]]) -> [u8; super::BLAKE3_DIGEST_BYTES] {
         let mut hasher = blake3::Hasher::new();

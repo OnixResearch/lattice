@@ -1,0 +1,36 @@
+{
+  "admitted_media_types": [
+    "video/mp4",
+    "video/webm",
+    "video/quicktime",
+    "video/mpeg"
+  ],
+  "allow_optional_omission": false,
+  "exact_provider_profiles": [
+    "google-gemini-v1beta-files-fixture"
+  ],
+  "generic_json_video_allowed": false,
+  "max_aggregate_media_bytes": 134217728,
+  "max_descriptor_bytes": 536870912,
+  "max_dimension_px": 32768,
+  "max_duration_ms": 1200000,
+  "max_frame_rate_millihz": 120000,
+  "max_prompt_video_bytes": 104857600,
+  "max_provider_handle_chars": 256,
+  "max_receipt_fragments": 16,
+  "max_video_count": 4,
+  "non_claims": [
+    "not-media-authenticity",
+    "not-codec-safety",
+    "not-successful-decoding",
+    "not-upload-completion",
+    "not-provider-acceptance",
+    "not-semantic-understanding",
+    "not-production-readiness",
+    "not-release-eligibility"
+  ],
+  "policy_id": "animus.provider-video-payload.default.v1",
+  "receipt_redaction_profile": "metadata-only-v1",
+  "require_injected_payload_service": true,
+  "schema": "animus.provider-video-payload-policy.v1"
+}

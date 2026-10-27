@@ -1,7 +1,6 @@
 mod safety;
 
-pub use safety::Leak;
-pub use safety::validate_text;
+pub use safety::{Leak, validate_text};
 
 const RECEIPT_SCHEMA: &str = "animus.workspace-receipt.v1";
 const CLEANUP_PENDING_LABEL: &str = "pending";
@@ -48,8 +47,10 @@ impl Record {
         let manifest_hash = manifest_hash(draft.manifest_labels);
         let cleanup_hash = cleanup_hash(draft.plan, draft.outcome);
         let outcome_kind = draft.outcome.map(super::result::Outcome::kind);
-        let capability_labels = super::planning::hash::capability_labels(draft.plan.required_capabilities());
-        let capability_gap_labels = super::planning::hash::capability_labels(draft.plan.unsupported_capabilities());
+        let capability_labels =
+            super::planning::hash::capability_labels(draft.plan.required_capabilities());
+        let capability_gap_labels =
+            super::planning::hash::capability_labels(draft.plan.unsupported_capabilities());
         let receipt_hash = identity(IdentityInput {
             plan: draft.plan,
             manifest_hash: manifest_hash.as_str(),
@@ -60,7 +61,10 @@ impl Record {
             status: draft.plan.status(),
             issue: draft.plan.issue(),
             workspace_id: alloc::string::String::from(draft.plan.selected_workspace_id()),
-            parent_workspace_id: draft.plan.parent_workspace_id().map(alloc::string::String::from),
+            parent_workspace_id: draft
+                .plan
+                .parent_workspace_id()
+                .map(alloc::string::String::from),
             descriptor_hash: alloc::string::String::from(draft.plan.descriptor_hash()),
             source_hash: alloc::string::String::from(draft.plan.source_hash()),
             manifest_hash,
@@ -176,7 +180,10 @@ fn manifest_hash(manifest_labels: &[&str]) -> alloc::string::String {
     alloc::format!("{}", blake3::hash(normalized.as_bytes()).to_hex())
 }
 
-fn cleanup_hash(plan: &super::planning::Plan, outcome: Option<&super::result::Outcome>) -> alloc::string::String {
+fn cleanup_hash(
+    plan: &super::planning::Plan,
+    outcome: Option<&super::result::Outcome>,
+) -> alloc::string::String {
     let outcome_label = outcome.map_or(CLEANUP_PENDING_LABEL, |actual| actual.kind().as_str());
     super::planning::hash::parts(&[
         RECEIPT_SCHEMA,
@@ -195,7 +202,9 @@ struct IdentityInput<'a> {
 }
 
 fn identity(input: IdentityInput<'_>) -> alloc::string::String {
-    let outcome_label = input.outcome_kind.map_or(CLEANUP_PENDING_LABEL, super::result::Kind::as_str);
+    let outcome_label = input
+        .outcome_kind
+        .map_or(CLEANUP_PENDING_LABEL, super::result::Kind::as_str);
     let parts = [
         RECEIPT_SCHEMA,
         input.plan.status().as_str(),

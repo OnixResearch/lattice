@@ -61,17 +61,24 @@ pub fn classify_interrupt_signal(
     let intent = interrupt_intent(signal);
     ensure_live_control_state(active_work.status())?;
     match intent {
-        InterruptIntent::Queue => Ok(super::UserControlEvent::QueueInterrupt(super::InterruptQueueAdmission::new(
+        InterruptIntent::Queue => Ok(super::UserControlEvent::QueueInterrupt(
+            super::InterruptQueueAdmission::new(
+                signal.active_work_id,
+                signal.source,
+                signal.message_hash,
+            )?,
+        )),
+        InterruptIntent::ImmediateDispatch => Ok(super::UserControlEvent::ImmediateDispatch(
+            super::ImmediateDispatchRequest::new(
+                signal.active_work_id,
+                signal.source,
+                signal.message_hash,
+            )?,
+        )),
+        InterruptIntent::Pause => Ok(super::UserControlEvent::Pause(super::PauseRequest::new(
             signal.active_work_id,
             signal.source,
-            signal.message_hash,
         )?)),
-        InterruptIntent::ImmediateDispatch => Ok(super::UserControlEvent::ImmediateDispatch(
-            super::ImmediateDispatchRequest::new(signal.active_work_id, signal.source, signal.message_hash)?,
-        )),
-        InterruptIntent::Pause => {
-            Ok(super::UserControlEvent::Pause(super::PauseRequest::new(signal.active_work_id, signal.source)?))
-        }
         InterruptIntent::Cancel => cancel_event(signal, active_work),
         InterruptIntent::Redirect => redirect_event(signal),
     }
@@ -94,7 +101,9 @@ fn append_message(
     next.replace_items(items);
     Ok(super::MessageQueueTransition {
         state: next,
-        event: super::UserControlEvent::QueueAdmitted(super::QueueItemEvent::from_message(&message)),
+        event: super::UserControlEvent::QueueAdmitted(super::QueueItemEvent::from_message(
+            &message,
+        )),
     })
 }
 
@@ -119,7 +128,9 @@ fn edit_message(
     next.replace_items(items);
     Ok(super::MessageQueueTransition {
         state: next,
-        event: super::UserControlEvent::QueueEdited(super::QueueItemEvent::from_message(&replacement)),
+        event: super::UserControlEvent::QueueEdited(super::QueueItemEvent::from_message(
+            &replacement,
+        )),
     })
 }
 
@@ -199,12 +210,18 @@ fn clear_source_messages(
     }
     let mut next = state.clone();
     next.replace_items(retained);
-    if next.pending_dispatch().is_some_and(|pending| pending.source() == source) {
+    if next
+        .pending_dispatch()
+        .is_some_and(|pending| pending.source() == source)
+    {
         next.set_pending_dispatch(None);
     }
     Ok(super::MessageQueueTransition {
         state: next,
-        event: super::UserControlEvent::QueueCleared { source, removed_count },
+        event: super::UserControlEvent::QueueCleared {
+            source,
+            removed_count,
+        },
     })
 }
 
@@ -245,7 +262,12 @@ fn acknowledge_dispatch(
     draft: super::DispatchAcknowledgementDraft<'_>,
 ) -> Result<super::MessageQueueTransition, super::MessageQueueError> {
     debug_assert!(!state.active_work_id().is_empty());
-    debug_assert!(state.items().iter().all(|item| item.active_work_id() == state.active_work_id()));
+    debug_assert!(
+        state
+            .items()
+            .iter()
+            .all(|item| item.active_work_id() == state.active_work_id())
+    );
     ensure_active_work_matches(state.active_work_id(), draft.active_work_id)?;
     let pending = state
         .pending_dispatch()
@@ -300,11 +322,16 @@ fn cancel_pending(
     clear_pending_if_matches(&mut next, removed.item_id());
     Ok(super::MessageQueueTransition {
         state: next,
-        event: super::UserControlEvent::PendingCancelled(super::QueueItemEvent::from_message(&removed)),
+        event: super::UserControlEvent::PendingCancelled(super::QueueItemEvent::from_message(
+            &removed,
+        )),
     })
 }
 
-fn unchanged_reorder(state: &super::MessageQueueState, item: &super::QueuedMessage) -> super::MessageQueueTransition {
+fn unchanged_reorder(
+    state: &super::MessageQueueState,
+    item: &super::QueuedMessage,
+) -> super::MessageQueueTransition {
     super::MessageQueueTransition {
         state: state.clone(),
         event: super::UserControlEvent::QueueReordered(super::QueueItemEvent::from_message(item)),
@@ -315,14 +342,20 @@ fn remove_item(
     items: &[super::QueuedMessage],
     item_id: &str,
 ) -> Result<Vec<super::QueuedMessage>, super::MessageQueueError> {
-    let index = items.iter().position(|item| item.item_id() == item_id).ok_or_else(|| unknown_item_error(item_id))?;
+    let index = items
+        .iter()
+        .position(|item| item.item_id() == item_id)
+        .ok_or_else(|| unknown_item_error(item_id))?;
     let mut retained = items.to_vec();
     retained.remove(index);
     Ok(retained)
 }
 
 fn clear_pending_if_matches(state: &mut super::MessageQueueState, item_id: &str) {
-    if state.pending_dispatch().is_some_and(|pending| pending.item_id() == item_id) {
+    if state
+        .pending_dispatch()
+        .is_some_and(|pending| pending.item_id() == item_id)
+    {
         state.set_pending_dispatch(None);
     }
 }
@@ -332,14 +365,18 @@ fn insertion_index(
     before_item_id: Option<&str>,
 ) -> Result<usize, super::MessageQueueError> {
     match before_item_id {
-        Some(target) => {
-            items.iter().position(|item| item.item_id() == target).ok_or_else(|| unknown_item_error(target))
-        }
+        Some(target) => items
+            .iter()
+            .position(|item| item.item_id() == target)
+            .ok_or_else(|| unknown_item_error(target)),
         None => Ok(items.len()),
     }
 }
 
-fn find_item_index(state: &super::MessageQueueState, item_id: &str) -> Result<usize, super::MessageQueueError> {
+fn find_item_index(
+    state: &super::MessageQueueState,
+    item_id: &str,
+) -> Result<usize, super::MessageQueueError> {
     let item_id = super::data::normalize_safe_metadata(super::FIELD_ITEM_ID, item_id)?;
     state
         .items()
@@ -348,7 +385,9 @@ fn find_item_index(state: &super::MessageQueueState, item_id: &str) -> Result<us
         .ok_or_else(|| unknown_item_error(item_id.as_str()))
 }
 
-fn ensure_queue_policy_allows(policy: &super::MessageQueuePolicy) -> Result<(), super::MessageQueueError> {
+fn ensure_queue_policy_allows(
+    policy: &super::MessageQueuePolicy,
+) -> Result<(), super::MessageQueueError> {
     if policy.allow_queue_mutations() {
         Ok(())
     } else {
@@ -360,7 +399,9 @@ fn ensure_queue_policy_allows(policy: &super::MessageQueuePolicy) -> Result<(), 
     }
 }
 
-fn ensure_interrupt_policy_allows(policy: &super::MessageQueuePolicy) -> Result<(), super::MessageQueueError> {
+fn ensure_interrupt_policy_allows(
+    policy: &super::MessageQueuePolicy,
+) -> Result<(), super::MessageQueueError> {
     if policy.allow_interrupts() {
         Ok(())
     } else {
@@ -372,7 +413,10 @@ fn ensure_interrupt_policy_allows(policy: &super::MessageQueuePolicy) -> Result<
     }
 }
 
-fn ensure_active_work_matches(expected: &str, provided: &str) -> Result<(), super::MessageQueueError> {
+fn ensure_active_work_matches(
+    expected: &str,
+    provided: &str,
+) -> Result<(), super::MessageQueueError> {
     let provided = super::data::normalize_safe_metadata(super::FIELD_ACTIVE_WORK_ID, provided)?;
     if expected == provided {
         Ok(())
@@ -385,7 +429,10 @@ fn ensure_active_work_matches(expected: &str, provided: &str) -> Result<(), supe
     }
 }
 
-fn ensure_source_allowed(policy: &super::MessageQueuePolicy, source: &str) -> Result<(), super::MessageQueueError> {
+fn ensure_source_allowed(
+    policy: &super::MessageQueuePolicy,
+    source: &str,
+) -> Result<(), super::MessageQueueError> {
     let source = super::data::normalize_safe_metadata(super::FIELD_SOURCE, source)?;
     if policy.admits_source(source.as_str()) {
         Ok(())
@@ -430,7 +477,10 @@ fn increment_removed_count(current: u32) -> Result<u32, super::MessageQueueError
     })
 }
 
-fn ensure_unique_item(state: &super::MessageQueueState, item_id: &str) -> Result<(), super::MessageQueueError> {
+fn ensure_unique_item(
+    state: &super::MessageQueueState,
+    item_id: &str,
+) -> Result<(), super::MessageQueueError> {
     if state.items().iter().any(|item| item.item_id() == item_id) {
         Err(super::MessageQueueError::new(
             super::MessageQueueErrorKind::DuplicateQueueItem,
@@ -442,7 +492,10 @@ fn ensure_unique_item(state: &super::MessageQueueState, item_id: &str) -> Result
     }
 }
 
-fn ensure_item_source_matches(item: &super::QueuedMessage, source: &str) -> Result<(), super::MessageQueueError> {
+fn ensure_item_source_matches(
+    item: &super::QueuedMessage,
+    source: &str,
+) -> Result<(), super::MessageQueueError> {
     let source = super::data::normalize_safe_metadata(super::FIELD_SOURCE, source)?;
     if item.source() == source {
         Ok(())
@@ -455,7 +508,10 @@ fn ensure_item_source_matches(item: &super::QueuedMessage, source: &str) -> Resu
     }
 }
 
-fn ensure_policy_hash_matches(provided: &str, expected: &str) -> Result<(), super::MessageQueueError> {
+fn ensure_policy_hash_matches(
+    provided: &str,
+    expected: &str,
+) -> Result<(), super::MessageQueueError> {
     if provided == expected {
         Ok(())
     } else {
@@ -467,7 +523,9 @@ fn ensure_policy_hash_matches(provided: &str, expected: &str) -> Result<(), supe
     }
 }
 
-fn ensure_live_control_state(status: super::ActiveWorkStatus) -> Result<(), super::MessageQueueError> {
+fn ensure_live_control_state(
+    status: super::ActiveWorkStatus,
+) -> Result<(), super::MessageQueueError> {
     if status.accepts_live_controls() {
         Ok(())
     } else {
@@ -493,7 +551,9 @@ fn interrupt_intent(signal: super::InterruptSignalDraft<'_>) -> InterruptIntent 
 fn heuristic_intent(keyword: Option<super::InterruptKeyword>) -> InterruptIntent {
     match keyword {
         Some(super::InterruptKeyword::Stop) => InterruptIntent::Cancel,
-        Some(super::InterruptKeyword::Wait | super::InterruptKeyword::Pause) => InterruptIntent::Pause,
+        Some(super::InterruptKeyword::Wait | super::InterruptKeyword::Pause) => {
+            InterruptIntent::Pause
+        }
         Some(super::InterruptKeyword::Redirect) => InterruptIntent::Redirect,
         Some(super::InterruptKeyword::Continue) => InterruptIntent::ImmediateDispatch,
         None => InterruptIntent::Queue,
@@ -511,10 +571,9 @@ fn cancel_event(
             "cancellation requested without an available host handle",
         ));
     }
-    Ok(super::UserControlEvent::Cancellation(super::CancellationRequest::new(
-        signal.active_work_id,
-        signal.source,
-    )?))
+    Ok(super::UserControlEvent::Cancellation(
+        super::CancellationRequest::new(signal.active_work_id, signal.source)?,
+    ))
 }
 
 fn redirect_event(
@@ -539,7 +598,9 @@ fn redirect_event(
             "redirect payload source did not match signal source",
         ));
     }
-    Ok(super::UserControlEvent::Redirection(super::RedirectionPayload::new(draft)?))
+    Ok(super::UserControlEvent::Redirection(
+        super::RedirectionPayload::new(draft)?,
+    ))
 }
 
 fn unknown_item_error(item_id: &str) -> super::MessageQueueError {

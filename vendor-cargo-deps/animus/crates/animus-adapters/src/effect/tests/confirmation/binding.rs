@@ -3,7 +3,8 @@ use super::super::super::*;
 #[test]
 fn mismatched_and_stale_approvals_are_rejected() {
     let request = super::support::protected_request(super::support::SUMMARY);
-    let other_policy = SafeHash::new(super::support::OTHER_POLICY_HASH).expect("other policy hash should parse");
+    let other_policy =
+        SafeHash::new(super::support::OTHER_POLICY_HASH).expect("other policy hash should parse");
 
     let mismatched_id = super::support::evaluated_issue(
         &request,

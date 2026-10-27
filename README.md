@@ -14,22 +14,24 @@ output is not permission to change the graph or expand its authority.
 ## Current status
 
 The standalone CLI and TUI accept an explicit local-operator Nickel profile via
-the `effect_authority` configuration field. Without one, shell, HTTP, and file
-effects still fail closed before adapter dispatch. Embedders can instead supply
-their own `RunContextProvider`.
+the `effect_authority` configuration field. Without one, shell, HTTP, file, and
+Agent effects fail closed before credential resolution or adapter dispatch.
+Embedders can instead supply their own `RunContextProvider`.
 See [Choregraph effect authority](docs/choregraph-effect-authority.md) for exact
 workflow inspection, profile authoring, expiry, and file-root configuration.
 
 The quickstart begins with effect-free import and export. Executing its shell
-pipeline requires a reviewed operator profile; authorization does not configure
-an HTTP transport, and the stock executor still uses `NoopHttpClient`.
+pipeline requires a reviewed operator profile. The standalone executor selects
+the bounded native HTTP/HTTPS client; HTTP effects still require exact authority,
+and authorization does not deliver credentials.
 
 ## Implemented components
 
 - **Workflow execution:** import and export typed Nickel workflows, execute
   dependency graphs, and bound parallel work with resource limits.
 - **Terminal operation:** edit and run workflows in the TUI, or use headless
-  commands with machine-readable run summaries.
+  commands with machine-readable run summaries. See [TUI authoring](docs/tui-authoring.md)
+  for typed editors, validation, and lifecycle behavior.
 - **Agents:** use command-backed Pi and Clankers adapters, OpenAI-compatible
   endpoints, or a bounded Animus leaf-agent profile.
 - **Durable control:** persist runs, scheduled occurrences, webhook claims,
@@ -53,11 +55,25 @@ nix develop
 cargo run --locked -- --help
 ```
 
-The current flake fetches its pinned Cairn source over GitHub SSH. GitHub SSH
-access is therefore a build prerequisite even though Lattice's own source is
-public. Dependency acquisition also needs network access or an existing local
-cache. Exact sources live in [Cargo.toml](Cargo.toml), [flake.nix](flake.nix), and
-their lockfiles; do not substitute sibling checkouts or floating revisions.
+The current flake fetches Cairn revision
+`5e1fe08d62149b286ff583eb056e655fe92e3cf1` and its locked Artifact input
+`e41340bec587b6d049b5cc518ec7db925dde84be` over GitHub SSH. Cargo's locked
+Choregraph closure also selects Trellis revision
+`d65974b14978e1a44b0f5067beb9ef6d83317dc8` over GitHub SSH. Authorized
+access to those exact sources (or an existing exact cache) is required; Lattice's
+public source alone does not establish an anonymously acquirable build closure.
+Other dependencies still require their locked network sources or existing
+caches. Exact sources live in [Cargo.toml](Cargo.toml), [flake.nix](flake.nix),
+and their lockfiles; do not substitute sibling checkouts or floating revisions.
+
+The component and asynchronous CI adapters also consume exact native Basalt,
+Mantle and hardened-runtime snapshots under `vendor-cargo-deps/`, with producer
+revisions and archive members recorded in each `SOURCE`. Maintain them through
+the [repository-owned import procedure](vendor-cargo-deps/README.md), not sibling
+dependency overrides or edits to imported source. Local correction cohorts are
+not remote-publication evidence. The actual Valence build-service validator is
+separately locked to `15e72b5a330b08139ac7c809ac31e7e87f825b22` over GitHub SSH;
+it and its exact Artifact dependencies require authorized acquisition or caches.
 
 ### Import and export a workflow
 
@@ -232,6 +248,19 @@ through the repository-owned sync scripts, not edited as ordinary local source.
 
 ## License
 
-The main `lattice` package declares **AGPL-3.0-or-later** in
-[Cargo.toml](Cargo.toml). Workspace crates and imported dependencies retain their
-own declared licenses.
+All new Lattice-owned source is licensed under **AGPL-3.0-or-later**, including
+the runtime, reusable cores, workflow contract and transport, schemas, fixtures,
+templates, documentation, and policy. See [LICENSE](LICENSE) and
+[Cargo.toml](Cargo.toml); standalone contract packages also carry the full text.
+
+Previous grants cannot be revoked. Content already received under MIT retains
+those rights, including byte-identical content still present in this tree. The
+contract and transport retain their attributed historical MIT notices in
+`LICENSE-MIT-HISTORICAL`; those notices do not offer MIT for new contributions.
+Kiln's immutable imported contract is not refreshed or relicensed by this change.
+
+Imported Rats, Animus, Basalt, Host Control, and TOON snapshots, other third-party
+material, exact old dependency pins, and historical receipts retain their own
+source-specific terms and identities. This source preparation does not publish
+a new revision or establish anonymous acquisition; the SSH and network/cache
+prerequisites above remain in force.

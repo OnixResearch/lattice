@@ -1,0 +1,47 @@
+[
+  {
+    "disposition": "existing-identity",
+    "role": "application",
+    "source": "animus-runtime::dogfood_shell"
+  },
+  {
+    "disposition": "existing-identity",
+    "role": "entrypoint",
+    "source": "animus-dogfood-smoke"
+  },
+  {
+    "disposition": "existing-schema-projection",
+    "role": "input-schema",
+    "source": "DogfoodRunRequest"
+  },
+  {
+    "disposition": "existing-schema-projection",
+    "role": "output-schema",
+    "source": "DogfoodReceipt"
+  },
+  {
+    "disposition": "closed-symbolic-summary",
+    "role": "effect-summary",
+    "source": "fake-backed-model-and-tool"
+  },
+  {
+    "disposition": "existing-identity",
+    "role": "host-profile",
+    "source": "session-authority-profile"
+  },
+  {
+    "disposition": "existing-identity",
+    "role": "adapter-cohort",
+    "source": "session-authority-profile.adapter_cohort"
+  },
+  {
+    "disposition": "existing-identity",
+    "role": "resource-profile",
+    "source": "process-job-profile-policy"
+  },
+  {
+    "disposition": "existing-identity",
+    "role": "policy",
+    "source": "session-authority-profile.policy_authorization"
+  }
+]

@@ -1,14 +1,10 @@
 use std::collections::BTreeMap;
 
-use basalt::CapabilityGrant;
-use basalt::ContractEffectClass;
-use basalt::ContractEnvelope;
-use basalt::SteelEvaluationReceipt;
-use basalt::SteelEvaluationRequest;
-use basalt::steel_receipt_hash;
-use basalt::steel_request_hash;
-use basalt::validate_steel_evaluation_receipt;
-use basalt::validate_steel_evaluation_request;
+use basalt::{
+    CapabilityGrant, ContractEffectClass, ContractEnvelope, SteelEvaluationReceipt,
+    SteelEvaluationRequest, steel_receipt_hash, steel_request_hash,
+    validate_steel_evaluation_receipt, validate_steel_evaluation_request,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum FixtureHostAction {
@@ -46,7 +42,10 @@ impl FixtureSteelAdapter {
                 request_hash: steel_request_hash(request),
                 allowed: false,
                 reason: format!("blocked host action: {:?}", self.action),
-                caveat_evidence: BTreeMap::from([("blocked_host_action".to_owned(), format!("{:?}", self.action))]),
+                caveat_evidence: BTreeMap::from([(
+                    "blocked_host_action".to_owned(),
+                    format!("{:?}", self.action),
+                )]),
                 effect_class: ContractEffectClass::HostEffect,
                 required_capabilities: Vec::new(),
                 checked_capabilities: Vec::new(),
@@ -116,7 +115,10 @@ const fn valid_adapter() -> FixtureSteelAdapter {
     }
 }
 
-fn rust_accepts_adapter_receipt(request: &SteelEvaluationRequest, receipt: &SteelEvaluationReceipt) -> bool {
+fn rust_accepts_adapter_receipt(
+    request: &SteelEvaluationRequest,
+    receipt: &SteelEvaluationReceipt,
+) -> bool {
     validate_steel_evaluation_request(request).is_accepted()
         && receipt.request_hash == steel_request_hash(request)
         && receipt.normalized_source_hash == request.envelope.normalized_source_hash

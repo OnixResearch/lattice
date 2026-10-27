@@ -1,14 +1,21 @@
-const IDENTITY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_workflow_identity");
+const IDENTITY_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_workflow_identity");
 const INSTRUCTIONS_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("recipe_workflow_instructions");
-const PROMPT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_workflow_initial_prompt");
-const ACTIVITY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_workflow_activity");
+const PROMPT_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_workflow_initial_prompt");
+const ACTIVITY_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_workflow_activity");
 const MODEL_PROFILE_FIELD: crate::validation::FieldName =
     crate::validation::FieldName::new("recipe_workflow_model_profile");
-const CAPABILITY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_workflow_capability");
-const TOOLSET_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_workflow_toolset");
-const GATE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_workflow_validation_gate");
-const SUBRECIPE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("recipe_workflow_subrecipe");
+const CAPABILITY_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_workflow_capability");
+const TOOLSET_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_workflow_toolset");
+const GATE_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_workflow_validation_gate");
+const SUBRECIPE_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("recipe_workflow_subrecipe");
 type Text = alloc::string::String;
 type Collection<T> = alloc::vec::Vec<T>;
 /// Untrusted recipe/workflow manifest fields.
@@ -78,21 +85,25 @@ impl RecipeWorkflow {
         let activities = super::text_collection(ACTIVITY_FIELD, draft.activities, true)?;
         let parameters = super::field::collect_parameters(draft.parameters)?;
         let model_profile = super::required_text(MODEL_PROFILE_FIELD, draft.model_profile)?;
-        let capability_ceilings = super::text_collection(CAPABILITY_FIELD, draft.capability_ceilings, true)?;
+        let capability_ceilings =
+            super::text_collection(CAPABILITY_FIELD, draft.capability_ceilings, true)?;
         let toolsets = super::text_collection(TOOLSET_FIELD, draft.toolsets, false)?;
         let validation_gates = super::text_collection(GATE_FIELD, draft.validation_gates, true)?;
         let retry_policy = super::attempt::RecipeRetryPolicy::validate(&draft.retry_policy)?;
         let subrecipes = super::text_collection(SUBRECIPE_FIELD, draft.subrecipes, false)?;
         let response_schema = super::shape::RecipeResponseSchema::validate(&draft.response_schema)?;
         let provenance = super::admit::RecipeTrustReceipt::new(&draft.provenance)?;
-        let dag_plan = super::graph::validate_recipe_dag(draft.dag_steps, super::graph::RecipeDagContext {
-            workflow_id: identity.as_str(),
-            parameters: parameters.as_slice(),
-            capability_ceilings: capability_ceilings.as_slice(),
-            validation_gates: validation_gates.as_slice(),
-            retry_policy: &retry_policy,
-            subrecipes: subrecipes.as_slice(),
-        })?;
+        let dag_plan = super::graph::validate_recipe_dag(
+            draft.dag_steps,
+            super::graph::RecipeDagContext {
+                workflow_id: identity.as_str(),
+                parameters: parameters.as_slice(),
+                capability_ceilings: capability_ceilings.as_slice(),
+                validation_gates: validation_gates.as_slice(),
+                retry_policy: &retry_policy,
+                subrecipes: subrecipes.as_slice(),
+            },
+        )?;
 
         Ok(Self {
             identity,

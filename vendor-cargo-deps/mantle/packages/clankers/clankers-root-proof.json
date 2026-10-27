@@ -1,0 +1,60 @@
+{
+  "final_proof_hash_blake3": "ca024b5c76489cd872fad1eee0e0383a2741cdba49001dd108afc406253dcc8f",
+  "schema": "crunch.clankers.root_proof.v1",
+  "package": "clankers",
+  "package_version": "0.1.0",
+  "source_git_head": "57c3cccccc5ad4f9a987f07e598008c2a0751f82",
+  "bundle": {
+    "url": "file://.crunch-drain/artifacts/clankers-root-bundle.tar.zst",
+    "recursive_sha256_sri": "sha256-a6vnNF5mE/E3C7KlyQ9JXM77fdlQ+Yzc7sSlRi9JkAk=",
+    "archive_sha256_sri": "sha256-+YKDpkxKWXWgLHYSNw4EzmzGQuhuWe36mV/oD9v5heo=",
+    "archive_blake3": "dae16bc6eafc5b5f82aad2d709fd5e27507c2928b79754ae214e6c3c385ec799",
+    "unpacked_bytes": 1218220900,
+    "archive_bytes": 109688082,
+    "vendored_source_count": 1169
+  },
+  "build": {
+    "derivation": "packages/clankers/clankers.ncl",
+    "cargo_command": "cargo build --release --locked --offline --no-default-features --bin clankers --target x86_64-unknown-linux-musl",
+    "features": "no-default-features; clankers-tts default features disabled in sandbox copy; ONNX TTS excluded for root smoke",
+    "native_linkage": "static musl sqlite/openssl",
+    "release_profile": "lto=false; codegen-units=32; debug=0"
+  },
+  "artifact": {
+    "logical_path": "/crunch/store/harkklvli5ggzk69w3wks8k3iw1v7zb3-clankers-0.1.0/bin/clankers",
+    "observed_path": ".crunch-drain/clankers-root-remap-fresh-c-1778773346/store/harkklvli5ggzk69w3wks8k3iw1v7zb3-clankers-0.1.0/bin/clankers",
+    "binary_blake3": "2a0fb9daba5445529141aa734de798b5748e65d18e86db5b6f4a776d1700c2ef",
+    "binary_file_summary": "105 MiB static-pie ELF, stripped; reproducible across fresh remapped Crunch stores"
+  },
+  "smoke": {
+    "command": "$out/bin/clankers --help",
+    "exit": 0,
+    "output_prefix": "clankers \u2014 a Rust terminal coding agent"
+  },
+  "rebuild_reproducibility": {
+    "schema": "crunch.clankers.rebuild_reproducibility.v2",
+    "verdict": "match",
+    "method": "two fresh --state-dir/--store Crunch rebuilds with --no-substitute after Rust path remapping",
+    "runs": [
+      {
+        "label": "c",
+        "run_dir": ".crunch-drain/clankers-root-remap-fresh-c-1778773346",
+        "path": ".crunch-drain/clankers-root-remap-fresh-c-1778773346/store/harkklvli5ggzk69w3wks8k3iw1v7zb3-clankers-0.1.0/bin/clankers",
+        "binary_blake3": "2a0fb9daba5445529141aa734de798b5748e65d18e86db5b6f4a776d1700c2ef",
+        "exit_status": 0
+      },
+      {
+        "label": "d",
+        "run_dir": ".crunch-drain/clankers-root-remap-fresh-d-1778774346",
+        "path": ".crunch-drain/clankers-root-remap-fresh-d-1778774346/store/harkklvli5ggzk69w3wks8k3iw1v7zb3-clankers-0.1.0/bin/clankers",
+        "binary_blake3": "2a0fb9daba5445529141aa734de798b5748e65d18e86db5b6f4a776d1700c2ef",
+        "exit_status": 0
+      }
+    ],
+    "previous_mismatch": {
+      "original_binary_blake3": "e1e8e1c36e0979a2534bcb8c394d4c360068985b0700b0e73ee32f1bd23917ff",
+      "rebuilt_binary_blake3": "82e569fcb115baf84efba01930b30085f0556d6ec9c3bc7c5ef45379e6aa5863",
+      "receipt_commit": "d225be90"
+    }
+  }
+}

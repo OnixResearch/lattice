@@ -4,10 +4,14 @@ use std::process::ExitCode;
 mod authority_identity;
 #[path = "../src/ast_grep_audit_identity.rs"]
 mod ast_grep_audit_identity;
+#[path = "release_verify/enforcement_profile.rs"]
+mod enforcement_profile;
 #[path = "release_verify/execute.rs"]
 mod execute;
 #[path = "release_verify/model.rs"]
 mod model;
+#[path = "release_verify/scratch.rs"]
+mod scratch;
 #[path = "release_verify/plan.rs"]
 mod plan;
 #[path = "release_verify/receipts.rs"]

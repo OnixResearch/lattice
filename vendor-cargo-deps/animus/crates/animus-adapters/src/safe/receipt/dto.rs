@@ -21,7 +21,11 @@ pub struct Draft<'a> {
 impl<'a> Draft<'a> {
     /// Builds a draft with required status, issue, and operation classes.
     #[must_use]
-    pub const fn new(status: super::Status, issue_code: super::IssueCode, operation: super::Operation) -> Self {
+    pub const fn new(
+        status: super::Status,
+        issue_code: super::IssueCode,
+        operation: super::Operation,
+    ) -> Self {
         Self {
             status,
             issue_code,

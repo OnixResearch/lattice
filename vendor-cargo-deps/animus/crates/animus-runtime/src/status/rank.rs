@@ -4,7 +4,9 @@ pub(super) fn newest_observation<'a>(
     observations
         .iter()
         .enumerate()
-        .max_by(|left, right| compare_observations(left.1, right.1).then_with(|| right.0.cmp(&left.0)))
+        .max_by(|left, right| {
+            compare_observations(left.1, right.1).then_with(|| right.0.cmp(&left.0))
+        })
         .map(|(index, observation)| super::types::SelectedObservation { observation, index })
 }
 
@@ -12,7 +14,9 @@ fn compare_observations(
     left: &animus_adapters::AgentStatusObservation,
     right: &animus_adapters::AgentStatusObservation,
 ) -> core::cmp::Ordering {
-    left.sequence().cmp(&right.sequence()).then_with(|| right.source_id().cmp(left.source_id()))
+    left.sequence()
+        .cmp(&right.sequence())
+        .then_with(|| right.source_id().cmp(left.source_id()))
 }
 
 pub(super) fn newest_conflicts(
@@ -20,9 +24,9 @@ pub(super) fn newest_conflicts(
     sequence: animus_adapters::StatusSequence,
     selected_state: animus_adapters::SemanticAgentState,
 ) -> bool {
-    trusted
-        .iter()
-        .any(|observation| observation.sequence() == sequence && observation.state() != selected_state)
+    trusted.iter().any(|observation| {
+        observation.sequence() == sequence && observation.state() != selected_state
+    })
 }
 
 pub(super) fn reject_newest_conflicts(
@@ -32,7 +36,10 @@ pub(super) fn reject_newest_conflicts(
 ) {
     for observation in observations {
         if observation.sequence() == sequence {
-            rejected.push(observation, super::types::RejectedReason::ConflictingLifecycleAuthority);
+            rejected.push(
+                observation,
+                super::types::RejectedReason::ConflictingLifecycleAuthority,
+            );
         }
     }
 }
@@ -66,7 +73,9 @@ pub(super) fn reject_heuristics(
     }
 }
 
-pub(super) fn fallback_reason(signals: super::types::FallbackSignals) -> super::types::FallbackReason {
+pub(super) fn fallback_reason(
+    signals: super::types::FallbackSignals,
+) -> super::types::FallbackReason {
     if !signals.has_target {
         return super::types::FallbackReason::NoObservation;
     }
@@ -79,10 +88,14 @@ pub(super) fn fallback_reason(signals: super::types::FallbackSignals) -> super::
     super::types::FallbackReason::NoTrustedLifecycle
 }
 
-pub(super) const fn freshness_for_unknown(reason: super::types::FallbackReason) -> super::types::Freshness {
+pub(super) const fn freshness_for_unknown(
+    reason: super::types::FallbackReason,
+) -> super::types::Freshness {
     match reason {
         super::types::FallbackReason::StaleLifecycle => super::types::Freshness::Stale,
-        super::types::FallbackReason::ConflictingLifecycleAuthority => super::types::Freshness::Conflicting,
+        super::types::FallbackReason::ConflictingLifecycleAuthority => {
+            super::types::Freshness::Conflicting
+        }
         super::types::FallbackReason::NoObservation
         | super::types::FallbackReason::NoTrustedLifecycle
         | super::types::FallbackReason::UntrustedLifecycle => super::types::Freshness::Missing,

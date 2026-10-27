@@ -70,5 +70,5 @@
   "evaluator": "nickel-1.17.0",
   "schema": "animus.policy-projection-receipts.v1",
   "shared_prelude": "policy/contracts/primitives.ncl",
-  "shared_prelude_blake3": "102e0de517da26582d662cfdc87acb45733099fd62b1d805d6e01eaa077744e0"
+  "shared_prelude_blake3": "1243df459c92eee04cef8186c9bf7aab20a60d0115966a902ae563e3ebd496c9"
 }

@@ -187,7 +187,10 @@ pub trait CodeGraphQueryService {
     /// # Errors
     ///
     /// Returns a stable diagnostic when the service is stale or the request is invalid.
-    fn query_code_graph(&self, query: &CodeGraphQuery<'_>) -> Result<CodeGraphQueryResult, CodeGraphError>;
+    fn query_code_graph(
+        &self,
+        query: &CodeGraphQuery<'_>,
+    ) -> Result<CodeGraphQueryResult, CodeGraphError>;
 }
 
 /// Disposable cache descriptor.
@@ -264,7 +267,9 @@ pub struct CodeGraphReceipt {
 /// # Errors
 ///
 /// Returns a stable diagnostic for unsafe labels or non-finite budgets.
-pub fn validate_code_graph_profile(draft: &CodeGraphProfileDraft<'_>) -> Result<CodeGraphProfile, CodeGraphError> {
+pub fn validate_code_graph_profile(
+    draft: &CodeGraphProfileDraft<'_>,
+) -> Result<CodeGraphProfile, CodeGraphError> {
     let labels = [
         draft.profile_id,
         draft.language,
@@ -339,7 +344,9 @@ pub fn admit_code_graph_file(
 pub fn normalize_code_graph_contribution(
     mut contribution: CodeGraphContribution,
 ) -> Result<CodeGraphContribution, CodeGraphError> {
-    if !safe_relative_path(&contribution.relative_path) || !valid_identity(&contribution.source_identity) {
+    if !safe_relative_path(&contribution.relative_path)
+        || !valid_identity(&contribution.source_identity)
+    {
         return Err(CodeGraphError::UnsafePath);
     }
     for symbol in &contribution.symbols {
@@ -373,11 +380,18 @@ pub fn build_code_graph_index(
         .collect::<Result<alloc::vec::Vec<_>, _>>()?;
     normalized.sort_by(|left, right| left.relative_path.cmp(&right.relative_path));
     let mut paths = alloc::collections::BTreeSet::new();
-    if normalized.iter().any(|entry| !paths.insert(entry.relative_path.clone())) {
+    if normalized
+        .iter()
+        .any(|entry| !paths.insert(entry.relative_path.clone()))
+    {
         return Err(CodeGraphError::InvalidLabel);
     }
     debug_assert!(normalized.len() <= profile.max_files);
-    debug_assert!(normalized.windows(2).all(|pair| pair[0].relative_path < pair[1].relative_path));
+    debug_assert!(
+        normalized
+            .windows(2)
+            .all(|pair| pair[0].relative_path < pair[1].relative_path)
+    );
 
     let identity = graph_identity(profile, &normalized);
     debug_assert!(valid_identity(&identity));
@@ -398,7 +412,10 @@ pub fn apply_code_graph_event(
     index: &CodeGraphIndex,
     event: CodeGraphEvent<'_>,
 ) -> Result<CodeGraphIndex, CodeGraphError> {
-    if matches!(event.kind, CodeGraphEventKind::Overflow | CodeGraphEventKind::Gap | CodeGraphEventKind::Unsupported) {
+    if matches!(
+        event.kind,
+        CodeGraphEventKind::Overflow | CodeGraphEventKind::Gap | CodeGraphEventKind::Unsupported
+    ) {
         let mut stale = index.clone();
         stale.freshness = CodeGraphFreshness::Stale;
         return Ok(stale);
@@ -409,21 +426,29 @@ pub fn apply_code_graph_event(
     debug_assert!(safe_relative_path(event.relative_path));
     let mut contributions = index.contributions.clone();
     contributions.retain(|item| item.relative_path != event.relative_path);
-    debug_assert!(contributions.iter().all(|item| item.relative_path != event.relative_path));
+    debug_assert!(
+        contributions
+            .iter()
+            .all(|item| item.relative_path != event.relative_path)
+    );
     match event.kind {
         CodeGraphEventKind::Delete => {}
         CodeGraphEventKind::Create | CodeGraphEventKind::Modify => {
             contributions.push(event.contribution.ok_or(CodeGraphError::InvalidLabel)?);
         }
         CodeGraphEventKind::Rename => {
-            let new_path = event.new_relative_path.ok_or(CodeGraphError::AmbiguousRename)?;
+            let new_path = event
+                .new_relative_path
+                .ok_or(CodeGraphError::AmbiguousRename)?;
             let replacement = event.contribution.ok_or(CodeGraphError::AmbiguousRename)?;
             if replacement.relative_path != new_path || !safe_relative_path(new_path) {
                 return Err(CodeGraphError::AmbiguousRename);
             }
             contributions.push(replacement);
         }
-        CodeGraphEventKind::Overflow | CodeGraphEventKind::Gap | CodeGraphEventKind::Unsupported => unreachable!(),
+        CodeGraphEventKind::Overflow
+        | CodeGraphEventKind::Gap
+        | CodeGraphEventKind::Unsupported => unreachable!(),
     }
     build_code_graph_index(profile, contributions)
 }
@@ -441,7 +466,8 @@ pub fn query_code_graph(
     if index.freshness != CodeGraphFreshness::Fresh {
         return Err(CodeGraphError::StaleIndex);
     }
-    if query.symbol.is_empty() || query.max_results == 0 || query.max_results > profile.max_results {
+    if query.symbol.is_empty() || query.max_results == 0 || query.max_results > profile.max_results
+    {
         return Err(CodeGraphError::InvalidBudget);
     }
     debug_assert_eq!(index.freshness, CodeGraphFreshness::Fresh);
@@ -452,7 +478,9 @@ pub fn query_code_graph(
         .contributions
         .iter()
         .flat_map(|entry| entry.symbols.iter())
-        .filter(|symbol| symbol.name == query.symbol && query.kind.is_none_or(|kind| kind == symbol.kind))
+        .filter(|symbol| {
+            symbol.name == query.symbol && query.kind.is_none_or(|kind| kind == symbol.kind)
+        })
         .cloned()
         .collect::<alloc::vec::Vec<_>>();
     matches.sort();
@@ -470,7 +498,9 @@ pub fn query_code_graph(
 /// # Errors
 ///
 /// Returns a stable diagnostic when an identity or schema label is malformed.
-pub fn code_graph_cache_identity(draft: &CodeGraphCacheDraft<'_>) -> Result<alloc::string::String, CodeGraphError> {
+pub fn code_graph_cache_identity(
+    draft: &CodeGraphCacheDraft<'_>,
+) -> Result<alloc::string::String, CodeGraphError> {
     let identities = [
         draft.workspace_identity,
         draft.source_identity,
@@ -479,7 +509,9 @@ pub fn code_graph_cache_identity(draft: &CodeGraphCacheDraft<'_>) -> Result<allo
         draft.query_identity,
         draft.graph_identity,
     ];
-    if identities.iter().any(|identity| !valid_identity(identity)) || !safe_label(draft.schema_identity) {
+    if identities.iter().any(|identity| !valid_identity(identity))
+        || !safe_label(draft.schema_identity)
+    {
         return Err(CodeGraphError::InvalidIdentity);
     }
     debug_assert!(identities.iter().all(|identity| valid_identity(identity)));
@@ -512,7 +544,9 @@ pub fn evaluate_code_graph_cache(
     }
     match observed_identity {
         None => CodeGraphCacheDecision::RebuildAndSave,
-        Some(observed) if valid_identity(observed) && observed == expected_identity => CodeGraphCacheDecision::Reuse,
+        Some(observed) if valid_identity(observed) && observed == expected_identity => {
+            CodeGraphCacheDecision::Reuse
+        }
         Some(_) => CodeGraphCacheDecision::QuarantineAndRebuild,
     }
 }
@@ -522,7 +556,9 @@ pub fn evaluate_code_graph_cache(
 /// # Errors
 ///
 /// Returns a stable denial without invoking a service when any required admission is absent.
-pub fn admit_code_graph_dispatch(admission: &CodeGraphDispatchAdmission) -> Result<(), CodeGraphError> {
+pub fn admit_code_graph_dispatch(
+    admission: &CodeGraphDispatchAdmission,
+) -> Result<(), CodeGraphError> {
     if admission.mutation_requested {
         return Err(CodeGraphError::InvalidLabel);
     }
@@ -548,8 +584,15 @@ pub fn admit_code_graph_dispatch(admission: &CodeGraphDispatchAdmission) -> Resu
 
 /// Projects metadata-only receipt evidence.
 #[must_use]
-pub fn project_code_graph_receipt(profile: &CodeGraphProfile, index: &CodeGraphIndex) -> CodeGraphReceipt {
-    let symbol_count = index.contributions.iter().map(|entry| entry.symbols.len()).sum::<usize>();
+pub fn project_code_graph_receipt(
+    profile: &CodeGraphProfile,
+    index: &CodeGraphIndex,
+) -> CodeGraphReceipt {
+    let symbol_count = index
+        .contributions
+        .iter()
+        .map(|entry| entry.symbols.len())
+        .sum::<usize>();
     let payload = alloc::format!(
         "{RECEIPT_DOMAIN}\0{}\0{}\0{}\0{}",
         profile.profile_identity,
@@ -559,7 +602,11 @@ pub fn project_code_graph_receipt(profile: &CodeGraphProfile, index: &CodeGraphI
     );
     let receipt_identity = blake3_hex(payload.as_bytes());
     debug_assert_eq!(receipt_identity.len(), BLAKE3_HEX_LENGTH);
-    debug_assert!(receipt_identity.bytes().all(|byte| byte.is_ascii_hexdigit()));
+    debug_assert!(
+        receipt_identity
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit())
+    );
     CodeGraphReceipt {
         profile_identity: profile.profile_identity.clone(),
         graph_identity: index.graph_identity.clone(),
@@ -571,7 +618,10 @@ pub fn project_code_graph_receipt(profile: &CodeGraphProfile, index: &CodeGraphI
     }
 }
 
-fn graph_identity(profile: &CodeGraphProfile, contributions: &[CodeGraphContribution]) -> alloc::string::String {
+fn graph_identity(
+    profile: &CodeGraphProfile,
+    contributions: &[CodeGraphContribution],
+) -> alloc::string::String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(GRAPH_DOMAIN.as_bytes());
     hasher.update(profile.profile_identity.as_bytes());
@@ -591,16 +641,18 @@ fn graph_identity(profile: &CodeGraphProfile, contributions: &[CodeGraphContribu
 fn safe_label(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= MAX_SAFE_LABEL_BYTES
-        && value
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b':' | b'/'))
+        && value.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b':' | b'/')
+        })
 }
 
 fn safe_relative_path(value: &str) -> bool {
     !value.is_empty()
         && !value.starts_with('/')
         && !value.contains('\\')
-        && value.split('/').all(|part| !part.is_empty() && part != "." && part != "..")
+        && value
+            .split('/')
+            .all(|part| !part.is_empty() && part != "." && part != "..")
 }
 
 fn valid_identity(value: &str) -> bool {
@@ -656,27 +708,38 @@ mod tests {
     fn positive_build_query_event_cache_and_receipt() {
         let profile = profile();
         assert!(admit_code_graph_file(&profile, "src/lib.rs", b"fn run() {}").is_ok());
-        let index = build_code_graph_index(&profile, alloc::vec![contribution(&ContributionFixture {
-            path: "src/lib.rs",
-            name: "run",
-        })])
+        let index = build_code_graph_index(
+            &profile,
+            alloc::vec![contribution(&ContributionFixture {
+                path: "src/lib.rs",
+                name: "run",
+            })],
+        )
         .expect("index");
-        let result = query_code_graph(&profile, &index, &CodeGraphQuery {
-            symbol: "run",
-            kind: Some(CodeGraphSymbolKind::Definition),
-            max_results: 1,
-        })
+        let result = query_code_graph(
+            &profile,
+            &index,
+            &CodeGraphQuery {
+                symbol: "run",
+                kind: Some(CodeGraphSymbolKind::Definition),
+                max_results: 1,
+            },
+        )
         .expect("query");
         assert_eq!(result.matches.len(), 1);
-        let updated = apply_code_graph_event(&profile, &index, CodeGraphEvent {
-            kind: CodeGraphEventKind::Modify,
-            relative_path: "src/lib.rs",
-            new_relative_path: None,
-            contribution: Some(contribution(&ContributionFixture {
-                path: "src/lib.rs",
-                name: "next",
-            })),
-        })
+        let updated = apply_code_graph_event(
+            &profile,
+            &index,
+            CodeGraphEvent {
+                kind: CodeGraphEventKind::Modify,
+                relative_path: "src/lib.rs",
+                new_relative_path: None,
+                contribution: Some(contribution(&ContributionFixture {
+                    path: "src/lib.rs",
+                    name: "next",
+                })),
+            },
+        )
         .expect("update");
         assert_ne!(updated.graph_identity, index.graph_identity);
         let receipt = project_code_graph_receipt(&profile, &updated);
@@ -691,7 +754,10 @@ mod tests {
             graph_identity: &updated.graph_identity,
         });
         assert!(cache.is_ok());
-        assert_eq!(evaluate_code_graph_cache(false, &blake3_hex(b"cache"), None), CodeGraphCacheDecision::Disabled);
+        assert_eq!(
+            evaluate_code_graph_cache(false, &blake3_hex(b"cache"), None),
+            CodeGraphCacheDecision::Disabled
+        );
         assert_eq!(
             evaluate_code_graph_cache(true, &blake3_hex(b"cache"), Some(&blake3_hex(b"stale"))),
             CodeGraphCacheDecision::QuarantineAndRebuild
@@ -711,26 +777,43 @@ mod tests {
     #[test]
     fn negative_paths_budgets_stale_and_rename_fail_closed() {
         let profile = profile();
-        assert_eq!(admit_code_graph_file(&profile, "../secret", b"x"), Err(CodeGraphError::UnsafePath));
-        assert_eq!(admit_code_graph_file(&profile, "src/x", &[0]), Err(CodeGraphError::UnsupportedText));
-        let index = build_code_graph_index(&profile, alloc::vec![contribution(&ContributionFixture {
-            path: "src/lib.rs",
-            name: "run",
-        })])
+        assert_eq!(
+            admit_code_graph_file(&profile, "../secret", b"x"),
+            Err(CodeGraphError::UnsafePath)
+        );
+        assert_eq!(
+            admit_code_graph_file(&profile, "src/x", &[0]),
+            Err(CodeGraphError::UnsupportedText)
+        );
+        let index = build_code_graph_index(
+            &profile,
+            alloc::vec![contribution(&ContributionFixture {
+                path: "src/lib.rs",
+                name: "run",
+            })],
+        )
         .expect("index");
-        let stale = apply_code_graph_event(&profile, &index, CodeGraphEvent {
-            kind: CodeGraphEventKind::Overflow,
-            relative_path: "src/lib.rs",
-            new_relative_path: None,
-            contribution: None,
-        })
+        let stale = apply_code_graph_event(
+            &profile,
+            &index,
+            CodeGraphEvent {
+                kind: CodeGraphEventKind::Overflow,
+                relative_path: "src/lib.rs",
+                new_relative_path: None,
+                contribution: None,
+            },
+        )
         .expect("stale");
         assert_eq!(
-            query_code_graph(&profile, &stale, &CodeGraphQuery {
-                symbol: "run",
-                kind: None,
-                max_results: 1
-            }),
+            query_code_graph(
+                &profile,
+                &stale,
+                &CodeGraphQuery {
+                    symbol: "run",
+                    kind: None,
+                    max_results: 1
+                }
+            ),
             Err(CodeGraphError::StaleIndex)
         );
         assert_eq!(
@@ -744,12 +827,16 @@ mod tests {
             Err(CodeGraphError::InvalidLabel)
         );
         assert_eq!(
-            apply_code_graph_event(&profile, &index, CodeGraphEvent {
-                kind: CodeGraphEventKind::Rename,
-                relative_path: "src/lib.rs",
-                new_relative_path: None,
-                contribution: None
-            }),
+            apply_code_graph_event(
+                &profile,
+                &index,
+                CodeGraphEvent {
+                    kind: CodeGraphEventKind::Rename,
+                    relative_path: "src/lib.rs",
+                    new_relative_path: None,
+                    contribution: None
+                }
+            ),
             Err(CodeGraphError::AmbiguousRename)
         );
     }

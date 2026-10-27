@@ -35,7 +35,9 @@ impl AdapterCallFailureMetadata {
     /// Returns [`crate::AdapterContractError`] when metadata is empty, too long,
     /// contains a NUL byte, or carries known raw prompt, provider, credential,
     /// path, model-output, or tool-output leak markers.
-    pub fn new(draft: AdapterCallFailureMetadataDraft<'_>) -> Result<Self, crate::AdapterContractError> {
+    pub fn new(
+        draft: AdapterCallFailureMetadataDraft<'_>,
+    ) -> Result<Self, crate::AdapterContractError> {
         let message = metadata::required_message(draft.message)?;
         let correlation_id = metadata::optional_correlation_id(draft.correlation_id)?;
         let receipt_reference = metadata::optional_receipt_reference(draft.receipt_reference)?;
@@ -66,7 +68,9 @@ impl AdapterCallFailureMetadata {
 
     fn fallback() -> Self {
         Self {
-            message: alloc::string::String::from(AdapterCallFailureClass::ExecutionFailure.as_str()),
+            message: alloc::string::String::from(
+                AdapterCallFailureClass::ExecutionFailure.as_str(),
+            ),
             correlation_id: None,
             receipt_reference: None,
         }
@@ -145,25 +149,42 @@ impl<Response> AdapterCallOutcome<Response> {
 
 // r[impl agent_harness_runtime.adapter_outcomes.compatibility]
 /// Opt-in adapter port that returns a typed outcome envelope instead of prose-only errors.
-pub trait ComponentOutcomeAdapter<Request, Response>: crate::ComponentAdapter<Request, Response> {
+pub trait ComponentOutcomeAdapter<Request, Response>:
+    crate::ComponentAdapter<Request, Response>
+{
     /// Calls the component and returns a typed completed or fail-closed outcome.
     ///
     /// # Errors
     ///
     /// Returns [`Self::Error`] for transport-level failures before a typed
     /// adapter outcome can be produced.
-    fn call_with_outcome(&mut self, request: &Request) -> Result<AdapterCallOutcome<Response>, Self::Error>;
+    fn call_with_outcome(
+        &mut self,
+        request: &Request,
+    ) -> Result<AdapterCallOutcome<Response>, Self::Error>;
 }
 
 /// Opt-in model adapter contract with typed adapter-call outcomes.
-pub trait ModelOutcomeAdapter: ComponentOutcomeAdapter<crate::ModelRequest, crate::ModelResponse> {}
+pub trait ModelOutcomeAdapter:
+    ComponentOutcomeAdapter<crate::ModelRequest, crate::ModelResponse>
+{
+}
 
-impl<T> ModelOutcomeAdapter for T where T: ComponentOutcomeAdapter<crate::ModelRequest, crate::ModelResponse> {}
+impl<T> ModelOutcomeAdapter for T where
+    T: ComponentOutcomeAdapter<crate::ModelRequest, crate::ModelResponse>
+{
+}
 
 /// Opt-in tool adapter contract with typed adapter-call outcomes.
-pub trait ToolOutcomeAdapter: ComponentOutcomeAdapter<crate::ToolRequest, crate::ToolResponse> {}
+pub trait ToolOutcomeAdapter:
+    ComponentOutcomeAdapter<crate::ToolRequest, crate::ToolResponse>
+{
+}
 
-impl<T> ToolOutcomeAdapter for T where T: ComponentOutcomeAdapter<crate::ToolRequest, crate::ToolResponse> {}
+impl<T> ToolOutcomeAdapter for T where
+    T: ComponentOutcomeAdapter<crate::ToolRequest, crate::ToolResponse>
+{
+}
 
 #[cfg(test)]
 mod tests;

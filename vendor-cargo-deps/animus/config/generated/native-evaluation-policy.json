@@ -1,0 +1,62 @@
+{
+  "bounds": {
+    "artifacts": 256,
+    "reward_dimensions": 128,
+    "runs": 1024,
+    "tasks": 4096
+  },
+  "defaults": {
+    "network": "none",
+    "runtime_nickel_allowed": false,
+    "secret_values_allowed": false,
+    "transcript_bodies_allowed": false
+  },
+  "evidence": {
+    "completion_claim_allowed": false,
+    "non_claims": [
+      "not-task-correctness",
+      "not-trace-completeness",
+      "not-verifier-soundness",
+      "not-benchmark-or-training-fitness",
+      "not-authoritative-completion",
+      "not-production-or-release-readiness"
+    ],
+    "raw_content_allowed": false,
+    "redaction": "metadata_only"
+  },
+  "profile_id": "native-evaluation-v1",
+  "recipes": [
+    "single_agent",
+    "best_of_n",
+    "user_simulation",
+    "isolated_agentic_judge",
+    "shared_advisory_judge"
+  ],
+  "resume": {
+    "mismatch": "rerun",
+    "require_complete": true,
+    "require_safe": true,
+    "require_terminal": true
+  },
+  "rewards": {
+    "judge": "advisory",
+    "missing": "error",
+    "non_finite": "error",
+    "out_of_domain": "error"
+  },
+  "schema": "animus.native-evaluation-policy.v1",
+  "source_cohort": {
+    "identity": "b3:069f20983a0d523d84028b76f85b3dd63a712f952e99cdef628824ef1ffe6bfe",
+    "license": "MIT",
+    "repository": "PrimeIntellect-ai/verifiers",
+    "revision": "1a997814e85a2e4f409add960aa852737388dbd8"
+  },
+  "taskset": {
+    "explicit_seed_required": true,
+    "global_shuffle_allowed": false,
+    "lazy_generator_identity_required": true,
+    "lazy_generator_version_required": true,
+    "positive_selection_bound_required": true,
+    "stable_order_required": true
+  }
+}

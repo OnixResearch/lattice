@@ -23,30 +23,36 @@ pub fn project_durable_session_store_receipt(
     reject_sensitive(input.sensitive)?;
     super::core::validate_durable_session_store_descriptor(input.policy, input.descriptor)?;
     if input.durability != input.descriptor.durability {
-        return Err(DurableSessionStoreError::new(DurableSessionStoreIssue::InvalidDescriptor, FIELD_RECEIPT));
+        return Err(DurableSessionStoreError::new(
+            DurableSessionStoreIssue::InvalidDescriptor,
+            FIELD_RECEIPT,
+        ));
     }
     super::core::safe_label(input.status, RECEIPT_FIELD)?;
     super::core::safe_label(input.lock_status, RECEIPT_FIELD)?;
     super::core::lowercase_blake3(input.prior_head_hash, RECEIPT_FIELD)?;
     super::core::lowercase_blake3(input.new_head_hash, RECEIPT_FIELD)?;
     let frame_count = input.committed_frame_count.to_string();
-    let receipt_hash = super::core::hash_parts(super::data::DURABLE_SESSION_RECEIPT_HASH_DOMAIN, &[
-        super::data::DURABLE_SESSION_RECEIPT_SCHEMA.as_bytes(),
-        input.descriptor.store_id.as_bytes(),
-        input.descriptor.policy_hash.as_bytes(),
-        input.descriptor.session_id.as_bytes(),
-        input.descriptor.branch_id.as_bytes(),
-        input.operation.as_str().as_bytes(),
-        input.durability.as_str().as_bytes(),
-        input.status.as_bytes(),
-        input.prior_head_hash.as_bytes(),
-        input.new_head_hash.as_bytes(),
-        frame_count.as_bytes(),
-        recovery_label(input.recovery_status).as_bytes(),
-        input.lock_status.as_bytes(),
-        super::data::REDACTION_MARKER.as_bytes(),
-        super::data::NON_CLAIM.as_bytes(),
-    ])?;
+    let receipt_hash = super::core::hash_parts(
+        super::data::DURABLE_SESSION_RECEIPT_HASH_DOMAIN,
+        &[
+            super::data::DURABLE_SESSION_RECEIPT_SCHEMA.as_bytes(),
+            input.descriptor.store_id.as_bytes(),
+            input.descriptor.policy_hash.as_bytes(),
+            input.descriptor.session_id.as_bytes(),
+            input.descriptor.branch_id.as_bytes(),
+            input.operation.as_str().as_bytes(),
+            input.durability.as_str().as_bytes(),
+            input.status.as_bytes(),
+            input.prior_head_hash.as_bytes(),
+            input.new_head_hash.as_bytes(),
+            frame_count.as_bytes(),
+            recovery_label(input.recovery_status).as_bytes(),
+            input.lock_status.as_bytes(),
+            super::data::REDACTION_MARKER.as_bytes(),
+            super::data::NON_CLAIM.as_bytes(),
+        ],
+    )?;
     debug_assert!(!receipt_hash.is_empty());
     debug_assert_eq!(receipt_hash.len(), super::data::BLAKE3_HEX_CHARS);
     Ok(DurableSessionStoreReceipt {
@@ -70,13 +76,18 @@ pub fn project_durable_session_store_receipt(
 }
 
 fn reject_sensitive(sensitive: SensitiveDraft<'_>) -> Result<(), DurableSessionStoreError> {
-    let has_private_bytes =
-        sensitive.private_payload.is_some() || sensitive.tool_result.is_some() || sensitive.raw_frame.is_some();
-    let has_host_private =
-        sensitive.provider_payload.is_some() || sensitive.credential.is_some() || sensitive.private_path.is_some();
+    let has_private_bytes = sensitive.private_payload.is_some()
+        || sensitive.tool_result.is_some()
+        || sensitive.raw_frame.is_some();
+    let has_host_private = sensitive.provider_payload.is_some()
+        || sensitive.credential.is_some()
+        || sensitive.private_path.is_some();
     let has_unbounded_diagnostic = sensitive.lock_dump.is_some() || sensitive.raw_error.is_some();
     if has_private_bytes || has_host_private || has_unbounded_diagnostic {
-        return Err(DurableSessionStoreError::new(DurableSessionStoreIssue::ReceiptLeak, FIELD_RECEIPT));
+        return Err(DurableSessionStoreError::new(
+            DurableSessionStoreIssue::ReceiptLeak,
+            FIELD_RECEIPT,
+        ));
     }
     debug_assert!(!has_private_bytes);
     debug_assert!(!has_host_private && !has_unbounded_diagnostic);
@@ -88,6 +99,8 @@ const fn recovery_label(status: super::data::DurableSessionRecoveryStatus) -> &'
         super::data::DurableSessionRecoveryStatus::Empty => "empty",
         super::data::DurableSessionRecoveryStatus::Clean => "clean",
         super::data::DurableSessionRecoveryStatus::IncompleteTailFrame => "incomplete_tail_frame",
-        super::data::DurableSessionRecoveryStatus::IncompleteTailTransaction => "incomplete_tail_transaction",
+        super::data::DurableSessionRecoveryStatus::IncompleteTailTransaction => {
+            "incomplete_tail_transaction"
+        }
     }
 }

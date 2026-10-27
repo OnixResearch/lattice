@@ -1,7 +1,5 @@
+use super::data::{ContextReferenceError, ContextResolverKind};
 use alloc::string::ToString;
-
-use super::data::ContextReferenceError;
-use super::data::ContextResolverKind;
 
 const CONTEXT_ADAPTER_SCHEMA: &str = "animus.context-adapter.v1";
 const CONTEXT_ROLE_MISMATCH_REASON: &str = "context adapter role does not match resolver kind";
@@ -277,15 +275,23 @@ impl Manifest {
         &self,
         role: ContextAdapterRole,
     ) -> Result<&ContextAdapterRoleRecord, ContextReferenceError> {
-        let record = self.role_record(role).ok_or(ContextReferenceError::ResolverMissing)?;
+        let record = self
+            .role_record(role)
+            .ok_or(ContextReferenceError::ResolverMissing)?;
         match (record.availability, record.policy_decision) {
-            (ContextAdapterAvailability::Available, ContextAdapterPolicyDecision::Allowed) => Ok(record),
+            (ContextAdapterAvailability::Available, ContextAdapterPolicyDecision::Allowed) => {
+                Ok(record)
+            }
             (_, ContextAdapterPolicyDecision::Denied) => Err(ContextReferenceError::ResolverDenied),
             (ContextAdapterAvailability::Missing, _) => Err(ContextReferenceError::ResolverMissing),
-            (ContextAdapterAvailability::Unsupported, _) => Err(ContextReferenceError::UnsupportedKind {
-                reason: CONTEXT_ROLE_MISMATCH_REASON,
-            }),
-            (ContextAdapterAvailability::Unavailable, _) => Err(ContextReferenceError::ResolverUnavailable),
+            (ContextAdapterAvailability::Unsupported, _) => {
+                Err(ContextReferenceError::UnsupportedKind {
+                    reason: CONTEXT_ROLE_MISMATCH_REASON,
+                })
+            }
+            (ContextAdapterAvailability::Unavailable, _) => {
+                Err(ContextReferenceError::ResolverUnavailable)
+            }
         }
     }
 }
@@ -332,7 +338,9 @@ fn validate_role_metadata(draft: ContextAdapterRoleDraft<'_>) -> Result<(), Cont
     .map_err(ContextReferenceError::SafeMetadata)
 }
 
-fn reject_duplicate_roles(records: &[ContextAdapterRoleRecord]) -> Result<(), ContextReferenceError> {
+fn reject_duplicate_roles(
+    records: &[ContextAdapterRoleRecord],
+) -> Result<(), ContextReferenceError> {
     for (index, record) in records.iter().enumerate() {
         if records
             .iter()

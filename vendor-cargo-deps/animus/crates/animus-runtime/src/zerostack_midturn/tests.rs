@@ -1,5 +1,4 @@
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven
-// validation compact while drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -7,7 +6,12 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
+#![allow(
+    compound_condition,
+    excessive_file_length,
+    function_length,
+    non_trait_imports
+)]
 #![allow(
     numeric_units,
     path_segment_repetition,
@@ -42,7 +46,10 @@ fn prompt_pressure_applies_cache_rules_without_double_counting() {
     )
     .expect("included cache pressure");
     assert_eq!(included.prompt_pressure_tokens, INPUT_TOKENS);
-    assert_eq!(included.cache_rule_used, ZerostackCachedTokenRule::IncludedInInputTokens);
+    assert_eq!(
+        included.cache_rule_used,
+        ZerostackCachedTokenRule::IncludedInInputTokens
+    );
 
     let separate = calculate_zerostack_prompt_pressure(
         &usage(Some(INPUT_TOKENS), Some(CACHE_TOKENS)),
@@ -51,9 +58,11 @@ fn prompt_pressure_applies_cache_rules_without_double_counting() {
     .expect("separate cache pressure");
     assert_eq!(separate.prompt_pressure_tokens, INPUT_TOKENS + CACHE_TOKENS);
 
-    let absent =
-        calculate_zerostack_prompt_pressure(&usage(Some(INPUT_TOKENS), None), &route(ZerostackCachedTokenRule::Absent))
-            .expect("absent cache pressure");
+    let absent = calculate_zerostack_prompt_pressure(
+        &usage(Some(INPUT_TOKENS), None),
+        &route(ZerostackCachedTokenRule::Absent),
+    )
+    .expect("absent cache pressure");
     assert_eq!(absent.prompt_pressure_tokens, INPUT_TOKENS);
 
     let malformed = calculate_zerostack_prompt_pressure(
@@ -61,11 +70,9 @@ fn prompt_pressure_applies_cache_rules_without_double_counting() {
         &route(ZerostackCachedTokenRule::Absent),
     )
     .expect_err("malformed cache field");
-    assert!(
-        malformed
-            .iter()
-            .any(|diagnostic| { diagnostic.kind == ZerostackMidturnDiagnosticKind::MalformedProviderUsage })
-    );
+    assert!(malformed.iter().any(|diagnostic| {
+        diagnostic.kind == ZerostackMidturnDiagnosticKind::MalformedProviderUsage
+    }));
 }
 
 #[test]
@@ -83,8 +90,11 @@ fn midturn_plan_respects_enabled_disabled_threshold_and_fail_policy() {
     assert_eq!(disabled.decision, ZerostackMidturnDecision::Warn);
     assert!(!disabled.compact_before_resume);
 
-    let under_threshold =
-        plan_zerostack_midturn_compaction(&policy(true), Some(prompt_pressure(PRESSURE_BELOW_THRESHOLD)), services);
+    let under_threshold = plan_zerostack_midturn_compaction(
+        &policy(true),
+        Some(prompt_pressure(PRESSURE_BELOW_THRESHOLD)),
+        services,
+    );
     assert_eq!(under_threshold.decision, ZerostackMidturnDecision::Continue);
 
     let missing_pressure = plan_zerostack_midturn_compaction(&policy(true), None, services);
@@ -99,24 +109,29 @@ fn missing_ledger_service_halts_without_model_or_tool_fallback() {
         ledger: ZerostackInjectedServiceState::Missing,
         summarizer: ZerostackInjectedServiceState::Ready,
     };
-    let plan =
-        plan_zerostack_midturn_compaction(&policy(true), Some(prompt_pressure(PRESSURE_OVER_THRESHOLD)), services);
+    let plan = plan_zerostack_midturn_compaction(
+        &policy(true),
+        Some(prompt_pressure(PRESSURE_OVER_THRESHOLD)),
+        services,
+    );
 
     assert_eq!(plan.decision, ZerostackMidturnDecision::Fail);
     assert!(plan.stop_before_continuing);
     assert!(!plan.compact_before_resume);
     assert!(!plan.resume_after_append);
-    assert!(
-        plan.diagnostics
-            .iter()
-            .any(|diagnostic| { diagnostic.kind == ZerostackMidturnDiagnosticKind::LedgerUnavailable })
-    );
+    assert!(plan.diagnostics.iter().any(|diagnostic| {
+        diagnostic.kind == ZerostackMidturnDiagnosticKind::LedgerUnavailable
+    }));
 }
 
 #[test]
 fn summary_validation_rejects_malformed_and_unsafe_outputs() {
     // r[agent_harness_runtime.zerostack_midturn_compaction.summarizer.malformed]
-    let valid = summary(SUMMARY_TEXT, ZerostackMidturnSummaryKind::Midturn, vec!["turn:one"]);
+    let valid = summary(
+        SUMMARY_TEXT,
+        ZerostackMidturnSummaryKind::Midturn,
+        vec!["turn:one"],
+    );
     assert!(validate_zerostack_midturn_summary(&valid).is_ok());
 
     let malformed = ZerostackMidturnSummary {
@@ -124,22 +139,29 @@ fn summary_validation_rejects_malformed_and_unsafe_outputs() {
         kind: ZerostackMidturnSummaryKind::Unsupported,
         metadata_labels: vec!["/home/user/path".to_string()],
         source_hash: ZerostackMidturnFingerprint::new("SHA256", "abc"),
-        ..summary(SUMMARY_TEXT, ZerostackMidturnSummaryKind::Midturn, vec!["turn:one"])
+        ..summary(
+            SUMMARY_TEXT,
+            ZerostackMidturnSummaryKind::Midturn,
+            vec!["turn:one"],
+        )
     };
     let diagnostics = validate_zerostack_midturn_summary(&malformed).expect_err("bad summary");
     assert!(
-        diagnostics
-            .iter()
-            .any(|diagnostic| { diagnostic.kind == ZerostackMidturnDiagnosticKind::InvalidSummary })
+        diagnostics.iter().any(|diagnostic| {
+            diagnostic.kind == ZerostackMidturnDiagnosticKind::InvalidSummary
+        })
     );
 }
 
 #[test]
 fn long_tool_output_artifact_keeps_only_bounded_visible_windows() {
     // r[agent_harness_runtime.zerostack_midturn_compaction.tool_artifacts.bounded]
-    let artifact =
-        artifactize_zerostack_tool_output(ARTIFACT_LABEL, TOOL_OUTPUT, &tool_artifact_policy(HEAD_CHARS, TAIL_CHARS))
-            .expect("artifact descriptor");
+    let artifact = artifactize_zerostack_tool_output(
+        ARTIFACT_LABEL,
+        TOOL_OUTPUT,
+        &tool_artifact_policy(HEAD_CHARS, TAIL_CHARS),
+    )
+    .expect("artifact descriptor");
 
     assert!(artifact.truncated);
     assert!(!artifact.embeds_full_output);
@@ -148,14 +170,15 @@ fn long_tool_output_artifact_keeps_only_bounded_visible_windows() {
     assert_eq!(artifact.total_chars, TOOL_OUTPUT.chars().count());
     assert_eq!(artifact.artifact_hash.algorithm, BLAKE3_ALGORITHM);
 
-    let invalid =
-        artifactize_zerostack_tool_output(ARTIFACT_LABEL, TOOL_OUTPUT, &tool_artifact_policy(ZERO_CHARS, TAIL_CHARS))
-            .expect_err("invalid artifact policy");
-    assert!(
-        invalid
-            .iter()
-            .any(|diagnostic| { diagnostic.kind == ZerostackMidturnDiagnosticKind::InvalidToolArtifactPolicy })
-    );
+    let invalid = artifactize_zerostack_tool_output(
+        ARTIFACT_LABEL,
+        TOOL_OUTPUT,
+        &tool_artifact_policy(ZERO_CHARS, TAIL_CHARS),
+    )
+    .expect_err("invalid artifact policy");
+    assert!(invalid.iter().any(|diagnostic| {
+        diagnostic.kind == ZerostackMidturnDiagnosticKind::InvalidToolArtifactPolicy
+    }));
 }
 
 fn fp(label: &str) -> ZerostackMidturnFingerprint {
@@ -195,17 +218,27 @@ fn route(cached_token_rule: ZerostackCachedTokenRule) -> ZerostackRouteMetadata 
     }
 }
 
-fn summary(text: &str, kind: ZerostackMidturnSummaryKind, metadata_labels: Vec<&str>) -> ZerostackMidturnSummary {
+fn summary(
+    text: &str,
+    kind: ZerostackMidturnSummaryKind,
+    metadata_labels: Vec<&str>,
+) -> ZerostackMidturnSummary {
     ZerostackMidturnSummary {
         text: text.to_string(),
         kind,
-        metadata_labels: metadata_labels.into_iter().map(std::string::ToString::to_string).collect(),
+        metadata_labels: metadata_labels
+            .into_iter()
+            .map(std::string::ToString::to_string)
+            .collect(),
         source_hash: fp("source"),
         summary_hash: fp("summary"),
     }
 }
 
-fn tool_artifact_policy(visible_head_chars: usize, visible_tail_chars: usize) -> ZerostackToolArtifactPolicy {
+fn tool_artifact_policy(
+    visible_head_chars: usize,
+    visible_tail_chars: usize,
+) -> ZerostackToolArtifactPolicy {
     ZerostackToolArtifactPolicy {
         visible_head: visible_head_chars,
         visible_tail: visible_tail_chars,

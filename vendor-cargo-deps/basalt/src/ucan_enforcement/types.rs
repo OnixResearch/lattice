@@ -1,24 +1,20 @@
-use serde::Deserialize;
-use serde::Serialize;
-use ucan::CaveatPolicySet;
-use ucan::HolderInvocationLimits;
-use ucan::HolderInvocationNonce;
-use ucan::HolderInvocationReplayAdmission;
-use ucan::KeyResolver;
-use ucan::OperationProfileId;
-use ucan::ProofStore;
-use ucan::RevocationChecker;
-use ucan::SignerSignature;
-use ucan::VerificationLimits;
-use ucan::VerificationTime;
-
 use super::core::operation_profile_digest;
 use crate::EnforcementRequest;
+use crate::ucan_profile::BasaltUcanProtocolProfile;
+use serde::{Deserialize, Serialize};
+use ucan::{
+    CaveatPolicySet, HolderInvocationLimits, HolderInvocationNonce,
+    HolderInvocationReplayAdmission, KeyResolver, OperationProfileId, ProofStore,
+    RevocationChecker, SignerSignature, VerificationLimits, VerificationTime,
+};
 
 const DOCUMENT_READ_CONTRACT: &str = "document-read";
 const DOCUMENT_READ_ABILITY: &str = "document/read";
 const DOCUMENT_WRITE_CONTRACT: &str = "document-write";
 const DOCUMENT_WRITE_ABILITY: &str = "document/write";
+const PROCESS_EXECUTE_CONTRACT: &str = "process-execute";
+const PROCESS_EXECUTE_ABILITY: &str = "process/execute";
+const PROCESS_EXECUTION_RESOURCE_PREFIX: &str = "onix://process-execution/";
 
 const TARGET_CANDIDATE_ACTIVATION_CONTRACT: &str = "onixos-target-candidate-activation";
 const TARGET_CANDIDATE_ACTIVATION_ABILITY: &str = "onix/target-candidate-activation";
@@ -43,6 +39,9 @@ pub enum EnforcementAction {
     DocumentRead,
     /// Write one document resource.
     DocumentWrite,
+    /// Execute one independently admitted, content-bound process context.
+    /// Requires explicit policy; the packaged default policy does not allow it.
+    ProcessExecute,
     /// Candidate activation for one `OnixOS` target.
     OnixosTargetCandidateActivation,
     /// Generation persistence for one `OnixOS` target.
@@ -55,6 +54,18 @@ pub enum EnforcementAction {
     OnixosStateSyncDelete,
     /// State-sync administration for one `OnixOS` target.
     OnixosStateSyncAdmin,
+    MantleBuildSubmit,
+    MantleInputUpload,
+    MantleStoreRead,
+    MantleProjectDeclare,
+    MantleStatusRead,
+    MantleLogRead,
+    MantleEventRead,
+    MantleResultRead,
+    MantleUsageRead,
+    MantleOwnedAttemptCancel,
+    MantlePublish,
+    MantleAdmin,
 }
 
 impl EnforcementAction {
@@ -64,12 +75,25 @@ impl EnforcementAction {
         match self {
             Self::DocumentRead => "document-read",
             Self::DocumentWrite => "document-write",
+            Self::ProcessExecute => "process-execute",
             Self::OnixosTargetCandidateActivation => "onixos-target-candidate-activation",
             Self::OnixosTargetGenerationPersistence => "onixos-target-generation-persistence",
             Self::OnixosTargetRollback => "onixos-target-rollback",
             Self::OnixosStateSyncPublish => "onixos-state-sync-publish",
             Self::OnixosStateSyncDelete => "onixos-state-sync-delete",
             Self::OnixosStateSyncAdmin => "onixos-state-sync-admin",
+            Self::MantleBuildSubmit => "mantle-build-submit",
+            Self::MantleInputUpload => "mantle-input-upload",
+            Self::MantleStoreRead => "mantle-store-read",
+            Self::MantleProjectDeclare => "mantle-project-declare",
+            Self::MantleStatusRead => "mantle-status-read",
+            Self::MantleLogRead => "mantle-log-read",
+            Self::MantleEventRead => "mantle-event-read",
+            Self::MantleResultRead => "mantle-result-read",
+            Self::MantleUsageRead => "mantle-usage-read",
+            Self::MantleOwnedAttemptCancel => "mantle-owned-attempt-cancel",
+            Self::MantlePublish => "mantle-publish",
+            Self::MantleAdmin => "mantle-admin",
         }
     }
 
@@ -79,12 +103,25 @@ impl EnforcementAction {
         match self {
             Self::DocumentRead => DOCUMENT_READ_CONTRACT,
             Self::DocumentWrite => DOCUMENT_WRITE_CONTRACT,
+            Self::ProcessExecute => PROCESS_EXECUTE_CONTRACT,
             Self::OnixosTargetCandidateActivation => TARGET_CANDIDATE_ACTIVATION_CONTRACT,
             Self::OnixosTargetGenerationPersistence => TARGET_GENERATION_PERSISTENCE_CONTRACT,
             Self::OnixosTargetRollback => TARGET_ROLLBACK_CONTRACT,
             Self::OnixosStateSyncPublish => STATE_SYNC_PUBLISH_CONTRACT,
             Self::OnixosStateSyncDelete => STATE_SYNC_DELETE_CONTRACT,
             Self::OnixosStateSyncAdmin => STATE_SYNC_ADMIN_CONTRACT,
+            Self::MantleBuildSubmit
+            | Self::MantleInputUpload
+            | Self::MantleStoreRead
+            | Self::MantleProjectDeclare
+            | Self::MantleStatusRead
+            | Self::MantleLogRead
+            | Self::MantleEventRead
+            | Self::MantleResultRead
+            | Self::MantleUsageRead
+            | Self::MantleOwnedAttemptCancel
+            | Self::MantlePublish
+            | Self::MantleAdmin => self.as_str(),
         }
     }
 
@@ -94,12 +131,25 @@ impl EnforcementAction {
         match self {
             Self::DocumentRead => DOCUMENT_READ_ABILITY,
             Self::DocumentWrite => DOCUMENT_WRITE_ABILITY,
+            Self::ProcessExecute => PROCESS_EXECUTE_ABILITY,
             Self::OnixosTargetCandidateActivation => TARGET_CANDIDATE_ACTIVATION_ABILITY,
             Self::OnixosTargetGenerationPersistence => TARGET_GENERATION_PERSISTENCE_ABILITY,
             Self::OnixosTargetRollback => TARGET_ROLLBACK_ABILITY,
             Self::OnixosStateSyncPublish => STATE_SYNC_PUBLISH_ABILITY,
             Self::OnixosStateSyncDelete => STATE_SYNC_DELETE_ABILITY,
             Self::OnixosStateSyncAdmin => STATE_SYNC_ADMIN_ABILITY,
+            Self::MantleBuildSubmit => "mantle/build/submit",
+            Self::MantleInputUpload => "mantle/input/upload",
+            Self::MantleStoreRead => "mantle/store/read",
+            Self::MantleProjectDeclare => "mantle/project/declare",
+            Self::MantleStatusRead => "mantle/status/read",
+            Self::MantleLogRead => "mantle/log/read",
+            Self::MantleEventRead => "mantle/event/read",
+            Self::MantleResultRead => "mantle/result/read",
+            Self::MantleUsageRead => "mantle/usage/read",
+            Self::MantleOwnedAttemptCancel => "mantle/attempt/cancel-owned",
+            Self::MantlePublish => "mantle/publish",
+            Self::MantleAdmin => "mantle/admin",
         }
     }
 
@@ -108,12 +158,25 @@ impl EnforcementAction {
     pub const fn resource_prefix(self) -> &'static str {
         match self {
             Self::DocumentRead | Self::DocumentWrite => "",
+            Self::ProcessExecute => PROCESS_EXECUTION_RESOURCE_PREFIX,
             Self::OnixosTargetCandidateActivation
             | Self::OnixosTargetGenerationPersistence
             | Self::OnixosTargetRollback => ONIXOS_TARGET_RESOURCE_PREFIX,
-            Self::OnixosStateSyncPublish | Self::OnixosStateSyncDelete | Self::OnixosStateSyncAdmin => {
-                STATE_SYNC_RESOURCE_PREFIX
-            }
+            Self::OnixosStateSyncPublish
+            | Self::OnixosStateSyncDelete
+            | Self::OnixosStateSyncAdmin => STATE_SYNC_RESOURCE_PREFIX,
+            Self::MantleBuildSubmit
+            | Self::MantleInputUpload
+            | Self::MantleStoreRead
+            | Self::MantleProjectDeclare
+            | Self::MantleStatusRead
+            | Self::MantleLogRead
+            | Self::MantleEventRead
+            | Self::MantleResultRead
+            | Self::MantleUsageRead
+            | Self::MantleOwnedAttemptCancel
+            | Self::MantlePublish
+            | Self::MantleAdmin => "mantle://gateway/v1/",
         }
     }
 
@@ -128,6 +191,7 @@ impl EnforcementAction {
 pub struct UcanEnforcementRequest<'request, 'credential> {
     pub(super) enforcement: &'request EnforcementRequest,
     pub(super) compact_token: &'credential str,
+    pub(super) profile: BasaltUcanProtocolProfile,
     pub(super) action: EnforcementAction,
     pub(super) nonce: HolderInvocationNonce,
     pub(super) holder_signature: &'credential SignerSignature,
@@ -139,6 +203,7 @@ impl<'request, 'credential> UcanEnforcementRequest<'request, 'credential> {
     pub const fn new(
         enforcement: &'request EnforcementRequest,
         compact_token: &'credential str,
+        profile: BasaltUcanProtocolProfile,
         action: EnforcementAction,
         nonce: HolderInvocationNonce,
         holder_signature: &'credential SignerSignature,
@@ -146,6 +211,7 @@ impl<'request, 'credential> UcanEnforcementRequest<'request, 'credential> {
         Self {
             enforcement,
             compact_token,
+            profile,
             action,
             nonce,
             holder_signature,
@@ -156,6 +222,12 @@ impl<'request, 'credential> UcanEnforcementRequest<'request, 'credential> {
     #[must_use]
     pub const fn enforcement(&self) -> &EnforcementRequest {
         self.enforcement
+    }
+
+    /// Return the explicitly selected UCAN protocol profile.
+    #[must_use]
+    pub const fn protocol_profile(&self) -> BasaltUcanProtocolProfile {
+        self.profile
     }
 
     /// Return the selected typed downstream action.
@@ -201,6 +273,7 @@ pub enum UcanEnforcementReason {
     HolderDenied,
     ReplayDenied,
     LimitExceeded,
+    ProtocolProfileDenied,
     OperationMismatch,
     UnverifiedAuthorityFields,
     PolicyDenied,
@@ -226,6 +299,7 @@ impl UcanEnforcementReason {
             Self::HolderDenied => "holder-denied",
             Self::ReplayDenied => "replay-denied",
             Self::LimitExceeded => "limit-exceeded",
+            Self::ProtocolProfileDenied => "protocol-profile-denied",
             Self::OperationMismatch => "operation-mismatch",
             Self::UnverifiedAuthorityFields => "unverified-authority-fields",
             Self::PolicyDenied => "policy-denied",

@@ -54,6 +54,9 @@ pub enum ContentRole {
     SkillBody,
     SkillReference,
     AnalyzerAsset,
+    WasmComponent,
+    WitSource,
+    MantleBundle,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -91,6 +94,8 @@ pub struct RuntimeArtifact {
     pub input_bytes: usize,
     pub output_bytes: usize,
     pub clear_environment: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wasm: Option<super::wasm::Descriptor>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -267,6 +272,10 @@ pub struct Lock {
     pub runtime_identities: BTreeMap<String, String>,
     pub analyzer_identities: BTreeMap<String, String>,
     pub skill_identities: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub component_cohort_identities: BTreeMap<String, String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub evidence_identities: BTreeMap<EvidenceKind, String>,
     pub trust_profile_identity: String,
     pub source_locator: String,
 }

@@ -77,7 +77,7 @@ impl WorkflowMeta {
 }
 
 /// Per-node execution configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum NodeConfig {
     Shell {
         command: String,
@@ -245,6 +245,7 @@ pub enum MutationError {
     StaleEdit(NodeId),
     ConditionConfigNotFound(NodeId),
     InvalidConditionConfig(crate::control_flow::ControlFlowError),
+    InvalidAggregate(String),
     Graph(GraphError),
 }
 
@@ -254,9 +255,15 @@ impl From<GraphError> for MutationError {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// A removal is valid only for the exact owner and incident topology observed.
+#[derive(Debug, Clone, PartialEq)]
 pub struct NodeRemovalPlan {
     pub node_id: NodeId,
+    node: Node,
+    config: NodeConfig,
+    credentials: Option<NodeCredentialRefs>,
+    runner: Option<NodeRunnerSettings>,
+    incident_edges: Vec<Edge>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -283,13 +290,7 @@ impl Workflow {
     /// Add a shell node with the given label and command.
     /// Returns the NodeId.
     pub fn add_shell_node(&mut self, label: impl Into<String>, command: impl Into<String>) -> NodeId {
-        let id = self.graph.add_node(label, &[PortSpec::new("stdin", TypeTag::String.as_str())], &[
-            PortSpec::new("stdout", TypeTag::String.as_str()),
-            PortSpec::new("stderr", TypeTag::String.as_str()),
-            PortSpec::new("exit", TypeTag::ExitCode.as_str()),
-        ]);
-        self.configs.insert(id.0, NodeConfig::shell(command));
-        id
+        self.add_configured_node(label, NodeConfig::shell(command))
     }
 
     /// Add an HTTP request node with default status, headers, and body outputs.
@@ -300,13 +301,7 @@ impl Workflow {
         method: impl Into<String>,
         url: impl Into<String>,
     ) -> NodeId {
-        let id = self.graph.add_node(label, &[PortSpec::new("body", TypeTag::String.as_str())], &[
-            PortSpec::new("status", TypeTag::String.as_str()),
-            PortSpec::new("headers", TypeTag::Json.as_str()),
-            PortSpec::new("body", TypeTag::String.as_str()),
-        ]);
-        self.configs.insert(id.0, NodeConfig::http(method, url));
-        id
+        self.add_configured_node(label, NodeConfig::http(method, url))
     }
 
     /// Add a file operation node with content, metadata, and bytes-written outputs.
@@ -317,24 +312,13 @@ impl Workflow {
         operation: FileOperationKind,
         path: impl Into<String>,
     ) -> NodeId {
-        let id = self.graph.add_node(label, &[PortSpec::new("content", TypeTag::String.as_str())], &[
-            PortSpec::new("content", TypeTag::String.as_str()),
-            PortSpec::new("metadata", TypeTag::Json.as_str()),
-            PortSpec::new("bytes_written", TypeTag::String.as_str()),
-        ]);
-        self.configs.insert(id.0, NodeConfig::file(operation, path));
-        id
+        self.add_configured_node(label, NodeConfig::file(operation, path))
     }
 
     /// Add an image input node with image and metadata outputs.
     /// Returns the NodeId.
     pub fn add_image_input_node(&mut self, label: impl Into<String>, path: impl Into<String>) -> NodeId {
-        let id = self.graph.add_node(label, &[], &[
-            PortSpec::new("image", TypeTag::Image.as_str()),
-            PortSpec::new("metadata", TypeTag::Json.as_str()),
-        ]);
-        self.configs.insert(id.0, NodeConfig::image_input(path));
-        id
+        self.add_configured_node(label, NodeConfig::image_input(path))
     }
 
     /// Add a generic agent node with media-aware inputs and typed outputs.
@@ -346,81 +330,27 @@ impl Workflow {
         prompt: impl Into<String>,
         output_mode: AgentOutputMode,
     ) -> NodeId {
-        let id = self.graph.add_node(
-            label,
-            &[
-                PortSpec::new("prompt", TypeTag::String.as_str()),
-                PortSpec::new("image", TypeTag::Image.as_str()),
-                PortSpec::new("json", TypeTag::Json.as_str()),
-            ],
-            &[
-                PortSpec::new("text", TypeTag::String.as_str()),
-                PortSpec::new("json", TypeTag::Json.as_str()),
-                PortSpec::new("image", TypeTag::Image.as_str()),
-                PortSpec::new("artifact", TypeTag::Bytes.as_str()),
-                PortSpec::new("metadata", TypeTag::Json.as_str()),
-            ],
-        );
-        self.configs.insert(id.0, NodeConfig::agent(target, prompt, output_mode));
-        id
+        self.add_configured_node(label, NodeConfig::agent(target, prompt, output_mode))
     }
 
     /// Add a typed operation node with one validated JSON result.
     pub fn add_operation_node(&mut self, label: impl Into<String>, plan: crate::operation::InvocationPlan) -> NodeId {
-        let id = self.graph.add_node(label, &[], &[PortSpec::new("result", TypeTag::Json.as_str())]);
-        self.configs.insert(id.0, NodeConfig::operation(plan));
-        id
+        self.add_configured_node(label, NodeConfig::operation(plan))
     }
 
     /// Add a condition node with one input and one output per branch.
     pub fn add_condition_node(&mut self, label: impl Into<String>, config: ConditionNodeConfig) -> NodeId {
-        let output_specs = config
-            .branches
-            .iter()
-            .map(|branch| PortSpec::new(branch.label.clone(), TypeTag::Any.as_str()))
-            .collect::<Vec<_>>();
-        let id = self.graph.add_node(label, &[PortSpec::new("value", TypeTag::Any.as_str())], &output_specs);
-        self.configs.insert(id.0, NodeConfig::condition(config));
-        id
+        self.add_configured_node(label, NodeConfig::condition(config))
     }
 
     /// Add a merge node with explicit input labels and one merged output.
     pub fn add_merge_node(&mut self, label: impl Into<String>, config: MergeNodeConfig) -> NodeId {
-        let input_specs = config
-            .required_inputs
-            .iter()
-            .map(|input| PortSpec::new(input.clone(), TypeTag::Any.as_str()))
-            .collect::<Vec<_>>();
-        let id = self.graph.add_node(label, &input_specs, &[PortSpec::new(
-            crate::control_flow::merge_output_port_label(),
-            TypeTag::Any.as_str(),
-        )]);
-        self.configs.insert(id.0, NodeConfig::merge(config));
-        id
+        self.add_configured_node(label, NodeConfig::merge(config))
     }
 
     /// Add a subworkflow invocation node with declared parent-facing ports.
     pub fn add_subworkflow_node(&mut self, label: impl Into<String>, config: SubworkflowNodeConfig) -> NodeId {
-        let input_specs = config
-            .input_mappings
-            .iter()
-            .map(|mapping| PortSpec::new(mapping.parent_input.clone(), TypeTag::Any.as_str()))
-            .collect::<Vec<_>>();
-        let output_specs = if config.output_mappings.is_empty() {
-            vec![PortSpec::new(
-                crate::control_flow::subworkflow_default_output_port_label(),
-                TypeTag::Any.as_str(),
-            )]
-        } else {
-            config
-                .output_mappings
-                .iter()
-                .map(|mapping| PortSpec::new(mapping.parent_output.clone(), TypeTag::Any.as_str()))
-                .collect::<Vec<_>>()
-        };
-        let id = self.graph.add_node(label, &input_specs, &output_specs);
-        self.configs.insert(id.0, NodeConfig::subworkflow(config));
-        id
+        self.add_configured_node(label, NodeConfig::subworkflow(config))
     }
 
     /// Add a durable approval gate with declared selected inputs and resume outputs.
@@ -429,47 +359,171 @@ impl Workflow {
         label: impl Into<String>,
         config: crate::workflow::gate::ApprovalNodeConfig,
     ) -> NodeId {
-        const CREDENTIAL_OUTPUT_PREFIX: &str = "credential:";
-        let input_specs = config
-            .selected_input_ports
-            .iter()
-            .map(|input| PortSpec::new(input.clone(), TypeTag::Any.as_str()))
-            .collect::<Vec<_>>();
-        let mut output_specs = config
-            .resume
-            .values
-            .iter()
-            .map(|field| PortSpec::new(field.name.as_str(), field.type_tag.clone()))
-            .collect::<Vec<_>>();
-        output_specs.extend(
-            config
-                .resume
-                .credential_bindings
-                .iter()
-                .map(|name| PortSpec::new(format!("{CREDENTIAL_OUTPUT_PREFIX}{name}"), TypeTag::String.as_str())),
-        );
-        let id = self.graph.add_node(label, &input_specs, &output_specs);
-        self.configs.insert(id.0, NodeConfig::approval(config));
-        id
+        self.add_configured_node(label, NodeConfig::approval(config))
+    }
+
+    #[allow(
+        unknown_lints,
+        no_unwrap,
+        reason = "existing infallible constructors retain their admitted-template contract; authoring uses try_add_configured_node"
+    )]
+    fn add_configured_node(&mut self, label: impl Into<String>, config: NodeConfig) -> NodeId {
+        self.try_add_configured_node(label, config)
+            .expect("Lattice-owned node templates require valid bounded graph identities and port declarations")
+    }
+
+    /// Add a validated config and its canonical typed ports atomically.
+    /// The caller validates config semantics; graph declaration/allocation errors
+    /// preserve the complete workflow, including allocator counters and config maps.
+    pub fn try_add_configured_node(
+        &mut self,
+        label: impl Into<String>,
+        config: NodeConfig,
+    ) -> Result<NodeId, MutationError> {
+        let id =
+            match &config {
+                NodeConfig::Shell { .. } => {
+                    self.graph.try_add_node(label, &[PortSpec::new("stdin", TypeTag::String.as_str())], &[
+                        PortSpec::new("stdout", TypeTag::String.as_str()),
+                        PortSpec::new("stderr", TypeTag::String.as_str()),
+                        PortSpec::new("exit", TypeTag::ExitCode.as_str()),
+                    ])
+                }
+                NodeConfig::Http { .. } => {
+                    self.graph.try_add_node(label, &[PortSpec::new("body", TypeTag::String.as_str())], &[
+                        PortSpec::new("status", TypeTag::String.as_str()),
+                        PortSpec::new("headers", TypeTag::Json.as_str()),
+                        PortSpec::new("body", TypeTag::String.as_str()),
+                    ])
+                }
+                NodeConfig::File { .. } => {
+                    self.graph.try_add_node(label, &[PortSpec::new("content", TypeTag::String.as_str())], &[
+                        PortSpec::new("content", TypeTag::String.as_str()),
+                        PortSpec::new("metadata", TypeTag::Json.as_str()),
+                        PortSpec::new("bytes_written", TypeTag::String.as_str()),
+                    ])
+                }
+                NodeConfig::ImageInput { .. } => self.graph.try_add_node(label, &[], &[
+                    PortSpec::new("image", TypeTag::Image.as_str()),
+                    PortSpec::new("metadata", TypeTag::Json.as_str()),
+                ]),
+                NodeConfig::Agent(_) => self.graph.try_add_node(
+                    label,
+                    &[
+                        PortSpec::new("prompt", TypeTag::String.as_str()),
+                        PortSpec::new("image", TypeTag::Image.as_str()),
+                        PortSpec::new("json", TypeTag::Json.as_str()),
+                    ],
+                    &[
+                        PortSpec::new("text", TypeTag::String.as_str()),
+                        PortSpec::new("json", TypeTag::Json.as_str()),
+                        PortSpec::new("image", TypeTag::Image.as_str()),
+                        PortSpec::new("artifact", TypeTag::Bytes.as_str()),
+                        PortSpec::new("metadata", TypeTag::Json.as_str()),
+                    ],
+                ),
+                NodeConfig::Operation(_) => {
+                    self.graph.try_add_node(label, &[], &[PortSpec::new("result", TypeTag::Json.as_str())])
+                }
+                NodeConfig::Condition(config) => {
+                    let outputs = config
+                        .branches
+                        .iter()
+                        .map(|branch| PortSpec::new(branch.label.clone(), TypeTag::Any.as_str()))
+                        .collect::<Vec<_>>();
+                    self.graph.try_add_node(label, &[PortSpec::new("value", TypeTag::Any.as_str())], &outputs)
+                }
+                NodeConfig::Merge(config) => {
+                    let inputs = config
+                        .required_inputs
+                        .iter()
+                        .map(|input| PortSpec::new(input.clone(), TypeTag::Any.as_str()))
+                        .collect::<Vec<_>>();
+                    self.graph.try_add_node(label, &inputs, &[PortSpec::new(
+                        crate::control_flow::merge_output_port_label(),
+                        TypeTag::Any.as_str(),
+                    )])
+                }
+                NodeConfig::Subworkflow(config) => {
+                    let inputs = config
+                        .input_mappings
+                        .iter()
+                        .map(|mapping| PortSpec::new(mapping.parent_input.clone(), TypeTag::Any.as_str()))
+                        .collect::<Vec<_>>();
+                    let outputs = if config.output_mappings.is_empty() {
+                        vec![PortSpec::new(
+                            crate::control_flow::subworkflow_default_output_port_label(),
+                            TypeTag::Any.as_str(),
+                        )]
+                    } else {
+                        config
+                            .output_mappings
+                            .iter()
+                            .map(|mapping| PortSpec::new(mapping.parent_output.clone(), TypeTag::Any.as_str()))
+                            .collect()
+                    };
+                    self.graph.try_add_node(label, &inputs, &outputs)
+                }
+                NodeConfig::Approval(config) => {
+                    const CREDENTIAL_OUTPUT_PREFIX: &str = "credential:";
+                    let inputs = config
+                        .selected_input_ports
+                        .iter()
+                        .map(|input| PortSpec::new(input.clone(), TypeTag::Any.as_str()))
+                        .collect::<Vec<_>>();
+                    let mut outputs = config
+                        .resume
+                        .values
+                        .iter()
+                        .map(|field| PortSpec::new(field.name.as_str(), field.type_tag.clone()))
+                        .collect::<Vec<_>>();
+                    outputs.extend(config.resume.credential_bindings.iter().map(|name| {
+                        PortSpec::new(format!("{CREDENTIAL_OUTPUT_PREFIX}{name}"), TypeTag::String.as_str())
+                    }));
+                    self.graph.try_add_node(label, &inputs, &outputs)
+                }
+            }?;
+        self.configs.insert(id.0, config);
+        Ok(id)
     }
 
     pub fn plan_node_removal(&self, node_id: impl WorkflowNodeIdentity) -> Result<NodeRemovalPlan, MutationError> {
         let node_id = node_id.workflow_node_id();
-        if self.graph.node(node_id).is_none() {
-            return Err(MutationError::NodeNotFound(node_id));
-        }
-        Ok(NodeRemovalPlan { node_id })
+        let node = self.graph.node(node_id).ok_or(MutationError::NodeNotFound(node_id))?;
+        self.validate_aggregate_ownership()?;
+        let config = self
+            .configs
+            .get(&node_id.0)
+            .ok_or_else(|| MutationError::InvalidAggregate(format!("node {node_id} has no execution config")))?;
+        Ok(NodeRemovalPlan {
+            node_id,
+            node: node.clone(),
+            config: config.clone(),
+            credentials: self.credentials.get(&node_id.0).cloned(),
+            runner: self.runner.get(&node_id.0).cloned(),
+            incident_edges: self.incident_edges(node_id).cloned().collect(),
+        })
     }
 
-    /// Apply a planned removal only while its selected node still exists.
+    /// Reject stale owners before validating and committing the complete candidate.
     pub fn apply_node_removal(&mut self, plan: NodeRemovalPlan) -> Result<(), MutationError> {
-        if self.graph.node(plan.node_id).is_none() {
+        if self.graph.node(plan.node_id) != Some(&plan.node)
+            || self.configs.get(&plan.node_id.0) != Some(&plan.config)
+            || self.credentials.get(&plan.node_id.0) != plan.credentials.as_ref()
+            || self.runner.get(&plan.node_id.0) != plan.runner.as_ref()
+            || !self.incident_edges(plan.node_id).eq(plan.incident_edges.iter())
+        {
             return Err(MutationError::StaleEdit(plan.node_id));
         }
-        self.graph.remove_node(plan.node_id)?;
-        self.configs.remove(&plan.node_id.0);
-        self.credentials.remove(&plan.node_id.0);
-        self.runner.remove(&plan.node_id.0);
+        self.validate_aggregate_ownership()?;
+        let mut candidate = self.clone();
+        candidate.graph.remove_node(plan.node_id)?;
+        candidate.configs.remove(&plan.node_id.0);
+        candidate.credentials.remove(&plan.node_id.0);
+        candidate.runner.remove(&plan.node_id.0);
+        candidate.validate_aggregate_ownership()?;
+        candidate.validate_expression_ownership()?;
+        *self = candidate;
         Ok(())
     }
 
@@ -479,24 +533,103 @@ impl Workflow {
         self.apply_node_removal(plan)
     }
 
+    fn incident_edges(&self, node_id: NodeId) -> impl Iterator<Item = &Edge> {
+        self.graph.edges().iter().filter(move |edge| {
+            self.graph.port_owner(edge.source) == Some(node_id) || self.graph.port_owner(edge.target) == Some(node_id)
+        })
+    }
+
+    /// Structural admission deliberately excludes unrelated runtime/provider policy.
+    pub(crate) fn validate_aggregate_ownership(&self) -> Result<(), MutationError> {
+        for node_id in self.configs.keys().chain(self.credentials.keys()).chain(self.runner.keys()) {
+            if self.graph.node(NodeId(*node_id)).is_none() {
+                return Err(MutationError::InvalidAggregate(format!("state belongs to missing node {node_id}")));
+            }
+        }
+        let mut ports = std::collections::BTreeSet::new();
+        for node in self.graph.nodes() {
+            if !self.configs.contains_key(&node.id.0) {
+                return Err(MutationError::InvalidAggregate(format!("node {} has no execution config", node.id)));
+            }
+            for (direction, declarations) in [
+                (PortDirection::Input, &node.input_ports),
+                (PortDirection::Output, &node.output_ports),
+            ] {
+                let mut labels = std::collections::BTreeSet::new();
+                for port in declarations {
+                    if !ports.insert(port.id)
+                        || !labels.insert(&port.label)
+                        || port.direction != direction
+                        || self.graph.port_owner(port.id) != Some(node.id)
+                        || self.graph.port(port.id) != Some(port)
+                    {
+                        return Err(MutationError::InvalidAggregate(format!("invalid ownership of port {}", port.id)));
+                    }
+                }
+            }
+        }
+        for edge in self.graph.edges() {
+            let source = self.graph.port(edge.source).ok_or(GraphError::PortNotFound(edge.source))?;
+            let target = self.graph.port(edge.target).ok_or(GraphError::PortNotFound(edge.target))?;
+            if source.direction != PortDirection::Output || target.direction != PortDirection::Input {
+                return Err(GraphError::WrongDirection.into());
+            }
+            if self.graph.port_owner(edge.source) == self.graph.port_owner(edge.target) {
+                return Err(GraphError::SelfLoop.into());
+            }
+            if source.type_tag != target.type_tag
+                && source.type_tag != TypeTag::Any.as_str()
+                && target.type_tag != TypeTag::Any.as_str()
+            {
+                return Err(GraphError::IncompatibleTypes {
+                    source_tag: source.type_tag.clone(),
+                    target_tag: target.type_tag.clone(),
+                }
+                .into());
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_expression_ownership(&self) -> Result<(), MutationError> {
+        if let Err(issues) = crate::expression_dependencies::workflow_projection(self) {
+            for issue in issues {
+                if matches!(
+                    issue.code,
+                    crate::expression_dependencies::ExpressionDependencyIssueCode::MissingProducerNode
+                        | crate::expression_dependencies::ExpressionDependencyIssueCode::MissingProducerOutputPort
+                ) {
+                    return Err(MutationError::InvalidAggregate(issue.message));
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub fn plan_condition_branch_reconciliation(
         &self,
         node_id: impl WorkflowNodeIdentity,
         branches: Vec<crate::control_flow::ConditionBranch>,
     ) -> Result<ConditionBranchReconciliationPlan, MutationError> {
         let node_id = node_id.workflow_node_id();
-        if self.graph.node(node_id).is_none() {
-            return Err(MutationError::NodeNotFound(node_id));
-        }
+        let node = self.graph.node(node_id).ok_or(MutationError::NodeNotFound(node_id))?;
         if !matches!(self.configs.get(&node_id.0), Some(NodeConfig::Condition(_))) {
             return Err(MutationError::ConditionConfigNotFound(node_id));
         }
         let config = ConditionNodeConfig { branches };
         crate::control_flow::validate_condition_config(&config).map_err(MutationError::InvalidConditionConfig)?;
+        self.validate_aggregate_ownership()?;
         let requested_specs = config
             .branches
             .iter()
-            .map(|branch| PortSpec::new(branch.label.clone(), TypeTag::Any.as_str()))
+            .map(|branch| {
+                let type_tag = node
+                    .output_ports
+                    .iter()
+                    .find(|port| port.label == branch.label)
+                    .map_or(TypeTag::Any.as_str(), |port| port.type_tag.as_str());
+                PortSpec::new(branch.label.clone(), type_tag)
+            })
             .collect();
         Ok(ConditionBranchReconciliationPlan {
             node_id,
@@ -512,8 +645,12 @@ impl Workflow {
         branches: Vec<crate::control_flow::ConditionBranch>,
     ) -> Result<(), MutationError> {
         let plan = self.plan_condition_branch_reconciliation(node_id, branches)?;
-        self.graph.reconcile_node_ports(plan.node_id, PortDirection::Output, &plan.requested_specs)?;
-        self.configs.insert(plan.node_id.0, NodeConfig::Condition(plan.config));
+        let mut candidate = self.clone();
+        candidate.graph.reconcile_node_ports(plan.node_id, PortDirection::Output, &plan.requested_specs)?;
+        candidate.configs.insert(plan.node_id.0, NodeConfig::Condition(plan.config));
+        candidate.validate_aggregate_ownership()?;
+        candidate.validate_expression_ownership()?;
+        *self = candidate;
         Ok(())
     }
 
@@ -722,5 +859,272 @@ mod tests {
             (Some(NodeConfig::Condition(actual)), NodeConfig::Condition(expected)) => assert_eq!(actual, &expected),
             _ => panic!("expected unchanged condition config"),
         }
+    }
+
+    fn snapshot(workflow: &Workflow) -> serde_json::Value {
+        serde_json::to_value(workflow).expect("workflow snapshot")
+    }
+
+    #[test]
+    fn removal_plan_rejects_changed_or_replaced_owner_and_incident_topology() {
+        for change in 0..7 {
+            let mut workflow = Workflow::new("stale owners", WorkflowTimestamp::epoch());
+            let owner = workflow.add_shell_node("owner", "true");
+            let other = workflow.add_shell_node("other", "cat");
+            let plan = workflow.plan_node_removal(owner).expect("plan");
+            match change {
+                0 => workflow.graph.node_mut(owner).expect("owner").label = "replacement".to_string(),
+                1 => workflow.set_node_config(owner, NodeConfig::http("POST", "https://example.com")),
+                2 => {
+                    let mut refs = NodeCredentialRefs::default();
+                    refs.env.insert("TOKEN".to_string(), SecretRef::new("env", "NEW_TOKEN", None));
+                    workflow.set_node_credentials(owner, refs);
+                }
+                3 => workflow.set_node_runner_settings(owner, NodeRunnerSettings::new("shell", "new-binding")),
+                4 => {
+                    let source = workflow.graph.node(owner).expect("owner").output_ports[0].id;
+                    let target = workflow.graph.node(other).expect("other").input_ports[0].id;
+                    workflow.graph.add_edge(source, target).expect("incident edge");
+                }
+                5 => {
+                    workflow.graph.remove_node(owner).expect("remove old owner");
+                    let mut stored = serde_json::to_value(&workflow.graph).expect("graph value");
+                    stored["next_node_id"] = serde_json::json!(owner.0);
+                    workflow.graph = serde_json::from_value(stored).expect("restore reusable id fixture");
+                    let replacement = workflow.add_shell_node("new owner", "false");
+                    assert_eq!(replacement, owner);
+                }
+                6 => workflow.graph.node_mut(owner).expect("owner").x = 42,
+                _ => unreachable!("bounded test cases"),
+            }
+            let before = snapshot(&workflow);
+            assert_eq!(workflow.apply_node_removal(plan), Err(MutationError::StaleEdit(owner)));
+            assert_eq!(snapshot(&workflow), before, "owner change {change}");
+        }
+    }
+
+    #[test]
+    fn removal_plan_preserves_intervening_unrelated_edits() {
+        let mut workflow = Workflow::new("unrelated edits", WorkflowTimestamp::epoch());
+        let owner = workflow.add_shell_node("owner", "true");
+        let other = workflow.add_shell_node("other", "true");
+        let plan = workflow.plan_node_removal(owner).expect("plan");
+        workflow.set_node_config(other, NodeConfig::shell("printf changed"));
+        workflow.meta.description = "keep new description".to_string();
+        let other_node = workflow.graph.node(other).cloned().expect("other");
+        let other_config = workflow.node_config(other).cloned().expect("config");
+        workflow.apply_node_removal(plan).expect("unchanged owner");
+        assert_eq!(workflow.graph.node(other), Some(&other_node));
+        assert_eq!(workflow.node_config(other), Some(&other_config));
+        assert_eq!(workflow.meta.description, "keep new description");
+    }
+
+    #[test]
+    fn orphan_maps_and_malformed_ports_reject_removal_without_partial_cleanup() {
+        for corruption in 0..6 {
+            let mut workflow = Workflow::new("orphan rejection", WorkflowTimestamp::epoch());
+            let owner = workflow.add_shell_node("owner", "true");
+            let plan = workflow.plan_node_removal(owner).expect("plan before corruption");
+            let orphan = NodeId(u64::MAX);
+            match corruption {
+                0 => {
+                    workflow.configs.insert(orphan.0, NodeConfig::shell("orphan"));
+                }
+                1 => {
+                    workflow.credentials.insert(orphan.0, NodeCredentialRefs::default());
+                }
+                2 => {
+                    workflow.runner.insert(orphan.0, NodeRunnerSettings::new("shell", "orphan"));
+                }
+                3 => {
+                    let other = workflow.add_shell_node("missing config", "true");
+                    workflow.configs.remove(&other.0);
+                }
+                4 => {
+                    let other = workflow.add_shell_node("malformed direction", "true");
+                    workflow.graph.node_mut(other).expect("other").output_ports[0].direction = PortDirection::Input;
+                }
+                5 => {
+                    let other = workflow.add_shell_node("duplicate port", "true");
+                    let duplicate = workflow.graph.node(other).expect("other").output_ports[0].clone();
+                    workflow.graph.node_mut(other).expect("other").output_ports.push(duplicate);
+                }
+                _ => unreachable!("bounded test cases"),
+            }
+            let before = snapshot(&workflow);
+            assert!(matches!(workflow.apply_node_removal(plan), Err(MutationError::InvalidAggregate(_))));
+            assert_eq!(snapshot(&workflow), before, "corruption {corruption}");
+        }
+    }
+
+    #[test]
+    fn dangling_edge_rejects_aggregate_removal_and_condition_reconciliation() {
+        let mut workflow = Workflow::new("dangling edge", WorkflowTimestamp::epoch());
+        let condition = workflow.add_condition_node("route", ConditionNodeConfig {
+            branches: vec![branch("keep")],
+        });
+        let target = workflow.add_shell_node("target", "cat");
+        let source = workflow.graph.node(condition).expect("route").output_ports[0].id;
+        let input = workflow.graph.node(target).expect("target").input_ports[0].id;
+        workflow.graph.add_edge(source, input).expect("edge");
+        workflow.graph.node_mut(target).expect("target").input_ports.clear();
+        let before = snapshot(&workflow);
+        assert!(workflow.remove_node(target).is_err());
+        assert_eq!(snapshot(&workflow), before);
+        assert!(workflow.replace_condition_branches(condition, vec![branch("new")]).is_err());
+        assert_eq!(snapshot(&workflow), before);
+    }
+
+    #[test]
+    fn condition_reorder_unchanged_rename_and_removal_preserve_semantic_port_identity() {
+        let mut workflow = Workflow::new("condition transitions", WorkflowTimestamp::epoch());
+        let condition = workflow.add_condition_node("route", ConditionNodeConfig {
+            branches: vec![branch("left"), branch("right")],
+        });
+        let target = workflow.add_shell_node("target", "cat");
+        workflow.graph.node_mut(condition).expect("condition").output_ports[0].type_tag = "string".to_string();
+        let original = workflow.graph.node(condition).expect("condition").output_ports.clone();
+        let input = workflow.graph.node(target).expect("target").input_ports[0].id;
+        workflow.graph.add_edge(original[0].id, input).expect("left edge");
+        let before = snapshot(&workflow);
+        workflow
+            .replace_condition_branches(condition, vec![branch("left"), branch("right")])
+            .expect("unchanged");
+        assert_eq!(snapshot(&workflow), before);
+        workflow
+            .replace_condition_branches(condition, vec![branch("right"), branch("left")])
+            .expect("reorder");
+        assert_eq!(workflow.graph.node(condition).expect("condition").output_ports, vec![
+            original[1].clone(),
+            original[0].clone()
+        ]);
+        assert_eq!(workflow.graph.edges(), &[Edge {
+            source: original[0].id,
+            target: input
+        }]);
+        workflow
+            .replace_condition_branches(condition, vec![branch("renamed"), branch("right")])
+            .expect("rename");
+        let renamed = workflow.graph.node(condition).expect("condition").output_ports[0].clone();
+        assert_ne!(renamed.id, original[0].id);
+        assert_ne!(renamed.id, original[1].id);
+        assert_eq!(renamed.type_tag, "any");
+        assert!(workflow.graph.port(original[0].id).is_none());
+        assert!(workflow.graph.edges().is_empty());
+        workflow.replace_condition_branches(condition, vec![branch("right")]).expect("remove");
+        assert_eq!(workflow.graph.node(condition).expect("condition").output_ports, vec![original[1].clone()]);
+        assert!(workflow.graph.port(renamed.id).is_none());
+    }
+
+    #[test]
+    fn malformed_condition_edits_and_exhaustion_are_atomic() {
+        let mut workflow = Workflow::new("invalid condition edits", WorkflowTimestamp::epoch());
+        let condition = workflow.add_condition_node("route", ConditionNodeConfig {
+            branches: vec![branch("keep")],
+        });
+        let invalid = [
+            vec![branch("")],
+            vec![branch("  ")],
+            vec![branch("duplicate"), branch("duplicate")],
+            vec![crate::control_flow::ConditionBranch {
+                label: "nan".to_string(),
+                predicate: ConditionPredicate::NumberGreaterThan(f64::NAN),
+            }],
+            vec![crate::control_flow::ConditionBranch {
+                label: "infinity".to_string(),
+                predicate: ConditionPredicate::NumberGreaterThan(f64::INFINITY),
+            }],
+            vec![crate::control_flow::ConditionBranch {
+                label: "pointer".to_string(),
+                predicate: ConditionPredicate::JsonPointerExists("not/a/pointer".to_string()),
+            }],
+            vec![crate::control_flow::ConditionBranch {
+                label: "escape".to_string(),
+                predicate: ConditionPredicate::JsonPointerExists("/bad~2escape".to_string()),
+            }],
+            vec![crate::control_flow::ConditionBranch {
+                label: "trailing".to_string(),
+                predicate: ConditionPredicate::JsonPointerExists("/bad~".to_string()),
+            }],
+        ];
+        for branches in invalid {
+            let before = snapshot(&workflow);
+            assert!(matches!(
+                workflow.replace_condition_branches(condition, branches),
+                Err(MutationError::InvalidConditionConfig(_))
+            ));
+            assert_eq!(snapshot(&workflow), before);
+        }
+        let mut stored = serde_json::to_value(&workflow.graph).expect("graph");
+        stored["next_port_id"] = serde_json::json!(u64::MAX);
+        workflow.graph = serde_json::from_value(stored).expect("exhausted allocator fixture");
+        let before = snapshot(&workflow);
+        assert_eq!(
+            workflow.replace_condition_branches(condition, vec![branch("keep"), branch("new")]),
+            Err(MutationError::Graph(GraphError::PortIdExhausted))
+        );
+        assert_eq!(snapshot(&workflow), before);
+        workflow
+            .replace_condition_branches(condition, vec![branch("keep")])
+            .expect("unchanged needs no fresh id");
+        assert_eq!(snapshot(&workflow), before);
+    }
+
+    #[test]
+    fn valid_json_pointer_predicates_include_root_and_escaped_tokens() {
+        let mut workflow = Workflow::new("valid predicates", WorkflowTimestamp::epoch());
+        let condition = workflow.add_condition_node("route", ConditionNodeConfig {
+            branches: vec![branch("keep")],
+        });
+        for pointer in ["", "/", "/a~1b/~0key", "/unicode/λ"] {
+            let edited = crate::control_flow::ConditionBranch {
+                label: "keep".to_string(),
+                predicate: ConditionPredicate::JsonPointerExists(pointer.to_string()),
+            };
+            workflow.replace_condition_branches(condition, vec![edited.clone()]).expect("RFC 6901 pointer");
+            assert_eq!(
+                workflow.node_config(condition),
+                Some(&NodeConfig::condition(ConditionNodeConfig { branches: vec![edited] }))
+            );
+        }
+    }
+
+    #[test]
+    fn finite_condition_thresholds_preserve_matching_output_identity() {
+        let mut workflow = Workflow::new("finite predicate bounds", WorkflowTimestamp::epoch());
+        let condition = workflow.add_condition_node("route", ConditionNodeConfig {
+            branches: vec![branch("keep")],
+        });
+        let original = workflow.graph.node(condition).expect("condition").output_ports[0].clone();
+        for threshold in [f64::MIN, -0.0, 0.0, f64::MAX] {
+            let edited = crate::control_flow::ConditionBranch {
+                label: "keep".to_string(),
+                predicate: ConditionPredicate::NumberGreaterThan(threshold),
+            };
+            workflow.replace_condition_branches(condition, vec![edited.clone()]).expect("finite threshold");
+            assert_eq!(workflow.graph.node(condition).expect("condition").output_ports, vec![original.clone()]);
+            assert_eq!(
+                workflow.node_config(condition),
+                Some(&NodeConfig::condition(ConditionNodeConfig { branches: vec![edited] }))
+            );
+        }
+    }
+
+    #[test]
+    fn condition_reconciliation_rejects_missing_or_noncondition_owner() {
+        let mut workflow = Workflow::new("wrong condition owner", WorkflowTimestamp::epoch());
+        let shell = workflow.add_shell_node("shell", "true");
+        let before = snapshot(&workflow);
+        assert_eq!(
+            workflow.replace_condition_branches(shell, vec![branch("new")]),
+            Err(MutationError::ConditionConfigNotFound(shell))
+        );
+        assert_eq!(snapshot(&workflow), before);
+        let missing = NodeId(u64::MAX);
+        assert_eq!(
+            workflow.replace_condition_branches(missing, vec![branch("new")]),
+            Err(MutationError::NodeNotFound(missing))
+        );
+        assert_eq!(snapshot(&workflow), before);
     }
 }

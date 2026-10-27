@@ -87,7 +87,11 @@ fn binding_rejects_missing_required_file_input() {
         },
     ];
     assert!(missing_file_inputs.len() < PARAMETER_COUNT);
-    assert!(missing_file_inputs.iter().all(|input| input.name != FILE_PARAM));
+    assert!(
+        missing_file_inputs
+            .iter()
+            .all(|input| input.name != FILE_PARAM)
+    );
 
     assert!(matches!(
         bind_recipe_parameters(RecipeBindingDraft {
@@ -120,7 +124,11 @@ fn binding_rejects_invalid_select_value() {
         },
     ];
     assert_eq!(bad_select_inputs.len(), PARAMETER_COUNT);
-    assert!(bad_select_inputs.iter().any(|input| input.value == "unsafe"));
+    assert!(
+        bad_select_inputs
+            .iter()
+            .any(|input| input.value == "unsafe")
+    );
 
     assert!(matches!(
         bind_recipe_parameters(RecipeBindingDraft {
@@ -192,10 +200,22 @@ fn malformed_output_blocks_automation_success() {
     let wrong_kind_outcome = validate_recipe_output(workflow.response_schema(), &wrong_kind)
         .expect("wrong kind should be recorded as failure");
 
-    assert_eq!(missing_outcome.status(), RecipeAutomationStatus::StructuredOutputFailure);
-    assert!(matches!(missing_outcome.failure_reason(), Some(RecipeOutputFailure::MissingField { .. })));
-    assert_eq!(wrong_kind_outcome.status(), RecipeAutomationStatus::StructuredOutputFailure);
-    assert!(matches!(wrong_kind_outcome.failure_reason(), Some(RecipeOutputFailure::KindMismatch { .. })));
+    assert_eq!(
+        missing_outcome.status(),
+        RecipeAutomationStatus::StructuredOutputFailure
+    );
+    assert!(matches!(
+        missing_outcome.failure_reason(),
+        Some(RecipeOutputFailure::MissingField { .. })
+    ));
+    assert_eq!(
+        wrong_kind_outcome.status(),
+        RecipeAutomationStatus::StructuredOutputFailure
+    );
+    assert!(matches!(
+        wrong_kind_outcome.failure_reason(),
+        Some(RecipeOutputFailure::KindMismatch { .. })
+    ));
 }
 
 #[test]
@@ -231,13 +251,16 @@ fn retry_policy_rejects_shell_bypass_unbounded_attempts_and_missing_timeout() {
             max_attempts: RETRY_ATTEMPTS,
             checks: &[missing_deadline_label],
         }),
-        Err(RecipeWorkflowError::Contract(crate::AdapterContractError::EmptyField { .. }))
+        Err(RecipeWorkflowError::Contract(
+            crate::AdapterContractError::EmptyField { .. }
+        ))
     ));
 }
 
 #[test]
 fn untrusted_or_invalid_provenance_has_no_runtime_influence() {
-    let pending = RecipeTrustReceipt::new(&pending_provenance()).expect("pending receipt should parse");
+    let pending =
+        RecipeTrustReceipt::new(&pending_provenance()).expect("pending receipt should parse");
     let influence = RecipeInfluence::evaluate(&pending);
 
     assert_eq!(pending.status(), RecipeTrustStatus::Pending);

@@ -1,18 +1,30 @@
 use super::model::{
-    PRIVATE_PUBLISH_SETTING, REQUIRED_LICENSE, REQUIRED_PACKAGE_FILES,
+    NICKEL_EVALUATOR_IDENTITY, PRIVATE_PUBLISH_SETTING, REQUIRED_LICENSE, REQUIRED_PACKAGE_FILES,
     REQUIRED_PRIVATE_SOURCE_FILES,
 };
 use super::validators::{
-    validate_package_contents, validate_package_metadata, validate_private_source_inventory,
+    validate_nickel_identity, validate_package_contents, validate_package_metadata,
+    validate_private_source_inventory,
 };
 
 const OMITTED_SYNC_MODULE: &str = "tools/sync_vendored_ucan/process.rs";
 const OMITTED_PRIVATE_MANIFEST: &str = "vendor/ucan/Cargo.toml";
 const PRIVATE_METADATA_SUFFIX: &str = "\"publish\":[]";
 const PUBLIC_METADATA_SUFFIX: &str = "\"publish\":[\"crates-io\"]";
+const WRONG_NICKEL_IDENTITY: &str = "nickel-lang-cli nickel 1.16.0 (rev stale)";
 
 fn metadata(suffix: &str) -> String {
     format!("{{\"license\":\"{REQUIRED_LICENSE}\",{suffix}}}")
+}
+
+#[test]
+fn exact_nickel_identity_is_admitted() {
+    assert!(validate_nickel_identity(NICKEL_EVALUATOR_IDENTITY).is_ok());
+}
+
+#[test]
+fn stale_nickel_identity_is_rejected() {
+    assert!(validate_nickel_identity(WRONG_NICKEL_IDENTITY).is_err());
 }
 
 #[test]

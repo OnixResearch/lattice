@@ -156,8 +156,14 @@ fn output_contract_validation_fails_closed_or_falls_back() {
     let fallback = result(false, "best_valid_evidence", true);
     let success = result(true, "deny", false);
 
-    assert_eq!(malformed.status(), crate::RouteResultStatus::MalformedOutput);
-    assert_eq!(fallback.status(), crate::RouteResultStatus::BestValidEvidence);
+    assert_eq!(
+        malformed.status(),
+        crate::RouteResultStatus::MalformedOutput
+    );
+    assert_eq!(
+        fallback.status(),
+        crate::RouteResultStatus::BestValidEvidence
+    );
     assert_eq!(success.status(), crate::RouteResultStatus::Success);
     assert_eq!(success.status().as_str(), "success");
 }
@@ -174,17 +180,21 @@ fn budget_ledger_tracks_and_fallback_decides() {
         fallback_policy: crate::limit::FallbackPolicy::BestValidEvidence,
     });
     let ledger = crate::BudgetLedger::from(&bounds);
-    let chain = crate::evidence::test_fallback_chain(alloc::vec![crate::evidence::test_fallback_step(
-        crate::evidence::FallbackStepFixture {
-            role: crate::Role::Fallback,
-            model_label: MODEL_FALLBACK_LOCAL,
-            backend_label: BACKEND_LOCAL,
-            is_local: true,
-        }
-    ),]);
+    let chain =
+        crate::evidence::test_fallback_chain(alloc::vec![crate::evidence::test_fallback_step(
+            crate::evidence::FallbackStepFixture {
+                role: crate::Role::Fallback,
+                model_label: MODEL_FALLBACK_LOCAL,
+                backend_label: BACKEND_LOCAL,
+                is_local: true,
+            }
+        ),]);
 
     assert_eq!(ledger.remaining_candidates(), MAX_CANDIDATES_THREE);
-    assert_eq!(ledger.consume_candidate().unwrap().remaining_candidates(), MAX_CANDIDATES_TWO);
+    assert_eq!(
+        ledger.consume_candidate().unwrap().remaining_candidates(),
+        MAX_CANDIDATES_TWO
+    );
     assert_eq!(
         crate::evaluate_fallback(
             &crate::StepFailure::new(MODEL_PRIMARY, true),
@@ -258,7 +268,8 @@ fn assert_selects(
         contract_pressure: case.contract_pressure,
         ..signal_draft()
     });
-    let selected = crate::select_recipe(&projected, recipes, catalog, budget).expect("selection should succeed");
+    let selected = crate::select_recipe(&projected, recipes, catalog, budget)
+        .expect("selection should succeed");
 
     assert_eq!(selected.family(), case.expected);
 }

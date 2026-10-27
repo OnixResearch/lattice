@@ -1,6 +1,4 @@
-use super::data::ContextReference;
-use super::data::ContextReferenceError;
-use super::data::ResolvedContextCandidate;
+use super::data::{ContextReference, ContextReferenceError, ResolvedContextCandidate};
 
 /// Host-owned resolver for file references.
 pub trait FileContextResolver {
@@ -10,7 +8,10 @@ pub trait FileContextResolver {
     ///
     /// Returns [`ContextReferenceError`] when the host denies, cannot service, or
     /// cannot safely describe the requested file reference.
-    fn resolve_file(&self, reference: &ContextReference) -> Result<ResolvedContextCandidate, ContextReferenceError>;
+    fn resolve_file(
+        &self,
+        reference: &ContextReference,
+    ) -> Result<ResolvedContextCandidate, ContextReferenceError>;
 }
 
 /// Host-owned resolver for directory references.
@@ -35,7 +36,10 @@ pub trait DiffContextResolver {
     ///
     /// Returns [`ContextReferenceError`] when the host denies, cannot service, or
     /// cannot safely describe the requested diff reference.
-    fn resolve_diff(&self, reference: &ContextReference) -> Result<ResolvedContextCandidate, ContextReferenceError>;
+    fn resolve_diff(
+        &self,
+        reference: &ContextReference,
+    ) -> Result<ResolvedContextCandidate, ContextReferenceError>;
 }
 
 /// Host-owned resolver for image references.
@@ -46,7 +50,10 @@ pub trait ImageContextResolver {
     ///
     /// Returns [`ContextReferenceError`] when the host denies, cannot service, or
     /// cannot safely describe the requested image reference.
-    fn resolve_image(&self, reference: &ContextReference) -> Result<ResolvedContextCandidate, ContextReferenceError>;
+    fn resolve_image(
+        &self,
+        reference: &ContextReference,
+    ) -> Result<ResolvedContextCandidate, ContextReferenceError>;
 }
 
 /// Host-owned resolver for URL references.
@@ -57,7 +64,10 @@ pub trait UrlContextResolver {
     ///
     /// Returns [`ContextReferenceError`] when the host denies, cannot service, or
     /// cannot safely describe the requested URL reference.
-    fn resolve_url(&self, reference: &ContextReference) -> Result<ResolvedContextCandidate, ContextReferenceError>;
+    fn resolve_url(
+        &self,
+        reference: &ContextReference,
+    ) -> Result<ResolvedContextCandidate, ContextReferenceError>;
 }
 
 /// Optional host resolver set used by the imperative dispatch shell.

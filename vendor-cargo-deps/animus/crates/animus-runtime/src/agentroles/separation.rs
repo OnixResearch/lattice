@@ -6,15 +6,11 @@
     allow(tigerstyle::non_trait_imports, tigerstyle::path_segment_repetition)
 )]
 
-use super::types::AGENT_ROLE_SEPARATION_HASH_DOMAIN;
-use super::types::AgentRoleError;
-use super::types::AgentRoleIssue;
-use super::types::AgentRoleSeparationDimension;
-use super::types::AgentRoleSeparationPolicy;
-use super::validation::ValidationValue;
-use super::validation::error;
-use super::validation::hash_parts;
-use super::validation::lowercase_blake3;
+use super::types::{
+    AGENT_ROLE_SEPARATION_HASH_DOMAIN, AgentRoleError, AgentRoleIssue,
+    AgentRoleSeparationDimension, AgentRoleSeparationPolicy,
+};
+use super::validation::{ValidationValue, error, hash_parts, lowercase_blake3};
 
 const FIELD_SEPARATION: &str = "agent_role_separation";
 
@@ -133,7 +129,8 @@ pub fn evaluate_agent_role_separation(
         .filter(|dimension| !dimension_passes(*dimension, observation))
         .collect::<Vec<_>>();
     let is_passed = failed_dimensions.is_empty();
-    let hash_material = separation_hash_material(policy, observation, &failed_dimensions, is_passed);
+    let hash_material =
+        separation_hash_material(policy, observation, &failed_dimensions, is_passed);
     let decision_hash = hash_parts(AGENT_ROLE_SEPARATION_HASH_DOMAIN, hash_material.as_slice());
     debug_assert_eq!(is_passed, failed_dimensions.is_empty());
     debug_assert!(!decision_hash.is_empty());
@@ -174,7 +171,9 @@ fn validate_identity_bindings(
     Ok(())
 }
 
-fn validate_state_dimensions(dimensions: &[AgentRoleSeparationDimension]) -> Result<(), AgentRoleError> {
+fn validate_state_dimensions(
+    dimensions: &[AgentRoleSeparationDimension],
+) -> Result<(), AgentRoleError> {
     let mut sorted = dimensions.to_vec();
     sorted.sort_unstable();
     let has_duplicate = sorted.windows(2).any(|pair| pair[0] == pair[1]);
@@ -199,16 +198,23 @@ fn validate_state_dimensions(dimensions: &[AgentRoleSeparationDimension]) -> Res
     Ok(())
 }
 
-fn dimension_passes(dimension: AgentRoleSeparationDimension, observation: &AgentRoleSeparationObservation<'_>) -> bool {
+fn dimension_passes(
+    dimension: AgentRoleSeparationDimension,
+    observation: &AgentRoleSeparationObservation<'_>,
+) -> bool {
     match dimension {
         AgentRoleSeparationDimension::Assignment => {
             observation.candidate_assignment_hash != observation.subject_assignment_hash
         }
-        AgentRoleSeparationDimension::Actor => observation.candidate_actor_hash != observation.subject_actor_hash,
+        AgentRoleSeparationDimension::Actor => {
+            observation.candidate_actor_hash != observation.subject_actor_hash
+        }
         AgentRoleSeparationDimension::RunThread => {
             observation.candidate_run_thread_hash != observation.subject_run_thread_hash
         }
-        AgentRoleSeparationDimension::Session => observation.candidate_session_hash != observation.subject_session_hash,
+        AgentRoleSeparationDimension::Session => {
+            observation.candidate_session_hash != observation.subject_session_hash
+        }
         AgentRoleSeparationDimension::ModelProfile => {
             observation.candidate_model_profile_hash != observation.subject_model_profile_hash
         }
@@ -221,7 +227,9 @@ fn dimension_passes(dimension: AgentRoleSeparationDimension, observation: &Agent
         AgentRoleSeparationDimension::CleanContext
         | AgentRoleSeparationDimension::SubjectImmutable
         | AgentRoleSeparationDimension::VerifierImmutable
-        | AgentRoleSeparationDimension::RubricImmutable => observation.satisfied_state_dimensions.contains(&dimension),
+        | AgentRoleSeparationDimension::RubricImmutable => {
+            observation.satisfied_state_dimensions.contains(&dimension)
+        }
     }
 }
 
@@ -249,43 +257,96 @@ fn separation_hash_material(
         observation.subject_workspace_hash.to_string(),
         observation.candidate_mutation_lineage_hash.to_string(),
         observation.subject_mutation_lineage_hash.to_string(),
-        observation.expected_verifier_hash.unwrap_or("none").to_string(),
-        observation.observed_verifier_hash.unwrap_or("none").to_string(),
-        observation.expected_rubric_hash.unwrap_or("none").to_string(),
-        observation.observed_rubric_hash.unwrap_or("none").to_string(),
+        observation
+            .expected_verifier_hash
+            .unwrap_or("none")
+            .to_string(),
+        observation
+            .observed_verifier_hash
+            .unwrap_or("none")
+            .to_string(),
+        observation
+            .expected_rubric_hash
+            .unwrap_or("none")
+            .to_string(),
+        observation
+            .observed_rubric_hash
+            .unwrap_or("none")
+            .to_string(),
         observation.policy_hash.to_string(),
         observation.observed_policy_hash.to_string(),
         is_passed.to_string(),
     ];
-    material.extend(policy.required_dimensions().iter().map(|dimension| format!("required:{}", dimension.as_str())));
+    material.extend(
+        policy
+            .required_dimensions()
+            .iter()
+            .map(|dimension| format!("required:{}", dimension.as_str())),
+    );
     material.extend(
         observation
             .satisfied_state_dimensions
             .iter()
             .map(|dimension| format!("satisfied:{}", dimension.as_str())),
     );
-    material.extend(failed_dimensions.iter().map(|dimension| format!("failed:{}", dimension.as_str())));
+    material.extend(
+        failed_dimensions
+            .iter()
+            .map(|dimension| format!("failed:{}", dimension.as_str())),
+    );
     debug_assert!(!material.is_empty());
-    debug_assert_eq!(material.first().map(String::as_str), Some(policy.policy_id()));
+    debug_assert_eq!(
+        material.first().map(String::as_str),
+        Some(policy.policy_id())
+    );
     material
 }
 
-fn validate_observation_hashes(observation: &AgentRoleSeparationObservation<'_>) -> Result<(), AgentRoleError> {
+fn validate_observation_hashes(
+    observation: &AgentRoleSeparationObservation<'_>,
+) -> Result<(), AgentRoleError> {
     for (field, hash) in [
-        ("candidate_assignment_hash", observation.candidate_assignment_hash),
-        ("subject_assignment_hash", observation.subject_assignment_hash),
+        (
+            "candidate_assignment_hash",
+            observation.candidate_assignment_hash,
+        ),
+        (
+            "subject_assignment_hash",
+            observation.subject_assignment_hash,
+        ),
         ("candidate_actor_hash", observation.candidate_actor_hash),
         ("subject_actor_hash", observation.subject_actor_hash),
-        ("candidate_run_thread_hash", observation.candidate_run_thread_hash),
-        ("subject_run_thread_hash", observation.subject_run_thread_hash),
+        (
+            "candidate_run_thread_hash",
+            observation.candidate_run_thread_hash,
+        ),
+        (
+            "subject_run_thread_hash",
+            observation.subject_run_thread_hash,
+        ),
         ("candidate_session_hash", observation.candidate_session_hash),
         ("subject_session_hash", observation.subject_session_hash),
-        ("candidate_model_profile_hash", observation.candidate_model_profile_hash),
-        ("subject_model_profile_hash", observation.subject_model_profile_hash),
-        ("candidate_workspace_hash", observation.candidate_workspace_hash),
+        (
+            "candidate_model_profile_hash",
+            observation.candidate_model_profile_hash,
+        ),
+        (
+            "subject_model_profile_hash",
+            observation.subject_model_profile_hash,
+        ),
+        (
+            "candidate_workspace_hash",
+            observation.candidate_workspace_hash,
+        ),
         ("subject_workspace_hash", observation.subject_workspace_hash),
-        ("candidate_mutation_lineage_hash", observation.candidate_mutation_lineage_hash),
-        ("subject_mutation_lineage_hash", observation.subject_mutation_lineage_hash),
+        (
+            "candidate_mutation_lineage_hash",
+            observation.candidate_mutation_lineage_hash,
+        ),
+        (
+            "subject_mutation_lineage_hash",
+            observation.subject_mutation_lineage_hash,
+        ),
         ("subject_hash", observation.subject_hash),
         ("observed_subject_hash", observation.observed_subject_hash),
         ("policy_hash", observation.policy_hash),
@@ -325,7 +386,11 @@ fn validate_optional_identity_pair(
         ));
     }
     if is_required && expected != observed {
-        return Err(error(AgentRoleIssue::BindingMismatch, FIELD_SEPARATION, "required separation identity changed"));
+        return Err(error(
+            AgentRoleIssue::BindingMismatch,
+            FIELD_SEPARATION,
+            "required separation identity changed",
+        ));
     }
     Ok(())
 }

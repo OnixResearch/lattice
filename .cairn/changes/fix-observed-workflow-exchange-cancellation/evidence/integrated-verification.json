@@ -1,0 +1,168 @@
+{
+  "schema": "lattice.observed-cancellation.integrated-verification.v1",
+  "status": "native-qualified-with-repository-holds",
+  "immediate_outcome": "The full Lattice application builds with the existing Tile, component, asynchronous Mantle/Basalt and actual pinned Valence integrations enabled.",
+  "durable_capability": "Typed observed cancellation survives the shell/core boundary; repository-owned native source imports and real component invocation preserve producer contracts.",
+  "maintenance_owners": {
+    "lattice": "Application adapters, lifecycle and repeatability",
+    "producers": "Hardened runtime, Mantle and Basalt retain their native contracts",
+    "kiln": "Strict web-service consumer qualification"
+  },
+  "source": "/nix/store/l0b1bvjspdr7mk1rch047cys2m3ywplp-lattice-observed-cancellation-source",
+  "executable": "/nix/store/vmnxaklv4frgzmny25cb3lnfw6rh58kg-lattice-observed-cancellation",
+  "executable_blake3": "b3:61c0ffb899a820a0eace7faf5a368b9fb7a54763a4a322cc775e0bc5e7f57925",
+  "checks": {
+    "all_targets": {
+      "exit_code": 0,
+      "evidence": "all-target-check.json"
+    },
+    "native_component_cli": {
+      "exit_code": 0,
+      "cases": [
+        {
+          "case": "named-method-native-component",
+          "exit_code": 0
+        },
+        {
+          "case": "source-tree-drift",
+          "exit_code": 1
+        }
+      ],
+      "evidence": "component-cli-smoke.json"
+    },
+    "focused_integrations": {
+      "exit_code": 0,
+      "passed": 33,
+      "failed": 0,
+      "evidence": "restored-integration-tests.json"
+    },
+    "application_unit_tests": {
+      "exit_code": 101,
+      "passed": 253,
+      "failed": 9,
+      "failures": [
+        "nickel::tests::imported_json_merge_preserves_nested_values_in_both_orders",
+        "nickel::tests::imported_json_merge_preserves_recursive_overrides_and_contracts",
+        "tui::app::tests::agent_error_feedback_is_visible_after_run_failure",
+        "tui::authoring::node::tests::operation_selection_requires_reproducible_admission_and_never_forges_identity",
+        "tui::authoring::tests::all_current_node_kinds_and_field_families_author_store_and_nickel_round_trip",
+        "tui::authoring::tests::invalid_cancelled_stale_drafts_and_save_rejection_preserve_workflow_and_store_bytes",
+        "tui::panels::tests::contextual_help_matches_canvas_and_wiring_modes",
+        "tui::panels::tests::contextual_help_matches_properties_and_output_focus",
+        "tui::panels::tests::contextual_help_uses_compact_copy_for_narrow_width"
+      ],
+      "workflow_exchange_tests_passed": 12,
+      "evidence": "application-unit-tests.json"
+    },
+    "completion_path_repetitions": {
+      "passed": 32,
+      "total": 32
+    },
+    "repository_script": {
+      "exit_code": 101,
+      "passed_pty": 4,
+      "failed_pty": 3,
+      "evidence": "repository-check.log"
+    },
+    "octet": {
+      "exit_code": 1,
+      "findings": 1708,
+      "errors": 0,
+      "new_baseline_findings": 1335,
+      "stale_baseline_findings": 849,
+      "evidence": "octet-precommit.log"
+    },
+    "nix_initial_live_tree": {
+      "exit_code": 1,
+      "diagnostic": "Live target/debug/deps/rmeta8qqGwH disappeared while source traversal evaluated; the source filter now excludes the target directory itself before descent."
+    },
+    "nix_second_live_tree": {
+      "exit_code": 102,
+      "diagnostic": "Lazy path input source contents changed while evidence files were being written; superseded for gate execution by the immutable-source check below."
+    },
+    "strict_kiln_native": {
+      "exit_code": 0,
+      "passed": true,
+      "outcomes": {
+        "success": "Success",
+        "failure": "DomainFailure",
+        "cancellation": "Cancelled"
+      },
+      "restart": {
+        "execution_preserved": true,
+        "invocations_before": 3,
+        "invocations_after": 3
+      },
+      "retirement": {
+        "all_processes_exited": true,
+        "credentials_removed": true,
+        "failures": [],
+        "scratch_removed": true
+      },
+      "consumer_repository": "https://github.com/OnixResearch/kiln",
+      "consumer_change": "prepare-web-service-deployment",
+      "consumer_evidence": "evidence/native-corrected/verification.json",
+      "service": {
+        "path": "/nix/store/6kr50bd924c3x56jhqycdfxn7ipzbyvg-kiln-web-service-0.1.0/bin/kiln-web-service",
+        "blake3": "e0668c2d0eec0836f72baeeb8c2aefaf072116fcf3bbbe64a9e5eafc15c7ee62"
+      },
+      "lattice": {
+        "path": "/nix/store/vmnxaklv4frgzmny25cb3lnfw6rh58kg-lattice-observed-cancellation",
+        "blake3": "61c0ffb899a820a0eace7faf5a368b9fb7a54763a4a322cc775e0bc5e7f57925"
+      },
+      "lattice_source": "/nix/store/l0b1bvjspdr7mk1rch047cys2m3ywplp-lattice-observed-cancellation-source"
+    },
+    "immutable_nix": {
+      "argv": [
+        "nix",
+        "flake",
+        "check",
+        "path:/nix/store/l0b1bvjspdr7mk1rch047cys2m3ywplp-lattice-observed-cancellation-source",
+        "--no-write-lock-file",
+        "-L",
+        "--option",
+        "builders",
+        "",
+        "--option",
+        "secret-key-files",
+        ""
+      ],
+      "exit_code": 1,
+      "failed_attribute": "checks.x86_64-linux.octet",
+      "derivation": "/nix/store/p3a8dkvmd7816yfym591kxnyqy0wmg0r-octet-consumer-check.drv",
+      "diagnostic": "invalid Cargo diagnostic path: capability locator ../octet-cargo-vendor/56bec518e7fca87e52360098282b7b5188f5474e1e64abf44c2bcc62a3ea36e6/tile-protocol-0.1.10/src/logical_surface.rs contains ..",
+      "scope": "Immutable source evaluation completed and builds started; the failing Octet builder aborted the full check, so no complete flake-pass claim."
+    },
+    "filtered_source_closure": {
+      "exit_code": 0,
+      "application_included": true,
+      "native_runtime_included": true,
+      "target_included": false,
+      "argv": [
+        "nix",
+        "eval",
+        "--json",
+        "path:.#packages.x86_64-linux.lattice.src",
+        "--apply",
+        "src: { target_included = builtins.pathExists (toString src + \"/target\"); application_included = builtins.pathExists (toString src + \"/src/main.rs\"); native_runtime_included = builtins.pathExists (toString src + \"/vendor-cargo-deps/hardened-wasmtime-runtime/crates/hardened-wasmtime-shell/src/lib.rs\"); }",
+        "--option",
+        "builders",
+        "",
+        "--option",
+        "secret-key-files",
+        ""
+      ]
+    },
+    "lifecycle": {
+      "evidence": "qualification-lifecycle.json",
+      "validation_exit_code": 0,
+      "tasks_gate_exit_code": 0,
+      "tasks_verdict": "PASS"
+    }
+  },
+  "non_claims": [
+    "Broader repository checks are not green.",
+    "No integration was disabled and no baseline was refreshed to hide findings.",
+    "No live GitHub/OIDC private build deployment, publication, production activation, archive or lifecycle acceptance."
+  ]
+}

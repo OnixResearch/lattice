@@ -26,7 +26,13 @@ fn malformed_and_oversized_credentials_fail_closed() {
         UcanEnforcementReason::MalformedCredential,
     );
     let oversized_receipt = assert_denied(
-        evaluate(oversized.as_str(), &request, &signature, nonce(), oversized_services),
+        evaluate(
+            oversized.as_str(),
+            &request,
+            &signature,
+            nonce(),
+            oversized_services,
+        ),
         UcanEnforcementReason::OversizedCredential,
     );
 
@@ -48,7 +54,9 @@ fn token_signature_and_holder_signature_failures_are_distinct() {
     let replay = RecordingReplay::new();
     let wrong_issuer = signer(WRONG_ISSUER_SEED_BYTE);
     let wrong_key_resolver = WrongIssuerKeyResolver {
-        public_key: wrong_issuer.public_key().expect("wrong issuer public key must derive"),
+        public_key: wrong_issuer
+            .public_key()
+            .expect("wrong issuer public key must derive"),
     };
     let wrong_key_services = TestServices {
         key_resolver: &wrong_key_resolver,
@@ -62,7 +70,13 @@ fn token_signature_and_holder_signature_failures_are_distinct() {
     };
 
     assert_denied(
-        evaluate(fixture.token.as_str(), &request, &signature, nonce(), wrong_key_services),
+        evaluate(
+            fixture.token.as_str(),
+            &request,
+            &signature,
+            nonce(),
+            wrong_key_services,
+        ),
         UcanEnforcementReason::SignatureDenied,
     );
     assert_denied(
@@ -93,7 +107,13 @@ fn canonical_field_size_failure_has_stable_limit_reason() {
     .expect("short test canonical limit must validate");
 
     assert_denied(
-        evaluate(fixture.token.as_str(), &request, &signature, nonce(), bounded_services),
+        evaluate(
+            fixture.token.as_str(),
+            &request,
+            &signature,
+            nonce(),
+            bounded_services,
+        ),
         UcanEnforcementReason::LimitExceeded,
     );
     assert_eq!(replay.calls.get(), 0);
@@ -104,7 +124,8 @@ fn operation_and_request_limits_fail_before_replay() {
     let fixture = InvocationFixture::direct(document_capability(PARENT_RESOURCE));
     let valid_request = enforcement_request(DOCUMENT_RESOURCE);
     let signature = sign_request(&fixture, &valid_request, nonce());
-    let wrong_action_request = EnforcementRequest::new("document-write", DOCUMENT_RESOURCE, DOCUMENT_READ_ABILITY);
+    let wrong_action_request =
+        EnforcementRequest::new("document-write", DOCUMENT_RESOURCE, DOCUMENT_READ_ABILITY);
     let oversized_resource = "r".repeat(OVERSIZED_REQUEST_BYTES);
     let oversized_request = enforcement_request(oversized_resource.as_str());
     let replay = RecordingReplay::new();

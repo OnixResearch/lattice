@@ -1,0 +1,5 @@
+[package
+name = "animus-session-core-boundary-malformed"
+
+[dependencies]
+animus-adapters = { path = "../../../../animus-adapters"

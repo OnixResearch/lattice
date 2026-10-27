@@ -5,61 +5,61 @@
 //! tool, store, timer, policy service, cancellation handle, summarizer, terminal,
 //! filesystem, network, process, clock, or credential source.
 
+#![cfg_attr(
+    animus_octet,
+    allow(
+        tigerstyle::assertion_density,
+        tigerstyle::function_length,
+        reason = "session reducers and adversarial fixtures return typed transition errors instead of panicking on untrusted facts"
+    )
+)]
+#![cfg_attr(
+    animus_octet,
+    allow(
+        tigerstyle::bool_naming,
+        tigerstyle::numeric_units,
+        reason = "published session and queue vocabulary uses field names fixed by its versioned contract"
+    )
+)]
+
 mod core;
 mod data;
 #[path = "receipt.rs"]
 mod evidence;
 
-pub use core::coding_session_effect_step_bound;
-pub use core::decode_coding_session_message;
-pub use core::encode_coding_session_message;
-pub use core::new_coding_session_state;
-pub use core::plan_coding_session_authority_transition;
-pub use core::reduce_coding_session_command;
-pub use core::reduce_coding_session_frontend_event;
-pub use core::reduce_coding_session_outcome;
-
-pub use data::CODING_SESSION_EFFECT_HASH_DOMAIN;
-pub use data::CODING_SESSION_EMPTY_HEAD_HASH;
-pub use data::CODING_SESSION_MESSAGE_HASH_DOMAIN;
-pub use data::CODING_SESSION_RECEIPT_HASH_DOMAIN;
-pub use data::CODING_SESSION_RECEIPT_SCHEMA;
-pub use data::CodingSessionAfterCommit;
-pub use data::CodingSessionCancellationRequest;
-pub use data::CodingSessionCommand;
-pub use data::CodingSessionCommitRequest;
-pub use data::CodingSessionConfig;
-pub use data::CodingSessionEffectOutcome;
-pub use data::CodingSessionEffectRequest;
-pub use data::CodingSessionEffectService;
-pub use data::CodingSessionError;
-pub use data::CodingSessionFrontendState;
-pub use data::CodingSessionInput;
-pub use data::CodingSessionInputPosture;
-pub use data::CodingSessionIssue;
-pub use data::CodingSessionMessage;
-pub use data::CodingSessionMessageKind;
-pub use data::CodingSessionProviderReply;
-pub use data::CodingSessionProviderRequest;
-pub use data::CodingSessionQueueBehavior;
-pub use data::CodingSessionQueueProfile;
-pub use data::CodingSessionReceipt;
-pub use data::CodingSessionRecoveryPosture;
-pub use data::CodingSessionRecoveryRequest;
-pub use data::CodingSessionRecoverySnapshot;
-pub use data::CodingSessionRecoveryStatus;
-pub use data::CodingSessionRun;
-pub use data::CodingSessionRunStatus;
-pub use data::CodingSessionSensitiveDraft;
-pub use data::CodingSessionServiceIssue;
-pub use data::CodingSessionServicePosture;
-pub use data::CodingSessionServiceSet;
-pub use data::CodingSessionState;
-pub use data::CodingSessionSummarizerRequest;
-pub use data::CodingSessionTerminalKind;
-pub use data::CodingSessionToolRequest;
-pub use data::CodingSessionTransition;
-pub use evidence::project_coding_session_receipt;
+pub use core::{
+    coding_session_effect_step_bound, coding_session_queue_precondition,
+    coding_session_queue_text_identity, decode_coding_session_message,
+    encode_coding_session_message, new_coding_session_state,
+    plan_coding_session_authority_transition, project_coding_session_queue_conflict_event,
+    project_coding_session_queue_safe_snapshot, project_coding_session_queue_success_event,
+    reduce_coding_session_command, reduce_coding_session_frontend_event,
+    reduce_coding_session_outcome,
+};
+pub use data::{
+    CODING_SESSION_EFFECT_HASH_DOMAIN, CODING_SESSION_EMPTY_HEAD_HASH,
+    CODING_SESSION_MESSAGE_HASH_DOMAIN, CODING_SESSION_RECEIPT_HASH_DOMAIN,
+    CODING_SESSION_RECEIPT_SCHEMA, CodingSessionAfterCommit, CodingSessionCancellationRequest,
+    CodingSessionCommand, CodingSessionCommitRequest, CodingSessionConfig,
+    CodingSessionEffectOutcome, CodingSessionEffectRequest, CodingSessionEffectService,
+    CodingSessionError, CodingSessionFrontendState, CodingSessionInput, CodingSessionInputPosture,
+    CodingSessionIssue, CodingSessionMessage, CodingSessionMessageKind, CodingSessionProviderReply,
+    CodingSessionProviderRequest, CodingSessionQueueAcceptedMutation, CodingSessionQueueBehavior,
+    CodingSessionQueueConflict, CodingSessionQueueConflictKind, CodingSessionQueueGeneration,
+    CodingSessionQueueMutationEvent, CodingSessionQueueMutationOperation,
+    CodingSessionQueueMutationPrecondition, CodingSessionQueueMutationReceipt,
+    CodingSessionQueueProfile, CodingSessionQueueReceiptError, CodingSessionQueueSafeEntry,
+    CodingSessionQueueSafeSnapshot, CodingSessionQueueSensitiveDraft, CodingSessionReceipt,
+    CodingSessionRecoveryPosture, CodingSessionRecoveryRequest, CodingSessionRecoverySnapshot,
+    CodingSessionRecoveryStatus, CodingSessionRun, CodingSessionRunStatus,
+    CodingSessionSensitiveDraft, CodingSessionServiceIssue, CodingSessionServicePosture,
+    CodingSessionServiceSet, CodingSessionState, CodingSessionSummarizerRequest,
+    CodingSessionTerminalKind, CodingSessionToolRequest, CodingSessionTransition,
+};
+pub use evidence::{
+    project_coding_session_queue_conflict_receipt, project_coding_session_queue_success_receipt,
+    project_coding_session_receipt,
+};
 
 #[cfg(test)]
 mod tests;

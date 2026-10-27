@@ -1,5 +1,4 @@
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven
-// validation compact while drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -7,42 +6,29 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
+#![allow(
+    compound_condition,
+    excessive_file_length,
+    function_length,
+    non_trait_imports
+)]
 #![allow(
     numeric_units,
     path_segment_repetition,
     raw_arithmetic_overflow,
     unbounded_collection_growth
 )]
-use super::BLAKE3_ALGORITHM;
-use super::DATASET_HASH_DOMAIN;
-use super::FIELD_POLICY;
-use super::FIELD_REPLAY;
-use super::FIELD_ROW;
-use super::HASH_PART_SEPARATOR;
-use super::REQUIRED_COUNT;
-use super::ROLE_ASSISTANT;
-use super::ROLE_SYSTEM;
-use super::ROLE_TOOL;
-use super::ROLE_USER;
-use super::data::DatasetChatMessage;
-use super::data::DatasetChatRow;
-use super::data::DatasetDiagnostic;
-use super::data::DatasetDiagnosticKind;
-use super::data::DatasetExportPolicy;
-use super::data::DatasetExportResult;
-use super::data::DatasetFingerprint;
-use super::data::DatasetInspectionReport;
-use super::data::DatasetMetadataProjection;
-use super::data::DatasetPreferenceExample;
-use super::data::DatasetPreferenceRow;
-use super::data::DatasetReplayRole;
-use super::data::DatasetRlStepKind;
-use super::data::DatasetRlTrajectory;
-use super::data::DatasetRlTrajectoryRow;
-use super::data::DatasetSessionSource;
-use super::data::DatasetSkippedRow;
-use super::data::DatasetTarget;
+use super::{
+    BLAKE3_ALGORITHM, DATASET_HASH_DOMAIN, FIELD_POLICY, FIELD_REPLAY, FIELD_ROW,
+    HASH_PART_SEPARATOR, REQUIRED_COUNT, ROLE_ASSISTANT, ROLE_SYSTEM, ROLE_TOOL, ROLE_USER,
+    data::{
+        DatasetChatMessage, DatasetChatRow, DatasetDiagnostic, DatasetDiagnosticKind,
+        DatasetExportPolicy, DatasetExportResult, DatasetFingerprint, DatasetInspectionReport,
+        DatasetMetadataProjection, DatasetPreferenceExample, DatasetPreferenceRow,
+        DatasetReplayRole, DatasetRlStepKind, DatasetRlTrajectory, DatasetRlTrajectoryRow,
+        DatasetSessionSource, DatasetSkippedRow, DatasetTarget,
+    },
+};
 
 const RAW_ENVIRONMENT_MARKER: &str = "env_secret:";
 const RAW_PRIVATE_MARKER: &str = "/home/";
@@ -162,14 +148,19 @@ pub fn export_chat_messages_row(
 ///
 /// Returns diagnostics for missing prompt, duplicate chosen/rejected candidates,
 /// missing outcome labels, or unsafe metadata.
-pub fn export_preference_row(example: &DatasetPreferenceExample) -> DatasetExportResult<DatasetPreferenceRow> {
+pub fn export_preference_row(
+    example: &DatasetPreferenceExample,
+) -> DatasetExportResult<DatasetPreferenceRow> {
     if example.prompt.is_empty()
         || example.prompt.iter().any(invalid_chat_prompt_message)
         || example.chosen.trim().is_empty()
         || example.rejected.trim().is_empty()
         || example.chosen == example.rejected
         || example.outcome_label.trim().is_empty()
-        || example.metadata.iter().any(|item| contains_private_marker(item))
+        || example
+            .metadata
+            .iter()
+            .any(|item| contains_private_marker(item))
     {
         return Err(vec![DatasetDiagnostic::new(
             DatasetDiagnosticKind::MalformedPreference,
@@ -192,20 +183,33 @@ pub fn export_preference_row(example: &DatasetPreferenceExample) -> DatasetExpor
 ///
 /// Returns diagnostics for missing rewards, missing terminal outcome, orphaned
 /// observations, invalid action links, or unsafe metadata.
-pub fn export_rl_trajectory_row(trajectory: &DatasetRlTrajectory) -> DatasetExportResult<DatasetRlTrajectoryRow> {
-    let has_prompt = trajectory.steps.iter().any(|step| step.kind == DatasetRlStepKind::Prompt);
-    let has_action = trajectory.steps.iter().any(|step| step.kind == DatasetRlStepKind::Action);
+pub fn export_rl_trajectory_row(
+    trajectory: &DatasetRlTrajectory,
+) -> DatasetExportResult<DatasetRlTrajectoryRow> {
+    let has_prompt = trajectory
+        .steps
+        .iter()
+        .any(|step| step.kind == DatasetRlStepKind::Prompt);
+    let has_action = trajectory
+        .steps
+        .iter()
+        .any(|step| step.kind == DatasetRlStepKind::Action);
     let action_ids: Vec<&str> = trajectory
         .steps
         .iter()
         .filter(|step| step.kind == DatasetRlStepKind::Action)
         .map(|step| step.step_id.as_str())
         .collect();
-    let invalid_step =
-        trajectory.steps.iter().any(|step| step.step_id.trim().is_empty() || step.content.trim().is_empty());
+    let invalid_step = trajectory
+        .steps
+        .iter()
+        .any(|step| step.step_id.trim().is_empty() || step.content.trim().is_empty());
     let invalid_observation_link = trajectory.steps.iter().any(|step| {
         step.kind == DatasetRlStepKind::Observation
-            && step.link_id.as_deref().is_none_or(|link| !action_ids.contains(&link))
+            && step
+                .link_id
+                .as_deref()
+                .is_none_or(|link| !action_ids.contains(&link))
     });
     let invalid_non_observation_link = trajectory
         .steps
@@ -216,9 +220,18 @@ pub fn export_rl_trajectory_row(trajectory: &DatasetRlTrajectory) -> DatasetExpo
         || invalid_step
         || invalid_observation_link
         || invalid_non_observation_link
-        || trajectory.reward_label.as_ref().is_none_or(|reward| reward.trim().is_empty())
-        || trajectory.terminal_outcome.as_ref().is_none_or(|outcome| outcome.trim().is_empty())
-        || trajectory.metadata.iter().any(|item| contains_private_marker(item))
+        || trajectory
+            .reward_label
+            .as_ref()
+            .is_none_or(|reward| reward.trim().is_empty())
+        || trajectory
+            .terminal_outcome
+            .as_ref()
+            .is_none_or(|outcome| outcome.trim().is_empty())
+        || trajectory
+            .metadata
+            .iter()
+            .any(|item| contains_private_marker(item))
     {
         return Err(vec![DatasetDiagnostic::new(
             DatasetDiagnosticKind::IncompleteTrajectory,
@@ -227,7 +240,10 @@ pub fn export_rl_trajectory_row(trajectory: &DatasetRlTrajectory) -> DatasetExpo
         )]);
     }
     Ok(DatasetRlTrajectoryRow {
-        row_id: blake3_dataset_export_fingerprint("rl-trajectory", trajectory.trajectory_id.as_bytes()),
+        row_id: blake3_dataset_export_fingerprint(
+            "rl-trajectory",
+            trajectory.trajectory_id.as_bytes(),
+        ),
         steps: trajectory.steps.clone(),
         reward_label: trajectory.reward_label.clone().unwrap_or_default(),
         terminal_outcome: trajectory.terminal_outcome.clone().unwrap_or_default(),
@@ -257,7 +273,10 @@ pub fn inspect_dataset_exports(
     DatasetInspectionReport {
         exported_rows,
         skipped_rows,
-        warning_classes: diagnostics.iter().map(|diagnostic| format!("{:?}", diagnostic.kind)).collect(),
+        warning_classes: diagnostics
+            .iter()
+            .map(|diagnostic| format!("{:?}", diagnostic.kind))
+            .collect(),
         policy_decisions,
         quality_warning_count,
         leakage_warning_count,
@@ -286,8 +305,10 @@ fn reject_private_payload(text: &str) -> DatasetExportResult<()> {
 }
 
 fn invalid_chat_prompt_message(message: &DatasetChatMessage) -> bool {
-    !matches!(message.role.as_str(), ROLE_SYSTEM | ROLE_USER | ROLE_ASSISTANT | ROLE_TOOL)
-        || message.content.trim().is_empty()
+    !matches!(
+        message.role.as_str(),
+        ROLE_SYSTEM | ROLE_USER | ROLE_ASSISTANT | ROLE_TOOL
+    ) || message.content.trim().is_empty()
         || contains_private_marker(&message.content)
 }
 
@@ -298,7 +319,11 @@ fn push_message(messages: &mut Vec<DatasetChatMessage>, role: &str, content: &st
     });
 }
 
-fn row_id(session_id: &str, branch_id: &str, messages: &[DatasetChatMessage]) -> DatasetFingerprint {
+fn row_id(
+    session_id: &str,
+    branch_id: &str,
+    messages: &[DatasetChatMessage],
+) -> DatasetFingerprint {
     let mut material = format!("{session_id}:{branch_id}");
     for message in messages {
         material.push_str(&message.role);
@@ -339,5 +364,8 @@ fn has_duplicate_source_spans(source: &DatasetSessionSource) -> bool {
 }
 
 fn count_diagnostics(diagnostics: &[DatasetDiagnostic], kind: DatasetDiagnosticKind) -> usize {
-    diagnostics.iter().filter(|diagnostic| diagnostic.kind == kind).count()
+    diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.kind == kind)
+        .count()
 }

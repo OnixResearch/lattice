@@ -89,7 +89,11 @@ impl RouteResult {
     pub fn new(draft: ResultDraft<'_>) -> Result<Self, crate::AdapterContractError> {
         let output_contract = crate::OutputContract::parse(draft.output_contract)?;
         let fallback_policy = crate::FallbackPolicy::parse(draft.fallback_policy)?;
-        let status = result_status(draft.final_output_valid, fallback_policy, draft.best_valid_evidence_available);
+        let status = result_status(
+            draft.final_output_valid,
+            fallback_policy,
+            draft.best_valid_evidence_available,
+        );
 
         Ok(Self {
             status,
@@ -140,7 +144,8 @@ fn result_status(
     if final_output_valid {
         return RouteResultStatus::Success;
     }
-    if fallback_policy == crate::FallbackPolicy::BestValidEvidence && best_valid_evidence_available {
+    if fallback_policy == crate::FallbackPolicy::BestValidEvidence && best_valid_evidence_available
+    {
         return RouteResultStatus::BestValidEvidence;
     }
     RouteResultStatus::MalformedOutput
@@ -216,33 +221,33 @@ pub fn evaluate_fallback(
 
     if failure.repairable() {
         return match ledger.remaining_repair_attempts() {
-            0 => FallbackDecision::FailRoute(FallbackRouteReason::BudgetExhausted(crate::BudgetExhausted::new(
-                crate::BudgetKind::Repair,
-                0,
-            ))),
+            0 => FallbackDecision::FailRoute(FallbackRouteReason::BudgetExhausted(
+                crate::BudgetExhausted::new(crate::BudgetKind::Repair, 0),
+            )),
             remaining => FallbackDecision::Repair(remaining),
         };
     }
 
     if ledger.remaining_candidates() == 0 {
-        return FallbackDecision::FailRoute(FallbackRouteReason::BudgetExhausted(crate::BudgetExhausted::new(
-            crate::BudgetKind::Candidate,
-            0,
-        )));
+        return FallbackDecision::FailRoute(FallbackRouteReason::BudgetExhausted(
+            crate::BudgetExhausted::new(crate::BudgetKind::Candidate, 0),
+        ));
     }
 
     if ledger.remaining_parallelism() == 0 {
-        return FallbackDecision::FailRoute(FallbackRouteReason::BudgetExhausted(crate::BudgetExhausted::new(
-            crate::BudgetKind::Parallelism,
-            0,
-        )));
+        return FallbackDecision::FailRoute(FallbackRouteReason::BudgetExhausted(
+            crate::BudgetExhausted::new(crate::BudgetKind::Parallelism, 0),
+        ));
     }
 
     let mut has_repeated_model = false;
     let mut has_ineligible_step = false;
     for step in chain.steps() {
         if step.model_label() == failure.model_label()
-            || ledger.tried_models().iter().any(|tried| tried.as_str() == step.model_label())
+            || ledger
+                .tried_models()
+                .iter()
+                .any(|tried| tried.as_str() == step.model_label())
         {
             has_repeated_model = true;
             continue;

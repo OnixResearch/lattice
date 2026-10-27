@@ -1,5 +1,48 @@
 //! HTTP request planning and client interface.
 
+mod native;
+
+pub use native::NativeHttpClient;
+
+pub const MAX_URL_BYTES: usize = 8_192;
+pub const MAX_REQUEST_BODY_BYTES: usize = 1_048_576;
+pub const MAX_RESPONSE_BODY_BYTES: usize = 8_388_608;
+pub const MAX_HEADER_COUNT: usize = 64;
+pub const MAX_HEADER_BYTES: usize = 16_384;
+pub const MAX_TIMEOUT_SECS: u64 = 300;
+pub const MAX_CONNECT_TIMEOUT_SECS: u64 = 10;
+
+/// A caller may narrow, but never enlarge, native transport ceilings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HttpBounds {
+    pub response_body_bytes: usize,
+    pub header_bytes: usize,
+    /// Covers the entire DNS, TCP and TLS connection establishment together.
+    pub connect_timeout_secs: u64,
+}
+
+impl Default for HttpBounds {
+    fn default() -> Self {
+        Self {
+            response_body_bytes: MAX_RESPONSE_BODY_BYTES,
+            header_bytes: MAX_HEADER_BYTES,
+            connect_timeout_secs: MAX_CONNECT_TIMEOUT_SECS,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HttpLimit {
+    Url,
+    RequestBody,
+    ResponseBody,
+    RequestHeaderCount,
+    RequestHeaderBytes,
+    ResponseHeaderCount,
+    ResponseHeaderBytes,
+    Deadline,
+}
+
 use std::collections::HashMap;
 
 use serde::Deserialize;
@@ -28,6 +71,8 @@ pub enum HttpError {
     InvalidRequest(String),
     Timeout(String),
     Transport(String),
+    LimitExceeded(HttpLimit),
+    Cancelled,
 }
 
 impl std::fmt::Display for HttpError {
@@ -36,6 +81,8 @@ impl std::fmt::Display for HttpError {
             Self::InvalidRequest(message) => write!(f, "invalid HTTP request: {message}"),
             Self::Timeout(message) => write!(f, "HTTP request timed out: {message}"),
             Self::Transport(message) => write!(f, "HTTP transport error: {message}"),
+            Self::LimitExceeded(limit) => write!(f, "HTTP limit exceeded: {limit:?}"),
+            Self::Cancelled => write!(f, "HTTP request cancelled; remote outcome may be unknown"),
         }
     }
 }
@@ -44,6 +91,29 @@ impl std::error::Error for HttpError {}
 
 pub trait HttpClient: Send + Sync {
     fn execute(&self, request: &HttpRequestPlan) -> Result<HttpResponse, HttpError>;
+
+    /// Embeddings without in-flight cancellation still reject pre-cancelled work.
+    /// Native transport overrides this to drop in-flight local I/O as well.
+    fn execute_with_cancellation(
+        &self,
+        request: &HttpRequestPlan,
+        cancellation: Option<&std::sync::atomic::AtomicBool>,
+    ) -> Result<HttpResponse, HttpError> {
+        if cancellation.is_some_and(|flag| flag.load(std::sync::atomic::Ordering::Acquire)) {
+            return Err(HttpError::Cancelled);
+        }
+        self.execute(request)
+    }
+
+    /// Explicit bounds cannot be silently ignored by an embedding client.
+    fn execute_bounded(
+        &self,
+        _request: &HttpRequestPlan,
+        _bounds: &HttpBounds,
+        _cancellation: Option<&std::sync::atomic::AtomicBool>,
+    ) -> Result<HttpResponse, HttpError> {
+        Err(HttpError::InvalidRequest("bounded HTTP execution unsupported".to_owned()))
+    }
 }
 
 #[derive(Debug, Default)]
@@ -77,7 +147,7 @@ impl HttpClient for StaticHttpClient {
         self.responses
             .get(&request.url)
             .cloned()
-            .ok_or_else(|| HttpError::Transport(format!("no fixture for {}", request.url)))
+            .ok_or_else(|| HttpError::Transport("no HTTP fixture configured".to_owned()))
             .and_then(|result| match result {
                 StaticHttpResult::Response(response) => Ok(response),
                 StaticHttpResult::Error(error) => Err(error),
@@ -101,4 +171,8 @@ pub fn validate_http_url(url: &str) -> bool {
         return false;
     };
     matches!(parsed.scheme(), "http" | "https")
+        && parsed.host_str().is_some()
+        && parsed.username().is_empty()
+        && parsed.password().is_none()
+        && parsed.fragment().is_none()
 }

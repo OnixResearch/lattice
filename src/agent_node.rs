@@ -6,12 +6,26 @@ use std::path::Path;
 
 use serde::Deserialize;
 use serde::Serialize;
+use zeroize::Zeroize;
 
 use crate::engine::value::ImageValue;
 use crate::engine::value::Value;
 use crate::engine::value::ValueData;
 use crate::image_node;
 use crate::openai::Transport;
+
+pub(crate) mod authority;
+
+/// Cleanup owner for execution-only process environment copies.
+pub(crate) struct ExecutionProcessRequest(pub(crate) ProcessRequest);
+
+impl Drop for ExecutionProcessRequest {
+    fn drop(&mut self) {
+        for value in self.0.env.values_mut() {
+            value.zeroize();
+        }
+    }
+}
 
 const DEFAULT_PI_RUNTIME_KEY: &str = "pi";
 const DEFAULT_CLANKERS_RUNTIME_KEY: &str = "clankers";
@@ -160,7 +174,8 @@ pub struct ExecutionContext {
 
 impl ExecutionContext {
     pub fn new(secret_env: std::collections::HashMap<String, String>) -> Self {
-        let secret_values = secret_env.values().filter(|value| !value.is_empty()).cloned().collect();
+        let mut secret_values = secret_env.values().filter(|value| !value.is_empty()).cloned().collect::<Vec<_>>();
+        secret_values.sort_by(|left, right| right.len().cmp(&left.len()).then_with(|| left.cmp(right)));
         Self {
             secret_env: secret_env.into_iter().collect(),
             secret_values,
@@ -173,6 +188,15 @@ impl ExecutionContext {
 
     pub fn redact(&self, value: &str) -> String {
         crate::credentials::redact_text(value, &self.secret_values)
+    }
+}
+
+impl Drop for ExecutionContext {
+    fn drop(&mut self) {
+        for value in self.secret_env.values_mut() {
+            value.zeroize();
+        }
+        self.secret_values.zeroize();
     }
 }
 
@@ -217,6 +241,9 @@ impl std::fmt::Display for AgentError {
 impl std::error::Error for AgentError {}
 
 pub trait AgentAdapter: Send + Sync {
+    /// Material-free identity of the selected backend and its execution configuration.
+    /// Planning must not resolve credentials, contact a backend, or perform an effect.
+    fn execution_identity(&self, request: &AgentRequest) -> Result<String, AgentError>;
     fn execute(&self, request: &AgentRequest, context: &ExecutionContext) -> Result<AgentResponse, AgentError>;
 }
 
@@ -224,6 +251,9 @@ pub trait AgentAdapter: Send + Sync {
 pub struct NoopAgentAdapter;
 
 impl AgentAdapter for NoopAgentAdapter {
+    fn execution_identity(&self, request: &AgentRequest) -> Result<String, AgentError> {
+        Err(AgentError::UnsupportedTarget(agent_target_label(request.target).to_owned()))
+    }
     fn execute(&self, request: &AgentRequest, _context: &ExecutionContext) -> Result<AgentResponse, AgentError> {
         Err(AgentError::UnsupportedTarget(agent_target_label(request.target).to_string()))
     }
@@ -418,12 +448,27 @@ impl Default for ProductionAgentAdapter {
 // r[impl lattice.agent_runtime.structured_input_projection.scenario.selected]
 // r[impl lattice.agent_runtime.projection_boundaries.scenario.evidence]
 impl AgentAdapter for ProductionAgentAdapter {
+    fn execution_identity(&self, request: &AgentRequest) -> Result<String, AgentError> {
+        let route = match runtime_route_for_target(&self.config, request.target)? {
+            RuntimeRoute::Command => "command",
+            RuntimeRoute::OpenAi(_) => "openai-compatible",
+            RuntimeRoute::Animus(_) => "animus",
+        };
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"lattice.agent.selected-runtime.v1");
+        serde_json::to_writer(
+            &mut hasher,
+            &(route, &self.config, &self.config.local_process.shell_program, &self.config.local_process.limits),
+        )
+        .map_err(|_| AgentError::PreflightRejected("agent runtime identity unavailable".to_owned()))?;
+        Ok(format!("blake3:{}", hasher.finalize().to_hex()))
+    }
     fn execute(&self, request: &AgentRequest, context: &ExecutionContext) -> Result<AgentResponse, AgentError> {
         let projection = self.config.structured_input_projection.for_target(request.target);
         let response = match runtime_route_for_target(&self.config, request.target)? {
             RuntimeRoute::Command => {
                 let plan = plan_agent_command(&self.config, request)?;
-                let output = run_agent_command(&plan, &self.config.local_process)?;
+                let output = run_agent_command(&plan, &self.config.local_process, context)?;
                 decode_agent_command_output(&plan, &output)
             }
             RuntimeRoute::OpenAi(runtime) => {
@@ -725,8 +770,14 @@ fn append_optional_string_section(sections: &mut Vec<String>, heading: &str, val
 fn run_agent_command(
     plan: &AgentCommandPlan,
     config: &crate::process::core::RuntimeConfig,
+    context: &ExecutionContext,
 ) -> Result<AgentCommandOutput, AgentError> {
-    run_agent_command_with_runner(plan, &ProductionProcessRunner::new(config.clone()))
+    let mut request = ExecutionProcessRequest(process_request_for_agent_command(plan));
+    request.0.env.clone_from(&context.secret_env);
+    let output = ProductionProcessRunner::new(config.clone())
+        .run(&request.0)
+        .map_err(|error| AgentError::Adapter(context.redact(&error.to_string())))?;
+    Ok(agent_command_output_from_process_output(output))
 }
 
 // r[impl n8nclone.workflow_execution.trait_boundaries.process_runner]

@@ -2,8 +2,11 @@
 fn steel_runtime_returns_immediate_final_response() {
     let mut model = super::support::ModelStub::ok();
     let mut tool = super::support::ToolStub::ok();
-    let result =
-        super::support::run_program_with_initial_turn_budget(super::support::RESPOND_PROGRAM, &mut model, &mut tool);
+    let result = super::support::run_program_with_initial_turn_budget(
+        super::support::RESPOND_PROGRAM,
+        &mut model,
+        &mut tool,
+    );
 
     assert!(matches!(
         result.status(),
@@ -17,8 +20,11 @@ fn steel_runtime_returns_immediate_final_response() {
 fn steel_runtime_stops_without_response() {
     let mut model = super::support::ModelStub::ok();
     let mut tool = super::support::ToolStub::ok();
-    let result =
-        super::support::run_program_with_initial_turn_budget(super::support::STOP_PROGRAM, &mut model, &mut tool);
+    let result = super::support::run_program_with_initial_turn_budget(
+        super::support::STOP_PROGRAM,
+        &mut model,
+        &mut tool,
+    );
 
     assert_eq!(result.status(), &crate::RuntimeStatus::Stopped);
     assert_eq!(model.calls, super::support::NO_ADAPTER_CALLS);

@@ -6,19 +6,15 @@
 //! [`ShellResolution`] that [`crate::secretspec_issuer::classify_resolution`]
 //! accepts.
 
+use super::{
+    DEFAULT_MAX_RESOLVED_VALUE_BYTES, DEFAULT_RESOLUTION_TIMEOUT, IssuerKeyDeclaration,
+    build_resolve_request, classify_resolution,
+};
+use crate::secretspec_issuer::IssuerResolutionResult;
+use serde::{Deserialize, Serialize};
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
-
-use serde::Deserialize;
-use serde::Serialize;
-
-use super::DEFAULT_MAX_RESOLVED_VALUE_BYTES;
-use super::DEFAULT_RESOLUTION_TIMEOUT;
-use super::IssuerKeyDeclaration;
-use super::build_resolve_request;
-use super::classify_resolution;
-use crate::secretspec_issuer::IssuerResolutionResult;
 
 /// Explicit resource bounds applied by the bounded worker.
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -132,12 +128,16 @@ pub fn resolve_issuer_key(
         })
         .map_err(|_| IssuerResolutionFailure::SpawnFailed)?;
 
-    let outcome = receiver.recv_timeout(boundaries.timeout).map_err(|error| match error {
-        mpsc::RecvTimeoutError::Timeout => IssuerResolutionFailure::Timeout,
-        mpsc::RecvTimeoutError::Disconnected => IssuerResolutionFailure::ChannelFailure,
-    })?;
+    let outcome = receiver
+        .recv_timeout(boundaries.timeout)
+        .map_err(|error| match error {
+            mpsc::RecvTimeoutError::Timeout => IssuerResolutionFailure::Timeout,
+            mpsc::RecvTimeoutError::Disconnected => IssuerResolutionFailure::ChannelFailure,
+        })?;
     let (response, admitted) = outcome;
-    worker.join().map_err(|_| IssuerResolutionFailure::WorkerPanic)?;
+    worker
+        .join()
+        .map_err(|_| IssuerResolutionFailure::WorkerPanic)?;
 
     let result = classify_resolution(declaration, response.as_str(), admitted);
     Ok(ShellResolution {

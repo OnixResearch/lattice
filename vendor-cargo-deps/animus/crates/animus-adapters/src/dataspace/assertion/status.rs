@@ -1,4 +1,5 @@
-const FIELD: crate::validation::FieldName = crate::validation::FieldName::new("dataspace_assertion_status");
+const FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("dataspace_assertion_status");
 
 const ACTIVE: &str = "active";
 const COMPLETED: &str = "completed";

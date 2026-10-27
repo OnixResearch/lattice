@@ -85,6 +85,7 @@ fn shell_fixture() -> Fixture {
 // r[verify lattice.standalone_effect_authority.provenance.scenario.local]
 // r[verify lattice.standalone_effect_authority.provenance.scenario.missing]
 // r[verify lattice.standalone_effect_authority.validation]
+// r[verify lattice.standalone_effect_authority.validation.scenario.native]
 #[tokio::test]
 async fn selected_operator_authority_runs_a_real_process_and_absence_has_no_effect() {
     let denied = shell_fixture();

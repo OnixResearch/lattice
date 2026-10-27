@@ -47,7 +47,11 @@ impl DiffReviewReport {
         let mut findings = super::Collection::with_capacity(draft.findings.len());
         for finding_draft in draft.findings {
             let finding = super::issue::DiffReviewFinding::validate(finding_draft)?;
-            super::check::reject_duplicate(super::FINDING_ID_FIELD, &mut finding_ids, finding.finding_id())?;
+            super::check::reject_duplicate(
+                super::FINDING_ID_FIELD,
+                &mut finding_ids,
+                finding.finding_id(),
+            )?;
             finding_ids.push(super::Text::from(finding.finding_id()));
             validate_finding_scope(&finding, reviewed_source_labels.as_slice())?;
             findings.push(finding);
@@ -144,12 +148,20 @@ pub fn compare_diff_review_rerun(
 ) -> Result<super::Collection<DiffReviewFindingStateRecord>, super::DiffReviewError> {
     assert!(prior.findings().len() <= super::MAX_REVIEW_FINDINGS);
     assert!(current.findings().len() <= super::MAX_REVIEW_FINDINGS);
-    let dismissed =
-        super::check::text_collection(super::DISMISSED_ID_FIELD, dismissed_ids, super::check::CollectionPolicy {
+    let dismissed = super::check::text_collection(
+        super::DISMISSED_ID_FIELD,
+        dismissed_ids,
+        super::check::CollectionPolicy {
             required: false,
             max_items: super::MAX_REVIEW_FINDINGS,
-        })?;
-    let mut records = super::Collection::with_capacity(prior.findings().len().saturating_add(current.findings().len()));
+        },
+    )?;
+    let mut records = super::Collection::with_capacity(
+        prior
+            .findings()
+            .len()
+            .saturating_add(current.findings().len()),
+    );
     for prior_finding in prior.findings() {
         let state = if contains_finding(current.findings(), prior_finding.finding_id()) {
             DiffReviewFindingState::Open
@@ -158,7 +170,10 @@ pub fn compare_diff_review_rerun(
         } else {
             DiffReviewFindingState::Fixed
         };
-        records.push(DiffReviewFindingStateRecord::new(prior_finding.finding_id(), state));
+        records.push(DiffReviewFindingStateRecord::new(
+            prior_finding.finding_id(),
+            state,
+        ));
     }
     for current_finding in current.findings() {
         if !contains_finding(prior.findings(), current_finding.finding_id()) {
@@ -186,5 +201,7 @@ fn validate_finding_scope(
 }
 
 fn contains_finding(findings: &[super::issue::DiffReviewFinding], finding_id: &str) -> bool {
-    findings.iter().any(|finding| finding.finding_id() == finding_id)
+    findings
+        .iter()
+        .any(|finding| finding.finding_id() == finding_id)
 }

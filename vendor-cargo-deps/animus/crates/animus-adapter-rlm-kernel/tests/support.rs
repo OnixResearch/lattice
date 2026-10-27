@@ -1,10 +1,13 @@
-#![allow(dead_code, missing_docs, clippy::missing_panics_doc, clippy::must_use_candidate)]
+#![allow(
+    dead_code,
+    missing_docs,
+    clippy::missing_panics_doc,
+    clippy::must_use_candidate
+)]
 
-use animus_adapter_rlm_kernel::HostOperationClass;
-use animus_adapter_rlm_kernel::REQUIRED_NON_CLAIMS;
-use animus_adapter_rlm_kernel::ResourceBounds;
-use animus_adapter_rlm_kernel::RlmKernelPolicy;
-use animus_adapter_rlm_kernel::RlmKernelPolicyDraft;
+use animus_adapter_rlm_kernel::{
+    HostOperationClass, REQUIRED_NON_CLAIMS, ResourceBounds, RlmKernelPolicy, RlmKernelPolicyDraft,
+};
 
 pub const PRIME_AGENT_REVISION: &str = "c5991bc853d27754aed345c13ff4d2e05c40f1f4";
 pub const HASH_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -23,6 +26,12 @@ pub const CHILD_FAN_OUT_LIMIT: u32 = 4;
 pub const CHILD_TOKEN_LIMIT: u64 = 16_000;
 pub const CHILD_WALL_TIME_LIMIT_MS: u64 = 60_000;
 pub const CHILD_RESULT_CHAR_LIMIT: u32 = 8_192;
+pub const HOST_CALL_LIMIT: u32 = 4;
+pub const HOST_RESULT_CHAR_LIMIT: u32 = 32_768;
+pub const CUMULATIVE_HOST_RESULT_CHAR_LIMIT: u32 = 65_536;
+pub const BRIDGE_NESTING_LIMIT: u32 = 4;
+pub const BRIDGE_FUEL_LIMIT: u64 = 500_000;
+pub const BRIDGE_WALL_TIME_LIMIT_MS: u64 = 120_000;
 
 pub const OPERATIONS: &[HostOperationClass] = &[
     HostOperationClass::FileRead,
@@ -54,6 +63,12 @@ pub fn policy() -> RlmKernelPolicy {
             max_child_tokens: CHILD_TOKEN_LIMIT,
             max_child_wall_time_ms: CHILD_WALL_TIME_LIMIT_MS,
             max_child_result_chars: CHILD_RESULT_CHAR_LIMIT,
+            max_host_calls_per_cell: HOST_CALL_LIMIT,
+            max_host_result_chars: HOST_RESULT_CHAR_LIMIT,
+            max_cumulative_host_result_chars: CUMULATIVE_HOST_RESULT_CHAR_LIMIT,
+            max_bridge_nesting: BRIDGE_NESTING_LIMIT,
+            max_bridge_evaluation_fuel: BRIDGE_FUEL_LIMIT,
+            max_bridge_wall_time_ms: BRIDGE_WALL_TIME_LIMIT_MS,
         },
         admitted_operations: OPERATIONS,
         admitted_child_profiles: &[CHILD_PROFILE],

@@ -20,15 +20,17 @@ undocumented_unsafe_blocks = "deny"
 
 [features]
 default = []
-rlm-kernel = ["dep:animus-adapter-rlm-kernel"]
+rlm-kernel = ["dep:animus-adapter-rlm-kernel", "dep:serde", "dep:serde_json"]
 
 [dependencies]
 animus-adapter-rlm-kernel = { path = "../animus-adapter-rlm-kernel", version = "0.1.0", optional = true }
 animus-adapters = { path = "../animus-adapters", version = "0.1.0" }
 animus-core = { path = "../animus-core", version = "0.1.0" }
 blake3 = { version = "1.8.5", default-features = false }
+serde = { version = "1.0.228", features = ["derive"], optional = true }
+serde_json = { version = "1.0.149", optional = true }
 steel = { package = "steel-core", version = "0.8.2" }
 
 [dev-dependencies]
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.150"
+serde_json = "1.0.149"

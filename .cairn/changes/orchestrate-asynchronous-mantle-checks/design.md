@@ -55,6 +55,12 @@ Submission uses a stable idempotency key. A duplicate call can recover the same 
 
 Lattice does not send evaluator expressions, arbitrary commands, or secret environment values as Mantle requests. Source and derivation inputs follow the admitted artifact boundary.
 
+### Admitted private producer prerequisite
+
+The implemented Mantle transport consumes `mantle-build-contract::async_api` from the separately admitted `serve-private-asynchronous-build-api` producer change. It uses a bounded private Unix-domain socket with an exact peer UID, configured service/project/holder identities, holder-bound UCAN presentation, durable replay admission, and pinned producer signing keys. This is the real receiver/coordinator/worker path, not an invented HTTP Build endpoint or a substitute authorization check in Lattice. GitHub OIDC and Check Runs retain their independently bounded HTTPS transports.
+
+Producer acceptance requires an immutable validated revision and actual positive/negative native receiver and worker evidence. The broader `add-nix-remote-service-gateway` remains active unless its own gates independently close; private Build API evidence does not prove Nix compatibility, public service exposure, anonymous source availability, deployed authority, or the external GitHub stages. A local signed native smoke is bounded local behavior evidence only. Private-repository and report-only rollout still require separately provisioned real GitHub/OIDC/service authority and their observed evidence before required status.
+
 ## Event consumption and state reduction
 
 The shell fetches bounded Mantle event pages by authenticated cursor. It verifies the configured producer key and gives parsed event facts to the reducer.

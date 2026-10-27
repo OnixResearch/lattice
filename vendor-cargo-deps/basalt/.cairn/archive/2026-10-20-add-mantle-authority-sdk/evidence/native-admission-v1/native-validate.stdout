@@ -1,0 +1,187 @@
+{
+  "change_issues": [],
+  "changes": 1,
+  "cross_repo_dependencies": [],
+  "cross_repo_evidence_issues": [],
+  "findings": [],
+  "issues": [],
+  "layout": "cairn",
+  "policy": "cairn-default",
+  "policy_selection": {
+    "blake3": "7a67802377005c18ebded42899e7f564f5d87087b6c14ca70464b35886f340a9",
+    "installation_receipt": false,
+    "locator": "cairn-policy/generated/cairn-policy.json",
+    "source": "legacy_default"
+  },
+  "profile_issues": [],
+  "receipt_hash": "16c2902ff69329908ac38599755efb1d497b9aa7b986a8fdb619830aa7edb1b1",
+  "resolution": {
+    "diagnostics": [],
+    "locator_consulted": false,
+    "registry_lookup": "local_locator_only",
+    "selected": {
+      "project_identity": null,
+      "root": ".",
+      "source": "explicit_root",
+      "store_id": null,
+      "store_identity": null
+    },
+    "valid": true
+  },
+  "spec_findings": [],
+  "spec_issues": [],
+  "spec_substance": [
+    {
+      "path": "./.cairn/changes/add-mantle-authority-sdk/specs/mantle-authority/spec.md",
+      "requirement_blocks": 3,
+      "scenario_blocks": 5,
+      "substantive_requirement_blocks": 3
+    },
+    {
+      "path": "./.cairn/specs/contract-backends/spec.md",
+      "requirement_blocks": 28,
+      "scenario_blocks": 37,
+      "substantive_requirement_blocks": 28
+    },
+    {
+      "path": "./.cairn/specs/crate-consumability/spec.md",
+      "requirement_blocks": 47,
+      "scenario_blocks": 53,
+      "substantive_requirement_blocks": 47
+    },
+    {
+      "path": "./.cairn/specs/durable-authority-adoption/spec.md",
+      "requirement_blocks": 7,
+      "scenario_blocks": 14,
+      "substantive_requirement_blocks": 7
+    },
+    {
+      "path": "./.cairn/specs/holder-observation/spec.md",
+      "requirement_blocks": 3,
+      "scenario_blocks": 5,
+      "substantive_requirement_blocks": 3
+    },
+    {
+      "path": "./.cairn/specs/nickel-toolchain/spec.md",
+      "requirement_blocks": 5,
+      "scenario_blocks": 7,
+      "substantive_requirement_blocks": 5
+    },
+    {
+      "path": "./.cairn/specs/nostr-identity-bindings/spec.md",
+      "requirement_blocks": 7,
+      "scenario_blocks": 13,
+      "substantive_requirement_blocks": 7
+    },
+    {
+      "path": "./.cairn/specs/peer-auth-policy/spec.md",
+      "requirement_blocks": 6,
+      "scenario_blocks": 10,
+      "substantive_requirement_blocks": 6
+    },
+    {
+      "path": "./.cairn/specs/policy-authoring-contracts/spec.md",
+      "requirement_blocks": 7,
+      "scenario_blocks": 7,
+      "substantive_requirement_blocks": 7
+    },
+    {
+      "path": "./.cairn/specs/policy-evaluation-cache/spec.md",
+      "requirement_blocks": 6,
+      "scenario_blocks": 10,
+      "substantive_requirement_blocks": 6
+    },
+    {
+      "path": "./.cairn/specs/test-hardening/spec.md",
+      "requirement_blocks": 3,
+      "scenario_blocks": 3,
+      "substantive_requirement_blocks": 3
+    },
+    {
+      "path": "./.cairn/specs/ucan-token-flow/spec.md",
+      "requirement_blocks": 55,
+      "scenario_blocks": 97,
+      "substantive_requirement_blocks": 55
+    }
+  ],
+  "specs_validated": 12,
+  "substance": [
+    {
+      "checkbox_tasks": 0,
+      "kind": "design",
+      "malformed_dependency_markers": 0,
+      "path": "./.cairn/changes/add-mantle-authority-sdk/design.md",
+      "requirement_blocks": 0,
+      "scenario_blocks": 0,
+      "substantive_lines": 38,
+      "substantive_requirement_blocks": 0,
+      "substantive_tasks": 0,
+      "task_done": 0,
+      "task_in_progress": 0,
+      "task_todo": 0
+    },
+    {
+      "checkbox_tasks": 0,
+      "kind": "proposal",
+      "malformed_dependency_markers": 0,
+      "path": "./.cairn/changes/add-mantle-authority-sdk/proposal.md",
+      "requirement_blocks": 0,
+      "scenario_blocks": 0,
+      "substantive_lines": 16,
+      "substantive_requirement_blocks": 0,
+      "substantive_tasks": 0,
+      "task_done": 0,
+      "task_in_progress": 0,
+      "task_todo": 0
+    },
+    {
+      "checkbox_tasks": 0,
+      "kind": "delta_spec",
+      "malformed_dependency_markers": 0,
+      "path": "./.cairn/changes/add-mantle-authority-sdk/specs/mantle-authority/spec.md",
+      "requirement_blocks": 3,
+      "scenario_blocks": 5,
+      "substantive_lines": 18,
+      "substantive_requirement_blocks": 3,
+      "substantive_tasks": 0,
+      "task_done": 0,
+      "task_in_progress": 0,
+      "task_todo": 0
+    },
+    {
+      "checkbox_tasks": 5,
+      "kind": "tasks",
+      "malformed_dependency_markers": 0,
+      "path": "./.cairn/changes/add-mantle-authority-sdk/tasks.md",
+      "requirement_blocks": 0,
+      "scenario_blocks": 0,
+      "substantive_lines": 5,
+      "substantive_requirement_blocks": 0,
+      "substantive_tasks": 5,
+      "task_done": 5,
+      "task_in_progress": 0,
+      "task_todo": 0
+    }
+  ],
+  "substance_findings": [],
+  "substance_issues": [],
+  "valid": true,
+  "workflow_profiles": [
+    {
+      "acceptance_ids": [],
+      "non_claims": [
+        "workflow state proves only the selected policy graph and observed structural artifact facts",
+        "workflow instructions do not prove artifact truth, review quality, or implementation correctness",
+        "workflow state does not satisfy proposal, design, tasks, sync, archive, evidence, or release gates",
+        "workflow commands are read-only and do not create, edit, delete, or approve lifecycle artifacts"
+      ],
+      "profile_identity_hash": "33736dd47b494470df56428ef00a670ab9f6adb5596cde47b5db5e031d20fedf",
+      "review_receipt_hashes": [],
+      "spec_effect": "delta",
+      "workflow_profile": "spec-driven",
+      "workflow_profile_compatibility_fallback": false,
+      "workflow_profile_source": "change_create",
+      "workflow_profile_version": 1
+    }
+  ]
+}

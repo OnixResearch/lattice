@@ -1,0 +1,72 @@
+{
+  "cohort_license_blake3": "fd12707e19e104da035c74958a676b0567b7dc2df01875ae07f058b79e59422f",
+  "cohort_revision": "b25c0874bf0ba699a58e21ef06f659d839659de3",
+  "cohort_schema_blake3": "528797f6970a8f24175daf1f994c742f2fe24f0b8230b9456885452a08132a90",
+  "non_claims": [
+    "server_trust",
+    "server_correctness",
+    "tool_safety",
+    "sandboxing",
+    "network_isolation",
+    "exactly_once_effects",
+    "mcp_parity",
+    "production_readiness",
+    "release_eligibility"
+  ],
+  "schema": "animus.mcp-client-host.v1",
+  "server": {
+    "arguments": [
+      "serve"
+    ],
+    "auto_discovery": false,
+    "credential_refs": [],
+    "environment_keys": [],
+    "executable_identity": "8cfdeb80bd4ac427573f73b74eee2c73dfb2794ac08d502415f75b49985e4ceb",
+    "executable_label": "animus-mcp-fixture-server",
+    "id": "fixture-stdio",
+    "inherit_environment": false,
+    "limits": {
+      "call_timeout_ms": 2000,
+      "cancellation_poll_ms": 10,
+      "discovery_timeout_ms": 2000,
+      "initialize_timeout_ms": 2000,
+      "max_arguments": 16,
+      "max_calls_per_generation": 4,
+      "max_description_bytes": 512,
+      "max_diagnostic_bytes": 512,
+      "max_environment_keys": 8,
+      "max_frame_bytes": 16384,
+      "max_instruction_bytes": 1024,
+      "max_resource_metadata_bytes": 1024,
+      "max_result_bytes": 8192,
+      "max_schema_bytes_each": 4096,
+      "max_schema_bytes_total": 8192,
+      "max_tool_name_bytes": 64,
+      "max_tools": 8,
+      "shutdown_timeout_ms": 250,
+      "teardown_timeout_ms": 2000
+    },
+    "policy_identity": "92bb8f7d26d1cda1220f6481e6cb2c7ac1e1de8e975d9f9d82351ceff6d40dc6",
+    "posture": "required",
+    "protocol_version": "2025-06-18",
+    "shell_fallback": false,
+    "tool_policies": [
+      {
+        "ability_policy_refs": [
+          "mcp-tool-policy"
+        ],
+        "capability_labels": [
+          "workspace-read"
+        ],
+        "name": "read_text",
+        "resource_policy_refs": [
+          "workspace-read-policy"
+        ],
+        "result_bounds": "bounded-json-result"
+      }
+    ],
+    "transport": "stdio",
+    "working_root_capability": "mcp-fixture-root",
+    "working_root_identity": "c01a43e5e96acf375dd9a314822bb1218421977dd49954c80cd826a93ac0f7d7"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "gate_classes": [
+    "check",
+    "test",
+    "lint"
+  ],
+  "limits": {
+    "max_continuations": 8,
+    "max_tokens": 100000,
+    "max_turns": 32,
+    "max_wall_clock_milliseconds": 3600000
+  },
+  "max_gate_output_bytes": 4096,
+  "non_claims": [
+    "not-task-success",
+    "not-objective-completion",
+    "not-verification-outside-gate-scope",
+    "not-change-detection-outside-admitted-file-set",
+    "not-gate-sandboxing",
+    "not-production-readiness",
+    "not-release-eligibility",
+    "not-authority-widening"
+  ],
+  "policy_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "policy_id": "autonomous-default",
+  "receipt_fields": [
+    "policy_identity",
+    "gate_identity",
+    "verified_scope",
+    "outcome_class",
+    "fingerprint_identity",
+    "limit_class"
+  ],
+  "schema": "animus.autonomous-gates.v1"
+}

@@ -7,10 +7,13 @@ pub(super) const DESCRIPTION: &str = "Helps assemble focused agent guidance";
 pub(super) const SECOND_DESCRIPTION: &str = "Reviews prompts before dispatch";
 pub(super) const PROVENANCE: &str = "bundle:pi-reference";
 pub(super) const PROJECT_PROVENANCE: &str = "project:workspace-guidance";
-pub(super) const VALID_HASH: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-pub(super) const SECOND_HASH: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+pub(super) const VALID_HASH: &str =
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+pub(super) const SECOND_HASH: &str =
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 pub(super) const RAW_PATH_HANDLE: &str = "/home/example/.pi/skills/secret/SKILL.md";
-pub(super) const UPPERCASE_HASH: &str = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+pub(super) const UPPERCASE_HASH: &str =
+    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 pub(super) const INVALID_NAME: &str = "Bad Resource";
 pub(super) const UNSAFE_PROVENANCE: &str = "/home/example/project/.pi/skill";
 pub(super) const UNSUPPORTED_KIND: &str = "theme";

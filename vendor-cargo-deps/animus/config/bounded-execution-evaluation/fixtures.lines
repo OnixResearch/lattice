@@ -1,0 +1,17 @@
+case|positive|success|all|mapped
+case|positive|nonzero_exit|octet,nickel_export,mantle|mapped_with_native_detail
+case|positive|timeout|octet,nickel_export|lossless
+case|negative|launch_denial|all|policy_rejection
+case|negative|missing_executable|all|launch_denial
+case|negative|environment_rejection|all|retained_consumer_detail
+case|negative|path_root_escape|all|retained_mechanism_detail
+case|negative|cancellation|all|blocked_when_unavailable
+case|negative|signal_termination|all|extension_or_blocker
+case|negative|output_overflow|all|retained_completeness
+case|negative|network_policy_difference|all|no_equivalence
+case|negative|cleanup_failure|all|no_coercion
+case|negative|unsupported_mechanism|all|blocked
+case|negative|stale_source|all|source_identity_mismatch
+case|negative|unsafe_diagnostic|all|safe_metadata_only
+case|negative|weakened_non_claim|all|overclaim_rejected
+case|negative|semantic_loss|all|extract_denied

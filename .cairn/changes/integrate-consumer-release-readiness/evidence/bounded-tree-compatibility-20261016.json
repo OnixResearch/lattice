@@ -1,0 +1,51 @@
+{
+  "schema": "lattice.bounded-tree-producer-observation.v1",
+  "observed_on": "2026-10-16",
+  "status": "owning-compatibility-and-native-archive-verified-local-revision-not-source-admitted",
+  "maintenance_owner": "bounded-tree producer maintainers; Lattice integration owns downstream source admission",
+  "consumer": "Mantle private asynchronous Build API producer cohort required by Lattice",
+  "source": {
+    "canonical_rid": "rad:zqhtZvsteJhxCJE96dMAZSZ9y1PX",
+    "revision": "ae98da3f032a21492ef2156969121c143dbf5cb4",
+    "tree": "9c12bd0663435b45429ed9d3fab84c79e386ef3d",
+    "archive_blake3": "76c58dd160d5019492f238fcb06db2dc72e15602ef76e2ec5580d1e7f8f3d27c",
+    "archive_format": "git archive --format=tar with tar.umask=0000",
+    "base_revision": "b0fd0103bc9eed2c1b6d852045959462d105d8f1",
+    "base_tree": "d5f71b05264df13d8eb900f3b8b8b686a75d9511",
+    "runtime_verified_revision_before_lifecycle_closeout": "32e0710d74f13859f9e2814e308737a7298045e8",
+    "producer_evidence_path": "cairn/archive/1970-01-01-blake3-minimum-fixed-compatibility/validation.md"
+  },
+  "change": "Exact BLAKE3 minimum1.8.2 to1.8.3 with default-features=false retained; Cargo-generated required constant_time_eq0.4.2 and cpufeatures0.2.17 changes only. No core/cap implementation, API, algorithm, Devenv pins, policy or lint-level changes.",
+  "content_blake3": {
+    "Cargo.toml": "ec5fc3be162e06facba1013cdee5e7428480fb483eb1f377853488b4813ca9be",
+    "Cargo.lock": "caa26a3371c26ee3c07152d0b1ff5597a9ec1c7b685a7945a893a5b2d42be75b",
+    "cairn/archive/1970-01-01-blake3-minimum-fixed-compatibility/validation.md": "61895e0971a2e028beb8b345ecc4fe1cfdc2d2ec1004421c33a2a674fe1ded35"
+  },
+  "owning_environment": {
+    "command_prefix": "devenv --offline --nix-option min-free 0 --nix-option max-free 0 --no-tui",
+    "rust": "1.97.1",
+    "cairn_revision": "70db8fe114910feb5d162fea5db8ad4ffdb6f176",
+    "cairn_nar_hash": "sha256-solfeKY4FXEB2rKgcCH3qu8afhT1XNeJKIheniMzHtY=",
+    "octet_toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu"
+  },
+  "observed_verification": {
+    "native_lifecycle_admission": "Owning proposal/design/tasks PASS before source edit; no modern/foreign policy substituted.",
+    "debug_release_smoke": "Both actual bounded stream/copy profiles passed, using canonical empty and102400-byte upstream-vector digests, consumed destination-byte equality, exact file/total boundary acceptance and independent one-byte excess rejection.",
+    "owning_devenv_test": "PASS: core/cap positive-negative conformance, foundation and policy negatives, Cairn export/validation/coverage, formatting, strict Clippy, no_std WASM and unchanged Octet deny-all.",
+    "octet": {"status": "clean", "findings": 0, "warnings": 0, "errors": 0},
+    "final_tasks_gate": {"valid": true, "verdict": "PASS", "receipt_hash": "f859ceb112565f35e8497c443887e470f2cb2fefa15b27f7c6c05c33d5560ae1"},
+    "final_archived_owning_gate": {"command": "devenv --offline --nix-option min-free 0 --nix-option max-free 0 --no-tui test", "status": "PASS", "job": "proc://bg_466", "duration_seconds": 1.85, "log": "bounded-tree-archived-owning-gate-20261016.log", "warnings": "Existing wasm-builtin, CLI/input version and kache disk-I/O warnings remain visible; no cache, pin or policy change was applied."},
+    "transient_smoke": "Removed before owning repository gates."
+  },
+  "lifecycle_closeout": {
+    "scope": "Only native requirement acceptance, archive relocation and provenance/traceability documentation followed the pre-archive runtime-verified revision; no production source or dependency changes.",
+    "policy_hash": "fcc753697f9b20441c1848acfe85d062b111fb04ee85f3df7ef177c7960d8069",
+    "sync": {"blocked": false, "mutated": true, "receipt_hash": "2baa3d44e5328bd7f8fa48c0411bf6024a9e3528c433a95d13d3a4f684cd62d5"},
+    "archive": {"blocked": false, "mutated": true, "path": "cairn/archive/1970-01-01-blake3-minimum-fixed-compatibility", "receipt_hash": "2432c6c6496a2df4b2963be7208fc08825d0e92a26aeabf9abc7d84d17a95568", "path_prefix": "Native tool emitted 1970-01-01; this is not the observation date."},
+    "validation": {"valid": true, "changes": 0, "specs_validated": 2, "issues": [], "findings": []},
+    "coverage": {"valid": true, "verdict": "pass", "requirements": 60, "referenced": 60, "missing": [], "dangling": [], "input_hash": "b3e6b5b36e7394fdce2c5268f9f8a1dbbe6bb817853c5ddfb971281329990f99", "receipt_hash": "6c35633e4b111b676396d1e70d94d99f99c3762763340915830d0e2c5487166d"},
+    "coverage_regression": "Before docs/traceability.md linked the archived runtime evidence, coverage correctly rejected all three newly accepted compatibility IDs. After the links were added, the same native command passed with 60/60 IDs and no missing/dangling references."
+  },
+  "repeatability": "Use the producer's unchanged owning Devenv test and committed validation.md commands; exact source-store wrapper restoration is separately recorded in locked-source-restoration-20261016.json.",
+  "non_claims": ["Local producer verification and commit do not establish remote publication or anonymous acquisition", "No consumer pin, source-cache override or fallback is admitted", "Existing canonical RID has no inferred HTTP projection; GitHub is not an admitted producer fallback", "Lattice whole-consumer, private receiver and public-build acceptance remain pending"]
+}

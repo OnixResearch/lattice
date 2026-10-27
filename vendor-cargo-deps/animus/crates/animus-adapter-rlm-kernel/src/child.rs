@@ -38,7 +38,11 @@ impl ChildSpawnRequest {
     ) -> Result<Self, crate::Error> {
         Ok(Self {
             profile: crate::required_text("child_profile", profile, MAX_PROFILE_CHARS)?,
-            context_slice: crate::required_text("child_context_slice", context_slice, MAX_CONTEXT_CHARS)?,
+            context_slice: crate::required_text(
+                "child_context_slice",
+                context_slice,
+                MAX_CONTEXT_CHARS,
+            )?,
             depth,
             fan_out,
             token_budget,
@@ -106,7 +110,10 @@ impl ChildSpawnRequest {
     /// Returns the bounded request character count.
     #[must_use]
     pub fn character_count(&self) -> usize {
-        self.profile.chars().count().saturating_add(self.context_slice.chars().count())
+        self.profile
+            .chars()
+            .count()
+            .saturating_add(self.context_slice.chars().count())
     }
 }
 
@@ -124,7 +131,11 @@ impl Lineage {
     /// # Errors
     ///
     /// Returns [`crate::Error`] when an identity or label is malformed.
-    pub fn new(parent_id_hash: &str, child_id_hash: &str, profile: &str) -> Result<Self, crate::Error> {
+    pub fn new(
+        parent_id_hash: &str,
+        child_id_hash: &str,
+        profile: &str,
+    ) -> Result<Self, crate::Error> {
         validate_hash("parent_id_hash", parent_id_hash)?;
         validate_hash("child_id_hash", child_id_hash)?;
         Ok(Self {
@@ -168,7 +179,11 @@ impl ChildResult {
     ///
     /// Returns [`crate::Error`] when the result is empty, contains NUL, or
     /// exceeds the request result budget.
-    pub fn new(request: &ChildSpawnRequest, lineage: Lineage, value: &str) -> Result<Self, crate::Error> {
+    pub fn new(
+        request: &ChildSpawnRequest,
+        lineage: Lineage,
+        value: &str,
+    ) -> Result<Self, crate::Error> {
         let value = crate::required_text("child_result", value, request.result_char_budget)?;
         let value_hash = crate::hash_parts("animus.rlm-child-result.v1", &[value.as_str()]);
         Ok(Self {
@@ -203,7 +218,10 @@ impl ChildResult {
 ///
 /// Returns [`crate::Error`] for an unadmitted profile, ambient spawn, or any
 /// depth, fan-out, token, wall-clock, or result-size budget violation.
-pub fn admit_child_spawn(policy: &crate::RlmKernelPolicy, request: &ChildSpawnRequest) -> Result<(), crate::Error> {
+pub fn admit_child_spawn(
+    policy: &crate::RlmKernelPolicy,
+    request: &ChildSpawnRequest,
+) -> Result<(), crate::Error> {
     if request.ambient_discovery || request.cross_session {
         return Err(crate::Error::AmbientChildSpawnDenied);
     }
@@ -211,10 +229,26 @@ pub fn admit_child_spawn(policy: &crate::RlmKernelPolicy, request: &ChildSpawnRe
         return Err(crate::Error::ChildProfileNotAdmitted);
     }
     let bounds = policy.bounds();
-    crate::ensure_at_most("child_depth", u64::from(request.depth), u64::from(bounds.max_child_depth))?;
-    crate::ensure_at_most("child_fan_out", u64::from(request.fan_out), u64::from(bounds.max_child_fan_out))?;
-    crate::ensure_at_most("child_tokens", request.token_budget, bounds.max_child_tokens)?;
-    crate::ensure_at_most("child_wall_time_ms", request.wall_time_ms, bounds.max_child_wall_time_ms)?;
+    crate::ensure_at_most(
+        "child_depth",
+        u64::from(request.depth),
+        u64::from(bounds.max_child_depth),
+    )?;
+    crate::ensure_at_most(
+        "child_fan_out",
+        u64::from(request.fan_out),
+        u64::from(bounds.max_child_fan_out),
+    )?;
+    crate::ensure_at_most(
+        "child_tokens",
+        request.token_budget,
+        bounds.max_child_tokens,
+    )?;
+    crate::ensure_at_most(
+        "child_wall_time_ms",
+        request.wall_time_ms,
+        bounds.max_child_wall_time_ms,
+    )?;
     crate::ensure_at_most(
         "child_result_chars",
         u64::from(request.result_char_budget),

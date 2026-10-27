@@ -1,0 +1,10 @@
+(module
+  (memory (export "memory") 1)
+  (func (export "run") (param $ptr i32) (param $len i32) (result i32)
+    (i32.store8 (local.get $ptr) (i32.const 88))
+    (i32.store8 (i32.add (local.get $ptr) (i32.const 1)) (i32.const 89))
+    (i32.store8 (i32.add (local.get $ptr) (i32.const 2)) (i32.const 90))
+    (i32.store8 (i32.add (local.get $ptr) (i32.const 3)) (i32.const 91))
+    (i32.store8 (i32.add (local.get $ptr) (i32.const 4)) (i32.const 92))
+    (i32.store8 (i32.add (local.get $ptr) (i32.const 5)) (i32.const 93))
+    (i32.const 6)))

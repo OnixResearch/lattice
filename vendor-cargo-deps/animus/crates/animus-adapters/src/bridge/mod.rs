@@ -3,25 +3,40 @@
 #![allow(non_trait_imports)]
 
 const ID_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("interop_id");
-const TRANSPORT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("mcp_transport");
-const COMMAND_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("mcp_command_label");
-const ENDPOINT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("mcp_endpoint_label");
+const TRANSPORT_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("mcp_transport");
+const COMMAND_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("mcp_command_label");
+const ENDPOINT_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("mcp_endpoint_label");
 const TOOL_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("interop_tool");
-const RESOURCE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("mcp_resource");
+const RESOURCE_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("mcp_resource");
 const PROMPT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("mcp_prompt");
 const SCHEMA_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("mcp_schema");
-const CONTRACT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("mcp_result_contract");
-const TIMEOUT_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("interop_timeout");
+const CONTRACT_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("mcp_result_contract");
+const TIMEOUT_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("interop_timeout");
 const ENV_KEY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("env_key");
-const PROVENANCE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("interop_provenance_hash");
-const PROFILE_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("acp_model_profile");
-const PERMISSION_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("acp_permission_mode");
-const SESSION_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("acp_session_correlation");
-const POLICY_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("acp_passthrough_policy");
-const LIMITATION_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("acp_limitation");
-const OPERATION_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("interop_operation");
-const STATUS_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("receipt_status");
-const REDACTION_FIELD: crate::validation::FieldName = crate::validation::FieldName::new("receipt_redaction");
+const PROVENANCE_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("interop_provenance_hash");
+const PROFILE_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("acp_model_profile");
+const PERMISSION_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("acp_permission_mode");
+const SESSION_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("acp_session_correlation");
+const POLICY_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("acp_passthrough_policy");
+const LIMITATION_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("acp_limitation");
+const OPERATION_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("interop_operation");
+const STATUS_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("receipt_status");
+const REDACTION_FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("receipt_redaction");
 
 const TRANSPORT_STDIO: &str = "stdio";
 const TRANSPORT_STREAMABLE_HTTP: &str = "streamable_http";
@@ -123,40 +138,21 @@ mod bridgecases;
 #[cfg(test)]
 mod tests;
 
-pub use boundary::McpAdvertisementDecision;
-pub use boundary::McpAdvertisementInput;
-pub use boundary::McpArgumentStatus;
-pub use boundary::McpDispatchDecision;
-pub use boundary::McpDispatchRequest;
-pub use boundary::McpMutationStatus;
-pub use boundary::McpReceipt;
-pub use boundary::McpReceiptDraft;
-pub use boundary::McpReceiptTruncationState;
-pub use boundary::McpServerTrust;
-pub use boundary::McpToolMapping;
-pub use boundary::McpToolMappingDraft;
-pub use boundary::McpTransportDecision;
-pub use boundary::McpTransportFailureClass;
-pub use boundary::McpTransportState;
-pub use boundary::evaluate_mcp_dispatch;
-pub use boundary::evaluate_mcp_transport;
-pub use boundary::plan_mcp_advertisement;
-pub use boundary::validate_mcp_receipt_text;
-pub use labels::AcpPermissionMode;
-pub use labels::AcpSessionCorrelation;
-pub use labels::AcpToolPassThroughPolicy;
-pub use labels::InteropOperationKind;
-pub use labels::McpTransportKind;
-pub use provider::AcpDescriptor;
-pub use provider::AcpDescriptorDraft;
-pub use record::InteropReceipt;
-pub use record::InteropReceiptDraft;
-pub use record::validate_interop_receipt_text;
-pub use route::ToolPassThroughInput;
-pub use route::ToolPassThroughResolution;
-pub use route::resolve_tool_pass_through;
-pub use server::McpDescriptor;
-pub use server::McpDescriptorDraft;
+pub use boundary::{
+    McpAdvertisementDecision, McpAdvertisementInput, McpArgumentStatus, McpDispatchDecision,
+    McpDispatchRequest, McpMutationStatus, McpReceipt, McpReceiptDraft, McpReceiptTruncationState,
+    McpServerTrust, McpToolMapping, McpToolMappingDraft, McpTransportDecision,
+    McpTransportFailureClass, McpTransportState, evaluate_mcp_dispatch, evaluate_mcp_transport,
+    plan_mcp_advertisement, validate_mcp_receipt_text,
+};
+pub use labels::{
+    AcpPermissionMode, AcpSessionCorrelation, AcpToolPassThroughPolicy, InteropOperationKind,
+    McpTransportKind,
+};
+pub use provider::{AcpDescriptor, AcpDescriptorDraft};
+pub use record::{InteropReceipt, InteropReceiptDraft, validate_interop_receipt_text};
+pub use route::{ToolPassThroughInput, ToolPassThroughResolution, resolve_tool_pass_through};
+pub use server::{McpDescriptor, McpDescriptorDraft};
 fn parse_value<T>(
     field_name: crate::validation::FieldName,
     value: &str,
@@ -169,7 +165,10 @@ fn parse_value<T>(
     })
 }
 
-fn required_text(field_name: crate::validation::FieldName, value: &str) -> Result<Text, InteropError> {
+fn required_text(
+    field_name: crate::validation::FieldName,
+    value: &str,
+) -> Result<Text, InteropError> {
     crate::validation::normalized_adapter_field(field_name, value).map_err(InteropError::from)
 }
 

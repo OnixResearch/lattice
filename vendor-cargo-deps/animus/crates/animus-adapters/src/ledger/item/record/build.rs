@@ -28,7 +28,11 @@ impl super::Entry {
     /// # Errors
     ///
     /// Returns [`crate::AdapterContractError`] when an entry field is invalid.
-    pub fn tool(id: &str, tool_label: &str, content: &str) -> Result<Self, crate::AdapterContractError> {
+    pub fn tool(
+        id: &str,
+        tool_label: &str,
+        content: &str,
+    ) -> Result<Self, crate::AdapterContractError> {
         Ok(Self::ToolResult {
             id: super::super::EntryId::new(id)?,
             tool_label: super::super::normalized_label(tool_label)?,
@@ -76,7 +80,11 @@ impl super::Entry {
     /// # Errors
     ///
     /// Returns [`crate::AdapterContractError`] when the identifier is invalid.
-    pub fn usage(id: &str, input_tokens: u32, output_tokens: u32) -> Result<Self, crate::AdapterContractError> {
+    pub fn usage(
+        id: &str,
+        input_tokens: u32,
+        output_tokens: u32,
+    ) -> Result<Self, crate::AdapterContractError> {
         Ok(Self::UsageObservation {
             id: super::super::EntryId::new(id)?,
             input_tokens,
@@ -89,7 +97,10 @@ impl super::Entry {
     /// # Errors
     ///
     /// Returns [`crate::AdapterContractError`] when the identifier is invalid.
-    pub fn safe_receipt(id: &str, receipt: crate::SafeReceipt) -> Result<Self, crate::AdapterContractError> {
+    pub fn safe_receipt(
+        id: &str,
+        receipt: crate::SafeReceipt,
+    ) -> Result<Self, crate::AdapterContractError> {
         Ok(Self::SafeReceipt {
             id: super::super::EntryId::new(id)?,
             receipt,

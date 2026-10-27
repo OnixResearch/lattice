@@ -7,12 +7,11 @@
 //! scans, and no ast-grep state. The release verifier shell owns running
 //! ast-grep and capturing candidate findings.
 
-use serde::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-pub use crate::ast_grep_audit_identity::AST_GREP_AUDIT_SCHEMA;
-pub use crate::ast_grep_audit_identity::DEFAULT_AST_GREP_TOOL;
-pub use crate::ast_grep_audit_identity::DEFAULT_AST_GREP_VERSION;
+pub use crate::ast_grep_audit_identity::{
+    AST_GREP_AUDIT_SCHEMA, DEFAULT_AST_GREP_TOOL, DEFAULT_AST_GREP_VERSION,
+};
 
 /// Default repository scan scope.
 pub const DEFAULT_REPOSITORY_SCOPE: &str = "src";
@@ -152,10 +151,15 @@ pub fn validate_rule_pack(pack: &AuditRulePack) -> Vec<RulePackIssue> {
                 message: "audit rule id must be non-empty".to_owned(),
             });
         }
-        if rule.posture == Posture::Blocking && (!rule.has_positive_fixture || !rule.has_negative_fixture) {
+        if rule.posture == Posture::Blocking
+            && (!rule.has_positive_fixture || !rule.has_negative_fixture)
+        {
             issues.push(RulePackIssue {
                 code: "rulepack.blocking-requires-fixtures".to_owned(),
-                message: format!("rule {} may not block release without a positive and a negative fixture", rule.id),
+                message: format!(
+                    "rule {} may not block release without a positive and a negative fixture",
+                    rule.id
+                ),
             });
         }
         for non_claim in &rule.non_claims {
@@ -243,7 +247,11 @@ mod tests {
 
         let pack = AuditRulePack::new(vec![rule]);
         let issues = validate_rule_pack(&pack);
-        assert!(issues.iter().any(|i| i.code == "rulepack.blocking-requires-fixtures"));
+        assert!(
+            issues
+                .iter()
+                .any(|i| i.code == "rulepack.blocking-requires-fixtures")
+        );
     }
 
     #[test]
@@ -254,14 +262,22 @@ mod tests {
 
         let pack = AuditRulePack::new(vec![rule]);
         let issues = validate_rule_pack(&pack);
-        assert!(issues.iter().any(|i| i.code == "rulepack.blocking-requires-fixtures"));
+        assert!(
+            issues
+                .iter()
+                .any(|i| i.code == "rulepack.blocking-requires-fixtures")
+        );
     }
 
     #[test]
     fn negative_unknown_schema_fails_closed() {
         let mut pack = AuditRulePack::new(vec![advisory_rule()]);
         pack.schema = "other".to_owned();
-        assert!(validate_rule_pack(&pack).iter().any(|i| i.code == "rulepack.schema"));
+        assert!(
+            validate_rule_pack(&pack)
+                .iter()
+                .any(|i| i.code == "rulepack.schema")
+        );
     }
 
     #[test]
@@ -269,7 +285,15 @@ mod tests {
         let pack = AuditRulePack::new(vec![advisory_rule()]);
         let receipt = advisory_receipt(&pack);
         assert!(receipt.is_advisory());
-        assert!(receipt.non_claims.contains(&CANDIDATE_EVIDENCE_NON_CLAIM.to_owned()));
-        assert!(receipt.non_claims.contains(&"does-not-prove-ucan-authority".to_owned()));
+        assert!(
+            receipt
+                .non_claims
+                .contains(&CANDIDATE_EVIDENCE_NON_CLAIM.to_owned())
+        );
+        assert!(
+            receipt
+                .non_claims
+                .contains(&"does-not-prove-ucan-authority".to_owned())
+        );
     }
 }

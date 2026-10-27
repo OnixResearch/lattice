@@ -1,0 +1,260 @@
+evaluating flake...
+checking flake output 'checks'...
+checking derivation checks.x86_64-linux.tests...
+derivation evaluated to /nix/store/m1bmfkvqg941piyyys0imyvh2mhnl18n-nickel-eval-tests-0.1.0.drv
+checking derivation checks.x86_64-linux.format...
+derivation evaluated to /nix/store/cqsicrvd9gmbrdykfp8y82f1arbb94xg-nickel-eval-format.drv
+checking flake output 'devShells'...
+checking derivation devShells.x86_64-linux.default...
+derivation evaluated to /nix/store/6yy95bb35sj83pk8qpbf4zyqr9kw5mbp-nix-shell.drv
+running 2 flake checks...
+building '/nix/store/cqsicrvd9gmbrdykfp8y82f1arbb94xg-nickel-eval-format.drv' on 'ssh-ng://root@aspen1.local'...
+building '/nix/store/m1bmfkvqg941piyyys0imyvh2mhnl18n-nickel-eval-tests-0.1.0.drv' on 'ssh-ng://root@aspen1.local'...
+copying 1 paths...
+copying path '/nix/store/5rjcdvhc8vb750hvf6qr4zjxjgxa57pk-source' to 'ssh-ng://root@aspen1.local'...
+building '/nix/store/cqsicrvd9gmbrdykfp8y82f1arbb94xg-nickel-eval-format.drv'...
+building '/nix/store/m1bmfkvqg941piyyys0imyvh2mhnl18n-nickel-eval-tests-0.1.0.drv'...
+nickel-eval-tests> Running phase: unpackPhase
+nickel-eval-tests> unpacking source archive /nix/store/5rjcdvhc8vb750hvf6qr4zjxjgxa57pk-source
+nickel-eval-tests> source root is source
+nickel-eval-tests> Executing cargoSetupPostUnpackHook
+copying 1 paths...
+copying path '/nix/store/3gl16plnm6ydsl4578r5l1x11hxw1r1j-nickel-eval-format' from 'ssh-ng://root@aspen1.local'...
+nickel-eval-tests> Finished cargoSetupPostUnpackHook
+nickel-eval-tests> Running phase: patchPhase
+nickel-eval-tests> Executing cargoSetupPostPatchHook
+nickel-eval-tests> Validating consistency between /build/source/Cargo.lock and /build/cargo-vendor-dir/Cargo.lock
+nickel-eval-tests> Finished cargoSetupPostPatchHook
+nickel-eval-tests> Running phase: updateAutotoolsGnuConfigScriptsPhase
+nickel-eval-tests> Running phase: configurePhase
+nickel-eval-tests> Running phase: buildPhase
+nickel-eval-tests> Executing cargoBuildHook
+nickel-eval-tests> cargoBuildHook flags: -j 32 --target x86_64-unknown-linux-gnu --offline --profile release --all-targets
+nickel-eval-tests>    Compiling version_check v0.9.5
+nickel-eval-tests>    Compiling proc-macro2 v1.0.107
+nickel-eval-tests>    Compiling unicode-ident v1.0.24
+nickel-eval-tests>    Compiling quote v1.0.47
+nickel-eval-tests>    Compiling serde_core v1.0.229
+nickel-eval-tests>    Compiling memchr v2.8.3
+nickel-eval-tests>    Compiling regex-syntax v0.8.11
+nickel-eval-tests>    Compiling libc v0.2.189
+nickel-eval-tests>    Compiling serde v1.0.229
+nickel-eval-tests>    Compiling typenum v1.20.1
+nickel-eval-tests>    Compiling rustversion v1.0.23
+nickel-eval-tests>    Compiling parking_lot_core v0.9.12
+nickel-eval-tests>    Compiling cfg-if v1.0.4
+nickel-eval-tests>    Compiling smallvec v1.15.2
+nickel-eval-tests>    Compiling scopeguard v1.2.0
+nickel-eval-tests>    Compiling siphasher v1.0.3
+nickel-eval-tests>    Compiling libm v0.2.16
+nickel-eval-tests>    Compiling hashbrown v0.17.1
+nickel-eval-tests>    Compiling equivalent v1.0.2
+nickel-eval-tests>    Compiling ryu v1.0.23
+nickel-eval-tests>    Compiling bit-vec v0.8.0
+nickel-eval-tests>    Compiling fixedbitset v0.5.7
+nickel-eval-tests>    Compiling same-file v1.0.6
+nickel-eval-tests>    Compiling foldhash v0.2.0
+nickel-eval-tests>    Compiling either v1.17.0
+nickel-eval-tests>    Compiling term v1.2.1
+nickel-eval-tests>    Compiling bytemuck v1.25.2
+nickel-eval-tests>    Compiling log v0.4.33
+nickel-eval-tests>    Compiling precomputed-hash v0.1.1
+nickel-eval-tests>    Compiling keccak v0.1.6
+nickel-eval-tests>    Compiling new_debug_unreachable v1.0.6
+nickel-eval-tests>    Compiling pico-args v0.5.0
+nickel-eval-tests>    Compiling malachite-nz v0.9.2
+nickel-eval-tests>    Compiling lock_api v0.4.14
+nickel-eval-tests>    Compiling unicode-xid v0.2.6
+nickel-eval-tests>    Compiling hashbrown v0.16.1
+nickel-eval-tests>    Compiling walkdir v2.5.0
+nickel-eval-tests>    Compiling phf_shared v0.11.3
+nickel-eval-tests>    Compiling ena v0.14.4
+nickel-eval-tests>    Compiling yansi v1.0.1
+nickel-eval-tests>    Compiling zmij v1.0.23
+nickel-eval-tests>    Compiling bit-set v0.8.0
+nickel-eval-tests>    Compiling itertools v0.14.0
+nickel-eval-tests>    Compiling fnv v1.0.7
+nickel-eval-tests>    Compiling winnow v1.0.4
+nickel-eval-tests>    Compiling foldhash v0.1.5
+nickel-eval-tests>    Compiling generic-array v0.14.7
+nickel-eval-tests>    Compiling safe_arch v1.1.0
+nickel-eval-tests>    Compiling proc-macro2-diagnostics v0.10.1
+nickel-eval-tests>    Compiling unicode-width v0.2.2
+nickel-eval-tests>    Compiling serde_json v1.0.151
+nickel-eval-tests>    Compiling termcolor v1.4.1
+nickel-eval-tests>    Compiling bitmaps v3.2.1
+nickel-eval-tests>    Compiling toml_writer v1.1.2+spec-1.1.0
+nickel-eval-tests>    Compiling hashbrown v0.15.5
+nickel-eval-tests>    Compiling ascii-canvas v4.0.0
+nickel-eval-tests>    Compiling itoa v1.0.18
+nickel-eval-tests>    Compiling heck v0.4.1
+nickel-eval-tests>    Compiling winnow v0.7.15
+nickel-eval-tests>    Compiling cpufeatures v0.2.17
+nickel-eval-tests>    Compiling arraydeque v0.5.1
+nickel-eval-tests>    Compiling aliasable v0.1.3
+nickel-eval-tests>    Compiling typed-arena v2.0.2
+nickel-eval-tests>    Compiling paste v1.0.15
+nickel-eval-tests>    Compiling static_assertions v1.1.0
+nickel-eval-tests>    Compiling arrayvec v0.5.2
+nickel-eval-tests>    Compiling bumpalo v3.20.3
+nickel-eval-tests>    Compiling unsafe-libyaml v0.2.11
+nickel-eval-tests>    Compiling aho-corasick v1.1.5
+nickel-eval-tests>    Compiling simple-counter v0.1.0
+nickel-eval-tests>    Compiling once_cell v1.21.4
+nickel-eval-tests>    Compiling thiserror v2.0.19
+nickel-eval-tests>    Compiling toml_parser v1.1.3+spec-1.1.0
+nickel-eval-tests>    Compiling vte v0.14.1
+nickel-eval-tests>    Compiling json_scanner v0.1.0
+nickel-eval-tests>    Compiling indexmap v2.14.0
+nickel-eval-tests>    Compiling wide v1.5.0
+nickel-eval-tests>    Compiling base64 v0.22.1
+nickel-eval-tests>    Compiling pretty v0.12.5
+nickel-eval-tests>    Compiling strip-ansi-escapes v0.2.1
+nickel-eval-tests>    Compiling getrandom v0.4.3
+nickel-eval-tests>    Compiling rustix v1.1.4
+nickel-eval-tests>    Compiling imbl-sized-chunks v0.1.3
+nickel-eval-tests>    Compiling syn v3.0.3
+nickel-eval-tests>    Compiling syn v2.0.119
+nickel-eval-tests>    Compiling colorchoice v1.0.5
+nickel-eval-tests>    Compiling strsim v0.11.1
+nickel-eval-tests>    Compiling unicode-segmentation v1.13.3
+nickel-eval-tests>    Compiling indoc v2.0.7
+nickel-eval-tests>    Compiling hashlink v0.10.0
+nickel-eval-tests>    Compiling bitflags v2.13.1
+nickel-eval-tests>    Compiling linux-raw-sys v0.12.1
+nickel-eval-tests>    Compiling fastrand v2.5.0
+nickel-eval-tests>    Compiling crypto-common v0.1.7
+nickel-eval-tests>    Compiling block-buffer v0.10.4
+nickel-eval-tests>    Compiling petgraph v0.7.1
+nickel-eval-tests>    Compiling saphyr-parser v0.0.6
+nickel-eval-tests>    Compiling digest v0.10.7
+nickel-eval-tests>    Compiling sha3 v0.10.9
+nickel-eval-tests>    Compiling parking_lot v0.12.5
+nickel-eval-tests>    Compiling md-5 v0.10.6
+nickel-eval-tests>    Compiling sha2 v0.10.9
+nickel-eval-tests>    Compiling sha-1 v0.10.1
+nickel-eval-tests>    Compiling string_cache v0.8.9
+nickel-eval-tests>    Compiling malachite-base v0.9.2
+nickel-eval-tests>    Compiling regex-automata v0.4.18
+nickel-eval-tests>    Compiling toml_datetime v0.7.5+spec-1.1.0
+nickel-eval-tests>    Compiling serde_spanned v1.1.1
+nickel-eval-tests>    Compiling serde_derive v1.0.229
+nickel-eval-tests>    Compiling thiserror-impl v2.0.19
+nickel-eval-tests>    Compiling toml v0.9.12+spec-1.1.0
+nickel-eval-tests>    Compiling tempfile v3.27.0
+nickel-eval-tests>    Compiling toml_edit v0.24.1+spec-1.1.0
+nickel-eval-tests>    Compiling ouroboros_macro v0.18.5
+nickel-eval-tests>    Compiling ouroboros v0.18.5
+nickel-eval-tests>    Compiling lalrpop-util v0.22.2
+nickel-eval-tests>    Compiling regex v1.13.1
+nickel-eval-tests>    Compiling logos-codegen v0.16.1
+nickel-eval-tests>    Compiling lalrpop v0.22.2
+nickel-eval-tests>    Compiling codespan-reporting v0.13.1
+nickel-eval-tests>    Compiling nickel-lang-vector v0.2.0
+nickel-eval-tests>    Compiling serde_yaml v0.9.34+deprecated
+nickel-eval-tests>    Compiling codespan v0.13.1
+nickel-eval-tests>    Compiling logos-derive v0.16.1
+nickel-eval-tests>    Compiling logos v0.16.1
+nickel-eval-tests>    Compiling nickel-lang-parser v0.3.0
+nickel-eval-tests>    Compiling nickel-lang-core v0.18.0 (/build/source/vendor/nickel-lang-core-0.18.0)
+nickel-eval-tests>    Compiling malachite-q v0.9.2
+nickel-eval-tests>    Compiling malachite-float v0.9.2
+nickel-eval-tests>    Compiling malachite v0.9.2
+nickel-eval-tests>    Compiling nickel-lang v2.2.0
+nickel-eval-tests>    Compiling nickel-eval v0.1.0 (/build/source)
+nickel-eval-tests>     Finished `release` profile [optimized] target(s) in 51.47s
+nickel-eval-tests> Finished cargoBuildHook
+nickel-eval-tests> buildPhase completed in 52 seconds
+nickel-eval-tests> Running phase: checkPhase
+nickel-eval-tests> Executing cargoCheckHook
+nickel-eval-tests> cargoCheckHook flags: -j 32 --profile release --target x86_64-unknown-linux-gnu --offline --all-targets --
+nickel-eval-tests>    Compiling nickel-eval v0.1.0 (/build/source)
+nickel-eval-tests>     Finished `release` profile [optimized] target(s) in 0.10s
+nickel-eval-tests>      Running unittests src/lib.rs (target/x86_64-unknown-linux-gnu/release/deps/nickel_eval-e7b5f99ddfb1a7db)
+nickel-eval-tests> 
+nickel-eval-tests> running 24 tests
+nickel-eval-tests> test cohort::tests::exact_reviewed_cohort_is_admitted ... ok
+nickel-eval-tests> test cohort::tests::drifted_mixed_and_unsupported_cohorts_fail_closed ... ok
+nickel-eval-tests> test errors::tests::contract_violation_display ... ok
+nickel-eval-tests> test errors::tests::diagnostic_context_merge_preserves_existing_and_overrides_explicit_fields ... ok
+nickel-eval-tests> test errors::tests::diagnostic_summary_bounds_long_messages ... ok
+nickel-eval-tests> test errors::tests::deserialization_display ... ok
+nickel-eval-tests> test errors::tests::diagnostic_summary_redacts_secret_like_message_values ... ok
+nickel-eval-tests> test errors::tests::evaluation_error_display ... ok
+nickel-eval-tests> test errors::tests::diagnostic_summary_preserves_programmatic_categories ... ok
+nickel-eval-tests> test errors::tests::diagnostic_summary_includes_context_fields ... ok
+nickel-eval-tests> test errors::tests::nickel_error_inline_size_stays_bounded ... ok
+nickel-eval-tests> test errors::tests::io_error_display ... ok
+nickel-eval-tests> test errors::tests::serialization_display ... ok
+nickel-eval-tests> test errors::tests::serialization_display_no_context ... ok
+nickel-eval-tests> test errors::tests::stdlib_resolution_display ... ok
+nickel-eval-tests> test errors::tests::template_generation_display ... ok
+nickel-eval-tests> test evaluator::tests::source_limit_must_be_positive ... ok
+nickel-eval-tests> test syntax::tests::bare_identifier ... ok
+nickel-eval-tests> test syntax::tests::escape_string_basics ... ok
+nickel-eval-tests> test syntax::tests::field_name_escaping ... ok
+nickel-eval-tests> test syntax::tests::keywords_are_not_identifiers ... ok
+nickel-eval-tests> test syntax::tests::non_identifiers ... ok
+nickel-eval-tests> test syntax::tests::render_key_bare ... ok
+nickel-eval-tests> test syntax::tests::render_key_quoted ... ok
+nickel-eval-tests> 
+nickel-eval-tests> test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+nickel-eval-tests> 
+nickel-eval-tests>      Running tests/boundary.rs (target/x86_64-unknown-linux-gnu/release/deps/boundary-43cdde5f9165f9e0)
+nickel-eval-tests> 
+nickel-eval-tests> running 4 tests
+nickel-eval-tests> test guard_rejects_product_and_sibling_dependencies ... ok
+nickel-eval-tests> test cargo_and_runtime_cohort_facts_are_exact ... ok
+nickel-eval-tests> test publication_guard_rejects_fallbacks_and_old_objects ... ok
+nickel-eval-tests> test shared_source_has_no_product_dependency ... ok
+nickel-eval-tests> 
+nickel-eval-tests> test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+nickel-eval-tests> 
+nickel-eval-tests>      Running tests/evaluator.rs (target/x86_64-unknown-linux-gnu/release/deps/evaluator-12bcd657a779d716)
+nickel-eval-tests> 
+nickel-eval-tests> running 10 tests
+nickel-eval-tests> test empty_contract_identity_fails_before_runtime ... ok
+nickel-eval-tests> test empty_source_fails_before_runtime ... ok
+nickel-eval-tests> test oversized_source_fails_before_runtime ... ok
+nickel-eval-tests> test contract_rejects_wrong_type ... ok
+nickel-eval-tests> test missing_import_is_evaluation_error ... ok
+nickel-eval-tests> test evaluate_file_resolves_sibling_import ... ok
+nickel-eval-tests> test malformed_source_is_evaluation_error ... ok
+nickel-eval-tests> test evaluate_json_export_array ... ok
+nickel-eval-tests> test deserialization_mismatch_is_error ... ok
+nickel-eval-tests> test evaluate_literals_and_records ... ok
+nickel-eval-tests> 
+nickel-eval-tests> test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+nickel-eval-tests> 
+nickel-eval-tests>      Running tests/imported_merge.rs (target/x86_64-unknown-linux-gnu/release/deps/imported_merge-1790dd3830d00ea2)
+nickel-eval-tests> 
+nickel-eval-tests> running 5 tests
+nickel-eval-tests> test deserialized_nested_data_merges_without_input_normalization ... ok
+nickel-eval-tests> test serde_created_containers_support_nested_contracts_and_merge ... ok
+nickel-eval-tests> test imported_json_accepts_nested_record_and_array_contracts ... ok
+nickel-eval-tests> test invalid_imports_and_nested_contracts_keep_safe_failure_categories ... ok
+nickel-eval-tests> test imported_json_and_yaml_merge_preserve_complete_values ... ok
+nickel-eval-tests> 
+nickel-eval-tests> test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+nickel-eval-tests> 
+nickel-eval-tests>      Running unittests examples/export_json.rs (target/x86_64-unknown-linux-gnu/release/examples/export_json-9587030db4cd1ad0)
+nickel-eval-tests> 
+nickel-eval-tests> running 0 tests
+nickel-eval-tests> 
+nickel-eval-tests> test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+nickel-eval-tests> 
+nickel-eval-tests> Finished cargoCheckHook
+nickel-eval-tests> Running phase: installPhase
+nickel-eval-tests> Running phase: fixupPhase
+nickel-eval-tests> shrinking RPATHs of ELF executables and libraries in /nix/store/sr8v2xini0hg8in1n4dkl6rsvn3k4i13-nickel-eval-tests-0.1.0
+nickel-eval-tests> checking for references to /build/ in /nix/store/sr8v2xini0hg8in1n4dkl6rsvn3k4i13-nickel-eval-tests-0.1.0...
+nickel-eval-tests> patching script interpreter paths in /nix/store/sr8v2xini0hg8in1n4dkl6rsvn3k4i13-nickel-eval-tests-0.1.0
+copying 1 paths...
+copying path '/nix/store/sr8v2xini0hg8in1n4dkl6rsvn3k4i13-nickel-eval-tests-0.1.0' from 'ssh-ng://root@aspen1.local'...
+all checks passed!
+warning: The check omitted these incompatible systems: aarch64-linux
+Use '--all-systems' to check all.
+OWNING_NICKEL_EXIT=0
+
+
+Wall time: 55.88 seconds

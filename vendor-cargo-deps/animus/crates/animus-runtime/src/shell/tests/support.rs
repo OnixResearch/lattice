@@ -96,10 +96,16 @@ impl ModelStub {
     }
 }
 
-impl animus_adapters::ComponentAdapter<animus_adapters::ModelRequest, animus_adapters::ModelResponse> for ModelStub {
+impl
+    animus_adapters::ComponentAdapter<animus_adapters::ModelRequest, animus_adapters::ModelResponse>
+    for ModelStub
+{
     type Error = AdapterFailure;
 
-    fn call(&mut self, request: &animus_adapters::ModelRequest) -> Result<animus_adapters::ModelResponse, Self::Error> {
+    fn call(
+        &mut self,
+        request: &animus_adapters::ModelRequest,
+    ) -> Result<animus_adapters::ModelResponse, Self::Error> {
         assert_eq!(request.prompt(), SUMMARY);
         self.calls = self.calls.saturating_add(EXPECTED_ADAPTER_CALLS);
         if self.fail {
@@ -131,16 +137,27 @@ impl ToolStub {
     }
 }
 
-impl animus_adapters::ComponentAdapter<animus_adapters::ToolRequest, animus_adapters::ToolResponse> for ToolStub {
+impl animus_adapters::ComponentAdapter<animus_adapters::ToolRequest, animus_adapters::ToolResponse>
+    for ToolStub
+{
     type Error = AdapterFailure;
 
-    fn call(&mut self, request: &animus_adapters::ToolRequest) -> Result<animus_adapters::ToolResponse, Self::Error> {
+    fn call(
+        &mut self,
+        request: &animus_adapters::ToolRequest,
+    ) -> Result<animus_adapters::ToolResponse, Self::Error> {
         assert_eq!(request.name(), TOOL_NAME);
         assert_eq!(request.schema_identity(), TOOL_SCHEMA);
         assert_eq!(request.arguments()[NO_ADAPTER_CALLS].name(), TOOL_INPUT);
-        assert_eq!(request.arguments()[NO_ADAPTER_CALLS].value(), TOOL_ARGUMENT_VALUE);
+        assert_eq!(
+            request.arguments()[NO_ADAPTER_CALLS].value(),
+            TOOL_ARGUMENT_VALUE
+        );
         assert_eq!(request.correlation_id(), TOOL_CALL_ID);
-        assert_eq!(request.output_policy().visible_char_budget, TOOL_VISIBLE_BUDGET);
+        assert_eq!(
+            request.output_policy().visible_char_budget,
+            TOOL_VISIBLE_BUDGET
+        );
         self.calls = self.calls.saturating_add(EXPECTED_ADAPTER_CALLS);
         if self.fail {
             return Err(AdapterFailure);
@@ -208,7 +225,10 @@ pub(super) fn run_policy_program_with_bad_profile(
     )
 }
 
-pub(super) fn run_program_with_missing_model_service(program: &str, tool: &mut ToolStub) -> crate::RunReport {
+pub(super) fn run_program_with_missing_model_service(
+    program: &str,
+    tool: &mut ToolStub,
+) -> crate::RunReport {
     super::super::run_with_steel_program(
         program,
         &runtime_input(),
@@ -217,7 +237,10 @@ pub(super) fn run_program_with_missing_model_service(program: &str, tool: &mut T
     )
 }
 
-pub(super) fn run_program_with_missing_tool_service(program: &str, model: &mut ModelStub) -> crate::RunReport {
+pub(super) fn run_program_with_missing_tool_service(
+    program: &str,
+    model: &mut ModelStub,
+) -> crate::RunReport {
     super::super::run_with_steel_program(
         program,
         &runtime_input(),
@@ -244,7 +267,10 @@ pub(super) fn run_program_with_unrelated_model_capability(
         },
     ])
     .expect("registry should validate");
-    assert_eq!(registry.descriptors().len(), CUSTOM_REGISTRY_DESCRIPTOR_COUNT);
+    assert_eq!(
+        registry.descriptors().len(),
+        CUSTOM_REGISTRY_DESCRIPTOR_COUNT
+    );
     assert!(registry.contains_service(crate::RuntimeCapabilityServiceKind::Model));
     assert!(registry.contains_service(crate::RuntimeCapabilityServiceKind::Tool));
     super::super::run_with_steel_program(
@@ -269,7 +295,10 @@ pub(super) fn run_program_with_unrelated_tool_capability(
         },
     ])
     .expect("registry should validate");
-    assert_eq!(registry.descriptors().len(), CUSTOM_REGISTRY_DESCRIPTOR_COUNT);
+    assert_eq!(
+        registry.descriptors().len(),
+        CUSTOM_REGISTRY_DESCRIPTOR_COUNT
+    );
     assert!(registry.contains_service(crate::RuntimeCapabilityServiceKind::Model));
     assert!(registry.contains_service(crate::RuntimeCapabilityServiceKind::Tool));
     super::super::run_with_steel_program(
@@ -296,7 +325,10 @@ pub(super) fn tool_response() -> animus_adapters::ToolResponse {
         },
     )
     .expect("tool output should bound");
-    animus_adapters::ToolResponse::from_bounded(bounded, animus_adapters::tool::OutputRedactionClass::Safe)
+    animus_adapters::ToolResponse::from_bounded(
+        bounded,
+        animus_adapters::tool::OutputRedactionClass::Safe,
+    )
 }
 
 fn runtime_adapters<'a>(
@@ -355,9 +387,11 @@ fn policy_script_for_program(program: &str) -> animus_steel::SteelPolicyScript<'
 }
 
 fn runtime_config_with_initial_turn_budget() -> crate::RuntimeConfig {
-    crate::RuntimeConfig::from_max_turn_count(INITIAL_TURN_BUDGET).expect("one max turn should be valid")
+    crate::RuntimeConfig::from_max_turn_count(INITIAL_TURN_BUDGET)
+        .expect("one max turn should be valid")
 }
 
 pub(super) fn runtime_config_with_followup_turn_budget() -> crate::RuntimeConfig {
-    crate::RuntimeConfig::from_max_turn_count(FOLLOWUP_TURN_BUDGET).expect("two max turns should be valid")
+    crate::RuntimeConfig::from_max_turn_count(FOLLOWUP_TURN_BUDGET)
+        .expect("two max turns should be valid")
 }

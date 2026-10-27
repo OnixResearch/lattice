@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Lattice-owned import metadata, not part of the immutable Rats source snapshot.
+# The MIT default below applies only to the imported historical Rats packages.
+# scripts/sync_rats.rs carries this wrapper alongside every refreshed snapshot.
+[workspace]
+members = ["source/ratcore", "source/subwayrat/crates/*"]
+resolver = "2"
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+version = "0.1.0"
+
+[workspace.dependencies]
+blake3 = "1.8.3"
+ratatui = { version = "0.30", default-features = false }
+ratcore = { path = "source/ratcore" }
+unicode-width = "0.2"

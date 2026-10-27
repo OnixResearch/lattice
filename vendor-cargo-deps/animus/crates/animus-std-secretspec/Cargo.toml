@@ -1,0 +1,52 @@
+[package]
+name = "animus-std-secretspec"
+description = "Optional bounded SecretSpec credential resolver for Animus host shells."
+edition = "2024"
+license = "AGPL-3.0-or-later"
+readme = "../../README.md"
+rust-version = "1.85"
+version = "0.1.0"
+autobins = false
+
+[features]
+default = []
+test-fixtures = []
+
+[[bin]]
+name = "animus-secretspec-worker"
+path = "src/bin/animus-secretspec-worker.rs"
+
+[[bin]]
+name = "animus-secretspec-sops-guard"
+path = "src/bin/animus-secretspec-sops-guard.rs"
+
+[[bin]]
+name = "animus-secretspec-sops-fixture"
+path = "src/bin/animus-secretspec-sops-fixture.rs"
+required-features = ["test-fixtures"]
+
+[[test]]
+name = "providers"
+path = "tests/providers.rs"
+required-features = ["test-fixtures"]
+
+[lints.rust]
+missing_docs = "deny"
+unsafe_code = "forbid"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(animus_octet)'] }
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+module_name_repetitions = { level = "allow", priority = 1 }
+pedantic = { level = "deny", priority = -1 }
+undocumented_unsafe_blocks = "deny"
+
+[dependencies]
+animus-adapters = { path = "../animus-adapters", version = "0.1.0" }
+blake3 = "1.8"
+bounded-exec = { git = "https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git", rev = "29dac88ecded94457572db3fdfaaaab95fa91525" }
+secretspec = { git = "https://github.com/cachix/secretspec.git", rev = "a8794e46ec9664a0e1a3869cc3105d0853937e48", default-features = false, features = ["sops"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tempfile = "3"
+zeroize = "1"

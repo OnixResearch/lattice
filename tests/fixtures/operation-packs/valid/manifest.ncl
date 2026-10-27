@@ -121,7 +121,7 @@
   admission = {
     identity = "b3:dfb435480ff7db7d6dab7075b9fb2933dd03a2fb2fd1399d7590ccec23d5b660",
     required_evidence = [],
-    allowed_licenses = ["MIT"],
+    allowed_licenses = ["AGPL-3.0-or-later"],
     allowed_capabilities = ["process_read"],
   },
   release = {
@@ -129,7 +129,7 @@
     channel = "beta",
     deprecated = false,
   },
-  licenses = ["MIT"],
+  licenses = ["AGPL-3.0-or-later"],
   required_non_claims = [
     "pack identity proves exact admitted content only",
     "pack admission does not prove maintainer or source trust",

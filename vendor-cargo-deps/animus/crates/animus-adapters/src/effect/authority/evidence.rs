@@ -186,7 +186,9 @@ pub(super) fn receipt_hash(fields: &ReceiptHashFields<'_>) -> alloc::string::Str
         fields.caveats.denies(),
         fields.caveats.asks()
     );
-    let sandbox = fields.sandbox_hash.map_or("none", super::super::SafeHash::as_str);
+    let sandbox = fields
+        .sandbox_hash
+        .map_or("none", super::super::SafeHash::as_str);
     super::schema::hash_parts(&[
         super::schema::HASH_SCHEMA,
         fields.status.as_str(),

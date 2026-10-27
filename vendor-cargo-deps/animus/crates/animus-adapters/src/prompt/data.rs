@@ -4,22 +4,16 @@ pub(in crate::prompt) mod forms;
 mod proof;
 mod rules;
 
-pub use carrier::ContextReferenceFragment;
-pub use carrier::ContextResolutionPlan;
-pub use carrier::ResolvedContextCandidate;
+pub use carrier::{ContextReferenceFragment, ContextResolutionPlan, ResolvedContextCandidate};
 pub use failure::ContextReferenceError;
-pub use forms::ContextLineRange;
-pub use forms::ContextReference;
-pub use forms::ContextReferenceKind;
-pub use forms::ContextRenderMode;
-pub use forms::ContextSourceTrust;
-pub use proof::ContextReferenceCounts;
-pub use proof::ContextReferenceProvenance;
-pub use proof::ContextReferenceProvenanceDraft;
-pub use rules::ContextOversizedPolicy;
-pub use rules::ContextReferenceBudget;
-pub use rules::ContextReferencePolicy;
-pub use rules::ContextReferencePolicyDecision;
-pub use rules::ContextReferenceStatus;
-pub use rules::ContextResolverKind;
-pub use rules::ContextTruncationState;
+pub use forms::{
+    ContextLineRange, ContextReference, ContextReferenceKind, ContextRenderMode, ContextSourceTrust,
+};
+pub use proof::{
+    ContextReferenceCounts, ContextReferenceProvenance, ContextReferenceProvenanceDraft,
+};
+pub use rules::{
+    ContextOversizedPolicy, ContextReferenceBudget, ContextReferencePolicy,
+    ContextReferencePolicyDecision, ContextReferenceStatus, ContextResolverKind,
+    ContextTruncationState,
+};

@@ -64,7 +64,9 @@ fn validate_with_limit(input: LimitInput<'_>) -> Result<String, super::super::De
 pub(crate) fn validate_hash(input: HashInput<'_>) -> Result<(), super::super::DelegationFailure> {
     debug_assert!(!input.field.is_empty());
     let hash = input.value.trim();
-    if hash.len() != super::super::BLAKE3_HEX_CHARS || !hash.chars().all(|character| character.is_ascii_hexdigit()) {
+    if hash.len() != super::super::BLAKE3_HEX_CHARS
+        || !hash.chars().all(|character| character.is_ascii_hexdigit())
+    {
         return Err(super::super::DelegationFailure::new(
             super::super::FailureKind::UnsafeText,
             input.field,
@@ -76,7 +78,9 @@ pub(crate) fn validate_hash(input: HashInput<'_>) -> Result<(), super::super::De
 
 fn contains_unsafe_marker(value: &str) -> bool {
     let lower = value.to_ascii_lowercase();
-    super::super::UNSAFE_TEXT_MARKERS.iter().any(|marker| lower.contains(&marker.to_ascii_lowercase()))
+    super::super::UNSAFE_TEXT_MARKERS
+        .iter()
+        .any(|marker| lower.contains(&marker.to_ascii_lowercase()))
 }
 
 pub(crate) fn validate_non_empty_slice<T>(

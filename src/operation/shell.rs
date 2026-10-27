@@ -207,7 +207,7 @@ fn execute_authorized(
         }
     };
     let dispatch = session.dispatch();
-    let http = crate::http::NoopHttpClient;
+    let http = crate::http::NativeHttpClient;
     let runtime = match request.cancellation {
         Some(cancellation) => crate::engine::effect::runtime::Adapters::new_with_cancellation(
             dispatch,

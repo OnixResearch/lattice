@@ -1,4 +1,5 @@
-const FIELD: crate::validation::FieldName = crate::validation::FieldName::new("dataspace_assertion_kind");
+const FIELD: crate::validation::FieldName =
+    crate::validation::FieldName::new("dataspace_assertion_kind");
 
 const RUNTIME_EVENT: &str = "runtime_event";
 const TOOL_STATE: &str = "tool_state";

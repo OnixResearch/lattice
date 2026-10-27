@@ -37,6 +37,7 @@ pub enum WorkflowDiagnosticCode {
     MalformedSecretRef,
     CredentialRefWithoutNode,
     UnknownCredentialProvider,
+    RunnerSettingsWithoutNode,
     UnsupportedCredentialField,
     InvalidHttpMethod,
     InvalidHttpUrl,
@@ -164,6 +165,18 @@ fn validate_node_configs(workflow: &Workflow, diagnostics: &mut Vec<WorkflowDiag
                 Some(node_id),
                 None,
                 "node config references a missing graph node".to_string(),
+            ));
+        }
+    }
+
+    for node_id in workflow.runner.keys() {
+        let node_id = crate::engine::workflow::NodeId(*node_id);
+        if workflow.graph.node(node_id).is_none() {
+            diagnostics.push(fatal(
+                WorkflowDiagnosticCode::RunnerSettingsWithoutNode,
+                Some(node_id),
+                None,
+                "runner settings belong to a missing graph node".to_string(),
             ));
         }
     }
@@ -382,12 +395,16 @@ fn validate_condition_topology(
         .map(|branch| branch.label.as_str())
         .collect::<std::collections::BTreeSet<_>>();
     for branch in &config.branches {
-        if !node.output_ports.iter().any(|port| port.label == branch.label) {
+        let matching_ports = node.output_ports.iter().filter(|port| port.label == branch.label).count();
+        if matching_ports != 1 {
             diagnostics.push(fatal(
                 WorkflowDiagnosticCode::InvalidConditionConfig,
                 Some(node.id),
                 None,
-                format!("condition branch '{}' has no matching output port", branch.label),
+                format!(
+                    "condition branch '{}' requires exactly one matching output port, found {matching_ports}",
+                    branch.label
+                ),
             ));
         }
     }

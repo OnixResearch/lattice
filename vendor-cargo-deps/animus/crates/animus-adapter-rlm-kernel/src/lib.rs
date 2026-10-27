@@ -18,43 +18,39 @@ extern crate alloc;
 
 use alloc::string::ToString;
 
+mod bridge;
 mod child;
 mod environment;
 mod policy;
 mod receipt;
 mod request;
+mod skillmodule;
 
-pub use child::ChildResult;
-pub use child::ChildSpawnRequest;
-pub use child::Lineage;
-pub use child::admit_child_spawn;
-pub use environment::CompactionCause;
-pub use environment::CompactionRequest;
-pub use environment::ContextBinding;
-pub use environment::DefinitionCommit;
-pub use environment::EnvironmentState;
-pub use environment::EvaluationMetrics;
-pub use environment::EvaluationPlan;
-pub use environment::EvaluationRequest;
-pub use environment::KernelCompactionPlan;
-pub use environment::bind_prompt_context;
-pub use environment::commit_evaluation;
-pub use environment::plan_compaction;
-pub use environment::plan_evaluation;
-pub use policy::REQUIRED_NON_CLAIMS;
-pub use policy::RLM_KERNEL_POLICY_SCHEMA;
-pub use policy::ResourceBounds;
-pub use policy::RlmKernelPolicy;
-pub use policy::RlmKernelPolicyDraft;
-pub use receipt::Receipt;
-pub use receipt::ReceiptCount;
-pub use receipt::ReceiptDraft;
-pub use receipt::ReceiptLeakClass;
-pub use receipt::RlmKernelStatus;
-pub use request::HostOperationClass;
-pub use request::HostRequest;
-pub use request::HostRequestAdmission;
-pub use request::admit_host_request;
+pub use bridge::{
+    BridgeCallObservation, BridgeCellIdentity, BridgeCompletedCall, BridgeCorrelation,
+    BridgeFailureClass, BridgePendingCall, BridgeReplayCallDraft, BridgeRunState, BridgeState,
+    host_request_identity,
+};
+pub use child::{ChildResult, ChildSpawnRequest, Lineage, admit_child_spawn};
+pub use environment::{
+    CompactionCause, CompactionRequest, ContextBinding, DefinitionCommit, EnvironmentState,
+    EvaluationMetrics, EvaluationPlan, EvaluationRequest, KernelCompactionPlan,
+    bind_prompt_context, commit_evaluation, plan_compaction, plan_evaluation,
+};
+pub use policy::{
+    REQUIRED_NON_CLAIMS, RLM_KERNEL_POLICY_SCHEMA, ResourceBounds, RlmKernelPolicy,
+    RlmKernelPolicyDraft,
+};
+pub use receipt::{Receipt, ReceiptCount, ReceiptDraft, ReceiptLeakClass, RlmKernelStatus};
+pub use request::{HostOperationClass, HostRequest, HostRequestAdmission, admit_host_request};
+pub use skillmodule::{
+    STEEL_SKILL_MODULE_COHORT, STEEL_SKILL_MODULE_IDENTITY_DOMAIN,
+    STEEL_SKILL_MODULE_RECEIPT_DOMAIN, STEEL_SKILL_MODULE_SCHEMA, SteelSkillModuleAuthority,
+    SteelSkillModuleBounds, SteelSkillModuleDependency, SteelSkillModuleDependencyDraft,
+    SteelSkillModuleDescriptor, SteelSkillModuleDescriptorDraft, SteelSkillModuleError,
+    SteelSkillModulePlan, SteelSkillModuleReceipt, SteelSkillModuleTrust,
+    resolve_steel_skill_modules, steel_skill_module_source_identity,
+};
 
 /// Stable schema for the model-facing Steel tool request.
 pub const STEEL_REPL_TOOL_SCHEMA: &str = "animus.steel-repl.v1";
@@ -140,6 +136,14 @@ pub enum Error {
     ProhibitedClaim,
     /// A receipt contradicts its status or preservation facts.
     InconsistentReceipt,
+    /// A bridge transition does not apply to the current state.
+    BridgeStateConflict,
+    /// A bridge result does not match the pending call.
+    BridgeCorrelationMismatch,
+    /// Cancellation stopped a bridge run.
+    BridgeCancelled,
+    /// The bridge wall-time bound expired.
+    BridgeTimedOut,
 }
 
 impl core::fmt::Display for Error {
@@ -151,7 +155,10 @@ impl core::fmt::Display for Error {
                 field,
                 max_chars,
                 actual_chars,
-            } => write!(formatter, "{field} must contain at most {max_chars} characters; got {actual_chars}"),
+            } => write!(
+                formatter,
+                "{field} must contain at most {max_chars} characters; got {actual_chars}"
+            ),
             Self::ZeroBound { field } => write!(formatter, "{field} must be positive"),
             Self::BoundExceeded { field, max, actual } => {
                 write!(formatter, "{field} must be at most {max}; got {actual}")
@@ -160,29 +167,54 @@ impl core::fmt::Display for Error {
                 formatter.write_str("cohort revision must be lowercase 40-character Git hex")
             }
             Self::InvalidBlake3Identity { field } => {
-                write!(formatter, "{field} must be lowercase 64-character BLAKE3 hex")
+                write!(
+                    formatter,
+                    "{field} must be lowercase 64-character BLAKE3 hex"
+                )
             }
             Self::OperationNotAdmitted { operation } => {
-                write!(formatter, "operation {} is not admitted", operation.as_str())
+                write!(
+                    formatter,
+                    "operation {} is not admitted",
+                    operation.as_str()
+                )
             }
             Self::MissingNonClaim { non_claim } => {
                 write!(formatter, "required non-claim {non_claim} is missing")
             }
             Self::DuplicateIdentity { field } => write!(formatter, "{field} contains duplicates"),
-            Self::InvalidBindingName => formatter.write_str("binding name is not a safe Steel identifier"),
+            Self::InvalidBindingName => {
+                formatter.write_str("binding name is not a safe Steel identifier")
+            }
             Self::ChildProfileNotAdmitted => formatter.write_str("child profile is not admitted"),
             Self::AmbientChildSpawnDenied => formatter.write_str("ambient child spawn is denied"),
-            Self::ImplicitKernelClearDenied => formatter.write_str("implicit kernel clear is denied"),
+            Self::ImplicitKernelClearDenied => {
+                formatter.write_str("implicit kernel clear is denied")
+            }
             Self::ReceiptLeak { class } => {
-                write!(formatter, "receipt contains prohibited {} content", class.as_str())
+                write!(
+                    formatter,
+                    "receipt contains prohibited {} content",
+                    class.as_str()
+                )
             }
             Self::ProhibitedClaim => formatter.write_str("receipt contains a prohibited claim"),
             Self::InconsistentReceipt => formatter.write_str("receipt facts are inconsistent"),
+            Self::BridgeStateConflict => formatter.write_str("bridge state rejects the transition"),
+            Self::BridgeCorrelationMismatch => {
+                formatter.write_str("bridge result correlation does not match the pending call")
+            }
+            Self::BridgeCancelled => formatter.write_str("bridge run was cancelled"),
+            Self::BridgeTimedOut => formatter.write_str("bridge wall-time bound expired"),
         }
     }
 }
 
-pub(crate) fn required_text(field: &'static str, value: &str, max_chars: u32) -> Result<alloc::string::String, Error> {
+pub(crate) fn required_text(
+    field: &'static str,
+    value: &str,
+    max_chars: u32,
+) -> Result<alloc::string::String, Error> {
     let normalized = value.trim();
     if normalized.is_empty() {
         return Err(Error::EmptyField { field });
@@ -228,7 +260,10 @@ pub(crate) fn usize_to_u64(value: usize) -> u64 {
 }
 
 pub(crate) fn is_lower_hex(value: &str, expected_chars: usize) -> bool {
-    value.len() == expected_chars && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    value.len() == expected_chars
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 pub(crate) fn hash_parts(domain: &str, parts: &[&str]) -> alloc::string::String {

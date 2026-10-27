@@ -1,0 +1,8 @@
+hardened-wasmtime-runtime development environment
+Rust: rustc 1.97.1 (8bab26f4f 2026-07-14)
+
+Gates:
+  cargo test
+  nix run .#octet-deny-all -- --workspace -- --all-targets
+  nix flake check -L
+clippy-exit=0

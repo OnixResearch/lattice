@@ -5,7 +5,7 @@ let MaximumRoots = 64 in
 let MaximumRootIdBytes = 128 in
 let MaximumU64 = 18446744073709551615 in
 let ProfileSchema = "lattice.standalone-effect-authority.v1" in
-let PolicyRef = "blake3:56800b3cb2f0819e31cbd32fc3ee41e1a74e7dbf6495540ad8d50db5341f0a79" in
+let PolicyRef = "blake3:0f63ce4bb3e707f53ea634a48211dad5215e1aeeec1209b25992020d6d2459ec" in
 
 let Exact = fun expected => std.contract.from_predicate (fun value =>
   std.is_string value && value == expected
@@ -56,6 +56,11 @@ let grant_is_closed = fun grant =>
     grant.operation == "lattice/file"
     && grant.resource == "lattice://file/" ++ node
     && std.array.elem grant.ability ["file/read", "file/write", "file/append"]
+  )
+  || (
+    grant.operation == "lattice/agent"
+    && grant.resource == "lattice://agent/" ++ node
+    && grant.ability == "agent/execute"
   )
 in
 

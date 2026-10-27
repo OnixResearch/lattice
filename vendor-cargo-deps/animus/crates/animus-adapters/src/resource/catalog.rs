@@ -1,19 +1,8 @@
-use super::BODY_FIELD;
-use super::Catalog;
-use super::Collection;
-use super::ContentDraft;
-use super::Context;
-use super::DIAGNOSTIC_SLOTS_PER_DESCRIPTOR;
-use super::Descriptor;
-use super::Diagnostic;
-use super::Issue;
-use super::LoadedContent;
-use super::MAX_DESCRIPTORS;
-use super::Request;
-use super::Summary;
-use super::Text;
-use super::TrustStatus;
-use super::validation;
+use super::{
+    BODY_FIELD, Catalog, Collection, ContentDraft, Context, DIAGNOSTIC_SLOTS_PER_DESCRIPTOR,
+    Descriptor, Diagnostic, Issue, LoadedContent, MAX_DESCRIPTORS, Request, Summary, Text,
+    TrustStatus, validation,
+};
 
 /// Builds deterministic resource summaries from already validated descriptors.
 ///
@@ -23,7 +12,10 @@ use super::validation;
 #[must_use]
 pub fn advertise(descriptors: &[Descriptor]) -> Catalog {
     let descriptor_count = descriptors.len();
-    assert!(descriptor_count <= MAX_DESCRIPTORS, "descriptor inputs stay within the resource item bound");
+    assert!(
+        descriptor_count <= MAX_DESCRIPTORS,
+        "descriptor inputs stay within the resource item bound"
+    );
     let diagnostic_slots_count = descriptor_count.saturating_mul(DIAGNOSTIC_SLOTS_PER_DESCRIPTOR);
     assert!(
         diagnostic_slots_count >= descriptor_count,
@@ -46,7 +38,10 @@ pub fn advertise(descriptors: &[Descriptor]) -> Catalog {
 
     sort_summaries(&mut summaries);
     sort_diagnostics(&mut diagnostics);
-    Catalog { summaries, diagnostics }
+    Catalog {
+        summaries,
+        diagnostics,
+    }
 }
 
 /// Builds progressive disclosure context without loading unselected bodies.
@@ -66,9 +61,9 @@ pub fn build_context(request: Request<'_>) -> Context {
         "loaded body inputs stay within the resource item bound"
     );
     let catalog = advertise(request.descriptors);
-    let selected_content = request
-        .selected_name
-        .and_then(|selected_name| select_loaded_content(request.descriptors, request.loaded_contents, selected_name));
+    let selected_content = request.selected_name.and_then(|selected_name| {
+        select_loaded_content(request.descriptors, request.loaded_contents, selected_name)
+    });
 
     Context {
         catalog,
@@ -81,17 +76,34 @@ fn select_loaded_content(
     bodies: &[ContentDraft<'_>],
     selected_name: &str,
 ) -> Option<LoadedContent> {
-    assert!(descriptors.len() <= MAX_DESCRIPTORS, "descriptor inputs stay within the resource item bound");
-    assert!(bodies.len() <= MAX_DESCRIPTORS, "loaded body inputs stay within the resource item bound");
-    let descriptor = descriptors.iter().find(|item| item.name() == selected_name)?;
-    assert_eq!(descriptor.name(), selected_name, "selected descriptor matches the requested resource name");
+    assert!(
+        descriptors.len() <= MAX_DESCRIPTORS,
+        "descriptor inputs stay within the resource item bound"
+    );
+    assert!(
+        bodies.len() <= MAX_DESCRIPTORS,
+        "loaded body inputs stay within the resource item bound"
+    );
+    let descriptor = descriptors
+        .iter()
+        .find(|item| item.name() == selected_name)?;
+    assert_eq!(
+        descriptor.name(),
+        selected_name,
+        "selected descriptor matches the requested resource name"
+    );
     if duplicate_name(descriptor.name(), descriptors) || denied_by_trust(descriptor) {
         return None;
     }
     let body = bodies.iter().find(|candidate| {
-        candidate.name == descriptor.name() && candidate.content_identity == descriptor.content_identity().as_str()
+        candidate.name == descriptor.name()
+            && candidate.content_identity == descriptor.content_identity().as_str()
     })?;
-    assert_eq!(body.name, descriptor.name(), "loaded body matches selected resource");
+    assert_eq!(
+        body.name,
+        descriptor.name(),
+        "loaded body matches selected resource"
+    );
     assert_eq!(
         body.content_identity,
         descriptor.content_identity().as_str(),
@@ -108,14 +120,22 @@ fn select_loaded_content(
 }
 
 fn duplicate_name(name: &str, descriptors: &[Descriptor]) -> bool {
-    descriptors.iter().filter(|descriptor| descriptor.name() == name).count() > 1
+    descriptors
+        .iter()
+        .filter(|descriptor| descriptor.name() == name)
+        .count()
+        > 1
 }
 
 fn denied_by_trust(descriptor: &Descriptor) -> bool {
     descriptor.trust_status() == TrustStatus::Untrusted
 }
 
-fn push_diagnostic(descriptor: &Descriptor, issue: Issue, diagnostics: &mut Collection<Diagnostic>) {
+fn push_diagnostic(
+    descriptor: &Descriptor,
+    issue: Issue,
+    diagnostics: &mut Collection<Diagnostic>,
+) {
     if diagnostics.iter().any(|diagnostic| {
         diagnostic.issue == issue
             && diagnostic.name == descriptor.name()
@@ -134,12 +154,18 @@ fn push_diagnostic(descriptor: &Descriptor, issue: Issue, diagnostics: &mut Coll
 
 fn sort_summaries(summaries: &mut [Summary]) {
     summaries.sort_by(|left, right| {
-        left.name.cmp(&right.name).then(left.kind.cmp(&right.kind)).then(left.scope.cmp(&right.scope))
+        left.name
+            .cmp(&right.name)
+            .then(left.kind.cmp(&right.kind))
+            .then(left.scope.cmp(&right.scope))
     });
 }
 
 fn sort_diagnostics(diagnostics: &mut [Diagnostic]) {
     diagnostics.sort_by(|left, right| {
-        left.name.cmp(&right.name).then(left.kind.cmp(&right.kind)).then(left.scope.cmp(&right.scope))
+        left.name
+            .cmp(&right.name)
+            .then(left.kind.cmp(&right.kind))
+            .then(left.scope.cmp(&right.scope))
     });
 }

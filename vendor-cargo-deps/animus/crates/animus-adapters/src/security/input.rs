@@ -102,8 +102,11 @@ impl Review {
     /// missing, unsafe material appears in safe fields, collections exceed their
     /// ceilings, or raw evidence cannot be hashed within adapter bounds.
     pub fn validate(draft: &Draft<'_>) -> Result<Self, super::Error> {
-        let task_labels =
-            required_safe_collection(super::TASK_LABEL_FIELD, draft.task_labels, super::MAX_TASK_LABEL_ITEMS)?;
+        let task_labels = required_safe_collection(
+            super::TASK_LABEL_FIELD,
+            draft.task_labels,
+            super::MAX_TASK_LABEL_ITEMS,
+        )?;
         let recent_context_summaries = required_safe_collection(
             super::CONTEXT_SUMMARY_FIELD,
             draft.recent_context_summaries,
@@ -115,8 +118,11 @@ impl Review {
             draft.active_policy_labels,
             super::MAX_POLICY_LABEL_ITEMS,
         )?;
-        let evidence_hashes =
-            raw_evidence_hashes(super::RAW_EVIDENCE_FIELD, draft.raw_evidence, super::MAX_EVIDENCE_ITEMS)?;
+        let evidence_hashes = raw_evidence_hashes(
+            super::RAW_EVIDENCE_FIELD,
+            draft.raw_evidence,
+            super::MAX_EVIDENCE_ITEMS,
+        )?;
         Ok(Self {
             task_labels,
             recent_context_summaries,
@@ -232,7 +238,11 @@ fn evidence_hashes(
     let mut hashes = super::Collection::with_capacity(values.len());
     for value in values {
         crate::validation::validate_optional_adapter_field(field, value)?;
-        hashes.push(super::hash_parts(&[super::HASH_SCHEMA, field.as_str(), value]));
+        hashes.push(super::hash_parts(&[
+            super::HASH_SCHEMA,
+            field.as_str(),
+            value,
+        ]));
     }
     Ok(hashes)
 }

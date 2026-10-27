@@ -1,0 +1,871 @@
+use alloc::collections::BTreeSet;
+use alloc::format;
+use alloc::string::String;
+use alloc::vec;
+use alloc::vec::Vec;
+use core::fmt;
+
+use serde::Deserialize;
+use serde::Deserializer;
+use serde::Serialize;
+
+use crate::fetch_policy::InputFetchPolicy;
+use crate::fetch_policy::compatibility_problems;
+use crate::freshness::FreshnessProbe;
+use crate::freshness::validate_freshness_probe;
+use crate::retention::InputRetentionPolicy;
+use crate::trust::InputTrustPolicy;
+use crate::version::SchemaVersion;
+use crate::version::parse_version;
+
+pub const MAX_INPUTS: u32 = 4096;
+pub const MAX_MIRRORS_PER_INPUT: u32 = 64;
+pub const MAX_PATCHES_PER_INPUT: u32 = 256;
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ProjectManifest {
+    pub version: String,
+    pub inputs: Vec<ManifestInput>,
+    pub patches: Vec<PatchDef>,
+    pub retention: InputRetentionPolicy,
+}
+
+#[derive(Deserialize)]
+struct RawProjectManifest {
+    version: String,
+    inputs: Vec<ManifestInput>,
+    patches: Option<Vec<PatchDef>>,
+    retention: Option<InputRetentionPolicy>,
+}
+
+impl<'de> Deserialize<'de> for ProjectManifest {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where D: Deserializer<'de> {
+        let raw = RawProjectManifest::deserialize(deserializer)?;
+        Ok(Self {
+            version: raw.version,
+            inputs: raw.inputs,
+            patches: raw.patches.unwrap_or_else(Vec::new),
+            retention: raw.retention.unwrap_or_default(),
+        })
+    }
+}
+
+impl ProjectManifest {
+    pub fn schema_version(self) -> Option<SchemaVersion> {
+        parse_version(self.version)
+    }
+
+    pub fn validate(self) -> Vec<String> {
+        let ProjectManifest {
+            version,
+            inputs,
+            patches,
+            retention,
+        } = self;
+        let mut problems = Vec::with_capacity(inputs.len().saturating_mul(2).saturating_add(patches.len()));
+
+        match parse_version(version.clone()) {
+            None => {
+                problems.push(format!("invalid manifest version: '{}'", version));
+            }
+            Some(v) if !v.is_compatible_with(SchemaVersion::CURRENT) => {
+                problems.push(format!(
+                    "manifest version {} is not compatible with current version {}",
+                    v,
+                    SchemaVersion::CURRENT
+                ));
+            }
+            _ => {}
+        }
+
+        if inputs.len() as u64 > MAX_INPUTS as u64 {
+            problems.push(format!("too many inputs: {} (max {MAX_INPUTS})", inputs.len()));
+        }
+
+        problems.extend(retention.validate_owner("project"));
+
+        let mut seen_names = BTreeSet::new();
+        for input in &inputs {
+            if !seen_names.insert(input.name.as_str()) {
+                problems.push(format!("duplicate input name: {}", input.name));
+            }
+            problems.extend(input.validate());
+        }
+
+        let mut seen_patch_names = BTreeSet::new();
+        for patch in &patches {
+            if !seen_patch_names.insert(patch.name.as_str()) {
+                problems.push(format!("duplicate patch name: {}", patch.name));
+            }
+            problems.extend(patch.validate());
+        }
+
+        let patch_names: BTreeSet<&str> = patches.iter().map(|p| p.name.as_str()).collect();
+        for input in &inputs {
+            for patch_ref in &input.patches {
+                if !patch_names.contains(patch_ref.as_str()) {
+                    problems.push(format!("input '{}' references undefined patch '{patch_ref}'", input.name));
+                }
+            }
+        }
+
+        problems
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ManifestInput {
+    pub name: String,
+    pub kind: InputKind,
+    pub hash: HashSpec,
+    pub frozen: bool,
+    pub mirrors: Vec<String>,
+    pub patches: Vec<String>,
+    pub fetch_policy: InputFetchPolicy,
+    pub retention: Option<InputRetentionPolicy>,
+    pub freshness: Option<FreshnessProbe>,
+    pub trust: Option<InputTrustPolicy>,
+}
+
+#[derive(Deserialize)]
+struct RawManifestInput {
+    name: String,
+    kind: InputKind,
+    hash: Option<HashSpec>,
+    frozen: Option<bool>,
+    mirrors: Option<Vec<String>>,
+    patches: Option<Vec<String>>,
+    fetch_policy: Option<InputFetchPolicy>,
+    retention: Option<InputRetentionPolicy>,
+    freshness: Option<FreshnessProbe>,
+    trust: Option<InputTrustPolicy>,
+}
+
+impl<'de> Deserialize<'de> for ManifestInput {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where D: Deserializer<'de> {
+        let raw = RawManifestInput::deserialize(deserializer)?;
+        Ok(Self {
+            name: raw.name,
+            kind: raw.kind,
+            hash: raw.hash.unwrap_or_default(),
+            frozen: raw.frozen.unwrap_or(false),
+            mirrors: raw.mirrors.unwrap_or_else(Vec::new),
+            patches: raw.patches.unwrap_or_else(Vec::new),
+            fetch_policy: raw.fetch_policy.unwrap_or_default(),
+            retention: raw.retention,
+            freshness: raw.freshness,
+            trust: raw.trust,
+        })
+    }
+}
+
+impl ManifestInput {
+    fn validate(&self) -> Vec<String> {
+        let mut problems = Vec::new();
+
+        if self.name.is_empty() {
+            problems.push("input name must not be empty".into());
+        }
+
+        if self.mirrors.len() as u64 > MAX_MIRRORS_PER_INPUT as u64 {
+            problems.push(format!(
+                "input '{}': too many mirrors: {} (max {MAX_MIRRORS_PER_INPUT})",
+                self.name,
+                self.mirrors.len()
+            ));
+        }
+
+        if self.patches.len() as u64 > MAX_PATCHES_PER_INPUT as u64 {
+            problems.push(format!(
+                "input '{}': too many patches: {} (max {MAX_PATCHES_PER_INPUT})",
+                self.name,
+                self.patches.len()
+            ));
+        }
+
+        if let Some(probe) = self.freshness.clone() {
+            match validate_freshness_probe(probe) {
+                Ok(_) => {}
+                Err(err) => {
+                    problems.push(format!("input '{}': invalid freshness probe: {err}", self.name));
+                }
+            }
+        }
+
+        if let Some(retention) = self.retention {
+            problems.extend(retention.validate(format!("input '{}'", self.name)));
+        }
+
+        if let Some(trust) = &self.trust {
+            problems.extend(trust.validate_borrowed(&format!("input '{}'", self.name)));
+        }
+
+        problems.extend(self.kind.validate(&self.name));
+        problems.extend(compatibility_problems(self));
+
+        problems
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "type")]
+pub enum InputKind {
+    #[serde(rename = "file")]
+    File { url: String },
+    #[serde(rename = "tarball")]
+    Tarball { url: String },
+    #[serde(rename = "git")]
+    Git {
+        repository: String,
+        reference: GitReference,
+    },
+    #[serde(rename = "darcs")]
+    Darcs {
+        repository: String,
+        selector: DarcsSelector,
+    },
+    #[serde(rename = "pijul")]
+    Pijul {
+        repository: String,
+        selector: PijulSelector,
+    },
+    #[serde(rename = "fossil")]
+    Fossil {
+        repository: String,
+        selector: FossilSelector,
+    },
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type")]
+enum RawInputKind {
+    #[serde(rename = "file")]
+    File { url: String },
+    #[serde(rename = "tarball")]
+    Tarball { url: String },
+    #[serde(rename = "git")]
+    Git {
+        repository: String,
+        reference: Option<GitReference>,
+    },
+    #[serde(rename = "darcs")]
+    Darcs {
+        repository: String,
+        selector: DarcsSelector,
+    },
+    #[serde(rename = "pijul")]
+    Pijul {
+        repository: String,
+        selector: PijulSelector,
+    },
+    #[serde(rename = "fossil")]
+    Fossil {
+        repository: String,
+        selector: FossilSelector,
+    },
+}
+
+impl<'de> Deserialize<'de> for InputKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where D: Deserializer<'de> {
+        let raw = RawInputKind::deserialize(deserializer)?;
+        Ok(match raw {
+            RawInputKind::File { url } => Self::File { url },
+            RawInputKind::Tarball { url } => Self::Tarball { url },
+            RawInputKind::Git { repository, reference } => Self::Git {
+                repository,
+                reference: reference.unwrap_or_else(GitReference::default),
+            },
+            RawInputKind::Darcs { repository, selector } => Self::Darcs { repository, selector },
+            RawInputKind::Pijul { repository, selector } => Self::Pijul { repository, selector },
+            RawInputKind::Fossil { repository, selector } => Self::Fossil { repository, selector },
+        })
+    }
+}
+
+impl InputKind {
+    fn validate(&self, input_name: &str) -> Vec<String> {
+        match self {
+            Self::File { .. } | Self::Tarball { .. } => Vec::new(),
+            Self::Git { repository, .. } => validate_repository(input_name, "git", repository),
+            Self::Darcs { repository, selector } => {
+                let mut problems = validate_repository(input_name, "darcs", repository);
+                problems.extend(selector.validate(input_name));
+                problems
+            }
+            Self::Pijul { repository, selector } => {
+                let mut problems = validate_repository(input_name, "pijul", repository);
+                problems.extend(selector.validate(input_name));
+                problems
+            }
+            Self::Fossil { repository, selector } => {
+                let mut problems = validate_repository(input_name, "fossil", repository);
+                problems.extend(selector.validate(input_name));
+                problems
+            }
+        }
+    }
+}
+
+fn validate_repository(input_name: &str, kind: impl AsRef<str>, repository: &str) -> Vec<String> {
+    let kind = kind.as_ref();
+    let mut problems = Vec::new();
+    if repository.is_empty() {
+        problems.push(format!("input '{input_name}': {kind} repository must not be empty"));
+    }
+    if is_forge_shortcut(repository) {
+        problems.push(format!(
+            "input '{input_name}': {kind} repository must be an explicit URL, not forge shorthand '{repository}'"
+        ));
+    }
+    problems
+}
+
+fn is_forge_shortcut(repository: &str) -> bool {
+    const FORGE_SHORTCUT_PREFIXES: &[&str] = &["github:", "gitlab:", "codeberg:", "sourcehut:", "pijul:", "fossil:"];
+    FORGE_SHORTCUT_PREFIXES.iter().any(|prefix| repository.starts_with(prefix))
+}
+
+fn validate_selector_value(input_name: &str, selector: impl AsRef<str>, value: &str) -> Vec<String> {
+    let selector = selector.as_ref();
+    if value.is_empty() {
+        return vec![format!("input '{input_name}': {selector} selector must not be empty")];
+    }
+    Vec::new()
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "ref_type", content = "ref_value")]
+pub enum GitReference {
+    #[serde(rename = "branch")]
+    Branch(String),
+    #[serde(rename = "tag")]
+    Tag(String),
+    #[serde(rename = "rev")]
+    Rev(String),
+}
+
+impl Default for GitReference {
+    fn default() -> Self {
+        GitReference::Branch("main".into())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "selector_type", content = "selector_value")]
+pub enum DarcsSelector {
+    #[serde(rename = "tag")]
+    Tag(String),
+    #[serde(rename = "context")]
+    Context(String),
+}
+
+/// Formats the canonical selector identity without cloning its owned values.
+impl fmt::Display for DarcsSelector {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Tag(tag) => write!(f, "tag:{tag}"),
+            Self::Context(context) => write!(f, "context:{context}"),
+        }
+    }
+}
+
+impl DarcsSelector {
+    pub(crate) fn validate(&self, input_name: &str) -> Vec<String> {
+        match self {
+            Self::Tag(tag) => validate_selector_value(input_name, "darcs tag", tag),
+            Self::Context(context) => validate_selector_value(input_name, "darcs context", context),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "selector_type")]
+pub enum PijulSelector {
+    #[serde(rename = "channel")]
+    Channel { channel: String },
+    #[serde(rename = "state")]
+    State { channel: String, state: String },
+    #[serde(rename = "change")]
+    Change { channel: String, change: String },
+}
+
+/// Formats the canonical selector identity without cloning its owned values.
+impl fmt::Display for PijulSelector {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Channel { channel } => write!(f, "channel:{channel}"),
+            Self::State { channel, state } => write!(f, "channel:{channel}:state:{state}"),
+            Self::Change { channel, change } => write!(f, "channel:{channel}:change:{change}"),
+        }
+    }
+}
+
+impl PijulSelector {
+    pub(crate) fn validate(&self, input_name: &str) -> Vec<String> {
+        let channel = match self {
+            Self::Channel { channel } | Self::State { channel, .. } | Self::Change { channel, .. } => channel,
+        };
+        let mut problems = validate_selector_value(input_name, "pijul channel", channel);
+        match self {
+            Self::Channel { .. } => {}
+            Self::State { state, .. } => problems.extend(validate_selector_value(input_name, "pijul state", state)),
+            Self::Change { change, .. } => problems.extend(validate_selector_value(input_name, "pijul change", change)),
+        }
+        problems
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "selector_type", content = "selector_value")]
+pub enum FossilSelector {
+    #[serde(rename = "branch")]
+    Branch(String),
+    #[serde(rename = "tag")]
+    Tag(String),
+    #[serde(rename = "checkin")]
+    Checkin(String),
+}
+
+/// Formats the canonical selector identity without cloning its owned values.
+impl fmt::Display for FossilSelector {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Branch(branch) => write!(f, "branch:{branch}"),
+            Self::Tag(tag) => write!(f, "tag:{tag}"),
+            Self::Checkin(checkin) => write!(f, "checkin:{checkin}"),
+        }
+    }
+}
+
+impl FossilSelector {
+    pub(crate) fn validate(&self, input_name: &str) -> Vec<String> {
+        match self {
+            Self::Branch(branch) => validate_selector_value(input_name, "fossil branch", branch),
+            Self::Tag(tag) => validate_selector_value(input_name, "fossil tag", tag),
+            Self::Checkin(checkin) => validate_selector_value(input_name, "fossil checkin", checkin),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum HashAlgo {
+    #[default]
+    #[serde(rename = "sha256")]
+    Sha256,
+    #[serde(rename = "sha512")]
+    Sha512,
+    #[serde(rename = "blake3")]
+    Blake3,
+}
+
+impl fmt::Display for HashAlgo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            HashAlgo::Sha256 => write!(f, "sha256"),
+            HashAlgo::Sha512 => write!(f, "sha512"),
+            HashAlgo::Blake3 => write!(f, "blake3"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Default)]
+pub struct HashSpec {
+    pub algo: HashAlgo,
+    pub expected: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct RawHashSpec {
+    algo: Option<HashAlgo>,
+    expected: Option<String>,
+}
+
+impl<'de> Deserialize<'de> for HashSpec {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where D: Deserializer<'de> {
+        let raw = RawHashSpec::deserialize(deserializer)?;
+        Ok(Self {
+            algo: raw.algo.unwrap_or_default(),
+            expected: raw.expected,
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct PatchDef {
+    pub name: String,
+    pub source: PatchSource,
+    pub trust: Option<InputTrustPolicy>,
+}
+
+#[derive(Deserialize)]
+struct RawPatchDef {
+    name: String,
+    source: PatchSource,
+    trust: Option<InputTrustPolicy>,
+}
+
+impl<'de> Deserialize<'de> for PatchDef {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where D: Deserializer<'de> {
+        let raw = RawPatchDef::deserialize(deserializer)?;
+        Ok(Self {
+            name: raw.name,
+            source: raw.source,
+            trust: raw.trust,
+        })
+    }
+}
+
+impl PatchDef {
+    fn validate(&self) -> Vec<String> {
+        let mut problems = Vec::new();
+        if self.name.is_empty() {
+            problems.push("patch name must not be empty".into());
+        }
+        if let Some(trust) = &self.trust {
+            problems.extend(trust.validate_borrowed(&format!("patch '{}'", self.name)));
+        }
+        problems
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum PatchSource {
+    #[serde(rename = "local")]
+    Local { path: String },
+    #[serde(rename = "remote")]
+    Remote { url: String, hash: HashSpec },
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::string::ToString;
+    use alloc::vec;
+
+    use super::*;
+
+    fn sample_manifest() -> ProjectManifest {
+        ProjectManifest {
+            version: "1.0.0".into(),
+            inputs: vec![
+                ManifestInput {
+                    name: "nixpkgs".into(),
+                    kind: InputKind::Git {
+                        repository: "https://github.com/NixOS/nixpkgs.git".into(),
+                        reference: GitReference::Branch("nixos-unstable".into()),
+                    },
+                    hash: HashSpec::default(),
+                    frozen: false,
+                    mirrors: vec!["https://mirrors.tuna.tsinghua.edu.cn/git/nixpkgs.git".into()],
+                    patches: vec![],
+                    fetch_policy: InputFetchPolicy::GenerationMaterial,
+                    retention: None,
+                    freshness: None,
+                    trust: None,
+                },
+                ManifestInput {
+                    name: "hello-src".into(),
+                    kind: InputKind::Tarball {
+                        url: "https://ftp.gnu.org/gnu/hello/hello-2.12.1.tar.gz".into(),
+                    },
+                    hash: HashSpec {
+                        algo: HashAlgo::Sha256,
+                        expected: Some("sha256-jZkUKv2SV28wsM18tCqNxoCZmLxdYH2Idh9RLibH2yA=".into()),
+                    },
+                    frozen: true,
+                    mirrors: vec![],
+                    patches: vec!["hello-fix".into()],
+                    fetch_policy: InputFetchPolicy::GenerationMaterial,
+                    retention: None,
+                    freshness: None,
+                    trust: None,
+                },
+            ],
+            patches: vec![PatchDef {
+                name: "hello-fix".into(),
+                source: PatchSource::Local {
+                    path: "patches/hello-fix.patch".into(),
+                },
+                trust: None,
+            }],
+            retention: InputRetentionPolicy::Untracked,
+        }
+    }
+
+    #[test]
+    fn manifest_validates_clean() {
+        let m = sample_manifest();
+        let problems = m.validate();
+        assert!(problems.is_empty(), "unexpected problems: {problems:?}");
+    }
+
+    #[test]
+    fn manifest_detects_duplicate_names() {
+        let mut m = sample_manifest();
+        m.inputs.push(m.inputs[0].clone());
+        let problems = m.validate();
+        assert_eq!(problems.len(), 1);
+        assert!(problems[0].contains("duplicate input name"));
+    }
+
+    #[test]
+    fn manifest_detects_undefined_patch() {
+        let mut m = sample_manifest();
+        m.inputs[0].patches.push("nonexistent".into());
+        let problems = m.validate();
+        assert_eq!(problems.len(), 1);
+        assert!(problems[0].contains("undefined patch"));
+    }
+
+    #[test]
+    fn manifest_serde_roundtrip() {
+        let m = sample_manifest();
+        let json = serde_json::to_string_pretty(&m).unwrap();
+        let parsed: ProjectManifest = serde_json::from_str(&json).unwrap();
+        assert_eq!(m, parsed);
+    }
+
+    #[test]
+    fn empty_name_is_invalid() {
+        let m = ProjectManifest {
+            version: "1.0.0".into(),
+            inputs: vec![ManifestInput {
+                name: "".into(),
+                kind: InputKind::File {
+                    url: "https://example.com/f".into(),
+                },
+                hash: HashSpec::default(),
+                frozen: false,
+                mirrors: vec![],
+                patches: vec![],
+                fetch_policy: InputFetchPolicy::GenerationMaterial,
+                retention: None,
+                freshness: None,
+                trust: None,
+            }],
+            patches: vec![],
+            retention: InputRetentionPolicy::Untracked,
+        };
+        let problems = m.validate();
+        assert!(!problems.is_empty());
+        assert!(problems[0].contains("must not be empty"));
+    }
+
+    #[test]
+    fn git_reference_default_is_main() {
+        let r = GitReference::default();
+        assert_eq!(r, GitReference::Branch("main".into()));
+    }
+
+    #[test]
+    fn fetch_policy_default_is_generation_material() {
+        let json = r#"{
+            "name":"src",
+            "kind":{"type":"file","url":"https://example.com/src"}
+        }"#;
+        let input: ManifestInput = serde_json::from_str(json).unwrap();
+        assert_eq!(input.fetch_policy, InputFetchPolicy::GenerationMaterial);
+        assert_eq!(input.retention, None);
+    }
+
+    #[test]
+    fn retention_defaults_to_untracked() {
+        let json = r#"{
+            "version":"1.0.0",
+            "inputs":[],
+            "patches":[]
+        }"#;
+        let manifest: ProjectManifest = serde_json::from_str(json).unwrap();
+        assert_eq!(manifest.retention, InputRetentionPolicy::Untracked);
+    }
+
+    #[test]
+    fn invalid_retention_generation_limit_is_rejected() {
+        let mut m = sample_manifest();
+        m.inputs[0].retention = Some(InputRetentionPolicy::RecentGenerations { generations: 0 });
+        let problems = m.validate();
+        assert!(problems.iter().any(|problem| problem.contains("retention recent-generations")));
+    }
+
+    #[test]
+    fn build_fetch_policy_with_patches_is_invalid() {
+        let mut m = sample_manifest();
+        m.inputs[0].fetch_policy = InputFetchPolicy::BuildFetchAction;
+        m.inputs[0].patches.push("hello-fix".into());
+        let problems = m.validate();
+        assert!(problems.iter().any(|problem| problem.contains("build-fetch-action")));
+    }
+
+    #[test]
+    fn unknown_fetch_policy_string_is_rejected() {
+        let json = r#"{
+            "name":"src",
+            "kind":{"type":"file","url":"https://example.com/src"},
+            "fetch_policy":"surprise-network"
+        }"#;
+        let error = serde_json::from_str::<ManifestInput>(json).unwrap_err();
+        assert!(error.to_string().contains("unknown variant"));
+    }
+
+    #[test]
+    fn manifest_rejects_bad_version() {
+        let m = ProjectManifest {
+            version: "garbage".into(),
+            inputs: vec![],
+            patches: vec![],
+            retention: InputRetentionPolicy::Untracked,
+        };
+        let problems = m.validate();
+        assert!(!problems.is_empty());
+        assert!(problems[0].contains("invalid manifest version"));
+    }
+
+    #[test]
+    fn manifest_rejects_incompatible_version() {
+        let m = ProjectManifest {
+            version: "99.0.0".into(),
+            inputs: vec![],
+            patches: vec![],
+            retention: InputRetentionPolicy::Untracked,
+        };
+        let problems = m.validate();
+        assert!(!problems.is_empty());
+        assert!(problems[0].contains("not compatible"));
+    }
+
+    #[test]
+    fn manifest_accepts_compatible_version() {
+        let m = ProjectManifest {
+            version: "1.1.0".into(),
+            inputs: vec![],
+            patches: vec![],
+            retention: InputRetentionPolicy::Untracked,
+        };
+        let problems = m.validate();
+        assert!(problems.is_empty());
+    }
+
+    #[test]
+    fn schema_version_accessor() {
+        let m = sample_manifest();
+        let v = m.schema_version().unwrap();
+        assert_eq!(v.major, 1);
+        assert_eq!(v.minor, 0);
+    }
+
+    #[test]
+    fn vcs_input_selectors_roundtrip() {
+        let manifest = ProjectManifest {
+            version: "1.0.0".into(),
+            inputs: vec![
+                ManifestInput {
+                    name: "darcs-src".into(),
+                    kind: InputKind::Darcs {
+                        repository: "https://example.invalid/src.darcs".into(),
+                        selector: DarcsSelector::Tag("v1".into()),
+                    },
+                    hash: HashSpec::default(),
+                    frozen: false,
+                    mirrors: vec!["https://mirror.invalid/src.darcs".into()],
+                    patches: vec![],
+                    fetch_policy: InputFetchPolicy::GenerationMaterial,
+                    retention: None,
+                    freshness: None,
+                    trust: None,
+                },
+                ManifestInput {
+                    name: "pijul-src".into(),
+                    kind: InputKind::Pijul {
+                        repository: "https://example.invalid/src.pijul".into(),
+                        selector: PijulSelector::State {
+                            channel: "main".into(),
+                            state: "state-1".into(),
+                        },
+                    },
+                    hash: HashSpec::default(),
+                    frozen: false,
+                    mirrors: vec![],
+                    patches: vec![],
+                    fetch_policy: InputFetchPolicy::GenerationMaterial,
+                    retention: None,
+                    freshness: None,
+                    trust: None,
+                },
+                ManifestInput {
+                    name: "fossil-src".into(),
+                    kind: InputKind::Fossil {
+                        repository: "https://example.invalid/src.fossil".into(),
+                        selector: FossilSelector::Checkin("abc123".into()),
+                    },
+                    hash: HashSpec::default(),
+                    frozen: false,
+                    mirrors: vec![],
+                    patches: vec![],
+                    fetch_policy: InputFetchPolicy::GenerationMaterial,
+                    retention: None,
+                    freshness: None,
+                    trust: None,
+                },
+            ],
+            patches: vec![],
+            retention: InputRetentionPolicy::Untracked,
+        };
+
+        let json = serde_json::to_string(&manifest).unwrap();
+        let parsed: ProjectManifest = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(manifest, parsed);
+        assert!(parsed.validate().is_empty());
+    }
+
+    #[test]
+    fn vcs_manifest_validation_rejects_forge_shortcuts_and_empty_selectors() {
+        let manifest = ProjectManifest {
+            version: "1.0.0".into(),
+            inputs: vec![
+                ManifestInput {
+                    name: "forge".into(),
+                    kind: InputKind::Darcs {
+                        repository: "github:owner/repo".into(),
+                        selector: DarcsSelector::Tag("v1".into()),
+                    },
+                    hash: HashSpec::default(),
+                    frozen: false,
+                    mirrors: vec![],
+                    patches: vec![],
+                    fetch_policy: InputFetchPolicy::GenerationMaterial,
+                    retention: None,
+                    freshness: None,
+                    trust: None,
+                },
+                ManifestInput {
+                    name: "empty".into(),
+                    kind: InputKind::Pijul {
+                        repository: "https://example.invalid/repo".into(),
+                        selector: PijulSelector::Channel { channel: "".into() },
+                    },
+                    hash: HashSpec::default(),
+                    frozen: false,
+                    mirrors: vec![],
+                    patches: vec![],
+                    fetch_policy: InputFetchPolicy::GenerationMaterial,
+                    retention: None,
+                    freshness: None,
+                    trust: None,
+                },
+            ],
+            patches: vec![],
+            retention: InputRetentionPolicy::Untracked,
+        };
+
+        let problems = manifest.validate();
+
+        assert!(problems.iter().any(|problem| problem.contains("explicit URL")));
+        assert!(problems.iter().any(|problem| problem.contains("selector must not be empty")));
+    }
+}

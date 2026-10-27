@@ -1,18 +1,18 @@
 #![allow(unknown_lints)]
-#![allow(non_trait_imports, path_segment_repetition, underscore_in_module_filename)]
+#![allow(
+    non_trait_imports,
+    path_segment_repetition,
+    underscore_in_module_filename
+)]
 
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use super::GuidanceError;
-use super::MAX_SKILL_DESCRIPTOR_ITEMS;
-use super::SKILL_ASSET_FIELD;
-use super::SKILL_DEPENDENCY_FIELD;
-use super::SKILL_REFERENCE_FIELD;
-use super::SKILL_SCRIPT_FIELD;
-use super::SkillDiscoveryMetadata;
-use super::SkillManifestTrustStatus;
-use super::normalize_list;
+use super::{
+    GuidanceError, MAX_SKILL_DESCRIPTOR_ITEMS, SKILL_ASSET_FIELD, SKILL_DEPENDENCY_FIELD,
+    SKILL_REFERENCE_FIELD, SKILL_SCRIPT_FIELD, SkillDiscoveryMetadata, SkillManifestTrustStatus,
+    normalize_list,
+};
 
 /// Validated skill package descriptor with trust-gated resources.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -39,10 +39,22 @@ impl SkillPackageDescriptor {
             metadata: draft.metadata.clone(),
             instructions_hash: crate::artifact::Hash::new(draft.instructions_hash)
                 .map_err(GuidanceError::InvalidHash)?,
-            optional_scripts: normalize_list(SKILL_SCRIPT_FIELD, draft.optional_scripts, MAX_SKILL_DESCRIPTOR_ITEMS)?,
-            references: normalize_list(SKILL_REFERENCE_FIELD, draft.references, MAX_SKILL_DESCRIPTOR_ITEMS)?,
+            optional_scripts: normalize_list(
+                SKILL_SCRIPT_FIELD,
+                draft.optional_scripts,
+                MAX_SKILL_DESCRIPTOR_ITEMS,
+            )?,
+            references: normalize_list(
+                SKILL_REFERENCE_FIELD,
+                draft.references,
+                MAX_SKILL_DESCRIPTOR_ITEMS,
+            )?,
             assets: normalize_list(SKILL_ASSET_FIELD, draft.assets, MAX_SKILL_DESCRIPTOR_ITEMS)?,
-            dependencies: normalize_list(SKILL_DEPENDENCY_FIELD, draft.dependencies, MAX_SKILL_DESCRIPTOR_ITEMS)?,
+            dependencies: normalize_list(
+                SKILL_DEPENDENCY_FIELD,
+                draft.dependencies,
+                MAX_SKILL_DESCRIPTOR_ITEMS,
+            )?,
             trust_status: draft.trust_status,
         })
     }
@@ -125,8 +137,12 @@ pub enum SkillScriptDenial {
 /// Always returns a denial; trusted scripts must be routed through host shell,
 /// hook, and tool policy rather than the reusable runtime core.
 // r[impl agent_harness_runtime.openai_codex_guidance_skill_budget.skill_package]
-pub fn admit_runtime_core_skill_script(package: &SkillPackageDescriptor) -> Result<(), SkillScriptDenial> {
-    if !package.optional_scripts().is_empty() && package.trust_status() != SkillManifestTrustStatus::Trusted {
+pub fn admit_runtime_core_skill_script(
+    package: &SkillPackageDescriptor,
+) -> Result<(), SkillScriptDenial> {
+    if !package.optional_scripts().is_empty()
+        && package.trust_status() != SkillManifestTrustStatus::Trusted
+    {
         return Err(SkillScriptDenial::UntrustedPackage);
     }
     Err(SkillScriptDenial::RuntimeCoreDoesNotExecuteScripts)

@@ -1,0 +1,8412 @@
+// HARDENING-BACKLOG 2026-09-09: pre-existing tigerstyle findings in this file are
+// recorded in .cairn/archive/1970-01-01-complete-store-capability-migration/evidence/
+// tigerstyle-remaining-2026-09-09.log and scheduled for the standalone store-shell
+// hardening pass. Scoped to the lint categories present at recording time.
+#![allow(
+    tigerstyle::bool_naming,
+    tigerstyle::explicit_defaults,
+    tigerstyle::no_unwrap,
+    tigerstyle::numeric_units,
+    tigerstyle::too_many_parameters,
+    tigerstyle::unbounded_collection_growth,
+    tigerstyle::usize_in_public_api,
+    tigerstyle::sentinel_fallback
+)]
+
+//! StoreHandle: unified access to blob, directory, pathinfo, and remote
+//! pathinfo services. Consumers receive a StoreHandle — they do not
+//! construct or own individual services.
+// r[impl foreign_derivation_import.source_materialization]
+
+use std::collections::BTreeMap;
+use std::collections::BTreeSet;
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::num::NonZeroUsize;
+use std::path::Path;
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::Duration;
+
+use futures::StreamExt;
+use nix_compat::derivation::Derivation;
+use nix_compat::narinfo::SigningKey;
+use nix_compat::narinfo::VerifyingKey;
+use nix_compat::narinfo::fingerprint_with_store_dir;
+use nix_compat::nixhash::CAHash;
+use nix_compat::store_path::DIGEST_SIZE;
+use nix_compat::store_path::StorePath;
+use nix_compat::store_path::StorePathRef;
+use reqwest::StatusCode;
+use reqwest::redirect::Policy;
+use sha2::Digest as _;
+use sha2::Sha256;
+use snix_castore::Node;
+use snix_castore::blobservice::BlobService;
+use snix_castore::blobservice::CombinedBlobService;
+use snix_castore::blobservice::MemoryBlobService;
+use snix_castore::blobservice::ObjectStoreBlobService;
+use snix_castore::directoryservice::Cache as DirectoryCache;
+use snix_castore::directoryservice::DirectoryService;
+use snix_castore::directoryservice::RedbDirectoryService;
+use snix_castore::directoryservice::RedbDirectoryServiceConfig;
+use snix_castore::import::fs::ingest_path;
+use snix_store::nar::NarCalculationService;
+use snix_store::nar::SimpleRenderer;
+use snix_store::path_info::PathInfo;
+use snix_store::pathinfoservice::CachePathInfoService as PathInfoCache;
+use snix_store::pathinfoservice::NixHTTPPathInfoService;
+use snix_store::pathinfoservice::NixHTTPPathInfoServiceConfig;
+use snix_store::pathinfoservice::PathInfoService;
+use snix_store::pathinfoservice::RedbPathInfoService;
+use snix_store::pathinfoservice::RedbPathInfoServiceConfig;
+use tokio::io::AsyncReadExt;
+use tokio::io::AsyncWriteExt;
+use tracing::info;
+use tracing::info as trace_info;
+use url::Url;
+
+use crate::ActionResultDiscoveryReport;
+use crate::ActionResultPublicationReport;
+use crate::ActionResultStoreSet;
+use crate::ArtifactProvenance;
+use crate::CaMappings;
+use crate::Error;
+use crate::GcReport;
+use crate::GcRootRecord;
+use crate::GcRootSource;
+use crate::HttpActionResultStore;
+use crate::LocalActionResultStore;
+use crate::Publisher;
+use crate::StoreAuditEvent;
+use crate::StoreAuditKind;
+use crate::StoreBackend;
+use crate::StoreBackendCapabilityProfile;
+use crate::StoreFallbackMode;
+use crate::StoreSource;
+use crate::StoreSourceAdmission;
+use crate::StoreSourceLease;
+use crate::StoredArtifactAttestation;
+use crate::StoredClosureAttestation;
+use crate::attestation::artifact_attestation_matches_pathinfo;
+use crate::attestation::load_artifact_attestation;
+use crate::attestation::load_or_create_runtime_closure_attestation;
+use crate::attestation::persist_artifact_attestation;
+use crate::completeness::recursive_castore_completeness;
+use crate::export::export_castore_to_disk;
+use crate::gc;
+use crate::metadata_cache::AdvisoryMetadataCache;
+use crate::metadata_cache::MetadataCacheKeyInput;
+use crate::metadata_cache::MetadataClass;
+use crate::metadata_cache::RefreshPolicy;
+use crate::metadata_cache::check_metadata_validity;
+use crate::metadata_cache::metadata_cache_key;
+use crate::metadata_cache::new_metadata_entry;
+use crate::overlay::StoreOverlayState;
+use crate::path_identity::require_requested_path_identity;
+use crate::roots;
+use crate::source_admission::Leased;
+use crate::source_admission::LocalBaseLayerLease;
+use crate::source_admission::admit_source;
+
+pub(crate) const NAR_SHA256_BYTES: usize = 32;
+const MAX_PENDING_PUBLICATION_STEPS: usize = 65_536;
+const MAX_REMOTE_TRUSTED_PUBLIC_KEYS: usize = 16;
+const OVERLAY_DIRECTORY_READ_LIMIT: usize = 1_000_000;
+const MAX_LAYERED_CLOSURE_PATHS: usize = 1_000_000;
+const MAX_RECORDED_LAYER_SELECTIONS: usize = 65_536;
+const SOURCE_SLICE_NAR_MAX_BYTES: u64 = 1_073_741_824;
+
+/// Configuration for opening a store.
+pub struct StoreConfig {
+    /// Durable authority selected explicitly by the caller.
+    pub backend: StoreBackend,
+
+    /// State directory for backend identity and persistent blobs and databases.
+    pub state_dir: PathBuf,
+
+    /// Physical output directory (from CLI `--store`). Where root build
+    /// outputs are exported on disk. Defaults to the store_dir.
+    pub output_dir: PathBuf,
+
+    /// Ordered list of remote binary cache URLs (e.g., "https://cache.nixos.org").
+    /// Uses the first URL for existing single-cache dispatch. Empty = no remote substitution.
+    pub remote_cache_urls: Vec<String>,
+
+    /// How strictly store-layer fallbacks are handled.
+    pub fallback_mode: StoreFallbackMode,
+
+    /// The logical store prefix for derivation paths (e.g. "/crunch/store"
+    /// or "/nix/store" in compat mode). Derivation hashes, output paths,
+    /// and sandbox layout all use this prefix.
+    pub store_dir: String,
+
+    /// Ordered list of read-only base store state directories for overlay
+    /// composition. Declared in priority order: base A is consulted before
+    /// base B.  The local store remains the writable overlay.  All bases
+    /// MUST share the same `store_dir` prefix.  Empty = no overlay composition
+    /// (default single-store behavior).
+    pub base_state_dirs: Vec<PathBuf>,
+
+    /// Operator-owned admission for remote cache and base-layer sessions.
+    /// `None` permits local-only stores, including a declared local base layer;
+    /// a configured remote source without an admission authority fails closed.
+    pub source_admission: Option<Arc<dyn StoreSourceAdmission>>,
+}
+
+impl StoreConfig {
+    /// Validate a selected writable store and its read-only bases without creating state.
+    pub fn preflight_backend_identity_for(
+        backend: StoreBackend,
+        state_dir: &Path,
+        store_dir: &str,
+        base_state_dirs: &[PathBuf],
+        source_admission: Option<&dyn StoreSourceAdmission>,
+    ) -> Result<(), Error> {
+        Self::preflight_backend_identity_with_profile(
+            backend,
+            backend.profile(),
+            state_dir,
+            store_dir,
+            base_state_dirs,
+            source_admission,
+        )
+    }
+
+    pub(crate) fn preflight_backend_identity_with_profile(
+        backend: StoreBackend,
+        profile: StoreBackendCapabilityProfile,
+        state_dir: &Path,
+        store_dir: &str,
+        base_state_dirs: &[PathBuf],
+        source_admission: Option<&dyn StoreSourceAdmission>,
+    ) -> Result<(), Error> {
+        // An unsupported overlay composition is refused before any declared base is
+        // inspected, so a rejected configuration never touches a caller-declared
+        // directory and the refusal does not depend on the base being readable.
+        if !base_state_dirs.is_empty() {
+            backend.require_overlay_composition(profile)?;
+        }
+        // The writable state identity is read before any declared base is opened, so a
+        // rejected writable state never causes a declared base to be touched. The base
+        // identity reads still happen only after the source-session witnesses exist.
+        crate::overlay::preflight_store_identity(state_dir, store_dir, backend, profile, !base_state_dirs.is_empty())?;
+        let sources = Self::admit_base_sources(base_state_dirs, store_dir, source_admission)?;
+        for base_state_dir in &sources.base_dirs {
+            crate::overlay::preflight_store_identity(base_state_dir, store_dir, backend, profile, true)?;
+        }
+        Ok(())
+    }
+
+    // Only callers retaining the source-session witnesses may reach raw identity I/O.
+    fn preflight_admitted_backend_identity(
+        backend: StoreBackend,
+        profile: StoreBackendCapabilityProfile,
+        state_dir: &Path,
+        store_dir: &str,
+        base_state_dirs: &[PathBuf],
+    ) -> Result<(), Error> {
+        if !base_state_dirs.is_empty() {
+            backend.require_overlay_composition(profile)?;
+        }
+        crate::overlay::preflight_store_identity(state_dir, store_dir, backend, profile, !base_state_dirs.is_empty())?;
+        for base_state_dir in base_state_dirs {
+            crate::overlay::preflight_store_identity(base_state_dir, store_dir, backend, profile, true)?;
+        }
+        Ok(())
+    }
+
+    /// Validate the selected backend and any legacy Snix state before obtaining a mutation lock.
+    pub fn preflight_backend_identity(&self) -> Result<(), Error> {
+        let sources = self.admit_sources()?;
+        Self::preflight_admitted_backend_identity(
+            self.backend,
+            self.backend.profile(),
+            &self.state_dir,
+            &self.store_dir,
+            &sources.base_dirs,
+        )
+    }
+
+    /// Create a store config with an explicit durable backend.
+    ///
+    /// Other fields (remote_cache_urls and base_state_dirs) default to empty;
+    /// `fallback_mode` defaults to `Practical`.
+    pub fn new(backend: StoreBackend, state_dir: PathBuf, output_dir: PathBuf, store_dir: String) -> Self {
+        Self {
+            backend,
+            state_dir,
+            output_dir,
+            remote_cache_urls: Vec::new(),
+            fallback_mode: crate::StoreFallbackMode::Practical,
+            store_dir,
+            base_state_dirs: Vec::new(),
+            source_admission: None,
+        }
+    }
+
+    /// Set `base_state_dirs` for overlay composition.
+    pub fn with_base_state_dirs(mut self, dirs: Vec<PathBuf>) -> Self {
+        self.base_state_dirs = dirs;
+        self
+    }
+
+    /// Add a single base state directory to the overlay stack.
+    pub fn add_base_state_dir(mut self, dir: PathBuf) -> Self {
+        self.base_state_dirs.push(dir);
+        self
+    }
+
+    fn admit_sources(&self) -> Result<AdmittedSources, Error> {
+        let mut sources =
+            Self::admit_base_sources(&self.base_state_dirs, &self.store_dir, self.source_admission.as_deref())?;
+        for cache_url in &self.remote_cache_urls {
+            let parsed =
+                Url::parse(cache_url).map_err(|error| Error::Store(format!("invalid substituter URL: {error}")))?;
+            let lease = admit_source(
+                self.source_admission.as_deref(),
+                StoreSource::Substituter(parsed.as_str()),
+                &self.store_dir,
+            )?;
+            sources.remote_urls.push(parsed);
+            sources.remote_leases.push(lease);
+        }
+        Ok(sources)
+    }
+
+    fn admit_base_sources(
+        base_state_dirs: &[PathBuf],
+        store_dir: &str,
+        source_admission: Option<&dyn StoreSourceAdmission>,
+    ) -> Result<AdmittedSources, Error> {
+        let mut sources = AdmittedSources::default();
+        for (declaration_index, base_dir) in base_state_dirs.iter().enumerate() {
+            let metadata = std::fs::symlink_metadata(base_dir)
+                .map_err(|error| Error::Store(format!("opening overlay base {}: {error}", base_dir.display())))?;
+            if metadata.file_type().is_symlink() || !metadata.is_dir() {
+                return Err(Error::Store(format!(
+                    "overlay-base-not-directory: declaration {declaration_index} is not a direct directory"
+                )));
+            }
+            let canonical = std::fs::canonicalize(base_dir)
+                .map_err(|error| Error::Store(format!("resolving overlay base {}: {error}", base_dir.display())))?;
+            // A base layer is a local, operator-declared directory, so its
+            // admission rests on that declaration and on the base's own trust
+            // policy. A configured admission authority stays the authority for a
+            // declared base and can still refuse it; only the absence of an
+            // authority leaves a local base layer admitted on its own facts.
+            let lease: Arc<dyn StoreSourceLease> = match source_admission {
+                Some(admission) => admission.admit(StoreSource::BaseLayer(&canonical), store_dir)?,
+                None => Arc::new(LocalBaseLayerLease),
+            };
+            sources.base_leases.push(lease);
+            sources.base_dirs.push(canonical);
+        }
+        Ok(sources)
+    }
+}
+
+#[derive(Default)]
+struct AdmittedSources {
+    remote_urls: Vec<Url>,
+    remote_leases: Vec<Arc<dyn StoreSourceLease>>,
+    base_leases: Vec<Arc<dyn StoreSourceLease>>,
+    base_dirs: Vec<PathBuf>,
+}
+
+/// Return type for a successful cache lookup on a single output.
+#[derive(Debug, Clone)]
+pub struct CacheHit {
+    pub path_info: PathInfo,
+    pub node: Node,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OutputSubstitutionMode {
+    Delta,
+    Full,
+}
+
+impl OutputSubstitutionMode {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Delta => "delta",
+            Self::Full => "full",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct OutputSubstitutionReport {
+    pub mode: OutputSubstitutionMode,
+    pub transferred_bytes: u64,
+    pub reused_bytes: u64,
+    pub metadata_reused: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fallback_reason: Option<String>,
+}
+
+const DELTA_CAPABILITY_TIMEOUT_MS: u64 = 2_000;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum RemoteDeltaCapability {
+    Supported(DeltaCapabilityAdvertisementWire),
+    Unsupported,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+enum DeltaChunkingAlgorithmWire {
+    FastCdc,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+enum DeltaChunkDigestAlgorithmWire {
+    Blake3,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+struct DeltaChunkProfileWire {
+    chunking: DeltaChunkingAlgorithmWire,
+    chunk_digest: DeltaChunkDigestAlgorithmWire,
+    min_chunk_bytes: u32,
+    avg_chunk_bytes: u32,
+    max_chunk_bytes: u32,
+}
+
+impl DeltaChunkProfileWire {
+    fn protocol_v1() -> Self {
+        Self {
+            chunking: DeltaChunkingAlgorithmWire::FastCdc,
+            chunk_digest: DeltaChunkDigestAlgorithmWire::Blake3,
+            min_chunk_bytes: 131_072,
+            avg_chunk_bytes: 262_144,
+            max_chunk_bytes: 524_288,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+struct DeltaNegotiationOfferWire {
+    supported_versions: Vec<u32>,
+    supported_chunk_profiles: Vec<DeltaChunkProfileWire>,
+}
+
+impl DeltaNegotiationOfferWire {
+    fn protocol_v1() -> Self {
+        Self {
+            supported_versions: vec![1],
+            supported_chunk_profiles: vec![DeltaChunkProfileWire::protocol_v1()],
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+struct DeltaHttpEndpointsWire {
+    capability_path: String,
+    candidate_path: String,
+    has_set_path: String,
+    stream_path: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+struct DeltaCapabilityAdvertisementWire {
+    supported_versions: Vec<u32>,
+    supported_chunk_profiles: Vec<DeltaChunkProfileWire>,
+    endpoints: DeltaHttpEndpointsWire,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+struct DeltaCandidateRequestWire {
+    logical_path: String,
+    output_name: String,
+    client_offer: DeltaNegotiationOfferWire,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+struct DeltaNegotiatedProtocolWire {
+    version: u32,
+    chunk_profile: DeltaChunkProfileWire,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+struct DeltaChunkRefWire {
+    digest: snix_castore::B3Digest,
+    size_bytes: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum DeltaArtifactNodeWire {
+    Directory {
+        digest: snix_castore::B3Digest,
+        children: Vec<DeltaArtifactNodeWire>,
+    },
+    Blob {
+        digest: snix_castore::B3Digest,
+        size_bytes: u64,
+        chunks: Vec<DeltaChunkRefWire>,
+    },
+    Symlink {
+        target: String,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+struct DeltaOutputFixtureWire {
+    output_id: String,
+    root: DeltaArtifactNodeWire,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+struct DeltaClosureFixtureWire {
+    store_prefix: String,
+    outputs: Vec<DeltaOutputFixtureWire>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+struct DeltaCandidateResponseWire {
+    session_id: String,
+    negotiated: DeltaNegotiatedProtocolWire,
+    sender: DeltaClosureFixtureWire,
+    output_name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+struct DeltaReceiverManifestWire {
+    store_prefix: String,
+    known_outputs: Vec<String>,
+    known_directories: Vec<snix_castore::B3Digest>,
+    known_blobs: Vec<snix_castore::B3Digest>,
+    known_chunks: Vec<snix_castore::B3Digest>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+struct DeltaReceiverHasSetWire {
+    manifest: DeltaReceiverManifestWire,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+struct DeltaStreamRequestWire {
+    session_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum DeltaTransferFrameWire {
+    Blob {
+        digest: snix_castore::B3Digest,
+        bytes: Vec<u8>,
+    },
+    Chunk {
+        parent_digest: snix_castore::B3Digest,
+        chunk_digest: snix_castore::B3Digest,
+        chunk_index: u32,
+        bytes: Vec<u8>,
+    },
+    FinalPathInfo {
+        path_info: PathInfo,
+    },
+}
+
+#[derive(Debug, Clone)]
+struct AppliedDeltaChunkWire {
+    digest: snix_castore::B3Digest,
+    chunk_index: u32,
+}
+
+#[derive(Debug, Clone)]
+struct AppliedDeltaStreamWire {
+    final_path_info: PathInfo,
+    chunk_frames_by_parent: HashMap<snix_castore::B3Digest, BTreeMap<u32, AppliedDeltaChunkWire>>,
+    blob_frames: u32,
+    chunk_frames: u32,
+    transferred_bytes: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum DeltaAttemptResult {
+    Accepted {
+        path_info: Box<PathInfo>,
+        report: OutputSubstitutionReport,
+    },
+    Fallback {
+        reason: String,
+    },
+}
+
+/// Pre-built services for the test-only injected Snix handle.
+/// Durable callers open a selected backend with `StoreConfig`.
+#[cfg(any(test, feature = "test-support"))]
+pub struct StoreHandleServices {
+    pub blob_service: Arc<dyn BlobService>,
+    pub directory_service: Arc<dyn DirectoryService>,
+    pub pathinfo_service: Arc<dyn PathInfoService>,
+    pub remote_pathinfo: Option<Arc<dyn PathInfoService>>,
+    pub state_dir: PathBuf,
+    pub output_dir_str: String,
+    /// Output publication adapters called after successful admission.
+    pub publishers: Vec<Arc<dyn Publisher>>,
+}
+
+/// Outputs and logical NAR-byte accounting reconstructed during shared-result admission.
+#[derive(Debug, Clone)]
+pub struct ActionResultOutputProbe {
+    pub outputs: BTreeMap<String, PathInfo>,
+    pub transferred_nar_bytes: u64,
+    pub reused_nar_bytes: u64,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct NarByteAccounting {
+    pub(crate) transferred_nar_bytes: u64,
+    pub(crate) reused_nar_bytes: u64,
+    pub(crate) nar_size_bytes: u64,
+    pub(crate) is_transferred: bool,
+}
+
+pub(crate) fn account_action_result_nar_bytes(accounting: NarByteAccounting) -> Result<(u64, u64), String> {
+    if accounting.is_transferred {
+        let transferred_nar_bytes = accounting
+            .transferred_nar_bytes
+            .checked_add(accounting.nar_size_bytes)
+            .ok_or_else(|| "action-result-transferred-nar-bytes-overflow".to_string())?;
+        return Ok((transferred_nar_bytes, accounting.reused_nar_bytes));
+    }
+    let reused_nar_bytes = accounting
+        .reused_nar_bytes
+        .checked_add(accounting.nar_size_bytes)
+        .ok_or_else(|| "action-result-reused-nar-bytes-overflow".to_string())?;
+    Ok((accounting.transferred_nar_bytes, reused_nar_bytes))
+}
+
+#[allow(
+    tigerstyle::ambient_clock,
+    reason = "imperative store shell reads wall time for advisory metadata TTLs"
+)]
+fn advisory_metadata_time_now_secs() -> Result<u64, Error> {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .map_err(|error| Error::Cache(format!("system clock precedes Unix epoch: {error}")))
+}
+
+/// Grouped parameters for persisting a build output.
+pub struct PersistOutputRequest<'a> {
+    pub output_name: &'a str,
+    pub output_path: &'a StorePath<String>,
+    pub path_info: PathInfo,
+    pub final_node: Node,
+    pub provenance: Option<ArtifactProvenance>,
+    pub is_root: bool,
+    pub root_source: Option<GcRootSource>,
+}
+
+/// Grouped parameters for verified source ingestion at an exact logical path.
+pub struct VerifiedSourceIngestRequest<'a> {
+    pub source_path: &'a Path,
+    pub logical_store_path: &'a str,
+    pub source_name: &'a str,
+    pub signing_key: &'a SigningKey<ed25519_dalek::SigningKey>,
+}
+
+/// Immutable NAR observation of a castore source subtree.
+///
+/// Private fields prevent callers from inventing NAR facts without reading
+/// the selected store's content. An absent or changed subtree cannot be
+/// published through `admit_verified_source_batch`.
+#[derive(Clone, Debug)]
+pub struct ObservedSourceSlice {
+    node: Node,
+    nar_size: u64,
+    nar_sha256: [u8; NAR_SHA256_BYTES],
+    nar_blake3: [u8; 32],
+}
+
+impl ObservedSourceSlice {
+    #[must_use]
+    pub fn node(&self) -> &Node {
+        &self.node
+    }
+
+    #[must_use]
+    pub fn nar_size(&self) -> u64 {
+        self.nar_size
+    }
+
+    #[must_use]
+    pub fn nar_sha256(&self) -> [u8; NAR_SHA256_BYTES] {
+        self.nar_sha256
+    }
+
+    #[must_use]
+    pub fn nar_blake3(&self) -> [u8; 32] {
+        self.nar_blake3
+    }
+}
+
+/// One previously observed source subtree for atomic PathInfo admission.
+pub struct VerifiedSourceBatchEntry<'a> {
+    pub observed: &'a ObservedSourceSlice,
+    pub source_name: &'a str,
+    pub signing_key: &'a SigningKey<ed25519_dalek::SigningKey>,
+}
+
+/// A logical source path returned only after batch publication succeeds.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VerifiedSourceBatchResult {
+    pub logical_store_path: String,
+    pub nar_size: u64,
+    pub nar_sha256: [u8; NAR_SHA256_BYTES],
+    pub nar_blake3: [u8; 32],
+}
+
+struct SourceNarObserver {
+    sha256: Sha256,
+    blake3: blake3::Hasher,
+    size: u64,
+    limit_exceeded: bool,
+}
+
+impl SourceNarObserver {
+    fn new() -> Self {
+        Self {
+            sha256: Sha256::new(),
+            blake3: blake3::Hasher::new(),
+            size: 0,
+            limit_exceeded: false,
+        }
+    }
+
+    fn finish(self) -> (u64, [u8; NAR_SHA256_BYTES], [u8; 32]) {
+        (self.size, self.sha256.finalize().into(), *blake3::Hasher::finalize(&self.blake3).as_bytes())
+    }
+}
+
+impl tokio::io::AsyncWrite for SourceNarObserver {
+    fn poll_write(
+        mut self: std::pin::Pin<&mut Self>,
+        _cx: &mut std::task::Context<'_>,
+        bytes: &[u8],
+    ) -> std::task::Poll<std::io::Result<usize>> {
+        let next = u64::try_from(bytes.len()).ok().and_then(|added| self.size.checked_add(added));
+        match next {
+            Some(next) if next <= SOURCE_SLICE_NAR_MAX_BYTES => {
+                self.sha256.update(bytes);
+                self.blake3.update(bytes);
+                self.size = next;
+                std::task::Poll::Ready(Ok(bytes.len()))
+            }
+            _ => {
+                self.limit_exceeded = true;
+                std::task::Poll::Ready(Err(std::io::Error::other("verified-source-slice-limit")))
+            }
+        }
+    }
+
+    fn poll_flush(
+        self: std::pin::Pin<&mut Self>,
+        _cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        std::task::Poll::Ready(Ok(()))
+    }
+
+    fn poll_shutdown(
+        self: std::pin::Pin<&mut Self>,
+        _cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        std::task::Poll::Ready(Ok(()))
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RemoteSubstitutionRequest<'a> {
+    digest: [u8; DIGEST_SIZE],
+    output_path: &'a StorePath<String>,
+    output_name: &'a str,
+    is_root: bool,
+    root_source: Option<GcRootSource>,
+}
+
+pub(crate) fn path_info_content_and_signature_matches(existing: &PathInfo, candidate: &PathInfo) -> bool {
+    existing.store_path == candidate.store_path
+        && existing.node == candidate.node
+        && existing.references == candidate.references
+        && existing.nar_size == candidate.nar_size
+        && existing.nar_sha256 == candidate.nar_sha256
+        && existing.deriver == candidate.deriver
+        && existing.ca == candidate.ca
+        && candidate.signatures.iter().all(|signature| existing.signatures.contains(signature))
+}
+
+async fn verified_source_candidate(
+    request: &VerifiedSourceIngestRequest<'_>,
+    store_dir: &str,
+    blob_service: Arc<dyn BlobService>,
+    directory_service: Arc<dyn DirectoryService>,
+) -> Result<PathInfo, Error> {
+    assert!(!request.logical_store_path.is_empty(), "logical_store_path must not be empty");
+    assert!(!request.source_name.is_empty(), "source_name must not be empty");
+    let store_path = StorePath::from_absolute_path_with_prefix(request.logical_store_path.as_bytes(), store_dir)
+        .map_err(|error| {
+            Error::Store(format!("verified source logical store path {}: {error}", request.logical_store_path))
+        })?;
+    let metadata = std::fs::symlink_metadata(request.source_path)
+        .map_err(|error| Error::Store(format!("verified source {}: {error}", request.source_path.display())))?;
+    if metadata.file_type().is_symlink() {
+        return Err(Error::Store(format!(
+            "verified source root must not be a symlink: {}",
+            request.source_path.display()
+        )));
+    }
+    let node =
+        ingest_path::<_, _, _, &[u8]>(blob_service.clone(), directory_service.clone(), request.source_path, None)
+            .await
+            .map_err(|error| {
+                Error::Store(format!("verified source ingest {}: {error}", request.source_path.display()))
+            })?;
+    let renderer = SimpleRenderer::new(blob_service, directory_service);
+    let (nar_size, nar_sha256) = renderer
+        .calculate_nar(&node)
+        .await
+        .map_err(|error| Error::Store(format!("verified source NAR calculation: {error}")))?;
+    Ok(signed_path_info_for_node(
+        store_path,
+        node,
+        nar_size,
+        nar_sha256,
+        request.signing_key,
+        store_dir,
+        None,
+    ))
+}
+
+fn remove_existing_export_path(path: &Path) -> std::io::Result<()> {
+    let metadata = std::fs::symlink_metadata(path)?;
+    if metadata.is_dir() {
+        std::fs::remove_dir_all(path)
+    } else {
+        std::fs::remove_file(path)
+    }
+}
+
+fn combine_blob_services(
+    overlay: Arc<dyn BlobService>,
+    base_services: Vec<Arc<dyn BlobService>>,
+) -> Result<Arc<dyn BlobService>, Error> {
+    assert!(!base_services.is_empty());
+    let mut bases = base_services.into_iter();
+    let Some(mut inner) = bases.next() else {
+        return Err(Error::Store("overlay blob service requires at least one base".to_string()));
+    };
+    for base in bases {
+        inner = Arc::new(CombinedBlobService::new_no_backfill("base-chain".to_string(), inner, base));
+    }
+    Ok(Arc::new(CombinedBlobService::new_no_backfill("overlay".to_string(), overlay, inner)))
+}
+
+fn combine_directory_services(
+    overlay: Arc<dyn DirectoryService>,
+    base_services: Vec<Arc<dyn DirectoryService>>,
+) -> Result<Arc<dyn DirectoryService>, Error> {
+    assert!(!base_services.is_empty());
+    let mut bases = base_services.into_iter();
+    let Some(mut inner) = bases.next() else {
+        return Err(Error::Store("overlay directory service requires at least one base".to_string()));
+    };
+    let read_limit = NonZeroUsize::new(OVERLAY_DIRECTORY_READ_LIMIT)
+        .ok_or_else(|| Error::Store("overlay directory read limit must be positive".to_string()))?;
+    for base in bases {
+        inner = Arc::new(DirectoryCache::new_no_backfill("base-chain".to_string(), inner, base, read_limit));
+    }
+    Ok(Arc::new(DirectoryCache::new_no_backfill("overlay".to_string(), overlay, inner, read_limit)))
+}
+
+fn combine_pathinfo_services(
+    overlay: Arc<dyn PathInfoService>,
+    base_services: Vec<Arc<dyn PathInfoService>>,
+) -> Result<Arc<dyn PathInfoService>, Error> {
+    assert!(!base_services.is_empty());
+    let mut bases = base_services.into_iter();
+    let Some(mut inner) = bases.next() else {
+        return Err(Error::Store("overlay PathInfo service requires at least one base".to_string()));
+    };
+    for base in bases {
+        inner = Arc::new(PathInfoCache::new_no_backfill("base-chain".to_string(), inner, base));
+    }
+    Ok(Arc::new(PathInfoCache::new_no_backfill("overlay".to_string(), overlay, inner)))
+}
+
+fn validate_store_dir(store_dir: &str) -> Result<(), Error> {
+    let path = Path::new(store_dir);
+    if store_dir.is_empty() || !path.is_absolute() || store_dir.ends_with('/') {
+        return Err(Error::Store(format!(
+            "logical store directory must be absolute, non-empty, and have no trailing slash: {store_dir:?}"
+        )));
+    }
+    Ok(())
+}
+
+fn configured_action_result_stores(
+    state_dir: &Path,
+    base_state_dirs: &[PathBuf],
+    remote_urls: &[String],
+    sources: &AdmittedSources,
+) -> ActionResultStoreSet {
+    let policy = crate::action_result::action_result_runtime_policy();
+    assert!(policy.limits.max_sources > 0);
+    assert!(policy.limits.max_candidates > 0);
+    let mut stores = ActionResultStoreSet::new(remote_urls.is_empty());
+    if policy.sources.local_enabled {
+        stores.add_local(Box::new(LocalActionResultStore::new(state_dir)));
+        for (base_index, base_state_dir) in base_state_dirs.iter().enumerate() {
+            stores.add_discovery_only(Box::new(Leased::new(
+                LocalActionResultStore::new_with_source_id(
+                    base_state_dir,
+                    format!("base[{}]", base_index.saturating_add(1)),
+                ),
+                sources.base_leases[base_index].clone(),
+            )));
+        }
+    }
+    if !policy.sources.http_enabled {
+        return stores;
+    }
+    for (remote_index, remote_url) in remote_urls.iter().enumerate() {
+        let parsed = match Url::parse(remote_url) {
+            Ok(parsed) => parsed,
+            Err(error) => {
+                tracing::warn!(url = %remote_url, error = %error, "shared action-result HTTP source disabled");
+                continue;
+            }
+        };
+        match HttpActionResultStore::with_default_timeout(parsed) {
+            Ok(store) => stores.add_remote(Box::new(Leased::new(store, sources.remote_leases[remote_index].clone()))),
+            Err(error) => {
+                tracing::warn!(url = %remote_url, error = %error, "shared action-result HTTP source disabled");
+            }
+        }
+    }
+    stores
+}
+
+/// Dynamic dispatch via trait objects. Store operations are I/O-bound so
+/// the vtable cost is irrelevant.
+pub struct StoreHandle {
+    pub(crate) blob_service: Arc<dyn BlobService>,
+    pub(crate) directory_service: Arc<dyn DirectoryService>,
+    /// Selected durable authority; Snix services are only session scratch under Casita.
+    backend: StoreBackend,
+    pub(crate) casita_store: Option<Arc<crate::casita::CasitaStore>>,
+    pub(crate) pathinfo_service: Arc<dyn PathInfoService>,
+    /// Raw writable-overlay services retained for mutation and GC isolation.
+    overlay_blob_service: Arc<dyn BlobService>,
+    overlay_directory_service: Arc<dyn DirectoryService>,
+    overlay_pathinfo: Arc<dyn PathInfoService>,
+    base_pathinfo_inspection_services: Vec<Arc<dyn PathInfoService>>,
+    remote_pathinfo: Option<Arc<dyn PathInfoService>>,
+    remote_cache_urls: Vec<Url>,
+    source_admission: Option<Arc<dyn StoreSourceAdmission>>,
+    remote_source_leases: Vec<Arc<dyn StoreSourceLease>>,
+    remote_trusted_public_keys: Vec<VerifyingKey>,
+    remote_delta_capability: Option<RemoteDeltaCapability>,
+    remote_delta_http_client: Option<reqwest::Client>,
+    state_dir: PathBuf,
+    /// Physical output dir string (from `--store`).
+    pub(crate) output_dir_str: String,
+    /// Logical store prefix (e.g. "/crunch/store" or "/nix/store").
+    store_dir: String,
+    /// Startup-time degraded store facts recorded while opening services.
+    startup_audit_events: Vec<StoreAuditEvent>,
+    /// Output store path -> Node for outputs built/ingested this session.
+    pub output_nodes: HashMap<StorePath<String>, Node>,
+    /// Absolute output path -> PathInfo for outputs built this session.
+    pub built_outputs: HashMap<String, PathInfo>,
+    /// Successful remote substitutions recorded for reporting.
+    output_substitution_reports: HashMap<StorePath<String>, OutputSubstitutionReport>,
+    /// Exact composed-layer selections observed during this store session.
+    read_layer_selections: BTreeMap<String, crate::layer::StoreLayerSelection>,
+    /// Persistent writable-overlay CA derivation -> output path mapping.
+    pub ca_mappings: CaMappings,
+    /// Read-only CA mappings in declared base order.
+    base_ca_mappings: Vec<CaMappings>,
+    /// Advisory remote metadata cache for accelerating repeat probes.
+    /// Loaded from state_dir at construction; saved after each modification.
+    #[cfg(not(test))]
+    advisory_metadata_cache: AdvisoryMetadataCache,
+    #[cfg(test)]
+    pub advisory_metadata_cache: AdvisoryMetadataCache,
+    /// Advisory shared action-result discovery/publication stores.
+    action_result_stores: ActionResultStoreSet,
+    /// Accepted ordered base descriptors and generation observations.
+    overlay_state: Option<StoreOverlayState>,
+    /// Optional managed provenance for selected roots in this build session.
+    root_registration: Option<crate::retention::RootRegistration>,
+    /// Output publication adapters called after successful admission.
+    publishers: Vec<Arc<dyn Publisher>>,
+    pending_publication_steps: Vec<crate::PublicationEffectStep>,
+}
+
+impl StoreHandle {
+    /// Open (or create) a store from a config.
+    ///
+    /// Initializes blob, directory, and pathinfo services backed by the
+    /// state directory. Optionally configures a remote binary cache for
+    /// substitution.
+    pub async fn open(config: StoreConfig) -> Result<Self, Error> {
+        validate_store_dir(&config.store_dir)?;
+        // Source admission precedes all base descriptors and backend effects.
+        if !config.base_state_dirs.is_empty() {
+            return Self::open_overlay(config).await;
+        }
+        Self::open_single(config).await
+    }
+
+    async fn open_single(config: StoreConfig) -> Result<Self, Error> {
+        validate_store_dir(&config.store_dir)?;
+        let sources = config.admit_sources()?;
+        StoreConfig::preflight_admitted_backend_identity(
+            config.backend,
+            config.backend.profile(),
+            &config.state_dir,
+            &config.store_dir,
+            &sources.base_dirs,
+        )?;
+        let state_dir = &config.state_dir;
+        std::fs::create_dir_all(state_dir)
+            .map_err(|e| Error::Store(format!("creating state dir {}: {e}", state_dir.display())))?;
+        crate::overlay::ensure_store_identity(state_dir, &config.store_dir, config.backend)?;
+        type OpenedStoreServices = (
+            Option<Arc<crate::casita::CasitaStore>>,
+            Arc<dyn BlobService>,
+            Arc<dyn DirectoryService>,
+            Arc<dyn PathInfoService>,
+            Vec<StoreAuditEvent>,
+        );
+
+        let (casita_store, blob_service, directory_service, pathinfo_service, mut startup_audit_events):
+            OpenedStoreServices =
+            match config.backend {
+                StoreBackend::Snix => {
+                    let blob_service = open_blob_service(state_dir)?;
+                    let directory_service = open_directory_service(state_dir).await?;
+                    let (pathinfo_service, audit_events) =
+                        open_pathinfo_service(state_dir, config.fallback_mode).await?;
+                    (None, blob_service, directory_service, pathinfo_service, audit_events)
+                }
+                StoreBackend::Casita => {
+                    let store = crate::casita::CasitaStore::open(state_dir, &config.store_dir).await?;
+                    let blob_service = store.blob_service.clone();
+                    let directory_service = store.directory_service.clone();
+                    let pathinfo_service: Arc<dyn PathInfoService> = store.clone();
+                    (Some(store), blob_service, directory_service, pathinfo_service, Vec::new())
+                }
+            };
+
+        let (remote_pathinfo, remote_trusted_public_keys) =
+            configured_remote_pathinfo(&config, &sources, blob_service.clone(), directory_service.clone())?;
+
+        let output_dir_str = config.output_dir.to_str().unwrap_or(&config.store_dir).to_string();
+        let ca_mappings = CaMappings::load(&config.state_dir);
+
+        // Warn if CA mappings contain paths from a different store prefix.
+        // This happens when switching from /nix/store to /crunch/store (or vice versa).
+        let prefix_with_slash = format!("{}/", config.store_dir);
+        if let Some(first_stale) = ca_mappings.first_key_with_wrong_prefix(&prefix_with_slash) {
+            tracing::warn!(
+                stale_path = %first_stale,
+                expected_prefix = %config.store_dir,
+                "CA mappings contain paths from a different store prefix. \
+                 Clear the state directory ({}) to reset.",
+                config.state_dir.display(),
+            );
+        }
+
+        let advisory_metadata_cache = AdvisoryMetadataCache::load(&config.state_dir);
+        let action_result_stores =
+            configured_action_result_stores(&config.state_dir, &[], &config.remote_cache_urls, &sources);
+
+        Ok(Self {
+            backend: config.backend,
+            casita_store,
+            blob_service: blob_service.clone(),
+            directory_service: directory_service.clone(),
+            pathinfo_service: pathinfo_service.clone(),
+            overlay_blob_service: blob_service,
+            overlay_directory_service: directory_service,
+            overlay_pathinfo: pathinfo_service,
+            base_pathinfo_inspection_services: Vec::new(),
+            remote_pathinfo,
+            remote_cache_urls: sources.remote_urls,
+            source_admission: config.source_admission,
+            remote_source_leases: sources.remote_leases,
+            remote_trusted_public_keys,
+            remote_delta_capability: None,
+            remote_delta_http_client: None,
+            state_dir: config.state_dir,
+            output_dir_str,
+            store_dir: config.store_dir,
+            startup_audit_events: std::mem::take(&mut startup_audit_events),
+            output_nodes: HashMap::new(),
+            built_outputs: HashMap::new(),
+            output_substitution_reports: HashMap::new(),
+            read_layer_selections: BTreeMap::new(),
+            ca_mappings,
+            base_ca_mappings: Vec::new(),
+            advisory_metadata_cache,
+            action_result_stores,
+            overlay_state: None,
+            root_registration: None,
+            publishers: Vec::new(),
+            pending_publication_steps: Vec::new(),
+        })
+    }
+
+    /// Open a store with overlay composition: a writable overlay over one or
+    /// more read-only base stores.  All bases MUST share the same `store_dir`
+    /// prefix as the overlay.  Writes route to the overlay only; bases are
+    /// opened read-only.
+    ///
+    /// When `base_state_dirs` is empty, this is equivalent to `open()`.
+    pub async fn open_overlay(mut config: StoreConfig) -> Result<Self, Error> {
+        validate_store_dir(&config.store_dir)?;
+        // Admit before reading any base identity, descriptor or generation.
+        if config.base_state_dirs.is_empty() {
+            return Self::open_single(config).await;
+        }
+        let mut sources = config.admit_sources()?;
+        StoreConfig::preflight_admitted_backend_identity(
+            config.backend,
+            config.backend.profile(),
+            &config.state_dir,
+            &config.store_dir,
+            &sources.base_dirs,
+        )?;
+        // Use the admitted canonical identity for all subsequent base effects.
+        config.base_state_dirs = std::mem::take(&mut sources.base_dirs);
+
+        // Validate every base before creating or opening writable overlay state.
+        let overlay_state = crate::overlay::prepare_overlay_state(&config.base_state_dirs, &config.store_dir)?;
+
+        let state_dir = &config.state_dir;
+        std::fs::create_dir_all(state_dir)
+            .map_err(|e| Error::Store(format!("creating state dir {}: {e}", state_dir.display())))?;
+        crate::overlay::ensure_store_identity(state_dir, &config.store_dir, config.backend)?;
+
+        let overlay_blob = open_blob_service(state_dir)?;
+        let overlay_directory = open_directory_service(state_dir).await?;
+        let (overlay_pathinfo, mut startup_audit_events) =
+            open_pathinfo_service(state_dir, config.fallback_mode).await?;
+
+        // Open each accepted base through read-only services.
+        let mut base_blob_services: Vec<Arc<dyn BlobService>> = Vec::with_capacity(config.base_state_dirs.len());
+        let mut base_directory_services: Vec<Arc<dyn DirectoryService>> =
+            Vec::with_capacity(config.base_state_dirs.len());
+        let mut base_pathinfo_services: Vec<Arc<dyn PathInfoService>> =
+            Vec::with_capacity(config.base_state_dirs.len());
+        let mut base_pathinfo_inspection_services: Vec<Arc<dyn PathInfoService>> =
+            Vec::with_capacity(config.base_state_dirs.len());
+        let mut base_ca_mappings = Vec::with_capacity(config.base_state_dirs.len());
+
+        let base_store_dir: Arc<str> = Arc::from(config.store_dir.as_str());
+        for (declaration_index, base_dir) in config.base_state_dirs.iter().enumerate() {
+            if !base_dir.is_dir() {
+                return Err(Error::Store(format!("base state directory does not exist: {}", base_dir.display())));
+            }
+
+            // Open base blob service (read-only, no write needed).
+            let blob_dir = base_dir.join("blobs");
+            if !blob_dir.is_dir() {
+                return Err(Error::Store(format!("base blob directory does not exist: {}", blob_dir.display())));
+            }
+            let base_blob = ObjectStoreBlobService::new_local(&blob_dir)
+                .map_err(|e| Error::Store(format!("opening base blob service {}: {e}", blob_dir.display())))?;
+            base_blob_services.push(Arc::new(Leased::new(base_blob, sources.base_leases[declaration_index].clone())));
+
+            // Open base directory service (read-only).
+            let base_db_path = base_dir.join("directories.redb");
+            let base_directory = RedbDirectoryService::new("base".to_string(), RedbDirectoryServiceConfig {
+                path: Some(base_db_path.clone()),
+                read_only: true,
+                cache_size: None,
+            })
+            .await
+            .map_err(|e| Error::Store(format!("opening base directory {}: {e}", base_db_path.display())))?;
+            base_directory_services
+                .push(Arc::new(Leased::new(base_directory, sources.base_leases[declaration_index].clone())));
+
+            // Open base pathinfo service (read-only).
+            let base_pathinfo: Arc<dyn PathInfoService> = Arc::new(Leased::new(
+                open_pathinfo_service_read_only(base_dir, config.fallback_mode).await?,
+                sources.base_leases[declaration_index].clone(),
+            ));
+            base_pathinfo_inspection_services.push(base_pathinfo.clone());
+            base_pathinfo_services.push(crate::overlay::trusted_base_pathinfo_service(
+                crate::overlay::TrustedBasePathInfoRequest {
+                    inner: base_pathinfo,
+                    base_state_dir: base_dir,
+                    declaration_index,
+                    store_dir: base_store_dir.clone(),
+                },
+            )?);
+            base_ca_mappings.push(CaMappings::load(base_dir));
+        }
+
+        // Chain services: near=overlay, far=base_stack.
+        // For multiple bases, wrap inner layers: overlay -> baseA -> baseB.
+        let combined_blob = combine_blob_services(overlay_blob.clone(), base_blob_services)?;
+        let combined_directory = combine_directory_services(overlay_directory.clone(), base_directory_services)?;
+
+        // PathInfo writes remain routed to the overlay while reads can fall through.
+        let combined_pathinfo = combine_pathinfo_services(overlay_pathinfo.clone(), base_pathinfo_services)?;
+
+        let (remote_pathinfo, remote_trusted_public_keys) =
+            configured_remote_pathinfo(&config, &sources, combined_blob.clone(), combined_directory.clone())?;
+
+        let output_dir_str = config.output_dir.to_str().unwrap_or(&config.store_dir).to_string();
+        let ca_mappings = CaMappings::load(&config.state_dir);
+
+        let prefix_with_slash = format!("{}/", config.store_dir);
+        if let Some(first_stale) = ca_mappings.first_key_with_wrong_prefix(&prefix_with_slash) {
+            tracing::warn!(
+                stale_path = %first_stale,
+                expected_prefix = %config.store_dir,
+                "CA mappings contain paths from a different store prefix. \
+                 Clear the state directory ({}) to reset.",
+                config.state_dir.display(),
+            );
+        }
+
+        let advisory_metadata_cache = AdvisoryMetadataCache::load(&config.state_dir);
+        let action_result_stores = configured_action_result_stores(
+            &config.state_dir,
+            &config.base_state_dirs,
+            &config.remote_cache_urls,
+            &sources,
+        );
+
+        Ok(Self {
+            backend: config.backend,
+            casita_store: None,
+            blob_service: combined_blob,
+            directory_service: combined_directory,
+            pathinfo_service: combined_pathinfo,
+            overlay_blob_service: overlay_blob,
+            overlay_directory_service: overlay_directory,
+            overlay_pathinfo,
+            base_pathinfo_inspection_services,
+            remote_pathinfo,
+            remote_cache_urls: sources.remote_urls,
+            source_admission: config.source_admission,
+            remote_source_leases: sources.remote_leases,
+            remote_trusted_public_keys,
+            remote_delta_capability: None,
+            remote_delta_http_client: None,
+            state_dir: config.state_dir,
+            output_dir_str,
+            store_dir: config.store_dir,
+            startup_audit_events: std::mem::take(&mut startup_audit_events),
+            output_nodes: HashMap::new(),
+            built_outputs: HashMap::new(),
+            output_substitution_reports: HashMap::new(),
+            read_layer_selections: BTreeMap::new(),
+            ca_mappings,
+            base_ca_mappings,
+            advisory_metadata_cache,
+            action_result_stores,
+            overlay_state: Some(overlay_state),
+            root_registration: None,
+            publishers: Vec::new(),
+            pending_publication_steps: Vec::new(),
+        })
+    }
+
+    /// Construct a Snix handle from pre-built services for focused compatibility tests.
+    /// Injected services are caller-owned; this preflights identity before reading
+    /// shell metadata but does not bind identity or open services. Durable callers
+    /// must use `open`, which also constructs the selected backend's services.
+    /// Casita cannot be injected without its durable repository.
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn from_services_with_store_dir(
+        backend: StoreBackend,
+        services: StoreHandleServices,
+        store_dir: String,
+    ) -> Result<Self, Error> {
+        if backend != StoreBackend::Snix {
+            return Err(Error::Store(
+                "casita-store-services-unsupported: open the durable Casita repository".to_string(),
+            ));
+        }
+        StoreConfig::preflight_backend_identity_for(backend, &services.state_dir, &store_dir, &[], None)?;
+        let ca_mappings = CaMappings::load(&services.state_dir);
+        let advisory_metadata_cache = AdvisoryMetadataCache::load(&services.state_dir);
+        let action_result_stores =
+            configured_action_result_stores(&services.state_dir, &[], &[], &AdmittedSources::default());
+        Ok(Self {
+            backend,
+            casita_store: None,
+            blob_service: services.blob_service.clone(),
+            directory_service: services.directory_service.clone(),
+            pathinfo_service: services.pathinfo_service.clone(),
+            overlay_blob_service: services.blob_service,
+            overlay_directory_service: services.directory_service,
+            overlay_pathinfo: services.pathinfo_service.clone(),
+            base_pathinfo_inspection_services: Vec::new(),
+            remote_pathinfo: services.remote_pathinfo,
+            remote_cache_urls: Vec::new(),
+            source_admission: None,
+            remote_source_leases: Vec::new(),
+            remote_trusted_public_keys: Vec::new(),
+            remote_delta_capability: None,
+            remote_delta_http_client: None,
+            state_dir: services.state_dir,
+            output_dir_str: services.output_dir_str,
+            store_dir,
+            startup_audit_events: Vec::new(),
+            output_nodes: HashMap::new(),
+            built_outputs: HashMap::new(),
+            output_substitution_reports: HashMap::new(),
+            read_layer_selections: BTreeMap::new(),
+            ca_mappings,
+            base_ca_mappings: Vec::new(),
+            advisory_metadata_cache,
+            action_result_stores,
+            overlay_state: None,
+            root_registration: None,
+            publishers: services.publishers,
+            pending_publication_steps: Vec::new(),
+        })
+    }
+
+    /// Arc-cloned blob service.
+    /// Drain the pending publication effect plan.
+    ///
+    /// Admission records effects; the application shell owns execution.
+    pub fn take_publication_effect_plan(&mut self) -> crate::PublicationEffectPlan {
+        crate::PublicationEffectPlan {
+            steps: std::mem::take(&mut self.pending_publication_steps),
+        }
+    }
+
+    /// Execute a publication effect plan and return typed observations.
+    ///
+    /// Failed publication is observed and logged; it never erases the
+    /// underlying output admission.
+    pub async fn execute_publication_plan(
+        &self,
+        plan: crate::PublicationEffectPlan,
+    ) -> Vec<crate::PublicationObservation> {
+        const PUBLISHER_WARN_PREFIX: &str = "output publication failed (admitted anyway)";
+        let mut observations = Vec::with_capacity(plan.steps.len());
+        for step in &plan.steps {
+            let observation = step.execute().await;
+            if let Err(err) = &observation.outcome {
+                tracing::warn!(path = %step.logical_path, err = %err, PUBLISHER_WARN_PREFIX);
+            }
+            observations.push(observation);
+        }
+        observations
+    }
+
+    /// Selected durable backend and its declared capability profile.
+    pub fn backend(&self) -> StoreBackend {
+        self.backend
+    }
+
+    /// Read-only check before a guarded Casita GC recovery attempt.
+    pub fn casita_gc_fence_pending(state_dir: &Path) -> Result<bool, Error> {
+        gc::casita_gc_fence_pending(state_dir)
+    }
+
+    /// Finish only previously fenced removals; never acquire a nested lock.
+    pub async fn recover_casita_gc_under_guard(&mut self, guard: &crate::StoreMutationGuard) -> Result<(), Error> {
+        if !guard.protects_state_dir(&self.state_dir) {
+            return Err(Error::MutationLock(
+                "gc-plan-stale: recovery guard does not protect selected state directory".to_string(),
+            ));
+        }
+        if let Some(store) = &self.casita_store {
+            gc::recover_casita_gc(
+                &self.state_dir,
+                gc::CasitaGcPaths {
+                    output_dir_str: &self.output_dir_str,
+                    store_dir: &self.store_dir,
+                },
+                store,
+                &mut self.ca_mappings,
+            )
+            .await?;
+        }
+        Ok(())
+    }
+
+    /// Publish an otherwise unreferenced castore node as one durable Casita root.
+    pub async fn admit_castore_payload_root(&self, node: &Node) -> Result<(), Error> {
+        if let Some(store) = &self.casita_store {
+            store.admit_castore_payload_root(node).await?;
+        }
+        Ok(())
+    }
+
+    /// Rehydrate a retained castore node before a fresh-process cache probe.
+    pub async fn rehydrate_castore_payload_root(&self, node: &Node) -> Result<(), Error> {
+        if let Some(store) = &self.casita_store {
+            store.rehydrate_castore_payload_root(node).await?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn preflight_casita_archive_trust(&self, import_keys: &[VerifyingKey]) -> Result<(), Error> {
+        match self.backend {
+            StoreBackend::Snix => Ok(()),
+            StoreBackend::Casita => self
+                .casita_store
+                .as_ref()
+                .ok_or_else(|| Error::Store("casita-backend-unavailable: Casita authority is not open".to_string()))?
+                .preflight_archive_trust(import_keys),
+        }
+    }
+
+    pub(crate) fn casita_batch_root_change_limit(&self) -> Option<usize> {
+        self.casita_store.as_ref().map(|store| store.repository.limits().max_root_changes)
+    }
+
+    pub fn blob_service(&self) -> Arc<dyn BlobService> {
+        self.blob_service.clone()
+    }
+
+    /// Startup-time degraded store facts captured while opening services.
+    pub fn startup_audit_events(&self) -> &[StoreAuditEvent] {
+        &self.startup_audit_events
+    }
+
+    /// Arc-cloned directory service.
+    pub fn directory_service(&self) -> Arc<dyn DirectoryService> {
+        self.directory_service.clone()
+    }
+
+    /// Arc-cloned local pathinfo service.
+    pub fn pathinfo_service(&self) -> Arc<dyn PathInfoService> {
+        self.pathinfo_service.clone()
+    }
+
+    pub(crate) fn base_pathinfo_inspection_services(&self) -> Vec<Arc<dyn PathInfoService>> {
+        self.base_pathinfo_inspection_services.clone()
+    }
+
+    pub(crate) fn overlay_state(&self) -> Option<StoreOverlayState> {
+        self.overlay_state.clone()
+    }
+
+    pub(crate) fn ca_mapping_snapshots(&self) -> (CaMappings, Vec<CaMappings>) {
+        (self.ca_mappings.clone(), self.base_ca_mappings.clone())
+    }
+
+    /// Arc-cloned remote pathinfo service (if configured).
+    pub fn remote_pathinfo(&self) -> Option<Arc<dyn PathInfoService>> {
+        self.remote_pathinfo.clone()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_test_source_admission(&mut self) {
+        self.source_admission = Some(Arc::new(crate::source_admission::TestSourceAdmission));
+    }
+
+    pub(crate) fn admit_http_source(&self, cache_url: &Url) -> Result<Arc<dyn StoreSourceLease>, Error> {
+        admit_source(self.source_admission.as_deref(), StoreSource::Substituter(cache_url.as_str()), &self.store_dir)
+    }
+
+    /// The state directory backing this store.
+    pub fn state_dir(&self) -> &Path {
+        &self.state_dir
+    }
+
+    /// The logical store prefix (e.g. "/crunch/store").
+    pub fn store_dir(&self) -> &str {
+        &self.store_dir
+    }
+
+    pub fn overlay_report(&self) -> Result<Option<crate::StoreOverlayReport>, Error> {
+        self.revalidate_overlay_bases()?;
+        self.overlay_state.as_ref().map(crate::overlay::overlay_report).transpose()
+    }
+
+    pub fn revalidate_overlay_bases(&self) -> Result<(), Error> {
+        let Some(state) = self.overlay_state.as_ref() else {
+            return Ok(());
+        };
+        crate::overlay::revalidate_overlay_state(state)
+    }
+
+    pub async fn path_info_with_layer(
+        &self,
+        path: &StorePath<String>,
+    ) -> Result<Option<crate::layer::Layered<PathInfo>>, Error> {
+        self.revalidate_overlay_bases()?;
+        let read = self
+            .pathinfo_service
+            .get_with_layer(*path.digest())
+            .await
+            .map_err(|error| Error::Store(format!("PathInfo lookup for {path}: {error}")))?;
+        self.revalidate_overlay_bases()?;
+        let Some(read) = read else {
+            return Ok(None);
+        };
+        if read.value.store_path != *path {
+            return Err(Error::Store(format!(
+                "overlay-pathinfo-digest-collision: requested {path}, observed {} in layer {}",
+                read.value.store_path, read.layer_index,
+            )));
+        }
+        if self.overlay_state.is_some() && read.layer_index == 0 {
+            let trusted_keys = crate::overlay::load_layer_trust_keys(&self.state_dir)?;
+            crate::overlay::verify_pathinfo_trust(&read.value, &trusted_keys, &self.store_dir)
+                .map_err(|error| Error::Store(format!("overlay-layer-trust-failure for {path}: {error}")))?;
+        }
+        let shadows = self.pathinfo_shadow_observations(read.layer_index, &read.value).await;
+        let mut layered = crate::layer::Layered::from_service_index(read.value, read.layer_index)
+            .map_err(|error| Error::Store(format!("mapping PathInfo layer for {path}: {error}")))?;
+        layered.shadows = shadows;
+        Ok(Some(layered))
+    }
+
+    async fn pathinfo_shadow_observations(
+        &self,
+        selected_layer_index: usize,
+        selected: &PathInfo,
+    ) -> Vec<crate::layer::LayerShadowObservation> {
+        let mut observations = Vec::new();
+        for (base_index, service) in self.base_pathinfo_inspection_services.iter().enumerate() {
+            let layer_index = base_index.saturating_add(1);
+            if layer_index <= selected_layer_index {
+                continue;
+            }
+            let layer = crate::layer::StoreLayer::Base { index: layer_index };
+            let status = match service.get(*selected.store_path.digest()).await {
+                Ok(Some(lower)) if lower.store_path != selected.store_path => {
+                    crate::layer::LayerShadowStatus::DigestCollision
+                }
+                Ok(Some(lower)) if lower == *selected => crate::layer::LayerShadowStatus::Matching,
+                Ok(Some(_)) => crate::layer::LayerShadowStatus::Conflicting,
+                Ok(None) => continue,
+                Err(_) => crate::layer::LayerShadowStatus::ReadFailure,
+            };
+            observations.push(crate::layer::LayerShadowObservation { layer, status });
+        }
+        observations
+    }
+
+    fn record_layer_selection<T>(
+        &mut self,
+        store_path: &StorePath<String>,
+        layered: &crate::layer::Layered<T>,
+    ) -> Result<(), Error> {
+        let key = store_path.to_string();
+        if !self.read_layer_selections.contains_key(&key)
+            && self.read_layer_selections.len() >= MAX_RECORDED_LAYER_SELECTIONS
+        {
+            return Err(Error::Store("store layer selection limit exceeded".to_string()));
+        }
+        self.read_layer_selections
+            .insert(key.clone(), crate::layer::StoreLayerSelection::from_layered(key, layered));
+        Ok(())
+    }
+
+    pub fn take_read_layer_selections(&mut self) -> Vec<crate::layer::StoreLayerSelection> {
+        std::mem::take(&mut self.read_layer_selections).into_values().collect()
+    }
+
+    pub async fn list_pathinfos_with_layer(&self) -> Result<Vec<crate::layer::Layered<PathInfo>>, Error> {
+        use futures::StreamExt;
+        use snix_store::pathinfoservice::PathInfoService;
+
+        self.revalidate_overlay_bases()?;
+        const LISTED_PATHINFOS_MAX: usize = 1_000_000;
+        let mut pathinfos = Vec::new();
+        let mut seen = std::collections::BTreeSet::new();
+
+        // Layer 0: the writable overlay. Trust-check entries against the
+        // overlay trusted keys exactly as before.
+        let mut overlay_stream = self.overlay_pathinfo.list();
+        // Empty fresh overlays need no key, but every present record must pass
+        // exactly the same trust check as a direct layered lookup.
+        let mut overlay_trusted_keys = None;
+        let mut remaining = LISTED_PATHINFOS_MAX;
+        while let Some(result) = overlay_stream.next().await {
+            assert!(remaining > 0, "composed PathInfo listing exceeds {LISTED_PATHINFOS_MAX} entries");
+            remaining -= 1;
+            let path_info = result.map_err(|err| Error::Store(format!("listing overlay PathInfos: {err}")))?;
+            if self.overlay_state.is_some() && overlay_trusted_keys.is_none() {
+                overlay_trusted_keys = Some(crate::overlay::load_layer_trust_keys(&self.state_dir)?);
+            }
+            if let Some(trusted_keys) = &overlay_trusted_keys {
+                crate::overlay::verify_pathinfo_trust(&path_info, trusted_keys, &self.store_dir).map_err(|error| {
+                    Error::Store(format!("overlay-layer-trust-failure for {}: {error}", path_info.store_path))
+                })?;
+            }
+            seen.insert(path_info.store_path.clone());
+            let shadows = self.pathinfo_shadow_observations(0, &path_info).await;
+            let mut layered = crate::layer::Layered::from_service_index(path_info, 0)
+                .map_err(|error| Error::Store(format!("mapping listed overlay PathInfo layer: {error}")))?;
+            layered.shadows = shadows;
+            pathinfos.push(layered);
+        }
+
+        // Layers 1..: base stores in declaration order; entries already
+        // present in a nearer layer are shadowed and skipped.
+        for (base_index, base) in self.base_pathinfo_inspection_services.iter().enumerate() {
+            let service_index = base_index.checked_add(1).ok_or_else(|| Error::Store("base index overflow".into()))?;
+            let base_dir = self
+                .overlay_state
+                .as_ref()
+                .and_then(|state| state.base_state_dirs.get(base_index))
+                .ok_or_else(|| Error::Store("listed base has no declared overlay state".to_string()))?;
+            let trusted_keys = crate::overlay::load_layer_trust_keys(base_dir)?;
+            assert!(remaining > 0, "composed PathInfo listing exceeds {LISTED_PATHINFOS_MAX} entries");
+            let mut base_stream = base.list();
+            while let Some(result) = base_stream.next().await {
+                assert!(remaining > 0, "composed PathInfo listing exceeds {LISTED_PATHINFOS_MAX} entries");
+                remaining -= 1;
+                let path_info = result.map_err(|err| Error::Store(format!("listing base PathInfos: {err}")))?;
+                if !seen.insert(path_info.store_path.clone()) {
+                    continue;
+                }
+                crate::overlay::verify_pathinfo_trust(&path_info, &trusted_keys, &self.store_dir).map_err(|error| {
+                    Error::Store(format!("overlay-layer-trust-failure in base {base_index}: {error}"))
+                })?;
+                let shadows = self.pathinfo_shadow_observations(service_index, &path_info).await;
+                let mut layered = crate::layer::Layered::from_service_index(path_info, service_index)
+                    .map_err(|error| Error::Store(format!("mapping listed base PathInfo layer: {error}")))?;
+                layered.shadows = shadows;
+                pathinfos.push(layered);
+            }
+        }
+
+        assert!(pathinfos.len() <= LISTED_PATHINFOS_MAX, "listing bound must hold");
+        pathinfos.sort_by(|left, right| left.value.store_path.cmp(&right.value.store_path));
+        self.revalidate_overlay_bases()?;
+        Ok(pathinfos)
+    }
+
+    pub async fn discover_action_results(&self, action_ref: &str) -> ActionResultDiscoveryReport {
+        self.action_result_stores.discover(action_ref).await
+    }
+
+    pub async fn probe_action_result_outputs(
+        &self,
+        record: &crunch_action_result_core::ActionResultRecord,
+    ) -> Result<ActionResultOutputProbe, String> {
+        let mut outputs = BTreeMap::new();
+        let mut transferred_nar_bytes = 0_u64;
+        let mut reused_nar_bytes = 0_u64;
+        for output in &record.outputs {
+            let store_path = StorePath::from_absolute_path_with_prefix(output.store_path.as_bytes(), &self.store_dir)
+                .map_err(|_| format!("action-result-output-store-path-invalid:{}", output.store_path))?;
+            let digest = *store_path.digest();
+            let local = self
+                .pathinfo_service
+                .get(digest)
+                .await
+                .map_err(|error| format!("action-result-local-pathinfo-query:{error}"))?;
+            let (path_info, transferred) = match local {
+                Some(path_info) => (path_info, false),
+                None => {
+                    let remote = self
+                        .remote_pathinfo
+                        .as_ref()
+                        .ok_or_else(|| "action-result-output-pathinfo-missing".to_string())?;
+                    let path_info = remote
+                        .get(digest)
+                        .await
+                        .map_err(|error| format!("action-result-remote-pathinfo-query:{error}"))?
+                        .ok_or_else(|| "action-result-output-pathinfo-missing".to_string())?;
+                    (path_info, true)
+                }
+            };
+            if path_info.store_path != store_path {
+                return Err("action-result-output-pathinfo-store-path-mismatch".to_string());
+            }
+            if !self
+                .castore_has_complete_content(&path_info.node)
+                .await
+                .map_err(|error| format!("action-result-object-completeness:{error}"))?
+            {
+                return Err("action-result-output-object-incomplete".to_string());
+            }
+            (transferred_nar_bytes, reused_nar_bytes) = account_action_result_nar_bytes(NarByteAccounting {
+                transferred_nar_bytes,
+                reused_nar_bytes,
+                nar_size_bytes: path_info.nar_size,
+                is_transferred: transferred,
+            })?;
+            if outputs.insert(output.name.clone(), path_info).is_some() {
+                return Err("action-result-output-name-duplicate".to_string());
+            }
+        }
+        Ok(ActionResultOutputProbe {
+            outputs,
+            transferred_nar_bytes,
+            reused_nar_bytes,
+        })
+    }
+
+    pub async fn admit_action_result_outputs(
+        &mut self,
+        outputs: &BTreeMap<String, PathInfo>,
+        is_root: bool,
+        root_source: Option<GcRootSource>,
+    ) -> Result<(), Error> {
+        for (output_name, path_info) in outputs {
+            self.persist_and_export_signed_output(PersistOutputRequest {
+                output_name,
+                output_path: &path_info.store_path,
+                path_info: path_info.clone(),
+                final_node: path_info.node.clone(),
+                provenance: None,
+                is_root,
+                root_source,
+            })
+            .await?;
+        }
+        Ok(())
+    }
+
+    pub async fn publish_local_action_result(
+        &self,
+        record: &crunch_action_result_core::SignedActionResultRecord,
+    ) -> Result<Vec<ActionResultPublicationReport>, String> {
+        self.action_result_stores.publish_local(record).await
+    }
+
+    pub async fn publish_remote_action_result(
+        &self,
+        record: &crunch_action_result_core::SignedActionResultRecord,
+    ) -> Result<Vec<ActionResultPublicationReport>, String> {
+        self.action_result_stores.publish_remote(record).await
+    }
+
+    pub fn replace_action_result_stores(&mut self, stores: ActionResultStoreSet) {
+        self.action_result_stores = stores;
+    }
+
+    pub(crate) fn take_action_result_stores(&mut self) -> ActionResultStoreSet {
+        std::mem::replace(&mut self.action_result_stores, ActionResultStoreSet::new(false))
+    }
+
+    pub fn list_retained_roots(&self) -> Result<Vec<GcRootRecord>, Error> {
+        roots::list_roots(&self.state_dir)
+    }
+
+    pub async fn pin_retained_root(
+        &self,
+        logical_path: &str,
+        owner_label: &str,
+        reason: &str,
+    ) -> Result<GcRootRecord, Error> {
+        if let Some(store) = &self.casita_store {
+            store.require_recovered_gc()?;
+        }
+        self.revalidate_overlay_bases()?;
+        let root = roots::pin_root_for_owner(
+            &self.state_dir,
+            &self.store_dir,
+            self.pathinfo_service.as_ref(),
+            logical_path,
+            owner_label,
+            reason,
+        )
+        .await?;
+        self.revalidate_overlay_bases()?;
+        Ok(root)
+    }
+
+    pub fn unpin_retained_root(
+        &self,
+        logical_path: &str,
+        owner_label: &str,
+        reason: Option<&str>,
+    ) -> Result<Option<GcRootRecord>, Error> {
+        if let Some(store) = &self.casita_store {
+            store.require_recovered_gc()?;
+        }
+        let owner = roots::operator_owner(owner_label)?;
+        roots::unpin_root_for_owner_reason(
+            &self.state_dir,
+            roots::LogicalStorePathRef {
+                logical_path,
+                store_dir: &self.store_dir,
+            },
+            &owner,
+            reason,
+        )
+    }
+
+    pub fn set_root_registration(&mut self, registration: Option<crate::retention::RootRegistration>) {
+        self.root_registration = registration;
+    }
+
+    pub async fn register_retained_root(
+        &self,
+        store_path: &StorePath<String>,
+        source: GcRootSource,
+    ) -> Result<GcRootRecord, Error> {
+        if let Some(store) = &self.casita_store {
+            store.require_recovered_gc()?;
+        }
+        self.revalidate_overlay_bases()?;
+        let root = match &self.root_registration {
+            Some(registration) => {
+                roots::register_root_with_registration(
+                    &self.state_dir,
+                    &self.store_dir,
+                    self.pathinfo_service.as_ref(),
+                    store_path,
+                    source,
+                    registration.clone(),
+                )
+                .await
+            }
+            None => {
+                roots::register_root(
+                    &self.state_dir,
+                    &self.store_dir,
+                    self.pathinfo_service.as_ref(),
+                    store_path,
+                    source,
+                )
+                .await
+            }
+        }?;
+        self.revalidate_overlay_bases()?;
+        Ok(root)
+    }
+
+    pub async fn garbage_collect(&mut self, accepted_plan_id: Option<&str>) -> Result<GcReport, Error> {
+        self.garbage_collect_with_castore_roots(accepted_plan_id, &[]).await
+    }
+    /// Casita GC requires the caller's already-held lock for recovery and execution.
+    pub async fn garbage_collect_under_guard(
+        &mut self,
+        guard: &crate::StoreMutationGuard,
+        accepted_plan_id: Option<&str>,
+    ) -> Result<GcReport, Error> {
+        self.garbage_collect_with_castore_roots_under_guard(guard, accepted_plan_id, &[]).await
+    }
+
+    /// Plan and execute with the same-state mutation guard, never reacquiring it.
+    pub async fn garbage_collect_with_castore_roots_under_guard(
+        &mut self,
+        guard: &crate::StoreMutationGuard,
+        accepted_plan_id: Option<&str>,
+        retained_castore_roots: &[Node],
+    ) -> Result<GcReport, Error> {
+        self.recover_casita_gc_under_guard(guard).await?;
+        self.garbage_collect_inner(accepted_plan_id, retained_castore_roots).await
+    }
+
+    pub async fn garbage_collect_with_castore_roots(
+        &mut self,
+        accepted_plan_id: Option<&str>,
+        retained_castore_roots: &[Node],
+    ) -> Result<GcReport, Error> {
+        if self.backend == StoreBackend::Casita {
+            return Err(Error::MutationLock(
+                "casita-gc-guard-required: use garbage_collect_with_castore_roots_under_guard".to_string(),
+            ));
+        }
+        self.garbage_collect_inner(accepted_plan_id, retained_castore_roots).await
+    }
+
+    async fn garbage_collect_inner(
+        &mut self,
+        accepted_plan_id: Option<&str>,
+        retained_castore_roots: &[Node],
+    ) -> Result<GcReport, Error> {
+        self.revalidate_overlay_bases()?;
+        let ctx = gc::GcContext {
+            state_dir: &self.state_dir,
+            output_dir_str: &self.output_dir_str,
+            store_dir: &self.store_dir,
+            overlay_pathinfo: self.overlay_pathinfo.as_ref(),
+            composed_pathinfo: self.pathinfo_service.as_ref(),
+            overlay_directory_service: self.overlay_directory_service.as_ref(),
+            overlay_blob_service: self.overlay_blob_service.as_ref(),
+            overlay_plan_identity: self.overlay_state.as_ref().map(|state| state.plan.plan_identity.into_bytes()),
+            retained_castore_roots,
+            casita_store: self.casita_store.clone(),
+        };
+        let report = gc::run_gc(&ctx, &mut self.ca_mappings, accepted_plan_id).await?;
+        self.revalidate_overlay_bases()?;
+        Ok(report)
+    }
+
+    /// Render a NAR archive from a castore node into an arbitrary writer.
+    ///
+    /// Streams the archive without buffering the full content in memory.
+    /// The writer receives the raw (uncompressed) NAR byte stream.
+    /// Collect stored PathInfo records, bounded inside the store shell.
+    ///
+    /// Named administration operation; raw PathInfo services stay private.
+    pub async fn store_list_pathinfos_bounded(&self, max_entries: u32) -> Result<Vec<PathInfo>, Error> {
+        use futures::StreamExt;
+        use snix_store::pathinfoservice::PathInfoService;
+
+        assert!(max_entries > 0, "pathinfo scan bound must be positive");
+        let mut stream = self.pathinfo_service().list();
+        let mut results = Vec::new();
+        let scan_bound = usize::try_from(max_entries).unwrap_or(usize::MAX);
+        for _ in 0..scan_bound {
+            let Some(result) = stream.next().await else {
+                return Ok(results);
+            };
+            let path_info = result.map_err(|err| Error::PathInfoService(format!("listing pathinfo: {err}")))?;
+            results.push(path_info);
+        }
+        if stream.next().await.is_none() {
+            return Ok(results);
+        }
+        Err(Error::Store(format!("pathinfo scan exceeds {max_entries} entries")))
+    }
+
+    pub async fn render_nar<W: tokio::io::AsyncWrite + Unpin + Send>(
+        &self,
+        node: &Node,
+        dest: &mut W,
+    ) -> Result<(), Error> {
+        use snix_store::nar::write_nar;
+
+        const NAR_DUPLEX_BUF_BYTES: usize = 64 * 1024;
+
+        let (mut reader, writer) = tokio::io::duplex(NAR_DUPLEX_BUF_BYTES);
+        let node = node.clone();
+        let blob_service = self.blob_service();
+        let directory_service = self.directory_service();
+
+        let write_task = tokio::spawn(async move { write_nar(writer, &node, blob_service, directory_service).await });
+
+        // r[impl mantle.io_fault.fixtures] Fault the actual NAR stream write
+        // at the store adapter, without changing the production copy.
+        #[cfg(test)]
+        let copy_result = async {
+            let count = crate::fault_scope::fallible!(tokio::io::copy(&mut reader, dest).await);
+            Ok::<_, std::io::Error>(count)
+        }
+        .await;
+        #[cfg(not(test))]
+        let copy_result = tokio::io::copy(&mut reader, dest).await;
+        copy_result.map_err(|e| Error::Export(format!("streaming NAR: {e}")))?;
+
+        write_task
+            .await
+            .map_err(|e| Error::Export(format!("NAR writer task panicked: {e}")))?
+            .map_err(|e| Error::Export(format!("rendering NAR: {e}")))?;
+
+        Ok(())
+    }
+
+    /// Observe one already-stored source subtree without granting publication authority.
+    pub async fn observe_source_slice(&self, root: &Node, subpath: &str) -> Result<ObservedSourceSlice, Error> {
+        if subpath.starts_with('/') {
+            return Err(Error::Store(format!("verified-source-slice-invalid-subpath: {subpath}")));
+        }
+        let mut node = root.clone();
+        if !subpath.is_empty() {
+            for part in subpath.split('/') {
+                let component = snix_castore::PathComponent::try_from(part)
+                    .map_err(|error| Error::Store(format!("verified-source-slice-invalid-subpath: {error}")))?;
+                let digest = match &node {
+                    Node::Directory { digest, .. } => *digest,
+                    Node::Symlink { .. } => {
+                        return Err(Error::Store(format!("verified-source-slice-symlink-traversal: {subpath}")));
+                    }
+                    Node::File { .. } => {
+                        return Err(Error::Store(format!("verified-source-slice-absent: {subpath}")));
+                    }
+                };
+                let directory = self
+                    .directory_service
+                    .get(&digest)
+                    .await
+                    .map_err(|error| Error::Store(format!("verified-source-slice-absent: {subpath}: {error}")))?
+                    .ok_or_else(|| Error::Store(format!("verified-source-slice-absent: {subpath}")))?;
+                node = directory
+                    .nodes()
+                    .find(|(name, _)| name.as_ref() == component.as_ref())
+                    .map(|(_, child)| child.clone())
+                    .ok_or_else(|| Error::Store(format!("verified-source-slice-absent: {subpath}")))?;
+            }
+        }
+        if matches!(node, Node::Symlink { .. }) {
+            return Err(Error::Store(format!("verified-source-slice-symlink-traversal: {subpath}")));
+        }
+        if !self.castore_has_complete_content(&node).await? {
+            return Err(Error::Store(format!("verified-source-slice-absent: incomplete castore at {subpath}")));
+        }
+        let mut observer = SourceNarObserver::new();
+        if let Err(error) = self.render_nar(&node, &mut observer).await {
+            if observer.limit_exceeded {
+                return Err(Error::Store(format!(
+                    "verified-source-slice-limit: NAR exceeds {SOURCE_SLICE_NAR_MAX_BYTES} bytes"
+                )));
+            }
+            return Err(error);
+        }
+        let (nar_size, nar_sha256, nar_blake3) = observer.finish();
+        Ok(ObservedSourceSlice {
+            node,
+            nar_size,
+            nar_sha256,
+            nar_blake3,
+        })
+    }
+
+    /// Check whether the castore has the content referenced by a Node.
+    ///
+    /// Files: probe blob_service. Directories: probe directory_service.
+    /// Symlinks: always present (target is inline in the Node).
+    pub async fn castore_has_content(&self, node: &Node) -> Result<bool, Error> {
+        // Tiger Style: verify node structural invariant.
+        debug_assert!(
+            !matches!(node, Node::Directory { size, .. } if *size == u64::MAX),
+            "directory size must not be sentinel value"
+        );
+        match node {
+            Node::File { digest, .. } => {
+                self.blob_service.has(digest).await.map_err(|e| Error::BlobService(format!("existence check: {e}")))
+            }
+            Node::Directory { digest, .. } => self
+                .directory_service
+                .get(digest)
+                .await
+                .map(|opt| opt.is_some())
+                .map_err(|e| Error::DirectoryService(format!("existence check: {e}"))),
+            Node::Symlink { .. } => Ok(true),
+        }
+    }
+
+    /// Recursive castore completeness check (r[impl cache_substitution.castore_completeness]).
+    ///
+    /// Returns `true` if the full tree rooted at `node` is present in
+    /// local castore storage.  Checks all child blobs/directories
+    /// recursively (bounded by `MAX_RECURSIVE_NODES` and `MAX_DEPTH`).
+    /// Every call checks the active services so stale process-global state
+    /// cannot admit an action result whose data was removed or never imported.
+    pub async fn castore_has_complete_content(&self, node: &Node) -> Result<bool, Error> {
+        recursive_castore_completeness(&*self.blob_service, &*self.directory_service, node).await
+    }
+
+    /// Read the full content of a file blob from castore.
+    pub async fn read_blob(&self, node: &Node) -> Result<Vec<u8>, Error> {
+        use tokio::io::AsyncReadExt;
+
+        let digest = match node {
+            Node::File { digest, size, .. } => {
+                const MAX_BLOB_READ_BYTES: u64 = 8_388_608;
+                if *size > MAX_BLOB_READ_BYTES {
+                    return Err(Error::BlobService(format!(
+                        "blob too large to read: {size} bytes (limit: {MAX_BLOB_READ_BYTES})"
+                    )));
+                }
+                *digest
+            }
+            other => {
+                return Err(Error::BlobService(format!("read_blob called on non-file node: {other:?}")));
+            }
+        };
+
+        let mut reader = self
+            .blob_service
+            .open_read(&digest)
+            .await
+            .map_err(|e| Error::BlobService(format!("opening blob: {e}")))?
+            .ok_or_else(|| {
+                Error::BlobService(format!("blob not found: {}", data_encoding::HEXLOWER.encode(digest.as_slice())))
+            })?;
+
+        let mut buf = Vec::new();
+        reader.read_to_end(&mut buf).await.map_err(|e| Error::BlobService(format!("reading blob: {e}")))?;
+
+        Ok(buf)
+    }
+
+    /// The output directory string (from `--store`).
+    pub fn output_dir_str(&self) -> &str {
+        &self.output_dir_str
+    }
+
+    pub fn take_output_substitution_report(
+        &mut self,
+        output_path: &StorePath<String>,
+    ) -> Option<OutputSubstitutionReport> {
+        self.output_substitution_reports.remove(output_path)
+    }
+
+    pub fn record_verified_output_substitution_report(
+        &mut self,
+        output_path: &StorePath<String>,
+        report: OutputSubstitutionReport,
+    ) {
+        self.record_output_substitution_report(output_path, report);
+    }
+
+    fn record_output_substitution_report(&mut self, output_path: &StorePath<String>, report: OutputSubstitutionReport) {
+        let previous = self.output_substitution_reports.insert(output_path.clone(), report);
+        debug_assert!(previous.is_none(), "substitution report should only be recorded once per output path");
+    }
+
+    /// Reuse a previously known castore node for `path` when possible.
+    ///
+    /// Snix checks the session cache before local PathInfo. Casita always
+    /// rechecks its durable root, envelope, and trust policy instead of treating
+    /// session nodes as authority. Returns `None` when no reusable local node
+    /// is known or when the referenced castore content is missing.
+    pub async fn cached_node_for_path(&mut self, path: &StorePath<String>) -> Result<Option<Node>, Error> {
+        Ok(self.cached_node_for_path_with_layer(path).await?.map(|read| read.value))
+    }
+
+    pub async fn cached_node_for_path_with_layer(
+        &mut self,
+        path: &StorePath<String>,
+    ) -> Result<Option<crate::layer::Layered<Node>>, Error> {
+        if path.name().is_empty() || !path.to_string().contains('-') {
+            return Err(Error::Store(format!("invalid logical store path: {path}")));
+        }
+        if self.backend == StoreBackend::Snix
+            && let Some(node) = self.output_nodes.get(path).cloned()
+        {
+            if self.castore_has_complete_content(&node).await? {
+                return Ok(Some(crate::layer::Layered::overlay(node)));
+            }
+            self.output_nodes.remove(path);
+            return Ok(None);
+        }
+
+        let Some(path_info) = self.path_info_with_layer(path).await? else {
+            return Ok(None);
+        };
+        if !self.castore_has_complete_content(&path_info.value.node).await? {
+            if self.overlay_state.is_none() {
+                return Ok(None);
+            }
+            return Err(Error::Store(format!(
+                "overlay-content-incomplete: {path} selected from {} has incomplete castore content",
+                path_info.layer,
+            )));
+        }
+        self.revalidate_overlay_bases()?;
+        self.record_layer_selection(path, &path_info)?;
+
+        let layered_node = path_info.map(|value| value.node);
+        if self.backend == StoreBackend::Snix && layered_node.layer.is_overlay() {
+            self.output_nodes.insert(path.clone(), layered_node.value.clone());
+        }
+        Ok(Some(layered_node))
+    }
+
+    /// Return and physically export one complete local PathInfo.
+    pub async fn export_cached_path_info(&mut self, path: &StorePath<String>) -> Result<Option<PathInfo>, Error> {
+        assert!(!path.name().is_empty(), "store path name must not be empty");
+        let Some(node) = self.cached_node_for_path(path).await? else {
+            return Ok(None);
+        };
+        let path_info = self
+            .pathinfo_service
+            .get(*path.digest())
+            .await
+            .map_err(|error| Error::Store(format!("PathInfo export lookup for {path}: {error}")))?
+            .ok_or_else(|| Error::Store(format!("cached node has no PathInfo: {path}")))?;
+        if path_info.store_path != *path || path_info.node != node {
+            return Err(Error::Store(format!("cached PathInfo changed during export: {path}")));
+        }
+        self.export_output_if_needed(path, &node, true).await?;
+        self.built_outputs
+            .insert(path.to_absolute_path_with_prefix(&self.output_dir_str), path_info.clone());
+        Ok(Some(path_info))
+    }
+
+    pub fn resolve_ca_mapping(
+        &self,
+        drv_abs: &str,
+        output_name: &str,
+    ) -> Result<Option<crate::layer::Layered<String>>, Error> {
+        self.revalidate_overlay_bases()?;
+        if let Some(path) = self.ca_mappings.get(drv_abs, output_name) {
+            return Ok(Some(crate::layer::Layered::overlay(path.to_string())));
+        }
+        for (base_index, mappings) in self.base_ca_mappings.iter().enumerate() {
+            if let Some(path) = mappings.get(drv_abs, output_name) {
+                return Ok(Some(crate::layer::Layered {
+                    value: path.to_string(),
+                    layer: crate::layer::StoreLayer::Base {
+                        index: base_index.saturating_add(1),
+                    },
+                    shadows: Vec::new(),
+                }));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Record a CA mapping and persist to disk.
+    pub fn insert_ca_mapping(&mut self, drv_abs: &str, output_name: &str, ca_abs: &str) {
+        self.ca_mappings.insert(drv_abs, output_name, ca_abs);
+        self.ca_mappings.save(&self.state_dir);
+    }
+
+    // -- Cache checking --
+
+    /// Check whether all outputs of a derivation are cached.
+    ///
+    /// Returns `Some(outputs)` on full hit, `None` on any miss.
+    /// Checks local PathInfo + castore content, falls back to remote
+    /// binary cache substitution.
+    pub async fn check_cache(
+        &mut self,
+        drv_path: &StorePath<String>,
+        derivation: &Derivation,
+        is_root: bool,
+        root_source: Option<GcRootSource>,
+    ) -> Result<Option<HashMap<String, PathInfo>>, Error> {
+        assert!(!derivation.outputs.is_empty(), "derivation must have at least one output");
+
+        let mut infos = HashMap::with_capacity(derivation.outputs.len());
+        let drv_abs = drv_path.to_absolute_path_with_prefix(&self.store_dir);
+
+        let is_fod = derivation.outputs.values().any(|o| o.ca_hash.is_some());
+
+        for (output_name, output) in &derivation.outputs {
+            let output_path: StorePath<String> = match output.path.as_ref() {
+                Some(p) => p.clone(),
+                None => match self.resolve_ca_mapping(&drv_abs, output_name)? {
+                    Some(ca_mapping) => {
+                        StorePath::from_absolute_path_with_prefix(ca_mapping.value.as_bytes(), &self.store_dir)
+                            .map_err(|_| Error::Cache(format!("invalid CA mapping path: {}", ca_mapping.value)))?
+                    }
+                    None => return Ok(None),
+                },
+            };
+
+            let stored = self.path_info_with_layer(&output_path).await?;
+
+            match stored {
+                Some(layered_path_info) => {
+                    self.record_layer_selection(&output_path, &layered_path_info)?;
+                    let path_info = layered_path_info.value;
+                    // All outputs require declared-size castore completeness.
+                    // Directory outputs recursively check child blobs and directories;
+                    // file outputs verify the blob can reconstruct the declared size;
+                    // symlinks are inline and always complete.
+                    // r[impl cache_substitution.castore_completeness]
+                    let has_content = self.castore_has_complete_content(&path_info.node).await?;
+                    if has_content {
+                        self.persist_artifact_attestation_without_evidence_loss(&path_info, output_name, None).await?;
+                        self.export_output_if_needed(&output_path, &path_info.node, is_root).await?;
+                        if layered_path_info.layer.is_overlay() {
+                            self.output_nodes.insert(output_path.clone(), path_info.node.clone());
+                        }
+                        self.built_outputs
+                            .insert(output_path.to_absolute_path_with_prefix(&self.output_dir_str), path_info.clone());
+                        if is_root && let Some(source) = root_source {
+                            self.register_retained_root(&output_path, source).await?;
+                        }
+                        infos.insert(output_name.clone(), path_info);
+                    } else {
+                        tracing::warn!(
+                            path = %output_path,
+                            "PathInfo exists but castore content missing or incomplete, rebuilding"
+                        );
+                        return Ok(None);
+                    }
+                }
+                None => {
+                    if !is_fod
+                        && let Some(remote_pi) = self
+                            .try_substitute_remote(
+                                *output_path.digest(),
+                                &output_path,
+                                output_name,
+                                is_root,
+                                root_source,
+                            )
+                            .await?
+                    {
+                        infos.insert(output_name.clone(), remote_pi);
+                        continue;
+                    }
+                    return Ok(None);
+                }
+            }
+        }
+
+        Ok(Some(infos))
+    }
+
+    fn ensure_remote_delta_http_client(&mut self) -> Result<reqwest::Client, String> {
+        if let Some(client) = &self.remote_delta_http_client {
+            return Ok(client.clone());
+        }
+
+        let client = build_delta_http_client()?;
+        self.remote_delta_http_client = Some(client.clone());
+        Ok(client)
+    }
+
+    async fn probe_remote_delta_capability_if_needed(&mut self, output_path: &StorePath<String>, output_name: &str) {
+        if self.remote_delta_capability.is_some() {
+            return;
+        }
+
+        let Some(cache_url) = self.remote_cache_urls.first().cloned() else {
+            self.remote_delta_capability = Some(RemoteDeltaCapability::Unsupported);
+            return;
+        };
+
+        let client = match self.ensure_remote_delta_http_client() {
+            Ok(client) => client,
+            Err(err) => {
+                tracing::warn!(
+                    path = %output_path,
+                    output = %output_name,
+                    cache = %cache_url,
+                    err = %err,
+                    "delta capability client setup failed, using full-artifact substitution"
+                );
+                self.remote_delta_capability = Some(RemoteDeltaCapability::Unsupported);
+                return;
+            }
+        };
+
+        let capability = match probe_remote_delta_capability(&client, &cache_url).await {
+            Ok(capability) => capability,
+            Err(err) => {
+                tracing::warn!(
+                    path = %output_path,
+                    output = %output_name,
+                    cache = %cache_url,
+                    err = %err,
+                    "delta capability probe failed, using full-artifact substitution"
+                );
+                RemoteDeltaCapability::Unsupported
+            }
+        };
+
+        if matches!(capability, RemoteDeltaCapability::Supported(_)) {
+            trace_info!(
+                path = %output_path,
+                output = %output_name,
+                cache = %cache_url,
+                "same-authority delta capability detected; attempting candidate negotiation before full-artifact fallback"
+            );
+        }
+
+        self.remote_delta_capability = Some(capability);
+    }
+
+    async fn local_output_matches_candidate(&mut self, logical_path: &str) -> Result<bool, String> {
+        let store_path = match StorePath::from_absolute_path_with_prefix(logical_path.as_bytes(), &self.store_dir) {
+            Ok(store_path) => store_path,
+            Err(_) => return Ok(false),
+        };
+        let reused = self
+            .cached_node_for_path(&store_path)
+            .await
+            .map_err(|e| format!("checking local output match for {logical_path}: {e}"))?;
+        Ok(reused.is_some())
+    }
+
+    async fn collect_known_receiver_content(
+        &self,
+        root: &DeltaArtifactNodeWire,
+        known_directories: &mut HashSet<snix_castore::B3Digest>,
+        known_blobs: &mut HashSet<snix_castore::B3Digest>,
+        known_chunks: &mut HashSet<snix_castore::B3Digest>,
+    ) -> Result<(), String> {
+        let mut pending_nodes: Vec<&DeltaArtifactNodeWire> = vec![root];
+        while let Some(node) = pending_nodes.pop() {
+            match node {
+                DeltaArtifactNodeWire::Directory { digest, children } => {
+                    let local_directory = self
+                        .directory_service
+                        .get(digest)
+                        .await
+                        .map_err(|e| format!("directory lookup for {digest}: {e}"))?;
+                    if local_directory.is_some() {
+                        known_directories.insert(*digest);
+                        continue;
+                    }
+                    for child in children.iter().rev() {
+                        pending_nodes.push(child);
+                    }
+                }
+                DeltaArtifactNodeWire::Blob { digest, chunks, .. } => {
+                    let has_blob = self
+                        .blob_service
+                        .has(digest)
+                        .await
+                        .map_err(|e| format!("blob presence lookup for {digest}: {e}"))?;
+                    if has_blob {
+                        known_blobs.insert(*digest);
+                        continue;
+                    }
+                    for chunk in chunks {
+                        let has_chunk = self
+                            .blob_service
+                            .has(&chunk.digest)
+                            .await
+                            .map_err(|e| format!("chunk presence lookup for {}: {e}", chunk.digest))?;
+                        if has_chunk {
+                            known_chunks.insert(chunk.digest);
+                        }
+                    }
+                }
+                DeltaArtifactNodeWire::Symlink { .. } => {}
+            }
+        }
+        Ok(())
+    }
+
+    async fn build_receiver_has_set_for_candidate(
+        &mut self,
+        candidate: &DeltaCandidateResponseWire,
+    ) -> Result<DeltaReceiverHasSetWire, String> {
+        if candidate.sender.store_prefix != self.store_dir {
+            return Err(format!(
+                "store prefix mismatch: sender={} receiver={}",
+                candidate.sender.store_prefix, self.store_dir
+            ));
+        }
+
+        let mut known_outputs = HashSet::<String>::new();
+        let mut known_directories = HashSet::<snix_castore::B3Digest>::new();
+        let mut known_blobs = HashSet::<snix_castore::B3Digest>::new();
+        let mut known_chunks = HashSet::<snix_castore::B3Digest>::new();
+
+        for output in &candidate.sender.outputs {
+            if self.local_output_matches_candidate(&output.output_id).await? {
+                known_outputs.insert(output.output_id.clone());
+                continue;
+            }
+            self.collect_known_receiver_content(
+                &output.root,
+                &mut known_directories,
+                &mut known_blobs,
+                &mut known_chunks,
+            )
+            .await?;
+        }
+
+        let mut known_outputs: Vec<String> = known_outputs.into_iter().collect();
+        known_outputs.sort();
+        let mut known_directories: Vec<snix_castore::B3Digest> = known_directories.into_iter().collect();
+        known_directories.sort_by_key(|digest| digest.to_string());
+        let mut known_blobs: Vec<snix_castore::B3Digest> = known_blobs.into_iter().collect();
+        known_blobs.sort_by_key(|digest| digest.to_string());
+        let mut known_chunks: Vec<snix_castore::B3Digest> = known_chunks.into_iter().collect();
+        known_chunks.sort_by_key(|digest| digest.to_string());
+
+        Ok(DeltaReceiverHasSetWire {
+            manifest: DeltaReceiverManifestWire {
+                store_prefix: self.store_dir.clone(),
+                known_outputs,
+                known_directories,
+                known_blobs,
+                known_chunks,
+            },
+        })
+    }
+
+    async fn content_bytes_for_node(&self, node: &Node) -> Result<u64, Error> {
+        let mut total_bytes = 0u64;
+        let mut pending_nodes = vec![node.clone()];
+        while let Some(next_node) = pending_nodes.pop() {
+            match next_node {
+                Node::File { size, .. } => {
+                    total_bytes = total_bytes.saturating_add(size);
+                }
+                Node::Symlink { .. } => {}
+                Node::Directory { digest, .. } => {
+                    let directory = self
+                        .directory_service
+                        .get(&digest)
+                        .await
+                        .map_err(|e| Error::DirectoryService(format!("loading directory {digest}: {e}")))?
+                        .ok_or_else(|| Error::DirectoryService(format!("directory not found: {digest}")))?;
+                    for (_name, child) in directory.nodes() {
+                        pending_nodes.push(child.clone());
+                    }
+                }
+            }
+        }
+        Ok(total_bytes)
+    }
+
+    async fn write_blob_with_expected_digest(
+        &self,
+        expected_digest: &snix_castore::B3Digest,
+        bytes: &[u8],
+    ) -> Result<(), String> {
+        let mut writer = self.blob_service.open_write().await;
+        writer.write_all(bytes).await.map_err(|e| format!("writing blob {expected_digest}: {e}"))?;
+        let written_digest =
+            writer.close().await.map_err(|e| format!("closing blob writer for {expected_digest}: {e}"))?;
+        if written_digest != *expected_digest {
+            return Err(format!("delta blob digest mismatch: expected {expected_digest}, got {written_digest}"));
+        }
+        Ok(())
+    }
+
+    async fn read_blob_by_digest(&self, digest: &snix_castore::B3Digest) -> Result<Option<Vec<u8>>, String> {
+        let Some(mut reader) =
+            self.blob_service.open_read(digest).await.map_err(|e| format!("opening blob {digest}: {e}"))?
+        else {
+            return Ok(None);
+        };
+        let mut bytes = Vec::new();
+        reader.read_to_end(&mut bytes).await.map_err(|e| format!("reading blob {digest}: {e}"))?;
+        Ok(Some(bytes))
+    }
+
+    async fn apply_delta_transfer_frames(
+        &self,
+        frames: Vec<DeltaTransferFrameWire>,
+    ) -> Result<AppliedDeltaStreamWire, String> {
+        let mut final_path_info = None;
+        let mut chunk_frames_by_parent = HashMap::<snix_castore::B3Digest, BTreeMap<u32, AppliedDeltaChunkWire>>::new();
+        let mut blob_frames = 0u32;
+        let mut chunk_frames = 0u32;
+        let mut transferred_bytes = 0u64;
+
+        for frame in frames {
+            match frame {
+                DeltaTransferFrameWire::Blob { digest, bytes } => {
+                    self.write_blob_with_expected_digest(&digest, &bytes).await?;
+                    transferred_bytes = transferred_bytes.saturating_add(bytes.len() as u64);
+                    blob_frames = blob_frames.saturating_add(1);
+                }
+                DeltaTransferFrameWire::Chunk {
+                    parent_digest,
+                    chunk_digest,
+                    chunk_index,
+                    bytes,
+                } => {
+                    self.write_blob_with_expected_digest(&chunk_digest, &bytes).await?;
+                    transferred_bytes = transferred_bytes.saturating_add(bytes.len() as u64);
+                    let previous = chunk_frames_by_parent.entry(parent_digest).or_default().insert(
+                        chunk_index,
+                        AppliedDeltaChunkWire {
+                            digest: chunk_digest,
+                            chunk_index,
+                        },
+                    );
+                    if previous.is_some() {
+                        return Err(format!(
+                            "duplicate chunk frame for parent {} index {}",
+                            parent_digest, chunk_index
+                        ));
+                    }
+                    chunk_frames = chunk_frames.saturating_add(1);
+                }
+                DeltaTransferFrameWire::FinalPathInfo { path_info } => {
+                    if final_path_info.replace(path_info).is_some() {
+                        return Err("delta stream carried multiple final PathInfo frames".to_string());
+                    }
+                }
+            }
+        }
+
+        let final_path_info = final_path_info.ok_or_else(|| "delta stream ended without final PathInfo".to_string())?;
+        Ok(AppliedDeltaStreamWire {
+            final_path_info,
+            chunk_frames_by_parent,
+            blob_frames,
+            chunk_frames,
+            transferred_bytes,
+        })
+    }
+
+    fn requested_candidate_root<'a>(
+        &'a self,
+        candidate: &'a DeltaCandidateResponseWire,
+        output_path: &StorePath<String>,
+    ) -> Result<&'a DeltaArtifactNodeWire, String> {
+        let requested_logical_path = output_path.to_absolute_path_with_prefix(&self.store_dir);
+        candidate
+            .sender
+            .outputs
+            .iter()
+            .find(|output| output.output_id == requested_logical_path)
+            .map(|output| &output.root)
+            .ok_or_else(|| format!("delta candidate missing requested output {requested_logical_path}"))
+    }
+
+    fn ensure_delta_root_matches_pathinfo(
+        &self,
+        root: &DeltaArtifactNodeWire,
+        path_info: &PathInfo,
+    ) -> Result<(), String> {
+        match (root, &path_info.node) {
+            (
+                DeltaArtifactNodeWire::Directory { digest, .. },
+                Node::Directory {
+                    digest: node_digest, ..
+                },
+            ) if digest == node_digest => Ok(()),
+            (
+                DeltaArtifactNodeWire::Blob { digest, size_bytes, .. },
+                Node::File {
+                    digest: node_digest,
+                    size,
+                    ..
+                },
+            ) if digest == node_digest && size_bytes == size => Ok(()),
+            (DeltaArtifactNodeWire::Symlink { target }, Node::Symlink { target: node_target })
+                if target.as_bytes() == node_target.as_ref() =>
+            {
+                Ok(())
+            }
+            _ => Err(format!("delta final PathInfo node mismatch for {}", path_info.store_path)),
+        }
+    }
+
+    async fn ensure_directory_closure_available(&self, root_digest: &snix_castore::B3Digest) -> Result<(), String> {
+        let mut pending = vec![*root_digest];
+        let mut seen = HashSet::<snix_castore::B3Digest>::new();
+        while let Some(directory_digest) = pending.pop() {
+            if !seen.insert(directory_digest) {
+                continue;
+            }
+            let directory = self
+                .directory_service
+                .get(&directory_digest)
+                .await
+                .map_err(|e| format!("loading directory {directory_digest}: {e}"))?
+                .ok_or_else(|| {
+                    format!(
+                        "delta directory {} missing locally; wire format lacks directory entry names",
+                        directory_digest
+                    )
+                })?;
+            for (_name, child) in directory.nodes() {
+                match child {
+                    Node::Directory { digest, .. } => pending.push(*digest),
+                    Node::File { digest, .. } => {
+                        let has_blob =
+                            self.blob_service.has(digest).await.map_err(|e| format!("checking blob {digest}: {e}"))?;
+                        if !has_blob {
+                            return Err(format!("delta directory closure missing blob {digest}"));
+                        }
+                    }
+                    Node::Symlink { .. } => {}
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn materialize_chunked_blob_from_local_content(
+        &self,
+        blob_digest: &snix_castore::B3Digest,
+        size_bytes: u64,
+        chunks: &[DeltaChunkRefWire],
+        applied: &AppliedDeltaStreamWire,
+    ) -> Result<(), String> {
+        if let Some(streamed_chunks) = applied.chunk_frames_by_parent.get(blob_digest) {
+            if streamed_chunks.len() > chunks.len() {
+                return Err(format!(
+                    "delta stream advertised too many chunks for blob {}: {} > {}",
+                    blob_digest,
+                    streamed_chunks.len(),
+                    chunks.len()
+                ));
+            }
+            for chunk in streamed_chunks.values() {
+                let chunk_idx = usize::try_from(chunk.chunk_index)
+                    .map_err(|_| format!("chunk index {} overflows usize", chunk.chunk_index))?;
+                let expected_chunk = chunks.get(chunk_idx).ok_or_else(|| {
+                    format!("delta stream chunk index {} out of range for blob {}", chunk.chunk_index, blob_digest)
+                })?;
+                if expected_chunk.digest != chunk.digest {
+                    return Err(format!(
+                        "delta stream chunk digest mismatch for blob {} index {}",
+                        blob_digest, chunk.chunk_index
+                    ));
+                }
+            }
+        }
+
+        let capacity_bytes = usize::try_from(size_bytes)
+            .map_err(|_| format!("blob {} too large to materialize: {} bytes", blob_digest, size_bytes))?;
+        let mut bytes = Vec::with_capacity(capacity_bytes);
+        for chunk in chunks {
+            let chunk_bytes = self
+                .read_blob_by_digest(&chunk.digest)
+                .await?
+                .ok_or_else(|| format!("delta blob {} missing chunk {}", blob_digest, chunk.digest))?;
+            let expected_len = usize::try_from(chunk.size_bytes)
+                .map_err(|_| format!("chunk {} too large to materialize", chunk.digest))?;
+            if chunk_bytes.len() != expected_len {
+                return Err(format!(
+                    "delta chunk size mismatch for {}: expected {}, got {}",
+                    chunk.digest,
+                    chunk.size_bytes,
+                    chunk_bytes.len()
+                ));
+            }
+            bytes.extend_from_slice(&chunk_bytes);
+        }
+        if bytes.len() != capacity_bytes {
+            return Err(format!(
+                "delta blob size mismatch for {}: expected {}, got {}",
+                blob_digest,
+                size_bytes,
+                bytes.len()
+            ));
+        }
+        self.write_blob_with_expected_digest(blob_digest, &bytes).await
+    }
+
+    async fn reconstruct_delta_output_node(
+        &self,
+        root: &DeltaArtifactNodeWire,
+        applied: &AppliedDeltaStreamWire,
+    ) -> Result<Node, String> {
+        self.ensure_delta_root_matches_pathinfo(root, &applied.final_path_info)?;
+
+        match (&applied.final_path_info.node, root) {
+            (
+                node @ Node::File {
+                    digest,
+                    size,
+                    executable: _,
+                },
+                DeltaArtifactNodeWire::Blob {
+                    digest: root_digest,
+                    size_bytes,
+                    chunks,
+                },
+            ) => {
+                if digest != root_digest {
+                    return Err(format!("delta blob digest mismatch for {}", applied.final_path_info.store_path));
+                }
+                if size != size_bytes {
+                    return Err(format!("delta blob size mismatch for {}", applied.final_path_info.store_path));
+                }
+                let has_blob =
+                    self.blob_service.has(digest).await.map_err(|e| format!("checking blob {digest}: {e}"))?;
+                if !has_blob {
+                    if chunks.is_empty() {
+                        return Err(format!("delta stream missing full blob {}", digest));
+                    }
+                    self.materialize_chunked_blob_from_local_content(digest, *size, chunks, applied).await?;
+                }
+                Ok(node.clone())
+            }
+            (
+                node @ Node::Directory { digest, size },
+                DeltaArtifactNodeWire::Directory {
+                    digest: root_digest, ..
+                },
+            ) => {
+                if digest != root_digest {
+                    return Err(format!("delta directory digest mismatch for {}", applied.final_path_info.store_path));
+                }
+                self.ensure_directory_closure_available(digest).await?;
+                let directory = self
+                    .directory_service
+                    .get(digest)
+                    .await
+                    .map_err(|e| format!("loading directory {digest}: {e}"))?
+                    .ok_or_else(|| format!("delta directory {} missing locally", digest))?;
+                if directory.size() != *size {
+                    return Err(format!(
+                        "delta directory size mismatch for {}: expected {}, got {}",
+                        digest,
+                        size,
+                        directory.size()
+                    ));
+                }
+                Ok(node.clone())
+            }
+            (node @ Node::Symlink { .. }, DeltaArtifactNodeWire::Symlink { .. }) => Ok(node.clone()),
+            _ => Err(format!("delta root kind mismatch for {}", applied.final_path_info.store_path)),
+        }
+    }
+
+    fn delta_content_bytes(root: &DeltaArtifactNodeWire) -> u64 {
+        match root {
+            DeltaArtifactNodeWire::Directory { children, .. } => {
+                children.iter().fold(0u64, |total, child| total.saturating_add(Self::delta_content_bytes(child)))
+            }
+            DeltaArtifactNodeWire::Blob { size_bytes, .. } => *size_bytes,
+            DeltaArtifactNodeWire::Symlink { .. } => 0,
+        }
+    }
+
+    fn verify_delta_pathinfo_trusted(&self, path_info: &PathInfo) -> Result<(), String> {
+        if self.remote_trusted_public_keys.is_empty() {
+            return Ok(());
+        }
+        if path_info.signatures.is_empty() {
+            return Err(format!("delta PathInfo for {} had no signatures", path_info.store_path));
+        }
+        let fingerprint = compute_pathinfo_fingerprint(path_info, &self.store_dir);
+        let is_trusted = path_info.signatures.iter().any(|signature| {
+            let signature_ref = signature.as_ref();
+            self.remote_trusted_public_keys.iter().any(|key| key.verify(&fingerprint, &signature_ref))
+        });
+        if is_trusted {
+            Ok(())
+        } else {
+            Err(format!(
+                "delta PathInfo signatures for {} did not match configured trusted keys",
+                path_info.store_path
+            ))
+        }
+    }
+
+    async fn attempt_delta_candidate_negotiation(
+        &mut self,
+        output_path: &StorePath<String>,
+        output_name: &str,
+        capability: &DeltaCapabilityAdvertisementWire,
+        is_root: bool,
+        root_source: Option<GcRootSource>,
+    ) -> DeltaAttemptResult {
+        let Some(cache_url) = self.remote_cache_urls.first().cloned() else {
+            return DeltaAttemptResult::Fallback {
+                reason: "cache_url_missing".to_string(),
+            };
+        };
+
+        let client = match self.ensure_remote_delta_http_client() {
+            Ok(client) => client,
+            Err(err) => {
+                tracing::warn!(
+                    path = %output_path,
+                    output = %output_name,
+                    cache = %cache_url,
+                    err = %err,
+                    "delta candidate client setup failed, using full-artifact substitution"
+                );
+                return DeltaAttemptResult::Fallback {
+                    reason: "candidate_client_setup_failed".to_string(),
+                };
+            }
+        };
+
+        let candidate_url = match resolve_same_authority_endpoint_url(&cache_url, &capability.endpoints.candidate_path)
+        {
+            Ok(url) => url,
+            Err(err) => {
+                tracing::warn!(
+                    path = %output_path,
+                    output = %output_name,
+                    cache = %cache_url,
+                    err = %err,
+                    "delta candidate endpoint invalid, using full-artifact substitution"
+                );
+                return DeltaAttemptResult::Fallback {
+                    reason: "candidate_endpoint_invalid".to_string(),
+                };
+            }
+        };
+
+        let request = DeltaCandidateRequestWire {
+            logical_path: output_path.to_absolute_path_with_prefix(&self.store_dir),
+            output_name: output_name.to_string(),
+            client_offer: DeltaNegotiationOfferWire::protocol_v1(),
+        };
+
+        let response = match client.post(candidate_url.clone()).json(&request).send().await {
+            Ok(response) => response,
+            Err(err) => {
+                tracing::warn!(
+                    path = %output_path,
+                    output = %output_name,
+                    cache = %cache_url,
+                    err = %err,
+                    "delta candidate negotiation failed, using full-artifact substitution"
+                );
+                return DeltaAttemptResult::Fallback {
+                    reason: "candidate_request_failed".to_string(),
+                };
+            }
+        };
+
+        if !response.status().is_success() {
+            if response.status() == StatusCode::NOT_FOUND || response.status() == StatusCode::FORBIDDEN {
+                trace_info!(
+                    path = %output_path,
+                    output = %output_name,
+                    cache = %cache_url,
+                    candidate = %candidate_url,
+                    status = %response.status(),
+                    "delta candidate endpoint unavailable, using full-artifact substitution"
+                );
+                return DeltaAttemptResult::Fallback {
+                    reason: "candidate_endpoint_unavailable".to_string(),
+                };
+            }
+            tracing::warn!(
+                path = %output_path,
+                output = %output_name,
+                cache = %cache_url,
+                candidate = %candidate_url,
+                status = %response.status(),
+                "delta candidate negotiation returned unexpected status, using full-artifact substitution"
+            );
+            return DeltaAttemptResult::Fallback {
+                reason: "candidate_status_unexpected".to_string(),
+            };
+        }
+
+        let candidate = match response.json::<DeltaCandidateResponseWire>().await {
+            Ok(candidate) => candidate,
+            Err(err) => {
+                tracing::warn!(
+                    path = %output_path,
+                    output = %output_name,
+                    cache = %cache_url,
+                    candidate = %candidate_url,
+                    err = %err,
+                    "delta candidate response was invalid JSON, using full-artifact substitution"
+                );
+                return DeltaAttemptResult::Fallback {
+                    reason: "candidate_json_invalid".to_string(),
+                };
+            }
+        };
+        if candidate.output_name != output_name {
+            tracing::warn!(
+                path = %output_path,
+                requested_output = %output_name,
+                candidate_output = %candidate.output_name,
+                cache = %cache_url,
+                candidate = %candidate_url,
+                "delta candidate response output name mismatch, using full-artifact substitution"
+            );
+            return DeltaAttemptResult::Fallback {
+                reason: "candidate_output_name_mismatch".to_string(),
+            };
+        }
+
+        let has_set = match self.build_receiver_has_set_for_candidate(&candidate).await {
+            Ok(has_set) => has_set,
+            Err(err) => {
+                tracing::warn!(
+                    path = %output_path,
+                    output = %output_name,
+                    cache = %cache_url,
+                    candidate = %candidate_url,
+                    err = %err,
+                    "building receiver delta manifest failed, using full-artifact substitution"
+                );
+                return DeltaAttemptResult::Fallback {
+                    reason: "receiver_manifest_failed".to_string(),
+                };
+            }
+        };
+
+        let has_set_url = match resolve_same_authority_endpoint_url(&cache_url, &capability.endpoints.has_set_path) {
+            Ok(url) => url,
+            Err(err) => {
+                tracing::warn!(
+                    path = %output_path,
+                    output = %output_name,
+                    cache = %cache_url,
+                    err = %err,
+                    "delta has-set endpoint invalid, using full-artifact substitution"
+                );
+                return DeltaAttemptResult::Fallback {
+                    reason: "has_set_endpoint_invalid".to_string(),
+                };
+            }
+        };
+
+        let has_set_response = match client.post(has_set_url.clone()).json(&has_set).send().await {
+            Ok(response) => response,
+            Err(err) => {
+                tracing::warn!(
+                    path = %output_path,
+                    output = %output_name,
+                    cache = %cache_url,
+                    has_set = %has_set_url,
+                    err = %err,
+                    "delta has-set POST failed, using full-artifact substitution"
+                );
+                return DeltaAttemptResult::Fallback {
+                    reason: "has_set_request_failed".to_string(),
+                };
+            }
+        };
+
+        if !has_set_response.status().is_success() {
+            if has_set_response.status() == StatusCode::NOT_FOUND || has_set_response.status() == StatusCode::FORBIDDEN
+            {
+                trace_info!(
+                    path = %output_path,
+                    output = %output_name,
+                    cache = %cache_url,
+                    has_set = %has_set_url,
+                    status = %has_set_response.status(),
+                    "delta has-set endpoint unavailable, using full-artifact substitution"
+                );
+                return DeltaAttemptResult::Fallback {
+                    reason: "has_set_endpoint_unavailable".to_string(),
+                };
+            }
+            tracing::warn!(
+                path = %output_path,
+                output = %output_name,
+                cache = %cache_url,
+                has_set = %has_set_url,
+                status = %has_set_response.status(),
+                "delta has-set POST returned unexpected status, using full-artifact substitution"
+            );
+            return DeltaAttemptResult::Fallback {
+                reason: "has_set_status_unexpected".to_string(),
+            };
+        }
+
+        let stream_url = match resolve_same_authority_endpoint_url(&cache_url, &capability.endpoints.stream_path) {
+            Ok(url) => url,
+            Err(err) => {
+                tracing::warn!(
+                    path = %output_path,
+                    output = %output_name,
+                    cache = %cache_url,
+                    err = %err,
+                    "delta stream endpoint invalid, using full-artifact substitution"
+                );
+                return DeltaAttemptResult::Fallback {
+                    reason: "stream_endpoint_invalid".to_string(),
+                };
+            }
+        };
+        let stream_request = DeltaStreamRequestWire {
+            session_id: candidate.session_id.clone(),
+        };
+        let stream_response = match client.post(stream_url.clone()).json(&stream_request).send().await {
+            Ok(response) => response,
+            Err(err) => {
+                tracing::warn!(
+                    path = %output_path,
+                    output = %output_name,
+                    cache = %cache_url,
+                    stream = %stream_url,
+                    err = %err,
+                    "delta stream request failed, using full-artifact substitution"
+                );
+                return DeltaAttemptResult::Fallback {
+                    reason: "stream_request_failed".to_string(),
+                };
+            }
+        };
+
+        if !stream_response.status().is_success() {
+            if stream_response.status() == StatusCode::NOT_FOUND || stream_response.status() == StatusCode::FORBIDDEN {
+                trace_info!(
+                    path = %output_path,
+                    output = %output_name,
+                    cache = %cache_url,
+                    stream = %stream_url,
+                    status = %stream_response.status(),
+                    "delta stream endpoint unavailable, using full-artifact substitution"
+                );
+                return DeltaAttemptResult::Fallback {
+                    reason: "stream_endpoint_unavailable".to_string(),
+                };
+            }
+            tracing::warn!(
+                path = %output_path,
+                output = %output_name,
+                cache = %cache_url,
+                stream = %stream_url,
+                status = %stream_response.status(),
+                "delta stream request returned unexpected status, using full-artifact substitution"
+            );
+            return DeltaAttemptResult::Fallback {
+                reason: "stream_status_unexpected".to_string(),
+            };
+        }
+
+        let stream_frames = match decode_delta_transfer_frames(stream_response).await {
+            Ok(frames) => frames,
+            Err(err) => {
+                tracing::warn!(
+                    path = %output_path,
+                    output = %output_name,
+                    cache = %cache_url,
+                    stream = %stream_url,
+                    err = %err,
+                    "delta stream decode failed, using full-artifact substitution"
+                );
+                return DeltaAttemptResult::Fallback {
+                    reason: "stream_decode_failed".to_string(),
+                };
+            }
+        };
+        let applied = match self.apply_delta_transfer_frames(stream_frames).await {
+            Ok(applied) => applied,
+            Err(err) => {
+                tracing::warn!(
+                    path = %output_path,
+                    output = %output_name,
+                    cache = %cache_url,
+                    stream = %stream_url,
+                    err = %err,
+                    "delta stream application failed, using full-artifact substitution"
+                );
+                return DeltaAttemptResult::Fallback {
+                    reason: "stream_application_failed".to_string(),
+                };
+            }
+        };
+        let root = match self.requested_candidate_root(&candidate, output_path) {
+            Ok(root) => root,
+            Err(err) => {
+                tracing::warn!(
+                    path = %output_path,
+                    output = %output_name,
+                    cache = %cache_url,
+                    candidate = %candidate_url,
+                    err = %err,
+                    "delta candidate root lookup failed, using full-artifact substitution"
+                );
+                return DeltaAttemptResult::Fallback {
+                    reason: "candidate_root_missing".to_string(),
+                };
+            }
+        };
+        let total_content_bytes = Self::delta_content_bytes(root);
+        let final_node = match self.reconstruct_delta_output_node(root, &applied).await {
+            Ok(node) => node,
+            Err(err) => {
+                tracing::warn!(
+                    path = %output_path,
+                    output = %output_name,
+                    cache = %cache_url,
+                    stream = %stream_url,
+                    err = %err,
+                    "delta reconstruction failed, using full-artifact substitution"
+                );
+                return DeltaAttemptResult::Fallback {
+                    reason: "delta_reconstruction_failed".to_string(),
+                };
+            }
+        };
+        if let Err(err) = self.verify_delta_pathinfo_trusted(&applied.final_path_info) {
+            tracing::warn!(
+                path = %output_path,
+                output = %output_name,
+                cache = %cache_url,
+                stream = %stream_url,
+                err = %err,
+                "delta final PathInfo was untrusted, using full-artifact substitution"
+            );
+            return DeltaAttemptResult::Fallback {
+                reason: "delta_pathinfo_untrusted".to_string(),
+            };
+        }
+
+        let path_info = match self
+            .persist_and_export_signed_output(PersistOutputRequest {
+                output_name,
+                output_path,
+                path_info: applied.final_path_info.clone(),
+                final_node,
+                provenance: None,
+                is_root,
+                root_source,
+            })
+            .await
+        {
+            Ok(path_info) => path_info,
+            Err(err) => {
+                tracing::warn!(
+                    path = %output_path,
+                    output = %output_name,
+                    cache = %cache_url,
+                    err = %err,
+                    "delta final acceptance failed, using full-artifact substitution"
+                );
+                return DeltaAttemptResult::Fallback {
+                    reason: "delta_acceptance_failed".to_string(),
+                };
+            }
+        };
+
+        trace_info!(
+            path = %output_path,
+            output = %output_name,
+            cache = %cache_url,
+            candidate = %candidate_url,
+            has_set = %has_set_url,
+            stream = %stream_url,
+            session = %candidate.session_id,
+            blob_frames = applied.blob_frames,
+            chunk_frames = applied.chunk_frames,
+            transferred_bytes = applied.transferred_bytes,
+            reused_bytes = total_content_bytes.saturating_sub(applied.transferred_bytes),
+            "delta substitution accepted"
+        );
+        DeltaAttemptResult::Accepted {
+            path_info: Box::new(path_info),
+            report: OutputSubstitutionReport {
+                mode: OutputSubstitutionMode::Delta,
+                transferred_bytes: applied.transferred_bytes,
+                reused_bytes: total_content_bytes.saturating_sub(applied.transferred_bytes),
+                metadata_reused: false,
+                fallback_reason: None,
+            },
+        }
+    }
+
+    /// Try to fetch a single output from the remote binary cache.
+    ///
+    /// On hit: persists PathInfo locally (write-through), caches the
+    /// output node, and returns the PathInfo.
+    /// Tries the primary remote cache first, then falls back through
+    /// any additional configured URLs in configured priority order.
+    /// r[impl cache_substitution.ordered_substituters]
+    pub async fn try_substitute_remote(
+        &mut self,
+        digest: [u8; DIGEST_SIZE],
+        output_path: &StorePath<String>,
+        output_name: &str,
+        is_root: bool,
+        root_source: Option<GcRootSource>,
+    ) -> Result<Option<PathInfo>, Error> {
+        assert!(!output_name.is_empty(), "output_name must not be empty");
+        if digest != *output_path.digest() {
+            return Err(Error::Cache(format!("remote-substitution-request-digest-mismatch: output {output_path}")));
+        }
+        let request = RemoteSubstitutionRequest {
+            digest,
+            output_path,
+            output_name,
+            is_root,
+            root_source: root_source.map(GcRootSource::for_remote_result),
+        };
+
+        // Try the primary remote PathInfo service (built from the first URL).
+        if let Some(primary) = &self.remote_pathinfo.clone() {
+            let result = self.try_substitute_remote_from_service(primary.as_ref(), request).await?;
+            if result.is_some() {
+                return Ok(result);
+            }
+        }
+
+        // Iterate through remaining configured URLs as fallbacks.
+        // Delta capability probing is skipped for fallback URLs.
+        if self.remote_cache_urls.len() > 1 {
+            for fallback_idx in 1..self.remote_cache_urls.len() {
+                let url_str = self.remote_cache_urls[fallback_idx].as_str().to_string();
+                let Ok(fallback_svc) = build_remote_pathinfo(RemotePathInfoOptions {
+                    cache_url: &url_str,
+                    lease: self.remote_source_leases[fallback_idx].clone(),
+                    store_dir: &self.store_dir,
+                    blob_service: self.blob_service.clone(),
+                    directory_service: self.directory_service.clone(),
+                }) else {
+                    tracing::warn!(
+                        url = %url_str,
+                        "failed to build fallback remote cache PathInfo service, skipping"
+                    );
+                    continue;
+                };
+                let result = self.try_substitute_remote_fallback(fallback_svc.as_ref(), request).await?;
+                if result.is_some() {
+                    return Ok(result);
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    /// Attempt substitution through a single remote PathInfo service
+    /// with full delta capability probing (primary cache path).
+    async fn try_substitute_remote_from_service(
+        &mut self,
+        remote: &dyn PathInfoService,
+        request: RemoteSubstitutionRequest<'_>,
+    ) -> Result<Option<PathInfo>, Error> {
+        self.probe_remote_delta_capability_if_needed(request.output_path, request.output_name).await;
+
+        let delta_capability = match self.remote_delta_capability.clone() {
+            Some(RemoteDeltaCapability::Supported(capability)) => Some(capability),
+            Some(RemoteDeltaCapability::Unsupported) | None => None,
+        };
+        let mut delta_fallback_reason = None;
+        if let Some(capability) = delta_capability.as_ref() {
+            match self
+                .attempt_delta_candidate_negotiation(
+                    request.output_path,
+                    request.output_name,
+                    capability,
+                    request.is_root,
+                    request.root_source,
+                )
+                .await
+            {
+                DeltaAttemptResult::Accepted { path_info, report } => {
+                    self.record_output_substitution_report(request.output_path, report);
+                    return Ok(Some(*path_info));
+                }
+                DeltaAttemptResult::Fallback { reason } => {
+                    delta_fallback_reason = Some(reason);
+                }
+            }
+        }
+
+        self.try_substitute_remote_fetch(remote, request, delta_fallback_reason).await
+    }
+
+    /// Attempt substitution through a remote PathInfo service without
+    /// delta capability probing (fallback cache path).
+    async fn try_substitute_remote_fallback(
+        &mut self,
+        remote: &dyn PathInfoService,
+        request: RemoteSubstitutionRequest<'_>,
+    ) -> Result<Option<PathInfo>, Error> {
+        self.try_substitute_remote_fetch(remote, request, None).await
+    }
+
+    /// Core NAR-fetch substitution for a single remote PathInfo service.
+    ///
+    /// Consults the advisory metadata cache before the remote probe:
+    /// - Fresh Narinfo entry → proceed, preserving metadata_reused flag.
+    /// - Fresh NegativeMiss entry → skip (return None without network call).
+    /// - No entry (or stale/expired) → normal live probe.
+    ///
+    /// Records the result (hit or miss) in the cache after completing.
+    ///
+    /// r[impl cache_substitution.remote_metadata_cache]
+    async fn try_substitute_remote_fetch(
+        &mut self,
+        remote: &dyn PathInfoService,
+        request: RemoteSubstitutionRequest<'_>,
+        delta_fallback_reason: Option<String>,
+    ) -> Result<Option<PathInfo>, Error> {
+        // Build a metadata cache key for this cache identity + output.
+        // Trust-policy digest is omitted (advisory-only; final verification
+        // handles trust separately).
+        let cache_url = self.remote_cache_urls.first().map(|url| url.as_str().to_string()).unwrap_or_default();
+        let output_digest_hex = request.digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+
+        let meta_key = metadata_cache_key(MetadataCacheKeyInput {
+            cache_identity: &cache_url,
+            trust_policy_digest: "", // advisory only; final verification owns trust
+            store_prefix: &self.store_dir,
+            output_digest: &output_digest_hex,
+            metadata_class: MetadataClass::Narinfo,
+        });
+        let miss_key = metadata_cache_key(MetadataCacheKeyInput {
+            cache_identity: &cache_url,
+            trust_policy_digest: "", // advisory only; final verification owns trust
+            store_prefix: &self.store_dir,
+            output_digest: &output_digest_hex,
+            metadata_class: MetadataClass::NegativeMiss,
+        });
+
+        let now_secs = advisory_metadata_time_now_secs()?;
+
+        // Check negative miss cache first.
+        if let Some(entry) = self.advisory_metadata_cache.get(&miss_key) {
+            let validity = check_metadata_validity(entry, &miss_key, now_secs, RefreshPolicy::Normal);
+            if validity.is_reusable() {
+                tracing::debug!(
+                    cache = %cache_url,
+                    path = %request.output_path,
+                    "advisory metadata: negative miss (skipping remote probe)"
+                );
+                return Ok(None);
+            }
+        }
+
+        // Check positive narinfo cache.
+        let mut is_metadata_reused = false;
+        if let Some(entry) = self.advisory_metadata_cache.get(&meta_key) {
+            let validity = check_metadata_validity(entry, &meta_key, now_secs, RefreshPolicy::Normal);
+            if validity.is_reusable() {
+                is_metadata_reused = true;
+                tracing::debug!(
+                    cache = %cache_url,
+                    path = %request.output_path,
+                    "advisory metadata: narinfo known (reusing cached probe)"
+                );
+            }
+        }
+
+        match remote.get(request.digest).await {
+            Ok(Some(remote_pi)) => {
+                // r[impl cache_substitution.requested_path_identity]
+                require_requested_path_identity(request.digest, request.output_path, &remote_pi)
+                    .map_err(Error::Cache)?;
+                trace_info!(
+                    path = %request.output_path,
+                    output = %request.output_name,
+                    "substituting from remote cache"
+                );
+
+                self.pathinfo_service
+                    .put(remote_pi.clone())
+                    .await
+                    .map_err(|e| Error::Cache(format!("persisting substituted PathInfo: {e}")))?;
+                persist_artifact_attestation(&self.state_dir, &self.store_dir, &remote_pi, request.output_name, None)
+                    .await?;
+
+                let transferred_bytes = match self.content_bytes_for_node(&remote_pi.node).await {
+                    Ok(bytes) => bytes,
+                    Err(err) => {
+                        tracing::warn!(
+                            path = %request.output_path,
+                            output = %request.output_name,
+                            err = %err,
+                            "could not derive full substitution content-byte count from local castore; falling back to PathInfo.nar_size"
+                        );
+                        remote_pi.nar_size
+                    }
+                };
+                self.record_output_substitution_report(request.output_path, OutputSubstitutionReport {
+                    mode: OutputSubstitutionMode::Full,
+                    transferred_bytes,
+                    reused_bytes: 0,
+                    fallback_reason: delta_fallback_reason,
+                    metadata_reused: is_metadata_reused,
+                });
+                self.output_nodes.insert(request.output_path.clone(), remote_pi.node.clone());
+                self.built_outputs
+                    .insert(request.output_path.to_absolute_path_with_prefix(&self.output_dir_str), remote_pi.clone());
+                self.export_output_if_needed(request.output_path, &remote_pi.node, request.is_root).await?;
+                if request.is_root
+                    && let Some(source) = request.root_source
+                {
+                    self.register_retained_root(request.output_path, source).await?;
+                }
+
+                // Record successful hit in advisory cache (if metadata was not
+                // already known, or to refresh the entry).
+                if !is_metadata_reused {
+                    let hit_entry = new_metadata_entry(meta_key, now_secs, "substituted".to_string());
+                    self.advisory_metadata_cache.put(hit_entry);
+                    self.advisory_metadata_cache.save(&self.state_dir);
+                }
+
+                Ok(Some(remote_pi))
+            }
+            Ok(None) => {
+                // Record negative miss in advisory cache.
+                let miss_entry = new_metadata_entry(miss_key, now_secs, "not found".to_string());
+                self.advisory_metadata_cache.put(miss_entry);
+                self.advisory_metadata_cache.save(&self.state_dir);
+                Ok(None)
+            }
+            Err(e) => {
+                tracing::warn!(
+                    path = %request.output_path,
+                    err = %e,
+                    "remote cache query failed, building locally"
+                );
+                Ok(None)
+            }
+        }
+    }
+
+    // -- Persistence + realization --
+
+    /// Check a verified source candidate without mutating this store.
+    pub async fn preflight_verified_source(&self, request: VerifiedSourceIngestRequest<'_>) -> Result<PathInfo, Error> {
+        let preview_blob_service = Arc::new(MemoryBlobService::default()) as Arc<dyn BlobService>;
+        let preview_directory_service = Arc::new(
+            RedbDirectoryService::new_temporary(
+                "verified-source-preflight".to_string(),
+                RedbDirectoryServiceConfig::default(),
+            )
+            .map_err(|error| Error::Store(format!("verified source preflight directory service: {error}")))?,
+        ) as Arc<dyn DirectoryService>;
+        let candidate =
+            verified_source_candidate(&request, &self.store_dir, preview_blob_service, preview_directory_service)
+                .await?;
+        if let Some(existing) = self
+            .pathinfo_service
+            .get(*candidate.store_path.digest())
+            .await
+            .map_err(|error| Error::PathInfoService(format!("verified source preflight: {error}")))?
+        {
+            if path_info_content_and_signature_matches(&existing, &candidate) {
+                return Ok(existing);
+            }
+            return Err(Error::Store(format!(
+                "verified source refuses conflicting existing PathInfo: {}",
+                request.logical_store_path
+            )));
+        }
+        Ok(candidate)
+    }
+
+    /// Ingest verified source bytes at an exact logical store path.
+    ///
+    /// The caller binds the source bytes to a receipt before this shell runs. This
+    /// method preserves the requested target path, signs PathInfo, accepts exact
+    /// idempotent reuse, and refuses conflicting existing PathInfo.
+    pub async fn ingest_verified_source(
+        &mut self,
+        request: VerifiedSourceIngestRequest<'_>,
+    ) -> Result<PathInfo, Error> {
+        let candidate = verified_source_candidate(
+            &request,
+            &self.store_dir,
+            self.blob_service.clone(),
+            self.directory_service.clone(),
+        )
+        .await?;
+        if let Some(existing) = self
+            .pathinfo_service
+            .get(*candidate.store_path.digest())
+            .await
+            .map_err(|error| Error::PathInfoService(format!("verified source preflight: {error}")))?
+        {
+            if path_info_content_and_signature_matches(&existing, &candidate) {
+                return Ok(existing);
+            }
+            return Err(Error::Store(format!(
+                "verified source refuses conflicting existing PathInfo: {}",
+                request.logical_store_path
+            )));
+        }
+        let output_path = candidate.store_path.clone();
+        let final_node = candidate.node.clone();
+        self.persist_and_export_signed_output(PersistOutputRequest {
+            output_name: request.source_name,
+            output_path: &output_path,
+            path_info: candidate,
+            final_node,
+            provenance: None,
+            is_root: false,
+            root_source: None,
+        })
+        .await
+    }
+
+    /// Adopt a locally materialized output only after its caller independently verifies it.
+    ///
+    /// The logical path must map to an existing entry in this handle's physical output
+    /// directory. Existing PathInfo entries are never replaced through this seam;
+    /// an exact signed match is returned only after fresh tree and NAR validation.
+    pub async fn adopt_verified_local_output(
+        &mut self,
+        logical_store_path: &str,
+        output_name: &str,
+        signing_key: &SigningKey<ed25519_dalek::SigningKey>,
+        provenance: Option<&ArtifactProvenance>,
+    ) -> Result<PathInfo, Error> {
+        assert!(!logical_store_path.is_empty(), "logical_store_path must not be empty");
+        assert!(!output_name.is_empty(), "output_name must not be empty");
+        let store_path = StorePath::from_absolute_path_with_prefix(logical_store_path.as_bytes(), &self.store_dir)
+            .map_err(|error| Error::Store(format!("adoption logical store path {logical_store_path}: {error}")))?;
+        let existing = self
+            .pathinfo_service
+            .get(*store_path.digest())
+            .await
+            .map_err(|error| Error::PathInfoService(format!("adoption preflight: {error}")))?;
+        let physical_path = Path::new(&self.output_dir_str).join(store_path.to_string());
+        let metadata = std::fs::symlink_metadata(&physical_path)
+            .map_err(|error| Error::Store(format!("adoption source {}: {error}", physical_path.display())))?;
+        if metadata.file_type().is_symlink() {
+            return Err(Error::Store(format!(
+                "adoption source root must not be a symlink: {}",
+                physical_path.display()
+            )));
+        }
+        let node = ingest_path::<_, _, _, &[u8]>(
+            self.blob_service.clone(),
+            self.directory_service.clone(),
+            &physical_path,
+            None,
+        )
+        .await
+        .map_err(|error| Error::Store(format!("adoption ingest {}: {error}", physical_path.display())))?;
+        let renderer = SimpleRenderer::new(self.blob_service.clone(), self.directory_service.clone());
+        let (nar_size, nar_sha256) = renderer
+            .calculate_nar(&node)
+            .await
+            .map_err(|error| Error::Store(format!("adoption NAR calculation: {error}")))?;
+        if let Some(existing) = existing {
+            validate_existing_adoption(&existing, &store_path, &node, nar_size, &nar_sha256)?;
+            return Ok(existing);
+        }
+        let path_info = signed_path_info_for_node(
+            store_path.clone(),
+            node.clone(),
+            nar_size,
+            nar_sha256,
+            signing_key,
+            &self.store_dir,
+            None,
+        );
+        self.persist_and_export_signed_output(PersistOutputRequest {
+            output_name,
+            output_path: &store_path,
+            path_info,
+            final_node: node,
+            provenance: provenance.cloned(),
+            is_root: true,
+            root_source: Some(GcRootSource::Build),
+        })
+        .await
+    }
+
+    /// Persist a signed PathInfo and export it to disk when needed.
+    ///
+    /// StoreHandle refuses to persist unsigned PathInfos. That keeps the
+    /// "always sign before persist" invariant at the storage boundary,
+    /// even if a caller constructs the PathInfo itself.
+    pub async fn persist_and_export_signed_output(&mut self, req: PersistOutputRequest<'_>) -> Result<PathInfo, Error> {
+        if req.output_name.is_empty() {
+            return Err(Error::Store("output name must not be empty".to_string()));
+        }
+
+        if req.path_info.store_path != *req.output_path {
+            return Err(Error::Store(format!(
+                "PathInfo store path mismatch: expected {}, got {}",
+                req.output_path, req.path_info.store_path,
+            )));
+        }
+
+        if req.path_info.signatures.is_empty() {
+            return Err(Error::Store(format!("refusing to persist unsigned PathInfo for {}", req.output_path)));
+        }
+
+        self.revalidate_overlay_bases()?;
+        self.pathinfo_service
+            .put(req.path_info.clone())
+            .await
+            .map_err(|e| Error::Store(format!("persisting PathInfo: {e}")))?;
+        self.persist_artifact_attestation_without_evidence_loss(
+            &req.path_info,
+            req.output_name,
+            req.provenance.as_ref(),
+        )
+        .await?;
+
+        self.export_output_if_needed(req.output_path, &req.final_node, req.is_root).await?;
+        self.revalidate_overlay_bases()?;
+        let abs_path = req.output_path.to_absolute_path_with_prefix(&self.output_dir_str);
+        self.built_outputs.insert(abs_path, req.path_info.clone());
+        self.output_nodes.insert(req.output_path.clone(), req.final_node.clone());
+        if req.is_root
+            && let Some(source) = req.root_source
+        {
+            self.register_retained_root(req.output_path, source).await?;
+        }
+
+        // Record a publication effect plan instead of executing publishers
+        // inline. The application shell drains the plan and executes it, and
+        // observations carry the success or failure evidence.
+        // r[impl remote_builds.production_verified_publication]
+        for (publisher_index, publisher) in self.publishers.iter().enumerate() {
+            assert!(
+                self.pending_publication_steps.len() < MAX_PENDING_PUBLICATION_STEPS,
+                "pending publication steps exceed bounded plan capacity"
+            );
+            self.pending_publication_steps.push(crate::PublicationEffectStep::new(
+                u32::try_from(publisher_index).expect("publisher index fits u32"),
+                req.output_path.to_string(),
+                std::sync::Arc::new(req.path_info.clone()),
+                publisher.clone(),
+            ));
+        }
+
+        Ok(req.path_info)
+    }
+
+    async fn persist_artifact_attestation_without_evidence_loss(
+        &self,
+        path_info: &PathInfo,
+        output_name: &str,
+        provenance: Option<&ArtifactProvenance>,
+    ) -> Result<(), Error> {
+        assert!(!output_name.is_empty(), "output_name must not be empty");
+
+        let preserve_existing = match provenance {
+            Some(_) => false,
+            None => match load_artifact_attestation(&self.state_dir, &path_info.store_path, &self.store_dir).await? {
+                Some(stored) => {
+                    artifact_attestation_matches_pathinfo(&self.store_dir, path_info, output_name, &stored.attestation)
+                }
+                None => false,
+            },
+        };
+        if preserve_existing {
+            return Ok(());
+        }
+        persist_artifact_attestation(&self.state_dir, &self.store_dir, path_info, output_name, provenance).await?;
+        Ok(())
+    }
+
+    async fn export_output_if_needed(
+        &self,
+        output_path: &StorePath<String>,
+        final_node: &Node,
+        is_root: bool,
+    ) -> Result<(), Error> {
+        if !is_root {
+            return Ok(());
+        }
+
+        let abs_path = output_path.to_absolute_path_with_prefix(&self.output_dir_str);
+        let abs_path_buf = PathBuf::from(&abs_path);
+        if std::fs::symlink_metadata(&abs_path_buf).is_ok() {
+            if self.exported_path_matches_node(&abs_path_buf, final_node).await? {
+                return Ok(());
+            }
+            tracing::warn!(
+                path = %abs_path,
+                "existing exported output differs from castore; refreshing materialization"
+            );
+            remove_existing_export_path(&abs_path_buf)
+                .map_err(|e| Error::Export(format!("removing stale exported output {abs_path}: {e}")))?;
+        }
+
+        match export_castore_to_disk(final_node, &abs_path, &self.blob_service, &self.directory_service).await {
+            Ok(()) => Ok(()),
+            Err(e) if e.contains("Read-only file system") || e.contains("Permission denied") => {
+                tracing::warn!(
+                    path = %abs_path,
+                    "could not export output to disk (read-only store), \
+                     output is available in castore"
+                );
+                Ok(())
+            }
+            Err(e) => Err(Error::Export(format!("exporting output {abs_path} to disk: {e}"))),
+        }
+    }
+
+    async fn exported_path_matches_node(&self, path: &Path, expected_node: &Node) -> Result<bool, Error> {
+        let actual_node =
+            ingest_path::<_, _, _, &[u8]>(self.blob_service.clone(), self.directory_service.clone(), path, None)
+                .await
+                .map_err(|e| Error::Export(format!("inspecting existing export {}: {e}", path.display())))?;
+        Ok(actual_node == *expected_node)
+    }
+
+    pub async fn get_artifact_attestation(
+        &self,
+        store_path: &StorePath<String>,
+    ) -> Result<Option<StoredArtifactAttestation>, Error> {
+        Ok(self.get_artifact_attestation_with_layer(store_path).await?.map(|read| read.value))
+    }
+
+    pub async fn get_artifact_attestation_with_layer(
+        &self,
+        store_path: &StorePath<String>,
+    ) -> Result<Option<crate::layer::Layered<StoredArtifactAttestation>>, Error> {
+        let Some(path_info) = self.path_info_with_layer(store_path).await? else {
+            return Ok(None);
+        };
+        let state_dir = match path_info.layer {
+            crate::layer::StoreLayer::Overlay => &self.state_dir,
+            crate::layer::StoreLayer::Base { index } => {
+                let base_index = index
+                    .checked_sub(1)
+                    .ok_or_else(|| Error::Store("base layer index must be greater than zero".to_string()))?;
+                self.overlay_state
+                    .as_ref()
+                    .and_then(|state| state.base_state_dirs.get(base_index))
+                    .ok_or_else(|| Error::Store(format!("base layer index {index} is not declared")))?
+            }
+        };
+        let attestation = load_artifact_attestation(state_dir, store_path, &self.store_dir).await?;
+        self.revalidate_overlay_bases()?;
+        Ok(attestation.map(|mut value| {
+            value.selected_layer = path_info.layer;
+            crate::layer::Layered {
+                value,
+                layer: path_info.layer,
+                shadows: path_info.shadows.clone(),
+            }
+        }))
+    }
+
+    pub async fn runtime_closure_attestation(
+        &self,
+        roots: &[StorePath<String>],
+    ) -> Result<StoredClosureAttestation, Error> {
+        self.revalidate_overlay_bases()?;
+        let remote: Option<&dyn PathInfoService> = self.remote_pathinfo.as_ref().map(|svc| svc.as_ref());
+        let mut attestation = load_or_create_runtime_closure_attestation(
+            &self.state_dir,
+            &self.store_dir,
+            self.pathinfo_service.as_ref(),
+            remote,
+            roots,
+        )
+        .await?;
+        attestation.selected_layers = self.closure_layer_provenance(roots).await?;
+        self.revalidate_overlay_bases()?;
+        Ok(attestation)
+    }
+
+    async fn closure_layer_provenance(
+        &self,
+        roots: &[StorePath<String>],
+    ) -> Result<BTreeMap<String, crate::layer::StoreLayer>, Error> {
+        let mut pending = roots.to_vec();
+        let mut visited = BTreeSet::new();
+        let mut selected_layers = BTreeMap::new();
+        while let Some(path) = pending.pop() {
+            if !visited.insert(path.clone()) {
+                continue;
+            }
+            if visited.len() > MAX_LAYERED_CLOSURE_PATHS {
+                return Err(Error::Store(format!("layered closure exceeds {MAX_LAYERED_CLOSURE_PATHS} paths")));
+            }
+            let read = self
+                .pathinfo_service
+                .get_with_layer(*path.digest())
+                .await
+                .map_err(|error| Error::Store(format!("reading closure layer for {path}: {error}")))?
+                .ok_or_else(|| Error::MissingClosureFacts {
+                    path: path.clone(),
+                    store_dir: self.store_dir.clone(),
+                    detail: "PathInfo missing while recording closure layer provenance".to_string(),
+                })?;
+            if read.value.store_path != path {
+                return Err(Error::Store(format!(
+                    "closure layer digest collision: requested {path}, observed {}",
+                    read.value.store_path
+                )));
+            }
+            if self.overlay_state.is_some() && read.layer_index == 0 {
+                let trusted_keys = crate::overlay::load_layer_trust_keys(&self.state_dir)?;
+                crate::overlay::verify_pathinfo_trust(&read.value, &trusted_keys, &self.store_dir)
+                    .map_err(|error| Error::Store(format!("overlay-layer-trust-failure for {path}: {error}")))?;
+            }
+            let layer = crate::layer::StoreLayer::from_service_index(read.layer_index)
+                .map_err(|error| Error::Store(format!("mapping closure layer for {path}: {error}")))?;
+            selected_layers.insert(path.to_absolute_path_with_prefix(&self.store_dir), layer);
+            pending.extend(read.value.references);
+        }
+        Ok(selected_layers)
+    }
+}
+
+fn normalized_cache_base_url(cache_url: &Url) -> Url {
+    assert!(cache_url.has_host(), "cache_url must include a host");
+    let mut base = cache_url.clone();
+    base.set_query(None);
+    base.set_fragment(None);
+    let mut normalized_path = base.path().to_string();
+    if !normalized_path.ends_with('/') {
+        normalized_path.push('/');
+    }
+    base.set_path(&normalized_path);
+    base
+}
+
+fn same_cache_authority(left: &Url, right: &Url) -> bool {
+    left.scheme() == right.scheme()
+        && left.host_str() == right.host_str()
+        && left.port_or_known_default() == right.port_or_known_default()
+}
+
+fn resolve_same_authority_endpoint_url(cache_url: &Url, endpoint: &str) -> Result<Url, String> {
+    if endpoint.is_empty() {
+        return Err("delta endpoint must not be empty".to_string());
+    }
+
+    let resolved = match Url::parse(endpoint) {
+        Ok(url) => url,
+        Err(url::ParseError::RelativeUrlWithoutBase) => normalized_cache_base_url(cache_url)
+            .join(endpoint)
+            .map_err(|e| format!("joining delta endpoint URL: {e}"))?,
+        Err(e) => return Err(format!("parsing delta endpoint URL: {e}")),
+    };
+
+    if !same_cache_authority(cache_url, &resolved) {
+        return Err(format!("delta endpoint crosses cache authority: {resolved}"));
+    }
+
+    Ok(resolved)
+}
+
+fn delta_capability_url(cache_url: &Url) -> Result<Url, String> {
+    resolve_same_authority_endpoint_url(cache_url, "delta/capabilities")
+}
+
+fn validate_delta_capability_advertisement(
+    cache_url: &Url,
+    advertisement: &DeltaCapabilityAdvertisementWire,
+) -> Result<(), String> {
+    if advertisement.supported_versions.is_empty() {
+        return Err("delta capability advertisement must include at least one version".to_string());
+    }
+    if advertisement.supported_chunk_profiles.is_empty() {
+        return Err("delta capability advertisement must include at least one chunk profile".to_string());
+    }
+
+    let endpoints = &advertisement.endpoints;
+    let _ = resolve_same_authority_endpoint_url(cache_url, &endpoints.capability_path)?;
+    let _ = resolve_same_authority_endpoint_url(cache_url, &endpoints.candidate_path)?;
+    let _ = resolve_same_authority_endpoint_url(cache_url, &endpoints.has_set_path)?;
+    let _ = resolve_same_authority_endpoint_url(cache_url, &endpoints.stream_path)?;
+    Ok(())
+}
+
+fn build_delta_http_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .redirect(Policy::none())
+        .timeout(Duration::from_millis(DELTA_CAPABILITY_TIMEOUT_MS))
+        .build()
+        .map_err(|e| format!("building delta capability client: {e}"))
+}
+
+async fn decode_delta_transfer_frames(response: reqwest::Response) -> Result<Vec<DeltaTransferFrameWire>, String> {
+    const MAX_FRAME_COUNT: usize = 100_000;
+
+    const MAX_STREAM_CHUNKS: usize = 10_000_000;
+    let mut frames = Vec::<DeltaTransferFrameWire>::with_capacity(256);
+    let mut buffered = Vec::<u8>::with_capacity(4096);
+    let mut stream = response.bytes_stream();
+
+    for _ in 0..MAX_STREAM_CHUNKS {
+        let Some(chunk_result) = stream.next().await else { break };
+        let chunk = chunk_result.map_err(|e| format!("reading delta stream chunk: {e}"))?;
+        buffered.extend_from_slice(&chunk);
+
+        while let Some(line_end) = buffered.iter().position(|byte| *byte == b'\n') {
+            let mut line = buffered.drain(..=line_end).collect::<Vec<u8>>();
+            if line.last() == Some(&b'\n') {
+                line.pop();
+            }
+            if line.last() == Some(&b'\r') {
+                line.pop();
+            }
+            if line.is_empty() {
+                continue;
+            }
+            let frame = serde_json::from_slice::<DeltaTransferFrameWire>(&line)
+                .map_err(|e| format!("decoding delta stream frame: {e}"))?;
+            frames.push(frame);
+            assert!(frames.len() <= MAX_FRAME_COUNT, "delta transfer frame count exceeded {MAX_FRAME_COUNT}");
+        }
+    }
+
+    if !buffered.is_empty() {
+        let frame = serde_json::from_slice::<DeltaTransferFrameWire>(&buffered)
+            .map_err(|e| format!("decoding trailing delta stream frame: {e}"))?;
+        frames.push(frame);
+    }
+    assert!(frames.len() <= MAX_FRAME_COUNT, "final delta transfer frame count exceeded {MAX_FRAME_COUNT}");
+
+    Ok(frames)
+}
+
+pub fn parse_remote_trusted_public_keys(url_str: &str) -> Result<Vec<VerifyingKey>, String> {
+    assert!(!url_str.is_empty(), "substituter URL must not be empty");
+
+    let nix_url_str = format!("nix+{url_str}");
+    let nix_url: Url = nix_url_str.parse().map_err(|e| format!("invalid substituter URL '{url_str}': {e}"))?;
+
+    let mut indexed_keys = Vec::<(u32, String)>::with_capacity(MAX_REMOTE_TRUSTED_PUBLIC_KEYS);
+    for (key, value) in nix_url.query_pairs() {
+        let Some(index_text) = key.strip_prefix("trusted_public_keys[").and_then(|rest| rest.strip_suffix(']')) else {
+            continue;
+        };
+        let index = index_text
+            .parse::<u32>()
+            .map_err(|e| format!("parsing trusted public key index '{index_text}': {e}"))?;
+        if indexed_keys.len() >= MAX_REMOTE_TRUSTED_PUBLIC_KEYS {
+            return Err(format!("substituter URL exceeds trusted public key limit {MAX_REMOTE_TRUSTED_PUBLIC_KEYS}"));
+        }
+        indexed_keys.push((index, value.into_owned()));
+    }
+    indexed_keys.sort_by_key(|(index, _)| *index);
+    if indexed_keys.windows(2).any(|pair| pair[0].0 == pair[1].0) {
+        return Err("substituter URL repeats a trusted public key index".to_string());
+    }
+
+    let expected_key_count = indexed_keys.len();
+    let mut trusted_public_keys = Vec::with_capacity(expected_key_count);
+    for (_index, key_text) in indexed_keys {
+        let key =
+            VerifyingKey::parse(&key_text).map_err(|e| format!("parsing trusted public key '{key_text}': {e}"))?;
+        trusted_public_keys.push(key);
+    }
+    assert_eq!(trusted_public_keys.len(), expected_key_count, "every indexed key must produce a verifying key");
+    Ok(trusted_public_keys)
+}
+
+fn compute_pathinfo_fingerprint(path_info: &PathInfo, store_dir: &str) -> String {
+    let store_path_ref: StorePathRef = path_info.store_path.as_ref();
+    let references = path_info.references.iter().map(|reference| reference.as_ref()).collect::<Vec<_>>();
+    fingerprint_with_store_dir(&store_path_ref, &path_info.nar_sha256, path_info.nar_size, references.iter(), store_dir)
+}
+
+fn validate_existing_adoption(
+    existing: &PathInfo,
+    store_path: &StorePath<String>,
+    observed_node: &Node,
+    observed_nar_size: u64,
+    observed_nar_sha256: &[u8; NAR_SHA256_BYTES],
+) -> Result<(), Error> {
+    if existing.store_path != *store_path {
+        return Err(Error::Store(format!(
+            "adoption PathInfo digest collision: expected {store_path}, found {}",
+            existing.store_path
+        )));
+    }
+    if existing.signatures.is_empty() {
+        return Err(Error::Store(format!("adoption existing PathInfo is unsigned: {store_path}")));
+    }
+    if existing.node != *observed_node {
+        return Err(Error::Store(format!("adoption existing PathInfo node differs from physical tree: {store_path}")));
+    }
+    if existing.nar_size != observed_nar_size || existing.nar_sha256 != *observed_nar_sha256 {
+        return Err(Error::Store(format!(
+            "adoption existing PathInfo NAR facts differ from physical tree: {store_path}"
+        )));
+    }
+    assert_eq!(existing.store_path, *store_path);
+    assert!(!existing.signatures.is_empty());
+    Ok(())
+}
+
+pub(crate) fn signed_path_info_for_node(
+    store_path: StorePath<String>,
+    node: Node,
+    nar_size: u64,
+    nar_sha256: [u8; NAR_SHA256_BYTES],
+    signing_key: &SigningKey<ed25519_dalek::SigningKey>,
+    store_dir: &str,
+    ca: Option<CAHash>,
+) -> PathInfo {
+    let mut path_info = PathInfo {
+        store_path,
+        node,
+        references: Vec::new(),
+        nar_size,
+        nar_sha256,
+        signatures: Vec::new(),
+        deriver: None,
+        ca,
+    };
+    let path_info_fingerprint = compute_pathinfo_fingerprint(&path_info, store_dir);
+    path_info.signatures.push(signing_key.sign(path_info_fingerprint.as_bytes()).to_owned());
+    assert_eq!(path_info.signatures.len(), 1);
+    debug_assert!(!path_info_fingerprint.is_empty());
+    path_info
+}
+
+async fn probe_remote_delta_capability(
+    client: &reqwest::Client,
+    cache_url: &Url,
+) -> Result<RemoteDeltaCapability, String> {
+    assert!(!cache_url.as_str().is_empty(), "cache_url must not be empty");
+    let is_http_scheme = matches!(cache_url.scheme(), "http" | "https");
+    assert!(is_http_scheme, "cache_url must use http or https scheme");
+
+    let capability_url = delta_capability_url(cache_url)?;
+    let response = client
+        .get(capability_url)
+        .send()
+        .await
+        .map_err(|e| format!("requesting delta capability endpoint: {e}"))?;
+
+    if response.status().is_success() {
+        let advertisement = response
+            .json::<DeltaCapabilityAdvertisementWire>()
+            .await
+            .map_err(|e| format!("decoding delta capability advertisement: {e}"))?;
+        validate_delta_capability_advertisement(cache_url, &advertisement)?;
+        return Ok(RemoteDeltaCapability::Supported(advertisement));
+    }
+    if response.status() == StatusCode::NOT_FOUND || response.status() == StatusCode::FORBIDDEN {
+        return Ok(RemoteDeltaCapability::Unsupported);
+    }
+
+    Err(format!("delta capability endpoint returned {}", response.status()))
+}
+
+// -- Service construction (moved from main.rs) --
+
+fn open_blob_service(state_dir: &Path) -> Result<Arc<dyn BlobService>, Error> {
+    let blob_dir = state_dir.join("blobs");
+    std::fs::create_dir_all(&blob_dir)
+        .map_err(|e| Error::BlobService(format!("creating blob dir {}: {e}", blob_dir.display())))?;
+
+    let svc = ObjectStoreBlobService::new_local(&blob_dir)
+        .map_err(|e| Error::BlobService(format!("opening at {}: {e}", blob_dir.display())))?;
+
+    info!(path = %blob_dir.display(), "blob service opened");
+    Ok(Arc::new(svc))
+}
+
+async fn open_directory_service(state_dir: &Path) -> Result<Arc<dyn DirectoryService>, Error> {
+    let db_path = state_dir.join("directories.redb");
+    let svc = RedbDirectoryService::new("crunch".to_string(), RedbDirectoryServiceConfig {
+        path: Some(db_path.clone()),
+        read_only: false,
+        cache_size: None,
+    })
+    .await
+    .map_err(|e| Error::DirectoryService(format!("opening {}: {e}", db_path.display())))?;
+    Ok(Arc::new(svc))
+}
+
+async fn open_pathinfo_service(
+    state_dir: &Path,
+    fallback_mode: StoreFallbackMode,
+) -> Result<(Arc<dyn PathInfoService>, Vec<StoreAuditEvent>), Error> {
+    assert!(state_dir.is_absolute(), "state_dir must be absolute");
+    assert!(state_dir.is_dir(), "state_dir must exist");
+
+    let db_path = state_dir.join("pathinfo.redb");
+    match RedbPathInfoService::new("crunch".to_string(), RedbPathInfoServiceConfig {
+        path: Some(db_path.clone()),
+        read_only: false,
+        cache_size: None,
+    })
+    .await
+    {
+        Ok(svc) => {
+            info!(path = %db_path.display(), "PathInfo database opened");
+            Ok((Arc::new(svc), Vec::new()))
+        }
+        Err(e) => {
+            let detail = format!("failed to open PathInfo database at {}: {e}", db_path.display());
+            if fallback_mode.is_strict() {
+                return Err(Error::PathInfoFallbackRejected { detail });
+            }
+            tracing::warn!(
+                path = %db_path.display(),
+                err = %e,
+                "failed to open PathInfo database, using in-memory fallback"
+            );
+            let svc = RedbPathInfoService::new_temporary("crunch".to_string(), RedbPathInfoServiceConfig {
+                path: None,
+                cache_size: None,
+                read_only: false,
+            })
+            .map_err(|e| Error::PathInfoService(format!("in-memory fallback: {e}")))?;
+            let detail = format!("{detail}; using in-memory fallback");
+            Ok((Arc::new(svc), vec![StoreAuditEvent::new(StoreAuditKind::PathInfoFallback, detail)]))
+        }
+    }
+}
+
+/// Open a PathInfo service in read-only mode for a base store.
+/// This is a simplified version that opens the database read-only
+/// and does not provide an in-memory fallback (base must be readable).
+async fn open_pathinfo_service_read_only(
+    state_dir: &Path,
+    fallback_mode: StoreFallbackMode,
+) -> Result<Arc<dyn PathInfoService>, Error> {
+    assert!(state_dir.is_absolute(), "base state_dir must be absolute");
+    assert!(state_dir.is_dir(), "base state_dir must exist");
+
+    let db_path = state_dir.join("pathinfo.redb");
+    match RedbPathInfoService::new("base".to_string(), RedbPathInfoServiceConfig {
+        path: Some(db_path.clone()),
+        read_only: true,
+        cache_size: None,
+    })
+    .await
+    {
+        Ok(svc) => {
+            info!(path = %db_path.display(), "base PathInfo database opened (read-only)");
+            Ok(Arc::new(svc))
+        }
+        Err(e) => {
+            let detail = format!("failed to open base PathInfo database at {}: {e}", db_path.display());
+            if fallback_mode.is_strict() {
+                return Err(Error::PathInfoFallbackRejected { detail });
+            }
+            tracing::warn!(
+                path = %db_path.display(),
+                err = %e,
+                "failed to open base PathInfo database, using in-memory fallback (read-only)"
+            );
+            let svc = RedbPathInfoService::new_temporary("base".to_string(), RedbPathInfoServiceConfig {
+                path: None,
+                cache_size: None,
+                read_only: false,
+            })
+            .map_err(|e| Error::PathInfoService(format!("in-memory fallback for base: {e}")))?;
+            Ok(Arc::new(svc))
+        }
+    }
+}
+
+/// Remote PathInfo service plus the public keys admitted for its cache.
+type RemotePathInfoSelection = (Option<Arc<dyn PathInfoService>>, Vec<VerifyingKey>);
+
+fn configured_remote_pathinfo(
+    config: &StoreConfig,
+    sources: &AdmittedSources,
+    blob_service: Arc<dyn BlobService>,
+    directory_service: Arc<dyn DirectoryService>,
+) -> Result<RemotePathInfoSelection, Error> {
+    let Some(cache_url) = config.remote_cache_urls.first() else {
+        return Ok((None, Vec::new()));
+    };
+    let trusted_public_keys = parse_remote_trusted_public_keys(cache_url).map_err(Error::PathInfoService)?;
+    let service = build_remote_pathinfo(RemotePathInfoOptions {
+        cache_url,
+        store_dir: &config.store_dir,
+        blob_service,
+        directory_service,
+        lease: sources.remote_leases[0].clone(),
+    })?;
+    info!(url = %cache_url, "binary cache substitution enabled");
+    Ok((Some(service), trusted_public_keys))
+}
+
+struct RemotePathInfoOptions<'a> {
+    cache_url: &'a str,
+    store_dir: &'a str,
+    blob_service: Arc<dyn BlobService>,
+    directory_service: Arc<dyn DirectoryService>,
+    lease: Arc<dyn StoreSourceLease>,
+}
+
+fn build_remote_pathinfo(options: RemotePathInfoOptions<'_>) -> Result<Arc<dyn PathInfoService>, Error> {
+    assert!(!options.cache_url.is_empty(), "remote cache URL must not be empty");
+    assert!(!options.store_dir.is_empty(), "remote cache store prefix must not be empty");
+
+    // NixHTTPPathInfoServiceConfig::try_from expects "nix+https://..." scheme.
+    let nix_url_str = format!("nix+{}", options.cache_url);
+    let nix_url: url::Url = nix_url_str
+        .parse()
+        .map_err(|error| Error::PathInfoService(format!("invalid substituter URL '{}': {error}", options.cache_url)))?;
+
+    let config: NixHTTPPathInfoServiceConfig = nix_url
+        .try_into()
+        .map_err(|error| Error::PathInfoService(format!("remote cache config for '{}': {error}", options.cache_url)))?;
+    let config = config.with_store_dir(options.store_dir.to_string()).map_err(|error| {
+        Error::PathInfoService(format!("remote cache store prefix '{}': {error}", options.store_dir))
+    })?;
+
+    let service = NixHTTPPathInfoService::try_build(
+        "crunch-remote".to_string(),
+        config,
+        options.blob_service,
+        options.directory_service,
+    )
+    .map_err(|error| Error::PathInfoService(format!("building remote cache client: {error}")))?;
+
+    Ok(Arc::new(Leased::new(service, options.lease)))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Read;
+    use std::io::Write;
+    use std::net::TcpListener;
+    use std::net::TcpStream;
+    use std::num::NonZeroUsize;
+    use std::sync::Arc;
+    use std::sync::Mutex;
+    use std::sync::atomic::AtomicBool;
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::Ordering;
+    use std::thread;
+    use std::thread::JoinHandle;
+    use std::time::Duration;
+
+    use crunch_delta::DeltaHttpEndpoints;
+    use crunch_delta::NegotiationOffer;
+    use crunch_delta::chunk_profile_wire_v1;
+    use nix_compat::narinfo::SigningKey;
+    use snix_castore::SymlinkTarget;
+    use snix_castore::blobservice::MemoryBlobService;
+    use snix_store::nar::NarCalculationService;
+    use snix_store::nar::SimpleRenderer;
+    use snix_store::nar::write_nar;
+    use snix_store::pathinfoservice::LruPathInfoService;
+    use tokio::io::AsyncReadExt;
+    use tokio::io::AsyncWriteExt;
+
+    use super::*;
+    use crate::layer::StoreLayer;
+
+    #[derive(Debug)]
+    struct MutationCountingPathInfoService {
+        response: Option<PathInfo>,
+        get_count: AtomicUsize,
+        put_count: AtomicUsize,
+    }
+
+    impl MutationCountingPathInfoService {
+        fn new(response: Option<PathInfo>) -> Self {
+            assert!(response.as_ref().is_none_or(|path_info| !path_info.store_path.name().is_empty()));
+            Self {
+                response,
+                get_count: AtomicUsize::new(0),
+                put_count: AtomicUsize::new(0),
+            }
+        }
+
+        fn get_count(&self) -> usize {
+            self.get_count.load(Ordering::SeqCst)
+        }
+
+        fn put_count(&self) -> usize {
+            self.put_count.load(Ordering::SeqCst)
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl PathInfoService for MutationCountingPathInfoService {
+        async fn get(
+            &self,
+            _digest: [u8; DIGEST_SIZE],
+        ) -> Result<Option<PathInfo>, snix_store::pathinfoservice::Error> {
+            self.get_count.fetch_add(1, Ordering::SeqCst);
+            Ok(self.response.clone())
+        }
+
+        async fn put(&self, path_info: PathInfo) -> Result<PathInfo, snix_store::pathinfoservice::Error> {
+            self.put_count.fetch_add(1, Ordering::SeqCst);
+            Ok(path_info)
+        }
+
+        fn list(&self) -> futures::stream::BoxStream<'static, Result<PathInfo, snix_store::pathinfoservice::Error>> {
+            futures::stream::empty().boxed()
+        }
+    }
+
+    #[test]
+    fn remote_trusted_key_parser_accepts_indexed_keys_and_rejects_duplicate_indexes() {
+        const CACHE_KEY: &str = "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=";
+        let accepted_url = format!("https://cache.nixos.org?trusted_public_keys[0]={CACHE_KEY}");
+        let keys = parse_remote_trusted_public_keys(&accepted_url).unwrap();
+        assert_eq!(keys.len(), 1);
+        assert_eq!(keys[0].to_string(), CACHE_KEY);
+
+        let duplicate_url =
+            format!("https://cache.nixos.org?trusted_public_keys[0]={CACHE_KEY}&trusted_public_keys[0]={CACHE_KEY}");
+        assert_eq!(
+            parse_remote_trusted_public_keys(&duplicate_url).unwrap_err(),
+            "substituter URL repeats a trusted public key index"
+        );
+    }
+
+    #[test]
+    fn action_result_nar_byte_accounting_distinguishes_transfer_reuse_and_overflow() {
+        const NAR_SIZE: u64 = 7;
+
+        assert_eq!(
+            account_action_result_nar_bytes(NarByteAccounting {
+                transferred_nar_bytes: 0,
+                reused_nar_bytes: 0,
+                nar_size_bytes: NAR_SIZE,
+                is_transferred: true,
+            }),
+            Ok((NAR_SIZE, 0))
+        );
+        assert_eq!(
+            account_action_result_nar_bytes(NarByteAccounting {
+                transferred_nar_bytes: 0,
+                reused_nar_bytes: 0,
+                nar_size_bytes: NAR_SIZE,
+                is_transferred: false,
+            }),
+            Ok((0, NAR_SIZE))
+        );
+        assert_eq!(
+            account_action_result_nar_bytes(NarByteAccounting {
+                transferred_nar_bytes: u64::MAX,
+                reused_nar_bytes: 0,
+                nar_size_bytes: 1,
+                is_transferred: true,
+            }),
+            Err("action-result-transferred-nar-bytes-overflow".to_string())
+        );
+        assert_eq!(
+            account_action_result_nar_bytes(NarByteAccounting {
+                transferred_nar_bytes: 0,
+                reused_nar_bytes: u64::MAX,
+                nar_size_bytes: 1,
+                is_transferred: false,
+            }),
+            Err("action-result-reused-nar-bytes-overflow".to_string())
+        );
+    }
+
+    fn test_handle(state_dir: &Path) -> StoreHandle {
+        test_handle_with_store_dir(state_dir, "/nix/store")
+    }
+
+    fn test_handle_with_store_dir(state_dir: &Path, store_dir: &str) -> StoreHandle {
+        let blob_service = Arc::new(MemoryBlobService::default()) as Arc<dyn BlobService>;
+        let directory_service = Arc::new(
+            RedbDirectoryService::new_temporary("handle-test".to_string(), RedbDirectoryServiceConfig::default())
+                .unwrap(),
+        ) as Arc<dyn DirectoryService>;
+        let pathinfo_service =
+            Arc::new(LruPathInfoService::with_capacity("handle-test".to_string(), NonZeroUsize::new(32).unwrap()))
+                as Arc<dyn PathInfoService>;
+
+        StoreHandle::from_services_with_store_dir(
+            StoreBackend::Snix,
+            StoreHandleServices {
+                blob_service,
+                directory_service,
+                pathinfo_service,
+                remote_pathinfo: None,
+                state_dir: state_dir.to_path_buf(),
+                output_dir_str: state_dir.display().to_string(),
+                publishers: Vec::new(),
+            },
+            store_dir.to_string(),
+        )
+        .unwrap()
+    }
+
+    fn test_handle_with_remote(state_dir: &Path) -> (StoreHandle, Arc<dyn PathInfoService>) {
+        let blob_service = Arc::new(MemoryBlobService::default()) as Arc<dyn BlobService>;
+        let directory_service = Arc::new(
+            RedbDirectoryService::new_temporary(
+                "handle-remote-test".to_string(),
+                RedbDirectoryServiceConfig::default(),
+            )
+            .unwrap(),
+        ) as Arc<dyn DirectoryService>;
+        let local =
+            Arc::new(LruPathInfoService::with_capacity("handle-local".to_string(), NonZeroUsize::new(32).unwrap()))
+                as Arc<dyn PathInfoService>;
+        let remote =
+            Arc::new(LruPathInfoService::with_capacity("handle-remote".to_string(), NonZeroUsize::new(32).unwrap()))
+                as Arc<dyn PathInfoService>;
+
+        let handle = StoreHandle::from_services_with_store_dir(
+            StoreBackend::Snix,
+            StoreHandleServices {
+                blob_service,
+                directory_service,
+                pathinfo_service: local,
+                remote_pathinfo: Some(remote.clone()),
+                state_dir: state_dir.to_path_buf(),
+                output_dir_str: state_dir.display().to_string(),
+                publishers: Vec::new(),
+            },
+            "/nix/store".to_string(),
+        )
+        .unwrap();
+        (handle, remote)
+    }
+
+    #[test]
+    fn synthetic_services_reject_casita_before_opening_state() {
+        let root = tempfile::tempdir().unwrap();
+        let state = root.path().join("state");
+        let output = root.path().join("store");
+        let services = StoreHandleServices {
+            blob_service: Arc::new(MemoryBlobService::default()),
+            directory_service: Arc::new(
+                RedbDirectoryService::new_temporary(
+                    "synthetic-casita-test".to_string(),
+                    RedbDirectoryServiceConfig::default(),
+                )
+                .unwrap(),
+            ),
+            pathinfo_service: Arc::new(LruPathInfoService::with_capacity(
+                "synthetic-casita-test".to_string(),
+                NonZeroUsize::new(32).unwrap(),
+            )),
+            remote_pathinfo: None,
+            state_dir: state.clone(),
+            output_dir_str: output.display().to_string(),
+            publishers: Vec::new(),
+        };
+        let error = StoreHandle::from_services_with_store_dir(StoreBackend::Casita, services, "/nix/store".to_string())
+            .err()
+            .expect("Casita requires its repository, not arbitrary Snix services");
+        assert!(error.to_string().contains("casita-store-services-unsupported"), "{error}");
+        assert!(!state.exists());
+        assert!(!output.exists());
+    }
+
+    #[tokio::test]
+    async fn synthetic_snix_services_reject_recorded_casita_before_loading_foreign_state() {
+        let root = tempfile::tempdir().unwrap();
+        let state = root.path().join("casita-state");
+        let casita_output = root.path().join("casita-output");
+        let synthetic_output = root.path().join("synthetic-output");
+        let casita = StoreHandle::open(StoreConfig::new(
+            StoreBackend::Casita,
+            state.clone(),
+            casita_output,
+            "/nix/store".to_string(),
+        ))
+        .await
+        .unwrap();
+        drop(casita);
+        let mut foreign_mappings = CaMappings::default();
+        foreign_mappings.insert("/nix/store/foreign.drv", "out", "/nix/store/foreign-output");
+        foreign_mappings.save_checked(&state).unwrap();
+        std::fs::write(state.join("advisory-meta-cache.json"), b"[]").unwrap();
+        let before = snapshot_test_repository(&state);
+
+        let services = StoreHandleServices {
+            blob_service: Arc::new(MemoryBlobService::default()),
+            directory_service: Arc::new(
+                RedbDirectoryService::new_temporary(
+                    "synthetic-foreign-state-test".to_string(),
+                    RedbDirectoryServiceConfig::default(),
+                )
+                .unwrap(),
+            ),
+            pathinfo_service: Arc::new(LruPathInfoService::with_capacity(
+                "synthetic-foreign-state-test".to_string(),
+                NonZeroUsize::new(32).unwrap(),
+            )),
+            remote_pathinfo: None,
+            state_dir: state.clone(),
+            output_dir_str: synthetic_output.display().to_string(),
+            publishers: Vec::new(),
+        };
+        let error = StoreHandle::from_services_with_store_dir(StoreBackend::Snix, services, "/nix/store".to_string())
+            .err()
+            .expect("synthetic Snix services must reject recorded Casita state");
+        assert!(
+            error.to_string().contains("store-backend-mismatch: requested snix, state declares casita"),
+            "{error}"
+        );
+        assert_eq!(snapshot_test_repository(&state), before, "wrong-backend synthetic open changed Casita state");
+        assert!(!synthetic_output.exists(), "wrong-backend synthetic open created output");
+    }
+
+    fn test_output(name: &str, digest_byte: u8) -> StorePath<String> {
+        StorePath::from_name_and_digest_fixed(name, [digest_byte; 20]).unwrap()
+    }
+    fn snapshot_test_repository(root: &Path) -> BTreeMap<PathBuf, Option<Vec<u8>>> {
+        let mut files = BTreeMap::new();
+        let mut pending = vec![root.to_path_buf()];
+        while let Some(directory) = pending.pop() {
+            for entry in std::fs::read_dir(directory).unwrap() {
+                let path = entry.unwrap().path();
+                let relative = path.strip_prefix(root).unwrap().to_path_buf();
+                let metadata = std::fs::symlink_metadata(&path).unwrap();
+                if metadata.is_dir() {
+                    files.insert(relative, None);
+                    pending.push(path);
+                } else {
+                    assert!(metadata.is_file(), "unexpected Casita repository member: {}", path.display());
+                    files.insert(relative, Some(std::fs::read(path).unwrap()));
+                }
+            }
+        }
+        files
+    }
+
+    fn test_signing_key() -> SigningKey<ed25519_dalek::SigningKey> {
+        SigningKey::new("store-test-1".to_string(), ed25519_dalek::SigningKey::from_bytes(&[3_u8; 32]))
+    }
+
+    fn test_verifying_key() -> VerifyingKey {
+        let raw = ed25519_dalek::SigningKey::from_bytes(&[3_u8; 32]);
+        VerifyingKey::new("store-test-1".to_string(), raw.verifying_key())
+    }
+
+    fn test_signature() -> nix_compat::narinfo::Signature<String> {
+        test_signing_key().sign(b"signed").to_owned()
+    }
+
+    fn sign_test_pathinfo(path_info: &mut PathInfo) {
+        path_info.signatures.clear();
+        let signed_fingerprint = compute_pathinfo_fingerprint(path_info, nix_compat::store_path::STORE_DIR);
+        path_info.signatures.push(test_signing_key().sign(signed_fingerprint.as_bytes()).to_owned());
+    }
+
+    fn signed_pathinfo(store_path: StorePath<String>) -> PathInfo {
+        let mut path_info = PathInfo {
+            store_path,
+            node: Node::Symlink {
+                target: SymlinkTarget::try_from("target").unwrap(),
+            },
+            references: vec![],
+            nar_size: 1,
+            nar_sha256: [9u8; 32],
+            signatures: Vec::new(),
+            deriver: None,
+            ca: None,
+        };
+        sign_test_pathinfo(&mut path_info);
+        path_info
+    }
+
+    fn signed_pathinfo_with_signing_key(
+        store_path: StorePath<String>,
+        node: Node,
+        nar_size: u64,
+        nar_sha256: [u8; 32],
+        signing_key: &SigningKey<ed25519_dalek::SigningKey>,
+    ) -> PathInfo {
+        let mut path_info = PathInfo {
+            store_path,
+            node,
+            references: vec![],
+            nar_size,
+            nar_sha256,
+            signatures: vec![],
+            deriver: None,
+            ca: None,
+        };
+        let fingerprint = compute_pathinfo_fingerprint(&path_info, nix_compat::store_path::STORE_DIR);
+        path_info.signatures.push(signing_key.sign(fingerprint.as_bytes()).to_owned());
+        path_info
+    }
+
+    fn signed_file_pathinfo(
+        store_path: StorePath<String>,
+        digest: snix_castore::B3Digest,
+        size_bytes: u64,
+        executable: bool,
+    ) -> PathInfo {
+        PathInfo {
+            store_path,
+            node: Node::File {
+                digest,
+                size: size_bytes,
+                executable,
+            },
+            references: vec![],
+            nar_size: size_bytes,
+            nar_sha256: [8u8; 32],
+            signatures: vec![test_signature()],
+            deriver: None,
+            ca: None,
+        }
+    }
+
+    #[derive(Default, Debug)]
+    struct DeltaProbeCounts {
+        capability_gets: u32,
+        candidate_posts: u32,
+        has_set_posts: u32,
+        stream_posts: u32,
+        last_candidate_body: Option<String>,
+        last_has_set_body: Option<String>,
+        last_stream_body: Option<String>,
+    }
+
+    struct DeltaProbeServerConfig {
+        capability_status_line: &'static str,
+        capability_body: String,
+        capability_path: String,
+        candidate_status_line: &'static str,
+        candidate_body: String,
+        candidate_path: String,
+        has_set_status_line: &'static str,
+        has_set_body: String,
+        has_set_path: String,
+        stream_status_line: &'static str,
+        stream_body: String,
+        stream_path: String,
+    }
+
+    fn supported_delta_capability_body(candidate_path: &str, has_set_path: &str, stream_path: &str) -> String {
+        serde_json::to_string(&DeltaCapabilityAdvertisementWire {
+            supported_versions: vec![1],
+            supported_chunk_profiles: vec![DeltaChunkProfileWire::protocol_v1()],
+            endpoints: DeltaHttpEndpointsWire {
+                capability_path: "/delta/capabilities".to_string(),
+                candidate_path: candidate_path.to_string(),
+                has_set_path: has_set_path.to_string(),
+                stream_path: stream_path.to_string(),
+            },
+        })
+        .unwrap()
+    }
+
+    fn candidate_response_body(output_id: &str, output_name: &str, root: DeltaArtifactNodeWire) -> String {
+        serde_json::to_string(&DeltaCandidateResponseWire {
+            session_id: format!("session-{output_name}"),
+            negotiated: DeltaNegotiatedProtocolWire {
+                version: 1,
+                chunk_profile: DeltaChunkProfileWire::protocol_v1(),
+            },
+            sender: DeltaClosureFixtureWire {
+                store_prefix: "/nix/store".to_string(),
+                outputs: vec![DeltaOutputFixtureWire {
+                    output_id: output_id.to_string(),
+                    root,
+                }],
+            },
+            output_name: output_name.to_string(),
+        })
+        .unwrap()
+    }
+
+    async fn store_local_blob(handle: &StoreHandle, bytes: &[u8]) -> snix_castore::B3Digest {
+        let mut writer = handle.blob_service.open_write().await;
+        writer.write_all(bytes).await.unwrap();
+        writer.close().await.unwrap()
+    }
+
+    fn delta_stream_body(frames: &[DeltaTransferFrameWire]) -> String {
+        let mut body = String::new();
+        for frame in frames {
+            body.push_str(&serde_json::to_string(frame).unwrap());
+            body.push('\n');
+        }
+        body
+    }
+
+    async fn render_nar_bytes(handle: &StoreHandle, node: &Node) -> Vec<u8> {
+        let (mut reader, writer) = tokio::io::duplex(64 * 1024);
+        let node = node.clone();
+        let blob_service = handle.blob_service();
+        let directory_service = handle.directory_service();
+        let write_task = tokio::spawn(async move { write_nar(writer, &node, blob_service, directory_service).await });
+        let mut nar_bytes = Vec::new();
+        reader.read_to_end(&mut nar_bytes).await.unwrap();
+        write_task.await.unwrap().unwrap();
+        nar_bytes
+    }
+
+    fn narinfo_body_for(
+        path_info: &PathInfo,
+        nar_url: &str,
+        signing_key: &SigningKey<ed25519_dalek::SigningKey>,
+    ) -> String {
+        let fingerprint = compute_pathinfo_fingerprint(path_info, nix_compat::store_path::STORE_DIR);
+        let signature = signing_key.sign(fingerprint.as_bytes()).to_string();
+        let mut body = String::new();
+        body.push_str(&format!("StorePath: {}\n", path_info.store_path.to_absolute_path()));
+        body.push_str(&format!("URL: {nar_url}\n"));
+        body.push_str("Compression: none\n");
+        body.push_str(&format!("NarHash: sha256:{}\n", nix_compat::nixbase32::encode(&path_info.nar_sha256)));
+        body.push_str(&format!("NarSize: {}\n", path_info.nar_size));
+        body.push_str("References: \n");
+        body.push_str(&format!("Sig: {signature}\n"));
+        body
+    }
+
+    #[derive(Default, Debug)]
+    struct RealCacheRequestCounts {
+        delta: DeltaProbeCounts,
+        narinfo_gets: u32,
+        nar_gets: u32,
+    }
+
+    struct RealDeltaCacheServerConfig {
+        delta: DeltaProbeServerConfig,
+        narinfo_status_line: &'static str,
+        narinfo_path: String,
+        narinfo_body: String,
+        nar_status_line: &'static str,
+        nar_path: String,
+        nar_body: Vec<u8>,
+    }
+
+    fn spawn_real_delta_cache_server(
+        config: RealDeltaCacheServerConfig,
+    ) -> (Url, Arc<Mutex<RealCacheRequestCounts>>, Arc<AtomicBool>, JoinHandle<()>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let addr = listener.local_addr().unwrap();
+        let counts = Arc::new(Mutex::new(RealCacheRequestCounts::default()));
+        let stop = Arc::new(AtomicBool::new(false));
+        let counts_ref = counts.clone();
+        let stop_ref = stop.clone();
+
+        let handle = thread::spawn(move || {
+            while !stop_ref.load(Ordering::SeqCst) {
+                match listener.accept() {
+                    Ok((mut stream, _peer)) => handle_real_delta_cache_connection(&mut stream, &config, &counts_ref),
+                    Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
+                        thread::sleep(Duration::from_millis(10));
+                    }
+                    Err(err) => panic!("accept failed: {err}"),
+                }
+            }
+        });
+
+        (format!("http://{addr}/").parse().unwrap(), counts, stop, handle)
+    }
+
+    fn handle_real_delta_cache_connection(
+        stream: &mut TcpStream,
+        config: &RealDeltaCacheServerConfig,
+        counts: &Arc<Mutex<RealCacheRequestCounts>>,
+    ) {
+        let mut buf = [0u8; 8192];
+        let bytes_read = stream.read(&mut buf).unwrap();
+        let request = String::from_utf8_lossy(&buf[..bytes_read]);
+        let request_line = request.lines().next().unwrap_or_default();
+        let mut parts = request_line.split_whitespace();
+        let method = parts.next().unwrap_or_default();
+        let path = parts.next().unwrap_or("/");
+
+        if method == "GET" && path == config.narinfo_path {
+            counts.lock().unwrap().narinfo_gets += 1;
+            write_http_response(
+                stream,
+                config.narinfo_status_line,
+                b"text/plain; charset=utf-8",
+                config.narinfo_body.as_bytes(),
+            );
+            return;
+        }
+        if method == "GET" && path == config.nar_path {
+            counts.lock().unwrap().nar_gets += 1;
+            write_http_response(stream, config.nar_status_line, b"application/x-nix-nar", &config.nar_body);
+            return;
+        }
+
+        let body_start = request.find("\r\n\r\n").map(|idx| idx + 4).unwrap_or(request.len());
+        let body_text = request[body_start..].to_string();
+        let (status_line, body) = if method == "GET" && path == config.delta.capability_path {
+            counts.lock().unwrap().delta.capability_gets += 1;
+            (config.delta.capability_status_line, config.delta.capability_body.clone().into_bytes())
+        } else if method == "POST" && path == config.delta.candidate_path {
+            let mut guard = counts.lock().unwrap();
+            guard.delta.candidate_posts += 1;
+            guard.delta.last_candidate_body = Some(body_text);
+            (config.delta.candidate_status_line, config.delta.candidate_body.clone().into_bytes())
+        } else if method == "POST" && path == config.delta.has_set_path {
+            let mut guard = counts.lock().unwrap();
+            guard.delta.has_set_posts += 1;
+            guard.delta.last_has_set_body = Some(body_text);
+            (config.delta.has_set_status_line, config.delta.has_set_body.clone().into_bytes())
+        } else if method == "POST" && path == config.delta.stream_path {
+            let mut guard = counts.lock().unwrap();
+            guard.delta.stream_posts += 1;
+            guard.delta.last_stream_body = Some(body_text);
+            (config.delta.stream_status_line, config.delta.stream_body.clone().into_bytes())
+        } else {
+            ("HTTP/1.1 404 Not Found", b"missing".to_vec())
+        };
+        write_http_response(stream, status_line, b"text/plain; charset=utf-8", &body);
+    }
+
+    fn write_http_response(stream: &mut TcpStream, status_line: &str, content_type: &[u8], body: &[u8]) {
+        let mut headers = Vec::new();
+        headers.extend_from_slice(status_line.as_bytes());
+        headers.extend_from_slice(b"\r\nContent-Length: ");
+        headers.extend_from_slice(body.len().to_string().as_bytes());
+        headers.extend_from_slice(b"\r\nContent-Type: ");
+        headers.extend_from_slice(content_type);
+        headers.extend_from_slice(b"\r\nConnection: close\r\n\r\n");
+        stream.write_all(&headers).unwrap();
+        stream.write_all(body).unwrap();
+        stream.flush().unwrap();
+    }
+
+    fn stop_real_delta_cache_server(base_url: &Url, stop: Arc<AtomicBool>, handle: JoinHandle<()>) {
+        stop.store(true, Ordering::SeqCst);
+        let host = base_url.host_str().unwrap();
+        let port = base_url.port_or_known_default().unwrap();
+        let _ = TcpStream::connect((host, port));
+        handle.join().unwrap();
+    }
+
+    fn spawn_delta_probe_server(
+        config: DeltaProbeServerConfig,
+    ) -> (Url, Arc<Mutex<DeltaProbeCounts>>, Arc<AtomicBool>, JoinHandle<()>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let addr = listener.local_addr().unwrap();
+        let counts = Arc::new(Mutex::new(DeltaProbeCounts::default()));
+        let stop = Arc::new(AtomicBool::new(false));
+        let counts_ref = counts.clone();
+        let stop_ref = stop.clone();
+
+        let handle = thread::spawn(move || {
+            while !stop_ref.load(Ordering::SeqCst) {
+                match listener.accept() {
+                    Ok((mut stream, _peer)) => handle_delta_probe_connection(&mut stream, &config, &counts_ref),
+                    Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
+                        thread::sleep(Duration::from_millis(10));
+                    }
+                    Err(err) => panic!("accept failed: {err}"),
+                }
+            }
+        });
+
+        (format!("http://{addr}/").parse().unwrap(), counts, stop, handle)
+    }
+
+    fn handle_delta_probe_connection(
+        stream: &mut TcpStream,
+        config: &DeltaProbeServerConfig,
+        counts: &Arc<Mutex<DeltaProbeCounts>>,
+    ) {
+        let mut buf = [0u8; 4096];
+        let bytes_read = stream.read(&mut buf).unwrap();
+        let request = String::from_utf8_lossy(&buf[..bytes_read]);
+        let request_line = request.lines().next().unwrap_or_default();
+        let mut parts = request_line.split_whitespace();
+        let method = parts.next().unwrap_or_default();
+        let path = parts.next().unwrap_or("/");
+
+        let (status_line, body) = if method == "GET" && path == config.capability_path {
+            counts.lock().unwrap().capability_gets += 1;
+            (config.capability_status_line, config.capability_body.as_str())
+        } else if method == "POST" && path == config.candidate_path {
+            let body_start = request.find("\r\n\r\n").map(|idx| idx + 4).unwrap_or(request.len());
+            let body_text = request[body_start..].to_string();
+            let mut guard = counts.lock().unwrap();
+            guard.candidate_posts += 1;
+            guard.last_candidate_body = Some(body_text);
+            (config.candidate_status_line, config.candidate_body.as_str())
+        } else if method == "POST" && path == config.has_set_path {
+            let body_start = request.find("\r\n\r\n").map(|idx| idx + 4).unwrap_or(request.len());
+            let body_text = request[body_start..].to_string();
+            let mut guard = counts.lock().unwrap();
+            guard.has_set_posts += 1;
+            guard.last_has_set_body = Some(body_text);
+            (config.has_set_status_line, config.has_set_body.as_str())
+        } else if method == "POST" && path == config.stream_path {
+            let body_start = request.find("\r\n\r\n").map(|idx| idx + 4).unwrap_or(request.len());
+            let body_text = request[body_start..].to_string();
+            let mut guard = counts.lock().unwrap();
+            guard.stream_posts += 1;
+            guard.last_stream_body = Some(body_text);
+            (config.stream_status_line, config.stream_body.as_str())
+        } else {
+            ("HTTP/1.1 404 Not Found", "missing")
+        };
+
+        let response = format!("{status_line}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len());
+        stream.write_all(response.as_bytes()).unwrap();
+        stream.flush().unwrap();
+    }
+
+    fn stop_delta_probe_server(base_url: &Url, stop: Arc<AtomicBool>, handle: JoinHandle<()>) {
+        stop.store(true, Ordering::SeqCst);
+        let host = base_url.host_str().unwrap();
+        let port = base_url.port_or_known_default().unwrap();
+        let _ = TcpStream::connect((host, port));
+        handle.join().unwrap();
+    }
+
+    #[tokio::test]
+    async fn practical_pathinfo_open_fallback_records_audit_event() {
+        let state_dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(state_dir.path().join("pathinfo.redb")).unwrap();
+
+        let (_svc, audit_events) = open_pathinfo_service(state_dir.path(), StoreFallbackMode::Practical).await.unwrap();
+
+        assert_eq!(audit_events.len(), 1);
+        assert_eq!(audit_events[0].kind, StoreAuditKind::PathInfoFallback);
+        assert!(audit_events[0].detail.contains("using in-memory fallback"));
+    }
+
+    #[tokio::test]
+    async fn strict_pathinfo_open_fallback_is_rejected() {
+        let state_dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(state_dir.path().join("pathinfo.redb")).unwrap();
+
+        let err = match open_pathinfo_service(state_dir.path(), StoreFallbackMode::Strict).await {
+            Ok(_) => panic!("strict mode should reject PathInfo fallback"),
+            Err(err) => err,
+        };
+
+        assert!(matches!(err, Error::PathInfoFallbackRejected { .. }));
+        assert!(err.to_string().contains("strict mode does not permit in-memory PathInfo fallback"));
+    }
+
+    #[tokio::test]
+    async fn cached_node_for_path_reuses_local_pathinfo_node() {
+        use snix_store::pathinfoservice::PathInfoService;
+
+        let state_dir = tempfile::tempdir().unwrap();
+        let mut handle = test_handle(state_dir.path());
+        let output_path = test_output("cached-node", 6);
+        let path_info = signed_pathinfo(output_path.clone());
+        let expected_node = path_info.node.clone();
+        handle.pathinfo_service().put(path_info).await.unwrap();
+
+        let reused = handle.cached_node_for_path(&output_path).await.unwrap();
+
+        assert_eq!(reused, Some(expected_node.clone()));
+        assert_eq!(handle.output_nodes.get(&output_path), Some(&expected_node));
+    }
+
+    #[tokio::test]
+    async fn cached_node_for_path_rejects_incomplete_session_node() {
+        const DIGEST_BYTE: u8 = 53;
+        const DECLARED_SIZE: u64 = 1;
+
+        let state_dir = tempfile::tempdir().unwrap();
+        let mut handle = test_handle(state_dir.path());
+        let output_path = test_output("stale-session-node", DIGEST_BYTE);
+        let missing_digest = snix_castore::B3Digest::from(blake3::hash(b"missing-session-node").as_bytes());
+        let stale_node = Node::File {
+            digest: missing_digest,
+            size: DECLARED_SIZE,
+            executable: false,
+        };
+        handle.output_nodes.insert(output_path.clone(), stale_node);
+
+        let reused = handle.cached_node_for_path(&output_path).await.unwrap();
+
+        assert!(reused.is_none());
+        assert!(!handle.output_nodes.contains_key(&output_path));
+    }
+
+    #[tokio::test]
+    async fn check_cache_directory_output_with_missing_child_is_castore_incomplete() {
+        // V5: a directory output whose root exists but whose child blob
+        // is missing from castore is rejected as a cache miss.
+        // r[verify cache_substitution.castore_completeness]
+        let state_dir = tempfile::tempdir().unwrap();
+        let mut handle = test_handle(state_dir.path());
+
+        // Create a file blob.
+        let mut writer = handle.blob_service.open_write().await;
+        tokio::io::AsyncWriteExt::write_all(&mut writer, b"child-content").await.unwrap();
+        let blob_digest = writer.close().await.unwrap();
+
+        // Create a directory with that blob as a child.
+        let child_name = snix_castore::PathComponent::try_from("child.txt").unwrap();
+        let mut dir = snix_castore::Directory::new();
+        dir.add(child_name, Node::File {
+            digest: blob_digest,
+            size: 13,
+            executable: false,
+        })
+        .unwrap();
+        let dir_digest = dir.digest();
+        let dir_size = dir.size();
+
+        // Put the directory node in castore.
+        handle.directory_service.put(dir).await.unwrap();
+
+        // Create a PathInfo pointing to the directory root.
+        let output_path = test_output("complete-check", 42);
+        let path_info = PathInfo {
+            store_path: output_path.clone(),
+            node: Node::Directory {
+                digest: dir_digest,
+                size: dir_size,
+            },
+            references: vec![],
+            nar_size: 100,
+            nar_sha256: [10u8; 32],
+            signatures: vec![test_signature()],
+            deriver: None,
+            ca: None,
+        };
+        handle.pathinfo_service.put(path_info.clone()).await.unwrap();
+
+        // Phase 1: directory exists but child blob is NOT in blob service.
+        // The root directory WAS put, but the child blob was not.
+        // Wait - we need to remove the blob from the blob service to
+        // simulate the incomplete case. But MemoryBlobService has no
+        // remove. Instead, don't put the blob in the first place:
+        // the blob_digest exists but there's no entry for it.
+
+        // Actually, we DID write the blob above. To test incomplete,
+        // use a different blob_digest that was never written.
+
+        // Rebuild with a missing-blob directory:
+        let missing_payload = b"never-written";
+        let missing_blob = snix_castore::B3Digest::from(blake3::hash(missing_payload).as_bytes());
+        let missing_size = u64::try_from(missing_payload.len()).expect("test payload length fits u64");
+        let mut missing_dir = snix_castore::Directory::new();
+        missing_dir
+            .add(snix_castore::PathComponent::try_from("missing.txt").unwrap(), Node::File {
+                digest: missing_blob,
+                size: missing_size,
+                executable: false,
+            })
+            .unwrap();
+        let missing_dir_digest = missing_dir.digest();
+        let missing_dir_size = missing_dir.size();
+        handle.directory_service.put(missing_dir).await.unwrap();
+
+        let missing_output_path = test_output("missing-child", 43);
+        let missing_path_info = PathInfo {
+            store_path: missing_output_path.clone(),
+            node: Node::Directory {
+                digest: missing_dir_digest,
+                size: missing_dir_size,
+            },
+            references: vec![],
+            nar_size: 50,
+            nar_sha256: [11u8; 32],
+            signatures: vec![test_signature()],
+            deriver: None,
+            ca: None,
+        };
+        handle.pathinfo_service.put(missing_path_info.clone()).await.unwrap();
+
+        let mut missing_outputs = std::collections::BTreeMap::new();
+        missing_outputs.insert("out".to_string(), nix_compat::derivation::Output {
+            path: Some(missing_output_path.clone()),
+            ca_hash: None,
+        });
+        let missing_derivation = Derivation {
+            arguments: vec![],
+            builder: "/bin/sh".to_string(),
+            environment: std::collections::BTreeMap::new(),
+            input_derivations: std::collections::BTreeMap::new(),
+            input_sources: std::collections::BTreeSet::new(),
+            outputs: missing_outputs,
+            system: "x86_64-linux".to_string(),
+        };
+
+        let drv_path_missing = test_output("missing-child.drv", 44);
+
+        // Missing child blob → cache miss.
+        {
+            let cached = handle.check_cache(&drv_path_missing, &missing_derivation, false, None).await.unwrap();
+            assert!(cached.is_none(), "directory with missing child blob should NOT be a cache hit");
+        }
+
+        // Now put the missing blob → cache hit.
+        {
+            let mut writer = handle.blob_service.open_write().await;
+            tokio::io::AsyncWriteExt::write_all(&mut writer, missing_payload).await.unwrap();
+            writer.close().await.unwrap();
+        }
+
+        {
+            let cached = handle.check_cache(&drv_path_missing, &missing_derivation, false, None).await.unwrap();
+            assert!(cached.is_some(), "directory with all children present should be a cache hit");
+        }
+    }
+
+    #[tokio::test]
+    async fn check_cache_preserves_current_detailed_artifact_attestation() {
+        const OUTPUT_DIGEST_BYTE: u8 = 54;
+        const DERIVER_DIGEST_BYTE: u8 = 55;
+        const SOURCE_DIGEST_BYTE: u8 = 56;
+        const INPUT_DIGEST_BYTE: u8 = 57;
+        const EXPECTED_BUILD_INPUT_EDGE_COUNT: usize = 2;
+        let state_dir = tempfile::tempdir().unwrap();
+        let mut handle = test_handle(state_dir.path());
+        let output_path = test_output("cache-provenance", OUTPUT_DIGEST_BYTE);
+        let mut path_info = signed_pathinfo(output_path.clone());
+        path_info.deriver = Some(test_output("cache-provenance.drv", DERIVER_DIGEST_BYTE));
+        handle.pathinfo_service.put(path_info.clone()).await.unwrap();
+
+        let detailed = persist_artifact_attestation(
+            state_dir.path(),
+            "/nix/store",
+            &path_info,
+            "out",
+            Some(&ArtifactProvenance {
+                claims: None,
+                input_sources: vec![test_output("source", SOURCE_DIGEST_BYTE)],
+                input_artifacts: vec![test_output("input", INPUT_DIGEST_BYTE)],
+                store_layer: StoreLayer::Overlay,
+            }),
+        )
+        .await
+        .unwrap();
+        let attestation_path = crate::artifact_attestation_file_path(state_dir.path(), "/nix/store", &output_path);
+        let bytes_before_cache_hit = std::fs::read(&attestation_path).unwrap();
+        let mut outputs = std::collections::BTreeMap::new();
+        outputs.insert("out".to_string(), nix_compat::derivation::Output {
+            path: Some(output_path.clone()),
+            ca_hash: None,
+        });
+        let derivation = Derivation {
+            arguments: vec![],
+            builder: "/bin/sh".to_string(),
+            environment: std::collections::BTreeMap::new(),
+            input_derivations: std::collections::BTreeMap::new(),
+            input_sources: std::collections::BTreeSet::new(),
+            outputs,
+            system: "x86_64-linux".to_string(),
+        };
+
+        let cached = handle
+            .check_cache(&test_output("cache-provenance.drv", DERIVER_DIGEST_BYTE), &derivation, false, None)
+            .await
+            .unwrap();
+        let after_cache_hit = handle.get_artifact_attestation(&output_path).await.unwrap().unwrap();
+        let bytes_after_cache_hit = std::fs::read(&attestation_path).unwrap();
+
+        assert!(cached.is_some());
+        assert_eq!(bytes_after_cache_hit, bytes_before_cache_hit);
+        assert_eq!(after_cache_hit.digest, detailed.digest);
+        assert_eq!(
+            after_cache_hit
+                .attestation
+                .edges
+                .iter()
+                .filter(|edge| edge.kind == crunch_attestation::EdgeKind::BuildInput)
+                .count(),
+            EXPECTED_BUILD_INPUT_EDGE_COUNT
+        );
+    }
+
+    #[tokio::test]
+    async fn action_result_admission_preserves_current_detailed_artifact_attestation() {
+        const OUTPUT_DIGEST_BYTE: u8 = 60;
+        const DERIVER_DIGEST_BYTE: u8 = 61;
+        const INPUT_DIGEST_BYTE: u8 = 62;
+        let state_dir = tempfile::tempdir().unwrap();
+        let mut handle = test_handle(state_dir.path());
+        let output_path = test_output("action-result-provenance", OUTPUT_DIGEST_BYTE);
+        let mut path_info = signed_pathinfo(output_path.clone());
+        path_info.deriver = Some(test_output("action-result-provenance.drv", DERIVER_DIGEST_BYTE));
+        persist_artifact_attestation(
+            state_dir.path(),
+            "/nix/store",
+            &path_info,
+            "out",
+            Some(&ArtifactProvenance {
+                claims: None,
+                input_sources: Vec::new(),
+                input_artifacts: vec![test_output("action-result-input", INPUT_DIGEST_BYTE)],
+                store_layer: StoreLayer::Overlay,
+            }),
+        )
+        .await
+        .unwrap();
+        let attestation_path = crate::artifact_attestation_file_path(state_dir.path(), "/nix/store", &output_path);
+        let bytes_before_admission = std::fs::read(&attestation_path).unwrap();
+        let outputs = BTreeMap::from([("out".to_string(), path_info)]);
+
+        handle.admit_action_result_outputs(&outputs, false, None).await.unwrap();
+
+        let bytes_after_admission = std::fs::read(&attestation_path).unwrap();
+        let admitted = handle.get_artifact_attestation(&output_path).await.unwrap().unwrap();
+        assert_eq!(bytes_after_admission, bytes_before_admission);
+        assert!(admitted.attestation.edges.iter().any(|edge| edge.kind == crunch_attestation::EdgeKind::BuildInput));
+    }
+
+    #[tokio::test]
+    async fn check_cache_replaces_stale_artifact_attestation_facts() {
+        const OUTPUT_DIGEST_BYTE: u8 = 58;
+        const STALE_NAR_HASH_BYTE: u8 = 59;
+        let state_dir = tempfile::tempdir().unwrap();
+        let mut handle = test_handle(state_dir.path());
+        let output_path = test_output("stale-cache-attestation", OUTPUT_DIGEST_BYTE);
+        let mut stale_path_info = signed_pathinfo(output_path.clone());
+        stale_path_info.nar_sha256 = [STALE_NAR_HASH_BYTE; NAR_SHA256_BYTES];
+        let stale = persist_artifact_attestation(state_dir.path(), "/nix/store", &stale_path_info, "out", None)
+            .await
+            .unwrap();
+        let current_path_info = signed_pathinfo(output_path.clone());
+        handle.pathinfo_service.put(current_path_info.clone()).await.unwrap();
+
+        let mut outputs = std::collections::BTreeMap::new();
+        outputs.insert("out".to_string(), nix_compat::derivation::Output {
+            path: Some(output_path.clone()),
+            ca_hash: None,
+        });
+        let derivation = Derivation {
+            arguments: vec![],
+            builder: "/bin/sh".to_string(),
+            environment: std::collections::BTreeMap::new(),
+            input_derivations: std::collections::BTreeMap::new(),
+            input_sources: std::collections::BTreeSet::new(),
+            outputs,
+            system: "x86_64-linux".to_string(),
+        };
+
+        let cached = handle
+            .check_cache(&test_output("stale-cache-attestation.drv", OUTPUT_DIGEST_BYTE), &derivation, false, None)
+            .await
+            .unwrap();
+        let after_cache_hit = handle.get_artifact_attestation(&output_path).await.unwrap().unwrap();
+
+        assert!(cached.is_some());
+        assert_ne!(after_cache_hit.digest, stale.digest);
+        assert!(artifact_attestation_matches_pathinfo(
+            "/nix/store",
+            &current_path_info,
+            "out",
+            &after_cache_hit.attestation,
+        ));
+    }
+
+    #[tokio::test]
+    async fn check_cache_accepts_ca_mapping_with_custom_store_prefix() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let mut handle = test_handle_with_store_dir(state_dir.path(), "/crunch/store");
+        let drv_path = test_output("ca-demo.drv", 4);
+        let output_path = test_output("ca-demo", 5);
+        let path_info = signed_pathinfo(output_path.clone());
+        handle.pathinfo_service().put(path_info.clone()).await.unwrap();
+
+        let mut outputs = std::collections::BTreeMap::new();
+        outputs.insert("out".to_string(), nix_compat::derivation::Output {
+            path: None,
+            ca_hash: None,
+        });
+        let derivation = Derivation {
+            arguments: vec![],
+            builder: "/bin/sh".to_string(),
+            environment: std::collections::BTreeMap::new(),
+            input_derivations: std::collections::BTreeMap::new(),
+            input_sources: std::collections::BTreeSet::new(),
+            outputs,
+            system: "x86_64-linux".to_string(),
+        };
+
+        let drv_abs = drv_path.to_absolute_path_with_prefix("/crunch/store");
+        let out_abs = output_path.to_absolute_path_with_prefix("/crunch/store");
+        handle.insert_ca_mapping(&drv_abs, "out", &out_abs);
+
+        let cached = handle.check_cache(&drv_path, &derivation, false, None).await.unwrap();
+        let outputs = cached.expect("CA mapping with matching custom prefix should cache-hit");
+        assert_eq!(outputs.get("out").unwrap().store_path, output_path);
+    }
+
+    #[tokio::test]
+    async fn verified_local_output_adoption_ingests_signs_and_persists() {
+        const ADOPTION_DIGEST_BYTE: u8 = 31;
+        const ADOPTION_KEY_BYTE: u8 = 41;
+        let state_dir = tempfile::tempdir().unwrap();
+        let mut handle = test_handle(state_dir.path());
+        let store_path = test_output("adopted-provider", ADOPTION_DIGEST_BYTE);
+        let physical_path = state_dir.path().join(store_path.to_string());
+        std::fs::create_dir(&physical_path).unwrap();
+        std::fs::write(physical_path.join("provider.txt"), b"verified-provider").unwrap();
+        let logical_path = store_path.to_absolute_path();
+        let signing_key = SigningKey::new(
+            "adoption-test-1".to_string(),
+            ed25519_dalek::SigningKey::from_bytes(&[ADOPTION_KEY_BYTE; NAR_SHA256_BYTES]),
+        );
+
+        let adopted = handle.adopt_verified_local_output(&logical_path, "out", &signing_key, None).await.unwrap();
+        let reused = handle.adopt_verified_local_output(&logical_path, "out", &signing_key, None).await.unwrap();
+        let stored = handle.pathinfo_service.get(*store_path.digest()).await.unwrap().unwrap();
+
+        assert_eq!(adopted, stored);
+        assert_eq!(reused, stored);
+        assert_eq!(adopted.store_path, store_path);
+        assert_eq!(adopted.signatures.len(), 1);
+        assert!(crate::artifact_attestation_file_path(state_dir.path(), "/nix/store", &store_path).is_file());
+    }
+
+    #[tokio::test]
+    async fn verified_local_output_adoption_rejects_changed_existing_content() {
+        const ADOPTION_DIGEST_BYTE: u8 = 33;
+        const ADOPTION_KEY_BYTE: u8 = 43;
+        let state_dir = tempfile::tempdir().unwrap();
+        let mut handle = test_handle(state_dir.path());
+        let store_path = test_output("changed-provider", ADOPTION_DIGEST_BYTE);
+        let physical_path = state_dir.path().join(store_path.to_string());
+        std::fs::create_dir(&physical_path).unwrap();
+        std::fs::write(physical_path.join("provider.txt"), b"verified-provider").unwrap();
+        let logical_path = store_path.to_absolute_path();
+        let signing_key = SigningKey::new(
+            "adoption-test-3".to_string(),
+            ed25519_dalek::SigningKey::from_bytes(&[ADOPTION_KEY_BYTE; NAR_SHA256_BYTES]),
+        );
+        let adopted = handle.adopt_verified_local_output(&logical_path, "out", &signing_key, None).await.unwrap();
+        std::fs::write(physical_path.join("provider.txt"), b"substituted-provider").unwrap();
+
+        let error = handle
+            .adopt_verified_local_output(&logical_path, "out", &signing_key, None)
+            .await
+            .unwrap_err()
+            .to_string();
+        let stored = handle.pathinfo_service.get(*store_path.digest()).await.unwrap().unwrap();
+
+        assert!(error.contains("node differs from physical tree"));
+        assert_eq!(stored, adopted);
+        assert_ne!(
+            stored.node,
+            ingest_path::<_, _, _, &[u8]>(
+                handle.blob_service.clone(),
+                handle.directory_service.clone(),
+                &physical_path,
+                None,
+            )
+            .await
+            .unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn verified_local_output_adoption_rejects_a_missing_physical_path() {
+        const MISSING_DIGEST_BYTE: u8 = 32;
+        const ADOPTION_KEY_BYTE: u8 = 42;
+        let state_dir = tempfile::tempdir().unwrap();
+        let mut handle = test_handle(state_dir.path());
+        let store_path = test_output("missing-provider", MISSING_DIGEST_BYTE);
+        let logical_path = store_path.to_absolute_path();
+        let signing_key = SigningKey::new(
+            "adoption-test-2".to_string(),
+            ed25519_dalek::SigningKey::from_bytes(&[ADOPTION_KEY_BYTE; NAR_SHA256_BYTES]),
+        );
+
+        let error = handle
+            .adopt_verified_local_output(&logical_path, "out", &signing_key, None)
+            .await
+            .unwrap_err()
+            .to_string();
+
+        assert!(error.contains("adoption source"));
+        assert!(error.contains("missing-provider"));
+        assert!(handle.pathinfo_service.get(*store_path.digest()).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn verified_source_ingest_preserves_exact_path_and_reuses_matching_content() {
+        const SOURCE_DIGEST_BYTE: u8 = 33;
+        const SOURCE_KEY_BYTE: u8 = 43;
+        const OTHER_SOURCE_KEY_BYTE: u8 = 53;
+        let state_dir = tempfile::tempdir().unwrap();
+        let mut handle = test_handle(state_dir.path());
+        let source_path = state_dir.path().join("verified-source.txt");
+        std::fs::write(&source_path, b"verified-source").unwrap();
+        let store_path = test_output("foreign-source", SOURCE_DIGEST_BYTE);
+        let logical_path = store_path.to_absolute_path();
+        let signing_key = SigningKey::new(
+            "source-ingest-test-1".to_string(),
+            ed25519_dalek::SigningKey::from_bytes(&[SOURCE_KEY_BYTE; NAR_SHA256_BYTES]),
+        );
+        let request = || VerifiedSourceIngestRequest {
+            source_path: &source_path,
+            logical_store_path: &logical_path,
+            source_name: "foreign-source",
+            signing_key: &signing_key,
+        };
+
+        let preview = handle.preflight_verified_source(request()).await.unwrap();
+        assert_eq!(preview.store_path, store_path);
+        assert!(handle.pathinfo_service.get(*store_path.digest()).await.unwrap().is_none());
+        let first = handle.ingest_verified_source(request()).await.unwrap();
+        let second = handle.ingest_verified_source(request()).await.unwrap();
+
+        assert_eq!(first, second);
+        assert_eq!(first.store_path, store_path);
+        assert_eq!(first.signatures.len(), 1);
+
+        let other_signing_key = SigningKey::new(
+            "source-ingest-test-other".to_string(),
+            ed25519_dalek::SigningKey::from_bytes(&[OTHER_SOURCE_KEY_BYTE; NAR_SHA256_BYTES]),
+        );
+        let error = handle
+            .ingest_verified_source(VerifiedSourceIngestRequest {
+                source_path: &source_path,
+                logical_store_path: &logical_path,
+                source_name: "foreign-source",
+                signing_key: &other_signing_key,
+            })
+            .await
+            .unwrap_err();
+        assert!(error.to_string().contains("conflicting existing PathInfo"));
+    }
+
+    #[tokio::test]
+    async fn verified_source_ingest_rejects_conflicting_existing_content() {
+        const SOURCE_DIGEST_BYTE: u8 = 34;
+        const SOURCE_KEY_BYTE: u8 = 44;
+        let state_dir = tempfile::tempdir().unwrap();
+        let mut handle = test_handle(state_dir.path());
+        let first_path = state_dir.path().join("first-source.txt");
+        let second_path = state_dir.path().join("second-source.txt");
+        std::fs::write(&first_path, b"first-source").unwrap();
+        std::fs::write(&second_path, b"different-source").unwrap();
+        let store_path = test_output("conflicting-source", SOURCE_DIGEST_BYTE);
+        let logical_path = store_path.to_absolute_path();
+        let signing_key = SigningKey::new(
+            "source-ingest-test-2".to_string(),
+            ed25519_dalek::SigningKey::from_bytes(&[SOURCE_KEY_BYTE; NAR_SHA256_BYTES]),
+        );
+
+        let first = handle
+            .ingest_verified_source(VerifiedSourceIngestRequest {
+                source_path: &first_path,
+                logical_store_path: &logical_path,
+                source_name: "conflicting-source",
+                signing_key: &signing_key,
+            })
+            .await
+            .unwrap();
+        let error = handle
+            .ingest_verified_source(VerifiedSourceIngestRequest {
+                source_path: &second_path,
+                logical_store_path: &logical_path,
+                source_name: "conflicting-source",
+                signing_key: &signing_key,
+            })
+            .await
+            .unwrap_err();
+        let stored = handle.pathinfo_service.get(*store_path.digest()).await.unwrap().unwrap();
+
+        assert!(error.to_string().contains("conflicting existing PathInfo"));
+        assert_eq!(stored, first);
+    }
+
+    #[tokio::test]
+    async fn persist_signed_output_rejects_unsigned_pathinfo() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let mut handle = test_handle(state_dir.path());
+        let output_path = test_output("unsigned-path", 7);
+        let path_info = PathInfo {
+            store_path: output_path.clone(),
+            node: Node::Symlink {
+                target: SymlinkTarget::try_from("target").unwrap(),
+            },
+            references: vec![],
+            nar_size: 1,
+            nar_sha256: [1u8; 32],
+            signatures: vec![],
+            deriver: None,
+            ca: None,
+        };
+
+        let err = handle
+            .persist_and_export_signed_output(PersistOutputRequest {
+                output_name: "out",
+                output_path: &output_path,
+                path_info,
+                final_node: Node::Symlink {
+                    target: SymlinkTarget::try_from("target").unwrap(),
+                },
+                provenance: None,
+                is_root: false,
+                root_source: None,
+            })
+            .await
+            .unwrap_err();
+
+        assert!(matches!(err, Error::Store(msg) if msg.contains("unsigned PathInfo")));
+    }
+
+    #[tokio::test]
+    async fn failed_persist_does_not_register_root() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let mut handle = test_handle(state_dir.path());
+        let output_path = test_output("failed-root", 9);
+        let path_info = PathInfo {
+            store_path: output_path.clone(),
+            node: Node::Symlink {
+                target: SymlinkTarget::try_from("target").unwrap(),
+            },
+            references: vec![],
+            nar_size: 1,
+            nar_sha256: [1u8; 32],
+            signatures: vec![],
+            deriver: None,
+            ca: None,
+        };
+
+        let err = handle
+            .persist_and_export_signed_output(PersistOutputRequest {
+                output_name: "out",
+                output_path: &output_path,
+                path_info,
+                final_node: Node::Symlink {
+                    target: SymlinkTarget::try_from("target").unwrap(),
+                },
+                provenance: None,
+                is_root: true,
+                root_source: Some(crate::GcRootSource::Build),
+            })
+            .await
+            .unwrap_err();
+
+        assert!(matches!(err, Error::Store(msg) if msg.contains("unsigned PathInfo")));
+        assert!(crate::roots::list_roots(state_dir.path()).unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn persist_signed_output_rejects_store_path_mismatch() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let mut handle = test_handle(state_dir.path());
+        let expected = test_output("expected-path", 8);
+        let actual = test_output("actual-path", 9);
+        let path_info = signed_pathinfo(actual);
+
+        let err = handle
+            .persist_and_export_signed_output(PersistOutputRequest {
+                output_name: "out",
+                output_path: &expected,
+                path_info,
+                final_node: Node::Symlink {
+                    target: SymlinkTarget::try_from("target").unwrap(),
+                },
+                provenance: None,
+                is_root: false,
+                root_source: None,
+            })
+            .await
+            .unwrap_err();
+
+        assert!(matches!(err, Error::Store(msg) if msg.contains("store path mismatch")));
+    }
+
+    #[tokio::test]
+    async fn persist_signed_output_registers_build_root() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let mut handle = test_handle(state_dir.path());
+        let output_path = test_output("rooted-build", 12);
+
+        handle
+            .persist_and_export_signed_output(PersistOutputRequest {
+                output_name: "out",
+                output_path: &output_path,
+                path_info: signed_pathinfo(output_path.clone()),
+                final_node: Node::Symlink {
+                    target: SymlinkTarget::try_from("target").unwrap(),
+                },
+                provenance: None,
+                is_root: true,
+                root_source: Some(crate::GcRootSource::Build),
+            })
+            .await
+            .unwrap();
+
+        drop(handle);
+        let roots = crate::roots::list_roots(state_dir.path()).unwrap();
+        assert_eq!(roots.len(), 1);
+        assert_eq!(roots[0].logical_path, output_path.to_absolute_path());
+        assert_eq!(roots[0].source, crate::GcRootSource::Build);
+    }
+
+    #[tokio::test]
+    async fn root_export_refreshes_stale_materialized_path() {
+        const DIGEST_BYTE: u8 = 52;
+        const NAR_HASH_BYTE: u8 = 13;
+        const TEST_DIGEST_LEN: usize = 32;
+
+        let state_dir = tempfile::tempdir().unwrap();
+        let mut handle = test_handle(state_dir.path());
+        let output_path = test_output("refresh-stale-export", DIGEST_BYTE);
+        let expected_bytes = b"fresh-castore-content";
+        let stale_bytes = b"stale-partial-content";
+        let digest = store_local_blob(&handle, expected_bytes).await;
+        let expected_size = u64::try_from(expected_bytes.len()).expect("test bytes fit u64");
+        let node = Node::File {
+            digest,
+            size: expected_size,
+            executable: false,
+        };
+        let output_abs = output_path.to_absolute_path_with_prefix(&state_dir.path().display().to_string());
+        let output_abs_path = PathBuf::from(&output_abs);
+        std::fs::create_dir_all(output_abs_path.parent().unwrap()).unwrap();
+        std::fs::write(&output_abs_path, stale_bytes).unwrap();
+        let signing_key = SigningKey::new(
+            "store-test-refresh".to_string(),
+            ed25519_dalek::SigningKey::from_bytes(&[NAR_HASH_BYTE; TEST_DIGEST_LEN]),
+        );
+        let path_info = signed_pathinfo_with_signing_key(
+            output_path.clone(),
+            node.clone(),
+            expected_size,
+            [NAR_HASH_BYTE; TEST_DIGEST_LEN],
+            &signing_key,
+        );
+
+        handle
+            .persist_and_export_signed_output(PersistOutputRequest {
+                output_name: "out",
+                output_path: &output_path,
+                path_info,
+                final_node: node,
+                provenance: None,
+                is_root: true,
+                root_source: Some(crate::GcRootSource::Build),
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(std::fs::read(&output_abs_path).unwrap(), expected_bytes);
+    }
+
+    #[tokio::test]
+    async fn persist_signed_output_registers_self_build_root() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let mut handle = test_handle(state_dir.path());
+        let output_path = test_output("rooted-self-build", 13);
+
+        handle
+            .persist_and_export_signed_output(PersistOutputRequest {
+                output_name: "out",
+                output_path: &output_path,
+                path_info: signed_pathinfo(output_path.clone()),
+                final_node: Node::Symlink {
+                    target: SymlinkTarget::try_from("target").unwrap(),
+                },
+                provenance: None,
+                is_root: true,
+                root_source: Some(crate::GcRootSource::SelfBuild),
+            })
+            .await
+            .unwrap();
+
+        drop(handle);
+        let roots = crate::roots::list_roots(state_dir.path()).unwrap();
+        assert_eq!(roots.len(), 1);
+        assert_eq!(roots[0].source, crate::GcRootSource::SelfBuild);
+    }
+
+    #[tokio::test]
+    async fn persist_signed_output_writes_artifact_attestation() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let mut handle = test_handle(state_dir.path());
+        let output_path = test_output("built-path", 10);
+
+        handle
+            .persist_and_export_signed_output(PersistOutputRequest {
+                output_name: "dev",
+                output_path: &output_path,
+                path_info: signed_pathinfo(output_path.clone()),
+                final_node: Node::Symlink {
+                    target: SymlinkTarget::try_from("target").unwrap(),
+                },
+                provenance: None,
+                is_root: false,
+                root_source: None,
+            })
+            .await
+            .unwrap();
+
+        let stored = handle.get_artifact_attestation(&output_path).await.unwrap().unwrap();
+        assert_eq!(stored.attestation.facts.output_name, "dev");
+        assert_eq!(stored.attestation.facts.logical_path, output_path.to_absolute_path());
+    }
+
+    #[tokio::test]
+    async fn persistent_output_calls_configured_publisher() {
+        // V9: admission records a publication effect plan; the shell executes
+        // it and observations carry the success or failure evidence.
+        // r[verify remote_builds.production_verified_publication]
+        use std::sync::Arc;
+
+        use crate::RecordingPublisher;
+
+        let state_dir = tempfile::tempdir().unwrap();
+        let publisher = Arc::new(RecordingPublisher::new());
+        let mut handle = test_handle(state_dir.path());
+        handle.publishers.push(publisher.clone());
+
+        let output_path = test_output("published-output", 99);
+        handle
+            .persist_and_export_signed_output(PersistOutputRequest {
+                output_name: "out",
+                output_path: &output_path,
+                path_info: signed_pathinfo(output_path.clone()),
+                final_node: Node::Symlink {
+                    target: SymlinkTarget::try_from("target").unwrap(),
+                },
+                provenance: None,
+                is_root: false,
+                root_source: None,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(publisher.call_count(), 0, "admission must not execute publishers inline");
+        let plan = handle.take_publication_effect_plan();
+        assert_eq!(plan.len(), 1, "admission must record one publication effect");
+        let observations = handle.execute_publication_plan(plan).await;
+        assert_eq!(observations.len(), 1);
+        assert!(observations[0].is_success(), "publication observation must record success");
+        assert_eq!(publisher.call_count(), 1, "publisher should be called once by execution");
+        assert!(publisher.calls()[0].contains("published-output"), "publisher should receive the output path");
+    }
+
+    #[tokio::test]
+    async fn persistent_output_does_not_fail_on_publisher_error() {
+        // V10: a publisher error is logged as a warning but does not
+        // retroactively fail the build admission.
+        // r[verify remote_builds.production_verified_publication]
+        use std::sync::Arc;
+
+        use crate::RecordingPublisher;
+
+        let state_dir = tempfile::tempdir().unwrap();
+        let publisher = Arc::new(RecordingPublisher::new());
+        publisher.fail_next();
+        let mut handle = test_handle(state_dir.path());
+        handle.publishers.push(publisher.clone());
+
+        let output_path = test_output("failed-publish-output", 100);
+        let result = handle
+            .persist_and_export_signed_output(PersistOutputRequest {
+                output_name: "out",
+                output_path: &output_path,
+                path_info: signed_pathinfo(output_path.clone()),
+                final_node: Node::Symlink {
+                    target: SymlinkTarget::try_from("target").unwrap(),
+                },
+                provenance: None,
+                is_root: false,
+                root_source: None,
+            })
+            .await;
+
+        assert!(result.is_ok(), "admission should succeed even if publisher fails");
+        let plan = handle.take_publication_effect_plan();
+        assert_eq!(plan.len(), 1, "failed publication must still be planned for shell execution");
+        let observations = handle.execute_publication_plan(plan).await;
+        assert_eq!(observations.len(), 1);
+        assert!(!observations[0].is_success(), "publisher failure must be a typed failed observation");
+    }
+
+    #[tokio::test]
+    async fn noop_publisher_is_default_and_skips_all_outputs() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let mut handle = test_handle(state_dir.path());
+        let output_path = test_output("default-no-publish", 101);
+        let result = handle
+            .persist_and_export_signed_output(PersistOutputRequest {
+                output_name: "out",
+                output_path: &output_path,
+                path_info: signed_pathinfo(output_path.clone()),
+                final_node: Node::Symlink {
+                    target: SymlinkTarget::try_from("target").unwrap(),
+                },
+                provenance: None,
+                is_root: false,
+                root_source: None,
+            })
+            .await;
+        assert!(result.is_ok(), "admission with default noop publisher should succeed");
+    }
+
+    #[test]
+    fn delta_capability_url_preserves_cache_subpath_without_trailing_slash() {
+        let cache_url = Url::parse("https://cache.example.test/binary-cache").unwrap();
+        let capability_url = delta_capability_url(&cache_url).unwrap();
+
+        assert_eq!(capability_url.as_str(), "https://cache.example.test/binary-cache/delta/capabilities");
+        let candidate_url = resolve_same_authority_endpoint_url(&cache_url, "delta/request").unwrap();
+        assert_eq!(candidate_url.as_str(), "https://cache.example.test/binary-cache/delta/request");
+    }
+
+    #[test]
+    fn delta_capability_url_preserves_cache_subpath_with_trailing_slash() {
+        let cache_url = Url::parse("https://cache.example.test/binary-cache/").unwrap();
+        let capability_url = delta_capability_url(&cache_url).unwrap();
+
+        assert_eq!(capability_url.as_str(), "https://cache.example.test/binary-cache/delta/capabilities");
+    }
+
+    #[test]
+    fn delta_capability_url_uses_root_cache_authority() {
+        let cache_url = Url::parse("https://cache.example.test/").unwrap();
+        let capability_url = delta_capability_url(&cache_url).unwrap();
+
+        assert_eq!(capability_url.as_str(), "https://cache.example.test/delta/capabilities");
+    }
+
+    #[test]
+    fn resolve_same_authority_endpoint_rejects_cross_origin_urls() {
+        let cache_url = Url::parse("https://cache.example.test/binary-cache").unwrap();
+        let err =
+            resolve_same_authority_endpoint_url(&cache_url, "https://evil.example.test/delta/request").unwrap_err();
+
+        assert!(err.contains("crosses cache authority"));
+    }
+
+    #[test]
+    fn local_protocol_v1_matches_crunch_delta_wire_contract() {
+        let local_profile = DeltaChunkProfileWire::protocol_v1();
+        let upstream_profile = chunk_profile_wire_v1();
+        assert_eq!(local_profile.min_chunk_bytes, upstream_profile.min_chunk_bytes);
+        assert_eq!(local_profile.avg_chunk_bytes, upstream_profile.avg_chunk_bytes);
+        assert_eq!(local_profile.max_chunk_bytes, upstream_profile.max_chunk_bytes);
+
+        let local_offer = DeltaNegotiationOfferWire::protocol_v1();
+        let upstream_offer = NegotiationOffer::protocol_v1();
+        assert_eq!(local_offer.supported_versions, upstream_offer.supported_versions);
+        assert_eq!(local_offer.supported_chunk_profiles.len(), upstream_offer.supported_chunk_profiles.len());
+        assert_eq!(
+            local_offer.supported_chunk_profiles[0].min_chunk_bytes,
+            upstream_offer.supported_chunk_profiles[0].min_chunk_bytes
+        );
+        assert_eq!(
+            local_offer.supported_chunk_profiles[0].avg_chunk_bytes,
+            upstream_offer.supported_chunk_profiles[0].avg_chunk_bytes
+        );
+        assert_eq!(
+            local_offer.supported_chunk_profiles[0].max_chunk_bytes,
+            upstream_offer.supported_chunk_profiles[0].max_chunk_bytes
+        );
+
+        let local_endpoints = DeltaHttpEndpointsWire {
+            capability_path: "/binary-cache/delta/capabilities".to_string(),
+            candidate_path: "/binary-cache/delta/request".to_string(),
+            has_set_path: "/binary-cache/delta/has-set".to_string(),
+            stream_path: "/binary-cache/delta/stream".to_string(),
+        };
+        let upstream_endpoints = DeltaHttpEndpoints::under_cache_authority("/binary-cache");
+        assert_eq!(local_endpoints.capability_path, upstream_endpoints.capability_path);
+        assert_eq!(local_endpoints.candidate_path, upstream_endpoints.candidate_path);
+        assert_eq!(local_endpoints.has_set_path, upstream_endpoints.has_set_path);
+        assert_eq!(local_endpoints.stream_path, upstream_endpoints.stream_path);
+    }
+
+    #[tokio::test]
+    async fn remote_substitution_probes_delta_capability_once_per_session() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let (mut handle, remote) = test_handle_with_remote(state_dir.path());
+        let capability_path = "/delta/capabilities".to_string();
+        let candidate_path = "/delta/request".to_string();
+        let has_set_path = "/delta/has-set".to_string();
+        let stream_path = "/delta/stream".to_string();
+        let reusable_bytes = b"delta-reuse";
+        let reusable_digest = store_local_blob(&handle, reusable_bytes).await;
+        let requested_logical_path = test_output("delta-probe-first", 20).to_absolute_path();
+        let candidate_body = candidate_response_body(&requested_logical_path, "out", DeltaArtifactNodeWire::Blob {
+            digest: reusable_digest,
+            size_bytes: reusable_bytes.len() as u64,
+            chunks: Vec::new(),
+        });
+        let stream_body = delta_stream_body(&[
+            DeltaTransferFrameWire::Blob {
+                digest: reusable_digest,
+                bytes: reusable_bytes.to_vec(),
+            },
+            DeltaTransferFrameWire::FinalPathInfo {
+                path_info: signed_pathinfo(test_output("delta-stream-path", 28)),
+            },
+        ]);
+        let (base_url, counts, stop, probe_handle) = spawn_delta_probe_server(DeltaProbeServerConfig {
+            capability_status_line: "HTTP/1.1 200 OK",
+            capability_body: supported_delta_capability_body(&candidate_path, &has_set_path, &stream_path),
+            capability_path,
+            candidate_status_line: "HTTP/1.1 200 OK",
+            candidate_body,
+            candidate_path,
+            has_set_status_line: "HTTP/1.1 200 OK",
+            has_set_body: "has-set-ok".to_string(),
+            has_set_path,
+            stream_status_line: "HTTP/1.1 200 OK",
+            stream_body,
+            stream_path,
+        });
+        handle.remote_cache_urls = vec![base_url.clone()];
+
+        let first_output = test_output("delta-probe-first", 20);
+        let second_output = test_output("delta-probe-second", 21);
+        remote.put(signed_pathinfo(first_output.clone())).await.unwrap();
+        remote.put(signed_pathinfo(second_output.clone())).await.unwrap();
+
+        let first = handle
+            .try_substitute_remote(*first_output.digest(), &first_output, "out", false, None)
+            .await
+            .unwrap();
+        let second = handle
+            .try_substitute_remote(*second_output.digest(), &second_output, "out", false, None)
+            .await
+            .unwrap();
+
+        assert!(first.is_some(), "first remote substitution should hit");
+        assert!(second.is_some(), "second remote substitution should hit");
+        assert!(matches!(handle.remote_delta_capability, Some(RemoteDeltaCapability::Supported(_))));
+        let counts = counts.lock().unwrap();
+        assert_eq!(counts.capability_gets, 1, "delta capability probe should be cached");
+        assert_eq!(counts.candidate_posts, 2, "candidate negotiation should run for each substitution attempt");
+        assert_eq!(counts.has_set_posts, 2, "has-set post should run for each successful candidate response");
+        assert_eq!(counts.stream_posts, 2, "stream request should run for each successful has-set post");
+        let candidate_body = counts.last_candidate_body.as_ref().expect("candidate request body");
+        assert!(candidate_body.contains("\"logical_path\":\"/nix/store/"));
+        assert!(candidate_body.contains("\"output_name\":\"out\""));
+        let has_set_body = counts.last_has_set_body.as_ref().expect("has-set body");
+        let has_set: DeltaReceiverHasSetWire = serde_json::from_str(has_set_body).unwrap();
+        assert_eq!(has_set.manifest.store_prefix, "/nix/store");
+        assert!(has_set.manifest.known_outputs.contains(&requested_logical_path));
+        let stream_body = counts.last_stream_body.as_ref().expect("stream body");
+        let stream_request: DeltaStreamRequestWire = serde_json::from_str(stream_body).unwrap();
+        assert!(stream_request.session_id.starts_with("session-out"));
+        drop(counts);
+        stop_delta_probe_server(&base_url, stop, probe_handle);
+    }
+
+    #[tokio::test]
+    async fn remote_substitution_missing_local_backing_content_is_absent_from_receiver_manifest() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let (mut handle, _remote) = test_handle_with_remote(state_dir.path());
+        let capability_path = "/delta/capabilities".to_string();
+        let candidate_path = "/delta/request".to_string();
+        let has_set_path = "/delta/has-set".to_string();
+        let stream_path = "/delta/stream".to_string();
+        let output_path = test_output("delta-missing-backing", 33);
+        let final_bytes = b"delta-full";
+        let final_digest: snix_castore::B3Digest = blake3::hash(final_bytes).as_bytes().into();
+        handle
+            .pathinfo_service
+            .put(signed_file_pathinfo(output_path.clone(), final_digest, final_bytes.len() as u64, false))
+            .await
+            .unwrap();
+        let candidate_body =
+            candidate_response_body(&output_path.to_absolute_path(), "out", DeltaArtifactNodeWire::Blob {
+                digest: final_digest,
+                size_bytes: final_bytes.len() as u64,
+                chunks: Vec::new(),
+            });
+        let stream_body = delta_stream_body(&[
+            DeltaTransferFrameWire::Blob {
+                digest: final_digest,
+                bytes: final_bytes.to_vec(),
+            },
+            DeltaTransferFrameWire::FinalPathInfo {
+                path_info: signed_file_pathinfo(output_path.clone(), final_digest, final_bytes.len() as u64, false),
+            },
+        ]);
+        let (base_url, counts, stop, probe_handle) = spawn_delta_probe_server(DeltaProbeServerConfig {
+            capability_status_line: "HTTP/1.1 200 OK",
+            capability_body: supported_delta_capability_body(&candidate_path, &has_set_path, &stream_path),
+            capability_path,
+            candidate_status_line: "HTTP/1.1 200 OK",
+            candidate_body,
+            candidate_path,
+            has_set_status_line: "HTTP/1.1 200 OK",
+            has_set_body: "has-set-ok".to_string(),
+            has_set_path,
+            stream_status_line: "HTTP/1.1 200 OK",
+            stream_body,
+            stream_path,
+        });
+        handle.remote_cache_urls = vec![base_url.clone()];
+
+        let substituted =
+            handle.try_substitute_remote(*output_path.digest(), &output_path, "out", true, None).await.unwrap();
+        assert!(substituted.is_some(), "delta substitution should still succeed");
+
+        let counts = counts.lock().unwrap();
+        let has_set_body = counts.last_has_set_body.as_ref().expect("has-set body");
+        let has_set: DeltaReceiverHasSetWire = serde_json::from_str(has_set_body).unwrap();
+        assert!(
+            has_set.manifest.known_outputs.is_empty(),
+            "missing local output backing should not advertise output reuse"
+        );
+        assert!(
+            has_set.manifest.known_blobs.is_empty(),
+            "missing local blob backing should not advertise blob reuse"
+        );
+        assert!(
+            has_set.manifest.known_chunks.is_empty(),
+            "no local chunks should be advertised when backing content is absent"
+        );
+        drop(counts);
+        stop_delta_probe_server(&base_url, stop, probe_handle);
+    }
+
+    #[tokio::test]
+    async fn remote_substitution_receiver_manifest_stays_bounded_to_requested_output() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let (mut handle, _remote) = test_handle_with_remote(state_dir.path());
+        let capability_path = "/delta/capabilities".to_string();
+        let candidate_path = "/delta/request".to_string();
+        let has_set_path = "/delta/has-set".to_string();
+        let stream_path = "/delta/stream".to_string();
+        let output_path = test_output("delta-bounded-manifest", 34);
+        let unrelated_output_path = test_output("delta-unrelated-local", 35);
+        let local_chunk = b"delta-local-";
+        let local_chunk_digest = store_local_blob(&handle, local_chunk).await;
+        let unrelated_bytes = b"unrelated-store-content";
+        let unrelated_digest = store_local_blob(&handle, unrelated_bytes).await;
+        handle
+            .pathinfo_service
+            .put(signed_file_pathinfo(
+                unrelated_output_path.clone(),
+                unrelated_digest,
+                unrelated_bytes.len() as u64,
+                false,
+            ))
+            .await
+            .unwrap();
+        let remote_chunk = b"delta-remote";
+        let remote_chunk_digest: snix_castore::B3Digest = blake3::hash(remote_chunk).as_bytes().into();
+        let final_bytes = [local_chunk.as_slice(), remote_chunk.as_slice()].concat();
+        let final_digest: snix_castore::B3Digest = blake3::hash(&final_bytes).as_bytes().into();
+        let candidate_body =
+            candidate_response_body(&output_path.to_absolute_path(), "out", DeltaArtifactNodeWire::Blob {
+                digest: final_digest,
+                size_bytes: final_bytes.len() as u64,
+                chunks: vec![
+                    DeltaChunkRefWire {
+                        digest: local_chunk_digest,
+                        size_bytes: local_chunk.len() as u64,
+                    },
+                    DeltaChunkRefWire {
+                        digest: remote_chunk_digest,
+                        size_bytes: remote_chunk.len() as u64,
+                    },
+                ],
+            });
+        let stream_body = delta_stream_body(&[
+            DeltaTransferFrameWire::Chunk {
+                parent_digest: final_digest,
+                chunk_digest: remote_chunk_digest,
+                chunk_index: 1,
+                bytes: remote_chunk.to_vec(),
+            },
+            DeltaTransferFrameWire::FinalPathInfo {
+                path_info: signed_file_pathinfo(output_path.clone(), final_digest, final_bytes.len() as u64, false),
+            },
+        ]);
+        let (base_url, counts, stop, probe_handle) = spawn_delta_probe_server(DeltaProbeServerConfig {
+            capability_status_line: "HTTP/1.1 200 OK",
+            capability_body: supported_delta_capability_body(&candidate_path, &has_set_path, &stream_path),
+            capability_path,
+            candidate_status_line: "HTTP/1.1 200 OK",
+            candidate_body,
+            candidate_path,
+            has_set_status_line: "HTTP/1.1 200 OK",
+            has_set_body: "has-set-ok".to_string(),
+            has_set_path,
+            stream_status_line: "HTTP/1.1 200 OK",
+            stream_body,
+            stream_path,
+        });
+        handle.remote_cache_urls = vec![base_url.clone()];
+
+        let substituted =
+            handle.try_substitute_remote(*output_path.digest(), &output_path, "out", true, None).await.unwrap();
+        assert!(substituted.is_some(), "delta substitution should succeed with bounded manifest");
+
+        let counts = counts.lock().unwrap();
+        let has_set_body = counts.last_has_set_body.as_ref().expect("has-set body");
+        let has_set: DeltaReceiverHasSetWire = serde_json::from_str(has_set_body).unwrap();
+        assert_eq!(has_set.manifest.known_outputs.len(), 0, "unrelated outputs must stay out of manifest");
+        assert_eq!(has_set.manifest.known_blobs.len(), 0, "unrelated blobs must stay out of manifest");
+        assert_eq!(
+            has_set.manifest.known_chunks,
+            vec![local_chunk_digest],
+            "manifest should only include chunks reachable from requested output"
+        );
+        assert!(
+            !has_set.manifest.known_outputs.contains(&unrelated_output_path.to_absolute_path()),
+            "manifest should not enumerate unrelated local outputs"
+        );
+        assert!(
+            !has_set.manifest.known_blobs.contains(&unrelated_digest),
+            "manifest should not enumerate unrelated local blobs"
+        );
+        drop(counts);
+        stop_delta_probe_server(&base_url, stop, probe_handle);
+    }
+
+    #[tokio::test]
+    async fn remote_substitution_closure_scoped_delta_accepts_requested_output_and_reports_reuse() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let (mut handle, _remote) = test_handle_with_remote(state_dir.path());
+        let capability_path = "/delta/capabilities".to_string();
+        let candidate_path = "/delta/request".to_string();
+        let has_set_path = "/delta/has-set".to_string();
+        let stream_path = "/delta/stream".to_string();
+        let requested_output_path = test_output("delta-closure-requested", 40);
+        let sibling_output_path = test_output("delta-closure-sibling", 41);
+        let shared_bytes = b"closure-local-";
+        let shared_digest = store_local_blob(&handle, shared_bytes).await;
+        handle
+            .pathinfo_service
+            .put(signed_file_pathinfo(sibling_output_path.clone(), shared_digest, shared_bytes.len() as u64, false))
+            .await
+            .unwrap();
+        let remote_bytes = b"closure-remote";
+        let remote_chunk_digest: snix_castore::B3Digest = blake3::hash(remote_bytes).as_bytes().into();
+        let final_bytes = [shared_bytes.as_slice(), remote_bytes.as_slice()].concat();
+        let final_digest: snix_castore::B3Digest = blake3::hash(&final_bytes).as_bytes().into();
+        let candidate_body = serde_json::to_string(&DeltaCandidateResponseWire {
+            session_id: "session-out".to_string(),
+            negotiated: DeltaNegotiatedProtocolWire {
+                version: 1,
+                chunk_profile: DeltaChunkProfileWire::protocol_v1(),
+            },
+            sender: DeltaClosureFixtureWire {
+                store_prefix: "/nix/store".to_string(),
+                outputs: vec![
+                    DeltaOutputFixtureWire {
+                        output_id: requested_output_path.to_absolute_path(),
+                        root: DeltaArtifactNodeWire::Blob {
+                            digest: final_digest,
+                            size_bytes: final_bytes.len() as u64,
+                            chunks: vec![
+                                DeltaChunkRefWire {
+                                    digest: shared_digest,
+                                    size_bytes: shared_bytes.len() as u64,
+                                },
+                                DeltaChunkRefWire {
+                                    digest: remote_chunk_digest,
+                                    size_bytes: remote_bytes.len() as u64,
+                                },
+                            ],
+                        },
+                    },
+                    DeltaOutputFixtureWire {
+                        output_id: sibling_output_path.to_absolute_path(),
+                        root: DeltaArtifactNodeWire::Blob {
+                            digest: shared_digest,
+                            size_bytes: shared_bytes.len() as u64,
+                            chunks: Vec::new(),
+                        },
+                    },
+                ],
+            },
+            output_name: "out".to_string(),
+        })
+        .unwrap();
+        let stream_body = delta_stream_body(&[
+            DeltaTransferFrameWire::Chunk {
+                parent_digest: final_digest,
+                chunk_digest: remote_chunk_digest,
+                chunk_index: 1,
+                bytes: remote_bytes.to_vec(),
+            },
+            DeltaTransferFrameWire::FinalPathInfo {
+                path_info: signed_file_pathinfo(
+                    requested_output_path.clone(),
+                    final_digest,
+                    final_bytes.len() as u64,
+                    false,
+                ),
+            },
+        ]);
+        let (base_url, counts, stop, probe_handle) = spawn_delta_probe_server(DeltaProbeServerConfig {
+            capability_status_line: "HTTP/1.1 200 OK",
+            capability_body: supported_delta_capability_body(&candidate_path, &has_set_path, &stream_path),
+            capability_path,
+            candidate_status_line: "HTTP/1.1 200 OK",
+            candidate_body,
+            candidate_path,
+            has_set_status_line: "HTTP/1.1 200 OK",
+            has_set_body: "has-set-ok".to_string(),
+            has_set_path,
+            stream_status_line: "HTTP/1.1 200 OK",
+            stream_body,
+            stream_path,
+        });
+        handle.remote_cache_urls = vec![base_url.clone()];
+
+        let substituted = handle
+            .try_substitute_remote(
+                *requested_output_path.digest(),
+                &requested_output_path,
+                "out",
+                true,
+                Some(GcRootSource::Bootstrap),
+            )
+            .await
+            .unwrap()
+            .expect("closure-scoped delta substitution should accept requested output");
+
+        let report = handle.take_output_substitution_report(&requested_output_path).expect("substitution report");
+        let counts = counts.lock().unwrap();
+        let has_set_body = counts.last_has_set_body.as_ref().expect("has-set body");
+        let has_set: DeltaReceiverHasSetWire = serde_json::from_str(has_set_body).unwrap();
+        assert!(
+            has_set.manifest.known_outputs.contains(&sibling_output_path.to_absolute_path()),
+            "closure-scoped manifest should include reusable sibling output"
+        );
+        drop(counts);
+
+        assert_eq!(substituted.store_path, requested_output_path);
+        assert_eq!(report.mode, OutputSubstitutionMode::Delta);
+        assert_eq!(report.transferred_bytes, remote_bytes.len() as u64);
+        assert_eq!(report.reused_bytes, shared_bytes.len() as u64);
+        assert!(report.fallback_reason.is_none());
+        let exported_path = requested_output_path.to_absolute_path_with_prefix(handle.output_dir_str());
+        assert_eq!(std::fs::read(&exported_path).unwrap(), final_bytes);
+        let roots = crate::roots::list_roots(state_dir.path()).unwrap();
+        assert_eq!(roots.len(), 1);
+        assert_eq!(roots[0].logical_path, requested_output_path.to_absolute_path());
+        assert_eq!(roots[0].source, GcRootSource::Bootstrap);
+        stop_delta_probe_server(&base_url, stop, probe_handle);
+    }
+
+    #[tokio::test]
+    async fn remote_substitution_stream_failure_falls_back_through_real_http_cache() {
+        let remote_state_dir = tempfile::tempdir().unwrap();
+        let remote_output_dir = tempfile::tempdir().unwrap();
+        let output_path = test_output("delta-real-http-fallback", 32);
+        let first_chunk = b"delta-local-";
+        let second_chunk = b"delta-remote";
+        let first_chunk_digest: snix_castore::B3Digest = blake3::hash(first_chunk).as_bytes().into();
+        let second_chunk_digest: snix_castore::B3Digest = blake3::hash(second_chunk).as_bytes().into();
+        let final_bytes = [first_chunk.as_slice(), second_chunk.as_slice()].concat();
+        let trusted_dalek = ed25519_dalek::SigningKey::from_bytes(&[21u8; 32]);
+        let trusted_verify = VerifyingKey::new("real-http-cache-1".to_string(), trusted_dalek.verifying_key());
+        let trusted_sign = SigningKey::new("real-http-cache-1".to_string(), trusted_dalek);
+
+        {
+            let mut seeded_remote = StoreHandle::open(StoreConfig {
+                backend: StoreBackend::Snix,
+                state_dir: remote_state_dir.path().to_path_buf(),
+                output_dir: remote_output_dir.path().to_path_buf(),
+                remote_cache_urls: Vec::new(),
+                fallback_mode: StoreFallbackMode::Practical,
+                store_dir: "/nix/store".to_string(),
+                base_state_dirs: Vec::new(),
+                source_admission: Some(Arc::new(crate::source_admission::TestSourceAdmission)),
+            })
+            .await
+            .unwrap();
+            let final_digest = store_local_blob(&seeded_remote, &final_bytes).await;
+            let node = Node::File {
+                digest: final_digest,
+                size: final_bytes.len() as u64,
+                executable: false,
+            };
+            let renderer = SimpleRenderer::new(seeded_remote.blob_service(), seeded_remote.directory_service());
+            let (nar_size, nar_sha256) = renderer.calculate_nar(&node).await.unwrap();
+            let path_info = signed_pathinfo_with_signing_key(
+                output_path.clone(),
+                node.clone(),
+                nar_size,
+                nar_sha256,
+                &trusted_sign,
+            );
+            seeded_remote
+                .persist_and_export_signed_output(PersistOutputRequest {
+                    output_name: "out",
+                    output_path: &output_path,
+                    path_info,
+                    final_node: node,
+                    provenance: None,
+                    is_root: false,
+                    root_source: None,
+                })
+                .await
+                .unwrap();
+        }
+
+        let persisted_remote = StoreHandle::open(StoreConfig {
+            backend: StoreBackend::Snix,
+            state_dir: remote_state_dir.path().to_path_buf(),
+            output_dir: remote_output_dir.path().to_path_buf(),
+            remote_cache_urls: Vec::new(),
+            fallback_mode: StoreFallbackMode::Practical,
+            store_dir: "/nix/store".to_string(),
+            base_state_dirs: Vec::new(),
+            source_admission: Some(Arc::new(crate::source_admission::TestSourceAdmission)),
+        })
+        .await
+        .unwrap();
+        let path_info = persisted_remote
+            .pathinfo_service
+            .get(*output_path.digest())
+            .await
+            .unwrap()
+            .expect("persisted pathinfo");
+        assert_eq!(path_info.store_path, output_path);
+        assert!(!path_info.signatures.is_empty(), "persisted pathinfo should stay signed");
+        let final_digest = match path_info.node.clone() {
+            Node::File {
+                digest,
+                size,
+                executable,
+            } => {
+                assert_eq!(size, final_bytes.len() as u64);
+                assert!(!executable, "fixture output should be non-executable");
+                digest
+            }
+            other => panic!("expected persisted file node, got {other:?}"),
+        };
+        let nar_path = "/nar/delta-real-http-fallback.nar".to_string();
+        let narinfo_path = format!("/{}.narinfo", nix_compat::nixbase32::encode(output_path.digest()));
+        let narinfo_body = narinfo_body_for(&path_info, &nar_path, &trusted_sign);
+        let nar_body = render_nar_bytes(&persisted_remote, &path_info.node).await;
+
+        let capability_path = "/delta/capabilities".to_string();
+        let candidate_path = "/delta/request".to_string();
+        let has_set_path = "/delta/has-set".to_string();
+        let stream_path = "/delta/stream".to_string();
+        let candidate_body =
+            candidate_response_body(&output_path.to_absolute_path(), "out", DeltaArtifactNodeWire::Blob {
+                digest: final_digest,
+                size_bytes: final_bytes.len() as u64,
+                chunks: vec![
+                    DeltaChunkRefWire {
+                        digest: first_chunk_digest,
+                        size_bytes: first_chunk.len() as u64,
+                    },
+                    DeltaChunkRefWire {
+                        digest: second_chunk_digest,
+                        size_bytes: second_chunk.len() as u64,
+                    },
+                ],
+            });
+        let stream_body = delta_stream_body(&[DeltaTransferFrameWire::Chunk {
+            parent_digest: final_digest,
+            chunk_digest: second_chunk_digest,
+            chunk_index: 1,
+            bytes: second_chunk.to_vec(),
+        }]);
+        let (base_url, counts, stop, probe_handle) = spawn_real_delta_cache_server(RealDeltaCacheServerConfig {
+            delta: DeltaProbeServerConfig {
+                capability_status_line: "HTTP/1.1 200 OK",
+                capability_body: supported_delta_capability_body(&candidate_path, &has_set_path, &stream_path),
+                capability_path,
+                candidate_status_line: "HTTP/1.1 200 OK",
+                candidate_body,
+                candidate_path,
+                has_set_status_line: "HTTP/1.1 200 OK",
+                has_set_body: "has-set-ok".to_string(),
+                has_set_path,
+                stream_status_line: "HTTP/1.1 200 OK",
+                stream_body,
+                stream_path,
+            },
+            narinfo_status_line: "HTTP/1.1 200 OK",
+            narinfo_path,
+            narinfo_body,
+            nar_status_line: "HTTP/1.1 200 OK",
+            nar_path,
+            nar_body,
+        });
+        let receiver_state_dir = tempfile::tempdir().unwrap();
+        let receiver_output_dir = tempfile::tempdir().unwrap();
+        let remote_cache_url = format!(
+            "{}?trusted_public_keys[0]={}",
+            base_url,
+            url::form_urlencoded::byte_serialize(trusted_verify.to_string().as_bytes()).collect::<String>()
+        );
+        let mut handle = StoreHandle::open(StoreConfig {
+            backend: StoreBackend::Snix,
+            state_dir: receiver_state_dir.path().to_path_buf(),
+            output_dir: receiver_output_dir.path().to_path_buf(),
+            remote_cache_urls: vec![remote_cache_url],
+            fallback_mode: StoreFallbackMode::Practical,
+            store_dir: "/nix/store".to_string(),
+            base_state_dirs: Vec::new(),
+            source_admission: Some(Arc::new(crate::source_admission::TestSourceAdmission)),
+        })
+        .await
+        .unwrap();
+        store_local_blob(&handle, first_chunk).await;
+
+        let substituted = handle
+            .try_substitute_remote(*output_path.digest(), &output_path, "out", true, None)
+            .await
+            .unwrap()
+            .expect("stream failure should restart through full HTTP substitution");
+
+        assert_eq!(substituted.nar_sha256, path_info.nar_sha256);
+        let report = handle.take_output_substitution_report(&output_path).expect("substitution report");
+        assert_eq!(report.mode, OutputSubstitutionMode::Full);
+        assert_eq!(report.transferred_bytes, final_bytes.len() as u64);
+        assert_eq!(report.reused_bytes, 0);
+        assert_eq!(report.fallback_reason.as_deref(), Some("stream_application_failed"));
+        {
+            let counts = counts.lock().unwrap();
+            assert_eq!(counts.delta.capability_gets, 1);
+            assert_eq!(counts.delta.candidate_posts, 1);
+            assert_eq!(counts.delta.has_set_posts, 1);
+            assert_eq!(counts.delta.stream_posts, 1);
+            assert_eq!(counts.narinfo_gets, 1);
+            assert_eq!(counts.nar_gets, 1);
+        }
+        assert!(handle.blob_service.has(&second_chunk_digest).await.unwrap());
+        let exported_path = output_path.to_absolute_path_with_prefix(handle.output_dir_str());
+        assert_eq!(std::fs::read(&exported_path).unwrap(), final_bytes);
+        stop_real_delta_cache_server(&base_url, stop, probe_handle);
+    }
+
+    #[tokio::test]
+    async fn remote_substitution_accepts_delta_chunk_stream_without_full_fetch() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let (mut handle, _remote) = test_handle_with_remote(state_dir.path());
+        let capability_path = "/delta/capabilities".to_string();
+        let candidate_path = "/delta/request".to_string();
+        let has_set_path = "/delta/has-set".to_string();
+        let stream_path = "/delta/stream".to_string();
+        let output_path = test_output("delta-accept-hit", 29);
+        let first_chunk = b"delta-local-";
+        let second_chunk = b"delta-remote";
+        let first_chunk_digest = store_local_blob(&handle, first_chunk).await;
+        let second_chunk_digest: snix_castore::B3Digest = blake3::hash(second_chunk).as_bytes().into();
+        let final_bytes = [first_chunk.as_slice(), second_chunk.as_slice()].concat();
+        let final_digest: snix_castore::B3Digest = blake3::hash(&final_bytes).as_bytes().into();
+        let candidate_body =
+            candidate_response_body(&output_path.to_absolute_path(), "out", DeltaArtifactNodeWire::Blob {
+                digest: final_digest,
+                size_bytes: final_bytes.len() as u64,
+                chunks: vec![
+                    DeltaChunkRefWire {
+                        digest: first_chunk_digest,
+                        size_bytes: first_chunk.len() as u64,
+                    },
+                    DeltaChunkRefWire {
+                        digest: second_chunk_digest,
+                        size_bytes: second_chunk.len() as u64,
+                    },
+                ],
+            });
+        let stream_body = delta_stream_body(&[
+            DeltaTransferFrameWire::Chunk {
+                parent_digest: final_digest,
+                chunk_digest: second_chunk_digest,
+                chunk_index: 1,
+                bytes: second_chunk.to_vec(),
+            },
+            DeltaTransferFrameWire::FinalPathInfo {
+                path_info: signed_file_pathinfo(output_path.clone(), final_digest, final_bytes.len() as u64, false),
+            },
+        ]);
+        let (base_url, counts, stop, probe_handle) = spawn_delta_probe_server(DeltaProbeServerConfig {
+            capability_status_line: "HTTP/1.1 200 OK",
+            capability_body: supported_delta_capability_body(&candidate_path, &has_set_path, &stream_path),
+            capability_path,
+            candidate_status_line: "HTTP/1.1 200 OK",
+            candidate_body,
+            candidate_path,
+            has_set_status_line: "HTTP/1.1 200 OK",
+            has_set_body: "has-set-ok".to_string(),
+            has_set_path,
+            stream_status_line: "HTTP/1.1 200 OK",
+            stream_body,
+            stream_path,
+        });
+        handle.remote_cache_urls = vec![base_url.clone()];
+
+        let substituted = handle
+            .try_substitute_remote(*output_path.digest(), &output_path, "out", true, None)
+            .await
+            .unwrap()
+            .expect("delta substitution should accept chunk stream without full fallback");
+
+        assert!(matches!(handle.remote_delta_capability, Some(RemoteDeltaCapability::Supported(_))));
+        assert_eq!(substituted.store_path, output_path);
+        assert_eq!(substituted.node, Node::File {
+            digest: final_digest,
+            size: final_bytes.len() as u64,
+            executable: false,
+        });
+        {
+            let counts = counts.lock().unwrap();
+            assert_eq!(counts.capability_gets, 1);
+            assert_eq!(counts.candidate_posts, 1);
+            assert_eq!(counts.has_set_posts, 1);
+            assert_eq!(counts.stream_posts, 1);
+            let stream_body = counts.last_stream_body.as_ref().expect("stream body");
+            let stream_request: DeltaStreamRequestWire = serde_json::from_str(stream_body).unwrap();
+            assert_eq!(stream_request.session_id, "session-out");
+        }
+
+        let exported_path = output_path.to_absolute_path_with_prefix(handle.output_dir_str());
+        assert_eq!(std::fs::read(&exported_path).unwrap(), final_bytes);
+        assert!(handle.blob_service.has(&final_digest).await.unwrap());
+        let local_pathinfo = handle.pathinfo_service.get(*output_path.digest()).await.unwrap().unwrap();
+        assert_eq!(local_pathinfo.node, substituted.node);
+        stop_delta_probe_server(&base_url, stop, probe_handle);
+    }
+
+    #[tokio::test]
+    async fn remote_substitution_untrusted_delta_pathinfo_falls_back_to_full_fetch() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let (mut handle, remote) = test_handle_with_remote(state_dir.path());
+        let capability_path = "/delta/capabilities".to_string();
+        let candidate_path = "/delta/request".to_string();
+        let has_set_path = "/delta/has-set".to_string();
+        let stream_path = "/delta/stream".to_string();
+        let output_path = test_output("delta-untrusted-hit", 30);
+        let first_chunk = b"delta-local-";
+        let second_chunk = b"delta-remote";
+        let first_chunk_digest = store_local_blob(&handle, first_chunk).await;
+        let second_chunk_digest: snix_castore::B3Digest = blake3::hash(second_chunk).as_bytes().into();
+        let final_bytes = [first_chunk.as_slice(), second_chunk.as_slice()].concat();
+        let final_digest: snix_castore::B3Digest = blake3::hash(&final_bytes).as_bytes().into();
+
+        let trusted_dalek = ed25519_dalek::SigningKey::from_bytes(&[7u8; 32]);
+        let trusted_verify = VerifyingKey::new("cache-trusted-1".to_string(), trusted_dalek.verifying_key());
+        let trusted_sign = SigningKey::new("cache-trusted-1".to_string(), trusted_dalek);
+        handle.remote_trusted_public_keys = vec![trusted_verify];
+
+        let untrusted_dalek = ed25519_dalek::SigningKey::from_bytes(&[11u8; 32]);
+        let untrusted_sign = SigningKey::new("cache-untrusted-1".to_string(), untrusted_dalek);
+        let delta_path_info = signed_pathinfo_with_signing_key(
+            output_path.clone(),
+            Node::File {
+                digest: final_digest,
+                size: final_bytes.len() as u64,
+                executable: false,
+            },
+            final_bytes.len() as u64,
+            [4u8; 32],
+            &untrusted_sign,
+        );
+        let fallback_path_info = signed_pathinfo_with_signing_key(
+            output_path.clone(),
+            Node::File {
+                digest: final_digest,
+                size: final_bytes.len() as u64,
+                executable: false,
+            },
+            final_bytes.len() as u64,
+            [5u8; 32],
+            &trusted_sign,
+        );
+        remote.put(fallback_path_info.clone()).await.unwrap();
+
+        let candidate_body =
+            candidate_response_body(&output_path.to_absolute_path(), "out", DeltaArtifactNodeWire::Blob {
+                digest: final_digest,
+                size_bytes: final_bytes.len() as u64,
+                chunks: vec![
+                    DeltaChunkRefWire {
+                        digest: first_chunk_digest,
+                        size_bytes: first_chunk.len() as u64,
+                    },
+                    DeltaChunkRefWire {
+                        digest: second_chunk_digest,
+                        size_bytes: second_chunk.len() as u64,
+                    },
+                ],
+            });
+        let stream_body = delta_stream_body(&[
+            DeltaTransferFrameWire::Chunk {
+                parent_digest: final_digest,
+                chunk_digest: second_chunk_digest,
+                chunk_index: 1,
+                bytes: second_chunk.to_vec(),
+            },
+            DeltaTransferFrameWire::FinalPathInfo {
+                path_info: delta_path_info.clone(),
+            },
+        ]);
+        let (base_url, counts, stop, probe_handle) = spawn_delta_probe_server(DeltaProbeServerConfig {
+            capability_status_line: "HTTP/1.1 200 OK",
+            capability_body: supported_delta_capability_body(&candidate_path, &has_set_path, &stream_path),
+            capability_path,
+            candidate_status_line: "HTTP/1.1 200 OK",
+            candidate_body,
+            candidate_path,
+            has_set_status_line: "HTTP/1.1 200 OK",
+            has_set_body: "has-set-ok".to_string(),
+            has_set_path,
+            stream_status_line: "HTTP/1.1 200 OK",
+            stream_body,
+            stream_path,
+        });
+        handle.remote_cache_urls = vec![base_url.clone()];
+
+        let substituted = handle
+            .try_substitute_remote(*output_path.digest(), &output_path, "out", false, None)
+            .await
+            .unwrap()
+            .expect("untrusted delta PathInfo should fall back to full fetch");
+
+        assert_eq!(substituted.nar_sha256, fallback_path_info.nar_sha256);
+        assert_ne!(substituted.nar_sha256, delta_path_info.nar_sha256);
+        {
+            let counts = counts.lock().unwrap();
+            assert_eq!(counts.capability_gets, 1);
+            assert_eq!(counts.candidate_posts, 1);
+            assert_eq!(counts.has_set_posts, 1);
+            assert_eq!(counts.stream_posts, 1);
+        }
+        let local_pathinfo = handle.pathinfo_service.get(*output_path.digest()).await.unwrap().unwrap();
+        assert_eq!(local_pathinfo.nar_sha256, fallback_path_info.nar_sha256);
+        assert!(handle.blob_service.has(&second_chunk_digest).await.unwrap());
+        stop_delta_probe_server(&base_url, stop, probe_handle);
+    }
+
+    #[tokio::test]
+    async fn remote_substitution_directory_delta_without_local_directory_closure_falls_back_to_full_fetch() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let (mut handle, remote) = test_handle_with_remote(state_dir.path());
+        let capability_path = "/delta/capabilities".to_string();
+        let candidate_path = "/delta/request".to_string();
+        let has_set_path = "/delta/has-set".to_string();
+        let stream_path = "/delta/stream".to_string();
+        let output_path = test_output("delta-directory-fallback", 31);
+        let child_bytes = b"dir-child-payload";
+        let child_digest: snix_castore::B3Digest = blake3::hash(child_bytes).as_bytes().into();
+        let directory_digest: snix_castore::B3Digest =
+            blake3::hash(b"directory-root-missing-locally").as_bytes().into();
+        let delta_sign =
+            SigningKey::new("cache-directory-1".to_string(), ed25519_dalek::SigningKey::from_bytes(&[12u8; 32]));
+        let delta_path_info = signed_pathinfo_with_signing_key(
+            output_path.clone(),
+            Node::Directory {
+                digest: directory_digest,
+                size: 1,
+            },
+            child_bytes.len() as u64,
+            [6u8; 32],
+            &delta_sign,
+        );
+        let fallback_path_info = signed_pathinfo_with_signing_key(
+            output_path.clone(),
+            Node::Directory {
+                digest: directory_digest,
+                size: 1,
+            },
+            child_bytes.len() as u64,
+            [7u8; 32],
+            &delta_sign,
+        );
+        remote.put(fallback_path_info.clone()).await.unwrap();
+
+        let candidate_body =
+            candidate_response_body(&output_path.to_absolute_path(), "out", DeltaArtifactNodeWire::Directory {
+                digest: directory_digest,
+                children: vec![DeltaArtifactNodeWire::Blob {
+                    digest: child_digest,
+                    size_bytes: child_bytes.len() as u64,
+                    chunks: Vec::new(),
+                }],
+            });
+        let stream_body = delta_stream_body(&[
+            DeltaTransferFrameWire::Blob {
+                digest: child_digest,
+                bytes: child_bytes.to_vec(),
+            },
+            DeltaTransferFrameWire::FinalPathInfo {
+                path_info: delta_path_info.clone(),
+            },
+        ]);
+        let (base_url, counts, stop, probe_handle) = spawn_delta_probe_server(DeltaProbeServerConfig {
+            capability_status_line: "HTTP/1.1 200 OK",
+            capability_body: supported_delta_capability_body(&candidate_path, &has_set_path, &stream_path),
+            capability_path,
+            candidate_status_line: "HTTP/1.1 200 OK",
+            candidate_body,
+            candidate_path,
+            has_set_status_line: "HTTP/1.1 200 OK",
+            has_set_body: "has-set-ok".to_string(),
+            has_set_path,
+            stream_status_line: "HTTP/1.1 200 OK",
+            stream_body,
+            stream_path,
+        });
+        handle.remote_cache_urls = vec![base_url.clone()];
+
+        let substituted = handle
+            .try_substitute_remote(*output_path.digest(), &output_path, "out", false, None)
+            .await
+            .unwrap()
+            .expect("directory delta without local closure should fall back to full fetch");
+
+        assert_eq!(substituted.nar_sha256, fallback_path_info.nar_sha256);
+        assert_ne!(substituted.nar_sha256, delta_path_info.nar_sha256);
+        assert!(handle.directory_service.get(&directory_digest).await.unwrap().is_none());
+        {
+            let counts = counts.lock().unwrap();
+            assert_eq!(counts.capability_gets, 1);
+            assert_eq!(counts.candidate_posts, 1);
+            assert_eq!(counts.has_set_posts, 1);
+            assert_eq!(counts.stream_posts, 1);
+        }
+        let local_pathinfo = handle.pathinfo_service.get(*output_path.digest()).await.unwrap().unwrap();
+        assert_eq!(local_pathinfo.nar_sha256, fallback_path_info.nar_sha256);
+        assert!(handle.blob_service.has(&child_digest).await.unwrap());
+        stop_delta_probe_server(&base_url, stop, probe_handle);
+    }
+
+    #[tokio::test]
+    async fn remote_substitution_malformed_stream_json_falls_back_to_full_fetch() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let (mut handle, remote) = test_handle_with_remote(state_dir.path());
+        let capability_path = "/delta/capabilities".to_string();
+        let candidate_path = "/delta/request".to_string();
+        let has_set_path = "/delta/has-set".to_string();
+        let stream_path = "/delta/stream".to_string();
+        let requested_logical_path = test_output("stream-malformed", 29).to_absolute_path();
+        let candidate_body = candidate_response_body(&requested_logical_path, "out", DeltaArtifactNodeWire::Blob {
+            digest: blake3::hash(b"stream-malformed").as_bytes().into(),
+            size_bytes: 16,
+            chunks: Vec::new(),
+        });
+        let (base_url, counts, stop, probe_handle) = spawn_delta_probe_server(DeltaProbeServerConfig {
+            capability_status_line: "HTTP/1.1 200 OK",
+            capability_body: supported_delta_capability_body(&candidate_path, &has_set_path, &stream_path),
+            capability_path,
+            candidate_status_line: "HTTP/1.1 200 OK",
+            candidate_body,
+            candidate_path,
+            has_set_status_line: "HTTP/1.1 200 OK",
+            has_set_body: "has-set-ok".to_string(),
+            has_set_path,
+            stream_status_line: "HTTP/1.1 200 OK",
+            stream_body: "not-json\n".to_string(),
+            stream_path,
+        });
+        handle.remote_cache_urls = vec![base_url.clone()];
+
+        let output_path = test_output("stream-malformed", 29);
+        remote.put(signed_pathinfo(output_path.clone())).await.unwrap();
+
+        let substituted =
+            handle.try_substitute_remote(*output_path.digest(), &output_path, "out", false, None).await.unwrap();
+
+        assert!(substituted.is_some(), "malformed stream JSON should still fall back to full-artifact substitution");
+        assert!(matches!(handle.remote_delta_capability, Some(RemoteDeltaCapability::Supported(_))));
+        let counts = counts.lock().unwrap();
+        assert_eq!(counts.capability_gets, 1);
+        assert_eq!(counts.candidate_posts, 1);
+        assert_eq!(counts.has_set_posts, 1);
+        assert_eq!(counts.stream_posts, 1);
+        drop(counts);
+        stop_delta_probe_server(&base_url, stop, probe_handle);
+    }
+
+    #[tokio::test]
+    async fn remote_substitution_404_delta_probe_falls_back_to_full_fetch() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let (mut handle, remote) = test_handle_with_remote(state_dir.path());
+        let capability_path = "/delta/capabilities".to_string();
+        let (base_url, counts, stop, probe_handle) = spawn_delta_probe_server(DeltaProbeServerConfig {
+            capability_status_line: "HTTP/1.1 404 Not Found",
+            capability_body: "missing".to_string(),
+            capability_path,
+            candidate_status_line: "HTTP/1.1 200 OK",
+            candidate_body: "candidate-ok".to_string(),
+            candidate_path: "/delta/request".to_string(),
+            has_set_status_line: "HTTP/1.1 200 OK",
+            has_set_body: "has-set-ok".to_string(),
+            has_set_path: "/delta/has-set".to_string(),
+            stream_status_line: "HTTP/1.1 200 OK",
+            stream_body: "stream-ok".to_string(),
+            stream_path: "/delta/stream".to_string(),
+        });
+        handle.remote_cache_urls = vec![base_url.clone()];
+
+        let output_path = test_output("legacy-cache-hit", 22);
+        remote.put(signed_pathinfo(output_path.clone())).await.unwrap();
+
+        let substituted =
+            handle.try_substitute_remote(*output_path.digest(), &output_path, "out", false, None).await.unwrap();
+
+        assert!(substituted.is_some(), "legacy cache should still hit via full-artifact substitution");
+        assert_eq!(handle.remote_delta_capability, Some(RemoteDeltaCapability::Unsupported));
+        let counts = counts.lock().unwrap();
+        assert_eq!(counts.capability_gets, 1);
+        assert_eq!(counts.candidate_posts, 0);
+        assert_eq!(counts.has_set_posts, 0);
+        assert_eq!(counts.stream_posts, 0);
+        stop_delta_probe_server(&base_url, stop, probe_handle);
+    }
+
+    #[tokio::test]
+    async fn remote_substitution_probe_error_falls_back_to_full_fetch() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let (mut handle, remote) = test_handle_with_remote(state_dir.path());
+        let capability_path = "/delta/capabilities".to_string();
+        let (base_url, counts, stop, probe_handle) = spawn_delta_probe_server(DeltaProbeServerConfig {
+            capability_status_line: "HTTP/1.1 500 Internal Server Error",
+            capability_body: "broken".to_string(),
+            capability_path,
+            candidate_status_line: "HTTP/1.1 200 OK",
+            candidate_body: "candidate-ok".to_string(),
+            candidate_path: "/delta/request".to_string(),
+            has_set_status_line: "HTTP/1.1 200 OK",
+            has_set_body: "has-set-ok".to_string(),
+            has_set_path: "/delta/has-set".to_string(),
+            stream_status_line: "HTTP/1.1 200 OK",
+            stream_body: "stream-ok".to_string(),
+            stream_path: "/delta/stream".to_string(),
+        });
+        handle.remote_cache_urls = vec![base_url.clone()];
+
+        let output_path = test_output("probe-error-hit", 23);
+        remote.put(signed_pathinfo(output_path.clone())).await.unwrap();
+
+        let substituted =
+            handle.try_substitute_remote(*output_path.digest(), &output_path, "out", false, None).await.unwrap();
+
+        assert!(substituted.is_some(), "probe errors should still fall back to full-artifact substitution");
+        assert_eq!(handle.remote_delta_capability, Some(RemoteDeltaCapability::Unsupported));
+        let counts = counts.lock().unwrap();
+        assert_eq!(counts.capability_gets, 1);
+        assert_eq!(counts.candidate_posts, 0);
+        assert_eq!(counts.has_set_posts, 0);
+        assert_eq!(counts.stream_posts, 0);
+        stop_delta_probe_server(&base_url, stop, probe_handle);
+    }
+
+    #[tokio::test]
+    async fn remote_substitution_malformed_delta_capability_json_falls_back_to_full_fetch() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let (mut handle, remote) = test_handle_with_remote(state_dir.path());
+        let capability_path = "/delta/capabilities".to_string();
+        let (base_url, counts, stop, probe_handle) = spawn_delta_probe_server(DeltaProbeServerConfig {
+            capability_status_line: "HTTP/1.1 200 OK",
+            capability_body: "not-json".to_string(),
+            capability_path,
+            candidate_status_line: "HTTP/1.1 200 OK",
+            candidate_body: "candidate-ok".to_string(),
+            candidate_path: "/delta/request".to_string(),
+            has_set_status_line: "HTTP/1.1 200 OK",
+            has_set_body: "has-set-ok".to_string(),
+            has_set_path: "/delta/has-set".to_string(),
+            stream_status_line: "HTTP/1.1 200 OK",
+            stream_body: "stream-ok".to_string(),
+            stream_path: "/delta/stream".to_string(),
+        });
+        handle.remote_cache_urls = vec![base_url.clone()];
+
+        let output_path = test_output("probe-invalid-json-hit", 26);
+        remote.put(signed_pathinfo(output_path.clone())).await.unwrap();
+
+        let substituted =
+            handle.try_substitute_remote(*output_path.digest(), &output_path, "out", false, None).await.unwrap();
+
+        assert!(substituted.is_some(), "malformed probe JSON should still fall back to full-artifact substitution");
+        assert_eq!(handle.remote_delta_capability, Some(RemoteDeltaCapability::Unsupported));
+        let counts = counts.lock().unwrap();
+        assert_eq!(counts.capability_gets, 1);
+        assert_eq!(counts.candidate_posts, 0);
+        assert_eq!(counts.has_set_posts, 0);
+        assert_eq!(counts.stream_posts, 0);
+        stop_delta_probe_server(&base_url, stop, probe_handle);
+    }
+
+    #[tokio::test]
+    async fn remote_substitution_without_cache_url_skips_probe_and_full_fetches() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let (mut handle, remote) = test_handle_with_remote(state_dir.path());
+        let output_path = test_output("no-url-hit", 24);
+        remote.put(signed_pathinfo(output_path.clone())).await.unwrap();
+
+        let substituted =
+            handle.try_substitute_remote(*output_path.digest(), &output_path, "out", false, None).await.unwrap();
+
+        assert!(substituted.is_some(), "missing probe URL should still allow full-artifact substitution");
+        assert_eq!(handle.remote_delta_capability, Some(RemoteDeltaCapability::Unsupported));
+    }
+
+    #[tokio::test]
+    async fn remote_substitution_cross_authority_capability_falls_back_to_full_fetch() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let (mut handle, remote) = test_handle_with_remote(state_dir.path());
+        let capability_path = "/delta/capabilities".to_string();
+        let candidate_path = "https://evil.example.test/delta/request".to_string();
+        let (base_url, counts, stop, probe_handle) = spawn_delta_probe_server(DeltaProbeServerConfig {
+            capability_status_line: "HTTP/1.1 200 OK",
+            capability_body: supported_delta_capability_body(&candidate_path, "/delta/has-set", "/delta/stream"),
+            capability_path,
+            candidate_status_line: "HTTP/1.1 200 OK",
+            candidate_body: "candidate-ok".to_string(),
+            candidate_path: "/delta/request".to_string(),
+            has_set_status_line: "HTTP/1.1 200 OK",
+            has_set_body: "has-set-ok".to_string(),
+            has_set_path: "/delta/has-set".to_string(),
+            stream_status_line: "HTTP/1.1 200 OK",
+            stream_body: "stream-ok".to_string(),
+            stream_path: "/delta/stream".to_string(),
+        });
+        handle.remote_cache_urls = vec![base_url.clone()];
+
+        let output_path = test_output("cross-authority-hit", 25);
+        remote.put(signed_pathinfo(output_path.clone())).await.unwrap();
+
+        let substituted =
+            handle.try_substitute_remote(*output_path.digest(), &output_path, "out", false, None).await.unwrap();
+
+        assert!(
+            substituted.is_some(),
+            "cross-authority delta ads should still fall back to full-artifact substitution"
+        );
+        assert_eq!(handle.remote_delta_capability, Some(RemoteDeltaCapability::Unsupported));
+        let counts = counts.lock().unwrap();
+        assert_eq!(counts.capability_gets, 1);
+        assert_eq!(counts.candidate_posts, 0);
+        assert_eq!(counts.has_set_posts, 0);
+        assert_eq!(counts.stream_posts, 0);
+        drop(counts);
+        stop_delta_probe_server(&base_url, stop, probe_handle);
+    }
+
+    #[tokio::test]
+    async fn remote_substitution_registers_bootstrap_root() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let (mut handle, remote) = test_handle_with_remote(state_dir.path());
+        let output_path = test_output("bootstrap-root", 14);
+        let path_info = signed_pathinfo(output_path.clone());
+
+        remote.put(path_info).await.unwrap();
+
+        let substituted = handle
+            .try_substitute_remote(
+                *output_path.digest(),
+                &output_path,
+                "out",
+                true,
+                Some(crate::GcRootSource::Bootstrap),
+            )
+            .await
+            .unwrap();
+        assert!(substituted.is_some(), "remote substitution should hit");
+
+        drop(handle);
+        let roots = crate::roots::list_roots(state_dir.path()).unwrap();
+        assert_eq!(roots.len(), 1);
+        assert_eq!(roots[0].source, crate::GcRootSource::Bootstrap);
+    }
+
+    #[tokio::test]
+    async fn remote_substitution_writes_artifact_attestation() {
+        let state_dir = tempfile::tempdir().unwrap();
+        let (mut handle, remote) = test_handle_with_remote(state_dir.path());
+        let output_path = test_output("substituted-path", 15);
+        let path_info = signed_pathinfo(output_path.clone());
+
+        remote.put(path_info).await.unwrap();
+
+        let substituted =
+            handle.try_substitute_remote(*output_path.digest(), &output_path, "out", true, None).await.unwrap();
+        assert!(substituted.is_some(), "remote substitution should hit");
+
+        let exported = PathBuf::from(output_path.to_absolute_path_with_prefix(state_dir.path().to_str().unwrap()));
+        assert!(exported.exists() || exported.is_symlink(), "remote-substituted root should be exported");
+
+        let stored = handle.get_artifact_attestation(&output_path).await.unwrap().unwrap();
+        assert_eq!(stored.attestation.facts.output_name, "out");
+        assert_eq!(stored.attestation.facts.logical_path, output_path.to_absolute_path());
+    }
+
+    #[tokio::test]
+    async fn delta_and_full_substitution_record_same_attestation_and_root_metadata() {
+        let output_path = test_output("delta-attestation-parity", 37);
+        let path_info = signed_pathinfo(output_path.clone());
+        let capability_path = "/delta/capabilities".to_string();
+        let candidate_path = "/delta/request".to_string();
+        let has_set_path = "/delta/has-set".to_string();
+        let stream_path = "/delta/stream".to_string();
+        let candidate_body =
+            candidate_response_body(&output_path.to_absolute_path(), "out", DeltaArtifactNodeWire::Symlink {
+                target: "target".to_string(),
+            });
+        let stream_body = delta_stream_body(&[DeltaTransferFrameWire::FinalPathInfo {
+            path_info: path_info.clone(),
+        }]);
+
+        let delta_state_dir = tempfile::tempdir().unwrap();
+        let (mut delta_handle, _delta_remote) = test_handle_with_remote(delta_state_dir.path());
+        let (base_url, _counts, stop, probe_handle) = spawn_delta_probe_server(DeltaProbeServerConfig {
+            capability_status_line: "HTTP/1.1 200 OK",
+            capability_body: supported_delta_capability_body(&candidate_path, &has_set_path, &stream_path),
+            capability_path,
+            candidate_status_line: "HTTP/1.1 200 OK",
+            candidate_body,
+            candidate_path,
+            has_set_status_line: "HTTP/1.1 200 OK",
+            has_set_body: "has-set-ok".to_string(),
+            has_set_path,
+            stream_status_line: "HTTP/1.1 200 OK",
+            stream_body,
+            stream_path,
+        });
+        delta_handle.remote_cache_urls = vec![base_url.clone()];
+
+        let delta_substituted = delta_handle
+            .try_substitute_remote(*output_path.digest(), &output_path, "out", true, Some(GcRootSource::Bootstrap))
+            .await
+            .unwrap()
+            .expect("delta substitution should hit");
+        let delta_attestation = delta_handle.get_artifact_attestation(&output_path).await.unwrap().unwrap();
+        let delta_stored_pathinfo = delta_handle
+            .pathinfo_service
+            .get(*output_path.digest())
+            .await
+            .unwrap()
+            .expect("delta pathinfo should persist");
+        let delta_report = delta_handle.take_output_substitution_report(&output_path).expect("delta report");
+        let delta_roots = crate::roots::list_roots(delta_state_dir.path()).unwrap();
+        let delta_exported = output_path.to_absolute_path_with_prefix(delta_handle.output_dir_str());
+        assert_eq!(delta_report.mode, OutputSubstitutionMode::Delta);
+        assert_eq!(delta_substituted, path_info);
+        assert_eq!(delta_stored_pathinfo, path_info);
+        assert_eq!(delta_roots.len(), 1);
+        assert_eq!(delta_roots[0].logical_path, output_path.to_absolute_path());
+        assert_eq!(delta_roots[0].source, GcRootSource::Bootstrap);
+        assert_eq!(std::fs::read_link(&delta_exported).unwrap(), PathBuf::from("target"));
+        stop_delta_probe_server(&base_url, stop, probe_handle);
+
+        let full_state_dir = tempfile::tempdir().unwrap();
+        let (mut full_handle, full_remote) = test_handle_with_remote(full_state_dir.path());
+        full_remote.put(path_info.clone()).await.unwrap();
+
+        let full_substituted = full_handle
+            .try_substitute_remote(*output_path.digest(), &output_path, "out", true, Some(GcRootSource::Bootstrap))
+            .await
+            .unwrap()
+            .expect("full substitution should hit");
+        let full_attestation = full_handle.get_artifact_attestation(&output_path).await.unwrap().unwrap();
+        let full_stored_pathinfo = full_handle
+            .pathinfo_service
+            .get(*output_path.digest())
+            .await
+            .unwrap()
+            .expect("full pathinfo should persist");
+        let full_report = full_handle.take_output_substitution_report(&output_path).expect("full report");
+        let full_roots = crate::roots::list_roots(full_state_dir.path()).unwrap();
+        let full_exported = output_path.to_absolute_path_with_prefix(full_handle.output_dir_str());
+        assert_eq!(full_report.mode, OutputSubstitutionMode::Full);
+        assert_eq!(full_substituted, path_info);
+        assert_eq!(full_stored_pathinfo, path_info);
+        assert_eq!(full_roots.len(), 1);
+        assert_eq!(full_roots[0].logical_path, output_path.to_absolute_path());
+        assert_eq!(full_roots[0].source, GcRootSource::Bootstrap);
+        assert_eq!(std::fs::read_link(&full_exported).unwrap(), PathBuf::from("target"));
+
+        assert_eq!(
+            delta_attestation, full_attestation,
+            "accepted delta and full substitutions should persist identical artifact attestations"
+        );
+        assert_eq!(
+            delta_stored_pathinfo, full_stored_pathinfo,
+            "accepted delta and full substitutions should persist identical PathInfo"
+        );
+        assert_eq!(
+            delta_handle.output_nodes.get(&output_path),
+            full_handle.output_nodes.get(&output_path),
+            "accepted delta and full substitutions should populate the same cached output node"
+        );
+        assert_eq!(
+            delta_handle.built_outputs.get(&delta_exported),
+            full_handle.built_outputs.get(&full_exported),
+            "accepted delta and full substitutions should populate the same built-output metadata"
+        );
+    }
+
+    #[tokio::test]
+    async fn mismatched_remote_pathinfo_causes_no_substitution_mutations() {
+        // r[verify cache_substitution.requested_path_identity]
+        const REQUESTED_DIGEST_BYTE: u8 = 40;
+        const OBSERVED_DIGEST_BYTE: u8 = 41;
+
+        let state_dir = tempfile::tempdir().unwrap();
+        let requested_path = test_output("requested-output", REQUESTED_DIGEST_BYTE);
+        let observed_path = test_output("different-output", OBSERVED_DIGEST_BYTE);
+        let remote_path_info = signed_pathinfo(observed_path.clone());
+        let local = Arc::new(MutationCountingPathInfoService::new(None));
+        let remote = Arc::new(MutationCountingPathInfoService::new(Some(remote_path_info)));
+        let blob_service = Arc::new(MemoryBlobService::default()) as Arc<dyn BlobService>;
+        let directory_service = Arc::new(
+            RedbDirectoryService::new_temporary(
+                "mismatched-remote-pathinfo".to_string(),
+                RedbDirectoryServiceConfig::default(),
+            )
+            .unwrap(),
+        ) as Arc<dyn DirectoryService>;
+        let mut handle = StoreHandle::from_services_with_store_dir(
+            StoreBackend::Snix,
+            StoreHandleServices {
+                blob_service,
+                directory_service,
+                pathinfo_service: local.clone(),
+                remote_pathinfo: Some(remote.clone()),
+                state_dir: state_dir.path().to_path_buf(),
+                output_dir_str: state_dir.path().display().to_string(),
+                publishers: Vec::new(),
+            },
+            "/nix/store".to_string(),
+        )
+        .unwrap();
+        let expected_request_error =
+            format!("cache: remote-substitution-request-digest-mismatch: output {requested_path}");
+        let expected_error = format!(
+            "cache: remote-pathinfo-request-identity-mismatch: requested {requested_path}, observed {observed_path}"
+        );
+        let exported_path = requested_path.to_absolute_path_with_prefix(&handle.output_dir_str);
+
+        let request_error = handle
+            .try_substitute_remote(
+                [OBSERVED_DIGEST_BYTE; DIGEST_SIZE],
+                &requested_path,
+                "out",
+                true,
+                Some(GcRootSource::Build),
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(request_error.to_string(), expected_request_error);
+        assert_eq!(remote.get_count(), 0);
+
+        let error = handle
+            .try_substitute_remote(*requested_path.digest(), &requested_path, "out", true, Some(GcRootSource::Build))
+            .await
+            .unwrap_err();
+
+        assert_eq!(error.to_string(), expected_error);
+        assert_eq!(remote.get_count(), 1);
+        assert_eq!(remote.put_count(), 0);
+        assert_eq!(local.put_count(), 0);
+        assert!(handle.output_nodes.is_empty());
+        assert!(handle.built_outputs.is_empty());
+        assert!(handle.output_substitution_reports.is_empty());
+        assert!(handle.advisory_metadata_cache.is_empty());
+        assert!(!Path::new(&exported_path).exists());
+        assert!(roots::list_roots(state_dir.path()).unwrap().is_empty());
+        assert!(!crate::artifact_attestation_file_path(state_dir.path(), "/nix/store", &observed_path).exists());
+        assert!(!state_dir.path().join("advisory-meta-cache.json").exists());
+    }
+
+    #[tokio::test]
+    async fn try_substitute_remote_fallback_to_subsequent_url_when_primary_missing() {
+        // V1: when the primary remote cache has no PathInfo and a fallback
+        // URL is configured, the fallback is tried in configured priority order.
+        // r[verify cache_substitution.ordered_substituters]
+        let state_dir = tempfile::tempdir().unwrap();
+        let output_path = test_output("fallback-output", 42);
+        let path_info = signed_pathinfo(output_path.clone());
+
+        // Phase 1: primary has the PathInfo → returns Some
+        {
+            let (mut handle, primary_svc) = test_handle_with_remote(state_dir.path());
+            handle.remote_pathinfo = Some(primary_svc.clone());
+            primary_svc.put(path_info.clone()).await.unwrap();
+            let result =
+                handle.try_substitute_remote(*output_path.digest(), &output_path, "out", false, None).await.unwrap();
+            assert!(result.is_some(), "populated primary cache should return Some");
+        }
+
+        // Phase 2: primary is empty → returns None
+        {
+            let (mut handle, _primary_svc) = test_handle_with_remote(state_dir.path());
+            handle.remote_pathinfo =
+                Some(Arc::new(LruPathInfoService::with_capacity("empty".to_string(), NonZeroUsize::new(1).unwrap()))
+                    as Arc<dyn PathInfoService>);
+            let result =
+                handle.try_substitute_remote(*output_path.digest(), &output_path, "out", false, None).await.unwrap();
+            assert!(result.is_none(), "empty primary cache should return None");
+        }
+
+        // Phase 3: no remote cache at all → graceful None
+        {
+            let (mut handle, _) = test_handle_with_remote(state_dir.path());
+            handle.remote_pathinfo = None;
+            handle.remote_cache_urls.clear();
+            let result =
+                handle.try_substitute_remote(*output_path.digest(), &output_path, "out", false, None).await.unwrap();
+            assert!(result.is_none(), "no remote cache at all should return None");
+        }
+    }
+
+    #[tokio::test]
+    async fn try_substitute_remote_records_metadata_cache_on_hit() {
+        // V2: after a successful substitution, the advisory metadata cache
+        // records a Narinfo entry. A fresh reload of the cache sees it.
+        // r[verify cache_substitution.remote_metadata_cache]
+        // r[verify cache_substitution.structured_admission_diagnostics]
+        let state_dir = tempfile::tempdir().unwrap();
+        let (mut handle, primary_svc) = test_handle_with_remote(state_dir.path());
+        let output_path = test_output("meta-cached-output", 77);
+        let path_info = signed_pathinfo(output_path.clone());
+
+        primary_svc.put(path_info).await.unwrap();
+
+        // First substitution: metadata cache should be populated with Narinfo
+        {
+            let result =
+                handle.try_substitute_remote(*output_path.digest(), &output_path, "out", false, None).await.unwrap();
+            assert!(result.is_some(), "first substitution should succeed");
+        }
+
+        // The metadata cache should now have a Narinfo entry for this output.
+        let output_digest_hex = output_path.digest().iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+        let meta_key = metadata_cache_key(MetadataCacheKeyInput {
+            cache_identity: "",
+            trust_policy_digest: "",
+            store_prefix: &handle.store_dir,
+            output_digest: &output_digest_hex,
+            metadata_class: MetadataClass::Narinfo,
+        });
+        let cached = handle.advisory_metadata_cache.get(&meta_key);
+        assert!(cached.is_some(), "Narinfo entry should be in metadata cache after substitution");
+
+        // Verify the entry detail is set.
+        assert_eq!(cached.unwrap().detail, "substituted");
+    }
+
+    #[tokio::test]
+    async fn try_substitute_remote_negative_miss_prevents_repeat_probe() {
+        // V2: a negative miss (remote has no PathInfo) is cached as
+        // NegativeMiss. A second call skips the remote probe.
+        // r[verify cache_substitution.remote_metadata_cache]
+        let state_dir = tempfile::tempdir().unwrap();
+        let (mut handle, _primary_svc) = test_handle_with_remote(state_dir.path());
+        let output_path = test_output("negative-miss", 88);
+
+        // Set remote_pathinfo to a fresh empty service.
+        handle.remote_pathinfo =
+            Some(Arc::new(LruPathInfoService::with_capacity("empty".to_string(), NonZeroUsize::new(1).unwrap()))
+                as Arc<dyn PathInfoService>);
+
+        // First call: remote has no PathInfo → records NegativeMiss
+        {
+            let result =
+                handle.try_substitute_remote(*output_path.digest(), &output_path, "out", false, None).await.unwrap();
+            assert!(result.is_none(), "empty remote should return None");
+        }
+
+        // Metadata cache should have a NegativeMiss entry.
+        let output_digest_hex = output_path.digest().iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+        let miss_key = metadata_cache_key(MetadataCacheKeyInput {
+            cache_identity: "",
+            trust_policy_digest: "",
+            store_prefix: &handle.store_dir,
+            output_digest: &output_digest_hex,
+            metadata_class: MetadataClass::NegativeMiss,
+        });
+        let cached = handle.advisory_metadata_cache.get(&miss_key);
+        assert!(cached.is_some(), "NegativeMiss entry should exist after failed probe");
+    }
+
+    // ── Overlay composition tests ───────────────────────────────────────
+
+    fn set_test_tree_read_only(root: &Path, is_read_only: bool) {
+        let mut directories = vec![root.to_path_buf()];
+        let mut visited_directories = Vec::new();
+        while let Some(directory) = directories.pop() {
+            visited_directories.push(directory.clone());
+            for entry in std::fs::read_dir(&directory).unwrap() {
+                let path = entry.unwrap().path();
+                let metadata = std::fs::symlink_metadata(&path).unwrap();
+                if metadata.file_type().is_symlink() {
+                    continue;
+                }
+                if metadata.is_dir() {
+                    directories.push(path);
+                    continue;
+                }
+                let mut permissions = metadata.permissions();
+                permissions.set_readonly(is_read_only);
+                std::fs::set_permissions(path, permissions).unwrap();
+            }
+        }
+        for directory in visited_directories.into_iter().rev() {
+            let mut permissions = std::fs::metadata(&directory).unwrap().permissions();
+            permissions.set_readonly(is_read_only);
+            std::fs::set_permissions(directory, permissions).unwrap();
+        }
+    }
+
+    /// Create a real filesystem-based base store populated with a blob,
+    /// directory, and a signed PathInfo for a symlink output.
+    async fn create_base_store(base_dir: &Path, store_dir: &str, output_path: &StorePath<String>) -> PathInfo {
+        use snix_castore::directoryservice::RedbDirectoryServiceConfig;
+        use snix_store::pathinfoservice::RedbPathInfoServiceConfig;
+
+        // Create required directories and bind the logical prefix before service creation.
+        set_test_tree_read_only(base_dir, false);
+        std::fs::create_dir_all(base_dir.join("blobs")).unwrap();
+        crate::overlay::ensure_store_identity(base_dir, store_dir, StoreBackend::Snix).unwrap();
+        std::fs::write(base_dir.join("overlay-trusted-public-keys"), format!("{}\n", test_verifying_key())).unwrap();
+
+        // Open and close directory service to create the DB file.
+        let _dir_svc = RedbDirectoryService::new("base-test".to_string(), RedbDirectoryServiceConfig {
+            path: Some(base_dir.join("directories.redb")),
+            read_only: false,
+            cache_size: None,
+        })
+        .await
+        .unwrap();
+
+        // Open pathinfo service.
+        let pathinfo_svc = RedbPathInfoService::new("base-test".to_string(), RedbPathInfoServiceConfig {
+            path: Some(base_dir.join("pathinfo.redb")),
+            read_only: false,
+            cache_size: None,
+        })
+        .await
+        .unwrap();
+
+        // Create a signed PathInfo for a symlink output.
+        let path_info = signed_pathinfo(output_path.clone());
+        pathinfo_svc.put(path_info.clone()).await.unwrap();
+        persist_artifact_attestation(base_dir, store_dir, &path_info, "out", None).await.unwrap();
+        drop(pathinfo_svc);
+        drop(_dir_svc);
+        set_test_tree_read_only(base_dir, true);
+
+        path_info
+    }
+
+    async fn create_base_store_with_host_tree(
+        base_dir: &Path,
+        store_dir: &str,
+        output_path: &StorePath<String>,
+        source_is_directory: bool,
+    ) -> PathInfo {
+        const BASE_FILE_CONTENT: &[u8] = b"base-file-content";
+        set_test_tree_read_only(base_dir, false);
+        std::fs::create_dir_all(base_dir.join("blobs")).unwrap();
+        crate::overlay::ensure_store_identity(base_dir, store_dir, StoreBackend::Snix).unwrap();
+        std::fs::write(base_dir.join("overlay-trusted-public-keys"), format!("{}\n", test_verifying_key())).unwrap();
+        let source = base_dir.join("fixture-source");
+        if source_is_directory {
+            std::fs::create_dir_all(&source).unwrap();
+            std::fs::write(source.join("member"), BASE_FILE_CONTENT).unwrap();
+        } else {
+            std::fs::write(&source, BASE_FILE_CONTENT).unwrap();
+        }
+
+        let blob_service: Arc<dyn BlobService> =
+            Arc::new(ObjectStoreBlobService::new_local(base_dir.join("blobs")).unwrap());
+        let directory_service: Arc<dyn DirectoryService> = Arc::new(
+            RedbDirectoryService::new("base-tree".to_string(), RedbDirectoryServiceConfig {
+                path: Some(base_dir.join("directories.redb")),
+                read_only: false,
+                cache_size: None,
+            })
+            .await
+            .unwrap(),
+        );
+        let node = ingest_path::<_, _, _, &[u8]>(blob_service.clone(), directory_service.clone(), &source, None)
+            .await
+            .unwrap();
+        let renderer = SimpleRenderer::new(blob_service.clone(), directory_service.clone());
+        let (nar_size, nar_sha256) = renderer.calculate_nar(&node).await.unwrap();
+        let mut path_info = PathInfo {
+            store_path: output_path.clone(),
+            node,
+            references: Vec::new(),
+            nar_size,
+            nar_sha256,
+            signatures: Vec::new(),
+            deriver: None,
+            ca: None,
+        };
+        sign_test_pathinfo(&mut path_info);
+        let pathinfo_service = RedbPathInfoService::new("base-tree".to_string(), RedbPathInfoServiceConfig {
+            path: Some(base_dir.join("pathinfo.redb")),
+            read_only: false,
+            cache_size: None,
+        })
+        .await
+        .unwrap();
+        pathinfo_service.put(path_info.clone()).await.unwrap();
+        persist_artifact_attestation(base_dir, store_dir, &path_info, "out", None).await.unwrap();
+        drop(pathinfo_service);
+        drop(renderer);
+        drop(directory_service);
+        drop(blob_service);
+        set_test_tree_read_only(base_dir, true);
+        path_info
+    }
+
+    async fn create_base_store_with_references(
+        base_dir: &Path,
+        store_dir: &str,
+        output_path: &StorePath<String>,
+        references: Vec<StorePath<String>>,
+    ) -> PathInfo {
+        use snix_store::pathinfoservice::RedbPathInfoServiceConfig;
+
+        let mut path_info = create_base_store(base_dir, store_dir, output_path).await;
+        set_test_tree_read_only(base_dir, false);
+        path_info.references = references;
+        sign_test_pathinfo(&mut path_info);
+        let pathinfo_svc = RedbPathInfoService::new("base-test-update".to_string(), RedbPathInfoServiceConfig {
+            path: Some(base_dir.join("pathinfo.redb")),
+            read_only: false,
+            cache_size: None,
+        })
+        .await
+        .unwrap();
+        pathinfo_svc.put(path_info.clone()).await.unwrap();
+        drop(pathinfo_svc);
+        set_test_tree_read_only(base_dir, true);
+        path_info
+    }
+
+    /// Create a real filesystem-based overlay store over a base store,
+    /// both sharing the same store_dir prefix.
+    async fn create_overlay_handle(overlay_dir: &Path, base_dir: &Path, store_dir: &str) -> StoreHandle {
+        std::fs::write(overlay_dir.join("overlay-trusted-public-keys"), format!("{}\n", test_verifying_key())).unwrap();
+        StoreHandle::open_overlay(StoreConfig {
+            backend: StoreBackend::Snix,
+            state_dir: overlay_dir.to_path_buf(),
+            output_dir: overlay_dir.to_path_buf(),
+            remote_cache_urls: Vec::new(),
+            fallback_mode: StoreFallbackMode::Practical,
+            store_dir: store_dir.to_string(),
+            base_state_dirs: vec![base_dir.to_path_buf()],
+            source_admission: Some(Arc::new(crate::source_admission::TestSourceAdmission)),
+        })
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn overlay_custom_prefix_get_and_list_share_reference_signature_authority() {
+        use futures::TryStreamExt as _;
+
+        const STORE_DIR: &str = "/mantle/store";
+        for signed_prefix in [STORE_DIR, "/nix/store"] {
+            let base_dir = tempfile::tempdir().unwrap();
+            let overlay_dir = tempfile::tempdir().unwrap();
+            let base = StoreHandle::open(StoreConfig::new(
+                StoreBackend::Snix,
+                base_dir.path().to_path_buf(),
+                base_dir.path().join("export"),
+                STORE_DIR.to_string(),
+            ))
+            .await
+            .unwrap();
+            std::fs::write(base_dir.path().join("overlay-trusted-public-keys"), format!("{}\n", test_verifying_key()))
+                .unwrap();
+            let referenced = test_output("prefix-reference", 61);
+            let primary = test_output("prefix-primary", 62);
+            let mut entries = [signed_pathinfo(referenced.clone()), signed_pathinfo(primary.clone())];
+            entries[1].references.push(referenced);
+            for path_info in &mut entries {
+                let fingerprint = compute_pathinfo_fingerprint(path_info, signed_prefix);
+                path_info.signatures = vec![test_signing_key().sign(fingerprint.as_bytes()).to_owned()];
+                base.pathinfo_service.put(path_info.clone()).await.unwrap();
+            }
+            drop(base);
+            set_test_tree_read_only(base_dir.path(), true);
+            let handle = create_overlay_handle(overlay_dir.path(), base_dir.path(), STORE_DIR).await;
+            let trusted = signed_prefix == STORE_DIR;
+            for expected in &entries {
+                let raw = handle.pathinfo_service.get(*expected.store_path.digest()).await;
+                let layered = handle.path_info_with_layer(&expected.store_path).await;
+                if trusted {
+                    assert_eq!(raw.unwrap(), Some(expected.clone()));
+                    let layered = layered.unwrap().unwrap();
+                    assert_eq!(layered.value, *expected);
+                    assert_eq!(layered.layer, crate::layer::StoreLayer::Base { index: 1 });
+                } else {
+                    assert!(raw.unwrap_err().to_string().contains("overlay-layer-trust-failure"));
+                    assert!(layered.unwrap_err().to_string().contains("overlay-layer-trust-failure"));
+                }
+            }
+            let listed = handle.list_pathinfos_with_layer().await;
+            if trusted {
+                let listed = listed
+                    .unwrap()
+                    .into_iter()
+                    .map(|entry| (entry.value.store_path.clone(), entry.value))
+                    .collect::<BTreeMap<_, _>>();
+                let expected =
+                    entries.iter().map(|entry| (entry.store_path.clone(), entry.clone())).collect::<BTreeMap<_, _>>();
+                assert_eq!(listed, expected);
+            } else {
+                assert!(listed.unwrap_err().to_string().contains("overlay-layer-trust-failure"));
+                let raw_list = handle.pathinfo_service.list().try_collect::<Vec<_>>().await.unwrap();
+                assert!(
+                    raw_list.iter().all(|listed| !entries.contains(listed)),
+                    "raw listing must not expose base records rejected by get"
+                );
+            }
+            let parts = handle.into_pipeline_store_parts();
+            for expected in &entries {
+                let found = parts.output_lookup.find(&expected.store_path).await;
+                if trusted {
+                    assert_eq!(found.unwrap(), Some(expected.clone()));
+                } else {
+                    assert!(found.unwrap_err().to_string().contains("overlay-layer-trust-failure"));
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn overlay_read_through_base_hit_does_not_mutate_overlay() {
+        // r[verify store_transports.overlay_composition.scenario.read-through-no-backfill]
+        // GIVEN an overlay composed over a base that has PathInfo the overlay lacks
+        // WHEN reading that path through the composed handle
+        // THEN the base value is returned AND the overlay is NOT mutated.
+
+        let overlay_dir = tempfile::tempdir().unwrap();
+        let base_dir = tempfile::tempdir().unwrap();
+        let store_dir = "/nix/store";
+        let output_path = test_output("base-read-through", 1);
+
+        // Populate base with a signed PathInfo.
+        let _base_path_info = create_base_store(base_dir.path(), store_dir, &output_path).await;
+
+        // Open overlay over base.
+        let mut handle = create_overlay_handle(overlay_dir.path(), base_dir.path(), store_dir).await;
+
+        // Read the path through the composed handle.
+        let cached = handle.cached_node_for_path_with_layer(&output_path).await.unwrap().unwrap();
+        assert_eq!(cached.layer, crate::layer::StoreLayer::Base { index: 1 });
+
+        // Verify overlay was NOT populated: check the overlay's raw pathinfo
+        // service (not the combined service).
+        let overlay_hit = handle.overlay_pathinfo.get(*output_path.digest()).await.unwrap();
+        assert!(overlay_hit.is_none(), "overlay must NOT have the path after read-through");
+    }
+
+    #[tokio::test]
+    async fn overlay_ca_mapping_precedence_and_publication_are_layer_bounded() {
+        const HIGHER_BASE_LAYER_INDEX: usize = 1;
+        const LOWER_BASE_LAYER_INDEX: usize = 2;
+        let overlay_dir = tempfile::tempdir().unwrap();
+        let higher_base_dir = tempfile::tempdir().unwrap();
+        let lower_base_dir = tempfile::tempdir().unwrap();
+        let store_dir = "/nix/store";
+        let fixture_path = test_output("mapping-fixture", 1);
+        let shared_drv = "/nix/store/shared.drv";
+        let lower_only_drv = "/nix/store/lower-only.drv";
+        let overlay_only_drv = "/nix/store/overlay-only.drv";
+        let higher_output = "/nix/store/higher-output";
+        let lower_output = "/nix/store/lower-output";
+        let lower_only_output = "/nix/store/lower-only-output";
+        let overlay_output = "/nix/store/overlay-output";
+
+        create_base_store(higher_base_dir.path(), store_dir, &fixture_path).await;
+        set_test_tree_read_only(higher_base_dir.path(), false);
+        let mut higher_mappings = CaMappings::default();
+        higher_mappings.insert(shared_drv, "out", higher_output);
+        higher_mappings.save_checked(higher_base_dir.path()).unwrap();
+        set_test_tree_read_only(higher_base_dir.path(), true);
+
+        create_base_store(lower_base_dir.path(), store_dir, &fixture_path).await;
+        set_test_tree_read_only(lower_base_dir.path(), false);
+        let mut lower_mappings = CaMappings::default();
+        lower_mappings.insert(shared_drv, "out", lower_output);
+        lower_mappings.insert(lower_only_drv, "out", lower_only_output);
+        lower_mappings.save_checked(lower_base_dir.path()).unwrap();
+        set_test_tree_read_only(lower_base_dir.path(), true);
+
+        std::fs::write(overlay_dir.path().join("overlay-trusted-public-keys"), format!("{}\n", test_verifying_key()))
+            .unwrap();
+        let mut handle = StoreHandle::open_overlay(StoreConfig {
+            backend: StoreBackend::Snix,
+            state_dir: overlay_dir.path().to_path_buf(),
+            output_dir: overlay_dir.path().to_path_buf(),
+            remote_cache_urls: Vec::new(),
+            fallback_mode: StoreFallbackMode::Practical,
+            store_dir: store_dir.to_string(),
+            base_state_dirs: vec![
+                higher_base_dir.path().to_path_buf(),
+                lower_base_dir.path().to_path_buf(),
+            ],
+            source_admission: Some(Arc::new(crate::source_admission::TestSourceAdmission)),
+        })
+        .await
+        .unwrap();
+
+        let shared = handle.resolve_ca_mapping(shared_drv, "out").unwrap().unwrap();
+        assert_eq!(shared.value, higher_output);
+        assert_eq!(shared.layer, crate::layer::StoreLayer::Base {
+            index: HIGHER_BASE_LAYER_INDEX,
+        });
+        let lower_only = handle.resolve_ca_mapping(lower_only_drv, "out").unwrap().unwrap();
+        assert_eq!(lower_only.value, lower_only_output);
+        assert_eq!(lower_only.layer, crate::layer::StoreLayer::Base {
+            index: LOWER_BASE_LAYER_INDEX,
+        });
+
+        handle.insert_ca_mapping(shared_drv, "out", overlay_output);
+        handle.insert_ca_mapping(overlay_only_drv, "out", overlay_output);
+        let selected = handle.resolve_ca_mapping(shared_drv, "out").unwrap().unwrap();
+        assert_eq!(selected.value, overlay_output);
+        assert_eq!(selected.layer, crate::layer::StoreLayer::Overlay);
+
+        let persisted_overlay = CaMappings::load(overlay_dir.path());
+        assert_eq!(persisted_overlay.get(overlay_only_drv, "out"), Some(overlay_output));
+        let unchanged_higher = CaMappings::load(higher_base_dir.path());
+        assert_eq!(unchanged_higher.get(shared_drv, "out"), Some(higher_output));
+        assert_eq!(unchanged_higher.get(overlay_only_drv, "out"), None);
+        let unchanged_lower = CaMappings::load(lower_base_dir.path());
+        assert_eq!(unchanged_lower.get(shared_drv, "out"), Some(lower_output));
+        assert_eq!(unchanged_lower.get(overlay_only_drv, "out"), None);
+    }
+
+    #[tokio::test]
+    async fn overlay_shadows_base_pathinfo() {
+        // r[verify store_transports.overlay_composition.scenario.shadow]
+        // GIVEN overlay and base both have PathInfo for the same store path
+        // WHEN reading that path through the composed handle
+        // THEN the overlay's PathInfo is returned and base is NOT consulted.
+
+        let overlay_dir = tempfile::tempdir().unwrap();
+        let base_dir = tempfile::tempdir().unwrap();
+        let store_dir = "/nix/store";
+        let output_path = test_output("shadow-test", 3);
+
+        // Populate base with a PathInfo.
+        let _base_path_info = create_base_store(base_dir.path(), store_dir, &output_path).await;
+
+        // Open overlay over base.
+        let mut handle = create_overlay_handle(overlay_dir.path(), base_dir.path(), store_dir).await;
+
+        // Write a different PathInfo into the overlay's raw pathinfo database
+        // (not through the combined service, which has Unimplemented for put).
+        let mut overlay_path_info = PathInfo {
+            store_path: output_path.clone(),
+            node: Node::Symlink {
+                target: SymlinkTarget::try_from("overlay-target").unwrap(),
+            },
+            references: Vec::new(),
+            nar_size: 42,
+            nar_sha256: [4u8; 32],
+            signatures: Vec::new(),
+            deriver: None,
+            ca: None,
+        };
+        sign_test_pathinfo(&mut overlay_path_info);
+        handle.overlay_pathinfo.put(overlay_path_info.clone()).await.unwrap();
+
+        // Read the path through the composed handle.
+        let selected = handle.path_info_with_layer(&output_path).await.unwrap().unwrap();
+        assert_eq!(selected.layer, crate::layer::StoreLayer::Overlay);
+        assert_eq!(selected.shadows, vec![crate::layer::LayerShadowObservation {
+            layer: crate::layer::StoreLayer::Base { index: 1 },
+            status: crate::layer::LayerShadowStatus::Conflicting,
+        }]);
+        let cached = handle.cached_node_for_path(&output_path).await.unwrap();
+        assert!(cached.is_some(), "shadowed path should be readable");
+        if let Some(Node::Symlink { target }) = cached {
+            assert_eq!(target.to_string(), "overlay-target", "overlay symlink target must be returned, not base");
+        } else {
+            panic!("expected symlink node");
+        }
+    }
+
+    #[tokio::test]
+    async fn overlay_writes_route_to_overlay_only() {
+        // r[verify store_transports.overlay_composition.scenario.write-routing]
+        // GIVEN an overlay composed over a read-only base
+        // WHEN writing a signed PathInfo through the composed handle
+        // THEN the write lands in the overlay AND the base is NOT mutated.
+
+        let overlay_dir = tempfile::tempdir().unwrap();
+        let base_dir = tempfile::tempdir().unwrap();
+        let store_dir = "/nix/store";
+        let output_path = test_output("write-routing", 5);
+
+        // Populate base with a signed PathInfo (different path).
+        let _base_path_info = create_base_store(base_dir.path(), store_dir, &test_output("base-only", 77)).await;
+
+        // Open overlay over base.
+        let mut handle = create_overlay_handle(overlay_dir.path(), base_dir.path(), store_dir).await;
+
+        // Create a signed PathInfo for the overlay.
+        let overlay_path_info = signed_pathinfo(output_path.clone());
+
+        // Persist through the composed handle.
+        handle
+            .persist_and_export_signed_output(PersistOutputRequest {
+                output_name: "out",
+                output_path: &output_path,
+                path_info: overlay_path_info.clone(),
+                final_node: overlay_path_info.node.clone(),
+                provenance: None,
+                is_root: false,
+                root_source: None,
+            })
+            .await
+            .unwrap();
+
+        // Verify the overlay has the path.
+        let overlay_hit = handle.pathinfo_service().get(*output_path.digest()).await.unwrap();
+        assert!(overlay_hit.is_some(), "overlay must have the persisted path");
+
+        // Verify the base does NOT have the path (it only has the base-only path).
+        let base_pathinfo = RedbPathInfoService::new("base-verify".to_string(), RedbPathInfoServiceConfig {
+            path: Some(base_dir.path().join("pathinfo.redb")),
+            read_only: true,
+            cache_size: None,
+        })
+        .await
+        .unwrap();
+        let base_hit = base_pathinfo.get(*output_path.digest()).await.unwrap();
+        assert!(base_hit.is_none(), "base must NOT have the overlay's written path");
+    }
+
+    #[tokio::test]
+    async fn overlay_prefix_mismatch_preserves_both_layers() {
+        // r[verify store_transports.overlay_composition.scenario.prefix-mismatch]
+        // GIVEN an overlay configured with a base whose store_dir differs
+        // WHEN opening the composed handle
+        // THEN the open fails with a diagnostic naming both prefixes.
+
+        let overlay_dir = tempfile::tempdir().unwrap();
+        let base_dir = tempfile::tempdir().unwrap();
+
+        // Create base with /nix/store prefix.
+        let _base_path_info =
+            create_base_store(base_dir.path(), "/nix/store", &test_output("prefix-mismatch", 9)).await;
+        let base_identity_path = base_dir.path().join("store-identity.json");
+        let base_identity_before = std::fs::read(&base_identity_path).unwrap();
+        let base_pathinfo_path = base_dir.path().join("pathinfo.redb");
+        let base_pathinfo_before = std::fs::read(&base_pathinfo_path).unwrap();
+
+        // Open overlay with /crunch/store prefix — mismatch must fail.
+        let result = StoreHandle::open_overlay(StoreConfig {
+            backend: StoreBackend::Snix,
+            state_dir: overlay_dir.path().to_path_buf(),
+            output_dir: overlay_dir.path().to_path_buf(),
+            remote_cache_urls: Vec::new(),
+            fallback_mode: StoreFallbackMode::Practical,
+            store_dir: "/crunch/store".to_string(),
+            base_state_dirs: vec![base_dir.path().to_path_buf()],
+            source_admission: Some(Arc::new(crate::source_admission::TestSourceAdmission)),
+        })
+        .await;
+
+        let error = match result {
+            Ok(_) => panic!("prefix mismatch must fail before overlay services open"),
+            Err(error) => error,
+        };
+        let Error::Store(message) = error else {
+            panic!("prefix mismatch must be rejected by store identity admission");
+        };
+        assert!(message.contains("/nix/store") && message.contains("/crunch/store"), "{message}");
+        assert_eq!(std::fs::read(&base_identity_path).unwrap(), base_identity_before);
+        assert_eq!(std::fs::read(&base_pathinfo_path).unwrap(), base_pathinfo_before);
+        assert_eq!(std::fs::read_dir(overlay_dir.path()).unwrap().count(), 0);
+    }
+
+    #[tokio::test]
+    async fn overlay_rejects_foreign_base_before_opening_services_or_creating_writable_state() {
+        let root = tempfile::tempdir().unwrap();
+        let writable = root.path().join("writable");
+        let base = root.path().join("foreign-base");
+        std::fs::create_dir(&base).unwrap();
+        crate::overlay::ensure_store_identity(&base, "/nix/store", StoreBackend::Casita).unwrap();
+        let base_identity = std::fs::read(base.join("store-identity.json")).unwrap();
+        std::fs::write(base.join("blobs"), b"not a Snix blob service").unwrap();
+
+        let mut config =
+            StoreConfig::new(StoreBackend::Snix, writable.clone(), root.path().join("store"), "/nix/store".to_string())
+                .with_base_state_dirs(vec![base.clone()]);
+        config.source_admission = Some(Arc::new(crate::source_admission::TestSourceAdmission));
+        let error = StoreHandle::open(config).await.err().expect("foreign base must be rejected");
+        assert!(
+            error.to_string().contains("store-backend-mismatch: requested snix, state declares casita"),
+            "{error}"
+        );
+        assert!(!writable.exists(), "mismatched base created writable state");
+        assert_eq!(std::fs::read(base.join("store-identity.json")).unwrap(), base_identity);
+        assert_eq!(std::fs::read(base.join("blobs")).unwrap(), b"not a Snix blob service");
+
+        let no_overlay_profile = StoreBackendCapabilityProfile {
+            overlay_composition: false,
+            ..StoreBackend::Snix.profile()
+        };
+        let error = StoreConfig::preflight_backend_identity_with_profile(
+            StoreBackend::Snix,
+            no_overlay_profile,
+            &writable,
+            "/nix/store",
+            std::slice::from_ref(&base),
+            Some(&crate::source_admission::TestSourceAdmission),
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("snix-overlay-unsupported"), "{error}");
+        assert!(!writable.exists(), "disabled profile created writable state");
+        assert_eq!(std::fs::read(base.join("store-identity.json")).unwrap(), base_identity);
+    }
+
+    #[tokio::test]
+    async fn casita_lookup_does_not_fall_back_to_leftover_snix_pathinfo() {
+        let root = tempfile::tempdir().unwrap();
+        let snix_state = tempfile::tempdir().unwrap();
+        let casita_state = root.path().join("casita-state");
+        let output_dir = root.path().join("store");
+        let output_path = test_output("leftover-snix", 91);
+        let legacy_record = create_base_store(snix_state.path(), "/nix/store", &output_path).await;
+
+        let selected = || {
+            StoreConfig::new(StoreBackend::Casita, casita_state.clone(), output_dir.clone(), "/nix/store".to_string())
+        };
+        drop(StoreHandle::open(selected()).await.unwrap());
+        let leftover_path = casita_state.join("pathinfo.redb");
+        std::fs::copy(snix_state.path().join("pathinfo.redb"), &leftover_path).unwrap();
+        let leftover_bytes = std::fs::read(&leftover_path).unwrap();
+        let legacy_reader = RedbPathInfoService::new("legacy-snix-evidence".to_string(), RedbPathInfoServiceConfig {
+            path: Some(leftover_path.clone()),
+            read_only: true,
+            cache_size: None,
+        })
+        .await
+        .unwrap();
+        assert_eq!(legacy_reader.get(*output_path.digest()).await.unwrap(), Some(legacy_record));
+
+        let reopened = StoreHandle::open(selected()).await.unwrap();
+        assert_eq!(reopened.backend(), StoreBackend::Casita);
+        assert!(
+            reopened.pathinfo_service().get(*output_path.digest()).await.unwrap().is_none(),
+            "Casita lookup must not treat the leftover Snix record as selected store content"
+        );
+        assert_eq!(std::fs::read(&leftover_path).unwrap(), leftover_bytes);
+    }
+
+    #[tokio::test]
+    async fn snix_lookup_ignores_readable_casita_repository_left_in_recorded_state() {
+        let root = tempfile::tempdir().unwrap();
+        let snix_state = root.path().join("snix-state");
+        let casita_state = root.path().join("foreign-casita-state");
+        let output_dir = root.path().join("store");
+        std::fs::create_dir(&casita_state).unwrap();
+        std::fs::write(casita_state.join("casita-trusted-public-keys"), format!("{}\n", test_verifying_key())).unwrap();
+        let foreign = StoreHandle::open(StoreConfig::new(
+            StoreBackend::Casita,
+            casita_state.clone(),
+            output_dir.clone(),
+            "/nix/store".to_string(),
+        ))
+        .await
+        .unwrap();
+        let path = test_output("foreign-casita-output", 92);
+        let node = Node::Symlink {
+            target: SymlinkTarget::try_from("foreign-target").unwrap(),
+        };
+        let (nar_size, nar_sha256) = SimpleRenderer::new(foreign.blob_service(), foreign.directory_service())
+            .calculate_nar(&node)
+            .await
+            .unwrap();
+        let record = signed_pathinfo_with_signing_key(path.clone(), node, nar_size, nar_sha256, &test_signing_key());
+        foreign.pathinfo_service().put(record.clone()).await.unwrap();
+        assert_eq!(foreign.path_info_with_layer(&path).await.unwrap().map(|found| found.value), Some(record));
+        drop(foreign);
+
+        let snix_config =
+            || StoreConfig::new(StoreBackend::Snix, snix_state.clone(), output_dir.clone(), "/nix/store".to_string());
+        drop(StoreHandle::open(snix_config()).await.unwrap());
+        let identity_path = snix_state.join("store-identity.json");
+        let identity_before = std::fs::read(&identity_path).unwrap();
+        let leftover = snix_state.join("casita");
+        std::fs::rename(casita_state.join("casita"), &leftover).unwrap();
+        let leftovers_before = snapshot_test_repository(&leftover);
+
+        let selected = StoreHandle::open(snix_config()).await.unwrap();
+        assert_eq!(selected.backend(), StoreBackend::Snix);
+        assert!(selected.path_info_with_layer(&path).await.unwrap().is_none(), "Snix read a leftover Casita root");
+        assert_eq!(snapshot_test_repository(&leftover), leftovers_before, "Snix changed leftover Casita state");
+        assert_eq!(std::fs::read(identity_path).unwrap(), identity_before);
+    }
+
+    #[tokio::test]
+    async fn overlay_missing_base_fails_closed() {
+        // r[verify store_transports.overlay_cli_declaration.scenario.missing-base-fails]
+        // GIVEN an overlay configured with a base path that does not exist
+        // WHEN opening the composed handle
+        // THEN the open fails with a diagnostic naming the missing base path.
+
+        let overlay_dir = tempfile::tempdir().unwrap();
+        let missing_base = tempfile::tempdir().unwrap();
+        // Remove the temp dir so it doesn't exist.
+        let missing_path = missing_base.path().to_path_buf();
+        drop(missing_base); // directory is deleted
+
+        let result = StoreHandle::open_overlay(StoreConfig {
+            backend: StoreBackend::Snix,
+            state_dir: overlay_dir.path().to_path_buf(),
+            output_dir: overlay_dir.path().to_path_buf(),
+            remote_cache_urls: Vec::new(),
+            fallback_mode: StoreFallbackMode::Practical,
+            store_dir: "/nix/store".to_string(),
+            base_state_dirs: vec![missing_path],
+            source_admission: Some(Arc::new(crate::source_admission::TestSourceAdmission)),
+        })
+        .await;
+
+        assert!(result.is_err(), "missing base must fail closed");
+        let err = match result {
+            Err(e) => e.to_string(),
+            Ok(_) => panic!("missing base must fail closed"),
+        };
+        assert!(err.contains("opening overlay base"), "error must identify the missing base");
+    }
+
+    #[tokio::test]
+    async fn overlay_base_layer_opens_without_a_source_admission_authority() {
+        // GIVEN an overlay composed over a locally declared base layer
+        // WHEN opening the composed handle without a source admission authority
+        // THEN the open succeeds, because the base is the operator's own local
+        // declaration rather than an external endpoint.
+
+        let base_dir = tempfile::tempdir().unwrap();
+        let overlay_dir = tempfile::tempdir().unwrap();
+        let store_dir = "/nix/store";
+        create_base_store(base_dir.path(), store_dir, &test_output("issue-30-base", 71)).await;
+
+        let handle = StoreHandle::open_overlay(StoreConfig {
+            backend: StoreBackend::Snix,
+            state_dir: overlay_dir.path().to_path_buf(),
+            output_dir: overlay_dir.path().to_path_buf(),
+            remote_cache_urls: Vec::new(),
+            fallback_mode: StoreFallbackMode::Practical,
+            store_dir: store_dir.to_string(),
+            base_state_dirs: vec![base_dir.path().to_path_buf()],
+            source_admission: None,
+        })
+        .await;
+
+        let err = match handle {
+            Ok(_) => return,
+            Err(error) => error.to_string(),
+        };
+        panic!("a locally declared base layer must open without an admission authority: {err}");
+    }
+
+    #[tokio::test]
+    async fn overlay_substituter_refuses_to_open_without_a_source_admission_authority() {
+        // GIVEN a store configured with a substituter and no source admission
+        // authority
+        // WHEN opening the store
+        // THEN the open fails closed with the source admission diagnostic.
+
+        let overlay_dir = tempfile::tempdir().unwrap();
+        let result = StoreHandle::open_overlay(StoreConfig {
+            backend: StoreBackend::Snix,
+            state_dir: overlay_dir.path().to_path_buf(),
+            output_dir: overlay_dir.path().to_path_buf(),
+            remote_cache_urls: vec!["https://cache.example.invalid/substituters".to_string()],
+            fallback_mode: StoreFallbackMode::Practical,
+            store_dir: "/nix/store".to_string(),
+            base_state_dirs: Vec::new(),
+            source_admission: None,
+        })
+        .await;
+
+        let err = match result {
+            Err(error) => error.to_string(),
+            Ok(_) => panic!("a substituter must not open without a source admission authority"),
+        };
+        assert!(
+            err.contains("store-source-admission-required"),
+            "the refusal must name the missing admission authority, got: {err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn overlay_two_bases_stack_in_declaration_order() {
+        // r[verify store_transports.overlay_cli_declaration.scenario.ordered-stack]
+        // GIVEN an overlay composed over two bases declared as A then B
+        // WHEN reading a digest missing from the overlay
+        // THEN base A is consulted before base B, and a hit in A prevents B.
+
+        let overlay_dir = tempfile::tempdir().unwrap();
+        let base_a_dir = tempfile::tempdir().unwrap();
+        let base_b_dir = tempfile::tempdir().unwrap();
+        let store_dir = "/nix/store";
+        let path_a = test_output("base-a-only", 10);
+        let path_b = test_output("base-b-only", 11);
+        let path_both = test_output("both-bases", 12);
+
+        // base A has path_a and path_both.
+        create_base_store(base_a_dir.path(), store_dir, &path_a).await;
+        create_base_store(base_a_dir.path(), store_dir, &path_both).await;
+
+        // base B has path_b and path_both (same path_info as A for path_both).
+        create_base_store(base_b_dir.path(), store_dir, &path_b).await;
+        create_base_store(base_b_dir.path(), store_dir, &path_both).await;
+
+        // Open overlay over [base A, base B].
+        let mut handle = StoreHandle::open_overlay(StoreConfig {
+            backend: StoreBackend::Snix,
+            state_dir: overlay_dir.path().to_path_buf(),
+            output_dir: overlay_dir.path().to_path_buf(),
+            remote_cache_urls: Vec::new(),
+            fallback_mode: StoreFallbackMode::Practical,
+            store_dir: store_dir.to_string(),
+            base_state_dirs: vec![base_a_dir.path().to_path_buf(), base_b_dir.path().to_path_buf()],
+            source_admission: Some(Arc::new(crate::source_admission::TestSourceAdmission)),
+        })
+        .await
+        .unwrap();
+
+        // path_a should be found via base A.
+        let cached_a = handle.cached_node_for_path_with_layer(&path_a).await.unwrap().unwrap();
+        assert_eq!(cached_a.layer, crate::layer::StoreLayer::Base { index: 1 });
+
+        // path_b should be found via base B.
+        let cached_b = handle.cached_node_for_path_with_layer(&path_b).await.unwrap().unwrap();
+        assert_eq!(cached_b.layer, crate::layer::StoreLayer::Base { index: 2 });
+
+        // path_both should be found via base A (hit in A prevents B consult).
+        let cached_both = handle.cached_node_for_path_with_layer(&path_both).await.unwrap().unwrap();
+        assert_eq!(cached_both.layer, crate::layer::StoreLayer::Base { index: 1 });
+    }
+
+    #[tokio::test]
+    async fn overlay_reads_file_and_directory_content_from_distinct_bases_without_backfill() {
+        let overlay_dir = tempfile::tempdir().unwrap();
+        let base_file_dir = tempfile::tempdir().unwrap();
+        let base_directory_dir = tempfile::tempdir().unwrap();
+        let store_dir = "/nix/store";
+        let file_path = test_output("base-file", 13);
+        let directory_path = test_output("base-directory", 14);
+        let file_info = create_base_store_with_host_tree(base_file_dir.path(), store_dir, &file_path, false).await;
+        let directory_info =
+            create_base_store_with_host_tree(base_directory_dir.path(), store_dir, &directory_path, true).await;
+
+        let mut handle = StoreHandle::open_overlay(StoreConfig {
+            backend: StoreBackend::Snix,
+            state_dir: overlay_dir.path().to_path_buf(),
+            output_dir: overlay_dir.path().to_path_buf(),
+            remote_cache_urls: Vec::new(),
+            fallback_mode: StoreFallbackMode::Practical,
+            store_dir: store_dir.to_string(),
+            base_state_dirs: vec![
+                base_file_dir.path().to_path_buf(),
+                base_directory_dir.path().to_path_buf(),
+            ],
+            source_admission: Some(Arc::new(crate::source_admission::TestSourceAdmission)),
+        })
+        .await
+        .unwrap();
+
+        let selected_file = handle.cached_node_for_path_with_layer(&file_path).await.unwrap().unwrap();
+        let selected_directory = handle.cached_node_for_path_with_layer(&directory_path).await.unwrap().unwrap();
+        assert_eq!(selected_file.layer, crate::layer::StoreLayer::Base { index: 1 });
+        assert_eq!(selected_directory.layer, crate::layer::StoreLayer::Base { index: 2 });
+        assert_eq!(handle.read_blob(&selected_file.value).await.unwrap(), b"base-file-content");
+        assert!(handle.castore_has_complete_content(&selected_directory.value).await.unwrap());
+
+        if let Node::File { digest, .. } = &file_info.node {
+            assert!(!handle.overlay_blob_service.has(digest).await.unwrap());
+        } else {
+            panic!("file fixture must produce a file node");
+        }
+        if let Node::Directory { digest, .. } = &directory_info.node {
+            assert!(handle.overlay_directory_service.get(digest).await.unwrap().is_none());
+        } else {
+            panic!("directory fixture must produce a directory node");
+        }
+        assert!(handle.overlay_pathinfo.get(*file_path.digest()).await.unwrap().is_none());
+        assert!(handle.overlay_pathinfo.get(*directory_path.digest()).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn overlay_report_records_selected_base_descriptor() {
+        // r[verify store_transports.overlay_provenance_layer.scenario.base-trust]
+        // GIVEN a path is read through the base because the overlay lacks it
+        // WHEN synthesizing an artifact attestation for that path
+        // THEN the attestation facts record "base" as the store layer.
+
+        let overlay_dir = tempfile::tempdir().unwrap();
+        let base_dir = tempfile::tempdir().unwrap();
+        let store_dir = "/nix/store";
+        let output_path = test_output("base-trust-test", 22);
+
+        // Populate base.
+        let _base_path_info = create_base_store(base_dir.path(), store_dir, &output_path).await;
+
+        // Open overlay over base.
+        let mut handle = create_overlay_handle(overlay_dir.path(), base_dir.path(), store_dir).await;
+
+        let cached = handle.cached_node_for_path_with_layer(&output_path).await.unwrap().unwrap();
+        assert_eq!(cached.layer, crate::layer::StoreLayer::Base { index: 1 });
+        let attestation = handle.get_artifact_attestation_with_layer(&output_path).await.unwrap().unwrap();
+        assert_eq!(attestation.layer, crate::layer::StoreLayer::Base { index: 1 });
+        assert_eq!(attestation.value.selected_layer, crate::layer::StoreLayer::Base { index: 1 });
+        let closure_attestation = handle.runtime_closure_attestation(std::slice::from_ref(&output_path)).await.unwrap();
+        assert_eq!(
+            closure_attestation.selected_layers.get(&output_path.to_absolute_path()),
+            Some(&crate::layer::StoreLayer::Base { index: 1 })
+        );
+        let report = handle.overlay_report().unwrap().unwrap();
+        assert_eq!(report.bases.len(), 1);
+        assert_eq!(report.bases[0].declaration_index, 0);
+        assert_eq!(report.bases[0].trust_policy_id, "mantle-store-overlay-trust-v2");
+        assert_eq!(report.bases[0].accepted_signer_names, vec!["store-test-1"]);
+        assert!(report.bases[0].descriptor_blake3.starts_with("b3:"));
+    }
+
+    #[tokio::test]
+    async fn overlay_shadowed_path_does_not_inherit_base_trust() {
+        // r[verify store_transports.overlay_provenance_layer.scenario.no-inherited-trust]
+        // GIVEN overlay and base both have a PathInfo for the same store path
+        //   and the overlay PathInfo is unsigned
+        // WHEN verifying that path under overlay composition
+        // THEN the path is treated as unsigned (base signature does NOT cover it).
+
+        let overlay_dir = tempfile::tempdir().unwrap();
+        let base_dir = tempfile::tempdir().unwrap();
+        let store_dir = "/nix/store";
+        let output_path = test_output("no-inherit-trust", 33);
+
+        // Populate base with a signed PathInfo.
+        let _base_path_info = create_base_store(base_dir.path(), store_dir, &output_path).await;
+
+        // Open overlay over base.
+        let mut handle = create_overlay_handle(overlay_dir.path(), base_dir.path(), store_dir).await;
+
+        // Write an UNSIGNED PathInfo into the overlay for the same store path.
+        let unsigned_path_info = PathInfo {
+            store_path: output_path.clone(),
+            node: Node::Symlink {
+                target: SymlinkTarget::try_from("unsigned-target").unwrap(),
+            },
+            references: Vec::new(),
+            nar_size: 99,
+            nar_sha256: [5u8; 32],
+            signatures: Vec::new(), // unsigned
+            deriver: None,
+            ca: None,
+        };
+        // Write an UNSIGNED PathInfo into the overlay's raw pathinfo database.
+        handle.overlay_pathinfo.put(unsigned_path_info.clone()).await.unwrap();
+
+        // The invalid higher-precedence shadow must block lower-layer fallback.
+        let error = handle.cached_node_for_path(&output_path).await.unwrap_err();
+        assert!(error.to_string().contains("overlay-layer-trust-failure"));
+
+        // Verify that persist_and_export_signed_output also rejects the unsigned path.
+        let result = handle
+            .persist_and_export_signed_output(PersistOutputRequest {
+                output_name: "out",
+                output_path: &output_path,
+                path_info: unsigned_path_info.clone(),
+                final_node: unsigned_path_info.node.clone(),
+                provenance: None,
+                is_root: false,
+                root_source: None,
+            })
+            .await;
+        assert!(result.is_err(), "unsigned PathInfo must be rejected by persist");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("unsigned PathInfo"), "error must mention unsigned: {err_msg}");
+    }
+
+    #[tokio::test]
+    async fn overlay_incomplete_shadow_blocks_complete_base_fallback() {
+        const SHADOW_PATH_DIGEST_BYTE: u8 = 51;
+        let overlay_dir = tempfile::tempdir().unwrap();
+        let base_dir = tempfile::tempdir().unwrap();
+        let store_dir = "/nix/store";
+        let output_path = test_output("incomplete-shadow", SHADOW_PATH_DIGEST_BYTE);
+        create_base_store(base_dir.path(), store_dir, &output_path).await;
+        let mut handle = create_overlay_handle(overlay_dir.path(), base_dir.path(), store_dir).await;
+        let missing_digest: snix_castore::B3Digest = blake3::hash(b"missing-shadow-blob").as_bytes().into();
+        let overlay_path_info = signed_pathinfo_with_signing_key(
+            output_path.clone(),
+            Node::File {
+                digest: missing_digest,
+                size: 1,
+                executable: false,
+            },
+            1,
+            [6_u8; NAR_SHA256_BYTES],
+            &test_signing_key(),
+        );
+        handle.overlay_pathinfo.put(overlay_path_info).await.unwrap();
+
+        let error = handle.cached_node_for_path(&output_path).await.unwrap_err();
+
+        assert!(error.to_string().contains("overlay-content-incomplete"));
+        assert!(handle.overlay_pathinfo.get(*output_path.digest()).await.unwrap().is_some());
+    }
+
+    #[tokio::test]
+    async fn overlay_duplicate_base_declaration_fails_before_overlay_creation() {
+        let overlay_dir = tempfile::tempdir().unwrap();
+        let base_dir = tempfile::tempdir().unwrap();
+        let store_dir = "/nix/store";
+        create_base_store(base_dir.path(), store_dir, &test_output("duplicate-base", 41)).await;
+
+        let result = StoreHandle::open_overlay(StoreConfig {
+            backend: StoreBackend::Snix,
+            state_dir: overlay_dir.path().to_path_buf(),
+            output_dir: overlay_dir.path().to_path_buf(),
+            remote_cache_urls: Vec::new(),
+            fallback_mode: StoreFallbackMode::Practical,
+            store_dir: store_dir.to_string(),
+            base_state_dirs: vec![base_dir.path().to_path_buf(), base_dir.path().to_path_buf()],
+            source_admission: Some(Arc::new(crate::source_admission::TestSourceAdmission)),
+        })
+        .await;
+        let error = match result {
+            Ok(_) => panic!("duplicate base must fail"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("DuplicateBase"));
+        assert!(!overlay_dir.path().join("pathinfo.redb").exists());
+    }
+
+    #[tokio::test]
+    async fn overlay_rejects_base_with_write_permission() {
+        const WRITABLE_BASE_DIGEST_BYTE: u8 = 49;
+        let overlay_dir = tempfile::tempdir().unwrap();
+        let base_dir = tempfile::tempdir().unwrap();
+        let store_dir = "/nix/store";
+        create_base_store(base_dir.path(), store_dir, &test_output("writable-base", WRITABLE_BASE_DIGEST_BYTE)).await;
+        set_test_tree_read_only(base_dir.path(), false);
+
+        let result = StoreHandle::open_overlay(StoreConfig {
+            backend: StoreBackend::Snix,
+            state_dir: overlay_dir.path().to_path_buf(),
+            output_dir: overlay_dir.path().to_path_buf(),
+            remote_cache_urls: Vec::new(),
+            fallback_mode: StoreFallbackMode::Practical,
+            store_dir: store_dir.to_string(),
+            base_state_dirs: vec![base_dir.path().to_path_buf()],
+            source_admission: Some(Arc::new(crate::source_admission::TestSourceAdmission)),
+        })
+        .await;
+
+        let error = match result {
+            Ok(_) => panic!("writable base must fail"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("overlay-base-writable"));
+        assert!(!overlay_dir.path().join("pathinfo.redb").exists());
+    }
+
+    #[tokio::test]
+    async fn overlay_rejects_base_pathinfo_with_invalid_layer_signature() {
+        const INVALID_SIGNATURE_DIGEST_BYTE: u8 = 50;
+        let overlay_dir = tempfile::tempdir().unwrap();
+        let base_dir = tempfile::tempdir().unwrap();
+        let store_dir = "/nix/store";
+        let output_path = test_output("invalid-base-signature", INVALID_SIGNATURE_DIGEST_BYTE);
+        create_base_store(base_dir.path(), store_dir, &output_path).await;
+        set_test_tree_read_only(base_dir.path(), false);
+        let pathinfo_svc = RedbPathInfoService::new("base-corruption".to_string(), RedbPathInfoServiceConfig {
+            path: Some(base_dir.path().join("pathinfo.redb")),
+            read_only: false,
+            cache_size: None,
+        })
+        .await
+        .unwrap();
+        let mut invalid = signed_pathinfo(output_path.clone());
+        invalid.signatures = vec![test_signature()];
+        pathinfo_svc.put(invalid).await.unwrap();
+        drop(pathinfo_svc);
+        set_test_tree_read_only(base_dir.path(), true);
+        let mut handle = create_overlay_handle(overlay_dir.path(), base_dir.path(), store_dir).await;
+
+        let error = handle.cached_node_for_path(&output_path).await.unwrap_err();
+
+        assert!(error.to_string().contains("overlay-layer-trust-failure"));
+        assert!(handle.overlay_pathinfo.get(*output_path.digest()).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn overlay_generation_drift_blocks_later_read() {
+        let overlay_dir = tempfile::tempdir().unwrap();
+        let base_dir = tempfile::tempdir().unwrap();
+        let store_dir = "/nix/store";
+        let output_path = test_output("generation-drift", 42);
+        create_base_store(base_dir.path(), store_dir, &output_path).await;
+        let handle = create_overlay_handle(overlay_dir.path(), base_dir.path(), store_dir).await;
+
+        set_test_tree_read_only(base_dir.path(), false);
+        std::fs::write(base_dir.path().join("generation-drift-marker"), b"changed").unwrap();
+        set_test_tree_read_only(base_dir.path(), true);
+        let error = handle.path_info_with_layer(&output_path).await.unwrap_err();
+        assert!(error.to_string().contains("BaseGenerationDrift"));
+    }
+
+    #[tokio::test]
+    async fn overlay_base_state_mutation_blocks_output_admission() {
+        let overlay_dir = tempfile::tempdir().unwrap();
+        let base_dir = tempfile::tempdir().unwrap();
+        let store_dir = "/nix/store";
+        let output_path = test_output("base-replacement", 43);
+        create_base_store(base_dir.path(), store_dir, &output_path).await;
+        let mut handle = create_overlay_handle(overlay_dir.path(), base_dir.path(), store_dir).await;
+
+        set_test_tree_read_only(base_dir.path(), false);
+        std::fs::write(base_dir.path().join("replacement-marker"), b"replacement").unwrap();
+        set_test_tree_read_only(base_dir.path(), true);
+        let path_info = signed_pathinfo(test_output("blocked-output", 44));
+        let blocked_output = path_info.store_path.clone();
+        let error = handle
+            .persist_and_export_signed_output(PersistOutputRequest {
+                output_name: "out",
+                output_path: &blocked_output,
+                final_node: path_info.node.clone(),
+                path_info,
+                provenance: None,
+                is_root: false,
+                root_source: None,
+            })
+            .await
+            .unwrap_err();
+        assert!(error.to_string().contains("BaseGenerationDrift"));
+        assert!(handle.overlay_pathinfo.get(*blocked_output.digest()).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn overlay_gc_retains_base_reachability_without_base_mutation() {
+        let overlay_dir = tempfile::tempdir().unwrap();
+        let base_dir = tempfile::tempdir().unwrap();
+        let store_dir = "/nix/store";
+        let base_path = test_output("gc-base", 45);
+        create_base_store(base_dir.path(), store_dir, &base_path).await;
+        let base_database = base_dir.path().join("pathinfo.redb");
+        let base_before = blake3::hash(&std::fs::read(&base_database).unwrap());
+        let mut handle = create_overlay_handle(overlay_dir.path(), base_dir.path(), store_dir).await;
+
+        let overlay_path = test_output("gc-overlay-root", 46);
+        let mut overlay_path_info = signed_pathinfo(overlay_path.clone());
+        overlay_path_info.references = vec![base_path.clone()];
+        sign_test_pathinfo(&mut overlay_path_info);
+        handle
+            .persist_and_export_signed_output(PersistOutputRequest {
+                output_name: "out",
+                output_path: &overlay_path,
+                final_node: overlay_path_info.node.clone(),
+                path_info: overlay_path_info,
+                provenance: None,
+                is_root: true,
+                root_source: Some(GcRootSource::Build),
+            })
+            .await
+            .unwrap();
+
+        let plan = handle.garbage_collect(None).await.unwrap();
+        assert_eq!(plan.candidate_path_count, 0);
+        assert_eq!(plan.base_reachability.len(), 1);
+        assert_eq!(plan.base_reachability[0].path, base_path.to_absolute_path());
+        assert_eq!(plan.base_reachability[0].layer_index, 1);
+        let executed = handle.garbage_collect(Some(&plan.plan_id)).await.unwrap();
+        assert!(executed.execution_complete);
+        let base_after = blake3::hash(&std::fs::read(&base_database).unwrap());
+        assert_eq!(base_before, base_after);
+        assert!(handle.overlay_pathinfo.get(*base_path.digest()).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn overlay_gc_execution_rejects_stale_base_generation() {
+        const STALE_BASE_DIGEST_BYTE: u8 = 52;
+        let overlay_dir = tempfile::tempdir().unwrap();
+        let base_dir = tempfile::tempdir().unwrap();
+        let store_dir = "/nix/store";
+        let base_path = test_output("stale-gc-base", STALE_BASE_DIGEST_BYTE);
+        create_base_store(base_dir.path(), store_dir, &base_path).await;
+        let mut handle = create_overlay_handle(overlay_dir.path(), base_dir.path(), store_dir).await;
+        handle
+            .pin_retained_root(&base_path.to_absolute_path(), "operator", "explicit-pin-registered")
+            .await
+            .unwrap();
+        let plan = handle.garbage_collect(None).await.unwrap();
+        set_test_tree_read_only(base_dir.path(), false);
+        std::fs::write(base_dir.path().join("stale-gc-marker"), b"changed").unwrap();
+        set_test_tree_read_only(base_dir.path(), true);
+
+        let error = handle.garbage_collect(Some(&plan.plan_id)).await.unwrap_err();
+
+        assert!(error.to_string().contains("BaseGenerationDrift"));
+        assert!(handle.overlay_pathinfo.get(*base_path.digest()).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn overlay_gc_rejects_base_to_overlay_reference() {
+        let overlay_dir = tempfile::tempdir().unwrap();
+        let base_dir = tempfile::tempdir().unwrap();
+        let store_dir = "/nix/store";
+        let overlay_path = test_output("reverse-overlay", 47);
+        let mut single = StoreHandle::open(StoreConfig::new(
+            StoreBackend::Snix,
+            overlay_dir.path().to_path_buf(),
+            overlay_dir.path().to_path_buf(),
+            store_dir.to_string(),
+        ))
+        .await
+        .unwrap();
+        let overlay_path_info = signed_pathinfo(overlay_path.clone());
+        single
+            .persist_and_export_signed_output(PersistOutputRequest {
+                output_name: "out",
+                output_path: &overlay_path,
+                final_node: overlay_path_info.node.clone(),
+                path_info: overlay_path_info,
+                provenance: None,
+                is_root: false,
+                root_source: None,
+            })
+            .await
+            .unwrap();
+        drop(single);
+
+        let base_path = test_output("reverse-base", 48);
+        create_base_store_with_references(base_dir.path(), store_dir, &base_path, vec![overlay_path.clone()]).await;
+        let mut handle = create_overlay_handle(overlay_dir.path(), base_dir.path(), store_dir).await;
+        handle
+            .pin_retained_root(&base_path.to_absolute_path(), "operator", "explicit-pin-registered")
+            .await
+            .unwrap();
+
+        let error = handle.garbage_collect(None).await.unwrap_err();
+        assert!(error.to_string().contains("BaseToOverlayReference"));
+        assert!(handle.overlay_pathinfo.get(*overlay_path.digest()).await.unwrap().is_some());
+    }
+}

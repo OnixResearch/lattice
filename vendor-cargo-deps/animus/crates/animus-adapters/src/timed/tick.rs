@@ -1,7 +1,4 @@
-use super::MIN_INTERVAL_TICKS;
-use super::ScheduleCadence;
-use super::ScheduleError;
-use super::ScheduledWorkflow;
+use super::{MIN_INTERVAL_TICKS, ScheduleCadence, ScheduleError, ScheduledWorkflow};
 
 /// Explicit next-run planning input.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -39,9 +36,10 @@ pub fn plan_next_run(input: NextRunInput<'_>) -> Result<NextRunPlan, ScheduleErr
     }
     let next_tick = match input.schedule.cadence() {
         ScheduleCadence::RunNow => input.current_tick,
-        ScheduleCadence::Hourly | ScheduleCadence::Daily => {
-            input.current_tick.checked_add(input.interval_ticks).ok_or(ScheduleError::InvalidPlanningInput)?
-        }
+        ScheduleCadence::Hourly | ScheduleCadence::Daily => input
+            .current_tick
+            .checked_add(input.interval_ticks)
+            .ok_or(ScheduleError::InvalidPlanningInput)?,
     };
     Ok(NextRunPlan { next_tick })
 }

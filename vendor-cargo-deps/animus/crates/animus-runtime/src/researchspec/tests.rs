@@ -1,5 +1,4 @@
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven
-// validation compact while drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -7,7 +6,12 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
+#![allow(
+    compound_condition,
+    excessive_file_length,
+    function_length,
+    non_trait_imports
+)]
 #![allow(
     numeric_units,
     path_segment_repetition,
@@ -51,7 +55,7 @@ const GROUP_B: &str = "group.b";
 const GROUP_A_FILE: &str = "src/a.rs";
 const GROUP_B_FILE: &str = "src/b.rs";
 const IDEA_ID: &str = "idea.unresolved";
-const DOWNSTREAM_LINK: &str = "cairn/archive/example";
+const DOWNSTREAM_LINK: &str = ".cairn/archive/example";
 const BASELINE_METRIC: i64 = 1_000_000;
 const BETTER_METRIC: i64 = 1_200_000;
 const SMALL_IMPROVEMENT_METRIC: i64 = 1_050_000;
@@ -79,16 +83,20 @@ fn complete_study_contract_validates_and_names_missing_fields() {
     let diagnostics = validate_research_study_contract(&invalid).expect_err("invalid study");
 
     assert!(diagnostics.iter().any(|diagnostic| {
-        diagnostic.kind == ResearchSpecDiagnosticKind::MissingField && diagnostic.field == FIELD_PRIMARY_METRIC
+        diagnostic.kind == ResearchSpecDiagnosticKind::MissingField
+            && diagnostic.field == FIELD_PRIMARY_METRIC
     }));
     assert!(diagnostics.iter().any(|diagnostic| {
-        diagnostic.kind == ResearchSpecDiagnosticKind::EmptyCollection && diagnostic.field == FIELD_CHECKS
+        diagnostic.kind == ResearchSpecDiagnosticKind::EmptyCollection
+            && diagnostic.field == FIELD_CHECKS
     }));
     assert!(diagnostics.iter().any(|diagnostic| {
-        diagnostic.kind == ResearchSpecDiagnosticKind::EmptyCollection && diagnostic.field == FIELD_SCOPE
+        diagnostic.kind == ResearchSpecDiagnosticKind::EmptyCollection
+            && diagnostic.field == FIELD_SCOPE
     }));
     assert!(diagnostics.iter().any(|diagnostic| {
-        diagnostic.kind == ResearchSpecDiagnosticKind::EmptyCollection && diagnostic.field == FIELD_OFF_LIMITS
+        diagnostic.kind == ResearchSpecDiagnosticKind::EmptyCollection
+            && diagnostic.field == FIELD_OFF_LIMITS
     }));
 }
 
@@ -100,7 +108,10 @@ fn baseline_records_guarded_fingerprints_and_rejects_missing_primary_metric() {
     let valid = baseline(&study);
     assert!(validate_research_baseline(&study, &valid).is_ok());
     assert_eq!(valid.guarded_fingerprints[0].identity, GUARDED_FILE);
-    assert_eq!(valid.guarded_fingerprints[0].fingerprint.algorithm, BLAKE3_ALGORITHM);
+    assert_eq!(
+        valid.guarded_fingerprints[0].fingerprint.algorithm,
+        BLAKE3_ALGORITHM
+    );
 
     let invalid = ResearchSpecBaselineEvidence {
         primary_metric: metric("wrong_metric", BASELINE_METRIC),
@@ -128,10 +139,12 @@ fn vague_hypothesis_is_rejected_with_actionable_diagnostic() {
     let diagnostics = validate_research_hypothesis(&vague).expect_err("vague hypothesis");
 
     assert!(diagnostics.iter().any(|diagnostic| {
-        diagnostic.kind == ResearchSpecDiagnosticKind::VagueHypothesis && diagnostic.field == FIELD_EXPECTED_SIGNAL
+        diagnostic.kind == ResearchSpecDiagnosticKind::VagueHypothesis
+            && diagnostic.field == FIELD_EXPECTED_SIGNAL
     }));
     assert!(diagnostics.iter().any(|diagnostic| {
-        diagnostic.kind == ResearchSpecDiagnosticKind::VagueHypothesis && diagnostic.field == FIELD_FALSIFICATION
+        diagnostic.kind == ResearchSpecDiagnosticKind::VagueHypothesis
+            && diagnostic.field == FIELD_FALSIFICATION
     }));
 }
 
@@ -151,7 +164,8 @@ fn failed_run_requires_rollback_reason_and_next_action() {
     let diagnostics = validate_research_run(&study, &failed).expect_err("missing failure context");
 
     assert!(diagnostics.iter().any(|diagnostic| {
-        diagnostic.kind == ResearchSpecDiagnosticKind::FailedRunMissingContext && diagnostic.field == FIELD_ROLLBACK
+        diagnostic.kind == ResearchSpecDiagnosticKind::FailedRunMissingContext
+            && diagnostic.field == FIELD_ROLLBACK
     }));
     assert!(diagnostics.iter().any(|diagnostic| {
         diagnostic.kind == ResearchSpecDiagnosticKind::FailedRunMissingContext
@@ -169,7 +183,10 @@ fn keep_gate_accepts_clean_improvement_and_blocks_suspicious_changes() {
 
     let decision = evaluate_research_keep_gate(&study, &baseline, &hypothesis, &clean_run);
     assert_eq!(decision.outcome, ResearchSpecKeepOutcome::Eligible);
-    assert_eq!(decision.metric_delta_microunits, Some(FINAL_DELTA_MICROUNITS));
+    assert_eq!(
+        decision.metric_delta_microunits,
+        Some(FINAL_DELTA_MICROUNITS)
+    );
 
     let suspicious = ResearchSpecRunEvidence {
         primary_metric: metric(PRIMARY_METRIC, SMALL_IMPROVEMENT_METRIC),
@@ -180,12 +197,9 @@ fn keep_gate_accepts_clean_improvement_and_blocks_suspicious_changes() {
     let blocked = evaluate_research_keep_gate(&study, &baseline, &hypothesis, &suspicious);
 
     assert_eq!(blocked.outcome, ResearchSpecKeepOutcome::Blocked);
-    assert!(
-        blocked
-            .diagnostics
-            .iter()
-            .any(|diagnostic| { diagnostic.kind == ResearchSpecDiagnosticKind::MeasurementIntegrityRisk })
-    );
+    assert!(blocked.diagnostics.iter().any(|diagnostic| {
+        diagnostic.kind == ResearchSpecDiagnosticKind::MeasurementIntegrityRisk
+    }));
     assert!(
         blocked
             .diagnostics
@@ -213,12 +227,20 @@ fn keep_gate_honors_minimize_direction() {
         ..baseline(&study)
     };
     let hypothesis = linked_hypothesis(ResearchSpecHypothesisDecision::Undecided);
-    let run = run(&study, MINIMIZE_BETTER_METRIC, Vec::new(), guarded(GUARDED_LABEL));
+    let run = run(
+        &study,
+        MINIMIZE_BETTER_METRIC,
+        Vec::new(),
+        guarded(GUARDED_LABEL),
+    );
 
     let decision = evaluate_research_keep_gate(&study, &baseline, &hypothesis, &run);
 
     assert_eq!(decision.outcome, ResearchSpecKeepOutcome::Eligible);
-    assert_eq!(decision.metric_delta_microunits, Some(MINIMIZE_BASELINE_METRIC - MINIMIZE_BETTER_METRIC));
+    assert_eq!(
+        decision.metric_delta_microunits,
+        Some(MINIMIZE_BASELINE_METRIC - MINIMIZE_BETTER_METRIC)
+    );
 }
 
 #[test]
@@ -233,10 +255,9 @@ fn keep_gate_rejects_metric_regression() {
 
     assert_eq!(decision.outcome, ResearchSpecKeepOutcome::Blocked);
     assert!(
-        decision
-            .diagnostics
-            .iter()
-            .any(|diagnostic| { diagnostic.kind == ResearchSpecDiagnosticKind::MetricDidNotImprove })
+        decision.diagnostics.iter().any(|diagnostic| {
+            diagnostic.kind == ResearchSpecDiagnosticKind::MetricDidNotImprove
+        })
     );
 }
 
@@ -247,32 +268,34 @@ fn promotion_groups_detect_independent_dependent_and_overlapping_groups() {
         promotion_group(GROUP_A, RUN_ID, GROUP_A_FILE, Vec::new()),
         promotion_group(GROUP_B, "run.other", GROUP_B_FILE, Vec::new()),
     ]);
-    assert_eq!(independent.outcome, ResearchSpecPromotionOutcome::Independent);
+    assert_eq!(
+        independent.outcome,
+        ResearchSpecPromotionOutcome::Independent
+    );
     assert!(independent.diagnostics.is_empty());
 
     let dependent = evaluate_research_promotion_groups(&[
         promotion_group(GROUP_A, RUN_ID, GROUP_A_FILE, Vec::new()),
-        promotion_group(GROUP_B, "run.other", GROUP_B_FILE, vec![GROUP_A.to_string()]),
+        promotion_group(
+            GROUP_B,
+            "run.other",
+            GROUP_B_FILE,
+            vec![GROUP_A.to_string()],
+        ),
     ]);
     assert_eq!(dependent.outcome, ResearchSpecPromotionOutcome::Dependent);
-    assert!(
-        dependent
-            .diagnostics
-            .iter()
-            .any(|diagnostic| { diagnostic.kind == ResearchSpecDiagnosticKind::PromotionGroupDependency })
-    );
+    assert!(dependent.diagnostics.iter().any(|diagnostic| {
+        diagnostic.kind == ResearchSpecDiagnosticKind::PromotionGroupDependency
+    }));
 
     let overlapping = evaluate_research_promotion_groups(&[
         promotion_group(GROUP_A, RUN_ID, GROUP_A_FILE, Vec::new()),
         promotion_group(GROUP_B, "run.other", GROUP_A_FILE, Vec::new()),
     ]);
     assert_eq!(overlapping.outcome, ResearchSpecPromotionOutcome::Blocked);
-    assert!(
-        overlapping
-            .diagnostics
-            .iter()
-            .any(|diagnostic| { diagnostic.kind == ResearchSpecDiagnosticKind::PromotionGroupOverlap })
-    );
+    assert!(overlapping.diagnostics.iter().any(|diagnostic| {
+        diagnostic.kind == ResearchSpecDiagnosticKind::PromotionGroupOverlap
+    }));
 }
 
 #[test]
@@ -287,7 +310,13 @@ fn archive_rejects_unresolved_hypotheses_runs_and_ideas() {
     let kept_hypothesis = linked_hypothesis(ResearchSpecHypothesisDecision::Kept);
     let valid_archive = archive(&study, &baseline, Some(RUN_ID), Vec::new());
     assert!(
-        validate_research_archive(&study, &[kept_hypothesis], std::slice::from_ref(&kept_run), &valid_archive,).is_ok()
+        validate_research_archive(
+            &study,
+            &[kept_hypothesis],
+            std::slice::from_ref(&kept_run),
+            &valid_archive,
+        )
+        .is_ok()
     );
 
     let unresolved_hypothesis = linked_hypothesis(ResearchSpecHypothesisDecision::Undecided);
@@ -295,9 +324,19 @@ fn archive_rejects_unresolved_hypotheses_runs_and_ideas() {
         status: ResearchSpecRunStatus::Completed,
         ..kept_run
     };
-    let invalid_archive = archive(&study, &baseline, Some("missing.run"), vec![IDEA_ID.to_string()]);
-    let diagnostics = validate_research_archive(&study, &[unresolved_hypothesis], &[unresolved_run], &invalid_archive)
-        .expect_err("unresolved archive");
+    let invalid_archive = archive(
+        &study,
+        &baseline,
+        Some("missing.run"),
+        vec![IDEA_ID.to_string()],
+    );
+    let diagnostics = validate_research_archive(
+        &study,
+        &[unresolved_hypothesis],
+        &[unresolved_run],
+        &invalid_archive,
+    )
+    .expect_err("unresolved archive");
 
     assert!(diagnostics.iter().any(|diagnostic| {
         diagnostic.kind == ResearchSpecDiagnosticKind::UnresolvedArchiveDecision
@@ -308,7 +347,8 @@ fn archive_rejects_unresolved_hypotheses_runs_and_ideas() {
             && diagnostic.field == FIELD_ARCHIVE_IDEAS
     }));
     assert!(diagnostics.iter().any(|diagnostic| {
-        diagnostic.kind == ResearchSpecDiagnosticKind::UnknownReference && diagnostic.field == FIELD_ARCHIVE_BEST_RUN
+        diagnostic.kind == ResearchSpecDiagnosticKind::UnknownReference
+            && diagnostic.field == FIELD_ARCHIVE_BEST_RUN
     }));
 }
 
@@ -445,7 +485,9 @@ fn study() -> ResearchSpecStudyContract {
         scope_files: vec![SCOPE_FILE.to_string()],
         off_limits_files: vec![OFF_LIMITS_FILE.to_string()],
         guarded_measurement_files: vec![GUARDED_FILE.to_string()],
-        promotion_threshold: ResearchSpecThresholdPolicy::MinimumDeltaMicrounits(PROMOTION_THRESHOLD_MICROUNITS),
+        promotion_threshold: ResearchSpecThresholdPolicy::MinimumDeltaMicrounits(
+            PROMOTION_THRESHOLD_MICROUNITS,
+        ),
         provenance: ResearchSpecProvenance {
             source: SOURCE.to_string(),
             author: Some(AUTHOR.to_string()),

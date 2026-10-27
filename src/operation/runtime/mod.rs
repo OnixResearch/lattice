@@ -11,13 +11,15 @@
 use serde::Deserialize;
 use serde::Serialize;
 
+pub mod component;
+
 pub const CAIRN_RUNTIME_KIND: &str = "process";
 pub const CAIRN_RUNTIME_KEY: &str = "cairn-read-only-v1";
 pub const CAIRN_CHANGE_LIST_METHOD: &str = "change_list";
 pub const CAIRN_VALIDATE_METHOD: &str = "validate";
 pub const REPOSITORY_ROOT_TARGET: &str = "repository_root";
 const SUCCESS_EXIT_CODE: i32 = 0;
-const OUTPUT_IDENTITY_DOMAIN: &str = "lattice.operation-output.v1";
+pub(crate) const OUTPUT_IDENTITY_DOMAIN: &str = "lattice.operation-output.v1";
 const PROHIBITED_CLAIM_FIELDS: &[&str] = &[
     "lifecycle_complete",
     "production_ready",
@@ -198,7 +200,7 @@ pub fn classify_process_output(
     })
 }
 
-fn output_contains_prohibited_field(value: &serde_json::Value) -> bool {
+pub(crate) fn output_contains_prohibited_field(value: &serde_json::Value) -> bool {
     match value {
         serde_json::Value::Array(values) => values.iter().any(output_contains_prohibited_field),
         serde_json::Value::Object(values) => values.iter().any(|(key, value)| {

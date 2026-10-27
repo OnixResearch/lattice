@@ -3,12 +3,24 @@ use super::super::super::*;
 #[test]
 fn leak_fixtures_are_rejected() {
     let fixtures = [
-        ("RAW_PROMPT: approve this", ConfirmationReceiptLeak::RawPrompt),
+        (
+            "RAW_PROMPT: approve this",
+            ConfirmationReceiptLeak::RawPrompt,
+        ),
         ("credential=secret", ConfirmationReceiptLeak::Credential),
         ("/home/private/action", ConfirmationReceiptLeak::FullPath),
-        ("provider_json { raw }", ConfirmationReceiptLeak::ProviderPayload),
-        ("raw_tool_payload={\"cmd\":\"rm\"}", ConfirmationReceiptLeak::RawToolPayload),
-        ("secret_summary=token dump", ConfirmationReceiptLeak::SecretSummary),
+        (
+            "provider_json { raw }",
+            ConfirmationReceiptLeak::ProviderPayload,
+        ),
+        (
+            "raw_tool_payload={\"cmd\":\"rm\"}",
+            ConfirmationReceiptLeak::RawToolPayload,
+        ),
+        (
+            "secret_summary=token dump",
+            ConfirmationReceiptLeak::SecretSummary,
+        ),
     ];
 
     for (text, expected_leak) in fixtures {

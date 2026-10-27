@@ -1,0 +1,61 @@
+let Bounds = {
+  file_count_max | Number,
+  total_bytes_max | Number,
+  file_bytes_max | Number,
+  path_depth_max | Number,
+  process_timeout_ms | Number,
+  stdout_bytes_max | Number,
+  stderr_bytes_max | Number,
+} in
+
+let Policy = {
+  schema_version | Number,
+  policy_name | String,
+  source_kinds | Array String,
+  modes | Array String,
+  bounds_profile | String,
+  canonicalization_profile | String,
+  bounds | Bounds,
+  entry_types | Array String,
+  allow_symlinks | Bool,
+  allow_submodules | Bool,
+  ambient_discovery | Bool,
+  automatic_activation | Bool,
+  transitions | Array String,
+  diagnostics | Array String,
+  non_claims | Array String,
+} in
+
+{
+  schema_version = 1,
+  policy_name = "animus-skill-source-lifecycle-v1",
+  source_kinds = ["git", "radicle", "archive", "filesystem"],
+  modes = ["frozen", "tracked-candidate"],
+  bounds_profile = "skill-tree-standard-v1",
+  canonicalization_profile = "skill-tree-blake3-v1",
+  bounds = {
+    file_count_max = 256,
+    total_bytes_max = 1048576,
+    file_bytes_max = 65536,
+    path_depth_max = 12,
+    process_timeout_ms = 30000,
+    stdout_bytes_max = 4096,
+    stderr_bytes_max = 4096,
+  },
+  entry_types = ["regular-file", "directory"],
+  allow_symlinks = false,
+  allow_submodules = false,
+  ambient_discovery = false,
+  automatic_activation = false,
+  transitions = ["tracked-to-inactive-candidate", "reviewed-candidate-to-frozen"],
+  diagnostics = [
+    "unsafe-metadata", "invalid-identity", "invalid-revision", "invalid-bounds",
+    "policy-mismatch", "host-facts-denied", "stale-observation", "duplicate-asset",
+    "source-collision", "frozen-mismatch", "candidate-conflict", "promotion-drift",
+    "automatic-activation", "mutation-denied", "unsupported-claim",
+  ],
+  non_claims = [
+    "source-authenticity", "authorship", "review-quality", "script-safety",
+    "runtime-authority", "host-confinement", "release-eligibility",
+  ],
+} | Policy

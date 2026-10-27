@@ -1,11 +1,7 @@
-use super::AutomationError;
-use super::SCHEMA_ID_FIELD;
-use super::STRUCTURED_FIELD;
-use super::Text;
-use super::TextField;
-use super::contains_text;
-use super::required_text;
-use super::unique_texts;
+use super::{
+    AutomationError, SCHEMA_ID_FIELD, STRUCTURED_FIELD, Text, TextField, contains_text,
+    required_text, unique_texts,
+};
 
 /// Borrowed schema contract for structured output validation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -125,17 +121,23 @@ pub fn validate_structured_output(
 
     for field in &required_fields {
         if !contains_text(observed_fields.as_slice(), field.as_str()) {
-            return Ok(StructuredOutputReport::failed(schema_id, StructuredOutputFailure::MissingField {
-                field: field.clone(),
-            }));
+            return Ok(StructuredOutputReport::failed(
+                schema_id,
+                StructuredOutputFailure::MissingField {
+                    field: field.clone(),
+                },
+            ));
         }
     }
     if !schema.allow_extra_fields {
         for field in &observed_fields {
             if !contains_text(allowed_fields.as_slice(), field.as_str()) {
-                return Ok(StructuredOutputReport::failed(schema_id, StructuredOutputFailure::ExtraField {
-                    field: field.clone(),
-                }));
+                return Ok(StructuredOutputReport::failed(
+                    schema_id,
+                    StructuredOutputFailure::ExtraField {
+                        field: field.clone(),
+                    },
+                ));
             }
         }
     }

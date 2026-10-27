@@ -37,7 +37,9 @@ const TEMPERATURE_MILLIS: u16 = 4;
 #[test]
 fn canonical_request_accepts_structured_conversation() {
     // r[verify agent_harness_runtime.model_compat.message_request.validation]
-    let system_content = [CanonicalContentPartDraft::Text { text: SYSTEM_PROMPT }];
+    let system_content = [CanonicalContentPartDraft::Text {
+        text: SYSTEM_PROMPT,
+    }];
     let user_content = [
         CanonicalContentPartDraft::Text { text: USER_PROMPT },
         CanonicalContentPartDraft::ImageDescriptor {
@@ -100,8 +102,14 @@ fn canonical_request_accepts_structured_conversation() {
     assert_eq!(request.messages().len(), messages.len());
     assert_eq!(request.tools()[0].name(), TOOL_NAME);
     assert!(request.output().stream());
-    assert_eq!(request.reasoning().effort(), CanonicalReasoningEffort::Medium);
-    assert_eq!(CanonicalModelRequest::contract_identity(), CANONICAL_MODEL_REQUEST_CONTRACT_IDENTITY);
+    assert_eq!(
+        request.reasoning().effort(),
+        CanonicalReasoningEffort::Medium
+    );
+    assert_eq!(
+        CanonicalModelRequest::contract_identity(),
+        CANONICAL_MODEL_REQUEST_CONTRACT_IDENTITY
+    );
 }
 
 #[test]
@@ -114,11 +122,19 @@ fn canonical_request_rejects_malformed_roles_and_empty_messages() {
         tool_call_id: None,
     }];
     let error = request_with_messages(&bad_role).expect_err("unsupported role should fail");
-    assert!(matches!(error, CanonicalModelContractError::UnsupportedRole { .. }));
+    assert!(matches!(
+        error,
+        CanonicalModelContractError::UnsupportedRole { .. }
+    ));
 
     let empty_messages: [CanonicalModelMessageDraft<'_>; 0] = [];
     let error = request_with_messages(&empty_messages).expect_err("empty messages should fail");
-    assert_eq!(error, CanonicalModelContractError::EmptyCollection { field: "model_role" });
+    assert_eq!(
+        error,
+        CanonicalModelContractError::EmptyCollection {
+            field: "model_role",
+        }
+    );
 }
 
 #[test]
@@ -132,8 +148,12 @@ fn canonical_request_rejects_unsupported_content_and_missing_required_fields() {
         content: &unsupported_content,
         tool_call_id: None,
     }];
-    let error = request_with_messages(&unsupported_message).expect_err("unsupported part should fail");
-    assert!(matches!(error, CanonicalModelContractError::UnsupportedContentPart { .. }));
+    let error =
+        request_with_messages(&unsupported_message).expect_err("unsupported part should fail");
+    assert!(matches!(
+        error,
+        CanonicalModelContractError::UnsupportedContentPart { .. }
+    ));
 
     let text_content = [CanonicalContentPartDraft::Text { text: USER_PROMPT }];
     let message = [CanonicalModelMessageDraft {
@@ -151,7 +171,10 @@ fn canonical_request_rejects_unsupported_content_and_missing_required_fields() {
         provenance: &[],
     })
     .expect_err("wrong contract identity should fail");
-    assert!(matches!(error, CanonicalModelContractError::InvalidContractIdentity { .. }));
+    assert!(matches!(
+        error,
+        CanonicalModelContractError::InvalidContractIdentity { .. }
+    ));
 }
 
 #[test]
@@ -180,7 +203,10 @@ fn canonical_request_rejects_oversized_metadata_and_leaks() {
         provenance: &oversized,
     })
     .expect_err("oversized metadata should fail");
-    assert!(matches!(error, CanonicalModelContractError::CollectionTooLarge { .. }));
+    assert!(matches!(
+        error,
+        CanonicalModelContractError::CollectionTooLarge { .. }
+    ));
 
     let leaky_content = [CanonicalContentPartDraft::RawProviderPayload {
         label: RAW_PAYLOAD_LABEL,
@@ -190,21 +216,33 @@ fn canonical_request_rejects_oversized_metadata_and_leaks() {
         content: &leaky_content,
         tool_call_id: None,
     }];
-    let error = request_with_messages(&leaky_message).expect_err("raw provider payload should fail");
-    assert_eq!(error, CanonicalModelContractError::UnsafeText {
-        field: "model_raw_provider_payload",
-        reason: CanonicalUnsafeTextReason::RawProviderPayload,
-    });
+    let error =
+        request_with_messages(&leaky_message).expect_err("raw provider payload should fail");
+    assert_eq!(
+        error,
+        CanonicalModelContractError::UnsafeText {
+            field: "model_raw_provider_payload",
+            reason: CanonicalUnsafeTextReason::RawProviderPayload,
+        }
+    );
 }
 
 #[test]
 fn canonical_response_accepts_text_structured_tool_and_refusal_cases() {
     // r[verify agent_harness_runtime.model_compat.response_envelope.validation]
-    let text = [CanonicalModelResponseItemDraft::AssistantText { text: RESPONSE_TEXT }];
-    let text_response =
-        response_with_items(&text, Some(CanonicalFinishReason::Stop.as_str())).expect("text response should validate");
-    assert_eq!(text_response.items()[0].assistant_text(), Some(RESPONSE_TEXT));
-    assert_eq!(CanonicalModelResponseEnvelope::contract_identity(), CANONICAL_MODEL_RESPONSE_CONTRACT_IDENTITY);
+    let text = [CanonicalModelResponseItemDraft::AssistantText {
+        text: RESPONSE_TEXT,
+    }];
+    let text_response = response_with_items(&text, Some(CanonicalFinishReason::Stop.as_str()))
+        .expect("text response should validate");
+    assert_eq!(
+        text_response.items()[0].assistant_text(),
+        Some(RESPONSE_TEXT)
+    );
+    assert_eq!(
+        CanonicalModelResponseEnvelope::contract_identity(),
+        CANONICAL_MODEL_RESPONSE_CONTRACT_IDENTITY
+    );
 
     let structured = [CanonicalModelResponseItemDraft::StructuredPayload {
         schema_label: JSON_SCHEMA,
@@ -221,7 +259,9 @@ fn canonical_response_accepts_text_structured_tool_and_refusal_cases() {
     response_with_items(&tool, Some(CanonicalFinishReason::ToolCall.as_str()))
         .expect("tool-call response should validate");
 
-    let refusal = [CanonicalModelResponseItemDraft::Refusal { reason: REFUSAL_REASON }];
+    let refusal = [CanonicalModelResponseItemDraft::Refusal {
+        reason: REFUSAL_REASON,
+    }];
     response_with_items(&refusal, Some(CanonicalFinishReason::Refusal.as_str()))
         .expect("refusal response should validate");
 

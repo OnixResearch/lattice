@@ -104,4 +104,90 @@ mod tests {
         assert_eq!(error, SafeFailure::FileAccess);
         assert!(!error.to_string().contains("secret"));
     }
+
+    // r[verify lattice.nickel_import_merge.values]
+    // r[verify lattice.nickel_import_merge.values.scenario.nested]
+    #[test]
+    fn imported_json_merge_preserves_nested_values_in_both_orders() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        std::fs::write(
+            directory.path().join("identity.json"),
+            r#"{"machine":{"id":"machine-1"},"grants":[{"operation":"shell","allowed":true}]}"#,
+        )
+        .expect("JSON fixture writes");
+        let path = directory.path().join("profile.ncl");
+        let expected = serde_json::json!({
+            "machine": {"id": "machine-1", "reviewed": true},
+            "grants": [{"operation": "shell", "allowed": true}],
+            "expires": 1234
+        });
+
+        let import_path =
+            serde_json::to_string(&directory.path().join("identity.json")).expect("absolute import path encodes");
+        for expression in [
+            "identity & { machine.reviewed = true, expires = 1234 }",
+            "{ machine.reviewed = true, expires = 1234 } & identity",
+        ] {
+            let source = format!("let identity = import \"identity.json\" in {expression}");
+            std::fs::write(&path, &source).expect("Nickel fixture writes");
+            assert_eq!(evaluate_file(&path).expect("imported JSON merge evaluates"), expected);
+            let captured = format!("let identity = import {import_path} in {expression}");
+            assert_eq!(evaluate_source(&captured).expect("captured imported JSON merge evaluates"), expected);
+        }
+    }
+
+    // r[verify lattice.nickel_import_merge.values.scenario.recursive]
+    #[test]
+    fn imported_json_merge_preserves_recursive_overrides_and_contracts() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        std::fs::write(
+            directory.path().join("defaults.json"),
+            r#"{"base":3,"nested":{"answer":42},"items":[{"enabled":true}]}"#,
+        )
+        .expect("JSON fixture writes");
+        let path = directory.path().join("profile.ncl");
+        std::fs::write(
+            &path,
+            r#"
+            let defaults = import "defaults.json" in
+            ({ base | Number | default = 1, derived = base + 1 } & defaults)
+              & { base | force = 5, nested.extra = "retained" }
+            "#,
+        )
+        .expect("Nickel fixture writes");
+
+        assert_eq!(
+            evaluate_file(&path).expect("recursive imported JSON merge evaluates"),
+            serde_json::json!({
+                "base": 5,
+                "derived": 6,
+                "nested": {"answer": 42, "extra": "retained"},
+                "items": [{"enabled": true}]
+            })
+        );
+    }
+
+    // r[verify lattice.nickel_import_merge.boundary]
+    // r[verify lattice.nickel_import_merge.boundary.scenario.invalid]
+    #[test]
+    fn imported_json_merge_rejects_invalid_imports_and_contracts_safely() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        std::fs::write(directory.path().join("malformed.json"), r#"{"token":"secret-sentinel","#)
+            .expect("malformed JSON fixture writes");
+        std::fs::write(directory.path().join("invalid.json"), r#"{"count":"secret-sentinel"}"#)
+            .expect("invalid contract fixture writes");
+        let path = directory.path().join("private-profile.ncl");
+
+        for (source, expected) in [
+            (r#"(import "missing-secret-sentinel.json") & { enabled = true }"#, SafeFailure::Evaluation),
+            (r#"(import "malformed.json") & { enabled = true }"#, SafeFailure::Evaluation),
+            (r#"(import "invalid.json") & { count | Number }"#, SafeFailure::ContractViolation),
+        ] {
+            std::fs::write(&path, source).expect("Nickel fixture writes");
+            let error = evaluate_file(&path).expect_err("invalid imported merge fails");
+            assert_eq!(error, expected);
+            assert!(!error.to_string().contains("secret-sentinel"));
+            assert!(!error.to_string().contains(path.to_string_lossy().as_ref()));
+        }
+    }
 }

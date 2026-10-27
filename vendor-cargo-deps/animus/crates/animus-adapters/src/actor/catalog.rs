@@ -134,7 +134,9 @@ impl Manifest {
     #[must_use]
     pub const fn authority_boundary(&self) -> AuthorityBoundary {
         match self.source_scope {
-            SourceScope::User | SourceScope::Project | SourceScope::ExplicitHost => AuthorityBoundary::CeilingOnly,
+            SourceScope::User | SourceScope::Project | SourceScope::ExplicitHost => {
+                AuthorityBoundary::CeilingOnly
+            }
         }
     }
 

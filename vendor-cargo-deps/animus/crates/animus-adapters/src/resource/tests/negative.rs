@@ -9,9 +9,12 @@ fn missing_description_fails() {
     })
     .expect_err("missing description should fail");
 
-    assert_eq!(missing_description, Error::MissingField {
-        field: DESCRIPTION_FIELD.as_str(),
-    });
+    assert_eq!(
+        missing_description,
+        Error::MissingField {
+            field: DESCRIPTION_FIELD.as_str(),
+        }
+    );
 }
 
 #[test]
@@ -21,10 +24,13 @@ fn invalid_names_and_kind_labels_fail() {
         ..valid_draft()
     })
     .expect_err("invalid descriptor name should fail");
-    assert_eq!(invalid_name, Error::MalformedName {
-        field: NAME_FIELD.as_str(),
-        value: Text::from(INVALID_NAME),
-    });
+    assert_eq!(
+        invalid_name,
+        Error::MalformedName {
+            field: NAME_FIELD.as_str(),
+            value: Text::from(INVALID_NAME),
+        }
+    );
     assert_eq!(
         Descriptor::validate(&Draft {
             kind: Some(UNSUPPORTED_KIND),
@@ -56,11 +62,20 @@ fn unsafe_identity_and_provenance_fail() {
     })
     .expect_err("path-like provenance should fail");
 
-    assert!(matches!(unsafe_identity, Error::InvalidContentIdentity { .. }));
-    assert!(matches!(uppercase_identity, Error::InvalidContentIdentity { .. }));
-    assert_eq!(unsafe_provenance, Error::MalformedProvenance {
-        value: Text::from(UNSAFE_PROVENANCE),
-    });
+    assert!(matches!(
+        unsafe_identity,
+        Error::InvalidContentIdentity { .. }
+    ));
+    assert!(matches!(
+        uppercase_identity,
+        Error::InvalidContentIdentity { .. }
+    ));
+    assert_eq!(
+        unsafe_provenance,
+        Error::MalformedProvenance {
+            value: Text::from(UNSAFE_PROVENANCE),
+        }
+    );
 }
 
 #[test]
@@ -73,8 +88,11 @@ fn overlong_description_fails() {
     })
     .expect_err("overlong description should fail");
 
-    assert_eq!(overlong_description, Error::DescriptionTooLong {
-        max_chars: MAX_DESCRIPTION_CHARS,
-        actual_chars: overlong_chars,
-    });
+    assert_eq!(
+        overlong_description,
+        Error::DescriptionTooLong {
+            max_chars: MAX_DESCRIPTION_CHARS,
+            actual_chars: overlong_chars,
+        }
+    );
 }

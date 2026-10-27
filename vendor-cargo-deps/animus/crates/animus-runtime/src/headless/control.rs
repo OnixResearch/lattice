@@ -1,12 +1,7 @@
-use super::AutomationError;
-use super::FinalOutput;
-use super::LEDGER_HASH_FIELD;
-use super::RunRequest;
-use super::THREAD_ID_FIELD;
-use super::Text;
-use super::TextField;
-use super::ThreadResume;
-use super::required_text;
+use super::{
+    AutomationError, FinalOutput, LEDGER_HASH_FIELD, RunRequest, THREAD_ID_FIELD, Text, TextField,
+    ThreadResume, required_text,
+};
 
 /// Thread status visible to controllers.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -35,7 +30,11 @@ impl ThreadSnapshot {
     /// # Errors
     ///
     /// Returns [`AutomationError`] when thread identity or ledger hash is empty.
-    pub fn new(thread_id: &str, ledger_hash: &str, status: ThreadStatus) -> Result<Self, AutomationError> {
+    pub fn new(
+        thread_id: &str,
+        ledger_hash: &str,
+        status: ThreadStatus,
+    ) -> Result<Self, AutomationError> {
         Ok(Self {
             thread_id: required_text(TextField {
                 field: THREAD_ID_FIELD,
@@ -113,7 +112,10 @@ pub trait RuntimeThreadController {
 ///
 /// Returns [`AutomationError`] before execution continues when thread identity
 /// or ledger hash does not match.
-pub fn validate_thread_resume(snapshot: &ThreadSnapshot, resume: &ThreadResume) -> Result<(), AutomationError> {
+pub fn validate_thread_resume(
+    snapshot: &ThreadSnapshot,
+    resume: &ThreadResume,
+) -> Result<(), AutomationError> {
     if snapshot.thread_id() != resume.thread_id() {
         return Err(AutomationError::ThreadIdentityMismatch {
             expected_thread_id: Text::from(snapshot.thread_id()),
@@ -136,7 +138,10 @@ pub fn validate_thread_resume(snapshot: &ThreadSnapshot, resume: &ThreadResume) 
 ///
 /// Returns [`AutomationError`] when the thread identity is empty, mismatched, or
 /// no longer running.
-pub fn validate_thread_cancellation(snapshot: &ThreadSnapshot, thread_id: &str) -> Result<(), AutomationError> {
+pub fn validate_thread_cancellation(
+    snapshot: &ThreadSnapshot,
+    thread_id: &str,
+) -> Result<(), AutomationError> {
     let requested_id = required_text(TextField {
         field: THREAD_ID_FIELD,
         value: thread_id,

@@ -1,42 +1,43 @@
-use basalt::CapabilityGrant;
-use basalt::EnforcementRequest;
-use basalt::authority_core::AUTHORITY_DECISION_SCHEMA;
-use basalt::authority_core::AUTHORITY_FIXTURE_SCHEMA;
-use basalt::authority_core::AuthorityAdapterError;
-use basalt::authority_core::AuthorityDecision;
-use basalt::authority_core::AuthorityDenyDiagnostic;
-use basalt::authority_core::AuthorityEvidence;
-use basalt::authority_core::AuthorityInput;
-use basalt::authority_core::REQUIRED_AUTHORITY_NON_CLAIMS;
-use basalt::authority_core::VerificationRefDisposition;
-use basalt::authority_core::VerifiedGrantBinding;
-use basalt::authority_core::adapt_enforcement_request;
-use basalt::authority_core::default_authority_policy_ref;
-use basalt::authority_core::evaluate_authority;
-use basalt::default_policy;
+use basalt::authority_core::{
+    AUTHORITY_DECISION_SCHEMA, AUTHORITY_FIXTURE_SCHEMA, AuthorityAdapterError, AuthorityDecision,
+    AuthorityDenyDiagnostic, AuthorityEvidence, AuthorityInput, REQUIRED_AUTHORITY_NON_CLAIMS,
+    VerificationRefDisposition, VerifiedGrantBinding, adapt_enforcement_request,
+    default_authority_policy_ref, evaluate_authority,
+};
+use basalt::{CapabilityGrant, EnforcementRequest, default_policy};
 use serde::Deserialize;
 
-const DIRECT_MATCH: &str = include_str!("../contracts/authority-core/fixtures/generated/positive/direct-match.json");
+const DIRECT_MATCH: &str =
+    include_str!("../contracts/authority-core/fixtures/generated/positive/direct-match.json");
 const DELEGATED_MATCH: &str =
     include_str!("../contracts/authority-core/fixtures/generated/positive/delegated-match.json");
-const MISSING_GRANT: &str = include_str!("../contracts/authority-core/fixtures/generated/negative/missing-grant.json");
+const MISSING_GRANT: &str =
+    include_str!("../contracts/authority-core/fixtures/generated/negative/missing-grant.json");
 const WRONG_RESOURCE: &str =
     include_str!("../contracts/authority-core/fixtures/generated/negative/wrong-resource.json");
-const WRONG_ABILITY: &str = include_str!("../contracts/authority-core/fixtures/generated/negative/wrong-ability.json");
-const STALE_VERIFICATION_REF: &str =
-    include_str!("../contracts/authority-core/fixtures/generated/negative/stale-verification-ref.json");
-const CAVEAT_DENIED: &str = include_str!("../contracts/authority-core/fixtures/generated/negative/caveat-denied.json");
-const REPLAY_DENIED: &str = include_str!("../contracts/authority-core/fixtures/generated/negative/replay-denied.json");
+const WRONG_ABILITY: &str =
+    include_str!("../contracts/authority-core/fixtures/generated/negative/wrong-ability.json");
+const STALE_VERIFICATION_REF: &str = include_str!(
+    "../contracts/authority-core/fixtures/generated/negative/stale-verification-ref.json"
+);
+const CAVEAT_DENIED: &str =
+    include_str!("../contracts/authority-core/fixtures/generated/negative/caveat-denied.json");
+const REPLAY_DENIED: &str =
+    include_str!("../contracts/authority-core/fixtures/generated/negative/replay-denied.json");
 const MISSING_POLICY_REF: &str =
     include_str!("../contracts/authority-core/fixtures/generated/negative/missing-policy-ref.json");
-const MALFORMED_REQUEST_REF: &str =
-    include_str!("../contracts/authority-core/fixtures/generated/negative/malformed-request-ref.json");
-const AUTHORITY_OVERCLAIM: &str =
-    include_str!("../contracts/authority-core/fixtures/generated/negative/authority-overclaim.json");
-const MISSING_VERIFICATION_RECEIPT: &str =
-    include_str!("../contracts/authority-core/fixtures/generated/negative/missing-verification-receipt.json");
-const VERIFICATION_REQUEST_MISMATCH: &str =
-    include_str!("../contracts/authority-core/fixtures/generated/negative/verification-request-mismatch.json");
+const MALFORMED_REQUEST_REF: &str = include_str!(
+    "../contracts/authority-core/fixtures/generated/negative/malformed-request-ref.json"
+);
+const AUTHORITY_OVERCLAIM: &str = include_str!(
+    "../contracts/authority-core/fixtures/generated/negative/authority-overclaim.json"
+);
+const MISSING_VERIFICATION_RECEIPT: &str = include_str!(
+    "../contracts/authority-core/fixtures/generated/negative/missing-verification-receipt.json"
+);
+const VERIFICATION_REQUEST_MISMATCH: &str = include_str!(
+    "../contracts/authority-core/fixtures/generated/negative/verification-request-mismatch.json"
+);
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -69,7 +70,9 @@ fn evaluate_input(input: &AuthorityInput) -> AuthorityDecision {
 }
 
 fn actual_diagnostic(decision: &AuthorityDecision) -> &str {
-    decision.diagnostic.map_or("none", AuthorityDenyDiagnostic::as_str)
+    decision
+        .diagnostic
+        .map_or("none", AuthorityDenyDiagnostic::as_str)
 }
 
 #[test]
@@ -86,7 +89,10 @@ fn positive_fixtures_admit_only_the_exact_request() {
         assert_eq!(decision.binding.as_ref(), Some(&fixture.input.request));
         assert_eq!(decision.request_ref, fixture.input.request.request_ref);
         assert_eq!(decision.supported_claim, "exact-request-only");
-        assert_eq!(decision.non_claims, REQUIRED_AUTHORITY_NON_CLAIMS.map(str::to_owned));
+        assert_eq!(
+            decision.non_claims,
+            REQUIRED_AUTHORITY_NON_CLAIMS.map(str::to_owned)
+        );
     }
 }
 
@@ -116,7 +122,10 @@ fn negative_fixtures_fail_closed_with_stable_binding_diagnostics() {
         assert!(decision.binding.is_none());
         assert_eq!(actual_diagnostic(&decision), fixture.expected.diagnostic);
         assert_eq!(decision.supported_claim, "no-authority-admitted");
-        assert_eq!(decision.non_claims, REQUIRED_AUTHORITY_NON_CLAIMS.map(str::to_owned));
+        assert_eq!(
+            decision.non_claims,
+            REQUIRED_AUTHORITY_NON_CLAIMS.map(str::to_owned)
+        );
     }
 }
 
@@ -131,17 +140,31 @@ fn mutated_verified_fact_edges_fail_closed() {
     let mut rejected_receipt = base_input.clone();
     rejected_receipt.verification_receipts[0].disposition = VerificationRefDisposition::Rejected;
     let mut multiple_policies = base_input;
-    multiple_policies.policy_refs.push(multiple_policies.policy_refs[0].clone());
+    multiple_policies
+        .policy_refs
+        .push(multiple_policies.policy_refs[0].clone());
 
     let cases = [
-        ("malformed grant reference", AuthorityDenyDiagnostic::MalformedVerifiedGrant, malformed_grant),
+        (
+            "malformed grant reference",
+            AuthorityDenyDiagnostic::MalformedVerifiedGrant,
+            malformed_grant,
+        ),
         (
             "receipt omits selected grant reference",
             AuthorityDenyDiagnostic::VerificationGrantMismatch,
             omitted_grant_binding,
         ),
-        ("rejected verification receipt", AuthorityDenyDiagnostic::RejectedVerificationRef, rejected_receipt),
-        ("multiple policy references", AuthorityDenyDiagnostic::MultiplePolicyRefs, multiple_policies),
+        (
+            "rejected verification receipt",
+            AuthorityDenyDiagnostic::RejectedVerificationRef,
+            rejected_receipt,
+        ),
+        (
+            "multiple policy references",
+            AuthorityDenyDiagnostic::MultiplePolicyRefs,
+            multiple_policies,
+        ),
     ];
 
     for (name, expected, input) in cases {
@@ -154,7 +177,8 @@ fn mutated_verified_fact_edges_fail_closed() {
 
 #[test]
 fn malformed_verified_fact_json_is_rejected_before_evaluation() {
-    let mut fixture: serde_json::Value = serde_json::from_str(DIRECT_MATCH).expect("fixture JSON should parse");
+    let mut fixture: serde_json::Value =
+        serde_json::from_str(DIRECT_MATCH).expect("fixture JSON should parse");
     fixture["input"]["verified_grants"][0]
         .as_object_mut()
         .expect("verified grant should be an object")
@@ -175,7 +199,10 @@ fn existing_enforcement_request_adapter_preserves_public_fields() {
         fixture.input.request.resource.clone(),
         fixture.input.request.ability.clone(),
     )
-    .with_capability(CapabilityGrant::new(grant.resource.clone(), grant.ability.clone()));
+    .with_capability(CapabilityGrant::new(
+        grant.resource.clone(),
+        grant.ability.clone(),
+    ));
     let evidence = AuthorityEvidence {
         request_ref: fixture.input.request.request_ref.clone(),
         grant_bindings: vec![VerifiedGrantBinding {
@@ -201,8 +228,14 @@ fn existing_enforcement_request_adapter_preserves_public_fields() {
     assert_eq!(adapted.request.resource, request.resource);
     assert_eq!(adapted.request.ability, request.ability);
     assert_eq!(adapted.verified_grants.len(), request.capabilities.len());
-    assert_eq!(adapted.verified_grants[0].resource, request.capabilities[0].resource);
-    assert_eq!(adapted.verified_grants[0].ability, request.capabilities[0].ability);
+    assert_eq!(
+        adapted.verified_grants[0].resource,
+        request.capabilities[0].resource
+    );
+    assert_eq!(
+        adapted.verified_grants[0].ability,
+        request.capabilities[0].ability
+    );
     assert!(decision.is_allowed());
 }
 
@@ -237,8 +270,10 @@ fn adapter_rejects_unbound_existing_capabilities() {
 
 #[test]
 fn raw_token_material_is_not_an_authority_input_field() {
-    let mut fixture: serde_json::Value = serde_json::from_str(DIRECT_MATCH).expect("fixture JSON should parse");
-    fixture["input"]["raw_token"] = serde_json::Value::String("header.payload.signature".to_owned());
+    let mut fixture: serde_json::Value =
+        serde_json::from_str(DIRECT_MATCH).expect("fixture JSON should parse");
+    fixture["input"]["raw_token"] =
+        serde_json::Value::String("header.payload.signature".to_owned());
 
     let error = serde_json::from_value::<AuthorityFixture>(fixture)
         .expect_err("raw token material must be rejected at the pure DTO boundary");
@@ -251,10 +286,14 @@ fn trusted_policy_reference_mismatch_denies() {
     let fixture = parse_fixture(DIRECT_MATCH);
     let policy = default_policy().expect("embedded policy should parse");
     let mut trusted = default_authority_policy_ref(fixture.input.request.contract_id.as_str());
-    trusted.artifact_ref = "blake3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned();
+    trusted.artifact_ref =
+        "blake3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_owned();
 
     let decision = evaluate_authority(&policy, &trusted, &fixture.input);
 
     assert!(decision.is_denied());
-    assert_eq!(decision.diagnostic, Some(AuthorityDenyDiagnostic::PolicyRefMismatch));
+    assert_eq!(
+        decision.diagnostic,
+        Some(AuthorityDenyDiagnostic::PolicyRefMismatch)
+    );
 }

@@ -3,7 +3,7 @@
 ## 1. Confirm prerequisites and baseline
 
 - [ ] [serial] 1.1 Run existing workflow, credential, event, adapter, and GitHub-related tests before core changes. r[lattice.github_ci.evidence_boundary]
-- [ ] [serial] 1.2 Confirm archived immutable revisions for the Animus SecretSpec adapter, Basalt exchange, Mantle Build API, and Valence evidence profile. r[lattice.github_ci.secretspec_github_credentials] r[lattice.github_ci.evidence_boundary]
+- [ ] [serial] 1.2 Confirm archived immutable revisions for the Animus SecretSpec adapter, Basalt exchange, Mantle `serve-private-asynchronous-build-api` private Build API, and Valence evidence profile; do not treat the broader active Nix gateway as accepted. r[lattice.github_ci.secretspec_github_credentials] r[lattice.github_ci.evidence_boundary]
 - [ ] [serial] 1.3 Define named OIDC, HTTP, matrix, event-page, cursor, annotation, summary, retry, and recovery bounds. r[lattice.github_ci.oidc_acquisition] r[lattice.github_ci.bounded_check_runs]
 - [ ] [serial] 1.4 Define explicit non-claims and authority boundaries. r[lattice.github_ci.evidence_boundary]
 

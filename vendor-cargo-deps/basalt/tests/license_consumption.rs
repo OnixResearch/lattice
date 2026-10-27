@@ -1,23 +1,28 @@
-use basalt::license_consumption::LICENSE_CONSUMPTION_FIXTURE_SCHEMA;
-use basalt::license_consumption::LICENSE_CONSUMPTION_RECEIPT_SCHEMA;
-use basalt::license_consumption::LicenseConsumptionReceipt;
-use basalt::license_consumption::LicenseReviewAction;
-use basalt::license_consumption::REQUIRED_LICENSE_CONSUMPTION_NON_CLAIMS;
-use basalt::license_consumption::validate_license_consumption;
+use basalt::license_consumption::{
+    LICENSE_CONSUMPTION_FIXTURE_SCHEMA, LICENSE_CONSUMPTION_RECEIPT_SCHEMA,
+    LicenseConsumptionReceipt, LicenseReviewAction, REQUIRED_LICENSE_CONSUMPTION_NON_CLAIMS,
+    validate_license_consumption,
+};
 use serde::Deserialize;
 
-const ACKNOWLEDGED_AGPL: &str =
-    include_str!("../contracts/license-consumption/fixtures/generated/positive/acknowledged-agpl.json");
-const MISSING_REVIEW: &str =
-    include_str!("../contracts/license-consumption/fixtures/generated/negative/missing-review.json");
-const WRONG_ARTIFACT: &str =
-    include_str!("../contracts/license-consumption/fixtures/generated/negative/wrong-artifact-identity.json");
-const STALE_METADATA: &str =
-    include_str!("../contracts/license-consumption/fixtures/generated/negative/stale-license-metadata.json");
-const WEAKENED_NON_CLAIMS: &str =
-    include_str!("../contracts/license-consumption/fixtures/generated/negative/weakened-non-claims.json");
-const WRONG_LICENSE: &str =
-    include_str!("../contracts/license-consumption/fixtures/generated/negative/wrong-license-expression.json");
+const ACKNOWLEDGED_AGPL: &str = include_str!(
+    "../contracts/license-consumption/fixtures/generated/positive/acknowledged-agpl.json"
+);
+const MISSING_REVIEW: &str = include_str!(
+    "../contracts/license-consumption/fixtures/generated/negative/missing-review.json"
+);
+const WRONG_ARTIFACT: &str = include_str!(
+    "../contracts/license-consumption/fixtures/generated/negative/wrong-artifact-identity.json"
+);
+const STALE_METADATA: &str = include_str!(
+    "../contracts/license-consumption/fixtures/generated/negative/stale-license-metadata.json"
+);
+const WEAKENED_NON_CLAIMS: &str = include_str!(
+    "../contracts/license-consumption/fixtures/generated/negative/weakened-non-claims.json"
+);
+const WRONG_LICENSE: &str = include_str!(
+    "../contracts/license-consumption/fixtures/generated/negative/wrong-license-expression.json"
+);
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -40,7 +45,11 @@ fn parse_fixture(input: &str) -> LicenseFixture {
 }
 
 fn issue_codes(verdict: &basalt::license_consumption::LicenseConsumptionVerdict) -> Vec<String> {
-    verdict.issues.iter().map(|issue| issue.code.clone()).collect()
+    verdict
+        .issues
+        .iter()
+        .map(|issue| issue.code.clone())
+        .collect()
 }
 
 #[test]
@@ -53,8 +62,15 @@ fn positive_fixture_acknowledges_agpl_consumption() {
     assert!(fixture.expected.accepted);
     assert_eq!(fixture.expected.diagnostic, "none");
     assert!(verdict.accepted, "{}", fixture.fixture_id);
-    assert!(verdict.issues.is_empty(), "unexpected issues: {:?}", verdict.issues);
-    assert_eq!(verdict.supported_claim.as_deref(), Some("intentional-license-review"));
+    assert!(
+        verdict.issues.is_empty(),
+        "unexpected issues: {:?}",
+        verdict.issues
+    );
+    assert_eq!(
+        verdict.supported_claim.as_deref(),
+        Some("intentional-license-review")
+    );
 }
 
 #[test]
@@ -89,12 +105,15 @@ fn missing_review_issue_code_is_stable() {
 
 #[test]
 fn non_claim_boundary_is_preserved() {
-    assert_eq!(REQUIRED_LICENSE_CONSUMPTION_NON_CLAIMS, [
-        "legal-advice",
-        "license-exception",
-        "compatibility-promise",
-        "alternate-license-grant",
-    ]);
+    assert_eq!(
+        REQUIRED_LICENSE_CONSUMPTION_NON_CLAIMS,
+        [
+            "legal-advice",
+            "license-exception",
+            "compatibility-promise",
+            "alternate-license-grant",
+        ]
+    );
 }
 
 #[test]

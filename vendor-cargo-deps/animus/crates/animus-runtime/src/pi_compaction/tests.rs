@@ -1,5 +1,4 @@
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven
-// validation compact while drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -7,7 +6,12 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
+#![allow(
+    compound_condition,
+    excessive_file_length,
+    function_length,
+    non_trait_imports
+)]
 #![allow(
     numeric_units,
     path_segment_repetition,
@@ -53,7 +57,10 @@ fn policy_trigger_respects_enabled_budget_and_missing_estimates() {
         evaluate_pi_compaction_trigger(&policy, Some(DEFAULT_BUDGET_UNITS - DEFAULT_RESERVE_UNITS)),
         PiCompactionTrigger::UnderBudget
     );
-    assert_eq!(evaluate_pi_compaction_trigger(&policy, None), PiCompactionTrigger::MissingEstimate);
+    assert_eq!(
+        evaluate_pi_compaction_trigger(&policy, None),
+        PiCompactionTrigger::MissingEstimate
+    );
 
     let disabled = compaction_policy(false, DEFAULT_KEPT_UNITS);
     assert_eq!(
@@ -72,21 +79,38 @@ fn policy_trigger_respects_enabled_budget_and_missing_estimates() {
 fn cut_point_moves_before_tool_call_to_avoid_orphaned_results() {
     // r[agent_harness_runtime.pi_compaction.cut_points.reject_tool_result]
     let entries = vec![
-        entry(USER_ENTRY, TURN_ONE, PiCompactionReplayEntryKind::User, LARGE_ENTRY_UNITS),
+        entry(
+            USER_ENTRY,
+            TURN_ONE,
+            PiCompactionReplayEntryKind::User,
+            LARGE_ENTRY_UNITS,
+        ),
         tool_entry(CALL_ENTRY, TURN_TWO, PiCompactionReplayEntryKind::ToolCall),
-        tool_entry(RESULT_ENTRY, TURN_TWO, PiCompactionReplayEntryKind::ToolResult),
-        entry(ASSISTANT_ENTRY, TURN_TWO, PiCompactionReplayEntryKind::Assistant, ENTRY_UNITS),
+        tool_entry(
+            RESULT_ENTRY,
+            TURN_TWO,
+            PiCompactionReplayEntryKind::ToolResult,
+        ),
+        entry(
+            ASSISTANT_ENTRY,
+            TURN_TWO,
+            PiCompactionReplayEntryKind::Assistant,
+            ENTRY_UNITS,
+        ),
     ];
     let compaction_policy = compaction_policy(true, DEFAULT_KEPT_UNITS);
     let plan = prepare_pi_compaction(&compaction_policy, &entries, Some(DEFAULT_CONTEXT_ESTIMATE));
 
     assert_eq!(plan.trigger, PiCompactionTrigger::Required);
     assert_eq!(plan.cut_index, Some(1));
-    assert_eq!(plan.kept_entry_ids, vec![
-        CALL_ENTRY.to_string(),
-        RESULT_ENTRY.to_string(),
-        ASSISTANT_ENTRY.to_string(),
-    ]);
+    assert_eq!(
+        plan.kept_entry_ids,
+        vec![
+            CALL_ENTRY.to_string(),
+            RESULT_ENTRY.to_string(),
+            ASSISTANT_ENTRY.to_string(),
+        ]
+    );
     assert!(!plan.kept_entry_ids.contains(&USER_ENTRY.to_string()));
 }
 
@@ -94,19 +118,55 @@ fn cut_point_moves_before_tool_call_to_avoid_orphaned_results() {
 fn split_turn_plan_records_prefix_and_kept_suffix_order() {
     // r[agent_harness_runtime.pi_compaction.split_turn.prefix]
     let entries = vec![
-        entry(USER_ENTRY, TURN_ONE, PiCompactionReplayEntryKind::User, ENTRY_UNITS),
-        entry(ASSISTANT_ENTRY, TURN_ONE, PiCompactionReplayEntryKind::Assistant, ENTRY_UNITS),
-        entry("summary.entry", TURN_ONE, PiCompactionReplayEntryKind::Summary, ENTRY_UNITS),
-        entry("user.two", TURN_TWO, PiCompactionReplayEntryKind::User, LARGE_ENTRY_UNITS),
-        entry("assistant.two", TURN_TWO, PiCompactionReplayEntryKind::Assistant, ENTRY_UNITS),
-        entry("assistant.three", TURN_TWO, PiCompactionReplayEntryKind::Assistant, ENTRY_UNITS),
+        entry(
+            USER_ENTRY,
+            TURN_ONE,
+            PiCompactionReplayEntryKind::User,
+            ENTRY_UNITS,
+        ),
+        entry(
+            ASSISTANT_ENTRY,
+            TURN_ONE,
+            PiCompactionReplayEntryKind::Assistant,
+            ENTRY_UNITS,
+        ),
+        entry(
+            "summary.entry",
+            TURN_ONE,
+            PiCompactionReplayEntryKind::Summary,
+            ENTRY_UNITS,
+        ),
+        entry(
+            "user.two",
+            TURN_TWO,
+            PiCompactionReplayEntryKind::User,
+            LARGE_ENTRY_UNITS,
+        ),
+        entry(
+            "assistant.two",
+            TURN_TWO,
+            PiCompactionReplayEntryKind::Assistant,
+            ENTRY_UNITS,
+        ),
+        entry(
+            "assistant.three",
+            TURN_TWO,
+            PiCompactionReplayEntryKind::Assistant,
+            ENTRY_UNITS,
+        ),
     ];
     let compaction_policy = compaction_policy(true, DEFAULT_KEPT_UNITS);
     let plan = prepare_pi_compaction(&compaction_policy, &entries, Some(DEFAULT_CONTEXT_ESTIMATE));
 
     assert!(plan.split_turn);
-    assert_eq!(plan.split_turn_prefix_entry_ids, vec!["user.two".to_string()]);
-    assert_eq!(plan.kept_entry_ids, vec!["assistant.two".to_string(), "assistant.three".to_string()]);
+    assert_eq!(
+        plan.split_turn_prefix_entry_ids,
+        vec!["user.two".to_string()]
+    );
+    assert_eq!(
+        plan.kept_entry_ids,
+        vec!["assistant.two".to_string(), "assistant.three".to_string()]
+    );
 }
 
 #[test]
@@ -123,7 +183,10 @@ fn branch_handoff_selects_abandoned_span_and_honors_no_summary_request() {
 
     assert!(plan.summary_required);
     assert_eq!(plan.common_ancestor_id, Some(COMMON_ENTRY.to_string()));
-    assert_eq!(plan.abandoned_entry_ids, vec![OLD_BRANCH_ONE.to_string(), OLD_BRANCH_TWO.to_string()]);
+    assert_eq!(
+        plan.abandoned_entry_ids,
+        vec![OLD_BRANCH_ONE.to_string(), OLD_BRANCH_TWO.to_string()]
+    );
     assert_eq!(plan.target_entry_ids, vec![TARGET_BRANCH_ONE.to_string()]);
 
     let no_summary = PiBranchHandoffRequest {
@@ -139,23 +202,38 @@ fn branch_handoff_selects_abandoned_span_and_honors_no_summary_request() {
 fn missing_summarizer_halts_required_compaction_without_fallback() {
     // r[agent_harness_runtime.pi_compaction.injected_summarizer.missing]
     let entries = vec![
-        entry(USER_ENTRY, TURN_ONE, PiCompactionReplayEntryKind::User, LARGE_ENTRY_UNITS),
-        entry(ASSISTANT_ENTRY, TURN_TWO, PiCompactionReplayEntryKind::Assistant, ENTRY_UNITS),
+        entry(
+            USER_ENTRY,
+            TURN_ONE,
+            PiCompactionReplayEntryKind::User,
+            LARGE_ENTRY_UNITS,
+        ),
+        entry(
+            ASSISTANT_ENTRY,
+            TURN_TWO,
+            PiCompactionReplayEntryKind::Assistant,
+            ENTRY_UNITS,
+        ),
     ];
     let compaction_policy = compaction_policy(true, DEFAULT_KEPT_UNITS);
     let plan = prepare_pi_compaction(&compaction_policy, &entries, Some(DEFAULT_CONTEXT_ESTIMATE));
-    let missing = evaluate_required_pi_summarizer(&compaction_policy, &plan, PiCompactionSummarizerState::Missing);
+    let missing = evaluate_required_pi_summarizer(
+        &compaction_policy,
+        &plan,
+        PiCompactionSummarizerState::Missing,
+    );
 
     assert!(!missing.dispatch_summarizer);
     assert!(missing.request.is_none());
-    assert!(
-        missing
-            .diagnostics
-            .iter()
-            .any(|diagnostic| { diagnostic.kind == PiCompactionDiagnosticKind::SummarizerUnavailable })
-    );
+    assert!(missing.diagnostics.iter().any(|diagnostic| {
+        diagnostic.kind == PiCompactionDiagnosticKind::SummarizerUnavailable
+    }));
 
-    let ready = evaluate_required_pi_summarizer(&compaction_policy, &plan, PiCompactionSummarizerState::Ready);
+    let ready = evaluate_required_pi_summarizer(
+        &compaction_policy,
+        &plan,
+        PiCompactionSummarizerState::Ready,
+    );
     assert!(ready.dispatch_summarizer);
     assert!(ready.request.is_some());
 }
@@ -179,25 +257,48 @@ fn summary_metadata_accepts_redacted_data_and_rejects_raw_material() {
             .iter()
             .any(|diagnostic| { diagnostic.kind == PiCompactionDiagnosticKind::UnsafeMetadata })
     );
-    assert!(diagnostics.iter().any(|diagnostic| { diagnostic.kind == PiCompactionDiagnosticKind::InvalidHash }));
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| { diagnostic.kind == PiCompactionDiagnosticKind::InvalidHash })
+    );
 }
 
 fn branch_entries() -> Vec<PiCompactionReplayEntry> {
     vec![
-        entry_with_parents(COMMON_ENTRY, TURN_ONE, PiCompactionReplayEntryKind::User, Vec::new()),
-        entry_with_parents(OLD_BRANCH_ONE, TURN_ONE, PiCompactionReplayEntryKind::Assistant, vec![
-            COMMON_ENTRY.to_string(),
-        ]),
-        entry_with_parents(OLD_BRANCH_TWO, TURN_TWO, PiCompactionReplayEntryKind::Assistant, vec![
-            OLD_BRANCH_ONE.to_string(),
-        ]),
-        entry_with_parents(TARGET_BRANCH_ONE, TURN_TWO, PiCompactionReplayEntryKind::Assistant, vec![
-            COMMON_ENTRY.to_string(),
-        ]),
+        entry_with_parents(
+            COMMON_ENTRY,
+            TURN_ONE,
+            PiCompactionReplayEntryKind::User,
+            Vec::new(),
+        ),
+        entry_with_parents(
+            OLD_BRANCH_ONE,
+            TURN_ONE,
+            PiCompactionReplayEntryKind::Assistant,
+            vec![COMMON_ENTRY.to_string()],
+        ),
+        entry_with_parents(
+            OLD_BRANCH_TWO,
+            TURN_TWO,
+            PiCompactionReplayEntryKind::Assistant,
+            vec![OLD_BRANCH_ONE.to_string()],
+        ),
+        entry_with_parents(
+            TARGET_BRANCH_ONE,
+            TURN_TWO,
+            PiCompactionReplayEntryKind::Assistant,
+            vec![COMMON_ENTRY.to_string()],
+        ),
     ]
 }
 
-fn entry(id: &str, turn_id: &str, kind: PiCompactionReplayEntryKind, estimate_units: u32) -> PiCompactionReplayEntry {
+fn entry(
+    id: &str,
+    turn_id: &str,
+    kind: PiCompactionReplayEntryKind,
+    estimate_units: u32,
+) -> PiCompactionReplayEntry {
     entry_with_parents(id, turn_id, kind, Vec::new()).with_estimate(estimate_units)
 }
 
@@ -234,7 +335,10 @@ fn compaction_policy(enabled: bool, kept_recent_units: u32) -> PiCompactionPolic
     }
 }
 
-fn summary_entry(summary_text: &str, redacted_resource_ids: Vec<String>) -> PiCompactionSummaryEntry {
+fn summary_entry(
+    summary_text: &str,
+    redacted_resource_ids: Vec<String>,
+) -> PiCompactionSummaryEntry {
     PiCompactionSummaryEntry {
         summary_text: summary_text.to_string(),
         source_entry_count: DEFAULT_RESERVE_UNITS,
@@ -249,7 +353,11 @@ fn summary_entry(summary_text: &str, redacted_resource_ids: Vec<String>) -> PiCo
     }
 }
 
-fn tool_entry(id: &str, turn_id: &str, kind: PiCompactionReplayEntryKind) -> PiCompactionReplayEntry {
+fn tool_entry(
+    id: &str,
+    turn_id: &str,
+    kind: PiCompactionReplayEntryKind,
+) -> PiCompactionReplayEntry {
     PiCompactionReplayEntry {
         tool_binding: Some(PiCompactionToolBinding {
             call_id: TOOL_CALL_ID.to_string(),

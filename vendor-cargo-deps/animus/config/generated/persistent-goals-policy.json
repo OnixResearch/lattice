@@ -1,0 +1,42 @@
+{
+  "actions": [
+    "pause",
+    "resume",
+    "complete",
+    "clear",
+    "error",
+    "budget_exhausted"
+  ],
+  "cohort": "prime-agent-persistent-goals",
+  "explicit_completion_only": true,
+  "host_injected_accounting": true,
+  "license": "MIT",
+  "max_objective_identity_length": 128,
+  "minimum_budget_limit": 1,
+  "non_claims": [
+    "not-objective-achievement",
+    "not-work-quality",
+    "not-automatic-inference",
+    "not-production-or-release-readiness"
+  ],
+  "one_active_goal": true,
+  "receipt_fields": [
+    "policy_identity",
+    "transition",
+    "status",
+    "budget_class",
+    "token_counter_identity",
+    "elapsed_counter_identity",
+    "continuation_counter_identity"
+  ],
+  "schema": "animus.persistent-goals.v1",
+  "source_revision": "c5991bc853d27754aed345c13ff4d2e05c40f1f4",
+  "statuses": [
+    "active",
+    "paused",
+    "completed",
+    "budget_limited",
+    "errored",
+    "cleared"
+  ]
+}

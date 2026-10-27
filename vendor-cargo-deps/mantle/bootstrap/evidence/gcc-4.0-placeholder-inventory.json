@@ -1,0 +1,29 @@
+{
+  "schema": "mantle-gcc40-placeholder-inventory-v1",
+  "derivation": "bootstrap/gcc-4.0.ncl",
+  "status": "inventory-only",
+  "marker_count": 4,
+  "markers": [
+    {
+      "line": 1385,
+      "marker": "pass1 bridge",
+      "classification": "checked placeholder/frontier marker debt"
+    },
+    {
+      "line": 1565,
+      "marker": "pass1 bridge",
+      "classification": "checked placeholder/frontier marker debt"
+    },
+    {
+      "line": 1580,
+      "marker": "pass1 bridge",
+      "classification": "checked placeholder/frontier marker debt"
+    },
+    {
+      "line": 1724,
+      "marker": "pass1 bridge",
+      "classification": "checked placeholder/frontier marker debt"
+    }
+  ],
+  "non_claim": "inventory only; does not prove native GCC 4.0 correctness"
+}

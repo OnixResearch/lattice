@@ -1,5 +1,4 @@
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 
 const MAX_SAFE_LABEL_CHARS: u32 = 256;
 const MAX_RECEIPT_ITEMS: usize = 32;
@@ -170,7 +169,8 @@ impl Receipt {
         validate_hash("policy_identity", draft.policy_identity)?;
         let operation_classes = canonical_operations(draft.operation_classes)?;
         let counts = canonical_counts(draft.counts)?;
-        let child_lineage_hashes = canonical_hashes("child_lineage_hashes", draft.child_lineage_hashes)?;
+        let child_lineage_hashes =
+            canonical_hashes("child_lineage_hashes", draft.child_lineage_hashes)?;
         let artifact_hashes = canonical_hashes("artifact_hashes", draft.artifact_hashes)?;
         let non_claims = canonical_non_claims(draft.non_claims)?;
         validate_preservation(draft.status, draft.kernel_state_preserved)?;
@@ -266,7 +266,10 @@ fn reject_optional_leak(value: Option<&str>, class: ReceiptLeakClass) -> Result<
 fn reject_prohibited_claims(claims: &[&str]) -> Result<(), crate::Error> {
     for claim in claims {
         let normalized = safe_label("claim", claim)?;
-        if PROHIBITED_CLAIMS.iter().any(|prohibited| normalized == *prohibited) {
+        if PROHIBITED_CLAIMS
+            .iter()
+            .any(|prohibited| normalized == *prohibited)
+        {
             return Err(crate::Error::ProhibitedClaim);
         }
     }
@@ -288,7 +291,11 @@ fn canonical_operations(
 }
 
 fn canonical_counts(values: &[ReceiptCount]) -> Result<Vec<ReceiptCount>, crate::Error> {
-    crate::ensure_at_most("receipt_counts", crate::usize_to_u64(values.len()), crate::usize_to_u64(MAX_RECEIPT_ITEMS))?;
+    crate::ensure_at_most(
+        "receipt_counts",
+        crate::usize_to_u64(values.len()),
+        crate::usize_to_u64(MAX_RECEIPT_ITEMS),
+    )?;
     let mut canonical = values.to_vec();
     canonical.sort();
     let original_len = canonical.len();
@@ -302,7 +309,11 @@ fn canonical_counts(values: &[ReceiptCount]) -> Result<Vec<ReceiptCount>, crate:
 }
 
 fn canonical_hashes(field: &'static str, values: &[&str]) -> Result<Vec<String>, crate::Error> {
-    crate::ensure_at_most(field, crate::usize_to_u64(values.len()), crate::usize_to_u64(MAX_RECEIPT_ITEMS))?;
+    crate::ensure_at_most(
+        field,
+        crate::usize_to_u64(values.len()),
+        crate::usize_to_u64(MAX_RECEIPT_ITEMS),
+    )?;
     let mut canonical = values
         .iter()
         .map(|value| {
@@ -316,19 +327,26 @@ fn canonical_hashes(field: &'static str, values: &[&str]) -> Result<Vec<String>,
 }
 
 fn canonical_non_claims(values: &[&str]) -> Result<Vec<String>, crate::Error> {
-    let mut canonical = values.iter().map(|value| safe_label("non_claim", value)).collect::<Result<Vec<_>, _>>()?;
+    let mut canonical = values
+        .iter()
+        .map(|value| safe_label("non_claim", value))
+        .collect::<Result<Vec<_>, _>>()?;
     canonical.sort();
     canonical.dedup();
     for required in crate::REQUIRED_NON_CLAIMS {
         if !canonical.iter().any(|value| value == required) {
-            return Err(crate::Error::MissingNonClaim { non_claim: required });
+            return Err(crate::Error::MissingNonClaim {
+                non_claim: required,
+            });
         }
     }
     Ok(canonical)
 }
 
 fn validate_preservation(status: RlmKernelStatus, preserved: bool) -> Result<(), crate::Error> {
-    if (status == RlmKernelStatus::Preserved && !preserved) || (status == RlmKernelStatus::Cleared && preserved) {
+    if (status == RlmKernelStatus::Preserved && !preserved)
+        || (status == RlmKernelStatus::Cleared && preserved)
+    {
         return Err(crate::Error::InconsistentReceipt);
     }
     Ok(())
@@ -369,7 +387,12 @@ struct ReceiptIdentityInputs<'a> {
 
 fn receipt_identity(inputs: &ReceiptIdentityInputs<'_>) -> String {
     let draft = inputs.draft;
-    let operation_text = inputs.operations.iter().map(|operation| operation.as_str()).collect::<Vec<_>>().join(",");
+    let operation_text = inputs
+        .operations
+        .iter()
+        .map(|operation| operation.as_str())
+        .collect::<Vec<_>>()
+        .join(",");
     let count_text = inputs
         .counts
         .iter()
@@ -384,14 +407,17 @@ fn receipt_identity(inputs: &ReceiptIdentityInputs<'_>) -> String {
     } else {
         "not-preserved"
     };
-    crate::hash_parts(RECEIPT_IDENTITY_DOMAIN, &[
-        draft.status.as_str(),
-        draft.policy_identity,
-        operation_text.as_str(),
-        count_text.as_str(),
-        child_text.as_str(),
-        artifact_text.as_str(),
-        preserved,
-        non_claim_text.as_str(),
-    ])
+    crate::hash_parts(
+        RECEIPT_IDENTITY_DOMAIN,
+        &[
+            draft.status.as_str(),
+            draft.policy_identity,
+            operation_text.as_str(),
+            count_text.as_str(),
+            child_text.as_str(),
+            artifact_text.as_str(),
+            preserved,
+            non_claim_text.as_str(),
+        ],
+    )
 }

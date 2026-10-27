@@ -19,6 +19,7 @@
     reason = "the legacy TUI host remains a separately tracked decomposition; this change only carries bounded completion evidence"
 )]
 pub mod app;
+pub mod authoring;
 pub mod graph;
 pub mod input;
 pub mod panels;

@@ -588,3 +588,50 @@ r[crate_consumability.cap_std_cli_policy_boundary.validation]
 - GIVEN the cap-std CLI-policy change is ready to archive
 - WHEN focused CLI, no-default library, Cairn validation, and gate checks run
 - THEN the evidence MUST include positive and negative filesystem-boundary coverage and visible policy/UCAN non-claim documentation.
+
+### Requirement: Vendored UCAN composes with reviewed exact BLAKE3 consumers
+
+r[crate_consumability.blake3_alignment] Basalt MUST import a reviewed UCAN revision whose exact peer-authentication and Nostr BLAKE3 pins compose with supported consumer graphs. The source revision, vendored snapshot manifest, and Cargo lock MUST move together through owning tools.
+
+#### Scenario: Molten consumes branch-authority policy
+
+- GIVEN Molten requires the reviewed exact BLAKE3 cohort
+- WHEN Cargo resolves Basalt and its vendored UCAN peer-authentication crates
+- THEN one compatible BLAKE3 version MUST resolve without a patch override
+
+#### Scenario: Vendored source is edited by hand
+
+- GIVEN a vendored manifest differs from the recorded UCAN source revision
+- WHEN the snapshot check runs
+- THEN verification MUST fail before publication
+
+### Requirement: Compatibility evidence remains bounded
+
+r[crate_consumability.blake3_alignment.verification] Verification MUST cover snapshot parity, Basalt policy APIs, supported feature sets, and one downstream composition. It MUST NOT claim cryptographic correctness or universal compatibility.
+
+#### Scenario: Compatibility rail passes
+
+- GIVEN the imported revision and lock agree
+- WHEN focused, release, Nix, and lifecycle checks run
+- THEN the receipt MAY report tested dependency compatibility only
+
+### Requirement: Explicit enforcement-only dependency profile
+r[crate_consumability.enforcement_profile] Basalt SHALL preserve its default public modules and verification behavior. Explicit no-default consumers MUST omit OIDC HTTP and durable-state adapter dependencies while retaining exact UCAN enforcement. No dependency downgrade or verification bypass is permitted.
+
+#### Scenario: Default consumer
+- GIVEN default features
+- WHEN Basalt compiles and tests
+- THEN OIDC and durable-authority modules retain their existing behavior
+
+#### Scenario: Minimal consumer
+- GIVEN default features disabled
+- WHEN enforcement compiles and tests on pinned Rust 1.95
+- THEN signed execution and document verification remain available without bounded-http, bounded-http-core, replay-ledger-core or revocation-view-core
+
+### Requirement: Maintained isolation evidence
+r[crate_consumability.enforcement_profile_evidence] Release verification MUST test the minimal profile and reject empty or forbidden normal dependency observations. Evidence SHALL distinguish actual compiler results from configured feature intent.
+
+#### Scenario: Invalid dependency observation
+- GIVEN empty output or a forbidden package
+- WHEN the pure dependency validator runs
+- THEN it rejects the observation

@@ -52,10 +52,13 @@ fn lifecycle_reporting_covers_start_failure_continuation_and_aggregation() {
     assert_eq!(failure.evidence_ref(), Some(FAILURE_EVIDENCE_REF));
     assert_eq!(continuation.kind(), SubagentEventKind::Continuation);
     assert_eq!(aggregation.kind(), SubagentEventKind::Aggregation);
-    assert_eq!(bad_kind, SubagentError::UnsupportedValue {
-        field: EVENT_KIND_FIELD,
-        value: Text::from(BAD_EVENT_KIND),
-    });
+    assert_eq!(
+        bad_kind,
+        SubagentError::UnsupportedValue {
+            field: EVENT_KIND_FIELD,
+            value: Text::from(BAD_EVENT_KIND),
+        }
+    );
 }
 
 #[test]
@@ -83,7 +86,10 @@ fn aggregation_keeps_failures_and_write_conflicts_visible() {
     }])
     .expect("conflict outcome should aggregate");
 
-    assert_eq!(partial.status(), SubagentOutcomeKind::PartialParallelSuccess);
+    assert_eq!(
+        partial.status(),
+        SubagentOutcomeKind::PartialParallelSuccess
+    );
     assert_eq!(partial.success_count(), MIN_TURN_COUNT);
     assert_eq!(partial.failure_count(), MIN_TURN_COUNT);
     assert_eq!(conflict.status(), SubagentOutcomeKind::WriteConflict);

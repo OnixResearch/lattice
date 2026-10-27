@@ -72,7 +72,11 @@ impl WorkerContextItemKind {
     pub const fn is_default_safe(self) -> bool {
         matches!(
             self,
-            Self::ParentMessage | Self::Summary | Self::FileObservation | Self::MemoryDescriptor | Self::ToolResult
+            Self::ParentMessage
+                | Self::Summary
+                | Self::FileObservation
+                | Self::MemoryDescriptor
+                | Self::ToolResult
         )
     }
 }

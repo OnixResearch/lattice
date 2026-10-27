@@ -29,9 +29,16 @@ impl core::fmt::Display for Error {
                 field,
                 max_items,
                 actual_items,
-            } => write!(formatter, "{field} must contain at most {max_items} items; got {actual_items}"),
+            } => write!(
+                formatter,
+                "{field} must contain at most {max_items} items; got {actual_items}"
+            ),
             Self::UnsafeText { field, leak } => {
-                write!(formatter, "{field} contains unsafe {} material", leak.as_str())
+                write!(
+                    formatter,
+                    "{field} contains unsafe {} material",
+                    leak.as_str()
+                )
             }
         }
     }
@@ -182,9 +189,12 @@ impl AdvisoryReview {
     /// appears, collections exceed bounds, or raw evidence cannot be hashed
     /// within adapter limits.
     pub fn validate(draft: &AdvisoryReviewDraft<'_>) -> Result<Self, super::Error> {
-        let reviewer_label = super::input::required_safe_text(super::REVIEWER_LABEL_FIELD, draft.reviewer_label)?;
-        let explanation_label =
-            super::input::required_safe_text(super::REVIEW_EXPLANATION_FIELD, draft.explanation_label)?;
+        let reviewer_label =
+            super::input::required_safe_text(super::REVIEWER_LABEL_FIELD, draft.reviewer_label)?;
+        let explanation_label = super::input::required_safe_text(
+            super::REVIEW_EXPLANATION_FIELD,
+            draft.explanation_label,
+        )?;
         let evidence_hashes = super::input::optional_raw_evidence_hashes(
             super::RAW_EVIDENCE_FIELD,
             draft.raw_evidence,

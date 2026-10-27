@@ -1,0 +1,47 @@
+{
+  "schema": "mantle-gcc40-native-cc1-build-frontier-v1",
+  "derivation": "bootstrap/gcc-4.0.ncl",
+  "status": "frontier-only",
+  "native_attempt": {
+    "make_marker": "make -j1 -C gcc gengtype-yacc.c CC=tcc AR=\"$BINUTILS/bin/ar\" RANLIB=\"$BINUTILS/bin/ranlib\" MAKEINFO=true 2>&1 || true",
+    "diagnostic_marker": "MANTLE: gcc-4.0 native cc1 build reached TinyCC/Mes source boundary; installing pass1 bridge",
+    "pass1_bridge_marker": "the validated TinyCC handoff. This remains a bridge until native cc1 builds."
+  },
+  "source_frontier_markers": [
+    "under the c-parse flags deterministically segfaults TinyCC after that",
+    "rewrites before system.h trigger deterministic TinyCC segfaults.",
+    "through TinyCC/Mes diagnostics and segfault; seed the same inert files"
+  ],
+  "source_frontier_reduction": {
+    "schema": "mantle-gcc40-native-cc1-source-frontier-reduction-v22",
+    "prior_frontier": "source-frontier v21 recovered the concrete include payload config.h->auto-host.h#define_ssize_t plus system.h->stdio.h->__NEED_ssize_t->bits/alltypes.h:ssize_t, while the real c-parse.o make target still failed with rc=2 and two truncated include-flood lines",
+    "attempted_probe": "bounded generated-header seam probe comments out the generated #define ssize_t line in gcc/auto-host.h before the real make -C gcc c-parse.o target, restores auto-host.h afterward, and records whether the target advances past the include-flood frontier",
+    "probe_marker": "MANTLE-GCC40-NATIVE-CC1-SOURCE-FRONTIER-REDUCTION-V1: bounded gengtype-yacc probe records unchanged TinyCC/Mes c-parse boundary after generated-header seeds.",
+    "observed_result": "narrowed-stable-blocker",
+    "observed_frontier": "directly disabling the generated auto-host.h ssize_t definition did not advance the real make frontier: cparse_auto_host_ssize_patch=present; cparse_auto_host_ssize_disabled=present; cparse_make_auto_host_ssize_cparse_o_rc=2; cparse_make_auto_host_ssize_cparse_o_compile_command=present; cparse_make_auto_host_ssize_cparse_o_object=absent; cparse_make_auto_host_ssize_cparse_o_log_lines=109; cparse_make_auto_host_ssize_cparse_o_log_bytes=19374; cparse_make_auto_host_ssize_include_flood_lines=2; cparse_make_auto_host_ssize_include_flood_truncated_lines=2; cparse_make_auto_host_ssize_cparse_o_tail; make: *** [c-parse.o] Error 1; the v21 recovered payload remains useful evidence, but the blocker is not fixed by removing only the generated auto-host.h ssize_t define",
+    "retirement_condition": "replace when a follow-up diagnostic advances beyond the direct auto-host.h ssize_t seam probe and focused c-parse.o include-flood/truncation rc/stderr failure to a native GCC 4.0 c-parse/cc1 source-build step without pass1 fallback",
+    "diagnostic_derivation": "bootstrap/diag-gcc40-c-parse-boundary.ncl",
+    "diagnostic_markers": [
+      "diag-cparse-frontier: compact_archived_matrix_v8",
+      "diag-cparse-frontier: cparse_v19_adjusted_ssize_frontier=archived",
+      "diag-cparse-frontier: cparse_v20_systypes_config_frontier=archived",
+      "diag-cparse-frontier: cparse_v21_include_trace_frontier=archived",
+      "diag-cparse-frontier: cparse_auto_host_ssize_patch=$auto_patch",
+      "diag-cparse-frontier: cparse_auto_host_ssize_disabled=present",
+      "m=/tmp/gcc40-cparse-make-auto-host-ssize.log",
+      "diag-cparse-frontier: cparse_make_auto_host_ssize_cparse_o_rc=$rc",
+      "diag-cparse-frontier: cparse_make_auto_host_ssize_cparse_o_compile_command=present",
+      "diag-cparse-frontier: cparse_make_auto_host_ssize_cparse_o_object=absent",
+      "diag-cparse-frontier: cparse_make_auto_host_ssize_include_flood_lines=$include_flood_lines",
+      "diag-cparse-frontier: cparse_make_auto_host_ssize_include_flood_truncated_lines=$include_flood_truncated_lines",
+      "diag-cparse-frontier: cparse_make_auto_host_ssize_cparse_o_tail",
+      "exit \"$rc\""
+    ],
+    "non_claim": "diagnostic frontier evidence only; does not prove native GCC 4.0 compiler correctness"
+  },
+  "retirement_condition": {
+    "replacement_evidence": "retire when GCC 4.0 native cc1 source build evidence supersedes the pass1 bridge boundary",
+    "non_claim": "frontier-only receipt; does not prove native GCC 4.0 compiler correctness"
+  },
+  "parity_effect": "evidence-backed partial; does not prove native/full GCC 4.0 correctness"
+}

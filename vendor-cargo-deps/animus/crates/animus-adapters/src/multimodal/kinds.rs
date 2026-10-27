@@ -5,6 +5,8 @@ pub enum InputModality {
     Text,
     /// Image input.
     Image,
+    /// Video input.
+    Video,
 }
 
 impl InputModality {
@@ -14,6 +16,7 @@ impl InputModality {
         match self {
             Self::Text => "text",
             Self::Image => super::IMAGE_MODALITY,
+            Self::Video => "video",
         }
     }
 }

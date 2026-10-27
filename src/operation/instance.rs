@@ -129,8 +129,18 @@ fn validate_definition(
             "operation instance type revision is stale",
         ));
     }
-    validate_target(instance, path, diagnostics);
-    validate_cairn_target(instance, path, diagnostics);
+    if super::runtime::component::runtime_is_component(&operation_type.definition.runtime) {
+        if !instance.target.is_empty() {
+            diagnostics.push(super::diagnostic(
+                super::model::DiagnosticCode::InvalidValue,
+                format!("{path}.target"),
+                "import-free component instances cannot grant host target facts",
+            ));
+        }
+    } else {
+        validate_target(instance, path, diagnostics);
+        validate_cairn_target(instance, path, diagnostics);
+    }
     validate_tags(instance, path, diagnostics);
     validate_defaults(instance, operation_type, path, diagnostics);
     validate_credentials(instance, operation_type, path, diagnostics);

@@ -76,8 +76,8 @@ pub fn encode_durable_session_transaction(
     }
     let commit_body = encode_commit_body(&transaction.commit)?;
     append_record(&mut output, RECORD_COMMIT, commit_body.as_slice())?;
-    let output_bytes =
-        u64::try_from(output.len()).map_err(|_error| wire_error(DurableSessionStoreIssue::BoundExceeded))?;
+    let output_bytes = u64::try_from(output.len())
+        .map_err(|_error| wire_error(DurableSessionStoreIssue::BoundExceeded))?;
     if output_bytes > policy.max_file_bytes {
         return Err(wire_error(DurableSessionStoreIssue::BoundExceeded));
     }
@@ -102,8 +102,8 @@ pub fn recover_durable_session_log(
     bytes: &[u8],
 ) -> Result<DurableSessionRecoveryReport, DurableSessionStoreError> {
     super::core::validate_durable_session_store_descriptor(policy, descriptor)?;
-    let journal_bytes =
-        u64::try_from(bytes.len()).map_err(|_error| wire_error(DurableSessionStoreIssue::BoundExceeded))?;
+    let journal_bytes = u64::try_from(bytes.len())
+        .map_err(|_error| wire_error(DurableSessionStoreIssue::BoundExceeded))?;
     if journal_bytes > policy.max_file_bytes {
         return Err(wire_error(DurableSessionStoreIssue::BoundExceeded));
     }
@@ -134,8 +134,8 @@ pub fn recover_durable_session_log(
         if u64::from(body_bytes) > policy.max_file_bytes {
             return Err(wire_error(DurableSessionStoreIssue::BoundExceeded));
         }
-        let body_len =
-            usize::try_from(body_bytes).map_err(|_error| wire_error(DurableSessionStoreIssue::BoundExceeded))?;
+        let body_len = usize::try_from(body_bytes)
+            .map_err(|_error| wire_error(DurableSessionStoreIssue::BoundExceeded))?;
         let Some(body_end) = state.offset.checked_add(body_len) else {
             return Err(wire_error(DurableSessionStoreIssue::BoundExceeded));
         };
@@ -195,8 +195,12 @@ impl RecoveryState {
         if frame.sequence != self.next_sequence {
             return Err(wire_error(DurableSessionStoreIssue::SequenceGap));
         }
-        let expected_previous =
-            self.pending_frames.last().map_or(self.head_hash.as_str(), |previous| previous.frame_hash.as_str());
+        let expected_previous = self
+            .pending_frames
+            .last()
+            .map_or(self.head_hash.as_str(), |previous| {
+                previous.frame_hash.as_str()
+            });
         if frame.previous_frame_hash != expected_previous {
             return Err(wire_error(DurableSessionStoreIssue::IntegrityMismatch));
         }
@@ -216,8 +220,10 @@ impl RecoveryState {
         if self.pending_start.is_none() {
             self.pending_start = Some(record_start);
         }
-        self.next_sequence =
-            self.next_sequence.checked_add(1).ok_or_else(|| wire_error(DurableSessionStoreIssue::SequenceGap))?;
+        self.next_sequence = self
+            .next_sequence
+            .checked_add(1)
+            .ok_or_else(|| wire_error(DurableSessionStoreIssue::SequenceGap))?;
         self.pending_frames.push(frame);
         Ok(())
     }
@@ -230,7 +236,12 @@ impl RecoveryState {
         if self.pending_frames.is_empty() {
             return Err(wire_error(DurableSessionStoreIssue::StaleHead));
         }
-        validate_commit(descriptor, self.head_hash.as_str(), &self.pending_frames, &commit)?;
+        validate_commit(
+            descriptor,
+            self.head_hash.as_str(),
+            &self.pending_frames,
+            &commit,
+        )?;
         self.head_hash = commit.commit_hash;
         self.active_leaf_id = Some(commit.active_leaf_id);
         self.committed_frames.append(&mut self.pending_frames);
@@ -239,7 +250,11 @@ impl RecoveryState {
         Ok(())
     }
 
-    fn mark_incomplete_tail(&mut self, record_start: usize, file_end: usize) -> Result<(), DurableSessionStoreError> {
+    fn mark_incomplete_tail(
+        &mut self,
+        record_start: usize,
+        file_end: usize,
+    ) -> Result<(), DurableSessionStoreError> {
         let ignored_start = self.pending_start.unwrap_or(record_start);
         self.ignored_tail_bytes = u64::try_from(file_end.saturating_sub(ignored_start))
             .map_err(|_error| wire_error(DurableSessionStoreIssue::BoundExceeded))?;
@@ -249,7 +264,10 @@ impl RecoveryState {
         Ok(())
     }
 
-    fn finish(mut self, file_end: usize) -> Result<DurableSessionRecoveryReport, DurableSessionStoreError> {
+    fn finish(
+        mut self,
+        file_end: usize,
+    ) -> Result<DurableSessionRecoveryReport, DurableSessionStoreError> {
         if !self.pending_frames.is_empty() {
             let pending_start = self.pending_start.unwrap_or(file_end);
             self.ignored_tail_bytes = u64::try_from(file_end.saturating_sub(pending_start))
@@ -287,8 +305,8 @@ fn encode_frame_body(frame: &DurableSessionFrame) -> Result<Vec<u8>, DurableSess
     push_text(&mut body, frame.branch_id.as_str())?;
     push_text(&mut body, frame.entry_id.as_str())?;
     push_optional_text(&mut body, frame.parent_id.as_deref())?;
-    let payload_bytes =
-        u32::try_from(frame.payload.len()).map_err(|_error| wire_error(DurableSessionStoreIssue::BoundExceeded))?;
+    let payload_bytes = u32::try_from(frame.payload.len())
+        .map_err(|_error| wire_error(DurableSessionStoreIssue::BoundExceeded))?;
     body.extend_from_slice(&payload_bytes.to_be_bytes());
     body.extend_from_slice(frame.payload.as_slice());
     push_hash(&mut body, frame.payload_hash.as_str())?;
@@ -374,8 +392,8 @@ fn decode_commit_body(body: &[u8]) -> Result<DurableSessionCommit, DurableSessio
     if frame_count == 0 || frame_count > super::data::MAX_TRANSACTION_FRAMES {
         return Err(wire_error(DurableSessionStoreIssue::BoundExceeded));
     }
-    let frame_hash_count =
-        usize::try_from(frame_count).map_err(|_error| wire_error(DurableSessionStoreIssue::BoundExceeded))?;
+    let frame_hash_count = usize::try_from(frame_count)
+        .map_err(|_error| wire_error(DurableSessionStoreIssue::BoundExceeded))?;
     let mut frame_hashes = Vec::with_capacity(frame_hash_count);
     for _frame_index in 0..frame_count {
         frame_hashes.push(cursor.read_hash()?);
@@ -412,17 +430,20 @@ fn validate_frame(
     let sequence = frame.sequence.to_string();
     let parent = frame.parent_id.as_deref().unwrap_or("");
     let payload_bytes = frame.payload.len().to_string();
-    let expected_frame_hash = super::core::hash_parts(super::data::DURABLE_SESSION_FRAME_HASH_DOMAIN, &[
-        descriptor.session_id.as_bytes(),
-        descriptor.branch_id.as_bytes(),
-        sequence.as_bytes(),
-        frame.entry_id.as_bytes(),
-        frame.kind.as_str().as_bytes(),
-        parent.as_bytes(),
-        payload_bytes.as_bytes(),
-        frame.payload_hash.as_bytes(),
-        frame.previous_frame_hash.as_bytes(),
-    ])?;
+    let expected_frame_hash = super::core::hash_parts(
+        super::data::DURABLE_SESSION_FRAME_HASH_DOMAIN,
+        &[
+            descriptor.session_id.as_bytes(),
+            descriptor.branch_id.as_bytes(),
+            sequence.as_bytes(),
+            frame.entry_id.as_bytes(),
+            frame.kind.as_str().as_bytes(),
+            parent.as_bytes(),
+            payload_bytes.as_bytes(),
+            frame.payload_hash.as_bytes(),
+            frame.previous_frame_hash.as_bytes(),
+        ],
+    )?;
     if expected_frame_hash != frame.frame_hash {
         return Err(wire_error(DurableSessionStoreIssue::IntegrityMismatch));
     }
@@ -440,7 +461,10 @@ fn validate_commit(
     if commit.prior_head_hash != current_head_hash {
         return Err(wire_error(DurableSessionStoreIssue::StaleHead));
     }
-    let actual_hashes = frames.iter().map(|frame| frame.frame_hash.as_str()).collect::<Vec<_>>();
+    let actual_hashes = frames
+        .iter()
+        .map(|frame| frame.frame_hash.as_str())
+        .collect::<Vec<_>>();
     if actual_hashes.as_slice() != commit.frame_hashes.as_slice() {
         return Err(wire_error(DurableSessionStoreIssue::IntegrityMismatch));
     }
@@ -455,14 +479,21 @@ fn validate_commit(
         commit.active_leaf_id.as_bytes(),
     ];
     transaction_parts.extend(actual_hashes.iter().map(|hash| hash.as_bytes()));
-    let expected_transaction_hash =
-        super::core::hash_parts(super::data::DURABLE_SESSION_TRANSACTION_HASH_DOMAIN, transaction_parts.as_slice())?;
-    let expected_commit_hash = super::core::hash_parts(super::data::DURABLE_SESSION_COMMIT_HASH_DOMAIN, &[
-        expected_transaction_hash.as_bytes(),
-        current_head_hash.as_bytes(),
-        commit.active_leaf_id.as_bytes(),
-    ])?;
-    if expected_transaction_hash != commit.transaction_hash || expected_commit_hash != commit.commit_hash {
+    let expected_transaction_hash = super::core::hash_parts(
+        super::data::DURABLE_SESSION_TRANSACTION_HASH_DOMAIN,
+        transaction_parts.as_slice(),
+    )?;
+    let expected_commit_hash = super::core::hash_parts(
+        super::data::DURABLE_SESSION_COMMIT_HASH_DOMAIN,
+        &[
+            expected_transaction_hash.as_bytes(),
+            current_head_hash.as_bytes(),
+            commit.active_leaf_id.as_bytes(),
+        ],
+    )?;
+    if expected_transaction_hash != commit.transaction_hash
+        || expected_commit_hash != commit.commit_hash
+    {
         return Err(wire_error(DurableSessionStoreIssue::IntegrityMismatch));
     }
     debug_assert_eq!(expected_transaction_hash, commit.transaction_hash);
@@ -470,8 +501,13 @@ fn validate_commit(
     Ok(())
 }
 
-fn append_record(output: &mut WireBuffer, record_type: u8, body: &[u8]) -> Result<(), DurableSessionStoreError> {
-    let body_bytes = u32::try_from(body.len()).map_err(|_error| wire_error(DurableSessionStoreIssue::BoundExceeded))?;
+fn append_record(
+    output: &mut WireBuffer,
+    record_type: u8,
+    body: &[u8],
+) -> Result<(), DurableSessionStoreError> {
+    let body_bytes = u32::try_from(body.len())
+        .map_err(|_error| wire_error(DurableSessionStoreIssue::BoundExceeded))?;
     output.reserve(ENVELOPE_HEADER_BYTES.saturating_add(body.len()));
     output.extend_from_slice(MAGIC);
     output.push(record_type);
@@ -482,14 +518,17 @@ fn append_record(output: &mut WireBuffer, record_type: u8, body: &[u8]) -> Resul
 
 fn push_text(output: &mut WireBuffer, value: &str) -> Result<(), DurableSessionStoreError> {
     super::core::safe_label(value, FIELD_WIRE)?;
-    let text_bytes =
-        u16::try_from(value.len()).map_err(|_error| wire_error(DurableSessionStoreIssue::BoundExceeded))?;
+    let text_bytes = u16::try_from(value.len())
+        .map_err(|_error| wire_error(DurableSessionStoreIssue::BoundExceeded))?;
     output.extend_from_slice(&text_bytes.to_be_bytes());
     output.extend_from_slice(value.as_bytes());
     Ok(())
 }
 
-fn push_optional_text(output: &mut WireBuffer, value: Option<&str>) -> Result<(), DurableSessionStoreError> {
+fn push_optional_text(
+    output: &mut WireBuffer,
+    value: Option<&str>,
+) -> Result<(), DurableSessionStoreError> {
     let Some(value) = value else {
         output.extend_from_slice(&0_u16.to_be_bytes());
         return Ok(());
@@ -507,7 +546,9 @@ fn read_u32_at(bytes: &[u8], offset: &mut usize) -> Result<u32, DurableSessionSt
     let Some(end) = offset.checked_add(core::mem::size_of::<u32>()) else {
         return Err(wire_error(DurableSessionStoreIssue::BoundExceeded));
     };
-    let raw = bytes.get(*offset..end).ok_or_else(|| wire_error(DurableSessionStoreIssue::IncompleteTail))?;
+    let raw = bytes
+        .get(*offset..end)
+        .ok_or_else(|| wire_error(DurableSessionStoreIssue::IncompleteTail))?;
     let array = <[u8; core::mem::size_of::<u32>()]>::try_from(raw)
         .map_err(|_error| wire_error(DurableSessionStoreIssue::MidFileCorruption))?;
     *offset = end;
@@ -525,8 +566,10 @@ impl<'a> Cursor<'a> {
     }
 
     fn read_u8(&mut self) -> Result<u8, DurableSessionStoreError> {
-        let value =
-            *self.bytes.get(self.offset).ok_or_else(|| wire_error(DurableSessionStoreIssue::MidFileCorruption))?;
+        let value = *self
+            .bytes
+            .get(self.offset)
+            .ok_or_else(|| wire_error(DurableSessionStoreIssue::MidFileCorruption))?;
         self.offset = self.offset.saturating_add(1);
         Ok(value)
     }
@@ -558,8 +601,8 @@ impl<'a> Cursor<'a> {
             return Err(wire_error(DurableSessionStoreIssue::BoundExceeded));
         }
         let bytes = self.read_exact(text_bytes)?;
-        let value =
-            core::str::from_utf8(bytes).map_err(|_error| wire_error(DurableSessionStoreIssue::MidFileCorruption))?;
+        let value = core::str::from_utf8(bytes)
+            .map_err(|_error| wire_error(DurableSessionStoreIssue::MidFileCorruption))?;
         if !value.is_empty() {
             super::core::safe_label(value, FIELD_WIRE)?;
         }
@@ -568,14 +611,15 @@ impl<'a> Cursor<'a> {
 
     fn read_hash(&mut self) -> Result<String, DurableSessionStoreError> {
         let bytes = self.read_exact(HASH_BYTES)?;
-        let value =
-            core::str::from_utf8(bytes).map_err(|_error| wire_error(DurableSessionStoreIssue::IntegrityMismatch))?;
+        let value = core::str::from_utf8(bytes)
+            .map_err(|_error| wire_error(DurableSessionStoreIssue::IntegrityMismatch))?;
         super::core::lowercase_blake3(value, FIELD_WIRE)?;
         Ok(String::from(value))
     }
 
     fn read_bytes(&mut self, count: u32) -> Result<&'a [u8], DurableSessionStoreError> {
-        let count = usize::try_from(count).map_err(|_error| wire_error(DurableSessionStoreIssue::BoundExceeded))?;
+        let count = usize::try_from(count)
+            .map_err(|_error| wire_error(DurableSessionStoreIssue::BoundExceeded))?;
         self.read_exact(count)
     }
 

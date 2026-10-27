@@ -42,7 +42,7 @@ use crate::file_node::FileSystem;
 use crate::http;
 use crate::http::HttpClient;
 use crate::http::HttpRequestPlan;
-use crate::http::NoopHttpClient;
+use crate::http::NativeHttpClient;
 use crate::image_node;
 use crate::image_node::ImageIo;
 use crate::image_node::LocalImageIo;
@@ -65,11 +65,14 @@ const EFFECT_OPERATION_SHELL: &str = "lattice/shell";
 const EFFECT_OPERATION_HTTP: &str = "lattice/http";
 const EFFECT_OPERATION_FILE: &str = "lattice/file";
 const EFFECT_OPERATION_TYPED: &str = "lattice/operation";
+const EFFECT_OPERATION_AGENT: &str = "lattice/agent";
 const EFFECT_ABILITY_PROCESS: &str = "process/execute";
 const EFFECT_ABILITY_NETWORK: &str = "network/request";
 const EFFECT_ABILITY_FILE_READ: &str = "file/read";
 const EFFECT_ABILITY_FILE_WRITE: &str = "file/write";
 const EFFECT_ABILITY_FILE_APPEND: &str = "file/append";
+const EFFECT_ABILITY_AGENT: &str = "agent/execute";
+const EFFECT_RESOURCE_AGENT_PREFIX: &str = "lattice://agent/";
 const AUTHORIZED_FILE_ROOT_COUNT: usize = 1;
 const BYTES_PER_KIBIBYTE: usize = 1_024;
 const KIBIBYTES_PER_MEBIBYTE: usize = 1_024;
@@ -81,7 +84,7 @@ const AUTHORIZED_EFFECT_BINDING_MISMATCH: &str = "authorized effect binding does
 const AUTHORIZED_EFFECT_REQUEST_MISMATCH: &str = "authorized effect request does not match the resolved adapter plan";
 const AUTHORIZED_FILE_ROOT_MISMATCH: &str = "authorized file effects require one configured root identifier";
 const AUTHORIZED_FILE_READ_UTF8_ERROR: &str = "authorized file read output is not valid UTF-8";
-const AUTHORIZED_EFFECTFUL_NODE_REQUIRED: &str = "authorized execution requires an effectful shell, HTTP, or file node";
+const AUTHORIZED_EFFECTFUL_NODE_REQUIRED: &str = "authorized execution requires an effectful node";
 const AUTHORIZED_WORKFLOW_CONTEXT_REQUIRED: &str =
     "product effect execution requires a current Choregraph authority context";
 const CHOREGRAPH_EXECUTION_FAILURE: &str = "Choregraph product execution failed";
@@ -669,8 +672,8 @@ pub(super) fn effect_operation(config: &NodeConfig) -> Option<&'static str> {
         NodeConfig::Http { .. } => Some(EFFECT_OPERATION_HTTP),
         NodeConfig::File { .. } => Some(EFFECT_OPERATION_FILE),
         NodeConfig::Operation(_) => Some(EFFECT_OPERATION_TYPED),
+        NodeConfig::Agent(_) => Some(EFFECT_OPERATION_AGENT),
         NodeConfig::ImageInput { .. }
-        | NodeConfig::Agent(_)
         | NodeConfig::Condition(_)
         | NodeConfig::Merge(_)
         | NodeConfig::Subworkflow(_)
@@ -688,8 +691,8 @@ fn effect_ability(config: &NodeConfig) -> Option<&'static str> {
             FileOperationKind::Append => EFFECT_ABILITY_FILE_APPEND,
         }),
         NodeConfig::Operation(_) => Some(EFFECT_ABILITY_PROCESS),
+        NodeConfig::Agent(_) => Some(EFFECT_ABILITY_AGENT),
         NodeConfig::ImageInput { .. }
-        | NodeConfig::Agent(_)
         | NodeConfig::Condition(_)
         | NodeConfig::Merge(_)
         | NodeConfig::Subworkflow(_)
@@ -703,8 +706,8 @@ fn effect_resource(config: &NodeConfig, node_id: crate::engine::workflow::NodeId
         NodeConfig::Http { .. } => EFFECT_RESOURCE_NETWORK_PREFIX,
         NodeConfig::File { .. } => EFFECT_RESOURCE_FILE_PREFIX,
         NodeConfig::Operation(_) => EFFECT_RESOURCE_PROCESS_PREFIX,
+        NodeConfig::Agent(_) => EFFECT_RESOURCE_AGENT_PREFIX,
         NodeConfig::ImageInput { .. }
-        | NodeConfig::Agent(_)
         | NodeConfig::Condition(_)
         | NodeConfig::Merge(_)
         | NodeConfig::Subworkflow(_)
@@ -1234,7 +1237,7 @@ pub(super) struct NodeExecution<'a> {
 /// The executor.
 pub struct Executor {
     next_run_id: u64,
-    credential_provider: Box<dyn CredentialProvider>,
+    credential_provider: std::sync::Arc<dyn CredentialProvider>,
     http_client: Box<dyn HttpClient>,
     file_system: Box<dyn FileSystem>,
     image_io: Box<dyn ImageIo>,
@@ -1243,6 +1246,7 @@ pub struct Executor {
     require_successful_shells: bool,
     subworkflow_runner_shell: Box<dyn SubworkflowRunnerShell>,
     cancellation: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    cancellation_observed: std::sync::atomic::AtomicBool,
     pub(super) frontier_policy: lattice_core::scheduling::CapacityPolicy,
     frontier_conflicts: BTreeMap<u64, lattice_core::scheduling::ConflictState>,
     observed_completion_order: Vec<crate::engine::workflow::NodeId>,
@@ -1272,7 +1276,7 @@ impl Executor {
     fn with_components(components: RuntimeParts) -> Self {
         Self {
             next_run_id: 0,
-            credential_provider: components.credential_provider,
+            credential_provider: components.credential_provider.into(),
             http_client: components.http_client,
             file_system: components.file_system,
             image_io: components.image_io,
@@ -1281,6 +1285,7 @@ impl Executor {
             require_successful_shells: false,
             subworkflow_runner_shell: default_subworkflow_runner_shell(),
             cancellation: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            cancellation_observed: std::sync::atomic::AtomicBool::new(false),
             frontier_policy: crate::engine::frontier::serial_capacity_policy(),
             frontier_conflicts: BTreeMap::new(),
             observed_completion_order: Vec::new(),
@@ -1290,7 +1295,7 @@ impl Executor {
     pub fn new() -> Self {
         Self::with_components(RuntimeParts {
             credential_provider: Box::<EmptyCredentialProvider>::default(),
-            http_client: Box::<NoopHttpClient>::default(),
+            http_client: Box::<NativeHttpClient>::default(),
             file_system: default_file_system(),
             image_io: default_image_io(),
             agent_adapter: default_agent_adapter(),
@@ -1301,7 +1306,7 @@ impl Executor {
     pub fn new_with_credential_provider(credential_provider: Box<dyn CredentialProvider>) -> Self {
         Self::with_components(RuntimeParts {
             credential_provider,
-            http_client: Box::<NoopHttpClient>::default(),
+            http_client: Box::<NativeHttpClient>::default(),
             file_system: default_file_system(),
             image_io: default_image_io(),
             agent_adapter: default_agent_adapter(),
@@ -1323,7 +1328,7 @@ impl Executor {
         let local_process = agent_runtime.local_process.clone();
         Self::with_components(RuntimeParts {
             credential_provider: Box::new(credential_provider),
-            http_client: Box::<NoopHttpClient>::default(),
+            http_client: Box::<NativeHttpClient>::default(),
             file_system: default_file_system(),
             image_io: default_image_io(),
             agent_adapter: Box::new(ProductionAgentAdapter::new(agent_runtime)),
@@ -1345,7 +1350,7 @@ impl Executor {
     pub fn new_with_file_system(file_system: Box<dyn FileSystem>) -> Self {
         Self::with_components(RuntimeParts {
             credential_provider: Box::<EmptyCredentialProvider>::default(),
-            http_client: Box::<NoopHttpClient>::default(),
+            http_client: Box::<NativeHttpClient>::default(),
             file_system,
             image_io: default_image_io(),
             agent_adapter: default_agent_adapter(),
@@ -1356,7 +1361,7 @@ impl Executor {
     pub fn new_with_image_io(image_io: Box<dyn ImageIo>) -> Self {
         Self::with_components(RuntimeParts {
             credential_provider: Box::<EmptyCredentialProvider>::default(),
-            http_client: Box::<NoopHttpClient>::default(),
+            http_client: Box::<NativeHttpClient>::default(),
             file_system: default_file_system(),
             image_io,
             agent_adapter: default_agent_adapter(),
@@ -1367,7 +1372,7 @@ impl Executor {
     pub fn new_with_agent_adapter(agent_adapter: Box<dyn AgentAdapter>) -> Self {
         Self::with_components(RuntimeParts {
             credential_provider: Box::<EmptyCredentialProvider>::default(),
-            http_client: Box::<NoopHttpClient>::default(),
+            http_client: Box::<NativeHttpClient>::default(),
             file_system: default_file_system(),
             image_io: default_image_io(),
             agent_adapter,
@@ -1381,6 +1386,11 @@ impl Executor {
 
     pub fn with_subworkflow_runner_shell(mut self, subworkflow_runner_shell: Box<dyn SubworkflowRunnerShell>) -> Self {
         self.subworkflow_runner_shell = subworkflow_runner_shell;
+        self
+    }
+
+    pub fn with_credential_provider(mut self, provider: Box<dyn CredentialProvider>) -> Self {
+        self.credential_provider = provider.into();
         self
     }
 
@@ -1428,6 +1438,10 @@ impl Executor {
 
     pub(super) fn cancellation_requested(&self) -> bool {
         self.cancellation.load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    pub(crate) fn cancellation_observed(&self) -> bool {
+        self.cancellation_observed.load(std::sync::atomic::Ordering::Acquire)
     }
 
     pub(super) fn frontier_conflict(
@@ -1594,21 +1608,6 @@ impl Executor {
                         };
                     }
                 };
-                let secret_env = match credentials::resolve_secret_env(
-                    node_credentials.unwrap_or(&NodeCredentialRefs::default()),
-                    self.credential_provider.as_ref(),
-                ) {
-                    Ok(secret_env) => secret_env,
-                    Err(error) => {
-                        return StepResult {
-                            node_id,
-                            status: NodeStatus::Failed {
-                                error: error.to_string(),
-                            },
-                            input_hash,
-                        };
-                    }
-                };
                 let resolved_command = match resolve_config_string(command, expression_context) {
                     Ok(value) => value,
                     Err(error) => {
@@ -1639,7 +1638,7 @@ impl Executor {
                         };
                     }
                 };
-                let mut sensitive_fragments = secret_env.secret_values.clone();
+                let mut sensitive_fragments = zeroize::Zeroizing::new(Vec::new());
                 sensitive_fragments.extend(resolved_command.sensitive_fragments.clone());
                 sensitive_fragments.extend(env_sensitive_fragments);
                 sensitive_fragments.extend(collect_input_sensitive_fragments(inputs));
@@ -1647,66 +1646,119 @@ impl Executor {
                     sensitive_fragments.extend(value.sensitive_fragments);
                     value.value
                 });
-                let merged_env = merged_shell_env(&resolved_env, &secret_env.env);
                 let stdin_value = shell_stdin_value(node, inputs);
                 let shell_input = ShellExecutionInput {
                     command: &resolved_command.value,
                     cwd: &resolved_cwd_value,
-                    environment: &merged_env,
+                    environment: &resolved_env,
                     timeout_secs: *timeout_secs,
                     should_pipe_stdin: *pipe_stdin,
                     stdin_value,
                 };
                 let result = match effect {
                     EffectExecution::Exact { binding, dispatch } => {
-                        let request = shell_process_request(&shell_input, &self.local_process);
-                        let payload = crate::engine::effect::runtime::process_plan_identity(&request);
-                        if !authorized_request_matches_payload(binding, &payload) {
-                            Err(AUTHORIZED_EFFECT_REQUEST_MISMATCH.to_owned())
-                        } else {
+                        let request = crate::engine::effect::runtime::credential::ProcessRecipe::new(
+                            shell_process_request(&shell_input, &self.local_process),
+                            node_credentials,
+                            std::sync::Arc::clone(&self.credential_provider),
+                        );
+                        request.and_then(|request| {
+                            if !authorized_request_matches_payload(binding, request.payload()) {
+                                return Err(AUTHORIZED_EFFECT_REQUEST_MISMATCH.to_owned());
+                            }
                             let runtime = crate::engine::effect::runtime::Adapters::new_with_cancellation(
                                 dispatch,
                                 self.http_client.as_ref(),
                                 &self.local_process,
                                 self.cancellation.as_ref(),
                             );
-                            dispatch.dispatch(&runtime, binding.clone(), &request).map_err(dispatch_error)
-                        }
+                            let result = dispatch.dispatch(&runtime, binding.clone(), &request).map_err(dispatch_error);
+                            if request.cancellation_observed() {
+                                self.cancellation_observed.store(true, std::sync::atomic::Ordering::Release);
+                            }
+                            result
+                        })
                     }
                     EffectExecution::Product(session) => {
-                        let request = shell_process_request(&shell_input, &self.local_process);
-                        let payload = crate::engine::effect::runtime::process_plan_identity(&request);
-                        let prepared = {
+                        let request = crate::engine::effect::runtime::credential::ProcessRecipe::new(
+                            shell_process_request(&shell_input, &self.local_process),
+                            node_credentials,
+                            std::sync::Arc::clone(&self.credential_provider),
+                        );
+                        let prepared = request.and_then(|request| {
                             let mut session = session.lock();
-                            session.bind_effect(node_id, &payload).map(|binding| (binding, session.dispatch_handle()))
-                        };
+                            session
+                                .bind_effect(node_id, request.payload())
+                                .map(|binding| (request, binding, session.dispatch_handle()))
+                                .map_err(choregraph_execution_error)
+                        });
                         match prepared {
-                            Ok((binding, dispatch)) => {
+                            Ok((request, binding, dispatch)) => {
                                 let local_process = self.local_process.clone();
                                 let cancellation = std::sync::Arc::clone(&self.cancellation);
                                 match tokio::task::spawn_blocking(move || {
-                                    let http_client = NoopHttpClient;
+                                    let http_client = NativeHttpClient;
                                     let runtime = crate::engine::effect::runtime::Adapters::new_with_cancellation(
                                         dispatch.as_ref(),
                                         &http_client,
                                         &local_process,
                                         cancellation.as_ref(),
                                     );
-                                    dispatch.dispatch(&runtime, binding, &request).map_err(dispatch_error)
+                                    let result = dispatch.dispatch(&runtime, binding, &request).map_err(dispatch_error);
+                                    (result, request.cancellation_observed())
                                 })
                                 .await
                                 {
-                                    Ok(result) => result,
+                                    Ok((result, cancelled)) => {
+                                        if cancelled {
+                                            self.cancellation_observed
+                                                .store(true, std::sync::atomic::Ordering::Release);
+                                        }
+                                        result
+                                    }
                                     Err(_) => Err(PROCESS_TASK_FAILURE_DIAGNOSTIC.to_owned()),
                                 }
                             }
-                            Err(error) => Err(choregraph_execution_error(error)),
+                            Err(error) => Err(error),
                         }
                     }
                     EffectExecution::Compatibility => {
-                        execute_shell(shell_input, &self.local_process, std::sync::Arc::clone(&self.cancellation))
-                            .await
-                            .map_err(|error| error.to_string())
+                        let subject = credentials::execution::node_subject(workflow, node_id);
+                        let secrets = subject.and_then(|subject| {
+                            credentials::resolve_secret_env_in_context(
+                                node_credentials.unwrap_or(&NodeCredentialRefs::default()),
+                                self.credential_provider.as_ref(),
+                                &subject,
+                                credentials::CredentialDestination::ShellEnvironment,
+                                Some(self.cancellation.as_ref()),
+                            )
+                            .map_err(|_| "credential_resolution_failed")
+                        });
+                        match secrets {
+                            Ok(mut secrets) => {
+                                sensitive_fragments.extend(std::mem::take(&mut secrets.secret_values));
+                                let merged_env = credentials::ResolvedSecretEnv {
+                                    env: merged_shell_env(&resolved_env, &secrets.env),
+                                    secret_values: Vec::new(),
+                                };
+                                execute_shell(
+                                    ShellExecutionInput {
+                                        environment: &merged_env.env,
+                                        ..shell_input
+                                    },
+                                    &self.local_process,
+                                    std::sync::Arc::clone(&self.cancellation),
+                                )
+                                .await
+                                .map_err(|error| {
+                                    if matches!(error, crate::agent_node::ProcessError::Cancelled) {
+                                        self.cancellation_observed.store(true, std::sync::atomic::Ordering::Release);
+                                    }
+                                    error.to_string()
+                                })
+                            }
+                            Err(error) => Err(error.to_owned()),
+                        }
                     }
                 };
 
@@ -1808,40 +1860,71 @@ impl Executor {
                     *timeout_secs,
                     inputs,
                 );
-                let response = match effect {
-                    EffectExecution::Exact { binding, dispatch } => {
-                        let payload = crate::engine::effect::runtime::network_plan_identity(&request);
-                        if !authorized_request_matches_payload(binding, &payload) {
-                            Err(AUTHORIZED_EFFECT_REQUEST_MISMATCH.to_owned())
-                        } else {
-                            let runtime = crate::engine::effect::runtime::Adapters::new(
-                                dispatch,
-                                self.http_client.as_ref(),
-                                &self.local_process,
-                            );
-                            dispatch.dispatch(&runtime, binding.clone(), &request).map_err(dispatch_error)
+                let response = if matches!(&effect, EffectExecution::Compatibility)
+                    && node_credentials.is_none_or(NodeCredentialRefs::is_empty)
+                {
+                    self.http_client
+                        .execute_with_cancellation(&request, Some(self.cancellation.as_ref()))
+                        .map_err(|error| error.to_string())
+                } else {
+                    let recipe = match crate::engine::effect::runtime::credential::NetworkRecipe::new(
+                        request,
+                        node_credentials,
+                        std::sync::Arc::clone(&self.credential_provider),
+                    ) {
+                        Ok(recipe) => recipe,
+                        Err(error) => {
+                            return StepResult {
+                                node_id,
+                                status: NodeStatus::Failed { error },
+                                input_hash,
+                            };
                         }
-                    }
-                    EffectExecution::Product(session) => {
-                        let payload = crate::engine::effect::runtime::network_plan_identity(&request);
-                        let prepared = {
-                            let mut session = session.lock();
-                            session.bind_effect(node_id, &payload).map(|binding| (binding, session.dispatch_handle()))
-                        };
-                        match prepared {
-                            Ok((binding, dispatch)) => {
-                                let runtime = crate::engine::effect::runtime::Adapters::new(
-                                    dispatch.as_ref(),
+                    };
+                    match effect {
+                        EffectExecution::Exact { binding, dispatch } => {
+                            if !authorized_request_matches_payload(binding, recipe.payload()) {
+                                Err(AUTHORIZED_EFFECT_REQUEST_MISMATCH.to_owned())
+                            } else {
+                                let runtime = crate::engine::effect::runtime::Adapters::new_with_cancellation(
+                                    dispatch,
                                     self.http_client.as_ref(),
                                     &self.local_process,
+                                    self.cancellation.as_ref(),
                                 );
-                                dispatch.dispatch(&runtime, binding, &request).map_err(dispatch_error)
+                                dispatch.dispatch(&runtime, binding.clone(), &recipe).map_err(dispatch_error)
                             }
-                            Err(error) => Err(choregraph_execution_error(error)),
                         }
-                    }
-                    EffectExecution::Compatibility => {
-                        self.http_client.execute(&request).map_err(|error| error.to_string())
+                        EffectExecution::Product(session) => {
+                            let prepared = {
+                                let mut session = session.lock();
+                                session
+                                    .bind_effect(node_id, recipe.payload())
+                                    .map(|binding| (binding, session.dispatch_handle()))
+                            };
+                            match prepared {
+                                Ok((binding, dispatch)) => {
+                                    let runtime = crate::engine::effect::runtime::Adapters::new_with_cancellation(
+                                        dispatch.as_ref(),
+                                        self.http_client.as_ref(),
+                                        &self.local_process,
+                                        self.cancellation.as_ref(),
+                                    );
+                                    dispatch.dispatch(&runtime, binding, &recipe).map_err(dispatch_error)
+                                }
+                                Err(error) => Err(choregraph_execution_error(error)),
+                            }
+                        }
+                        EffectExecution::Compatibility => {
+                            match credentials::execution::node_subject(workflow, node_id) {
+                                Ok(subject) => recipe.consume_for_embedding(
+                                    self.http_client.as_ref(),
+                                    self.cancellation.as_ref(),
+                                    &subject,
+                                ),
+                                Err(error) => Err(error.to_owned()),
+                            }
+                        }
                     }
                 };
                 match response {
@@ -2026,21 +2109,6 @@ impl Executor {
                 }
             }
             NodeConfig::Agent(settings) => {
-                let secret_env = match credentials::resolve_secret_env(
-                    node_credentials.unwrap_or(&NodeCredentialRefs::default()),
-                    self.credential_provider.as_ref(),
-                ) {
-                    Ok(secret_env) => secret_env,
-                    Err(error) => {
-                        return StepResult {
-                            node_id,
-                            status: NodeStatus::Failed {
-                                error: error.to_string(),
-                            },
-                            input_hash,
-                        };
-                    }
-                };
                 let output_ports = match agent_output_port_ids(node) {
                     Ok(ports) => ports,
                     Err(error) => {
@@ -2122,8 +2190,67 @@ impl Executor {
                     resolved_session,
                     inputs,
                 );
-                let agent_context = crate::agent_node::ExecutionContext::new(secret_env.env);
-                match self.agent_adapter.execute(&request, &agent_context) {
+                let response = match effect {
+                    EffectExecution::Exact { binding, dispatch } => agent_node::authority::Recipe::new(
+                        request,
+                        self.agent_adapter.as_ref(),
+                        node_credentials,
+                        std::sync::Arc::clone(&self.credential_provider),
+                        self.cancellation.as_ref(),
+                    )
+                    .and_then(|recipe| {
+                        if !authorized_request_matches_payload(binding, recipe.payload()) {
+                            return Err(AUTHORIZED_EFFECT_REQUEST_MISMATCH.to_owned());
+                        }
+                        let runtime = crate::engine::effect::runtime::Adapters::new_with_cancellation(
+                            dispatch,
+                            self.http_client.as_ref(),
+                            &self.local_process,
+                            self.cancellation.as_ref(),
+                        );
+                        dispatch.dispatch(&runtime, binding.clone(), &recipe).map_err(dispatch_error)
+                    }),
+                    EffectExecution::Product(session) => agent_node::authority::Recipe::new(
+                        request,
+                        self.agent_adapter.as_ref(),
+                        node_credentials,
+                        std::sync::Arc::clone(&self.credential_provider),
+                        self.cancellation.as_ref(),
+                    )
+                    .and_then(|recipe| {
+                        let (binding, dispatch) = {
+                            let mut session = session.lock();
+                            let binding =
+                                session.bind_effect(node_id, recipe.payload()).map_err(choregraph_execution_error)?;
+                            (binding, session.dispatch_handle())
+                        };
+                        let runtime = crate::engine::effect::runtime::Adapters::new_with_cancellation(
+                            dispatch.as_ref(),
+                            self.http_client.as_ref(),
+                            &self.local_process,
+                            self.cancellation.as_ref(),
+                        );
+                        dispatch.dispatch(&runtime, binding, &recipe).map_err(dispatch_error)
+                    }),
+                    EffectExecution::Compatibility => credentials::execution::node_subject(workflow, node_id)
+                        .map_err(str::to_owned)
+                        .and_then(|subject| {
+                            credentials::resolve_secret_env_in_context(
+                                node_credentials.unwrap_or(&NodeCredentialRefs::default()),
+                                self.credential_provider.as_ref(),
+                                &subject,
+                                credentials::CredentialDestination::AgentEnvironment,
+                                Some(self.cancellation.as_ref()),
+                            )
+                            .map_err(|error| error.to_string())
+                        })
+                        .and_then(|mut resolved| {
+                            let context = agent_node::ExecutionContext::new(std::mem::take(&mut resolved.env));
+                            agent_node::authority::execute_redacted(self.agent_adapter.as_ref(), &request, &context)
+                                .map_err(|error| error.to_string())
+                        }),
+                };
+                match response {
                     Ok(response) => match agent_node::validate_agent_response_mode(&response, settings.output_mode) {
                         Ok(()) => completed_step_result(
                             node_id,
@@ -2142,9 +2269,7 @@ impl Executor {
                     },
                     Err(error) => StepResult {
                         node_id,
-                        status: NodeStatus::Failed {
-                            error: error.to_string(),
-                        },
+                        status: NodeStatus::Failed { error },
                         input_hash,
                     },
                 }
@@ -2440,6 +2565,7 @@ impl Executor {
         control: ExecutionControl<'_>,
     ) -> ApprovalRunOutcome {
         self.observed_completion_order.clear();
+        self.cancellation_observed.store(false, std::sync::atomic::Ordering::Release);
         let run_id = RunId(self.next_run_id);
         self.next_run_id = self.next_run_id.saturating_add(1);
         let product_session = match product_context {
@@ -2844,9 +2970,9 @@ async fn execute_shell(
     config: &LocalProcessConfig,
     cancellation: std::sync::Arc<std::sync::atomic::AtomicBool>,
 ) -> Result<crate::agent_node::ProcessOutput, crate::agent_node::ProcessError> {
-    let request = shell_process_request(&input, config);
+    let request = crate::agent_node::ExecutionProcessRequest(shell_process_request(&input, config));
     let runner = crate::agent_node::ProductionProcessRunner::new(config.clone());
-    let output = tokio::task::spawn_blocking(move || runner.run_with_cancellation(&request, &cancellation))
+    let output = tokio::task::spawn_blocking(move || runner.run_with_cancellation(&request.0, &cancellation))
         .await
         .map_err(|_| crate::agent_node::ProcessError::Spawn(PROCESS_TASK_FAILURE_DIAGNOSTIC.to_owned()))??;
 

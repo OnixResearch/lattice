@@ -66,7 +66,7 @@ SOPS is selected by the SecretSpec profile and provider policy inside Animus. La
 
 ### Decision: deliver per binding and persist nothing
 
-**Choice:** The executor requests only references required by the current node or trigger. It installs each ephemeral value into the existing adapter-specific environment, header, or signature boundary and then drops it. Resolved values, decrypted documents, provider credentials, and value-derived hashes never enter durable Lattice state.
+**Choice:** The executor requests only references required by the current node or trigger. Agent plans seal the selected backend/configuration and resolver-policy identities under the dedicated `lattice-agent` contract; exact/product dispatch authorizes before resolution. `ResolvedSecretEnv` and receiving process, HTTP, and Agent owners clear their material on every scope exit, including partial failure, cancellation and unwinding. Resolved values, decrypted documents, provider credentials, and value-derived hashes never enter durable Lattice state.
 
 **Rationale:** Narrow delivery minimizes exposure and preserves serialization guarantees.
 

@@ -1,0 +1,66 @@
+let ModuleBounds = {
+  source_chars_max | Number,
+  evaluation_fuel_max | Number,
+  modules_max | Number,
+  exports_per_module_max | Number,
+  dependencies_per_module_max | Number,
+  capability_requests_per_module_max | Number,
+} in
+
+let Policy = {
+  schema | String,
+  language_cohort | String,
+  trust_states | Array String,
+  source_forms | Array String,
+  denied_source_forms | Array String,
+  automatic_activation | Bool,
+  ambient_discovery | Bool,
+  native_modules | Bool,
+  dynamic_libraries | Bool,
+  package_manager | Bool,
+  capability_intersection | Array String,
+  bounds | ModuleBounds,
+  non_claims | Array String,
+} in
+
+{
+  steel_skill_module_policy = {
+    schema = "animus.steel-skill-module-policy.v1",
+    language_cohort = "steel-source-v1",
+    trust_states = ["trusted"],
+    source_forms = ["complete-steel-source-unit"],
+    denied_source_forms = [
+      "native-module",
+      "dynamic-library",
+      "arbitrary-path",
+      "package-manager",
+      "network-fetch",
+      "ambient-environment",
+      "dynamic-evaluation",
+      "forged-bridge-request",
+      "undeclared-bridge-operation",
+    ],
+    automatic_activation = false,
+    ambient_discovery = false,
+    native_modules = false,
+    dynamic_libraries = false,
+    package_manager = false,
+    capability_intersection = ["session", "model-profile", "skill", "current-host"],
+    bounds = {
+      source_chars_max = 1048576,
+      evaluation_fuel_max = 16777216,
+      modules_max = 64,
+      exports_per_module_max = 64,
+      dependencies_per_module_max = 64,
+      capability_requests_per_module_max = 32,
+    },
+    non_claims = [
+      "source-authenticity",
+      "skill-correctness",
+      "native-extension-safety",
+      "sandboxing",
+      "task-success",
+      "production-readiness",
+    ],
+  } | Policy,
+}

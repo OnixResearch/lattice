@@ -1,59 +1,24 @@
 //! Runtime DAG pure core helpers.
 
-use std::collections::BTreeMap;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
-use super::BLAKE3_ALGORITHM;
-use super::CYCLE_REASON;
-use super::DUPLICATE_EDGE_REASON;
-use super::DUPLICATE_NODE_REASON;
-use super::EDGE_ARROW_SEPARATOR;
-use super::EDGE_LABEL_SEPARATOR;
-use super::EMPTY_EDGE_LABEL;
-use super::EMPTY_FIELD_REASON;
-use super::FIELD_BATCH;
-use super::FIELD_BOUNDS;
-use super::FIELD_EDGE;
-use super::FIELD_EDGE_FROM;
-use super::FIELD_EDGE_LABEL;
-use super::FIELD_EDGE_TO;
-use super::FIELD_GRAPH_LABEL;
-use super::FIELD_HASH;
-use super::FIELD_NODE_ID;
-use super::FIELD_RECEIPT_GRAPH_HASH;
-use super::FIELD_RECEIPT_HASH;
-use super::FIELD_RECEIPT_LEAKS;
-use super::FIELD_RECEIPT_REDACTION;
-use super::FIELD_RECEIPT_SCHEMA;
-use super::HASH_HEX_CHARS;
-use super::HASH_PART_SEPARATOR;
-use super::INVALID_HASH_REASON;
-use super::INVALID_RECEIPT_SCHEMA_REASON;
-use super::RECEIPT_LEAK_REASON;
-use super::RUNTIME_DAG_HASH_DOMAIN;
-use super::RUNTIME_DAG_RECEIPT_SCHEMA;
-use super::SELF_EDGE_REASON;
-use super::TOO_LONG_REASON;
-use super::TOO_MANY_EDGES_REASON;
-use super::TOO_MANY_NODES_REASON;
-use super::UNKNOWN_ENDPOINT_REASON;
-use super::UNMET_PREREQUISITE_CODE;
-use super::UNSAFE_LABEL_REASON;
-use super::UNSAFE_REDACTION_REASON;
-use super::UNSAFE_TEXT_MARKERS;
-use super::data::RuntimeDagBlockedNode;
-use super::data::RuntimeDagBounds;
-use super::data::RuntimeDagEdge;
-use super::data::RuntimeDagGraph;
-use super::data::RuntimeDagIssueKind;
-use super::data::RuntimeDagNode;
-use super::data::RuntimeDagReceipt;
-use super::data::RuntimeDagReceiptLeak;
-use super::data::RuntimeDagRedactionStatus;
-use super::data::RuntimeDagTopologicalBatch;
-use super::data::RuntimeDagTopologicalPlan;
-use super::data::RuntimeDagValidationIssue;
-use super::data::RuntimeDagValidationReport;
+use super::data::{
+    RuntimeDagBlockedNode, RuntimeDagBounds, RuntimeDagEdge, RuntimeDagGraph, RuntimeDagIssueKind,
+    RuntimeDagNode, RuntimeDagReceipt, RuntimeDagReceiptLeak, RuntimeDagRedactionStatus,
+    RuntimeDagTopologicalBatch, RuntimeDagTopologicalPlan, RuntimeDagValidationIssue,
+    RuntimeDagValidationReport,
+};
+use super::{
+    BLAKE3_ALGORITHM, CYCLE_REASON, DUPLICATE_EDGE_REASON, DUPLICATE_NODE_REASON,
+    EDGE_ARROW_SEPARATOR, EDGE_LABEL_SEPARATOR, EMPTY_EDGE_LABEL, EMPTY_FIELD_REASON, FIELD_BATCH,
+    FIELD_BOUNDS, FIELD_EDGE, FIELD_EDGE_FROM, FIELD_EDGE_LABEL, FIELD_EDGE_TO, FIELD_GRAPH_LABEL,
+    FIELD_HASH, FIELD_NODE_ID, FIELD_RECEIPT_GRAPH_HASH, FIELD_RECEIPT_HASH, FIELD_RECEIPT_LEAKS,
+    FIELD_RECEIPT_REDACTION, FIELD_RECEIPT_SCHEMA, HASH_HEX_CHARS, HASH_PART_SEPARATOR,
+    INVALID_HASH_REASON, INVALID_RECEIPT_SCHEMA_REASON, RECEIPT_LEAK_REASON,
+    RUNTIME_DAG_HASH_DOMAIN, RUNTIME_DAG_RECEIPT_SCHEMA, SELF_EDGE_REASON, TOO_LONG_REASON,
+    TOO_MANY_EDGES_REASON, TOO_MANY_NODES_REASON, UNKNOWN_ENDPOINT_REASON, UNMET_PREREQUISITE_CODE,
+    UNSAFE_LABEL_REASON, UNSAFE_REDACTION_REASON, UNSAFE_TEXT_MARKERS,
+};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct TopologyState {
@@ -202,7 +167,12 @@ pub fn project_runtime_dag_receipt(
     let node_ids = sorted_node_ids(graph);
     let edge_ids = sorted_edge_ids(graph);
     let batch_hashes = topology
-        .map(|plan| plan.batches.iter().map(|batch| batch.batch_hash.clone()).collect::<Vec<_>>())
+        .map(|plan| {
+            plan.batches
+                .iter()
+                .map(|batch| batch.batch_hash.clone())
+                .collect::<Vec<_>>()
+        })
         .unwrap_or_default();
     let mut receipt = RuntimeDagReceipt {
         schema: RUNTIME_DAG_RECEIPT_SCHEMA.to_owned(),
@@ -227,7 +197,9 @@ pub fn project_runtime_dag_receipt(
 /// # Errors
 ///
 /// Returns safe diagnostics when the receipt is malformed or contains leak markers.
-pub fn validate_runtime_dag_receipt(receipt: &RuntimeDagReceipt) -> Result<(), Vec<RuntimeDagValidationIssue>> {
+pub fn validate_runtime_dag_receipt(
+    receipt: &RuntimeDagReceipt,
+) -> Result<(), Vec<RuntimeDagValidationIssue>> {
     let mut issues = Vec::new();
     let bounds = RuntimeDagBounds::default();
 
@@ -269,7 +241,11 @@ pub fn validate_runtime_dag_receipt(receipt: &RuntimeDagReceipt) -> Result<(), V
     validate_receipt_vectors(receipt, bounds, &mut issues);
     validate_receipt_redaction(receipt, &mut issues);
 
-    if issues.is_empty() { Ok(()) } else { Err(issues) }
+    if issues.is_empty() {
+        Ok(())
+    } else {
+        Err(issues)
+    }
 }
 
 fn validate_count_bounds(graph: &RuntimeDagGraph, issues: &mut Vec<RuntimeDagValidationIssue>) {
@@ -328,7 +304,11 @@ fn collect_node_ids(
     node_ids
 }
 
-fn validate_edges(graph: &RuntimeDagGraph, node_ids: &BTreeSet<String>, issues: &mut Vec<RuntimeDagValidationIssue>) {
+fn validate_edges(
+    graph: &RuntimeDagGraph,
+    node_ids: &BTreeSet<String>,
+    issues: &mut Vec<RuntimeDagValidationIssue>,
+) {
     let mut seen = BTreeSet::new();
     let mut duplicates = BTreeSet::new();
 
@@ -351,7 +331,11 @@ fn validate_edges(graph: &RuntimeDagGraph, node_ids: &BTreeSet<String>, issues: 
     }
 }
 
-fn validate_edge_labels(edge: &RuntimeDagEdge, bounds: RuntimeDagBounds, issues: &mut Vec<RuntimeDagValidationIssue>) {
+fn validate_edge_labels(
+    edge: &RuntimeDagEdge,
+    bounds: RuntimeDagBounds,
+    issues: &mut Vec<RuntimeDagValidationIssue>,
+) {
     validate_label(
         LabelInput {
             field: FIELD_EDGE_FROM,
@@ -414,7 +398,11 @@ fn validate_edge_endpoints(
     }
 }
 
-fn validate_acyclic(graph: &RuntimeDagGraph, node_ids: &BTreeSet<String>, issues: &mut Vec<RuntimeDagValidationIssue>) {
+fn validate_acyclic(
+    graph: &RuntimeDagGraph,
+    node_ids: &BTreeSet<String>,
+    issues: &mut Vec<RuntimeDagValidationIssue>,
+) {
     if has_endpoint_issue(issues) {
         return;
     }
@@ -434,14 +422,20 @@ fn validate_acyclic(graph: &RuntimeDagGraph, node_ids: &BTreeSet<String>, issues
 
 fn topology_state(graph: &RuntimeDagGraph) -> TopologyState {
     let nodes = sorted_node_ids(graph);
-    let mut indegrees = nodes.iter().map(|node| (node.clone(), super::EMPTY_COUNT)).collect::<BTreeMap<_, _>>();
+    let mut indegrees = nodes
+        .iter()
+        .map(|node| (node.clone(), super::EMPTY_COUNT))
+        .collect::<BTreeMap<_, _>>();
     let mut dependents = BTreeMap::<String, Vec<String>>::new();
 
     for edge in &graph.edges {
         if let Some(indegree) = indegrees.get_mut(edge.to_node_id.as_str()) {
             *indegree += 1;
         }
-        dependents.entry(edge.from_node_id.clone()).or_default().push(edge.to_node_id.clone());
+        dependents
+            .entry(edge.from_node_id.clone())
+            .or_default()
+            .push(edge.to_node_id.clone());
     }
 
     for dependent_nodes in dependents.values_mut() {
@@ -476,7 +470,10 @@ fn topology_state(graph: &RuntimeDagGraph) -> TopologyState {
         batches.push(batch);
     }
 
-    let remaining_nodes = nodes.into_iter().filter(|node_id| !emitted.contains(node_id.as_str())).collect();
+    let remaining_nodes = nodes
+        .into_iter()
+        .filter(|node_id| !emitted.contains(node_id.as_str()))
+        .collect();
 
     TopologyState {
         batches,
@@ -521,7 +518,10 @@ fn collect_completed_nodes(
 fn incoming_prerequisites(graph: &RuntimeDagGraph) -> BTreeMap<String, Vec<String>> {
     let mut incoming = BTreeMap::<String, Vec<String>>::new();
     for edge in &graph.edges {
-        incoming.entry(edge.to_node_id.clone()).or_default().push(edge.from_node_id.clone());
+        incoming
+            .entry(edge.to_node_id.clone())
+            .or_default()
+            .push(edge.from_node_id.clone());
     }
     for prerequisites in incoming.values_mut() {
         prerequisites.sort();
@@ -558,7 +558,12 @@ fn validate_label(input: LabelInput<'_>, issues: &mut Vec<RuntimeDagValidationIs
 }
 
 fn validate_hash(input: HashInput<'_>, issues: &mut Vec<RuntimeDagValidationIssue>) {
-    if input.value.len() != HASH_HEX_CHARS || !input.value.chars().all(|character| character.is_ascii_hexdigit()) {
+    if input.value.len() != HASH_HEX_CHARS
+        || !input
+            .value
+            .chars()
+            .all(|character| character.is_ascii_hexdigit())
+    {
         issues.push(RuntimeDagValidationIssue::new(
             RuntimeDagIssueKind::InvalidHash,
             input.field,
@@ -618,7 +623,10 @@ fn validate_receipt_vectors(
     }
 }
 
-fn validate_receipt_redaction(receipt: &RuntimeDagReceipt, issues: &mut Vec<RuntimeDagValidationIssue>) {
+fn validate_receipt_redaction(
+    receipt: &RuntimeDagReceipt,
+    issues: &mut Vec<RuntimeDagValidationIssue>,
+) {
     if receipt.redaction != RuntimeDagRedactionStatus::Redacted {
         issues.push(RuntimeDagValidationIssue::new(
             RuntimeDagIssueKind::UnsafeReceiptRedaction,
@@ -647,15 +655,30 @@ fn contains_unsafe_material(value: &str) -> bool {
 
 fn edge_identity(edge: &RuntimeDagEdge) -> String {
     let label = edge.label.as_deref().unwrap_or(EMPTY_EDGE_LABEL);
-    format!("{}{}{}{}{}", edge.from_node_id, EDGE_ARROW_SEPARATOR, edge.to_node_id, EDGE_LABEL_SEPARATOR, label)
+    format!(
+        "{}{}{}{}{}",
+        edge.from_node_id, EDGE_ARROW_SEPARATOR, edge.to_node_id, EDGE_LABEL_SEPARATOR, label
+    )
 }
 
 fn sorted_node_ids(graph: &RuntimeDagGraph) -> Vec<String> {
-    graph.nodes.iter().map(|node| node.node_id.clone()).collect::<BTreeSet<_>>().into_iter().collect()
+    graph
+        .nodes
+        .iter()
+        .map(|node| node.node_id.clone())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
 }
 
 fn sorted_edge_ids(graph: &RuntimeDagGraph) -> Vec<String> {
-    graph.edges.iter().map(edge_identity).collect::<BTreeSet<_>>().into_iter().collect()
+    graph
+        .edges
+        .iter()
+        .map(edge_identity)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
 }
 
 fn graph_hash(graph: &RuntimeDagGraph) -> String {
@@ -671,7 +694,10 @@ fn graph_hash(graph: &RuntimeDagGraph) -> String {
 
 fn batch_hash(batch_index: usize, node_ids: &[String]) -> String {
     let batch_index_text = batch_index.to_string();
-    let canonical = canonical_parts(&[batch_index_text.as_str(), node_ids.join(HASH_PART_SEPARATOR).as_str()]);
+    let canonical = canonical_parts(&[
+        batch_index_text.as_str(),
+        node_ids.join(HASH_PART_SEPARATOR).as_str(),
+    ]);
     blake3_runtime_dag_fingerprint("batch", canonical.as_bytes())
 }
 
@@ -700,7 +726,10 @@ fn canonical_parts(parts: &[&str]) -> String {
 }
 
 fn issue_codes(issues: &[RuntimeDagValidationIssue]) -> Vec<String> {
-    issues.iter().map(|issue| issue.kind.code().to_owned()).collect()
+    issues
+        .iter()
+        .map(|issue| issue.kind.code().to_owned())
+        .collect()
 }
 
 fn has_endpoint_issue(issues: &[RuntimeDagValidationIssue]) -> bool {

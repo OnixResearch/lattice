@@ -1,6 +1,5 @@
-use std::cell::Cell;
-
 use crate::support::*;
+use std::cell::Cell;
 
 #[test]
 fn caveat_observations_repeat_before_one_final_replay_commit() {
@@ -8,7 +7,8 @@ fn caveat_observations_repeat_before_one_final_replay_commit() {
     let request = enforcement_request(DOCUMENT_RESOURCE);
     let signature = sign_request(&fixture, &request, nonce());
     let caveats = CountingCaveatSet::new(true);
-    let replay = RecordingReplay::after_caveats(&caveats.policy.calls, EXPECTED_CAVEAT_OBSERVATIONS);
+    let replay =
+        RecordingReplay::after_caveats(&caveats.policy.calls, EXPECTED_CAVEAT_OBSERVATIONS);
 
     let live = evaluate(
         fixture.token.as_str(),
@@ -70,7 +70,13 @@ fn final_verification_is_authoritative_and_drops_prospective_authority() {
     };
 
     let receipt = assert_denied(
-        evaluate(fixture.token.as_str(), &request, &signature, nonce(), services),
+        evaluate(
+            fixture.token.as_str(),
+            &request,
+            &signature,
+            nonce(),
+            services,
+        ),
         UcanEnforcementReason::BackendUnavailable,
     );
 

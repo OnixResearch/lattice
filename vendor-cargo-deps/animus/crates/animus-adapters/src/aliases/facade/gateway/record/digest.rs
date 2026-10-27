@@ -19,7 +19,9 @@ pub(super) fn zero_identity() -> Result<crate::ArtifactHash, crate::ArtifactVali
     crate::ArtifactHash::new(ZERO_IDENTITY_HEX)
 }
 
-fn identity_for_payload(payload: &str) -> Result<crate::ArtifactHash, crate::ArtifactValidationError> {
+fn identity_for_payload(
+    payload: &str,
+) -> Result<crate::ArtifactHash, crate::ArtifactValidationError> {
     debug_assert!(!payload.is_empty());
     let envelope = crate::ArtifactEnvelope::new(crate::ArtifactEnvelopeDraft::new(
         crate::ArtifactKind::RuntimeReceipt,

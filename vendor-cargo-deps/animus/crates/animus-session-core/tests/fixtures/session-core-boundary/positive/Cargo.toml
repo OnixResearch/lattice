@@ -1,0 +1,11 @@
+[package]
+name = "animus-session-core-boundary-positive"
+version = "0.0.0"
+edition = "2024"
+
+[dependencies]
+animus-adapters = { path = "../../../../animus-adapters" }
+blake3 = { version = "1.8.5", default-features = false }
+
+[dev-dependencies]
+serde = "1"

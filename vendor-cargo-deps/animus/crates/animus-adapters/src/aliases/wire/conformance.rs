@@ -15,6 +15,7 @@ pub type ProviderProjectionIndexStatus = crate::model::ProviderProjectionIndexSt
 /// Provider projection conformance index entry.
 pub type ProviderProjectionIndexEntry = crate::model::ProviderProjectionIndexEntry;
 /// Provider projection conformance index entry before validation.
-pub type ProviderProjectionIndexEntryDraft<'a> = crate::model::ProviderProjectionIndexEntryDraft<'a>;
+pub type ProviderProjectionIndexEntryDraft<'a> =
+    crate::model::ProviderProjectionIndexEntryDraft<'a>;
 /// Provider projection conformance error.
 pub type ProviderProjectionError = crate::model::ProviderProjectionError;

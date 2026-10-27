@@ -27,7 +27,9 @@ pub(crate) struct ProfileIdentityInput<'a> {
 }
 
 impl ProcessJobProfileIdentity {
-    pub(crate) fn new(input: ProfileIdentityInput<'_>) -> Result<Self, super::ProcessJobProfileError> {
+    pub(crate) fn new(
+        input: ProfileIdentityInput<'_>,
+    ) -> Result<Self, super::ProcessJobProfileError> {
         debug_assert!(!input.profile_name.is_empty());
         debug_assert!(!input.source_label.is_empty());
         super::checks::validate_profile_label(input.profile_name)?;

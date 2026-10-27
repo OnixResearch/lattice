@@ -1,0 +1,132 @@
+{
+  "bounds": {
+    "deadline_milliseconds": 30000,
+    "max_channel_bytes": 64,
+    "max_cpu_milliseconds": 30000,
+    "max_diagnostic_bytes": 2048,
+    "max_diff_records": 512,
+    "max_log_entries": 128,
+    "max_memory_bytes": 268435456,
+    "max_path_bytes": 256,
+    "max_record_records": 512,
+    "max_stderr_bytes": 65536,
+    "max_stdin_bytes": 4096,
+    "max_stdout_bytes": 1048576,
+    "minimum_hash_prefix_chars": 8
+  },
+  "channels": {
+    "allow_unlisted": false,
+    "allowlist": [
+      "main"
+    ]
+  },
+  "cohort": {
+    "change_hash_chars": 53,
+    "change_hash_format": "blake3-base32-nopad-uppercase",
+    "channel_output_format": "pijul-channel-lines-v1-beta18",
+    "cohort_identity": "ed1fcd07852103dd8ea0b2e824aac6cad51406c987e54240077888ce796aee2b",
+    "crate_checksum_sha256": "0500d14ab41adea4f0d71f03b9d1be895a0638e025204f5b6ab90e46c40684ff",
+    "diff_output_format": "pijul-diff-json-v1-beta18",
+    "license": "GPL-2.0-or-later",
+    "log_output_format": "pijul-log-hash-json-v1-beta18",
+    "nix_output_basename": "pijul-1.0.0-beta.18",
+    "nix_source_hash": "sha256-vU41JiuxB6Bsi88st/tkt02054oN3HEN52pnLu5hMA4=",
+    "release": "1.0.0-beta.18",
+    "source_change": "QRYOAJLYA5KO7JAYU6LMYHPU3NSZCTUMYEPCK3HNZIRIDZDWSMBAC",
+    "source_repository": "https://nest.pijul.com/pijul/pijul",
+    "source_state": "RISR562S7FZP3NNYDFVBQUMDEGB6YSSMSH2RGZDRYBIPGVQDSLXQC",
+    "state_id_chars": 53,
+    "state_id_format": "merkle-blake3-base32-nopad-uppercase"
+  },
+  "enabled_by_default": false,
+  "evidence": {
+    "author_details_allowed": false,
+    "change_descriptions_allowed": false,
+    "credentials_allowed": false,
+    "file_bodies_allowed": false,
+    "key_material_allowed": false,
+    "metadata_only": true,
+    "non_claims": [
+      "not-repository-integrity",
+      "not-change-semantic-correctness",
+      "not-content-correctness",
+      "not-merge-safety",
+      "not-authorship-authenticity",
+      "not-signature-verification",
+      "not-key-custody",
+      "not-network-or-remote-correctness",
+      "not-conflict-resolution-quality",
+      "not-persistence-or-durability",
+      "not-production-readiness",
+      "not-release-eligibility"
+    ],
+    "private_paths_allowed": false,
+    "raw_diffs_allowed": false,
+    "unrestricted_diagnostics_allowed": false
+  },
+  "identity": {
+    "load_local_identity_files": false,
+    "report_author_class": false,
+    "report_descriptive_timestamp": false,
+    "signature_authenticity_claim": false,
+    "signature_statuses": [
+      "not-reported",
+      "present-unverified",
+      "absent",
+      "unsupported"
+    ]
+  },
+  "operations": {
+    "confirmation_required": true,
+    "protected_mutations": [
+      "record",
+      "unrecord",
+      "apply",
+      "fork",
+      "reset",
+      "channel_mutation"
+    ],
+    "query_allowlist": [
+      "log",
+      "diff",
+      "channel_list"
+    ],
+    "unsupported": [
+      "change"
+    ]
+  },
+  "projections": [
+    "checkpoint",
+    "snapshot_ledger",
+    "provenance",
+    "workspace"
+  ],
+  "receipt": {
+    "non_claims": [
+      "not-repository-integrity",
+      "not-change-semantic-correctness",
+      "not-content-correctness",
+      "not-merge-safety",
+      "not-authorship-authenticity",
+      "not-signature-verification",
+      "not-key-custody",
+      "not-network-or-remote-correctness",
+      "not-conflict-resolution-quality",
+      "not-persistence-or-durability",
+      "not-production-readiness",
+      "not-release-eligibility"
+    ],
+    "omission_class": "content-omitted",
+    "projection_targets": [
+      "checkpoint",
+      "snapshot_ledger",
+      "provenance",
+      "workspace"
+    ],
+    "redaction_class": "metadata-only",
+    "repository_class": "explicit-local",
+    "status": "validated",
+    "truncation_class": "not-truncated"
+  },
+  "schema": "animus.pijul-vcs-adapter.v1"
+}

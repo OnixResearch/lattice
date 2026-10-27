@@ -1,28 +1,28 @@
-use ucan::OperationProfileAdmissionError;
-
-use super::core::OPERATION_PROFILE_DOMAIN;
-use super::core::blake3_reference_prefix;
-use super::core::decode_blake3_reference;
-use super::core::derive_request_binding;
-use super::core::operation_profile_digest;
+use super::core::{
+    OPERATION_PROFILE_DOMAIN, blake3_reference_prefix, decode_blake3_reference,
+    derive_request_binding, operation_profile_digest,
+};
 use super::error::profile_error_reason;
-use super::receipt::BLAKE3_DIGEST_BYTES;
-use super::receipt::ReceiptContext;
-use super::receipt::build_receipt;
-use super::receipt::receipt_schema;
-use super::types::EnforcementAction;
-use super::types::UcanEnforcementReason;
+use super::receipt::{BLAKE3_DIGEST_BYTES, ReceiptContext, build_receipt, receipt_schema};
+use super::types::{EnforcementAction, UcanEnforcementReason};
 use crate::EnforcementRequest;
+use crate::ucan_profile::BasaltUcanProtocolProfile;
+use ucan::OperationProfileAdmissionError;
 
 const CREDENTIAL_BYTE: u8 = 3;
 const REQUEST_BYTE: u8 = 5;
 const POLICY_BYTE: u8 = 7;
 const HEX_CHARACTERS_PER_BYTE: usize = 2;
-const EXPECTED_RECEIPT_BLAKE3: &str = "blake3:5f616b3417ee513cabba8dd8326bebe36b33e67e53be81093efe729870b1f640";
+// The receipt digest binds the imported UCAN source revision, not just policy.
+const EXPECTED_RECEIPT_BLAKE3: &str =
+    "blake3:ad8ae776bd1939f73659f2dd252b29cf2ca8685ae4cf50b55f6ab7f70d8b709d";
 
 fn receipt_context() -> ReceiptContext {
     ReceiptContext {
-        credential_bytes: Some(u64::try_from(BLAKE3_DIGEST_BYTES).expect("digest width must fit u64")),
+        protocol_profile: BasaltUcanProtocolProfile::OnixCompactEd25519V1,
+        credential_bytes: Some(
+            u64::try_from(BLAKE3_DIGEST_BYTES).expect("digest width must fit u64"),
+        ),
         credential: Some([CREDENTIAL_BYTE; BLAKE3_DIGEST_BYTES]),
         request_binding: Some([REQUEST_BYTE; BLAKE3_DIGEST_BYTES]),
         operation_profile: operation_profile_digest(EnforcementAction::DocumentWrite),
@@ -34,10 +34,15 @@ fn receipt_context() -> ReceiptContext {
 fn typed_actions_have_distinct_reviewed_bindings() {
     let read = operation_profile_digest(EnforcementAction::DocumentRead);
     let write = operation_profile_digest(EnforcementAction::DocumentWrite);
-    let request = EnforcementRequest::new("document-write", "did:key:z6Mkresource/docs/report", "document/write");
-    let first = derive_request_binding(EnforcementAction::DocumentWrite, &request).expect("bounded request must bind");
-    let second =
-        derive_request_binding(EnforcementAction::DocumentWrite, &request).expect("the same bounded request must bind");
+    let request = EnforcementRequest::new(
+        "document-write",
+        "did:key:z6Mkresource/docs/report",
+        "document/write",
+    );
+    let first = derive_request_binding(EnforcementAction::DocumentWrite, &request)
+        .expect("bounded request must bind");
+    let second = derive_request_binding(EnforcementAction::DocumentWrite, &request)
+        .expect("the same bounded request must bind");
 
     assert_ne!(read, write);
     assert_eq!(first, second);
@@ -66,8 +71,14 @@ fn operation_profile_hash_uses_unambiguous_length_prefixes() {
         ambiguous.update(field);
     }
 
-    assert_eq!(operation_profile_digest(action), *framed.finalize().as_bytes());
-    assert_ne!(operation_profile_digest(action), *ambiguous.finalize().as_bytes());
+    assert_eq!(
+        operation_profile_digest(action),
+        *framed.finalize().as_bytes()
+    );
+    assert_ne!(
+        operation_profile_digest(action),
+        *ambiguous.finalize().as_bytes()
+    );
 }
 
 #[test]
@@ -99,6 +110,17 @@ fn receipt_is_deterministic_and_redacted() {
 }
 
 #[test]
+fn protocol_profile_substitution_changes_receipt_identity() {
+    let compact = build_receipt(UcanEnforcementReason::Allowed, true, receipt_context());
+    let mut substituted = receipt_context();
+    substituted.protocol_profile = BasaltUcanProtocolProfile::UcanWg100;
+    let final_profile = build_receipt(UcanEnforcementReason::Allowed, true, substituted);
+
+    assert_ne!(compact.protocol_profile, final_profile.protocol_profile);
+    assert_ne!(compact.receipt_blake3, final_profile.receipt_blake3);
+}
+
+#[test]
 fn oversized_receipt_omits_credential_identity() {
     let mut context = receipt_context();
     context.credential = None;
@@ -116,6 +138,9 @@ fn blake3_reference_decoder_rejects_malformed_input() {
     assert!(decode_blake3_reference(&valid).is_some());
     assert!(decode_blake3_reference("blake3:short").is_none());
     assert!(
-        decode_blake3_reference("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").is_none()
+        decode_blake3_reference(
+            "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        )
+        .is_none()
     );
 }

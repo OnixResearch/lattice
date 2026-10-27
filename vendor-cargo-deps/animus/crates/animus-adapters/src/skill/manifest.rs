@@ -214,7 +214,10 @@ impl core::fmt::Display for Error {
             Self::DescriptionTooLong {
                 max_chars,
                 actual_chars,
-            } => write!(formatter, "skill description supports at most {max_chars} characters; got {actual_chars}"),
+            } => write!(
+                formatter,
+                "skill description supports at most {max_chars} characters; got {actual_chars}"
+            ),
             Self::UnsupportedVersion { value } => {
                 write!(formatter, "skill_version has unsupported version {value}")
             }
@@ -223,7 +226,10 @@ impl core::fmt::Display for Error {
                 field,
                 max_items,
                 actual_items,
-            } => write!(formatter, "{field} supports at most {max_items} items; got {actual_items}"),
+            } => write!(
+                formatter,
+                "{field} supports at most {max_items} items; got {actual_items}"
+            ),
             Self::InvalidContentIdentity { field, reason } => {
                 write!(formatter, "{field} is invalid: {reason}")
             }

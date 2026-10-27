@@ -1,5 +1,5 @@
 {
-  "basalt_policy_blake3": "5475d5473ec98cbf052a83512836b0739f5dad3e7b9b0ed201eb3094b1cf39bf",
+  "basalt_policy_blake3": "978fd731f98c48cbdbdedd2106d98bbb44e918670bac9b5ab143aab2dc516874",
   "contract_id": "document-write",
   "decisions": {
     "caveat_evaluation": "satisfied",
@@ -26,10 +26,11 @@
     "consumer-replay-store-durability",
     "application-authorization-completeness"
   ],
+  "protocol_profile": "onix-compact-ed25519-v1",
   "request_ability": "document/write",
   "request_resource": "did:key:z6Mkresource/docs/report",
-  "runtime_ucan_revision": "277ab768eb532ac0c715a3bbff2a7dc37a702f11",
-  "schema": "basalt.ucan-semantics-fixture.v1",
-  "support_catalog_blake3": "9ffae46c16556feb27614dee3f5945e48321f08a38f0b7c8b1baf7e0e106d095",
-  "support_catalog_revision": "277ab768eb532ac0c715a3bbff2a7dc37a702f11"
+  "runtime_ucan_revision": "3a2aa043068a82663cf72ec05ed5d56a7d65ecd5",
+  "schema": "basalt.ucan-semantics-fixture.v2",
+  "support_catalog_blake3": "fe77fd63076eaef555b74e702e4c14e483bdba70151ccc955c75b17d97412427",
+  "support_catalog_revision": "3a2aa043068a82663cf72ec05ed5d56a7d65ecd5"
 }

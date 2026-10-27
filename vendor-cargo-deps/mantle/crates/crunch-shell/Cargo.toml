@@ -1,0 +1,13 @@
+[package]
+name = "crunch-shell"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+crunch-shell-core = { path = "../crunch-shell-core" }
+serde = { version = "1.0", features = ["derive"] }
+
+[dev-dependencies]
+pretty_assertions = "1.0"
+serde_json = "1.0"

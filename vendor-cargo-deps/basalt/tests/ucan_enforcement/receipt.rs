@@ -21,11 +21,24 @@ fn identical_evaluations_have_identical_redacted_receipts() {
         &request,
         &signature,
         nonce(),
-        services(&fixture, &NoRevocations, &DenyUnknownCaveats, &second_replay),
+        services(
+            &fixture,
+            &NoRevocations,
+            &DenyUnknownCaveats,
+            &second_replay,
+        ),
     )
     .expect("second evaluation must pass");
 
     assert_eq!(first.receipt(), second.receipt());
+    assert_eq!(
+        first.receipt().protocol_profile,
+        BasaltUcanProtocolProfile::OnixCompactEd25519V1.as_str()
+    );
+    assert_eq!(
+        first.receipt().ucan_support_catalog_blake3,
+        basalt::ucan_semantics::UCAN_SUPPORT_CATALOG_BLAKE3
+    );
     assert_eq!(first_replay.calls.get(), FIRST_CALL);
     assert_eq!(second_replay.calls.get(), FIRST_CALL);
 }
@@ -59,7 +72,10 @@ fn compact_bearer_fixtures_keep_zeroizing_ownership() {
     ];
 
     for pattern in forbidden {
-        assert!(!sources.contains(pattern.as_str()), "test source copies or exposes compact bearer text: {pattern}");
+        assert!(
+            !sources.contains(pattern.as_str()),
+            "test source copies or exposes compact bearer text: {pattern}"
+        );
     }
     assert!(docs.contains("Pass only borrowed `CompactToken::as_str()` views"));
     assert!(docs.contains("Do not copy a compact bearer into `String` or `Vec` values"));
@@ -82,15 +98,28 @@ fn persisted_receipt_cannot_recreate_live_authority() {
     let persisted = serde_json::to_string(live.receipt()).expect("receipt must serialize");
     let restored: UcanEnforcementReceipt =
         serde_json::from_str(&persisted).expect("receipt must deserialize as evidence");
+    let mut old_schema: serde_json::Value =
+        serde_json::from_str(&persisted).expect("receipt must decode for mutation");
+    old_schema["schema"] =
+        serde_json::Value::String("basalt.ucan-enforcement-receipt.v1".to_owned());
+    let old_object = old_schema
+        .as_object_mut()
+        .expect("receipt mutation requires an object");
+    old_object.remove("protocol_profile");
+    old_object.remove("ucan_support_catalog_blake3");
     let live_source = include_str!("../../src/ucan_enforcement/shell.rs");
     let error_source = include_str!("../../src/ucan_enforcement/error.rs");
-    let struct_start = live_source.find("pub struct LiveUcanEnforcement").expect("live type source must exist");
+    let struct_start = live_source
+        .find("pub struct LiveUcanEnforcement")
+        .expect("live type source must exist");
     let struct_end = live_source[struct_start..]
         .find("impl fmt::Debug for LiveUcanEnforcement")
         .map(|offset| struct_start + offset)
         .expect("live debug implementation must follow its declaration");
     let struct_block = &live_source[struct_start..struct_end];
-    let failure_start = error_source.find("pub struct UcanEnforcementFailure").expect("failure type source must exist");
+    let failure_start = error_source
+        .find("pub struct UcanEnforcementFailure")
+        .expect("failure type source must exist");
     let failure_end = error_source[failure_start..]
         .find("impl UcanEnforcementFailure")
         .map(|offset| failure_start + offset)
@@ -105,9 +134,15 @@ fn persisted_receipt_cannot_recreate_live_authority() {
         .expect("live implementation must end before prospective authority");
 
     assert_eq!(&restored, live.receipt());
+    assert!(serde_json::from_value::<UcanEnforcementReceipt>(old_schema).is_err());
     assert!(!persisted.contains("did:key"));
     assert!(!persisted.contains(DOCUMENT_WRITE_ABILITY));
-    assert!(!struct_block.lines().skip(1).any(|line| line.trim_start().starts_with("pub ")));
+    assert!(
+        !struct_block
+            .lines()
+            .skip(1)
+            .any(|line| line.trim_start().starts_with("pub "))
+    );
     assert!(!failure_block.contains("AuthorityDecision"));
     assert!(!failure_block.contains("LiveUcanEnforcement"));
     assert!(!live_impl.contains("pub fn new"));

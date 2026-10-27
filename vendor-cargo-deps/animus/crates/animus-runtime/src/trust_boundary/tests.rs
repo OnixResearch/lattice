@@ -1,5 +1,4 @@
-// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven
-// validation compact while drained changes are archived.
+// Cairn adaptation compatibility modules intentionally keep public DTO names and table-driven validation compact while drained changes are archived.
 #![allow(
     unknown_lints,
     ambiguous_params,
@@ -7,7 +6,12 @@
     bool_naming,
     borrowed_argument_types
 )]
-#![allow(compound_condition, excessive_file_length, function_length, non_trait_imports)]
+#![allow(
+    compound_condition,
+    excessive_file_length,
+    function_length,
+    non_trait_imports
+)]
 #![allow(
     numeric_units,
     path_segment_repetition,
@@ -55,7 +59,8 @@ fn valid_boundary_passes_and_invalid_descriptor_fails_closed() {
     let diagnostics = validate_trust_boundary_descriptor(&invalid).expect_err("invalid boundary");
 
     assert!(diagnostics.iter().any(|diagnostic| {
-        diagnostic.kind == TrustBoundaryDiagnosticKind::EmptyCollection && diagnostic.field == FIELD_SANCTIONED_TOOLS
+        diagnostic.kind == TrustBoundaryDiagnosticKind::EmptyCollection
+            && diagnostic.field == FIELD_SANCTIONED_TOOLS
     }));
     assert!(
         diagnostics
@@ -68,47 +73,95 @@ fn valid_boundary_passes_and_invalid_descriptor_fails_closed() {
             .any(|diagnostic| { diagnostic.kind == TrustBoundaryDiagnosticKind::UnsafeRawPath })
     );
     assert!(diagnostics.iter().any(|diagnostic| {
-        diagnostic.kind == TrustBoundaryDiagnosticKind::InvalidHash && diagnostic.field == FIELD_VERIFIER_HASH
+        diagnostic.kind == TrustBoundaryDiagnosticKind::InvalidHash
+            && diagnostic.field == FIELD_VERIFIER_HASH
     }));
-    assert!(
-        diagnostics
-            .iter()
-            .any(|diagnostic| { diagnostic.kind == TrustBoundaryDiagnosticKind::MutableBoundaryRequest })
-    );
+    assert!(diagnostics.iter().any(|diagnostic| {
+        diagnostic.kind == TrustBoundaryDiagnosticKind::MutableBoundaryRequest
+    }));
 }
 
 #[test]
 fn monitor_allows_safe_actions_and_denies_exact_boundary_violations() {
     // r[verify agent_harness_runtime.ornith_trust_boundary.monitor.violations]
     let boundary = boundary();
-    let allowed = action(TrustBoundaryActionKind::ToolCall, Some(TOOL_CARGO), None, None, None, true);
+    let allowed = action(
+        TrustBoundaryActionKind::ToolCall,
+        Some(TOOL_CARGO),
+        None,
+        None,
+        None,
+        true,
+    );
     let allowed_decision = monitor_trust_boundary_action(&boundary, &allowed);
     assert!(allowed_decision.accepted);
     assert!(allowed_decision.issue_codes.is_empty());
 
     let cases = [
         (
-            action(TrustBoundaryActionKind::PathRead, None, Some(WITHHELD_ORACLE), None, None, true),
+            action(
+                TrustBoundaryActionKind::PathRead,
+                None,
+                Some(WITHHELD_ORACLE),
+                None,
+                None,
+                true,
+            ),
             TrustBoundaryIssueCode::WithheldPathRead,
         ),
         (
-            action(TrustBoundaryActionKind::VerifierModification, None, Some(VERIFIER_LABEL), None, None, true),
+            action(
+                TrustBoundaryActionKind::VerifierModification,
+                None,
+                Some(VERIFIER_LABEL),
+                None,
+                None,
+                true,
+            ),
             TrustBoundaryIssueCode::VerifierModification,
         ),
         (
-            action(TrustBoundaryActionKind::ToolCall, Some(TOOL_SHELL), None, None, None, true),
+            action(
+                TrustBoundaryActionKind::ToolCall,
+                Some(TOOL_SHELL),
+                None,
+                None,
+                None,
+                true,
+            ),
             TrustBoundaryIssueCode::UnsanctionedTool,
         ),
         (
-            action(TrustBoundaryActionKind::SandboxProfileChange, None, None, Some(SANDBOX_WEAK), None, true),
+            action(
+                TrustBoundaryActionKind::SandboxProfileChange,
+                None,
+                None,
+                Some(SANDBOX_WEAK),
+                None,
+                true,
+            ),
             TrustBoundaryIssueCode::SandboxWeakening,
         ),
         (
-            action(TrustBoundaryActionKind::ApprovalSuppression, None, None, None, None, false),
+            action(
+                TrustBoundaryActionKind::ApprovalSuppression,
+                None,
+                None,
+                None,
+                None,
+                false,
+            ),
             TrustBoundaryIssueCode::ApprovalSuppression,
         ),
         (
-            action(TrustBoundaryActionKind::EvidenceAcceptance, None, None, None, Some(UNKNOWN_EVIDENCE), true),
+            action(
+                TrustBoundaryActionKind::EvidenceAcceptance,
+                None,
+                None,
+                None,
+                Some(UNKNOWN_EVIDENCE),
+                true,
+            ),
             TrustBoundaryIssueCode::EvidencePolicyBypass,
         ),
     ];
@@ -126,24 +179,44 @@ fn judge_approval_cannot_override_monitor_denial_or_grant_authority() {
     let boundary = boundary();
     let denied = monitor_trust_boundary_action(
         &boundary,
-        &action(TrustBoundaryActionKind::ToolCall, Some(TOOL_SHELL), None, None, None, true),
+        &action(
+            TrustBoundaryActionKind::ToolCall,
+            Some(TOOL_SHELL),
+            None,
+            None,
+            None,
+            true,
+        ),
     );
-    let binding = bind_trust_boundary_judge(&denied, &TrustBoundaryJudgeVeto {
-        outcome: TrustBoundaryJudgeOutcome::Approve,
-        reason_label: Some("judge-ok".to_string()),
-    });
+    let binding = bind_trust_boundary_judge(
+        &denied,
+        &TrustBoundaryJudgeVeto {
+            outcome: TrustBoundaryJudgeOutcome::Approve,
+            reason_label: Some("judge-ok".to_string()),
+        },
+    );
     assert!(!binding.accepted);
     assert!(binding.monitor_denial_final);
     assert!(binding.judge_grant_ignored);
 
     let allowed = monitor_trust_boundary_action(
         &boundary,
-        &action(TrustBoundaryActionKind::ToolCall, Some(TOOL_CARGO), None, None, None, true),
+        &action(
+            TrustBoundaryActionKind::ToolCall,
+            Some(TOOL_CARGO),
+            None,
+            None,
+            None,
+            true,
+        ),
     );
-    let veto = bind_trust_boundary_judge(&allowed, &TrustBoundaryJudgeVeto {
-        outcome: TrustBoundaryJudgeOutcome::Veto,
-        reason_label: Some("suspicious-intent".to_string()),
-    });
+    let veto = bind_trust_boundary_judge(
+        &allowed,
+        &TrustBoundaryJudgeVeto {
+            outcome: TrustBoundaryJudgeOutcome::Veto,
+            reason_label: Some("suspicious-intent".to_string()),
+        },
+    );
     assert!(!veto.accepted);
     assert!(!veto.monitor_denial_final);
 }
@@ -153,15 +226,29 @@ fn anti_gaming_fixtures_are_reproducible_without_provider_calls() {
     // r[verify agent_harness_runtime.ornith_trust_boundary.anti_gaming.fixtures]
     let boundary = boundary();
     let fixtures = [
-        (TrustBoundaryActionKind::OracleCopy, TrustBoundaryIssueCode::OracleCopy),
-        (TrustBoundaryActionKind::HardcodedExpectedOutput, TrustBoundaryIssueCode::HardcodedExpectedOutput),
-        (TrustBoundaryActionKind::VisibleTestOverfit, TrustBoundaryIssueCode::VisibleTestOverfit),
-        (TrustBoundaryActionKind::AllowedToolIntentGaming, TrustBoundaryIssueCode::AllowedToolIntentGaming),
+        (
+            TrustBoundaryActionKind::OracleCopy,
+            TrustBoundaryIssueCode::OracleCopy,
+        ),
+        (
+            TrustBoundaryActionKind::HardcodedExpectedOutput,
+            TrustBoundaryIssueCode::HardcodedExpectedOutput,
+        ),
+        (
+            TrustBoundaryActionKind::VisibleTestOverfit,
+            TrustBoundaryIssueCode::VisibleTestOverfit,
+        ),
+        (
+            TrustBoundaryActionKind::AllowedToolIntentGaming,
+            TrustBoundaryIssueCode::AllowedToolIntentGaming,
+        ),
     ];
 
     for (kind, expected_issue) in fixtures {
-        let decision =
-            monitor_trust_boundary_action(&boundary, &action(kind, Some(TOOL_RIPGREP), None, None, None, true));
+        let decision = monitor_trust_boundary_action(
+            &boundary,
+            &action(kind, Some(TOOL_RIPGREP), None, None, None, true),
+        );
         assert!(!decision.accepted);
         assert!(decision.issue_codes.contains(&expected_issue));
     }
@@ -187,7 +274,11 @@ fn violation_receipts_accept_redacted_metadata_and_reject_leaks() {
     );
     let diagnostics = validate_trust_boundary_receipt(&leaking).expect_err("receipt leaks");
 
-    assert!(diagnostics.iter().any(|diagnostic| { diagnostic.kind == TrustBoundaryDiagnosticKind::ReceiptLeak }));
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| { diagnostic.kind == TrustBoundaryDiagnosticKind::ReceiptLeak })
+    );
     assert!(
         diagnostics
             .iter()

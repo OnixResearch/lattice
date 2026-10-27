@@ -1,12 +1,15 @@
-use std::cell::Cell;
-use std::cell::RefCell;
-use std::collections::BTreeSet;
-
 use super::*;
+use std::cell::{Cell, RefCell};
+use std::collections::BTreeSet;
 
 pub(crate) struct RecordingReplay<'a> {
     pub(crate) calls: Cell<u32>,
-    seen: RefCell<BTreeSet<(String, [u8; basalt::ucan::core::holder_invocation::HOLDER_INVOCATION_NONCE_BYTES])>>,
+    seen: RefCell<
+        BTreeSet<(
+            String,
+            [u8; basalt::ucan::core::holder_invocation::HOLDER_INVOCATION_NONCE_BYTES],
+        )>,
+    >,
     caveat_calls: Option<&'a Cell<u32>>,
     expected_caveat_calls: u32,
     pub(crate) committed: Cell<bool>,
@@ -23,7 +26,10 @@ impl RecordingReplay<'_> {
         }
     }
 
-    pub(crate) const fn after_caveats(caveat_calls: &Cell<u32>, expected_caveat_calls: u32) -> RecordingReplay<'_> {
+    pub(crate) const fn after_caveats(
+        caveat_calls: &Cell<u32>,
+        expected_caveat_calls: u32,
+    ) -> RecordingReplay<'_> {
         RecordingReplay {
             calls: Cell::new(0),
             seen: RefCell::new(BTreeSet::new()),
@@ -39,12 +45,19 @@ impl HolderInvocationReplayAdmission for RecordingReplay<'_> {
         &self,
         candidate: &HolderInvocationReplayCandidate<'_>,
     ) -> Result<(), HolderInvocationReplayError> {
-        self.calls
-            .set(self.calls.get().checked_add(FIRST_CALL).expect("test replay call count must not overflow"));
+        self.calls.set(
+            self.calls
+                .get()
+                .checked_add(FIRST_CALL)
+                .expect("test replay call count must not overflow"),
+        );
         if let Some(caveat_calls) = self.caveat_calls {
             assert_eq!(caveat_calls.get(), self.expected_caveat_calls);
         }
-        let replay_key = (candidate.audience().as_str().to_owned(), *candidate.nonce().as_bytes());
+        let replay_key = (
+            candidate.audience().as_str().to_owned(),
+            *candidate.nonce().as_bytes(),
+        );
         if !self.seen.borrow_mut().insert(replay_key) {
             return Err(HolderInvocationReplayError::Duplicate);
         }
@@ -68,9 +81,17 @@ impl CountingCaveatPolicy {
 }
 
 impl CaveatPolicy for CountingCaveatPolicy {
-    fn evaluate(&self, _caveat: &CaveatDocument, _request: &basalt::ucan::AuthorizationRequest) -> CaveatDecision {
-        self.calls
-            .set(self.calls.get().checked_add(FIRST_CALL).expect("test caveat call count must not overflow"));
+    fn evaluate(
+        &self,
+        _caveat: &CaveatDocument,
+        _request: &basalt::ucan::AuthorizationRequest,
+    ) -> CaveatDecision {
+        self.calls.set(
+            self.calls
+                .get()
+                .checked_add(FIRST_CALL)
+                .expect("test caveat call count must not overflow"),
+        );
         if self.is_allowed {
             CaveatDecision::Satisfied
         } else {
@@ -117,7 +138,11 @@ pub(crate) struct FailsAfterResolver<'a> {
 
 impl KeyResolver for FailsAfterResolver<'_> {
     fn resolve_key(&self, issuer: &IssuerDid) -> Result<Ed25519PublicKey, KeyResolverError> {
-        let next_call = self.calls.get().checked_add(FIRST_CALL).expect("test resolver call count must not overflow");
+        let next_call = self
+            .calls
+            .get()
+            .checked_add(FIRST_CALL)
+            .expect("test resolver call count must not overflow");
         self.calls.set(next_call);
         if next_call > self.allowed_calls {
             return Err(KeyResolverError::Backend {

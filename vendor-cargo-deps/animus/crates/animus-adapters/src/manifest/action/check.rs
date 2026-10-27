@@ -1,39 +1,19 @@
-use super::Collection;
-use super::Text;
-use super::consts::COMPATIBILITY_CAPABILITY_FIELD;
-use super::consts::COMPATIBILITY_PLATFORM_FIELD;
-use super::consts::COMPATIBILITY_VERSION_FIELD;
-use super::consts::HOST_CAPABILITY_FIELD;
-use super::consts::HOST_PLATFORM_FIELD;
-use super::consts::HOST_VERSION_FIELD;
-use super::consts::ROLE_ARTIFACT_LABEL_FIELD;
-use super::consts::ROLE_COMMAND_LABEL_FIELD;
-use super::consts::ROLE_COMMAND_OR_ARTIFACT_FIELD;
-use super::consts::ROLE_CONTEXT_FIELD;
-use super::consts::ROLE_EVENT_FIELD;
-use super::consts::ROLE_ID_FIELD;
-use super::consts::ROLE_KIND_FIELD;
-use super::consts::ROLE_LINK_SCHEME_FIELD;
-use super::consts::ROLE_TITLE_FIELD;
-use super::consts::VERSION_SEPARATOR;
-use super::context::contains_text;
-use super::context::diagnostic;
-use super::context::host_label;
-use super::context::host_labels;
-use super::context::parse_role_kind;
-use super::context::validate_optional_safe_label;
-use super::context::validate_required_safe_label;
-use super::context::validate_required_safe_labels;
-use super::types::PluginCompatibility;
-use super::types::PluginCompatibilityDraft;
-use super::types::PluginDiagnostic;
-use super::types::PluginDiagnosticKind;
-use super::types::PluginDiagnosticSeverity;
-use super::types::PluginHostCompatibility;
-use super::types::PluginHostCompatibilityDraft;
-use super::types::PluginRole;
-use super::types::PluginRoleDraft;
-use super::types::PluginRoleKind;
+use super::consts::{
+    COMPATIBILITY_CAPABILITY_FIELD, COMPATIBILITY_PLATFORM_FIELD, COMPATIBILITY_VERSION_FIELD,
+    HOST_CAPABILITY_FIELD, HOST_PLATFORM_FIELD, HOST_VERSION_FIELD, ROLE_ARTIFACT_LABEL_FIELD,
+    ROLE_COMMAND_LABEL_FIELD, ROLE_COMMAND_OR_ARTIFACT_FIELD, ROLE_CONTEXT_FIELD, ROLE_EVENT_FIELD,
+    ROLE_ID_FIELD, ROLE_KIND_FIELD, ROLE_LINK_SCHEME_FIELD, ROLE_TITLE_FIELD, VERSION_SEPARATOR,
+};
+use super::context::{
+    contains_text, diagnostic, host_label, host_labels, parse_role_kind,
+    validate_optional_safe_label, validate_required_safe_label, validate_required_safe_labels,
+};
+use super::types::{
+    PluginCompatibility, PluginCompatibilityDraft, PluginDiagnostic, PluginDiagnosticKind,
+    PluginDiagnosticSeverity, PluginHostCompatibility, PluginHostCompatibilityDraft, PluginRole,
+    PluginRoleDraft, PluginRoleKind,
+};
+use super::{Collection, Text};
 
 const STATIC_COMPATIBILITY_DIAGNOSTIC_CAPACITY: usize = 2;
 
@@ -54,8 +34,12 @@ pub(in crate::manifest) fn validate_manifest_compatibility(
     draft: &PluginCompatibilityDraft<'_>,
 ) -> Result<PluginCompatibility, super::super::PluginDescriptorError> {
     let version = validate_version_label(COMPATIBILITY_VERSION_FIELD, draft.minimum_host_version)?;
-    let capabilities = validate_required_safe_labels(COMPATIBILITY_CAPABILITY_FIELD, draft.required_host_capabilities)?;
-    let platforms = validate_required_safe_labels(COMPATIBILITY_PLATFORM_FIELD, draft.supported_platforms)?;
+    let capabilities = validate_required_safe_labels(
+        COMPATIBILITY_CAPABILITY_FIELD,
+        draft.required_host_capabilities,
+    )?;
+    let platforms =
+        validate_required_safe_labels(COMPATIBILITY_PLATFORM_FIELD, draft.supported_platforms)?;
     Ok(PluginCompatibility {
         minimum_host_version: version,
         required_host_capabilities: capabilities,
@@ -69,10 +53,12 @@ fn validate_version_label(
 ) -> Result<Text, super::super::PluginDescriptorError> {
     let label = validate_required_safe_label(field, value)?;
     if parse_semver(label.as_str()).is_none() {
-        return Err(super::super::PluginDescriptorError::InvalidCompatibilityVersion {
-            field: field.as_str(),
-            value: label,
-        });
+        return Err(
+            super::super::PluginDescriptorError::InvalidCompatibilityVersion {
+                field: field.as_str(),
+                value: label,
+            },
+        );
     }
     Ok(label)
 }
@@ -83,10 +69,12 @@ fn validate_required_version_value(
 ) -> Result<Text, super::super::PluginDescriptorError> {
     let label = validate_required_safe_label(field, Some(value))?;
     if parse_semver(label.as_str()).is_none() {
-        return Err(super::super::PluginDescriptorError::InvalidCompatibilityVersion {
-            field: field.as_str(),
-            value: label,
-        });
+        return Err(
+            super::super::PluginDescriptorError::InvalidCompatibilityVersion {
+                field: field.as_str(),
+                value: label,
+            },
+        );
     }
     Ok(label)
 }
@@ -109,7 +97,11 @@ fn parse_semver(value: &str) -> Option<SemverParts> {
     if parts.next().is_some() {
         return None;
     }
-    Some(SemverParts { major, minor, patch })
+    Some(SemverParts {
+        major,
+        minor,
+        patch,
+    })
 }
 
 pub(in crate::manifest) fn validate_roles(
@@ -142,7 +134,9 @@ fn validate_role(
         "role context labels must fit adapter bounds"
     );
     assert!(
-        !manifest_compatibility.required_host_capabilities().is_empty(),
+        !manifest_compatibility
+            .required_host_capabilities()
+            .is_empty(),
         "manifest compatibility must be validated before roles"
     );
     let role_kind_label = validate_required_safe_label(ROLE_KIND_FIELD, draft.kind)?;
@@ -150,12 +144,15 @@ fn validate_role(
     let id = validate_required_safe_label(ROLE_ID_FIELD, draft.id)?;
     let title = validate_required_safe_label(ROLE_TITLE_FIELD, draft.title)?;
     let context_labels = validate_required_safe_labels(ROLE_CONTEXT_FIELD, draft.context_labels)?;
-    let command_label = validate_optional_safe_label(ROLE_COMMAND_LABEL_FIELD, draft.command_label)?;
-    let artifact_label = validate_optional_safe_label(ROLE_ARTIFACT_LABEL_FIELD, draft.artifact_label)?;
+    let command_label =
+        validate_optional_safe_label(ROLE_COMMAND_LABEL_FIELD, draft.command_label)?;
+    let artifact_label =
+        validate_optional_safe_label(ROLE_ARTIFACT_LABEL_FIELD, draft.artifact_label)?;
     require_dispatch_label(command_label.as_ref(), artifact_label.as_ref())?;
     let event_name = validate_event_name(kind, draft.event_name)?;
     let link_scheme = validate_optional_safe_label(ROLE_LINK_SCHEME_FIELD, draft.link_scheme)?;
-    let compatibility = validate_effective_compatibility(&draft.compatibility, manifest_compatibility)?;
+    let compatibility =
+        validate_effective_compatibility(&draft.compatibility, manifest_compatibility)?;
     Ok(PluginRole {
         kind,
         id,
@@ -213,7 +210,10 @@ fn validate_effective_compatibility(
     let required_host_capabilities = if draft.required_host_capabilities.is_empty() {
         manifest_compatibility.required_host_capabilities().to_vec()
     } else {
-        validate_required_safe_labels(COMPATIBILITY_CAPABILITY_FIELD, draft.required_host_capabilities)?
+        validate_required_safe_labels(
+            COMPATIBILITY_CAPABILITY_FIELD,
+            draft.required_host_capabilities,
+        )?
     };
     let platform_labels = if draft.supported_platforms.is_empty() {
         manifest_compatibility.supported_platforms().to_vec()
@@ -247,25 +247,40 @@ pub(super) fn compatibility_diagnostics(
     required: &PluginCompatibility,
     host: &PluginHostCompatibility,
 ) -> Collection<PluginDiagnostic> {
-    assert!(!required.minimum_host_version().is_empty(), "required compatibility must include a version");
-    assert!(!host.host_version.is_empty(), "host compatibility must include a version");
+    assert!(
+        !required.minimum_host_version().is_empty(),
+        "required compatibility must include a version"
+    );
+    assert!(
+        !host.host_version.is_empty(),
+        "host compatibility must include a version"
+    );
     let required_capability_count = required.required_host_capabilities().len();
-    let reserved_diagnostic_count = required_capability_count.saturating_add(STATIC_COMPATIBILITY_DIAGNOSTIC_CAPACITY);
+    let reserved_diagnostic_count =
+        required_capability_count.saturating_add(STATIC_COMPATIBILITY_DIAGNOSTIC_CAPACITY);
     let mut diagnostics = Collection::with_capacity(reserved_diagnostic_count);
     if required_version_is_newer(HostVersionPair {
         required: required.minimum_host_version(),
         actual: host.host_version.as_str(),
     }) {
-        diagnostics.push(diagnostic(PluginDiagnosticKind::NewerHostRequired, PluginDiagnosticSeverity::Failure));
+        diagnostics.push(diagnostic(
+            PluginDiagnosticKind::NewerHostRequired,
+            PluginDiagnosticSeverity::Failure,
+        ));
     }
     for capability in required.required_host_capabilities() {
         if !contains_text(host.capabilities.as_slice(), capability.as_str()) {
-            diagnostics
-                .push(diagnostic(PluginDiagnosticKind::MissingHostCapability, PluginDiagnosticSeverity::Failure));
+            diagnostics.push(diagnostic(
+                PluginDiagnosticKind::MissingHostCapability,
+                PluginDiagnosticSeverity::Failure,
+            ));
         }
     }
     if !contains_text(required.supported_platforms(), host.platform.as_str()) {
-        diagnostics.push(diagnostic(PluginDiagnosticKind::UnsupportedPlatform, PluginDiagnosticSeverity::Failure));
+        diagnostics.push(diagnostic(
+            PluginDiagnosticKind::UnsupportedPlatform,
+            PluginDiagnosticSeverity::Failure,
+        ));
     }
     diagnostics
 }

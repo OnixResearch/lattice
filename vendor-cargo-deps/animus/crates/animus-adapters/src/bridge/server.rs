@@ -1,25 +1,9 @@
-use super::COMMAND_FIELD;
-use super::CONTRACT_FIELD;
-use super::Collection;
-use super::ENDPOINT_FIELD;
-use super::ENV_KEY_FIELD;
-use super::ENV_VALUE_SEPARATOR;
-use super::HashInput;
-use super::ID_FIELD;
-use super::InteropError;
-use super::LABEL_SPACE;
-use super::McpTransportKind;
-use super::PROMPT_FIELD;
-use super::PROVENANCE_FIELD;
-use super::RAW_URL_MARKER;
-use super::RESOURCE_FIELD;
-use super::SCHEMA_FIELD;
-use super::TIMEOUT_FIELD;
-use super::TOOL_FIELD;
-use super::Text;
-use super::required_text;
-use super::text_collection;
-use super::validate_hash;
+use super::{
+    COMMAND_FIELD, CONTRACT_FIELD, Collection, ENDPOINT_FIELD, ENV_KEY_FIELD, ENV_VALUE_SEPARATOR,
+    HashInput, ID_FIELD, InteropError, LABEL_SPACE, McpTransportKind, PROMPT_FIELD,
+    PROVENANCE_FIELD, RAW_URL_MARKER, RESOURCE_FIELD, SCHEMA_FIELD, TIMEOUT_FIELD, TOOL_FIELD,
+    Text, required_text, text_collection, validate_hash,
+};
 
 /// Untrusted MCP descriptor.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -84,7 +68,8 @@ impl McpDescriptor {
         text_collection(PROMPT_FIELD, draft.prompts, false)?;
         text_collection(SCHEMA_FIELD, draft.schema_ids, true)?;
         text_collection(CONTRACT_FIELD, draft.result_contracts, true)?;
-        let deadline_label = required_text(TIMEOUT_FIELD, draft.timeout_class).map_err(map_empty_to_timeout)?;
+        let deadline_label =
+            required_text(TIMEOUT_FIELD, draft.timeout_class).map_err(map_empty_to_timeout)?;
         let environment_keys = validate_environment_keys(draft.environment_keys)?;
         text_collection(TOOL_FIELD, draft.available_tool_ceilings, true)?;
         let provenance_hash = required_text(PROVENANCE_FIELD, draft.provenance_hash)?;
@@ -159,14 +144,19 @@ fn validate_transport_labels(
 ) -> Result<(), InteropError> {
     match transport {
         McpTransportKind::Stdio if command_label.is_none() => Err(InteropError::UnsafeRuntimeLabel),
-        McpTransportKind::StreamableHttp if endpoint_label.is_none() => Err(InteropError::UnsafeRuntimeLabel),
+        McpTransportKind::StreamableHttp if endpoint_label.is_none() => {
+            Err(InteropError::UnsafeRuntimeLabel)
+        }
         _ => Ok(()),
     }
 }
 
 fn validate_environment_keys(values: &[&str]) -> Result<Collection<Text>, InteropError> {
     let keys = text_collection(ENV_KEY_FIELD, values, false)?;
-    if keys.iter().any(|key| key.contains(ENV_VALUE_SEPARATOR) || key.contains(RAW_URL_MARKER)) {
+    if keys
+        .iter()
+        .any(|key| key.contains(ENV_VALUE_SEPARATOR) || key.contains(RAW_URL_MARKER))
+    {
         return Err(InteropError::EnvironmentValueLeak);
     }
     Ok(keys)
@@ -187,7 +177,9 @@ fn optional_runtime_label(
 }
 fn map_empty_to_timeout(error: InteropError) -> InteropError {
     match error {
-        InteropError::Contract(crate::AdapterContractError::EmptyField { .. }) => InteropError::MissingTimeout,
+        InteropError::Contract(crate::AdapterContractError::EmptyField { .. }) => {
+            InteropError::MissingTimeout
+        }
         other => other,
     }
 }

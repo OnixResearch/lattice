@@ -1,0 +1,125 @@
+{
+  "schema": "mantle-gcc40-native-boundary-v1",
+  "derivation": "bootstrap/gcc-4.0.ncl",
+  "status": "boundary-only",
+  "boundary": "native-gcc-make-to-pass1-bridge",
+  "native_attempt": {
+    "command_marker": "make -j1 -C \"$dir\"",
+    "diagnostic_marker": "MANTLE: gcc-4.0 native cc1 build reached TinyCC/Mes source boundary; installing pass1 bridge"
+  },
+  "installed_bridge_markers": [
+    "gcc (Mantle pass1 bridge) 4.0.4",
+    "Crunch GCC 4.0 pass1 cc1 object boundary",
+    "exec \"$TCC/bin/tcc\" -c -I\"$MUSL/include\" -o \"\\$outfile\" \"\\$input\""
+  ],
+  "promoted_native_slices": [
+    {
+      "id": "cc1-arithmetic-control-flow",
+      "receipt": "bootstrap/evidence/gcc-4.0-native-cc1-arithmetic.json",
+      "derivation_marker": "Mantle GCC 4.0 native cc1 arithmetic slice: no TinyCC delegation for bounded proof input."
+    },
+    {
+      "id": "cc1-logical-control-flow",
+      "receipt": "bootstrap/evidence/gcc-4.0-native-cc1-arithmetic.json",
+      "derivation_marker": "Mantle GCC 4.0 native cc1 logical slice: no TinyCC delegation for bounded proof input."
+    },
+    {
+      "id": "cc1-local-variable-assignment",
+      "receipt": "bootstrap/evidence/gcc-4.0-native-cc1-arithmetic.json",
+      "derivation_marker": "Mantle GCC 4.0 native cc1 local-vars slice: no TinyCC delegation for bounded proof input."
+    },
+    {
+      "id": "cc1-function-call",
+      "receipt": "bootstrap/evidence/gcc-4.0-native-cc1-arithmetic.json",
+      "derivation_marker": "Mantle GCC 4.0 native cc1 function-call slice: no TinyCC delegation for bounded proof input."
+    },
+    {
+      "id": "cc1-array-index",
+      "receipt": "bootstrap/evidence/gcc-4.0-native-cc1-arithmetic.json",
+      "derivation_marker": "Mantle GCC 4.0 native cc1 array-index slice: no TinyCC delegation for bounded proof input."
+    },
+    {
+      "id": "cc1-struct-field",
+      "receipt": "bootstrap/evidence/gcc-4.0-native-cc1-arithmetic.json",
+      "derivation_marker": "Mantle GCC 4.0 native cc1 struct-field slice: no TinyCC delegation for bounded proof input."
+    },
+    {
+      "id": "cc1-pointer-deref",
+      "receipt": "bootstrap/evidence/gcc-4.0-native-cc1-arithmetic.json",
+      "derivation_marker": "Mantle GCC 4.0 native cc1 pointer-deref slice: no TinyCC delegation for bounded proof input."
+    },
+    {
+      "id": "genattrtab-bounded-output",
+      "receipt": "bootstrap/evidence/gcc-4.0-native-generator-slice.json",
+      "derivation_marker": "Mantle GCC 4.0 native genattrtab bounded output slice: checked generated attrtab shape; full generator correctness pending."
+    },
+    {
+      "id": "genoutput-bounded-output",
+      "receipt": "bootstrap/evidence/gcc-4.0-native-generator-slice.json",
+      "derivation_marker": "Mantle GCC 4.0 native genoutput bounded output slice: checked generated output shape; full generator correctness pending."
+    },
+    {
+      "id": "genemit-bounded-output",
+      "receipt": "bootstrap/evidence/gcc-4.0-native-generator-slice.json",
+      "derivation_marker": "Mantle GCC 4.0 native genemit bounded output slice: checked generated emit source shape; full generator correctness pending."
+    },
+    {
+      "id": "genrecog-bounded-output",
+      "receipt": "bootstrap/evidence/gcc-4.0-native-generator-slice.json",
+      "derivation_marker": "Mantle GCC 4.0 native genrecog bounded output slice: checked generated recognition source shape; full generator correctness pending."
+    },
+    {
+      "id": "genextract-bounded-output",
+      "receipt": "bootstrap/evidence/gcc-4.0-native-generator-slice.json",
+      "derivation_marker": "Mantle GCC 4.0 native genextract bounded output slice: checked generated extraction source shape; full generator correctness pending."
+    },
+    {
+      "id": "libiberty-demangle-single-short-arg",
+      "receipt": "bootstrap/evidence/gcc-4.0-native-demangle-slice.json",
+      "derivation_marker": "gcc40_cplus_demangle_short_arg_itanium_v6_boundary"
+    }
+  ],
+  "last_observed_build_log": {
+    "status": "complete-with-pass1-bridge-plus-bounded-native-cc1-pointer-deref-slice",
+    "boundary_log_markers": [
+      "gcc40-cc   -g -DIN_GCC     -DHAVE_CONFIG_H  -o cc1",
+      "gcc40-cc   -g -DIN_GCC     -DHAVE_CONFIG_H  -o xgcc",
+      "gcc-4.0.4 build complete (languages: c)"
+    ]
+  },
+  "parity_effect": "evidence-backed partial; does not prove native gcc.4.0 correctness",
+  "native_frontier": {
+    "status": "frontier-only",
+    "blockers": [
+      {
+        "id": "cc1-bounded-pointer-deref",
+        "derivation_marker": "Mantle GCC 4.0 native cc1 pointer-deref slice: no TinyCC delegation for bounded proof input.",
+        "frontier": "installed cc1 has checked bounded arithmetic, logical/control-flow, local-variable, helper-call, array-index, struct-field, and pointer-deref no-TinyCC-delegation slices; full native cc1 parsing/codegen correctness remains pending"
+      },
+      {
+        "id": "libiberty-demangle-bounded-semantics",
+        "derivation_marker": "gcc40_cplus_demangle_short_arg_itanium_v6_boundary",
+        "frontier": "libiberty demangling has checked bounded flat, two-component nested, selected three-component nested zero-argument, selected single-int, selected single-char, selected single-long, and selected single-short Itanium semantic slices; full native cp-demangle remains pending"
+      },
+      {
+        "id": "generator-bounded-outputs",
+        "derivation_marker": "Mantle GCC 4.0 native genoutput bounded output slice: checked generated output shape; full generator correctness pending.",
+        "frontier": "native generator evidence has checked bounded genattrtab, genoutput, genemit, genrecog, and genextract output slices; full native generator correctness remains pending"
+      }
+    ]
+  },
+  "source_frontier_markers": {
+    "status": "boundary-only",
+    "checked_derivation_markers": [
+      "shell/tool bridge.  Follow the live-bootstrap pass1 shape instead:",
+      "under the c-parse flags deterministically segfaults TinyCC after that",
+      "rewrites before system.h trigger deterministic TinyCC segfaults.",
+      "the TinyCC/Mes handoff segfaults in missing-header diagnostics;",
+      "emitted by the genconstants/genflags bridge before tm.h can include them.",
+      "through TinyCC/Mes diagnostics and segfault; seed the same inert files",
+      "empty-predicate contract used during the graph-completion bridge.",
+      "the validated TinyCC handoff. This remains a bridge until native cc1 builds."
+    ],
+    "non_claim": "These markers document the checked native frontier/pass1 bridge; they do not prove native GCC 4.0 correctness."
+  }
+}

@@ -1,5 +1,15 @@
 {
   "contracts": {
+    "lattice-agent": {
+      "abilities": [
+        "agent/execute"
+      ],
+      "description": "Admit one exact Agent request bound to its selected backend and credential policy.",
+      "id": "lattice-agent",
+      "resource_prefixes": [
+        "lattice://agent/"
+      ]
+    },
     "lattice-file": {
       "abilities": [
         "file/read",

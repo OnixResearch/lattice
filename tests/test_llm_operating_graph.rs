@@ -72,6 +72,9 @@ impl RecordingAgentAdapter {
 }
 
 impl AgentAdapter for RecordingAgentAdapter {
+    fn execution_identity(&self, _request: &AgentRequest) -> Result<String, AgentError> {
+        Ok("test/recording-agent/v1".to_owned())
+    }
     fn execute(&self, request: &AgentRequest, _context: &AgentExecutionContext) -> Result<AgentResponse, AgentError> {
         self.requests.lock().expect("request log lock succeeds").push(request.clone());
         let role = request_role(request);

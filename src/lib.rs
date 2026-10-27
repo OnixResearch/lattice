@@ -116,6 +116,7 @@ pub mod agent_evaluation;
 pub mod agent_node;
 pub mod animus_agent;
 mod capability;
+pub mod compose_surface;
 pub mod config;
 pub mod content_identity;
 pub mod control_flow {
@@ -128,6 +129,7 @@ pub mod error;
 pub mod expression_dependencies;
 pub mod expressions;
 pub mod file_node;
+pub mod github_ci;
 pub mod guarded;
 pub mod headless;
 pub mod http;

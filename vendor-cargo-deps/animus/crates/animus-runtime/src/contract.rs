@@ -18,7 +18,10 @@ pub struct MaxTurns {
 
 impl MaxTurns {
     const fn from_valid_count(count: usize, policy_count: u32) -> Self {
-        Self { count, policy_count }
+        Self {
+            count,
+            policy_count,
+        }
     }
 
     pub(crate) const fn count(self) -> usize {
@@ -45,7 +48,10 @@ impl MaxTurns {
             });
         };
 
-        Ok(Self { count, policy_count })
+        Ok(Self {
+            count,
+            policy_count,
+        })
     }
 }
 
@@ -54,7 +60,8 @@ pub const DEFAULT_MAX_TURNS: MaxTurns =
     MaxTurns::from_valid_count(DEFAULT_MAX_TURNS_COUNT, DEFAULT_MAX_TURNS_POLICY_COUNT);
 
 /// Smallest accepted maximum-turn budget.
-pub const MIN_MAX_TURNS: MaxTurns = MaxTurns::from_valid_count(MIN_MAX_TURNS_COUNT, MIN_MAX_TURNS_POLICY_COUNT);
+pub const MIN_MAX_TURNS: MaxTurns =
+    MaxTurns::from_valid_count(MIN_MAX_TURNS_COUNT, MIN_MAX_TURNS_POLICY_COUNT);
 
 const _: () = assert!(DEFAULT_MAX_TURNS_COUNT >= MIN_MAX_TURNS_COUNT);
 const _: () = assert!(DEFAULT_MAX_TURNS_POLICY_COUNT >= MIN_MAX_TURNS_POLICY_COUNT);
@@ -131,7 +138,10 @@ impl core::fmt::Display for RuntimeError {
                 write!(formatter, "runtime config {field} is invalid: {reason}")
             }
             Self::LoopTurn { message } => {
-                write!(formatter, "runtime input could not form a loop turn: {message}")
+                write!(
+                    formatter,
+                    "runtime input could not form a loop turn: {message}"
+                )
             }
         }
     }
@@ -199,7 +209,9 @@ impl RuntimeInput {
     /// Returns [`RuntimeError`] when the summary is empty after trimming.
     pub fn new(summary: &str) -> Result<Self, RuntimeError> {
         if summary.trim().is_empty() {
-            return Err(RuntimeError::EmptyInput { field: SUMMARY_FIELD });
+            return Err(RuntimeError::EmptyInput {
+                field: SUMMARY_FIELD,
+            });
         }
 
         Ok(Self {

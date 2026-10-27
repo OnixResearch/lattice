@@ -20,8 +20,14 @@ impl Reference {
     /// Returns [`crate::AdapterContractError`] when the kind or value is invalid
     /// or the kind is unsupported.
     pub fn new(draft: ReferenceDraft<'_>) -> Result<Self, crate::AdapterContractError> {
-        crate::validation::validate_required_adapter_field(SESSION_REFERENCE_KIND_FIELD, draft.kind)?;
-        crate::validation::validate_required_adapter_field(SESSION_REFERENCE_VALUE_FIELD, draft.value)?;
+        crate::validation::validate_required_adapter_field(
+            SESSION_REFERENCE_KIND_FIELD,
+            draft.kind,
+        )?;
+        crate::validation::validate_required_adapter_field(
+            SESSION_REFERENCE_VALUE_FIELD,
+            draft.value,
+        )?;
         let kind = Kind::parse(draft.kind)?;
         Ok(Self {
             kind,
@@ -67,10 +73,12 @@ impl Kind {
     pub fn parse(value: &str) -> Result<Self, crate::AdapterContractError> {
         match value.trim() {
             SESSION_REFERENCE_KIND_NATIVE => Ok(Self::Native),
-            other => Err(crate::AdapterContractError::UnsupportedSessionReferenceKind {
-                field: SESSION_REFERENCE_KIND_FIELD.as_str(),
-                value: alloc::string::String::from(other),
-            }),
+            other => Err(
+                crate::AdapterContractError::UnsupportedSessionReferenceKind {
+                    field: SESSION_REFERENCE_KIND_FIELD.as_str(),
+                    value: alloc::string::String::from(other),
+                },
+            ),
         }
     }
 

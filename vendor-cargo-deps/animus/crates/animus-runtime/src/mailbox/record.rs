@@ -72,13 +72,23 @@ impl MessageQueueReceipt {
             validate_message_queue_receipt_text(denial_class)?;
         }
         let operation_kind = super::MessageQueueOperationKind::parse(
-            super::data::normalize_safe_metadata(super::FIELD_OPERATION_KIND, draft.operation_kind)?.as_str(),
+            super::data::normalize_safe_metadata(
+                super::FIELD_OPERATION_KIND,
+                draft.operation_kind,
+            )?
+            .as_str(),
         )?;
         let source = super::data::normalize_safe_metadata(super::FIELD_SOURCE, draft.source)?;
-        let active_work_hash =
-            super::data::validate_hash_metadata(super::FIELD_ACTIVE_WORK_HASH, draft.active_work_hash)?;
-        let queue_item_hash = super::data::validate_hash_metadata(super::FIELD_ITEM_HASH, draft.queue_item_hash)?;
-        let decision_class = super::data::normalize_safe_metadata(super::FIELD_DECISION_CLASS, draft.decision_class)?;
+        let active_work_hash = super::data::validate_hash_metadata(
+            super::FIELD_ACTIVE_WORK_HASH,
+            draft.active_work_hash,
+        )?;
+        let queue_item_hash =
+            super::data::validate_hash_metadata(super::FIELD_ITEM_HASH, draft.queue_item_hash)?;
+        let decision_class = super::data::normalize_safe_metadata(
+            super::FIELD_DECISION_CLASS,
+            draft.decision_class,
+        )?;
         let cancellation_handle_class = super::CancellationHandleClass::parse(
             super::data::normalize_safe_metadata(
                 super::FIELD_CANCELLATION_HANDLE_CLASS,
@@ -87,15 +97,21 @@ impl MessageQueueReceipt {
             .as_str(),
         )?;
         let budget_class = super::MessageBudgetClass::parse(
-            super::data::normalize_safe_metadata(super::FIELD_BUDGET_CLASS, draft.budget_class)?.as_str(),
+            super::data::normalize_safe_metadata(super::FIELD_BUDGET_CLASS, draft.budget_class)?
+                .as_str(),
         )?;
-        let policy_hash = super::data::validate_hash_metadata(super::FIELD_POLICY_HASH, draft.policy_hash)?;
+        let policy_hash =
+            super::data::validate_hash_metadata(super::FIELD_POLICY_HASH, draft.policy_hash)?;
         let denial_class = draft
             .denial_class
             .map(|value| super::data::normalize_safe_metadata(super::FIELD_DENIAL_CLASS, value))
             .transpose()?;
         let redaction_state = super::MessageRedactionState::parse(
-            super::data::normalize_safe_metadata(super::FIELD_REDACTION_STATE, draft.redaction_state)?.as_str(),
+            super::data::normalize_safe_metadata(
+                super::FIELD_REDACTION_STATE,
+                draft.redaction_state,
+            )?
+            .as_str(),
         )?;
         let receipt_hash = super::digest::receipt_hash(&ReceiptHashInput {
             operation_kind: operation_kind.as_str(),

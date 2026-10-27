@@ -36,7 +36,10 @@ const _: () = assert!(MAX_DIRECTIVE_TOKENS > 0);
 const _: () = assert!(MAX_CHAIN_TARGETS > 0);
 const _: () = assert!(HASH_HEX_CHARS == blake3::OUT_LEN.saturating_mul(BLAKE3_HEX_MULTIPLIER));
 
-pub(super) fn required_text(field: crate::validation::FieldName, value: &str) -> Result<Text, super::types::Error> {
+pub(super) fn required_text(
+    field: crate::validation::FieldName,
+    value: &str,
+) -> Result<Text, super::types::Error> {
     crate::validation::normalized_adapter_field(field, value).map_err(super::types::Error::from)
 }
 
@@ -52,7 +55,9 @@ pub(super) fn validate_precedence(precedence: u16) -> Result<(), super::types::E
     }
 }
 
-pub(super) fn validate_capabilities(capabilities: &[super::types::Capability]) -> Result<(), super::types::Error> {
+pub(super) fn validate_capabilities(
+    capabilities: &[super::types::Capability],
+) -> Result<(), super::types::Error> {
     if capabilities.is_empty() {
         Err(super::types::Error::MissingCapabilities)
     } else {
@@ -73,7 +78,9 @@ pub(super) fn validate_body(body: &str) -> Result<(), super::types::Error> {
     }
 }
 
-pub(super) fn normalize_extra_instruction(value: Option<&str>) -> Result<Option<Text>, super::types::Error> {
+pub(super) fn normalize_extra_instruction(
+    value: Option<&str>,
+) -> Result<Option<Text>, super::types::Error> {
     match value {
         Some(raw) => normalize_present_extra_instruction(raw),
         None => Ok(None),
@@ -121,7 +128,10 @@ pub(super) fn hash_parts(parts: &[&str]) -> Text {
         joined.push_str(part);
     }
     let rendered = blake3::hash(joined.as_bytes()).to_hex().to_string();
-    assert!(rendered.len() == HASH_HEX_CHARS, "BLAKE3 hex length drifted");
+    assert!(
+        rendered.len() == HASH_HEX_CHARS,
+        "BLAKE3 hex length drifted"
+    );
     rendered
 }
 
@@ -133,7 +143,12 @@ pub(super) struct BodyHashInput<'a> {
 }
 
 pub(super) fn profile_body_hash(input: BodyHashInput<'_>) -> Text {
-    hash_parts(&[HASH_SCHEMA, input.profile_id, input.source_identity, input.body])
+    hash_parts(&[
+        HASH_SCHEMA,
+        input.profile_id,
+        input.source_identity,
+        input.body,
+    ])
 }
 
 pub(super) fn count_to_u64(value: usize) -> u64 {

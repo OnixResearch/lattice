@@ -1,0 +1,134 @@
+# Architecture Decision Records
+
+ADRs dated before the 2026-05-14 rename may use the historical Crunch product
+name, `crunch` command examples, and legacy project filenames. Current
+operator-facing docs use Mantle/mantle names unless they are documenting a
+compatibility surface, crate name, or historical decision.
+
+| ADR | Title | Status |
+|-----|-------|--------|
+| [0001](0001-lazy-goals-vs-eager-dag.md) | Lazy goals vs eager DAG | Proposed |
+| [0002](0002-dynamic-derivations.md) | Dynamic derivations | Accepted |
+| [0003](0003-configurable-store-prefix.md) | Configurable store prefix | Accepted |
+| [0004](0004-native-provenance-attestations.md) | Native attestations | Proposed |
+| [0005](0005-project-outputs-schema.md) | Project outputs schema | Proposed |
+| [0006](0006-bootstrap-seed-abstraction.md) | Bootstrap seed abstraction | Accepted |
+| [0007](0007-normalized-bootstrap-seed-toolchain.md) | Normalized bootstrap seed toolchain | Accepted |
+| [0008](0008-reduced-muslcc-seed-provider.md) | Reduced musl.cc seed provider | Accepted |
+| [0009](0009-decentralized-release-verification.md) | Decentralized release verification separates technical and social trust | Proposed |
+| [0010](0010-keep-mantle-build-tool-boundary.md) | Keep Mantle's boundary build-shaped | Accepted |
+| [0011](0011-native-dynamic-plans.md) | Native dynamic plans | Accepted |
+| [0012](0012-overlay-store-composition.md) | Overlay store composition | Proposed |
+| [0013](0013-remote-execution-hardening.md) | Harden remote execution without replacing Mantle foundations | Proposed |
+| [0014](0014-package-ast-grep-as-bounded-structural-evidence.md) | Package ast-grep as bounded structural evidence | Proposed |
+| [0015](0015-rust-owned-machine-contract-generation.md) | Keep machine artifacts Rust-owned and generate Nickel review contracts | Accepted |
+| [0016](0016-materialize-wasm-components-as-build-artifacts.md) | Materialize WebAssembly components as build artifacts | Proposed |
+| [0017](0017-deterministic-lazy-goal-priority.md) | Deterministic priority for lazy ready goals | Accepted |
+| [0018](0018-mantle-owned-function-address-release-binding.md) | Own the function-address release binding at the Mantle boundary | Accepted |
+| [0019](0019-treat-preserves-function-receipts-as-opaque-canonical-sidecars.md) | Treat Preserves function-address receipts as opaque canonical sidecars | Accepted |
+| [0020](0020-keep-trellis-proof-evidence-recorded-only-until-valence-accepts.md) | Keep Trellis proof evidence recorded-only until Valence accepts it | Accepted |
+| [0021](0021-publish-release-bundles-with-an-atomic-no-clobber-commit.md) | Publish release bundles with an atomic no-clobber commit | Accepted |
+| [0022](0022-bound-kernelscript-as-planning-only-experiment.md) | Bound KernelScript as a planning-only experiment | Proposed |
+| [0023](0023-require-content-bound-release-rebuild-authority.md) | Require content-bound authority for release rebuild proofs | Accepted |
+| [0024](0024-separate-action-results-from-cas-and-execution.md) | Separate shared action results from CAS and execution | Proposed |
+| [0025](0025-reserve-remote-resources-with-fenced-leases.md) | Reserve remote resources with fenced leases and verified locality | Accepted |
+| [0026](0026-adopt-standalone-nickel-export-core-with-mantle-owned-authority.md) | Adopt the standalone Nickel export core without transferring Mantle authority | Accepted |
+| [0027](0027-distinguish-transfer-content-from-chunk-occurrence.md) | Distinguish transfer content identity from chunk occurrence identity | Accepted |
+| [0028](0028-bind-registry-oci-metadata-with-a-second-immutable-manifest.md) | Bind registry OCI metadata with a second immutable manifest | Accepted |
+| [0029](0029-authenticate-registry-digest-pairs-with-a-signature-artifact.md) | Authenticate registry digest pairs with a signature artifact | Accepted |
+| [0030](0030-encode-companion-artifacts-as-oci-image-manifests.md) | Encode companion artifacts as OCI image manifests | Accepted |
+| [0031](0031-hydrate-fresh-clone-inputs-from-source-bundles.md) | Hydrate fresh-clone inputs from source bundles | Accepted |
+| [0032](0032-deny-live-source-acquisition-in-hydrated-fixed-point-proofs.md) | Deny live source acquisition in hydrated fixed-point proofs | Accepted |
+| [0033](0033-preserve-history-when-publishing-mantle.md) | Preserve history when publishing Mantle | Accepted |
+| [0034](0034-keep-aeneasverif-proof-and-translation-authority-in-octet.md) | Keep AeneasVerif proof and translation authority in Octet | Accepted |
+| [0035](0035-cache-rust-units-through-castore-action-results.md) | Cache Rust units through castore action results | Accepted |
+| [0036](0036-run-stagex-grep-bridge-with-a-native-subset-runner.md) | Run the StageX grep bridge with a native subset runner | Accepted |
+| [0037](0037-add-a-later-full-shell-for-protected-stagex-configure.md) | Add a later full shell for protected StageX configure | Accepted |
+| [0038](0038-stabilize-protected-sed-stdin-with-regular-files.md) | Stabilize protected sed stdin with regular files | Accepted |
+| [0039](0039-relocate-stagex-configure-helpers-to-a-bounded-utility.md) | Relocate StageX configure helpers to a bounded utility | Accepted |
+| [0040](0040-validate-stagex-generated-sources-before-second-configure.md) | Validate StageX generated sources before second configure | Accepted |
+| [0041](0041-run-ylwrap-rewrites-with-a-bounded-native-runner.md) | Run `ylwrap` rewrites with a bounded native runner | Accepted |
+| [0042](0042-build-stagex-binutils-archives-with-a-bounded-producer.md) | Build StageX binutils archives with a bounded producer | Accepted |
+| [0043](0043-stage-stagex-binutils-install-under-its-logical-prefix.md) | Stage the StageX binutils install under its logical prefix | Accepted |
+| [0044](0044-canonicalize-tinycc-local-symbol-names-at-the-stagex-boundary.md) | Canonicalize TinyCC local symbol names at the StageX boundary | Accepted |
+| [0045](0045-adopt-orphaned-stagex-exec-descendants-before-inspection.md) | Adopt orphaned StageX exec descendants before inspection | Accepted |
+| [0046](0046-realize-foreign-graphs-through-a-receipt-bound-adapter.md) | Realize foreign graphs through a receipt-bound adapter | Proposed |
+| [0047](0047-bound-stagex-exec-audits-above-the-closed-binutils-trace.md) | Bound StageX exec audits above the closed binutils trace | Accepted |
+| [0048](0048-publish-the-protected-stagex-intermediate-provider.md) | Publish the protected StageX intermediate provider | Accepted |
+| [0049](0049-canonicalize-the-stagex-flex-runtime-section-name.md) | Canonicalize the StageX Flex runtime section name | Accepted |
+| [0050](0050-build-the-source-fixed-point-through-one-rust-proof-authority.md) | Build the source fixed point through one Rust proof authority | Accepted |
+| [0051](0051-cut-legacy-bootstrap-edges-at-the-stagex-provider.md) | Cut legacy bootstrap edges at the StageX provider | Accepted |
+| [0052](0052-separate-stagex-execution-evidence-from-runtime-handoff.md) | Separate StageX execution evidence from the runtime handoff | Accepted |
+| [0053](0053-isolate-irreversible-seccomp-listeners-by-proof-stage.md) | Isolate irreversible seccomp listeners by proof stage | Accepted |
+| [0054](0054-select-snix-backports-by-mantle-compatibility-boundary.md) | Select Snix backports by Mantle compatibility boundary | Accepted |
+| [0055](0055-plan-http-cache-closures-before-root-admission.md) | Plan HTTP cache closures before root admission | Accepted |
+| [0056](0056-generate-mantlepkgs-from-concrete-package-graphs.md) | Generate Mantlepkgs from concrete package graphs | Proposed |
+| [0057](0057-keep-composition-plans-concrete-and-frontend-neutral.md) | Keep composition plans concrete and frontend-neutral | Accepted |
+| [0058](0058-limit-store-access-with-concrete-capability-views.md) | Limit store access with concrete capability views | Proposed |
+| [0059](0059-bind-source-observations-without-new-signature-authority.md) | Bind source observations without new signature authority | Proposed |
+| [0060](0060-verify-remote-admission-with-a-trellis-model.md) | Verify remote admission with a Trellis model | Proposed |
+| [0061](0061-keep-remote-bearers-out-of-durable-state.md) | Keep remote bearers out of durable state | Accepted |
+| [0062](0062-adapt-ekala-package-maintenance-patterns-without-transferring-authority.md) | Adapt Ekala package-maintenance patterns without transferring authority | Proposed |
+| [0063](0063-keep-chaptered-release-archives-as-receipt-bound-transport.md) | Keep chaptered release archives as receipt-bound transport | Accepted |
+| [0064](0064-explain-store-retention-before-garbage-collection.md) | Explain store retention before garbage collection | Accepted |
+| [0065](0065-reject-picolibc-for-the-stagex-c-runtime.md) | Reject Picolibc for the StageX C runtime | Accepted |
+| [0066](0066-select-the-stagex-provider-compiler-by-bounded-workload.md) | Select the StageX provider compiler by bounded workload | Accepted |
+| [0067](0067-bind-source-fixed-point-open-file-limits-in-the-proof-plan.md) | Bind source fixed-point open-file limits in the proof plan | Accepted |
+| [0068](0068-default-to-deterministic-archives-in-gcc-built-binutils.md) | Default to deterministic archives in GCC-built binutils | Accepted |
+| [0069](0069-derive-gcc40-random-seeds-from-main-input-identity.md) | Derive GCC 4.0 random seeds from main input identity | Accepted |
+| [0070](0070-bind-source-fixed-point-to-root-action-trust-report.md) | Bind the source fixed point to a root action trust report | Proposed |
+| [0071](0071-adopt-nix-archive-at-the-filesystem-nar-boundary.md) | Adopt nix-archive at the filesystem NAR boundary | Proposed |
+| [0072](0072-bind-immutable-release-objects-to-one-current-pointer.md) | Bind immutable release objects to one current pointer | Accepted |
+| [0073](0073-read-nario-v2-without-transferring-nix-authority.md) | Read Nario v2 without transferring Nix authority | Accepted |
+| [0074](0074-enforce-evaluation-budgets-with-an-owned-worker.md) | Enforce evaluation budgets with an owned worker | Accepted |
+| [0075](0075-stream-complete-root-outcomes-with-canonical-summaries.md) | Stream complete root outcomes with canonical summaries | Accepted |
+| [0076](0076-resolve-historical-nixpkgs-versions-before-mantlepkgs-production.md) | Resolve historical Nixpkgs versions before Mantlepkgs production | Accepted |
+| [0077](0077-adopt-nix-derivation-at-the-nix-compatibility-boundary.md) | Adopt `nix-derivation` at the Nix compatibility boundary | Accepted |
+| [0078](0078-explore-distributed-evaluation.md) | Explore distributed evaluation feasibility | Accepted |
+| [0079](0079-spacewasm-stable-evidence-libtest-json.md) | Stable SpaceWasm evidence uses the libtest JSON harness grammar | Accepted |
+| [0080](0080-separate-coordination-from-batch-building.md) | Separate build coordination from batch building | Accepted |
+| [0081](0081-build-cargo-units-as-native-dynamic-plan-derivations.md) | Build Cargo units as native dynamic-plan derivations | Proposed |
+| [0082](0082-select-store-backends-explicitly-and-admit-casita.md) | Select store backends explicitly and admit Casita as a pinned backend | Proposed |
+| [0083](0083-require-declarations-before-transient-remote-handles.md) | Require declarations before transient remote handles | Proposed |
+| [0084](0084-dynamic-plan-source-slices.md) | Version dynamic plans for output-owned source slices | Proposed |
+| [0085](0085-publish-live-build-facts-outside-build-authority.md) | Publish live build facts outside build authority | Proposed |
+| [0086](0086-separate-bootstrap-source-pins-from-catalog-update-policy.md) | Separate bootstrap source pins from catalog update policy | Proposed |
+| [0087](0087-admit-prebuilt-android-toolchain-through-fixed-output-sources.md) | Admit prebuilt Android toolchain through fixed-output sources (reviewed metadata; see ADR 0110) | Proposed |
+| [0088](0088-stage-apk-builds-after-verified-tool-extraction.md) | Stage APK builds after verified tool extraction | Proposed |
+| [0089](0089-admit-prebuilt-android-toolchain-through-fixed-output-sources.md) | Admit prebuilt Android tools through pinned fixed-output sources | Proposed |
+| [0090](0090-carry-pattern-caveats-in-ucan-and-enforce-at-mantle-receivers.md) | Carry pattern caveats in UCAN and enforce at Mantle receivers | Proposed |
+| [0091](0091-version-long-lived-service-readiness-states-and-restart-policy.md) | Version long-lived service readiness states and restart policy | Proposed |
+| [0092](0092-lock-driven-vendor-fetches.md) | Acquire Cargo vendor inputs from lock-driven fixed-output fetches | Proposed |
+| [0093](0093-diff-admitted-watch-goals-by-identity.md) | Diff admitted watch goals by identity and cancel retracted work | Proposed |
+| [0095](0095-version-derivation-finish-gates.md) | Version derivation finish gates with explicit adoption | Proposed |
+| [0096](0096-keep-causal-build-traces-outside-evidence.md) | Keep causal build traces outside build evidence | Proposed |
+| [0098](0098-resolve-content-addressed-inputs-before-dispatch.md) | Resolve content-addressed inputs before dispatch under signed realisations | Proposed |
+| [0099](0099-reuse-local-daemon-for-depfile-validated-cc-cache.md) | Reuse local daemon for depfile-validated C/C++ compilation | Proposed |
+| [0100](0100-store-retention-interests-per-owner-record.md) | Store retention interests as per-owner records | Proposed |
+| [0101](0101-limit-nix-gateway-to-bounded-concrete-operations.md) | Limit Nix gateway to bounded concrete operations | Proposed |
+| [0103](0103-bind-static-inputs-to-dynamic-plan-roots.md) | Bind static inputs to dynamic-plan roots by request identity | Proposed |
+| [0109](0109-reject-package-layer-design-priors-without-a-consumer.md) | Reject package-layer design priors that have no consumer | Accepted |
+| [0110](0110-separate-reviewed-android-metadata-from-source-identity.md) | Separate reviewed Android metadata from source identity | Accepted |
+| [0111](0111-isolate-apk-signing-input-store-objects.md) | Isolate APK signing inputs in distinct store objects | Proposed |
+| [0112](0112-verify-completed-apk-builds-with-pinned-tools.md) | Verify completed APK builds with pinned tools | Proposed |
+| [0113](0113-select-equivalent-cargo-host-plan-units.md) | Select only equivalent Rust-plan host units for Cargo graphs | Proposed |
+| [0114](0114-reconcile-lineage-apis-with-explicit-contract-boundaries.md) | Reconcile lineage APIs with explicit contract boundaries | Proposed |
+| [0115](0115-bound-offline-model-conversion-to-inert-inputs.md) | Bound offline model conversion to inert inputs | Proposed |
+| [0116](0116-share-local-compile-cache-and-slot-authority.md) | Share local compile-cache and slot authority | Proposed |
+| [0118](0118-keep-reapi-transport-separate-from-mantle-output-authority.md) | Keep REAPI transport separate from Mantle output authority | Proposed |
+| [0119](0119-declare-native-inputs-for-the-offline-cargo-oracle.md) | Declare native inputs for the offline Cargo oracle | Proposed |
+| [0120](0120-isolate-blocking-proof-notifications-in-an-owned-process.md) | Isolate blocking proof notifications in an owned process | Proposed |
+| [0121](0121-bind-cold-continuations-to-actual-producer-outcomes.md) | Bind cold command continuations to actual producer outcomes | Proposed |
+| [0122](0122-use-native-blake3-streaming-at-snix-boundary.md) | Use native BLAKE3 streaming at the Snix boundary | Proposed |
+| [0123](0123-retain-unwired-source-program-authors-behind-item-scoped-dead-code-allows.md) | Retain unwired source-program authors behind item-scoped dead-code allows | Accepted |
+| [0124](0124-express-nickel-plan-shapes-as-record-types.md) | Express Nickel plan shapes as record types with whole-shape checks | Accepted |
+| [0125](0125-keep-rust-differential-and-wait-evidence-outside-authority.md) | Keep Rust differential and wait evidence outside execution authority | Proposed |
+| [0126](0126-require-qualified-providers-before-admitting-bounded-rust-sessions.md) | Require qualified providers before admitting bounded Rust sessions | Proposed |
+| [0127](0127-keep-worker-demand-lifetime-bound-and-without-authority.md) | Keep declared worker demand lifetime-bound and without authority | Proposed |
+| [0128](0128-fence-remote-entry-point-bindings-and-retract-future-sessions.md) | Fence remote entry-point bindings and retract future sessions | Proposed |
+| [0129](0129-enforce-application-authority-with-resolved-compiler-views.md) | Enforce application authority with resolved compiler views and runtime dependency edges | Proposed |
+| [0130](0130-observe-owned-descendant-execs-at-kernel-transition.md) | Observe owned descendant execs at the kernel transition | Proposed |
+| [0131](0131-report-remote-execution-failures-through-one-terminal-effect.md) | Report remote execution failures through one terminal effect | Proposed |
+| [0132](0132-require-explicit-remote-resource-declarations.md) | Require explicit remote resource declarations | Proposed |
+| [0133](0133-keep-resume-bundles-under-explicit-dev-cache-authority.md) | Keep resume bundles under explicit development cache authority | Proposed |
+| [0134](0134-separate-cargo-oracle-roots-from-compiler-execution.md) | Separate Cargo oracle roots from compiler execution capabilities | Proposed |

@@ -1,0 +1,41 @@
+{
+  "cohort": "prime-agent-continual-harness",
+  "conflict_detection": true,
+  "evidence_required": true,
+  "license": "MIT",
+  "max_content_bytes": 4096,
+  "max_snapshot_bytes": 65536,
+  "max_snapshots": 16,
+  "max_state_bytes": 65536,
+  "max_state_entries": 64,
+  "non_claims": [
+    "not-lesson-correctness",
+    "not-model-improvement",
+    "not-generalization",
+    "not-base-prompt-mutation",
+    "not-automatic-promotion",
+    "not-cross-session-consistency",
+    "not-production-readiness",
+    "not-release-eligibility"
+  ],
+  "promotion_requires_host_action": true,
+  "receipt_fields": [
+    "policy_identity",
+    "cohort",
+    "target_class",
+    "operation",
+    "status",
+    "snapshot_identity",
+    "state_identity",
+    "item_count",
+    "content_bytes"
+  ],
+  "schema": "animus.continual-harness.v1",
+  "source_revision": "c5991bc853d27754aed345c13ff4d2e05c40f1f4",
+  "target_classes": [
+    "supplemental_prompt",
+    "memory",
+    "skill_description",
+    "subagent_specification"
+  ]
+}

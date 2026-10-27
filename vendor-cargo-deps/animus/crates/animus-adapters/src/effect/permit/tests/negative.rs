@@ -40,7 +40,10 @@ fn missing_or_mismatched_policy_denies_dispatch() {
 #[test]
 fn ask_policy_rejects_denied_or_stale_prompt_decisions() {
     let policy = ask_policy();
-    let prompt = resolve(allowed_request(&policy)).prompt_request().expect("ask policy should prompt").clone();
+    let prompt = resolve(allowed_request(&policy))
+        .prompt_request()
+        .expect("ask policy should prompt")
+        .clone();
     let denied = decision(&policy, prompt.decision_token(), DecisionOutcome::Denied);
     let stale = decision(&policy, STALE_TOKEN, DecisionOutcome::Approved);
     let denied_resolution = resolve(ResolutionRequest {
@@ -67,19 +70,25 @@ fn malformed_or_untrusted_policy_descriptors_are_rejected() {
         ..policy_draft(ALLOW_OUTCOME_LABEL)
     })
     .expect_err("unknown action should fail");
-    assert_eq!(bad_action, Error::UnsupportedValue {
-        field: ACTION_FIELD.as_str(),
-        value: Text::from(BAD_ACTION),
-    });
+    assert_eq!(
+        bad_action,
+        Error::UnsupportedValue {
+            field: ACTION_FIELD.as_str(),
+            value: Text::from(BAD_ACTION),
+        }
+    );
 
     let untrusted = Policy::validate(&PolicyDraft {
         trust_status: Some(UNTRUSTED_LABEL),
         ..policy_draft(ALLOW_OUTCOME_LABEL)
     })
     .expect_err("untrusted policy should fail");
-    assert_eq!(untrusted, Error::UntrustedDescriptor {
-        trust_scope: TrustScope::User
-    });
+    assert_eq!(
+        untrusted,
+        Error::UntrustedDescriptor {
+            trust_scope: TrustScope::User
+        }
+    );
 }
 
 #[test]
@@ -89,11 +98,14 @@ fn precedence_and_receipt_redaction_bounds_are_enforced() {
         ..policy_draft(ALLOW_OUTCOME_LABEL)
     })
     .expect_err("out of range precedence should fail");
-    assert_eq!(bad_precedence, Error::PrecedenceOutOfRange {
-        min: MIN_PRECEDENCE,
-        max: MAX_PRECEDENCE,
-        actual: 0,
-    });
+    assert_eq!(
+        bad_precedence,
+        Error::PrecedenceOutOfRange {
+            min: MIN_PRECEDENCE,
+            max: MAX_PRECEDENCE,
+            actual: 0,
+        }
+    );
 
     let too_many_redactions = MAX_REDACTIONS.saturating_add(1);
     let markers = alloc::vec![REDACTION; too_many_redactions];
@@ -111,20 +123,38 @@ fn precedence_and_receipt_redaction_bounds_are_enforced() {
         redaction_markers: markers.as_slice(),
     })
     .expect_err("too many redactions should fail");
-    assert_eq!(too_many, Error::TooManyRedactions {
-        max_items: MAX_REDACTIONS,
-        actual_items: too_many_redactions,
-    });
+    assert_eq!(
+        too_many,
+        Error::TooManyRedactions {
+            max_items: MAX_REDACTIONS,
+            actual_items: too_many_redactions,
+        }
+    );
 }
 
 #[test]
 fn permission_receipt_leak_fixtures_are_rejected() {
-    assert_eq!(validate_text(RAW_PROMPT_RECEIPT), Err(ReceiptLeak::RawPrompt));
-    assert_eq!(validate_text(CREDENTIAL_RECEIPT), Err(ReceiptLeak::Credential));
-    assert_eq!(validate_text(PROVIDER_RECEIPT), Err(ReceiptLeak::ProviderPayload));
-    assert_eq!(validate_text(TOOL_BODY_RECEIPT), Err(ReceiptLeak::RawToolBody));
+    assert_eq!(
+        validate_text(RAW_PROMPT_RECEIPT),
+        Err(ReceiptLeak::RawPrompt)
+    );
+    assert_eq!(
+        validate_text(CREDENTIAL_RECEIPT),
+        Err(ReceiptLeak::Credential)
+    );
+    assert_eq!(
+        validate_text(PROVIDER_RECEIPT),
+        Err(ReceiptLeak::ProviderPayload)
+    );
+    assert_eq!(
+        validate_text(TOOL_BODY_RECEIPT),
+        Err(ReceiptLeak::RawToolBody)
+    );
     assert_eq!(validate_text(PATH_RECEIPT), Err(ReceiptLeak::FullPath));
-    assert_eq!(validate_text(OUTPUT_RECEIPT), Err(ReceiptLeak::UnboundedOutput));
+    assert_eq!(
+        validate_text(OUTPUT_RECEIPT),
+        Err(ReceiptLeak::UnboundedOutput)
+    );
 }
 
 fn decision(policy: &Policy, token: &str, outcome: DecisionOutcome) -> Decision {

@@ -1,0 +1,44 @@
+{
+  "cohort": "prime-agent-messaging-receipts",
+  "host_derived_identity": true,
+  "license": "MIT",
+  "limits_before_routing": true,
+  "max_message_bytes": 4096,
+  "max_pending_count": 32,
+  "max_rate_count": 16,
+  "non_claims": [
+    "not-read-or-acted",
+    "not-transport-security",
+    "not-exactly-once-or-ordered",
+    "not-message-correctness-or-cooperation"
+  ],
+  "receipt_fields": [
+    "policy_identity",
+    "roster_identity",
+    "sender_identity",
+    "target_count",
+    "mode",
+    "variant",
+    "counter_identity"
+  ],
+  "roles": [
+    {
+      "modes": [
+        "auto",
+        "steer",
+        "follow_up"
+      ],
+      "role": "root"
+    },
+    {
+      "modes": [
+        "auto",
+        "follow_up"
+      ],
+      "role": "subagent"
+    }
+  ],
+  "roster_bound": true,
+  "schema": "animus.messaging-receipts.v1",
+  "source_revision": "c5991bc853d27754aed345c13ff4d2e05c40f1f4"
+}

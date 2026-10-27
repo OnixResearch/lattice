@@ -1,0 +1,50 @@
+[workspace]
+members = ["crates/hardened-wasmtime-runtime", "crates/hardened-wasmtime-shell"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.93.0"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+differential-execution-core = { git = "https://seed.radicle.garden/z2pbwQ4Zd52M4oC1W9bLT3nQem9ay.git", rev = "cad5a7cb6c6502b0ec5dc76c51e03352260d8efd" }
+blake3 = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+hardened-wasmtime-runtime = { path = "crates/hardened-wasmtime-runtime" }
+# Exact pin: the molten.wasm.component.v1 profile admits wasmtime 45.0.0 only.
+# Features are explicit; host async supports fuel suspension, while guest component
+# async, threads, cache, profiling and parallel compilation stay off. gc-null
+# supplies reference-type support; guest GC remains denied.
+wasmtime = { version = "=45.0.0", default-features = false, features = [
+  "async",
+  "cranelift",
+  "winch",
+  "runtime",
+  "component-model",
+  "gc-null",
+  "wat",
+] }
+
+[workspace.metadata.octet]
+default_scope = ["--workspace"]
+cargo_check_args = ["--all-targets", "--all-features"]
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "deny"
+unused_must_use = "deny"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"
+panic = "deny"
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+must_use_candidate = "allow"

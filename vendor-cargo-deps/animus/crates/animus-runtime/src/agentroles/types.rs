@@ -682,13 +682,17 @@ impl AgentRoleCatalog {
     /// Finds a role by exact semantic identity.
     #[must_use]
     pub fn profile(&self, role_id: &str) -> Option<&AgentRoleProfile> {
-        self.profiles.iter().find(|profile| profile.role_id() == role_id)
+        self.profiles
+            .iter()
+            .find(|profile| profile.role_id() == role_id)
     }
 
     /// Finds a separation policy by exact identity.
     #[must_use]
     pub fn separation_policy(&self, policy_id: &str) -> Option<&AgentRoleSeparationPolicy> {
-        self.separation_policies.iter().find(|policy| policy.policy_id() == policy_id)
+        self.separation_policies
+            .iter()
+            .find(|policy| policy.policy_id() == policy_id)
     }
 }
 
@@ -742,7 +746,11 @@ pub struct AgentRoleError {
 }
 
 impl AgentRoleError {
-    pub(super) fn new(issue: AgentRoleIssue, field: &'static str, detail: impl Into<String>) -> Self {
+    pub(super) fn new(
+        issue: AgentRoleIssue,
+        field: &'static str,
+        detail: impl Into<String>,
+    ) -> Self {
         Self {
             issue,
             field,
