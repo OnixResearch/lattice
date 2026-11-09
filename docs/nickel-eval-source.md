@@ -72,6 +72,12 @@ the producer's top-level `main` refs, so that revision cannot yet be selected
 from a standard dependency or root patch. Admission still requires the producer
 `main` update (or an equivalent published core source) before this pin can move.
 
+Merging the repair onto the current producer `main` is not mechanically safe:
+the newer evaluator classifies the invalid imported-contract fixture as
+`Evaluation` rather than `ContractViolation`, so the producer's own regression
+fails until that behavior is reconciled. This is producer work, not a reason to
+change Lattice's expected failure category.
+
 Native adapter regression command:
 
 ```sh
