@@ -100,7 +100,7 @@ const OPERATION_CONTRACT_TEST_ARGS: &[&str] = &[
     "--test",
     "test_operation_cli",
 ];
-const TEST_ARGS: &[&str] = &["test"];
+const TEST_ARGS: &[&str] = &["test", "--workspace"];
 const CLIPPY_ARGS: &[&str] = &[
     "clippy",
     "--package",
