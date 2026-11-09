@@ -197,11 +197,11 @@ fn render_authoring(app: &App, area: Rect, buf: &mut Buffer) {
         .collect();
     if state.fields.is_empty() {
         lines.push(Line::from("Select one node for node-owned fields; Esc returns"));
-    } else if body.height > list_height {
-        if let Some(field) = state.fields.get(state.selected) {
-            lines.push(Line::styled(field.id.clone(), Style::default().fg(Color::Cyan)));
-            lines.push(Line::from(field.help.clone()));
-        }
+    } else if body.height > list_height
+        && let Some(field) = state.fields.get(state.selected)
+    {
+        lines.push(Line::styled(field.id.clone(), Style::default().fg(Color::Cyan)));
+        lines.push(Line::from(field.help.clone()));
     }
     Paragraph::new(lines).render(body, buf);
     Paragraph::new(if inner.width < 60 {
@@ -599,8 +599,10 @@ fn contextual_help_text(context: FooterHelpContext) -> &'static str {
     }
 
     match context.focus {
-        FocusPanel::Canvas => " C-W: author fields │ C-N: add │ C-P: palette │ C-R: run ",
-        FocusPanel::Properties => " C-W: config/ports/runner/creds │ C-P: palette ",
+        FocusPanel::Canvas => {
+            " e: cmd │ l: label │ t: timeout │ C-W: fields │ C-D: diagnostics │ C-R: run │ C-P: palette "
+        }
+        FocusPanel::Properties => " e: cmd │ l: label │ i: image │ p/r/o: agent │ k: creds │ C-W ",
         FocusPanel::Output => " ↑/↓: scroll │ C-P: palette │ A-Tab: focus ",
     }
 }
@@ -631,8 +633,8 @@ fn compact_contextual_help_text(context: FooterHelpContext) -> &'static str {
     }
 
     match context.focus {
-        FocusPanel::Canvas => " C-W fields │ C-P menu ",
-        FocusPanel::Properties => " C-W fields │ C-P menu ",
+        FocusPanel::Canvas => " e cmd │ l label │ C-W ",
+        FocusPanel::Properties => " e cmd │ l label │ C-W ",
         FocusPanel::Output => " ↑/↓ scroll │ A-Tab ",
     }
 }
@@ -1248,7 +1250,7 @@ mod tests {
     fn contextual_help_matches_canvas_and_wiring_modes() {
         assert_eq!(
             contextual_help_text(context(FocusPanel::Canvas)),
-            " e: cmd │ l: label │ t: timeout │ C-D: diagnostics │ C-R: run │ C-P: palette ",
+            " e: cmd │ l: label │ t: timeout │ C-W: fields │ C-D: diagnostics │ C-R: run │ C-P: palette ",
         );
 
         let wiring = FooterHelpContext {
@@ -1264,7 +1266,7 @@ mod tests {
     fn contextual_help_matches_properties_and_output_focus() {
         assert_eq!(
             contextual_help_text(context(FocusPanel::Properties)),
-            " e: cmd │ l: label │ i: image │ p/r/o: agent │ k: creds ",
+            " e: cmd │ l: label │ i: image │ p/r/o: agent │ k: creds │ C-W ",
         );
         assert_eq!(contextual_help_text(context(FocusPanel::Output)), " ↑/↓: scroll │ C-P: palette │ A-Tab: focus ",);
     }
@@ -1297,7 +1299,7 @@ mod tests {
             width: NARROW_STATUS_WIDTH,
             ..context(FocusPanel::Canvas)
         };
-        assert_eq!(contextual_help_text(narrow), " e cmd │ l label ");
+        assert_eq!(contextual_help_text(narrow), " e cmd │ l label │ C-W ");
 
         let narrow_wiring = FooterHelpContext {
             interaction_mode: FooterInteractionMode::Wiring,

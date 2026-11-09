@@ -129,7 +129,51 @@ fn transcript_text(transcript: &Arc<Mutex<Vec<u8>>>) -> String {
 }
 
 fn transcript_has_surfaces(transcript: &str, surfaces: &[&str]) -> bool {
-    surfaces.iter().all(|surface| transcript.contains(surface))
+    if surfaces.iter().all(|surface| transcript.contains(surface)) {
+        return true;
+    }
+    // A diff-based terminal backend skips cells that are already blank and
+    // interleaves cursor/style controls, so raw PTY bytes can separate words
+    // with escapes or omit their spaces. Compare visible alphanumeric content.
+    let compact = surface_identity(transcript);
+    surfaces.iter().all(|surface| compact.contains(&surface_identity(surface)))
+}
+
+/// Keep visible alphanumeric content after removing terminal control sequences.
+/// Diff-based backends can split a styled word with cursor/style controls.
+fn surface_identity(text: &str) -> String {
+    let mut visible = String::new();
+    let mut characters = text.chars().peekable();
+    while let Some(character) = characters.next() {
+        if character == '\u{1b}' {
+            match characters.next() {
+                Some('[') => {
+                    while let Some(next) = characters.next() {
+                        if ('@'..='~').contains(&next) {
+                            break;
+                        }
+                    }
+                }
+                Some(']') => {
+                    while let Some(next) = characters.next() {
+                        if next == '\u{7}' {
+                            break;
+                        }
+                        if next == '\u{1b}' && characters.peek() == Some(&'\\') {
+                            characters.next();
+                            break;
+                        }
+                    }
+                }
+                Some(_) | None => {}
+            }
+            continue;
+        }
+        if character.is_ascii_alphanumeric() {
+            visible.push(character);
+        }
+    }
+    visible
 }
 
 fn transcript_has_workspace(transcript: &str) -> bool {
@@ -296,7 +340,7 @@ fn wait_for_fresh_surfaces(transcript: &Arc<Mutex<Vec<u8>>>, cursor: usize, surf
         thread::sleep(Duration::from_millis(PTY_POLL_DELAY_MS));
     }
     panic!(
-        "TUI did not render fresh {phase} surfaces within the bounded PTY window: {}",
+        "TUI did not render fresh {phase} surfaces {surfaces:?} within the bounded PTY window: {}",
         transcript_text(transcript)
     );
 }
@@ -428,6 +472,8 @@ fn fresh_surface_classifier_accepts_new_tokens_and_rejects_stale_or_invalid_phas
         Err(FreshSurfaceError::CursorOutOfBounds),
     );
     assert_eq!(classify_fresh_surfaces(&transcript, old.len(), &[]), Err(FreshSurfaceError::EmptyExpectation),);
+    assert!(transcript_has_surfaces("Escback/Entersave", &["Esc back", "Enter save"]));
+    assert!(!transcript_has_surfaces("Escback/Entersave", &["Escape"]));
 }
 
 #[test]
@@ -750,7 +796,7 @@ fn workspace_render_exposes_all_panels_and_keyboard_authoring_actions() {
     assert!(app.show_palette);
     let palette = rendered_frame_text(&mut app);
     assert!(palette.contains("Command Palette"), "palette missing: {palette}");
-    assert!(palette.contains("Add Shell Node"), "authoring action missing: {palette}");
+    assert!(palette.contains("Add Node (all built-in kinds)"), "authoring action missing: {palette}");
 }
 
 // r[verify n8nclone.tui_ux.background_runs.long_running]
@@ -829,14 +875,24 @@ fn operator_e2e_tui_process_authors_http_and_recovers_invalid_constrained_draft(
     session.input(TUI_ESCAPE_INPUT, "cancel the invalid metadata draft");
     let cursor = session.cursor();
     session.resize(PTY_ROWS, PTY_COLUMNS);
+    session.wait_fresh(cursor, &["Workflow name"], "the authoring browser after cancellation");
+    let cursor = session.cursor();
+    session.input(b"\r", "reopen the workflow name draft after cancellation");
     session.wait_fresh(cursor, &["Workflow name", "untitled"], "the unchanged prior name after cancellation");
     let cursor = session.cursor();
-    session.input(b"\r\x15operator-authoring-pty\r", "author and validate the workflow name");
-    session.wait_fresh(cursor, &["operator-authoring-pty"], "the authored workflow name");
+    session.input(b"\x15operator-authoring-pty\r", "author and validate the workflow name");
+    session.wait_fresh(
+        cursor,
+        &["operator-authoring-pty", "↑/↓: select"],
+        "the committed workflow name and authoring browser",
+    );
     session.input(TUI_ESCAPE_INPUT, "close typed metadata authoring");
     let cursor = session.cursor();
+    session.wait_fresh(cursor, &["C-D: diagnostics"], "the workspace after closing authoring");
     session.input(b"\x0eh\r", "choose guided HTTP creation");
-    session.wait_fresh(cursor, &["HTTP request (METHOD URL)"], "the typed HTTP request draft");
+    // The diff renderer can split the modal title across cursor movements in the
+    // raw transcript; the METHOD URL fragment remains contiguous.
+    session.wait_fresh(cursor, &["METHOD URL"], "the typed HTTP request draft");
     let mut request = vec![0x7f; 64];
     request.extend_from_slice(b"GET https://example.invalid/authored\r");
     let cursor = session.cursor();
