@@ -1723,7 +1723,7 @@ impl Executor {
                         }
                     }
                     EffectExecution::Compatibility => {
-                        let subject = credentials::execution::node_subject(workflow, node_id);
+                        let subject = credentials::execution::node_subject(workflow, node_id).map_err(str::to_owned);
                         let secrets = subject.and_then(|subject| {
                             credentials::resolve_secret_env_in_context(
                                 node_credentials.unwrap_or(&NodeCredentialRefs::default()),
@@ -1732,7 +1732,9 @@ impl Executor {
                                 credentials::CredentialDestination::ShellEnvironment,
                                 Some(self.cancellation.as_ref()),
                             )
-                            .map_err(|_| "credential_resolution_failed")
+                            // Credential errors carry opaque reference identity and
+                            // bounded provider diagnostics, never resolved values.
+                            .map_err(|error| error.to_string())
                         });
                         match secrets {
                             Ok(mut secrets) => {
@@ -1757,7 +1759,7 @@ impl Executor {
                                     error.to_string()
                                 })
                             }
-                            Err(error) => Err(error.to_owned()),
+                            Err(error) => Err(error),
                         }
                     }
                 };
