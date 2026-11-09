@@ -1111,6 +1111,9 @@ impl App {
         debug_assert!(frontier_policy.total_slots > 0);
         debug_assert!(!frontier_policy.lane_slots.is_empty());
 
+        if let Err(error) = std::fs::create_dir_all(&config.data_dir) {
+            error!(error = %error, data_dir = ?config.data_dir, "failed to create data directory");
+        }
         let store = match Store::new(crate::config::store_path(&config.data_dir)) {
             Ok(s) => Some(s),
             Err(e) => {
@@ -3277,6 +3280,24 @@ mod tests {
 
         assert!(!app.has_unsaved_changes());
         assert!(!app.is_confirming_quit());
+    }
+
+    #[test]
+    fn app_creates_missing_data_directory_and_persists_workflow() {
+        let temp_dir = tempfile::tempdir().expect("temporary app directory");
+        let data_dir = temp_dir.path().join("nested").join("state");
+        let mut app = App::new(AppConfig {
+            data_dir: data_dir.clone(),
+            ..AppConfig::default()
+        });
+
+        assert!(app.store.is_some(), "store opens in the created data directory");
+        app.add_shell_node("Persist", "true");
+        app.save_workflow();
+
+        assert!(!app.has_unsaved_changes());
+        assert!(crate::config::store_path(&data_dir).exists());
+        assert!(app.store.as_ref().unwrap().load_workflow("untitled").unwrap().is_some());
     }
 
     // r[verify n8nclone.tui_ux.unsaved.failed_save]
