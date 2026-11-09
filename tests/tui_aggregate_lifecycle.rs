@@ -20,6 +20,7 @@ use lattice::engine::workflow::WorkflowTimestamp;
 use lattice::file_node::FileOperationKind;
 use lattice::operation;
 use lattice::workflow::gate;
+use lattice::workflow_format::PortableWorkflow;
 use lattice::workflow_format::load_workflow_nickel_file;
 use lattice::workflow_format::workflow_to_nickel;
 use lattice::workflow_format::workflow_to_portable;
@@ -455,9 +456,61 @@ fn reconciled_condition_typed_ports_and_edges_survive_store_and_nickel_round_tri
     let path = directory.path().join("condition.ncl");
     std::fs::write(&path, workflow_to_nickel(&loaded)).expect("Nickel");
     let imported = load_workflow_nickel_file(&path).expect("import reconciled topology");
-    assert_eq!(workflow_to_portable(&imported), workflow_to_portable(&workflow));
-    assert_eq!(imported.graph.port(keep).expect("stable port").type_tag, "string");
-    assert_eq!(imported.graph.edges(), workflow.graph.edges());
+    assert_eq!(
+        normalized_portable(&workflow_to_portable(&imported)),
+        normalized_portable(&workflow_to_portable(&workflow))
+    );
+    let imported_condition = imported.graph.node(condition).expect("imported condition");
+    let imported_keep = imported
+        .graph
+        .node(condition)
+        .expect("imported condition")
+        .output_ports
+        .iter()
+        .find(|port| port.label == "keep")
+        .expect("stable kept port");
+    assert_eq!(imported_keep.type_tag, "string");
+    let imported_target = imported.graph.nodes().find(|node| node.label == "target").expect("imported target");
+    let imported_input = imported_target.input_ports.first().expect("imported target input");
+    assert!(
+        imported
+            .graph
+            .edges()
+            .iter()
+            .any(|edge| edge.source == imported_keep.id && edge.target == imported_input.id),
+        "reconciled edge lost across Nickel import: {:?}",
+        imported.graph.edges()
+    );
+    assert_eq!(imported_condition.output_ports.iter().map(|port| port.label.as_str()).collect::<Vec<_>>(), [
+        "new", "keep"
+    ]);
     let diagnostics = validate_workflow(&imported);
     assert!(!has_fatal_diagnostics(&diagnostics), "{diagnostics:?}");
+}
+
+/// Collapse allocator-specific identities so a Nickel export/import can be
+/// compared for equivalent typed meaning rather than identical counters.
+fn normalized_portable(portable: &PortableWorkflow) -> PortableWorkflow {
+    let mut normalized = portable.clone();
+    let node_ids: BTreeMap<u64, u64> =
+        normalized.nodes.iter().enumerate().map(|(index, node)| (node.id, index as u64)).collect();
+    let mut port_ids = BTreeMap::new();
+    let mut next_port_id = 0_u64;
+    for node in &mut normalized.nodes {
+        node.id = node_ids[&node.id];
+        for port in node.input_ports.iter_mut().chain(node.output_ports.iter_mut()) {
+            port_ids.insert(port.id, next_port_id);
+            port.id = next_port_id;
+            next_port_id = next_port_id.saturating_add(1);
+        }
+    }
+    for edge in &mut normalized.edges {
+        edge.source = port_ids[&edge.source];
+        edge.target = port_ids[&edge.target];
+    }
+    for config in &mut normalized.configs {
+        config.node_id = node_ids[&config.node_id];
+    }
+    normalized.configs.sort_by_key(|config| config.node_id);
+    normalized
 }

@@ -529,31 +529,58 @@ fn admitted_operation() -> (
         revision: op::model::BLAKE3_PREFIX.to_string() + &"0".repeat(op::model::BLAKE3_HEX_LENGTH),
         description: "Pure admitted selection fixture".into(),
         tags: Vec::new(),
-        methods: vec![op::model::Method {
-            name: op::runtime::CAIRN_CHANGE_LIST_METHOD.into(),
-            description: "Read changes".into(),
-            arguments: op::model::RecordContract {
-                fields: Vec::new(),
-                deny_unknown_fields: true,
+        methods: vec![
+            op::model::Method {
+                name: op::runtime::CAIRN_CHANGE_LIST_METHOD.into(),
+                description: "Read changes".into(),
+                arguments: op::model::RecordContract {
+                    fields: Vec::new(),
+                    deny_unknown_fields: true,
+                },
+                output: op::model::RecordContract {
+                    fields: vec![op::model::FieldContract {
+                        name: "valid".into(),
+                        value_type: op::model::ValueType::Boolean,
+                        required: true,
+                        max_bytes: 64,
+                    }],
+                    deny_unknown_fields: false,
+                },
+                preflight: vec![
+                    op::model::PreflightCheck::RuntimeAvailable,
+                    op::model::PreflightCheck::ExecutableAvailable,
+                    op::model::PreflightCheck::RepositoryRootAdmitted,
+                    op::model::PreflightCheck::CredentialReferencesValid,
+                ],
+                capabilities: vec![op::CapabilityClass::ProcessRead],
+                side_effect: op::model::SideEffectClass::ReadOnly,
             },
-            output: op::model::RecordContract {
-                fields: vec![op::model::FieldContract {
-                    name: "valid".into(),
-                    value_type: op::model::ValueType::Boolean,
-                    required: true,
-                    max_bytes: 64,
-                }],
-                deny_unknown_fields: false,
+            op::model::Method {
+                name: op::runtime::CAIRN_VALIDATE_METHOD.into(),
+                description: "Validate repository".into(),
+                arguments: op::model::RecordContract {
+                    fields: Vec::new(),
+                    deny_unknown_fields: true,
+                },
+                output: op::model::RecordContract {
+                    fields: vec![op::model::FieldContract {
+                        name: "valid".into(),
+                        value_type: op::model::ValueType::Boolean,
+                        required: true,
+                        max_bytes: 64,
+                    }],
+                    deny_unknown_fields: false,
+                },
+                preflight: vec![
+                    op::model::PreflightCheck::RuntimeAvailable,
+                    op::model::PreflightCheck::ExecutableAvailable,
+                    op::model::PreflightCheck::RepositoryRootAdmitted,
+                    op::model::PreflightCheck::CredentialReferencesValid,
+                ],
+                capabilities: vec![op::CapabilityClass::ProcessRead],
+                side_effect: op::model::SideEffectClass::ReadOnly,
             },
-            preflight: vec![
-                op::model::PreflightCheck::RuntimeAvailable,
-                op::model::PreflightCheck::ExecutableAvailable,
-                op::model::PreflightCheck::RepositoryRootAdmitted,
-                op::model::PreflightCheck::CredentialReferencesValid,
-            ],
-            capabilities: vec![op::CapabilityClass::ProcessRead],
-            side_effect: op::model::SideEffectClass::ReadOnly,
-        }],
+        ],
         runtime: op::model::RuntimeRequirement {
             kind: op::runtime::CAIRN_RUNTIME_KIND.into(),
             key: op::runtime::CAIRN_RUNTIME_KEY.into(),

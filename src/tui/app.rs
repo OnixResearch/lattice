@@ -3168,6 +3168,34 @@ mod tests {
         }
     }
 
+    /// Select exact local-operator authority for one test workflow without
+    /// weakening the production fail-closed default.
+    fn operator_authority(
+        workflow: &Workflow,
+        root: &std::path::Path,
+    ) -> crate::engine::effect::standalone::OperatorRunContextSource {
+        const EXPIRY_UNIX_MS: u64 = 4_102_444_800_000;
+        let inspection =
+            crate::engine::effect::standalone::inspect_workflow(workflow).expect("workflow requirements inspect");
+        let profile = crate::engine::effect::standalone::core::Profile {
+            schema: inspection.schema,
+            workflow_revision: inspection.workflow_revision,
+            machine_identity: inspection.machine_identity,
+            policy_ref: inspection.policy_ref,
+            expires_at_unix_ms: EXPIRY_UNIX_MS,
+            grants: inspection.grants,
+            roots: std::collections::BTreeMap::new(),
+        };
+        let profile_path = root.join("authority.ncl");
+        std::fs::write(
+            root.join("authority.json"),
+            serde_json::to_vec(&profile).expect("authority profile serializes"),
+        )
+        .expect("authority profile writes");
+        std::fs::write(&profile_path, "import \"authority.json\"\n").expect("authority source writes");
+        crate::engine::effect::standalone::OperatorRunContextSource::new(profile_path)
+    }
+
     fn output_text_lines(app: &App) -> Vec<String> {
         (0..app.output.display_line_count())
             .filter_map(|line_index| match app.output.get_display_line(line_index) {
@@ -4063,6 +4091,8 @@ mod tests {
         let mut app = App::new(test_config(&temp_dir));
         app.set_executor_factory(agent_error_executor_factory(AgentError::Adapter("runtime unavailable".to_string())));
         app.add_agent_node("Pi agent", AgentTarget::Pi, "summarize", AgentOutputMode::Text);
+        let authority = operator_authority(&app.workflow, temp_dir.path());
+        app = app.with_authority_provider(std::sync::Arc::new(authority));
         let node_id = app.graph_state.focused.expect("focused node");
 
         assert!(app.start_workflow_run());
@@ -4070,20 +4100,36 @@ mod tests {
 
         assert!(!app.run_state.active);
         assert_eq!(app.run_state.node_statuses.get(&node_id.0), Some(&NodeRunStatus::Failed),);
-        assert!(output_text_lines(&app).iter().any(|line| line.contains("runtime unavailable")));
+        let lines = output_text_lines(&app);
+        assert!(lines.iter().any(|line| line.contains("effect dispatch failed: AdapterRejected")), "{lines:?}");
+        assert!(
+            !lines.iter().any(|line| line.contains("runtime unavailable")),
+            "raw adapter detail crossed the dispatch boundary: {lines:?}"
+        );
+        drop(app);
 
         let mut preflight_app = App::new(test_config(&temp_dir));
         preflight_app.set_executor_factory(agent_error_executor_factory(AgentError::PreflightRejected(
             "model unavailable".to_string(),
         )));
         preflight_app.add_agent_node("Preflight agent", AgentTarget::Clankers, "summarize", AgentOutputMode::Text);
+        let preflight_authority = operator_authority(&preflight_app.workflow, temp_dir.path());
+        preflight_app = preflight_app.with_authority_provider(std::sync::Arc::new(preflight_authority));
         let preflight_node_id = preflight_app.graph_state.focused.expect("preflight node focused");
 
         assert!(preflight_app.start_workflow_run());
         drain_run(&mut preflight_app).await;
 
         assert_eq!(preflight_app.run_state.node_statuses.get(&preflight_node_id.0), Some(&NodeRunStatus::Failed),);
-        assert!(output_text_lines(&preflight_app).iter().any(|line| line.contains("preflight rejected")));
+        let preflight_lines = output_text_lines(&preflight_app);
+        assert!(
+            preflight_lines.iter().any(|line| line.contains("effect dispatch failed: AdapterRejected")),
+            "{preflight_lines:?}"
+        );
+        assert!(
+            !preflight_lines.iter().any(|line| line.contains("model unavailable")),
+            "raw preflight detail crossed the dispatch boundary: {preflight_lines:?}"
+        );
     }
 
     // r[verify n8nclone.tui_ux.run_history.list]

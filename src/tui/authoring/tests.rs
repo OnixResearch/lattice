@@ -18,8 +18,10 @@ use crate::workflow_format::workflow_to_nickel;
 use crate::workflow_format::workflow_to_portable;
 
 fn app(root: &tempfile::TempDir) -> App {
+    let data_dir = root.path().join("state");
+    std::fs::create_dir_all(&data_dir).expect("create app data directory");
     App::new(crate::config::AppConfig {
-        data_dir: root.path().join("state"),
+        data_dir,
         ..Default::default()
     })
 }
@@ -329,8 +331,44 @@ fn all_current_node_kinds_and_field_families_author_store_and_nickel_round_trip(
     let source = root.path().join("authored.ncl");
     std::fs::write(&source, workflow_to_nickel(&stored)).unwrap();
     let imported = load_workflow_nickel_file(&source).unwrap();
-    assert_eq!(workflow_to_portable(&imported), expected);
+    let imported_diagnostics = crate::workflow_validation::validate_workflow(&imported);
+    assert!(
+        !crate::workflow_validation::has_fatal_diagnostics(&imported_diagnostics),
+        "{imported_diagnostics:?}"
+    );
+    assert_eq!(normalized_portable(&workflow_to_portable(&imported)), normalized_portable(&expected));
     assert!(app.store.as_ref().unwrap().list_runs(10).unwrap().is_empty());
+}
+
+/// Collapse run-local node and port identities so Nickel export/import preserves
+/// typed meaning without promising allocator-specific numeric identities.
+fn normalized_portable(
+    portable: &crate::workflow_format::PortableWorkflow,
+) -> crate::workflow_format::PortableWorkflow {
+    use std::collections::BTreeMap;
+
+    let mut normalized = portable.clone();
+    let node_ids: BTreeMap<u64, u64> =
+        normalized.nodes.iter().enumerate().map(|(index, node)| (node.id, index as u64)).collect();
+    let mut port_ids = BTreeMap::new();
+    let mut next_port_id = 0_u64;
+    for node in &mut normalized.nodes {
+        node.id = node_ids[&node.id];
+        for port in node.input_ports.iter_mut().chain(node.output_ports.iter_mut()) {
+            port_ids.insert(port.id, next_port_id);
+            port.id = next_port_id;
+            next_port_id = next_port_id.saturating_add(1);
+        }
+    }
+    for edge in &mut normalized.edges {
+        edge.source = port_ids[&edge.source];
+        edge.target = port_ids[&edge.target];
+    }
+    for config in &mut normalized.configs {
+        config.node_id = node_ids[&config.node_id];
+    }
+    normalized.configs.sort_by_key(|config| config.node_id);
+    normalized
 }
 
 // r[verify lattice.tui_ux.portable_authoring_parity.catalog.scenario.missing]
