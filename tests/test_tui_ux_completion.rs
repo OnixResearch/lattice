@@ -147,24 +147,23 @@ fn surface_identity(text: &str) -> String {
     while let Some(character) = characters.next() {
         if character == '\u{1b}' {
             match characters.next() {
-                Some('[') => {
-                    while let Some(next) = characters.next() {
-                        if ('@'..='~').contains(&next) {
-                            break;
-                        }
+                Some('[') => loop {
+                    match characters.next() {
+                        Some(next) if ('@'..='~').contains(&next) => break,
+                        Some(_) => {}
+                        None => break,
                     }
-                }
-                Some(']') => {
-                    while let Some(next) = characters.next() {
-                        if next == '\u{7}' {
-                            break;
-                        }
-                        if next == '\u{1b}' && characters.peek() == Some(&'\\') {
+                },
+                Some(']') => loop {
+                    match characters.next() {
+                        Some('\u{7}') | None => break,
+                        Some('\u{1b}') if characters.peek() == Some(&'\\') => {
                             characters.next();
                             break;
                         }
+                        Some(_) => {}
                     }
-                }
+                },
                 Some(_) | None => {}
             }
             continue;
