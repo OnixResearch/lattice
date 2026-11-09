@@ -65,6 +65,13 @@ reconstruct profile fields, remove the assertion, intercept the panic, or call
 an external evaluator. Correcting it requires the prepared producer repair to be
 published at an immutable revision and selected from both Cargo and Nix.
 
+The prepared repair is published on `rosa.radicle.network` as commit
+`b4ddff052105eb4b75827e228a65b823dc1a0444` and tag
+`nickel-eval-import-closurization-20261016`. Cargo's Radicle Git fetch maps only
+the producer's top-level `main` refs, so that revision cannot yet be selected
+from a standard dependency or root patch. Admission still requires the producer
+`main` update (or an equivalent published core source) before this pin can move.
+
 Native adapter regression command:
 
 ```sh
