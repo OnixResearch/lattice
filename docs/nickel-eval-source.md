@@ -56,6 +56,15 @@ external CLI's observed value. These local producer checks do not replace
 immutable publication, exact consumer dependency admission, or Lattice's final
 native profile smoke.
 
+### Current admission state
+
+The dependency pin above still selects the unpatched producer object, so
+`cargo test --lib nickel::tests::imported_json_merge` fails at the core `0.18.0`
+fixpoint assertion. That failure is the open admission blocker, not a reason to
+reconstruct profile fields, remove the assertion, intercept the panic, or call
+an external evaluator. Correcting it requires the prepared producer repair to be
+published at an immutable revision and selected from both Cargo and Nix.
+
 Native adapter regression command:
 
 ```sh
