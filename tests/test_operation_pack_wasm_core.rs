@@ -423,9 +423,10 @@ fn bundle_world_import_runtime_resource_and_authority_failures_are_ordered() {
     // r[verify lattice.operation_packs_wasm.world]
     // r[verify lattice.operation_packs_wasm.functional_core]
     // r[verify lattice.operation_packs_wasm.fallback]
+    type DispatchCase = (fn(&mut wasm::DispatchFacts), wasm::Blocker);
     let admitted = admitted();
     let exact = dispatch_facts(&admitted);
-    let cases: &[(fn(&mut wasm::DispatchFacts), wasm::Blocker)] = &[
+    let cases: &[DispatchCase] = &[
         (|facts| facts.runtime_available = false, wasm::Blocker::RuntimeUnavailable),
         (|facts| facts.platform = "aarch64-linux".to_string(), wasm::Blocker::Platform),
         (|facts| facts.bundle.bundle_identity = identity("other bundle"), wasm::Blocker::Bundle),

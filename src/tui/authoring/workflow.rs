@@ -560,7 +560,7 @@ fn edit_credential(workflow: &mut Workflow, node_id: u64, key: &str, value: &str
             return Err("environment name must match [A-Za-z_][A-Za-z0-9_]*".into());
         }
         let reference = secret_ref(&cells[1], &cells[2], &cells[3])?;
-        let refs = workflow.credentials.entry(node_id).or_insert_with(NodeCredentialRefs::default);
+        let refs = workflow.credentials.entry(node_id).or_default();
         if cells[0] != key && refs.env.contains_key(&cells[0]) {
             return Err("duplicate credential environment name".into());
         }

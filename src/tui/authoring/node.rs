@@ -474,12 +474,12 @@ pub fn apply(workflow: &mut Workflow, node_id: u64, id: &str, value: &str) -> Re
         return Err(issues.into_iter().map(|issue| issue.message).collect::<Vec<_>>().join("; "));
     }
     validate_nested(&config)?;
-    if let NodeConfig::Approval(approval) = &config {
-        if workflow.configs.iter().any(|(other, config)| {
+    if let NodeConfig::Approval(approval) = &config
+        && workflow.configs.iter().any(|(other, config)| {
             *other != node_id && matches!(config, NodeConfig::Approval(other) if other.gate_id == approval.gate_id)
-        }) {
-            return Err("Approval gate identity already exists".into());
-        }
+        })
+    {
+        return Err("Approval gate identity already exists".into());
     }
     let mut candidate = workflow.clone();
     reconcile(&mut candidate, node_id, &config, key)?;

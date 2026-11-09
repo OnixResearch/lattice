@@ -55,7 +55,7 @@ pub(crate) fn admit(descriptor: &super::Descriptor) -> Result<Profile, Error> {
     )
     .map_err(|_| Error::Invalid("component feature policy"))?;
     let resources = &descriptor.resources;
-    if resources.memory_bytes % WASM_PAGE_BYTES != 0 || resources.deadline_millis == 0 {
+    if !resources.memory_bytes.is_multiple_of(WASM_PAGE_BYTES) || resources.deadline_millis == 0 {
         return Err(Error::Invalid("component memory or deadline bound"));
     }
     let memory_pages = u32::try_from(resources.memory_bytes / WASM_PAGE_BYTES)

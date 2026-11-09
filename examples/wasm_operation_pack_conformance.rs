@@ -67,7 +67,7 @@ fn execute(
 }
 
 fn persisted(data_root: &Path, report: &execution::Report) -> Result<operation::RunRecord, Box<dyn std::error::Error>> {
-    let store = lattice::store::Store::new(&lattice::config::store_path(data_root))?;
+    let store = lattice::store::Store::new(lattice::config::store_path(data_root))?;
     let record = store.load_operation_run(&report.invocation_identity)?.ok_or("missing durable parent attempt")?;
     assert_eq!(record.run_id.0, report.run_id);
     assert_eq!(record.state, report.operation_state);
@@ -196,7 +196,7 @@ fn lifecycle(
     assert_eq!(expected.identity, completed.invocation_identity);
     let interrupted_root = root.join("interrupted");
     std::fs::create_dir_all(&interrupted_root)?;
-    let store = lattice::store::Store::new(&lattice::config::store_path(&interrupted_root))?;
+    let store = lattice::store::Store::new(lattice::config::store_path(&interrupted_root))?;
     let started = store.begin_operation_run(&expected, 1)?;
     drop(store);
     let recovered = execute(fixture, admitted, &interrupted_root, &fixture.method, None);
@@ -208,7 +208,7 @@ fn lifecycle(
     } else {
         assert!(recovered.is_err());
     }
-    let store = lattice::store::Store::new(&lattice::config::store_path(&interrupted_root))?;
+    let store = lattice::store::Store::new(lattice::config::store_path(&interrupted_root))?;
     assert_eq!(store.load_operation_run(&expected.identity)?, Some(started));
     Ok(())
 }
@@ -235,7 +235,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     private_report(&inputs.component, &effects_root, &effects)?;
     assert!(!effects.effect_run_ids.is_empty());
     assert!(effects.effect_run_ids.iter().all(|effect| *effect > effects.run_id));
-    let store = lattice::store::Store::new(&lattice::config::store_path(&effects_root))?;
+    let store = lattice::store::Store::new(lattice::config::store_path(&effects_root))?;
     for effect in &effects.effect_run_ids {
         let observed =
             store.load_run(lattice::engine::executor::RunId(*effect))?.ok_or("missing durable effect attempt")?;
