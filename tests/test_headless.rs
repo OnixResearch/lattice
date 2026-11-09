@@ -36,7 +36,7 @@ use lattice::headless::HeadlessRunStatus;
 use lattice::headless::process_result_for_summary;
 use lattice::headless::render_run_summary_text;
 use lattice::headless::run_saved_workflow;
-use lattice::headless::run_saved_workflow_with_agent_runtime_config;
+use lattice::headless::run_saved_workflow_with_agent_runtime_config_and_authority_provider;
 use lattice::headless::run_saved_workflow_with_authority_provider;
 use lattice::store::RunNodeDetailStatus;
 use lattice::store::Store;
@@ -106,11 +106,17 @@ const TEST_GRANT_REF: &str = "blake3:3333333333333333333333333333333333333333333
 const TEST_RECEIPT_REF: &str = "blake3:4444444444444444444444444444444444444444444444444444444444444444";
 const TEST_AUTHORITY_REF: &str = "test-current-authority";
 const PROCESS_CONTRACT: &str = "lattice-process";
+const AGENT_CONTRACT: &str = "lattice-agent";
 
 struct CurrentAuthorityFacts;
 
 impl dispatch::AuthorityFactsProvider for CurrentAuthorityFacts {
     fn load(&self, binding: &authority::IntentBinding) -> Result<authority::AuthorizationFacts, dispatch::Error> {
+        let contract_id = match binding.operation.as_str() {
+            "lattice/shell" | "lattice/operation" => PROCESS_CONTRACT,
+            "lattice/agent" => AGENT_CONTRACT,
+            _ => return Err(dispatch::Error::AuthorityDenied),
+        };
         let resource = binding.resource.as_str().to_owned();
         let ability = binding.ability.as_str().to_owned();
         let request_ref = binding.request.as_str().to_owned();
@@ -119,7 +125,7 @@ impl dispatch::AuthorityFactsProvider for CurrentAuthorityFacts {
             evidence: authority::Evidence::VerifiedUcan(basalt::authority_core::AuthorityInput {
                 schema: basalt::authority_core::AUTHORITY_INPUT_SCHEMA.to_owned(),
                 request: basalt::authority_core::AuthorityRequest {
-                    contract_id: PROCESS_CONTRACT.to_owned(),
+                    contract_id: contract_id.to_owned(),
                     resource: resource.clone(),
                     ability: ability.clone(),
                     request_ref: request_ref.clone(),
@@ -137,13 +143,13 @@ impl dispatch::AuthorityFactsProvider for CurrentAuthorityFacts {
                     verified_grant_refs: vec![TEST_GRANT_REF.to_owned()],
                     disposition: basalt::authority_core::VerificationRefDisposition::Current,
                 }],
-                policy_refs: vec![dispatch::trusted_policy_ref(PROCESS_CONTRACT)],
+                policy_refs: vec![dispatch::trusted_policy_ref(contract_id)],
                 caveat: basalt::authority_core::AuthorityCaveatDisposition::Satisfied,
                 replay: basalt::authority_core::AuthorityReplayDisposition::Admitted,
                 claims: vec![basalt::authority_core::AuthorityClaim::ExactRequest],
                 non_claims: basalt::authority_core::REQUIRED_AUTHORITY_NON_CLAIMS.map(str::to_owned).to_vec(),
             }),
-            trusted_policy_ref: dispatch::trusted_policy_ref(PROCESS_CONTRACT),
+            trusted_policy_ref: dispatch::trusted_policy_ref(contract_id),
             scope_requirement: authority::ScopeRequirement::UnscopedPermitted,
             scope_snapshot: None,
             revocation: authority::RevocationDisposition::Current,
@@ -530,12 +536,21 @@ async fn headless_run_uses_configured_production_agent_runtime() {
     store.save_workflow(&workflow).expect("workflow saves");
     let agent_runtime = pi_agent_runtime(command);
 
-    let summary =
-        run_saved_workflow_with_agent_runtime_config(&store, AGENT_WORKFLOW_NAME, RunId(AGENT_RUN_ID), agent_runtime)
-            .await
-            .expect("headless agent workflow runs");
+    let summary = run_saved_workflow_with_agent_runtime_config_and_authority_provider(
+        &store,
+        AGENT_WORKFLOW_NAME,
+        RunId(AGENT_RUN_ID),
+        agent_runtime,
+        &CurrentAuthorityProvider,
+    )
+    .await
+    .expect("headless agent workflow runs");
 
-    assert_eq!(summary.status, HeadlessRunStatus::Succeeded);
+    let details = store
+        .load_run_details(RunId(AGENT_RUN_ID))
+        .expect("agent run details load")
+        .expect("agent run details exist");
+    assert_eq!(summary.status, HeadlessRunStatus::Succeeded, "{details:?}");
     assert_eq!(summary.failures, NO_FAILURES);
     let outputs = store.get_cache(&input_hash).expect("agent cache lookup succeeds").expect("agent outputs cached");
     let text = string_output(&outputs, text_port);
@@ -566,11 +581,12 @@ async fn headless_run_maps_agent_image_handoff_to_image_output_port() {
     store.save_workflow(&workflow).expect("workflow saves");
     let agent_runtime = pi_agent_runtime(command);
 
-    let summary = run_saved_workflow_with_agent_runtime_config(
+    let summary = run_saved_workflow_with_agent_runtime_config_and_authority_provider(
         &store,
         AGENT_WORKFLOW_NAME,
         RunId(AGENT_IMAGE_RUN_ID),
         agent_runtime,
+        &CurrentAuthorityProvider,
     )
     .await
     .expect("headless image handoff workflow runs");

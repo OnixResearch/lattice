@@ -257,13 +257,33 @@ pub async fn run_saved_workflow_with_agent_runtime_config(
     agent_runtime: AgentRuntimeConfig,
 ) -> Result<HeadlessRunSummary, HeadlessRunError> {
     let authority_provider = crate::engine::effect::execution::UnavailableRunContextSource;
+    run_saved_workflow_with_agent_runtime_config_and_authority_provider(
+        store,
+        workflow_name,
+        run_id,
+        agent_runtime,
+        &authority_provider,
+    )
+    .await
+}
+
+/// Run a saved workflow with a selected agent runtime and an explicit effect
+/// authority source. Callers that omit authority must use the fail-closed
+/// `run_saved_workflow_with_agent_runtime_config` entry point instead.
+pub async fn run_saved_workflow_with_agent_runtime_config_and_authority_provider(
+    store: &Store,
+    workflow_name: &str,
+    run_id: RunId,
+    agent_runtime: AgentRuntimeConfig,
+    authority_provider: &dyn crate::engine::effect::execution::RunContextProvider,
+) -> Result<HeadlessRunSummary, HeadlessRunError> {
     shell::run_saved_workflow_with_executor_factory(
         shell::ProductRunRequest {
             store,
             workflow_name,
             run_id,
             owner: crate::store::RunOwner::Unscoped,
-            authority_provider: &authority_provider,
+            authority_provider,
         },
         || Executor::new_with_agent_runtime_config(agent_runtime.clone()),
     )
