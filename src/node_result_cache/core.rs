@@ -222,9 +222,17 @@ pub fn eviction_order(
     if promotion_threshold > FIFO_PROMOTION_THRESHOLD {
         return Err(DecisionError::PromotionThresholdOutOfRange);
     }
+    let limit = limit.min(records.len());
+    if limit == 0 {
+        return Ok(Vec::new());
+    }
     let mut ordered = records.to_vec();
+    if limit < ordered.len() {
+        ordered.select_nth_unstable_by_key(limit - 1, |record| policy_sort_key(record, promotion_threshold));
+        ordered.truncate(limit);
+    }
     ordered.sort_by_key(|record| policy_sort_key(record, promotion_threshold));
-    Ok(ordered.into_iter().take(limit).map(|record| record.key).collect())
+    Ok(ordered.into_iter().map(|record| record.key).collect())
 }
 
 // r[impl lattice.node_result_cache.decision]
