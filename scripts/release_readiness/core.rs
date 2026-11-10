@@ -92,8 +92,8 @@ pub fn completion_inputs(
         native_hash,
         policy_hash.as_str(),
     ] {
-        if hash.len() != 64 || !hash.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-            return Err("observed identities must be BLAKE3 hex digests".to_string());
+        if hash.len() != 64 || !hash.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)) {
+            return Err("observed identities must be lowercase BLAKE3 hex digests".to_string());
         }
     }
     let passed = valid && exit_code == 0;

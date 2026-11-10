@@ -207,6 +207,20 @@ fn completion_inputs_reject_malformed_identity_hashes() -> TestResult {
             "missing {field} was accepted"
         );
     }
+    let uppercase = "A".repeat(64);
+    let uppercase_observation = json!({
+        "exit_code": 0,
+        "stdout_hash": uppercase,
+        "stderr_hash": hash,
+        "native_binary_hash": hash,
+        "subject_hash": hash,
+        "policy_hash": release_inputs::json_hash(&json!({})),
+    });
+    assert!(
+        release_inputs::completion_inputs(&json!({}), &["cairn".into()], &validation, &uppercase_observation, &hash)
+            .is_err(),
+        "an uppercase identity was accepted"
+    );
     let mismatched = json!({
         "exit_code": 0,
         "stdout_hash": hash,
