@@ -507,7 +507,7 @@
       "evidence": [
         {
           "path": "src/headless.rs",
-          "blake3": "4d0f26dd9e199117420ff1bc396776d6a42754dd6fe44b6336f1d019abe3b36d"
+          "blake3": "554f437314e2fe7eb145656bb3aab798a7b61085235030df63edbf1f223605ed"
         },
         {
           "path": "src/triggers.rs",
