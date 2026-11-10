@@ -204,6 +204,15 @@ pub struct RetentionRecord {
     pub last_use_generation: u64,
 }
 
+fn policy_sort_key(record: &RetentionRecord, promotion_threshold: u8) -> (u64, u64, Key) {
+    let policy_generation = if promotion_threshold == FIFO_PROMOTION_THRESHOLD {
+        record.insertion_generation
+    } else {
+        record.last_use_generation
+    };
+    (policy_generation, record.insertion_generation, record.key)
+}
+
 // r[impl lattice.node_result_cache.decision]
 pub fn eviction_order(
     records: &[RetentionRecord],
@@ -214,20 +223,19 @@ pub fn eviction_order(
         return Err(DecisionError::PromotionThresholdOutOfRange);
     }
     let mut ordered = records.to_vec();
-    ordered.sort_by_key(|record| {
-        let policy_generation = if promotion_threshold == FIFO_PROMOTION_THRESHOLD {
-            record.insertion_generation
-        } else {
-            record.last_use_generation
-        };
-        (policy_generation, record.insertion_generation, record.key)
-    });
+    ordered.sort_by_key(|record| policy_sort_key(record, promotion_threshold));
     Ok(ordered.into_iter().take(limit).map(|record| record.key).collect())
 }
 
 // r[impl lattice.node_result_cache.decision]
 pub fn select_eviction(records: &[RetentionRecord], promotion_threshold: u8) -> Result<Option<Key>, DecisionError> {
-    Ok(eviction_order(records, promotion_threshold, 1)?.into_iter().next())
+    if promotion_threshold > FIFO_PROMOTION_THRESHOLD {
+        return Err(DecisionError::PromotionThresholdOutOfRange);
+    }
+    Ok(records
+        .iter()
+        .min_by_key(|record| policy_sort_key(record, promotion_threshold))
+        .map(|record| record.key))
 }
 
 #[derive(Debug, Clone, Copy)]
