@@ -597,11 +597,25 @@ fn validate_requirement(path: &str, lines: &[&str], heading_index: usize, diagno
             "requirement marker line must include MUST, SHOULD, SHALL, or MAY",
         ));
     }
-    let has_scenario = lines
-        .iter()
-        .skip(marker_index + LINE_NUMBER_BASE)
-        .take_while(|line| !line.trim_start().starts_with("### Requirement:"))
-        .any(|line| line.trim_start().starts_with("#### Scenario:"));
+    let mut in_fence = false;
+    let mut has_scenario = false;
+    for line in lines.iter().skip(marker_index + LINE_NUMBER_BASE) {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("```") {
+            in_fence = !in_fence;
+            continue;
+        }
+        if in_fence {
+            continue;
+        }
+        if trimmed.starts_with("### Requirement:") {
+            break;
+        }
+        if trimmed.starts_with("#### Scenario:") {
+            has_scenario = true;
+            break;
+        }
+    }
     if !has_scenario {
         diagnostics.push(diagnostic(path, heading_index, "requirement must include at least one scenario"));
     }
@@ -624,11 +638,22 @@ fn validate_scenario(path: &str, lines: &[&str], heading_index: usize, diagnosti
         diagnostics.push(diagnostic(path, marker_index, "scenario must start with a complete non-empty r[...] marker"));
     }
 
-    let scenario_lines = lines
-        .iter()
-        .skip(marker_index + LINE_NUMBER_BASE)
-        .take_while(|line| !line.trim_start().starts_with("###") && !line.trim_start().starts_with("####"));
-    let scenario_text = scenario_lines.map(|line| line.trim()).collect::<Vec<_>>();
+    let mut in_fence = false;
+    let mut scenario_text = Vec::new();
+    for line in lines.iter().skip(marker_index + LINE_NUMBER_BASE) {
+        let trimmed = line.trim();
+        if trimmed.starts_with("```") {
+            in_fence = !in_fence;
+            continue;
+        }
+        if in_fence {
+            continue;
+        }
+        if trimmed.starts_with("###") {
+            break;
+        }
+        scenario_text.push(trimmed);
+    }
 
     for required_clause in ["- GIVEN", "- WHEN", "- THEN"] {
         if !scenario_text.iter().any(|line| is_clause(line, required_clause)) {
@@ -736,5 +761,27 @@ mod tests {
         let unclosed = "### Requirement: Title\nr[lattice.example] MUST hold\n\n#### Scenario: Case\nr[lattice.example.scenario]\n- GIVEN a state\n- WHEN an action\n- THEN a result\n\n```\n";
         let diagnostics = validate_spec_text("spec.md", unclosed);
         assert!(diagnostics.iter().any(|diagnostic| diagnostic.message == "unclosed fenced code block"));
+    }
+
+    #[test]
+    fn fenced_content_cannot_satisfy_scenario_requirements() {
+        let requirement_with_fenced_scenario =
+            "### Requirement: Title\nr[lattice.example] MUST hold\n\n```\n#### Scenario: Not a scenario\n```\n";
+        let diagnostics = validate_spec_text("spec.md", requirement_with_fenced_scenario);
+        assert!(
+            diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.message == "requirement must include at least one scenario")
+        );
+
+        let scenario_with_fenced_clauses = "### Requirement: Title\nr[lattice.example] MUST hold\n\n#### Scenario: Case\nr[lattice.example.scenario]\n\n```\n- GIVEN a state\n- WHEN an action\n- THEN a result\n```\n";
+        let diagnostics = validate_spec_text("spec.md", scenario_with_fenced_clauses);
+        for clause in ["- GIVEN", "- WHEN", "- THEN"] {
+            assert!(
+                diagnostics.iter().any(
+                    |diagnostic| diagnostic.message == format!("scenario must include a non-empty {clause} clause")
+                )
+            );
+        }
     }
 }
