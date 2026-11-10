@@ -66,6 +66,8 @@ fn mcp_completion_status_requires_both_native_success_and_passing_verdict() -> T
         json!({"exit_code": 0, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash});
     for validation in [
         json!({"isError": true, "structuredContent": {"valid": true, "mcp": {"read_only": true}}}),
+        json!({"structuredContent": {"valid": true, "mcp": {"read_only": true}}}),
+        json!({"isError": false}),
         json!({"isError": false, "structuredContent": {"valid": "yes", "mcp": {"read_only": true}}}),
         json!({"isError": false, "structuredContent": {"valid": true, "mcp": {"read_only": false}}}),
     ] {
