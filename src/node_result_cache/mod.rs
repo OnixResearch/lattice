@@ -17,5 +17,4 @@ pub use core::project_key;
 pub use store::Error;
 pub use store::InsertReport;
 pub use store::Inserted;
-pub use store::LookupOrExecuteError;
 pub use store::Memoizer;

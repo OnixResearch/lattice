@@ -103,27 +103,20 @@ fn misses_execute_once_and_executor_errors_are_preserved() -> Result<(), Error> 
             calls.fetch_add(1, Ordering::SeqCst);
             Ok::<_, &'static str>("value")
         })
-        .map_err(map_execution_error)?;
+        .map_err(|_| Error::PlannedEntryMissing)?;
     let second = memoizer
         .get_or_execute(key(FIRST_KEY_BYTE), || {
             calls.fetch_add(1, Ordering::SeqCst);
             Ok::<_, &'static str>("other")
         })
-        .map_err(map_execution_error)?;
+        .map_err(|_| Error::PlannedEntryMissing)?;
     assert_eq!(*first, "value");
     assert_eq!(*second, "value");
     assert_eq!(calls.load(Ordering::SeqCst), 1);
 
     let error = memoizer.get_or_execute(key(SECOND_KEY_BYTE), || Err::<&str, _>("executor-error"));
-    assert!(matches!(error, Err(LookupOrExecuteError::Executor("executor-error"))));
+    assert!(matches!(error, Err("executor-error")));
     Ok(())
-}
-
-fn map_execution_error(error: LookupOrExecuteError<&'static str>) -> Error {
-    match error {
-        LookupOrExecuteError::Store(store_error) => store_error,
-        LookupOrExecuteError::Executor(_) => Error::PlannedEntryMissing,
-    }
 }
 
 #[test]
@@ -136,7 +129,7 @@ fn cache_insert_failure_preserves_the_executed_value() -> Result<(), Error> {
     }
     let value = memoizer
         .get_or_execute(key(FIRST_KEY_BYTE), || Ok::<_, &'static str>("value"))
-        .map_err(map_execution_error)?;
+        .map_err(|_| Error::PlannedEntryMissing)?;
     assert_eq!(*value, "value");
     Ok(())
 }
@@ -155,7 +148,7 @@ fn cache_lookup_failure_still_executes() -> Result<(), Error> {
             calls.fetch_add(1, Ordering::SeqCst);
             Ok::<_, &'static str>("value")
         })
-        .map_err(map_execution_error)?;
+        .map_err(|_| Error::PlannedEntryMissing)?;
     assert_eq!(*value, "value");
     assert_eq!(calls.load(Ordering::SeqCst), 1);
     Ok(())

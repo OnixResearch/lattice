@@ -55,12 +55,6 @@ pub struct Inserted<V> {
     pub report: InsertReport,
 }
 
-#[derive(Debug)]
-pub enum LookupOrExecuteError<E> {
-    Store(Error),
-    Executor(E),
-}
-
 struct Entry<V> {
     value: std::sync::Arc<V>,
     insertion_generation: u64,
@@ -189,14 +183,8 @@ impl<V> Memoizer<V> {
     /// A hit is advisory: it establishes neither node correctness nor input
     /// freshness. Workflow and effect authority remain with the executor.
     // r[impl lattice.node_result_cache.boundary]
-    pub fn get_or_execute<E, F>(
-        &self,
-        key: super::core::Key,
-        execute: F,
-    ) -> Result<std::sync::Arc<V>, LookupOrExecuteError<E>>
-    where
-        F: FnOnce() -> Result<V, E>,
-    {
+    pub fn get_or_execute<E, F>(&self, key: super::core::Key, execute: F) -> Result<std::sync::Arc<V>, E>
+    where F: FnOnce() -> Result<V, E> {
         let cached = match self.get(key) {
             Ok(value) => value,
             Err(error) => {
@@ -207,7 +195,7 @@ impl<V> Memoizer<V> {
         if let Some(value) = cached {
             return Ok(value);
         }
-        let value = std::sync::Arc::new(execute().map_err(LookupOrExecuteError::Executor)?);
+        let value = std::sync::Arc::new(execute()?);
         match self.insert_arc(key, std::sync::Arc::clone(&value)) {
             Ok(inserted) => Ok(inserted.value),
             Err(error) => {
