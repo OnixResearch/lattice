@@ -503,9 +503,23 @@ pub fn load_app_config(path: &Path) -> crate::error::Result<AppConfig> {
     }
 
     let json = load_nickel_as_json(path).map_err(|_| config_error("app_config_evaluation_failed"))?;
-    let config: AppConfig = serde_json::from_value(json).map_err(|_| config_error("app_config_invalid_shape"))?;
+    let mut config: AppConfig = serde_json::from_value(json).map_err(|_| config_error("app_config_invalid_shape"))?;
+    config.data_dir = expand_home(config.data_dir);
     config.validated_credential_hosts().map_err(|error| config_error(error.code()))?;
     Ok(config)
+}
+
+fn expand_home(path: PathBuf) -> PathBuf {
+    let Some(text) = path.to_str() else {
+        return path;
+    };
+    let Some(relative) = text.strip_prefix("~/") else {
+        return path;
+    };
+    let Some(home) = home::home_dir() else {
+        return path;
+    };
+    home.join(relative)
 }
 
 /// Load node templates from a directory of .ncl files.
@@ -745,4 +759,29 @@ pub const DEFAULT_NODE_TEMPLATE_FILES: &[DefaultNodeTemplateFile] = &[
 /// Generate an example node template.
 pub fn example_template_ncl() -> &'static str {
     GREP_TEMPLATE_NCL
+}
+
+#[cfg(test)]
+mod tests {
+    use super::expand_home;
+
+    #[test]
+    fn configured_home_paths_expand_but_other_paths_do_not() {
+        let home = home::home_dir().expect("home directory");
+        assert_eq!(expand_home(std::path::PathBuf::from("~/.lattice")), home.join(".lattice"));
+        assert_eq!(expand_home(std::path::PathBuf::from("/tmp/state")), std::path::PathBuf::from("/tmp/state"));
+        assert_eq!(expand_home(std::path::PathBuf::from("relative/~")), std::path::PathBuf::from("relative/~"));
+        assert_eq!(expand_home(std::path::PathBuf::from("~")), std::path::PathBuf::from("~"));
+    }
+
+    #[test]
+    fn load_app_config_expands_home_data_directory() {
+        let directory = tempfile::tempdir().expect("temporary config directory");
+        let path = directory.path().join("config.ncl");
+        std::fs::write(&path, r#"{ data_dir = "~/.lattice", default_timeout_secs = 60, shell = "sh" }"#)
+            .expect("config writes");
+
+        let config = super::load_app_config(&path).expect("config loads");
+        assert_eq!(config.data_dir, home::home_dir().expect("home directory").join(".lattice"));
+    }
 }
