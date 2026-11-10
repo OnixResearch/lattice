@@ -67,7 +67,7 @@ fn run_operator_e2e_cases(cases: &[OperatorE2eCase]) -> Result<(), ExitCode> {
 }
 
 fn cargo_test_args(case: OperatorE2eCase) -> Vec<&'static str> {
-    let mut args = vec!["test", "--test", case.test_target, case.test_filter, "--"];
+    let mut args = vec!["test", "--locked", "--test", case.test_target, case.test_filter, "--"];
     if case.exact_filter {
         args.push("--exact");
     }
