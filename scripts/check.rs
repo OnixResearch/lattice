@@ -521,6 +521,16 @@ fn validate_spec_text(path: &str, text: &str) -> Vec<SpecDiagnostic> {
     diagnostics
 }
 
+fn is_marker(line: &str) -> bool {
+    let Some(rest) = line.strip_prefix("r[") else {
+        return false;
+    };
+    let Some((id, _)) = rest.split_once(']') else {
+        return false;
+    };
+    !id.is_empty() && !id.contains('[')
+}
+
 fn validate_requirement(path: &str, lines: &[&str], heading_index: usize, diagnostics: &mut Vec<SpecDiagnostic>) {
     let Some(marker_index) = next_nonempty_line_index(lines, heading_index) else {
         diagnostics.push(diagnostic(
@@ -532,8 +542,12 @@ fn validate_requirement(path: &str, lines: &[&str], heading_index: usize, diagno
     };
     let marker_line = lines[marker_index].trim();
 
-    if !marker_line.starts_with("r[") {
-        diagnostics.push(diagnostic(path, marker_index, "requirement must start with an r[...] marker"));
+    if !is_marker(marker_line) {
+        diagnostics.push(diagnostic(
+            path,
+            marker_index,
+            "requirement must start with a complete non-empty r[...] marker",
+        ));
     }
     if !NORMATIVE_WORDS.iter().any(|word| marker_line.contains(word)) {
         diagnostics.push(diagnostic(
@@ -551,8 +565,8 @@ fn validate_scenario(path: &str, lines: &[&str], heading_index: usize, diagnosti
     };
     let marker_line = lines[marker_index].trim();
 
-    if !marker_line.starts_with("r[") {
-        diagnostics.push(diagnostic(path, marker_index, "scenario must start with an r[...] marker"));
+    if !is_marker(marker_line) {
+        diagnostics.push(diagnostic(path, marker_index, "scenario must start with a complete non-empty r[...] marker"));
     }
 
     let scenario_lines = lines
@@ -597,4 +611,20 @@ fn status_exit_code(code: Option<i32>) -> ExitCode {
         return ExitCode::from(PROCESS_STATUS_CODE_OVERFLOW_EXIT_CODE);
     };
     ExitCode::from(code)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_marker;
+
+    #[test]
+    fn markers_require_a_closed_nonempty_identifier() {
+        assert!(is_marker("r[lattice.example]"));
+        assert!(is_marker("r[lattice.example] MUST remain"));
+        assert!(!is_marker("r["));
+        assert!(!is_marker("r[]"));
+        assert!(!is_marker("r[lattice.example"));
+        assert!(!is_marker("r[[nested]]"));
+        assert!(!is_marker("not-a-marker"));
+    }
 }
