@@ -560,6 +560,10 @@ fn validate_spec_text(path: &str, text: &str) -> Vec<SpecDiagnostic> {
 fn validate_spec_text_with_seen(path: &str, text: &str, marker_ids: &mut BTreeSet<String>) -> Vec<SpecDiagnostic> {
     let lines = text.lines().collect::<Vec<_>>();
     let mut diagnostics = Vec::new();
+    if text.trim().is_empty() {
+        diagnostics.push(diagnostic(path, 0, "spec file must not be empty"));
+        return diagnostics;
+    }
     let mut fence_start = None;
 
     for (line_index, line) in lines.iter().enumerate() {
@@ -788,6 +792,12 @@ mod tests {
         );
         let complete = "### Requirement: Title\nr[lattice.example] MUST hold\n\n#### Scenario: Case\nr[lattice.example.scenario]\n- GIVEN a state\n- WHEN an action\n- THEN a result\n";
         assert!(validate_spec_text("spec.md", complete).is_empty());
+    }
+
+    #[test]
+    fn empty_specs_are_rejected() {
+        let diagnostics = validate_spec_text("spec.md", " \n\t\n");
+        assert!(diagnostics.iter().any(|diagnostic| diagnostic.message == "spec file must not be empty"));
     }
 
     #[test]
