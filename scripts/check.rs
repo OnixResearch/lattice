@@ -99,7 +99,7 @@ const FORMAT_CHECK_ARGS: &[&str] = &[
     "--package",
     "lattice-workflow-transport",
 ];
-const FOCUSED_CONSUMER_CHECK_ARGS: &[&str] = &["check", "--package", "lattice", "--all-targets"];
+const FOCUSED_CONSUMER_CHECK_ARGS: &[&str] = &["check", "--package", "lattice", "--all-targets", "--locked"];
 const ALL_FEATURES_CHECK_ARGS: &[&str] = &[
     "check",
     "--package",
@@ -115,6 +115,7 @@ const AGENT_EVALUATION_TEST_ARGS: &[&str] = &[
     "test_agent_evaluation_core",
     "--test",
     "test_agent_evaluation_shell",
+    "--locked",
 ];
 const OPERATION_CONTRACT_TEST_ARGS: &[&str] = &[
     "test",
@@ -122,6 +123,7 @@ const OPERATION_CONTRACT_TEST_ARGS: &[&str] = &[
     "test_operation_contracts",
     "--test",
     "test_operation_cli",
+    "--locked",
 ];
 const SECRETSPEC_TEST_ARGS: &[&str] = &[
     "test",
