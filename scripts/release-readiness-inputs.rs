@@ -25,6 +25,7 @@ use serde_json::Value;
 use serde_json::json;
 
 const MAX_BYTES: u64 = 16 * 1024 * 1024;
+const NATIVE_TIMEOUT: &str = "60s";
 
 fn main() -> ExitCode {
     match run() {
@@ -88,7 +89,7 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
         request.to_string(),
     ];
     let mut child = Command::new("timeout")
-        .arg("60s")
+        .arg(NATIVE_TIMEOUT)
         .args(&command)
         .current_dir(&root)
         .env_remove("CAIRN_GLOBAL_REGISTRY")
