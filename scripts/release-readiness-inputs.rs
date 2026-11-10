@@ -24,7 +24,7 @@ use std::process::Stdio;
 use serde_json::Value;
 use serde_json::json;
 
-const MAX_BYTES: u64 = 16 * 1024 * 1024;
+const MAX_STREAM_BYTES: u64 = 16 * 1024 * 1024;
 const NATIVE_TIMEOUT: &str = "60s";
 
 fn main() -> ExitCode {
@@ -145,8 +145,8 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
 
 fn read_stream(reader: impl Read) -> std::io::Result<Vec<u8>> {
     let mut bytes = Vec::new();
-    reader.take(MAX_BYTES + 1).read_to_end(&mut bytes)?;
-    if bytes.len() as u64 > MAX_BYTES {
+    reader.take(MAX_STREAM_BYTES + 1).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > MAX_STREAM_BYTES {
         return Err(std::io::Error::other("stream exceeds the 16 MiB observation bound"));
     }
     Ok(bytes)
