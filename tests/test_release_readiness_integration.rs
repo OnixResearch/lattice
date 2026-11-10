@@ -62,7 +62,20 @@ fn mcp_completion_status_requires_both_native_success_and_passing_verdict() -> T
         .is_err(),
         "a CLI-shaped verdict must not be relabelled as MCP execution evidence"
     );
-    let mut observation = json!({"exit_code": 0, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash});
+    let valid_observation =
+        json!({"exit_code": 0, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash});
+    for validation in [
+        json!({"isError": true, "structuredContent": {"valid": true, "mcp": {"read_only": true}}}),
+        json!({"isError": false, "structuredContent": {"valid": "yes", "mcp": {"read_only": true}}}),
+        json!({"isError": false, "structuredContent": {"valid": true, "mcp": {"read_only": false}}}),
+    ] {
+        assert!(
+            release_inputs::completion_inputs(&json!({}), &["cairn".into()], &validation, &valid_observation, &hash)
+                .is_err(),
+            "invalid MCP envelope was accepted: {validation}"
+        );
+    }
+    let mut observation = valid_observation.clone();
     observation.as_object_mut().ok_or("observation object")?.remove("stderr_hash");
     assert!(
         release_inputs::completion_inputs(
