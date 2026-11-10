@@ -133,7 +133,9 @@ command. The same configured provider is used by TUI, scheduler, orchestration,
 and approval-resume hosts.
 
 The JSON run summary reports status, completed steps, failures, and cache hits,
-not rendered node output.
+not rendered node output. `steps_run` counts every recorded node result,
+including skipped dependents after a failure; `completed` and `failures` report
+the outcomes.
 
 Use the `run_id` returned by the run summary in place of `RUN_ID`:
 
