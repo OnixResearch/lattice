@@ -105,9 +105,10 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     let status = child.wait()?;
     let stdout = stdout_reader.join().map_err(|_| "native stdout reader failed")??;
     let stderr = stderr_reader.join().map_err(|_| "native stderr reader failed")??;
+    let exit_code = status.code();
     let observation = json!({
         "schema": "lattice.release-mcp-observation.v1", "command": command,
-        "exit_code": status.code().ok_or("native observation terminated without an exit code")?,
+        "exit_code": exit_code,
         "native_binary_hash": native_binary_hash, "subject_hash": subject_hash,
         "policy_hash": core::json_hash(&policy),
         "stdout_hash": blake3::hash(&stdout).to_hex().to_string(),
@@ -120,6 +121,7 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     write_output(&output.join("validation.stderr"), &stderr)?;
     write_json(&output.join("source-manifest.json"), &subject)?;
     write_json(&output.join("observation.json"), &observation)?;
+    exit_code.ok_or("native observation terminated without an exit code")?;
     let validation: Value = serde_json::from_slice(&stdout)?;
     let inputs = core::completion_inputs(&policy, &command, &validation, &observation, &subject_hash)?;
     if source_manifest(&root)? != subject || read_bounded(&policy_path)? != policy_bytes {
