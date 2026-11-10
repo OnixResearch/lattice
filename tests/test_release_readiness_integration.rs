@@ -25,6 +25,15 @@ fn observed_inputs(valid: bool, exit_code: i32) -> Result<release_inputs::Comple
 }
 
 #[test]
+fn policy_declares_the_observation_output_paths() -> TestResult {
+    let policy: Value = serde_json::from_str(include_str!("../cairn-policy/generated/cairn-policy.json"))?;
+    let selected = &policy["release_readiness_policy"];
+    assert_eq!(selected["mcp_completion_contract"], release_inputs::CONTRACT_PATH);
+    assert_eq!(selected["mcp_completion_results"], release_inputs::RESULTS_PATH);
+    Ok(())
+}
+
+#[test]
 fn mcp_completion_status_requires_both_native_success_and_passing_verdict() -> TestResult {
     // r[verify lattice.release_integration.inputs]
     // r[verify lattice.release_integration.inputs.mcp]

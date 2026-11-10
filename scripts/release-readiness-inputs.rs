@@ -25,9 +25,6 @@ use serde_json::Value;
 use serde_json::json;
 
 const MAX_BYTES: u64 = 16 * 1024 * 1024;
-const OUTPUT: &str = "target/release-readiness";
-const CONTRACT: &str = "target/release-readiness/mcp-contract.json";
-const RESULTS: &str = "target/release-readiness/mcp-results.json";
 
 fn main() -> ExitCode {
     match run() {
@@ -57,20 +54,22 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     let policy_bytes = read_bounded(&policy_path)?;
     let policy: Value = serde_json::from_slice(&policy_bytes)?;
     let selected = &policy["release_readiness_policy"];
-    if selected["mcp_completion_contract"] != CONTRACT || selected["mcp_completion_results"] != RESULTS {
+    if selected["mcp_completion_contract"] != core::CONTRACT_PATH
+        || selected["mcp_completion_results"] != core::RESULTS_PATH
+    {
         return Err(
             "selected release policy must declare the maintained target/release-readiness MCP observation outputs"
                 .into(),
         );
     }
-    let output = root.join(OUTPUT);
+    let output = root.join(core::OUTPUT_ROOT);
     fs::create_dir_all(&output)?;
     if !output.canonicalize()?.starts_with(&root) {
         return Err("release observation output escapes repository root".into());
     }
     // An interrupted or rejected new observation must not leave old completion
     // inputs eligible for a later assessment.
-    for path in [root.join(CONTRACT), root.join(RESULTS)] {
+    for path in [root.join(core::CONTRACT_PATH), root.join(core::RESULTS_PATH)] {
         match fs::remove_file(path) {
             Ok(()) => {}
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
@@ -125,13 +124,13 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     write_output(&output.join("validation.stderr"), &stderr)?;
     write_json(&output.join("source-manifest.json"), &subject)?;
     write_json(&output.join("observation.json"), &observation)?;
-    write_json(&root.join(CONTRACT), &inputs.contract)?;
-    write_json(&root.join(RESULTS), &inputs.results)?;
+    write_json(&root.join(core::CONTRACT_PATH), &inputs.contract)?;
+    write_json(&root.join(core::RESULTS_PATH), &inputs.results)?;
     println!(
         "{}",
         json!({"command": "lattice release MCP input observation", "passed": inputs.passed,
         "subject_hash": subject_hash, "policy_hash": core::json_hash(&policy),
-        "observation_hash": core::json_hash(&observation), "contract": CONTRACT, "results": RESULTS})
+        "observation_hash": core::json_hash(&observation), "contract": core::CONTRACT_PATH, "results": core::RESULTS_PATH})
     );
     Ok(inputs.passed)
 }

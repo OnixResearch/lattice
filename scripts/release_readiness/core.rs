@@ -1,6 +1,10 @@
 use serde_json::Value;
 use serde_json::json;
 
+pub const OUTPUT_ROOT: &str = "target/release-readiness";
+pub const CONTRACT_PATH: &str = "target/release-readiness/mcp-contract.json";
+pub const RESULTS_PATH: &str = "target/release-readiness/mcp-results.json";
+
 pub struct CompletionInputs {
     pub contract: Value,
     pub results: Value,
