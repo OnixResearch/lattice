@@ -205,11 +205,16 @@ pub struct RetentionRecord {
 }
 
 // r[impl lattice.node_result_cache.decision]
-pub fn select_eviction(records: &[RetentionRecord], promotion_threshold: u8) -> Result<Option<Key>, DecisionError> {
+pub fn eviction_order(
+    records: &[RetentionRecord],
+    promotion_threshold: u8,
+    limit: usize,
+) -> Result<Vec<Key>, DecisionError> {
     if promotion_threshold > FIFO_PROMOTION_THRESHOLD {
         return Err(DecisionError::PromotionThresholdOutOfRange);
     }
-    let selected = records.iter().min_by_key(|record| {
+    let mut ordered = records.to_vec();
+    ordered.sort_by_key(|record| {
         let policy_generation = if promotion_threshold == FIFO_PROMOTION_THRESHOLD {
             record.insertion_generation
         } else {
@@ -217,7 +222,12 @@ pub fn select_eviction(records: &[RetentionRecord], promotion_threshold: u8) -> 
         };
         (policy_generation, record.insertion_generation, record.key)
     });
-    Ok(selected.map(|record| record.key))
+    Ok(ordered.into_iter().take(limit).map(|record| record.key).collect())
+}
+
+// r[impl lattice.node_result_cache.decision]
+pub fn select_eviction(records: &[RetentionRecord], promotion_threshold: u8) -> Result<Option<Key>, DecisionError> {
+    Ok(eviction_order(records, promotion_threshold, 1)?.into_iter().next())
 }
 
 #[derive(Debug, Clone, Copy)]

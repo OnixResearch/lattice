@@ -240,19 +240,7 @@ fn select_from_state<V>(state: &State<V>, promotion_threshold: u8) -> Result<Opt
 }
 
 fn eviction_order<V>(state: &State<V>, promotion_threshold: u8, limit: usize) -> Result<Vec<super::core::Key>, Error> {
-    let mut candidates = records(state);
-    let limit = limit.min(candidates.len());
-    let mut order = Vec::with_capacity(limit);
-    while order.len() < limit {
-        let selected =
-            super::core::select_eviction(&candidates, promotion_threshold)?.ok_or(Error::PlannedEntryMissing)?;
-        order.push(selected);
-        let Some(index) = candidates.iter().position(|record| record.key == selected) else {
-            return Err(Error::PlannedEntryMissing);
-        };
-        candidates.remove(index);
-    }
-    Ok(order)
+    super::core::eviction_order(&records(state), promotion_threshold, limit).map_err(Error::from)
 }
 
 // r[impl lattice.node_result_cache.deferral]
