@@ -8,13 +8,12 @@ Do not replace the pinned source with a sibling checkout or an unpublished
 revision. The cached older native binary can inspect MCP/corpus inputs but cannot
 implement the new consumer-selection contract.
 
-## Current blocker
-
-`test_release_readiness_integration::release_selection_lists_lattice_gates_not_foreign_producer_checks`
-still fails against the pinned Cairn cohort because that binary hardcodes its
-own maintained-local gate list. A new admitted Cairn revision must read the
-Lattice-owned release selection before this check can pass. Do not edit the
-expected list to match the foreign gates; listing is not execution evidence.
+The pinned Cairn revision reads
+`release_readiness_policy.required_external_commands` from the admitted policy
+and uses it for the readiness gate summary. Lattice declares that list in
+`cairn-policy/default.ncl`; the producer falls back to its own maintained list
+when the field is absent or malformed. Listing remains selection evidence, not
+execution evidence.
 
 ## Observe actual MCP inputs
 

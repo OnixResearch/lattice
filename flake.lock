@@ -86,16 +86,16 @@
     "cairn": {
       "flake": false,
       "locked": {
-        "lastModified": 1788405605,
-        "narHash": "sha256-9MTFmFa6hfe2caWTHl5ptyx62Cfdj/rr5ABzFFccaUs=",
-        "ref": "refs/heads/main",
-        "rev": "5e1fe08d62149b286ff583eb056e655fe92e3cf1",
-        "revCount": 422,
+        "lastModified": 1794286328,
+        "narHash": "sha256-bRjkP/pJdgSRghbQj7UcaM5/+KtzYK7nPp+SARidEY0=",
+        "ref": "refs/heads/release-selection-20261109",
+        "rev": "47ea1b867c44b026c030b535f9a1041950c482a0",
+        "revCount": 423,
         "type": "git",
         "url": "ssh://git@github.com/OnixResearch/cairn.git"
       },
       "original": {
-        "rev": "5e1fe08d62149b286ff583eb056e655fe92e3cf1",
+        "rev": "47ea1b867c44b026c030b535f9a1041950c482a0",
         "type": "git",
         "url": "ssh://git@github.com/OnixResearch/cairn.git"
       }

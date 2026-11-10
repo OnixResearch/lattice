@@ -2390,6 +2390,15 @@
     }
   },
   "name": "lattice-default",
+  "release_readiness_policy": {
+    "mcp_completion_contract": "target/release-readiness/mcp-contract.json",
+    "mcp_completion_results": "target/release-readiness/mcp-results.json",
+    "required_external_commands": [
+      "scripts/check.rs",
+      "octet-precommit-check",
+      "nix flake check -L --option secret-key-files ''"
+    ]
+  },
   "nominal_identity_policy": {
     "non_claims": [
       "nominal identities prove configured local syntax and role separation only; they do not prove evidence truth, authority, policy correctness, verifier soundness, mutation safety outside checked plans, or release eligibility"

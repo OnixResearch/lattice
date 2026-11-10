@@ -89,12 +89,14 @@ fn nickel_export_rejects_unsafe_roots_before_evidence_discovery() -> TestResult 
     let fixture = Fixture::new()?;
     let contracts = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("cairn-policy/contracts.ncl");
     let local = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("cairn-policy/traceability-contracts.ncl");
+    let release = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("cairn-policy/release-selection-contracts.ncl");
     fixture.write(
         "policy.ncl",
         format!(
-            "let Contracts = import {} in let Local = import {} in (import \"policy.json\") | (Contracts.Policy & {{traceability_policy | Local.Policy}})\n",
+            "let Contracts = import {} in let Local = import {} in let Release = import {} in (import \"policy.json\") | (Contracts.Policy & {{traceability_policy | Local.Policy}} & Release.Policy)\n",
             serde_json::to_string(&contracts)?,
-            serde_json::to_string(&local)?
+            serde_json::to_string(&local)?,
+            serde_json::to_string(&release)?
         ),
     )?;
     let valid: Value = serde_json::from_str(GENERATED_POLICY)?;

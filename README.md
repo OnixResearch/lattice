@@ -56,7 +56,7 @@ cargo run --locked -- --help
 ```
 
 The current flake fetches Cairn revision
-`5e1fe08d62149b286ff583eb056e655fe92e3cf1` and its locked Artifact input
+`47ea1b867c44b026c030b535f9a1041950c482a0` and its locked Artifact input
 `e41340bec587b6d049b5cc518ec7db925dde84be` over GitHub SSH. Cargo's locked
 Choregraph closure also selects Trellis revision
 `d65974b14978e1a44b0f5067beb9ef6d83317dc8` over GitHub SSH. Authorized

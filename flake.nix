@@ -12,7 +12,7 @@
     flake-utils.url = "github:numtide/flake-utils";
     octet.url = "github:OnixResearch/octet/bac0f3220ada38110c03498ccf2beae5ee83e642";
     cairn = {
-      url = "git+ssh://git@github.com/OnixResearch/cairn.git?rev=5e1fe08d62149b286ff583eb056e655fe92e3cf1";
+      url = "git+ssh://git@github.com/OnixResearch/cairn.git?rev=47ea1b867c44b026c030b535f9a1041950c482a0";
       flake = false;
     };
     role-protocol-runtime-source = {

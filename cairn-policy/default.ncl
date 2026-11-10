@@ -47,6 +47,15 @@ let TrellisTraceabilityProfile = {
 } in
 Upstream & {
   name | force = "lattice-default",
+  release_readiness_policy = {
+    required_external_commands = [
+      "scripts/check.rs",
+      "octet-precommit-check",
+      "nix flake check -L --option secret-key-files ''",
+    ],
+    mcp_completion_contract = "target/release-readiness/mcp-contract.json",
+    mcp_completion_results = "target/release-readiness/mcp-results.json",
+  },
   policy_schema_compatibility | force = Upstream.policy_schema_compatibility & {
     refresh_command | force = "nix run path:$CAIRN_SOURCE#cairn -- policy export --source cairn-policy/default.ncl --output cairn-policy/generated/cairn-policy.json",
   },
