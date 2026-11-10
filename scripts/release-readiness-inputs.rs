@@ -147,13 +147,14 @@ fn read_stream(reader: impl Read) -> std::io::Result<Vec<u8>> {
     let mut bytes = Vec::new();
     reader.take(MAX_BYTES + 1).read_to_end(&mut bytes)?;
     if bytes.len() as u64 > MAX_BYTES {
-        return Err(std::io::Error::other("native output exceeds the 16 MiB observation bound"));
+        return Err(std::io::Error::other("stream exceeds the 16 MiB observation bound"));
     }
     Ok(bytes)
 }
 
 fn read_bounded(path: &Path) -> std::io::Result<Vec<u8>> {
-    read_stream(fs::File::open(path)?)
+    let mut file = fs::File::open(path)?;
+    read_stream(&mut file).map_err(|error| std::io::Error::new(error.kind(), format!("{}: {error}", path.display())))
 }
 
 fn file_hash(path: &Path) -> std::io::Result<String> {
