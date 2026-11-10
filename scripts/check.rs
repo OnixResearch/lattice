@@ -575,6 +575,7 @@ fn validate_spec_text_with_seen(path: &str, text: &str, marker_ids: &mut BTreeSe
     let mut purpose_has_content = false;
     let mut in_purpose = false;
     let mut saw_requirements_section = false;
+    let mut in_requirements = false;
 
     for (line_index, line) in lines.iter().enumerate() {
         let trimmed = line.trim();
@@ -598,6 +599,11 @@ fn validate_spec_text_with_seen(path: &str, text: &str, marker_ids: &mut BTreeSe
         }
         if trimmed == "## Requirements" {
             saw_requirements_section = true;
+            in_requirements = true;
+            continue;
+        }
+        if in_requirements && trimmed.starts_with("## ") {
+            in_requirements = false;
         }
         if trimmed.starts_with("r[") {
             match marker_id(trimmed) {
@@ -610,7 +616,15 @@ fn validate_spec_text_with_seen(path: &str, text: &str, marker_ids: &mut BTreeSe
             }
         }
         if let Some(title) = trimmed.strip_prefix("### Requirement:") {
-            saw_requirement = true;
+            if in_requirements {
+                saw_requirement = true;
+            } else {
+                diagnostics.push(diagnostic(
+                    path,
+                    line_index,
+                    "requirement must appear under the Requirements section",
+                ));
+            }
             if title.trim().is_empty() {
                 diagnostics.push(diagnostic(path, line_index, "requirement heading must include a title"));
             }
@@ -631,6 +645,9 @@ fn validate_spec_text_with_seen(path: &str, text: &str, marker_ids: &mut BTreeSe
     }
     if !saw_requirements_section {
         diagnostics.push(diagnostic(path, 0, "spec file must include a Requirements section"));
+    }
+    if saw_requirements_section && !saw_requirement {
+        diagnostics.push(diagnostic(path, 0, "Requirements section must contain at least one requirement"));
     }
     if !saw_purpose_section {
         diagnostics.push(diagnostic(path, 0, "spec file must include a Purpose section"));
@@ -881,6 +898,28 @@ mod tests {
         let text = "# Title\n\n## Purpose\n\n## Requirements\n\n### Requirement: Title\nr[lattice.example] MUST hold\n\n#### Scenario: Case\nr[lattice.example.scenario]\n- GIVEN a state\n- WHEN an action\n- THEN a result\n";
         let diagnostics = validate_spec_text("spec.md", text);
         assert!(diagnostics.iter().any(|diagnostic| diagnostic.message == "Purpose section must not be empty"));
+    }
+
+    #[test]
+    fn requirements_outside_the_section_are_rejected() {
+        let text = "# Title\n\n## Purpose\n\nPurpose.\n\n### Requirement: Title\nr[lattice.example] MUST hold\n\n#### Scenario: Case\nr[lattice.example.scenario]\n- GIVEN a state\n- WHEN an action\n- THEN a result\n";
+        let diagnostics = validate_spec_text("spec.md", text);
+        assert!(
+            diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.message == "requirement must appear under the Requirements section")
+        );
+    }
+
+    #[test]
+    fn empty_requirements_sections_are_rejected() {
+        let text = "# Title\n\n## Purpose\n\nPurpose.\n\n## Requirements\n\nNo requirements.\n";
+        let diagnostics = validate_spec_text("spec.md", text);
+        assert!(
+            diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.message == "Requirements section must contain at least one requirement")
+        );
     }
 
     #[test]
