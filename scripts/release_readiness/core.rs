@@ -9,10 +9,10 @@ pub const MAX_MANIFEST_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 
 pub fn check_manifest_bounds(file_count: usize, total_bytes: u64) -> Result<(), String> {
     if file_count > MAX_MANIFEST_FILES {
-        return Err(format!("release source manifest exceeds {MAX_MANIFEST_FILES} files"));
+        return Err(format!("release source manifest has {file_count} files; limit {MAX_MANIFEST_FILES}"));
     }
     if total_bytes > MAX_MANIFEST_BYTES {
-        return Err(format!("release source manifest exceeds {MAX_MANIFEST_BYTES} bytes"));
+        return Err(format!("release source manifest has {total_bytes} bytes; limit {MAX_MANIFEST_BYTES}"));
     }
     Ok(())
 }
