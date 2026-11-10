@@ -17,4 +17,5 @@
 *.redb
 *.sock
 /data/
+/~/
 .pi/
