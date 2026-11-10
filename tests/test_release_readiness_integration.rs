@@ -79,6 +79,33 @@ fn mcp_completion_status_requires_both_native_success_and_passing_verdict() -> T
 }
 
 #[test]
+fn completion_inputs_reject_malformed_identity_hashes() -> TestResult {
+    let hash = release_inputs::json_hash(&json!("observed-test-bytes"));
+    let validation = json!({"isError": false, "structuredContent": {"valid": true, "mcp": {"read_only": true}}});
+    for field in ["stdout_hash", "stderr_hash", "native_binary_hash"] {
+        let mut observation =
+            json!({"exit_code": 0, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash});
+        observation[field] = json!("not-a-blake3-digest");
+        assert!(
+            release_inputs::completion_inputs(&json!({}), &["cairn".into()], &validation, &observation, &hash).is_err(),
+            "malformed {field} was accepted"
+        );
+    }
+    assert!(
+        release_inputs::completion_inputs(
+            &json!({}),
+            &["cairn".into()],
+            &validation,
+            &json!({"exit_code": 0, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash}),
+            "not-a-blake3-digest"
+        )
+        .is_err(),
+        "malformed subject hash was accepted"
+    );
+    Ok(())
+}
+
+#[test]
 fn consumer_canonicalization_retains_sequence_and_null_boundaries() -> TestResult {
     // r[verify lattice.release_integration.inputs.corpus]
     let fixture = Fixture::new()?;
