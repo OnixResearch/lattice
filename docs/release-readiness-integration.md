@@ -62,10 +62,11 @@ output left outside ignored paths.
 
 The completion contract selects only the observed native MCP lifecycle
 validation. Its BLAKE3 identities bind the exact command, policy, source manifest,
-raw evidence and observed process facts. It does not claim that tests, Octet,
-Nix, or any remote service ran. Cairn smoke separately executes its catalog,
-completion-validation, invalid-argument and default mutation-denial flow against
-these real inputs.
+raw evidence and observed process facts. The observation's subject and policy
+identities must match the supplied manifest and policy. It does not claim that
+tests, Octet, Nix, or any remote service ran. Cairn smoke separately executes
+its catalog, completion-validation, invalid-argument and default mutation-denial
+flow against these real inputs.
 
 ## Assess and replay
 
