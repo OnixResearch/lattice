@@ -240,7 +240,8 @@ fn source_manifest(root: &Path) -> Result<Value, Box<dyn std::error::Error>> {
                 let name = entry?.file_name();
                 let vendor_metadata = (name == ".cairn" || name == ".pi" || name == ".autoresearch")
                     && relative.starts_with("vendor-cargo-deps");
-                if name != "target" && name != ".git" && name != ".direnv" && !vendor_metadata {
+                let host_metadata = name == ".DS_Store" || name == "Thumbs.db";
+                if name != "target" && name != ".git" && name != ".direnv" && !host_metadata && !vendor_metadata {
                     pending.push(relative.join(name));
                 }
             }
