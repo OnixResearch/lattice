@@ -4,6 +4,7 @@ use serde_json::Value;
 use serde_json::json;
 
 pub const OUTPUT_ROOT: &str = "target/release-readiness";
+pub const OBSERVATION_SCHEMA: &str = "lattice.release-mcp-observation.v1";
 pub const CONTRACT_PATH: &str = "target/release-readiness/mcp-contract.json";
 pub const RESULTS_PATH: &str = "target/release-readiness/mcp-results.json";
 pub const VALIDATION_PATH: &str = "target/release-readiness/validation.json";
@@ -73,6 +74,9 @@ pub fn completion_inputs(
     }
     if command.iter().any(|argument| argument.is_empty()) {
         return Err("observed command contains an empty argument".to_string());
+    }
+    if observation["schema"].as_str() != Some(OBSERVATION_SCHEMA) {
+        return Err("native observation schema is absent or unsupported".to_string());
     }
     let observed_command = observation["command"].as_array().ok_or("native observation command is absent")?;
     if observed_command.len() != command.len()

@@ -116,7 +116,7 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     let stderr = stderr_reader.join().map_err(|_| "native stderr reader failed")??;
     let exit_code = status.code();
     let observation = json!({
-        "schema": "lattice.release-mcp-observation.v1", "command": command,
+        "schema": core::OBSERVATION_SCHEMA, "command": command,
         "exit_code": exit_code,
         "native_binary_hash": native_binary_hash, "subject_hash": subject_hash,
         "policy_hash": core::json_hash(&policy),
