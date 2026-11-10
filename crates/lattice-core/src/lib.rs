@@ -16,6 +16,7 @@ pub mod mapping;
 #[allow(
     unknown_lints,
     renamed_imports,
+    clippy::useless_attribute,
     reason = "the compatibility name keeps the existing expression dependency API while the file uses a non-repeating module owner"
 )]
 pub use mapping as expression_dependencies;

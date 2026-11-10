@@ -103,8 +103,9 @@ const OPERATION_CONTRACT_TEST_ARGS: &[&str] = &[
 const TEST_ARGS: &[&str] = &["test", "--workspace"];
 const CLIPPY_ARGS: &[&str] = &[
     "clippy",
-    "--package",
-    "lattice",
+    "--workspace",
+    "--exclude",
+    "lattice-repository-validation-fixture",
     "--all-targets",
     "--no-deps",
     "--",

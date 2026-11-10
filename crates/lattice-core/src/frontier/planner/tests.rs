@@ -109,8 +109,9 @@ fn invalid_policy_and_missing_preparation_are_rejected() {
 
 #[test]
 fn every_preparation_and_lifecycle_blocker_is_typed() {
+    type BlockerCase = (Blocker, fn(&mut Candidate));
     let valid = policy(1, 1);
-    let cases: &[(Blocker, fn(&mut Candidate))] = &[
+    let cases: &[BlockerCase] = &[
         (Blocker::MissingBackend, |candidate: &mut Candidate| candidate.backend_ready = false),
         (Blocker::MissingAuthority, |candidate: &mut Candidate| candidate.authority_ready = false),
         (Blocker::MissingCredential, |candidate: &mut Candidate| candidate.credential_ready = false),
