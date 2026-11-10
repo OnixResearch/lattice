@@ -6,7 +6,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-blake3 = "1.8.3"
+blake3 = "=1.8.5"
 ---
 
 use std::fmt::Write;
