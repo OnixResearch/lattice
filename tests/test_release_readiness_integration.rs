@@ -73,6 +73,17 @@ fn mcp_completion_status_requires_both_native_success_and_passing_verdict() -> T
         "a CLI-shaped verdict must not be relabelled as MCP execution evidence"
     );
     let valid_observation = json!({"exit_code": 0, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash, "subject_hash": hash, "policy_hash": release_inputs::json_hash(&json!({}))});
+    assert!(
+        release_inputs::completion_inputs(
+            &json!({}),
+            &[],
+            &json!({"isError": false, "structuredContent": {"valid": true, "mcp": {"read_only": true}}}),
+            &valid_observation,
+            &hash
+        )
+        .is_err(),
+        "an empty observed command was accepted"
+    );
     for validation in [
         json!({"isError": true, "structuredContent": {"valid": true, "mcp": {"read_only": true}}}),
         json!({"structuredContent": {"valid": true, "mcp": {"read_only": true}}}),

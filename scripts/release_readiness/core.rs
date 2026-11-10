@@ -59,6 +59,9 @@ pub fn completion_inputs(
     observation: &Value,
     subject_hash: &str,
 ) -> Result<CompletionInputs, String> {
+    if command.is_empty() {
+        return Err("observed command is empty".to_string());
+    }
     if validation["isError"] != false || validation["structuredContent"]["mcp"]["read_only"] != true {
         return Err("native MCP validation envelope is absent or invalid".to_string());
     }
