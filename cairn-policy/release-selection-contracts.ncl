@@ -2,10 +2,15 @@
 #
 # The producer reads this optional field to project consumer-selected release
 # gates; the base upstream contract remains an unchanged snapshot.
+let Commands = std.contract.from_predicate (fun values =>
+  std.is_array values
+  && std.array.length values > 0
+  && std.array.all (fun value => std.is_string value && std.string.length value > 0) values
+) in
 {
   Policy = {
     release_readiness_policy | {
-      required_external_commands | Array String,
+      required_external_commands | Commands,
       mcp_completion_contract | String,
       mcp_completion_results | String,
     },

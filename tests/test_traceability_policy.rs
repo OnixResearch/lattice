@@ -99,6 +99,39 @@ fn generated_release_selection_matches_policy_source() -> TestResult {
 }
 
 #[test]
+fn release_selection_contract_rejects_empty_or_malformed_commands() -> TestResult {
+    let fixture = Fixture::new()?;
+    let contracts = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("cairn-policy/contracts.ncl");
+    let local = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("cairn-policy/traceability-contracts.ncl");
+    let release = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("cairn-policy/release-selection-contracts.ncl");
+    fixture.write(
+        "policy.ncl",
+        format!(
+            "let Contracts = import {} in let Local = import {} in let Release = import {} in (import \"policy.json\") | (Contracts.Policy & {{traceability_policy | Local.Policy}} & Release.Policy)\n",
+            serde_json::to_string(&contracts)?,
+            serde_json::to_string(&local)?,
+            serde_json::to_string(&release)?
+        ),
+    )?;
+    let valid: Value = serde_json::from_str(GENERATED_POLICY)?;
+    for commands in [json!([]), json!([""]), json!([1])] {
+        let mut policy = valid.clone();
+        policy["release_readiness_policy"]["required_external_commands"] = commands;
+        fixture.write("policy.json", serde_json::to_vec(&policy)?)?;
+        let output = std::process::Command::new("nickel")
+            .current_dir(fixture.root.path())
+            .args(["export", "--format", "json", "policy.ncl"])
+            .output()?;
+        assert!(
+            !output.status.success(),
+            "malformed command list was accepted: {}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn nickel_export_rejects_unsafe_roots_before_evidence_discovery() -> TestResult {
     let fixture = Fixture::new()?;
     let contracts = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("cairn-policy/contracts.ncl");
