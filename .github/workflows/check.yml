@@ -37,6 +37,9 @@ jobs:
       - name: Rewrite GitHub SSH dependencies to HTTPS
         run: git config --global url.https://github.com/.insteadOf ssh://git@github.com/
 
+      - name: Record toolchain versions
+        run: nix develop . -c sh -c 'rustc --version; cargo --version; nickel --version'
+
       - name: Run hardened check harness
         timeout-minutes: 240
         env:
