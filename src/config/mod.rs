@@ -206,6 +206,7 @@ fn default_data_dir() -> Option<PathBuf> {
         home_dir,
         has_legacy_default,
     })
+    .map(expand_home)
 }
 
 fn read_data_dir_env(name: &str) -> Option<PathBuf> {
