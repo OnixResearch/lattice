@@ -294,6 +294,30 @@ fn manifest_path_keys_preserve_exact_utf8_paths_and_reject_non_utf8() {
 }
 
 #[test]
+fn manifest_skips_local_residue() {
+    let vendor = std::path::Path::new("vendor-cargo-deps/basalt");
+    for name in [
+        ".DS_Store",
+        "Thumbs.db",
+        ".idea",
+        ".vscode",
+        "x.swp",
+        "x.swo",
+        "x~",
+        "x.redb",
+        "x.sock",
+    ] {
+        assert!(release_inputs::skip_manifest_entry(std::ffi::OsStr::new(name), vendor), "{name}");
+    }
+    for name in ["target", ".git", ".direnv"] {
+        assert!(release_inputs::skip_manifest_entry(std::ffi::OsStr::new(name), std::path::Path::new("src")));
+    }
+    assert!(release_inputs::skip_manifest_entry(std::ffi::OsStr::new(".cairn"), vendor));
+    assert!(!release_inputs::skip_manifest_entry(std::ffi::OsStr::new(".cairn"), std::path::Path::new("src")));
+    assert!(!release_inputs::skip_manifest_entry(std::ffi::OsStr::new("main.rs"), std::path::Path::new("src")));
+}
+
+#[test]
 fn completion_inputs_reject_malformed_identity_hashes() -> TestResult {
     let hash = release_inputs::json_hash(&json!("observed-test-bytes"));
     let validation = json!({"isError": false, "structuredContent": {"valid": true, "mcp": {"read_only": true}}});

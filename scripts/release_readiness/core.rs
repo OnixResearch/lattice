@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::path::Path;
 
 use serde_json::Value;
@@ -36,6 +37,25 @@ pub fn manifest_path_key(path: &Path) -> Result<String, String> {
     path.to_str()
         .map(str::to_owned)
         .ok_or_else(|| format!("release source manifest rejects non-UTF-8 path: {}", path.display()))
+}
+
+pub fn skip_manifest_entry(name: &OsStr, relative: &Path) -> bool {
+    if name == "target" || name == ".git" || name == ".direnv" {
+        return true;
+    }
+    if (name == ".cairn" || name == ".pi" || name == ".autoresearch") && relative.starts_with("vendor-cargo-deps") {
+        return true;
+    }
+    if name == ".DS_Store" || name == "Thumbs.db" || name == ".idea" || name == ".vscode" {
+        return true;
+    }
+    name.to_str().is_some_and(|name| {
+        name.ends_with(".swp")
+            || name.ends_with(".swo")
+            || name.ends_with('~')
+            || name.ends_with(".redb")
+            || name.ends_with(".sock")
+    })
 }
 
 #[derive(Debug)]

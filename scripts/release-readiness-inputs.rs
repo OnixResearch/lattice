@@ -238,20 +238,7 @@ fn source_manifest(root: &Path) -> Result<Value, Box<dyn std::error::Error>> {
         if metadata.is_dir() {
             for entry in fs::read_dir(&path)? {
                 let name = entry?.file_name();
-                let vendor_metadata = (name == ".cairn" || name == ".pi" || name == ".autoresearch")
-                    && relative.starts_with("vendor-cargo-deps");
-                let host_metadata = name == ".DS_Store" || name == "Thumbs.db";
-                let ignored_metadata = host_metadata
-                    || name == ".idea"
-                    || name == ".vscode"
-                    || name.to_str().is_some_and(|name| {
-                        name.ends_with(".swp")
-                            || name.ends_with(".swo")
-                            || name.ends_with('~')
-                            || name.ends_with(".redb")
-                            || name.ends_with(".sock")
-                    });
-                if name != "target" && name != ".git" && name != ".direnv" && !ignored_metadata && !vendor_metadata {
+                if !core::skip_manifest_entry(&name, &relative) {
                     pending.push(relative.join(name));
                 }
             }
