@@ -141,6 +141,26 @@ fn cache_insert_failure_preserves_the_executed_value() -> Result<(), Error> {
     Ok(())
 }
 
+#[test]
+fn cache_lookup_failure_still_executes() -> Result<(), Error> {
+    let memoizer =
+        Memoizer::new(config(Some(SINGLE_SLOT_CAPACITY), super::super::core::STRICT_LRU_PROMOTION_THRESHOLD))?;
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let _guard = memoizer.state.lock().expect("cache lock");
+        panic!("poison cache lock");
+    }));
+    let calls = AtomicUsize::new(0);
+    let value = memoizer
+        .get_or_execute(key(FIRST_KEY_BYTE), || {
+            calls.fetch_add(1, Ordering::SeqCst);
+            Ok::<_, &'static str>("value")
+        })
+        .map_err(map_execution_error)?;
+    assert_eq!(*value, "value");
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    Ok(())
+}
+
 struct DropProbe {
     state: Weak<std::sync::Mutex<State<DropProbe>>>,
     dropped_after_unlock: std::sync::Arc<AtomicBool>,

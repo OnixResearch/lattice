@@ -197,7 +197,14 @@ impl<V> Memoizer<V> {
     where
         F: FnOnce() -> Result<V, E>,
     {
-        if let Some(value) = self.get(key).map_err(LookupOrExecuteError::Store)? {
+        let cached = match self.get(key) {
+            Ok(value) => value,
+            Err(error) => {
+                tracing::warn!(error = %error, "failed to read node result cache; executing");
+                None
+            }
+        };
+        if let Some(value) = cached {
             return Ok(value);
         }
         let value = std::sync::Arc::new(execute().map_err(LookupOrExecuteError::Executor)?);

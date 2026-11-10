@@ -53,8 +53,8 @@ synchronization boundary.
 `get_or_execute` returns a cached value on a hit. On a miss, it calls the
 supplied executor closure without changing the executor result or error; a
 cache insert failure is logged and the executed value is returned. A cache
-lookup error is returned as a store error and does not call the executor. A
-concurrent miss can still execute more than once because the cache is advisory.
+lookup error is logged and the executor is called. A concurrent miss can still
+execute more than once because the cache is advisory.
 
 ## Contract status
 
