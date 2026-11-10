@@ -41,6 +41,8 @@ jobs:
         run: nix develop . -c octet-precommit-check
 
       - name: Run Nix flake checks
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
         run: nix flake check -L --option secret-key-files ''
 
       - name: Verify gates left no tracked changes
