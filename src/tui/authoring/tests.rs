@@ -18,10 +18,8 @@ use crate::workflow_format::workflow_to_nickel;
 use crate::workflow_format::workflow_to_portable;
 
 fn app(root: &tempfile::TempDir) -> App {
-    let data_dir = root.path().join("state");
-    std::fs::create_dir_all(&data_dir).expect("create app data directory");
     App::new(crate::config::AppConfig {
-        data_dir,
+        data_dir: root.path().join("state"),
         ..Default::default()
     })
 }
