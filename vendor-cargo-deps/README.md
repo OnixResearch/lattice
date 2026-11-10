@@ -1,6 +1,10 @@
 # Vendored source snapshots
 
-These snapshots keep product builds independent of sibling checkout paths. `scripts/sync-vendored-sibling.rs` imports only explicitly selected Git archive paths and writes a `SOURCE` file with the repository and exact revision.
+These snapshots keep product builds independent of sibling checkout paths. The
+import scripts copy only explicitly selected Git archive paths; Basalt, Host
+Control, hardened runtime, Mantle and the Nickel snapshot also write a `SOURCE`
+file with the repository and exact revision, while Rats and Animus record their
+revisions below.
 
 - `rats/source/` comes from Rats revision `ef26e13b2e9cbcb4a0c902f9caff641b6d013867`.
 - `animus/` comes from Animus revision `f1662a8ed290b170c3986d2ddf2909b36d7e5fdc`.
