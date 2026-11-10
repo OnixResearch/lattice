@@ -8,6 +8,14 @@ Do not replace the pinned source with a sibling checkout or an unpublished
 revision. The cached older native binary can inspect MCP/corpus inputs but cannot
 implement the new consumer-selection contract.
 
+## Current blocker
+
+`test_release_readiness_integration::release_selection_lists_lattice_gates_not_foreign_producer_checks`
+still fails against the pinned Cairn cohort because that binary hardcodes its
+own maintained-local gate list. A new admitted Cairn revision must read the
+Lattice-owned release selection before this check can pass. Do not edit the
+expected list to match the foreign gates; listing is not execution evidence.
+
 ## Observe actual MCP inputs
 
 After all source, policy, dependency and lifecycle closeout edits, run from the
