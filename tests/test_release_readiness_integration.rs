@@ -40,7 +40,7 @@ fn mcp_completion_status_requires_both_native_success_and_passing_verdict() -> T
     let passed = observed_inputs(true, 0)?;
     assert!(passed.passed);
     assert_eq!(passed.results[0]["status"], "passed");
-    assert_eq!(passed.results[0]["artifacts"][1]["path"], "target/release-readiness/validation.stderr");
+    assert_eq!(passed.results[0]["artifacts"][1]["path"], release_inputs::STDERR_PATH);
     for (valid, exit_code) in [(false, 0), (true, 1), (false, 124)] {
         let failed = observed_inputs(valid, exit_code)?;
         assert!(!failed.passed);

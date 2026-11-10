@@ -60,10 +60,10 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     for path in [
         root.join(core::CONTRACT_PATH),
         root.join(core::RESULTS_PATH),
-        output.join("validation.json"),
-        output.join("validation.stderr"),
-        output.join("source-manifest.json"),
-        output.join("observation.json"),
+        root.join(core::VALIDATION_PATH),
+        root.join(core::STDERR_PATH),
+        root.join(core::SOURCE_MANIFEST_PATH),
+        root.join(core::OBSERVATION_PATH),
     ] {
         match fs::remove_file(path) {
             Ok(()) => {}
@@ -123,10 +123,10 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     });
     // Retain real bytes before parsing them or deriving completion records, so
     // malformed observations remain inspectable.
-    write_output(&output.join("validation.json"), &stdout)?;
-    write_output(&output.join("validation.stderr"), &stderr)?;
-    write_json(&output.join("source-manifest.json"), &subject)?;
-    write_json(&output.join("observation.json"), &observation)?;
+    write_output(&root.join(core::VALIDATION_PATH), &stdout)?;
+    write_output(&root.join(core::STDERR_PATH), &stderr)?;
+    write_json(&root.join(core::SOURCE_MANIFEST_PATH), &subject)?;
+    write_json(&root.join(core::OBSERVATION_PATH), &observation)?;
     exit_code.ok_or("native observation terminated without an exit code")?;
     let validation: Value = serde_json::from_slice(&stdout)?;
     let inputs = core::completion_inputs(&policy, &command, &validation, &observation, &subject_hash)?;
