@@ -14,7 +14,7 @@ pub const MAX_NATIVE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
 pub fn check_native_size(bytes: u64) -> Result<(), String> {
     if bytes > MAX_NATIVE_BYTES {
-        return Err(format!("native executable exceeds the {MAX_NATIVE_BYTES}-byte bound"));
+        return Err(format!("native executable has {bytes} bytes; limit {MAX_NATIVE_BYTES}"));
     }
     Ok(())
 }
