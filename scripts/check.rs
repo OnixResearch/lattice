@@ -117,6 +117,7 @@ const POLICY_TYPECHECK_ARGS: &[&str] = &[
     "cairn-policy/default.ncl",
     "cairn-policy/traceability-inventory.ncl",
 ];
+const RUNTIME_NICKEL_TYPECHECK_ARGS: &[&str] = &["-c", "nickel typecheck policy/*.ncl profiles/*.ncl contracts/*.ncl"];
 const FOCUSED_CONSUMER_CHECK_ARGS: &[&str] = &["check", "--package", "lattice", "--all-targets", "--locked"];
 const ALL_FEATURES_CHECK_ARGS: &[&str] = &[
     "check",
@@ -303,6 +304,12 @@ const COMMAND_STEPS: &[CheckStep] = &[
         name: "policy typecheck",
         program: "nickel",
         args: POLICY_TYPECHECK_ARGS,
+        use_repo_local_target: false,
+    },
+    CheckStep {
+        name: "runtime Nickel typecheck",
+        program: "sh",
+        args: RUNTIME_NICKEL_TYPECHECK_ARGS,
         use_repo_local_target: false,
     },
     CheckStep {
