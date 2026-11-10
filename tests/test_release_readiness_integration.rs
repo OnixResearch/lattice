@@ -198,6 +198,13 @@ fn json_hash_ignores_nested_object_key_order() {
 }
 
 #[test]
+fn json_hash_preserves_nested_array_order() {
+    let left = json!({"outer": [1, 2]});
+    let right = json!({"outer": [2, 1]});
+    assert_ne!(release_inputs::json_hash(&left), release_inputs::json_hash(&right));
+}
+
+#[test]
 fn manifest_bounds_reject_oversized_manifests() {
     assert!(release_inputs::check_manifest_bounds(0, 0).is_ok());
     assert!(
