@@ -68,6 +68,7 @@ fn mcp_completion_status_requires_both_native_success_and_passing_verdict() -> T
         json!({"isError": true, "structuredContent": {"valid": true, "mcp": {"read_only": true}}}),
         json!({"structuredContent": {"valid": true, "mcp": {"read_only": true}}}),
         json!({"isError": false}),
+        json!({"isError": false, "structuredContent": {"mcp": {"read_only": true}}}),
         json!({"isError": false, "structuredContent": {"valid": "yes", "mcp": {"read_only": true}}}),
         json!({"isError": false, "structuredContent": {"valid": true, "mcp": {"read_only": false}}}),
     ] {
@@ -77,6 +78,19 @@ fn mcp_completion_status_requires_both_native_success_and_passing_verdict() -> T
             "invalid MCP envelope was accepted: {validation}"
         );
     }
+    let mut missing_exit = valid_observation.clone();
+    missing_exit.as_object_mut().ok_or("observation object")?.remove("exit_code");
+    assert!(
+        release_inputs::completion_inputs(
+            &json!({}),
+            &["cairn".into()],
+            &json!({"isError": false, "structuredContent": {"valid": true, "mcp": {"read_only": true}}}),
+            &missing_exit,
+            &hash
+        )
+        .is_err(),
+        "an observation without an exit code must not be accepted"
+    );
     let mut observation = valid_observation.clone();
     observation.as_object_mut().ok_or("observation object")?.remove("stderr_hash");
     assert!(
