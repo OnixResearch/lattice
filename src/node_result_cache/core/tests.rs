@@ -80,6 +80,36 @@ fn config_requires_explicit_valid_bounds() -> Result<(), Box<dyn std::error::Err
 // r[verify lattice.node_result_cache.decision]
 // r[verify lattice.node_result_cache.verification]
 #[test]
+fn eviction_order_is_stable_and_limited() {
+    let records = [
+        RetentionRecord {
+            key: key(FIRST_KEY_BYTE),
+            insertion_generation: 2,
+            last_use_generation: 3,
+        },
+        RetentionRecord {
+            key: key(SECOND_KEY_BYTE),
+            insertion_generation: 1,
+            last_use_generation: 4,
+        },
+        RetentionRecord {
+            key: key(THIRD_KEY_BYTE),
+            insertion_generation: 3,
+            last_use_generation: 1,
+        },
+    ];
+    assert_eq!(eviction_order(&records, STRICT_LRU_PROMOTION_THRESHOLD, 2).expect("strict order"), vec![
+        key(THIRD_KEY_BYTE),
+        key(FIRST_KEY_BYTE)
+    ]);
+    assert_eq!(eviction_order(&records, FIFO_PROMOTION_THRESHOLD, 2).expect("fifo order"), vec![
+        key(SECOND_KEY_BYTE),
+        key(FIRST_KEY_BYTE)
+    ]);
+    assert!(eviction_order(&records, FIFO_PROMOTION_THRESHOLD, 0).expect("empty order").is_empty());
+}
+
+#[test]
 fn promotion_boundaries_and_middle_threshold_are_deterministic() {
     // r[verify lattice.node_result_cache.decision.scenario.strict_lru]
     assert_eq!(
