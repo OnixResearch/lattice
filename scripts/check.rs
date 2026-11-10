@@ -516,9 +516,17 @@ fn validate_spec_text(path: &str, text: &str) -> Vec<SpecDiagnostic> {
     let lines = text.lines().collect::<Vec<_>>();
     let mut diagnostics = Vec::new();
     let mut marker_ids = BTreeSet::new();
+    let mut fence_start = None;
 
     for (line_index, line) in lines.iter().enumerate() {
         let trimmed = line.trim();
+        if trimmed.starts_with("```") {
+            fence_start = if fence_start.is_some() { None } else { Some(line_index) };
+            continue;
+        }
+        if fence_start.is_some() {
+            continue;
+        }
         if let Some(id) = marker_id(trimmed) {
             if !marker_ids.insert(id) {
                 diagnostics.push(diagnostic(path, line_index, "duplicate r[...] marker identifier"));
@@ -536,6 +544,9 @@ fn validate_spec_text(path: &str, text: &str) -> Vec<SpecDiagnostic> {
             }
             validate_scenario(path, &lines, line_index, &mut diagnostics);
         }
+    }
+    if let Some(start) = fence_start {
+        diagnostics.push(diagnostic(path, start, "unclosed fenced code block"));
     }
 
     diagnostics
@@ -706,5 +717,14 @@ mod tests {
         let text = "### Requirement: Title\nr[lattice.example] MUST hold\n\n#### Scenario: Case\nr[lattice.example] MUST hold\n- GIVEN a state\n- WHEN an action\n- THEN a result\n";
         let diagnostics = validate_spec_text("spec.md", text);
         assert!(diagnostics.iter().any(|diagnostic| diagnostic.message == "duplicate r[...] marker identifier"));
+    }
+
+    #[test]
+    fn fenced_headings_are_ignored_and_fences_must_close() {
+        let text = "### Requirement: Title\nr[lattice.example] MUST hold\n\n#### Scenario: Case\nr[lattice.example.scenario]\n- GIVEN a state\n- WHEN an action\n- THEN a result\n\n```\n### Requirement: Not a heading\n```\n";
+        assert!(validate_spec_text("spec.md", text).is_empty());
+        let unclosed = "### Requirement: Title\nr[lattice.example] MUST hold\n\n#### Scenario: Case\nr[lattice.example.scenario]\n- GIVEN a state\n- WHEN an action\n- THEN a result\n\n```\n";
+        let diagnostics = validate_spec_text("spec.md", unclosed);
+        assert!(diagnostics.iter().any(|diagnostic| diagnostic.message == "unclosed fenced code block"));
     }
 }
