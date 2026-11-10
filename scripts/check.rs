@@ -112,6 +112,7 @@ const FORMAT_CHECK_ARGS: &[&str] = &[
     "--package",
     "lattice-workflow-transport",
 ];
+const POLICY_TYPECHECK_ARGS: &[&str] = &["typecheck", "cairn-policy/default.ncl"];
 const FOCUSED_CONSUMER_CHECK_ARGS: &[&str] = &["check", "--package", "lattice", "--all-targets", "--locked"];
 const ALL_FEATURES_CHECK_ARGS: &[&str] = &[
     "check",
@@ -292,6 +293,12 @@ const COMMAND_STEPS: &[CheckStep] = &[
         name: "format",
         program: CARGO_PROGRAM,
         args: FORMAT_CHECK_ARGS,
+        use_repo_local_target: false,
+    },
+    CheckStep {
+        name: "policy typecheck",
+        program: "nickel",
+        args: POLICY_TYPECHECK_ARGS,
         use_repo_local_target: false,
     },
     CheckStep {
