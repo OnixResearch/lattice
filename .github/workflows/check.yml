@@ -47,5 +47,6 @@ jobs:
 
       - name: Verify gates left no tracked changes
         run: |
+          git status --short
           git diff --exit-code
           test -z "$(git status --porcelain)"
