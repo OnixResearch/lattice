@@ -16,7 +16,7 @@ const GENERIC_FAILURE_EXIT_CODE: u8 = 1;
 const PROCESS_STATUS_CODE_OVERFLOW_EXIT_CODE: u8 = 255;
 const LINE_NUMBER_BASE: usize = 1;
 
-const SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "scripts/check.rs"];
+const SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "--edition", "2024", "scripts/check.rs"];
 const OPERATOR_E2E_SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "--edition", "2024", "scripts/operator-e2e.rs"];
 const INVENTORY_SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "--edition", "2024", "scripts/traceability-inventory.rs"];
 const RELEASE_INPUTS_SCRIPT_FORMAT_ARGS: &[&str] =
