@@ -221,6 +221,25 @@ fn completion_inputs_reject_malformed_identity_hashes() -> TestResult {
             .is_err(),
         "an uppercase identity was accepted"
     );
+    let uppercase_subject_observation = json!({
+        "exit_code": 0,
+        "stdout_hash": hash,
+        "stderr_hash": hash,
+        "native_binary_hash": hash,
+        "subject_hash": uppercase,
+        "policy_hash": release_inputs::json_hash(&json!({})),
+    });
+    assert!(
+        release_inputs::completion_inputs(
+            &json!({}),
+            &["cairn".into()],
+            &validation,
+            &uppercase_subject_observation,
+            &uppercase
+        )
+        .is_err(),
+        "an uppercase subject identity was accepted"
+    );
     let mismatched = json!({
         "exit_code": 0,
         "stdout_hash": hash,
