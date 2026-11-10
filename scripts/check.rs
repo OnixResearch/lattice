@@ -374,6 +374,10 @@ const COMMAND_STEPS: &[CheckStep] = &[
 ];
 
 fn main() -> ExitCode {
+    if !Path::new("Cargo.toml").is_file() {
+        eprintln!("run scripts/check.rs from the Lattice repository root");
+        return ExitCode::FAILURE;
+    }
     match run_checks(COMMAND_STEPS) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
