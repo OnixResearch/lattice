@@ -241,6 +241,9 @@
           || pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/animus/policy/" (toString path);
         isToonVendorPath =
           path: pkgs.lib.hasPrefix "${sourceRoot}/src/vendor-cargo-deps/toon-format/" (toString path);
+        isNickelCoreVendorPath =
+          path:
+          pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/nickel-lang-core-0.18.0/" (toString path);
         isRatsCompileTimeAssetPath =
           path:
           toString path == "${sourceRoot}/vendor-cargo-deps/rats/source/SOURCE"
@@ -310,6 +313,7 @@
               || isSourceFixturePath path
               || isAnimusCompileTimeAssetPath path
               || isToonVendorPath path
+              || isNickelCoreVendorPath path
               || isRatsCompileTimeAssetPath path
               || isRuntimeConfigAssetPath path
               || isCompileTimeDocPath path
@@ -1106,6 +1110,8 @@
                 test "$(nickel --version)" = 'nickel-lang-cli nickel 1.17.0 (rev 1320a98)'
                 grep -F 'f23be09e41337de8fa729274f50023f861ae0e8a' ${self}/Cargo.toml >/dev/null
                 grep -F 'nickel-lang-core = "=0.18.0"' ${self}/Cargo.toml >/dev/null
+                grep -F 'nickel-lang-core = { path = "vendor-cargo-deps/nickel-lang-core-0.18.0" }' ${self}/Cargo.toml >/dev/null
+                test -f ${self}/vendor-cargo-deps/nickel-lang-core-0.18.0/SOURCE
                 source_url=https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git
                 revision=f23be09e41337de8fa729274f50023f861ae0e8a
                 test -f ${nickel-eval}/LICENSE

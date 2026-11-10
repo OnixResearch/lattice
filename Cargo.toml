@@ -145,3 +145,6 @@ default = []
 simulation = ["dep:madsim"]
 property-testing = ["dep:bolero", "dep:bolero-generator", "dep:proptest"]
 animus-secretspec = ["dep:animus-std-secretspec"]
+
+[patch.crates-io]
+nickel-lang-core = { path = "vendor-cargo-deps/nickel-lang-core-0.18.0" }

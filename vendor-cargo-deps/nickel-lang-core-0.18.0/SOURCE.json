@@ -1,0 +1,14 @@
+{
+  "archive_blake3": "938c62064574204ba47fec59335eff48ef9e82b7b4a59284d644fe763f25dca2",
+  "archive_sha256": "692d8a2ba34c633bc37e704dc94f4ca33edaa8fbf6d08efdcadb81db333ccdb6",
+  "archive_url": "https://static.crates.io/crates/nickel-lang-core/nickel-lang-core-0.18.0.crate",
+  "license": "MIT",
+  "license_blake3": "1c515e18e4399a123ffb8c67e250cd1641dbda4754ff235dfaeb1e9e4a5a2d76",
+  "package": "nickel-lang-core",
+  "patch_blake3": "e7f9a76885dd9be1b706b4b679d8ccc8198ba5e3f915d5afd4dc2ab610b86832",
+  "schema": "nickel-eval.core-source.v1",
+  "snapshot_content_blake3": "e0e66e50b5ae0254533301b65cac8338858e8f65d440be9240efbc9bfc581536",
+  "upstream_fix_commit": "aa94d9b1f7a0981b4f0d6e8dff79f0a74ff1bb1a",
+  "upstream_fix_url": "https://github.com/nickel-lang/nickel/commit/aa94d9b1f7a0981b4f0d6e8dff79f0a74ff1bb1a",
+  "version": "0.18.0"
+}

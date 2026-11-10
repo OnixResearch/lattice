@@ -3765,8 +3765,6 @@ dependencies = [
 [[package]]
 name = "nickel-lang-core"
 version = "0.18.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "692d8a2ba34c633bc37e704dc94f4ca33edaa8fbf6d08efdcadb81db333ccdb6"
 dependencies = [
  "anstyle",
  "base64 0.22.1",

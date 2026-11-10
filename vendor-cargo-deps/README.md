@@ -8,6 +8,7 @@ These snapshots keep product builds independent of sibling checkout paths. `scri
 - `basalt/` comes from Basalt revision `b34d6ac27ad396530fb799e79223acf71112ee0f`.
 - `hardened-wasmtime-runtime/` comes from shared runtime revision `1d642fa5cba7ce8a6d8f127f28ec6d8505842378`.
 - `mantle/` comes from Mantle revision `dcf4b51b3210f25f08e96d4e7bc1653d2fbcd240`.
+- `nickel-lang-core-0.18.0/` is a byte-exact snapshot of the producer repair at nickel-eval revision `b4ddff052105eb4b75827e228a65b823dc1a0444` (tag `nickel-eval-import-closurization-20261016`), selected by the root `[patch.crates-io]` entry. Refresh it with the producer's `scripts/import-nickel-core.py` from that revision.
 
 The snapshots preserve source provenance. They do not transfer correctness claims.
 

@@ -1,0 +1,9 @@
+repository=https://rosa.radicle.network/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git
+revision=b4ddff052105eb4b75827e228a65b823dc1a0444
+tag=nickel-eval-import-closurization-20261016
+path=vendor/nickel-lang-core-0.18.0
+package=nickel-lang-core
+version=0.18.0
+license=MIT
+upstream_fix=https://github.com/nickel-lang/nickel/commit/aa94d9b1f7a0981b4f0d6e8dff79f0a74ff1bb1a
+note=Byte-exact producer snapshot. Refresh with scripts/import-nickel-core.py from the producer revision; do not edit imported files.

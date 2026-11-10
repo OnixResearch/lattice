@@ -56,35 +56,23 @@ external CLI's observed value. These local producer checks do not replace
 immutable publication, exact consumer dependency admission, or Lattice's final
 native profile smoke.
 
-### Current admission state
+### Admitted import repair
 
-The dependency pin above still selects the unpatched producer object, so
-`cargo test --lib nickel::tests::imported_json_merge` fails at the core `0.18.0`
-fixpoint assertion. That failure is the open admission blocker, not a reason to
-reconstruct profile fields, remove the assertion, intercept the panic, or call
-an external evaluator. Correcting it requires the prepared producer repair to be
-published at an immutable revision and selected from both Cargo and Nix.
+Lattice vendors the exact producer repair at
+`vendor-cargo-deps/nickel-lang-core-0.18.0` and selects it with a root
+`[patch.crates-io]` entry. The snapshot is byte-exact from nickel-eval revision
+`b4ddff052105eb4b75827e228a65b823dc1a0444` (tag
+`nickel-eval-import-closurization-20261016`) and retains the producer's
+`SOURCE.json` archive, patch, license, and snapshot identities plus a Lattice
+`SOURCE` provenance file. Refresh it with the producer's
+`scripts/import-nickel-core.py`; do not edit imported files.
 
-The prepared repair is published on `rosa.radicle.network` as commit
-`b4ddff052105eb4b75827e228a65b823dc1a0444` and tag
-`nickel-eval-import-closurization-20261016`. Cargo's Radicle Git fetch maps only
-the producer's top-level `main` refs, so that revision cannot yet be selected
-from a standard dependency or root patch. Admission still requires the producer
-`main` update (or an equivalent published core source) before this pin can move.
-
-Merging the repair onto the current producer `main` is not mechanically safe:
-the newer evaluator classifies the invalid imported-contract fixture as
-`Evaluation` rather than `ContractViolation`, and its dependency selection does
-not compile the retained core `0.18.0` snapshot. A producer-main admission
-therefore needs a dedicated rebase against the current dependency cohort, not a
-mechanical merge. This is producer work, not a reason to change Lattice's
-expected failure category.
-
-A local path patch of the published repair against Lattice's current lock was
-verified to compile and pass all three imported-merge regressions. Admission
-still requires choosing a repository-owned vendored snapshot or an equivalent
-producer publication; the verification does not justify an uncommitted local
-path dependency.
+The retained core remains `0.18.0`, the evaluator cohort remains Nickel CLI
+`1.17.0` / `nickel-lang 2.2.0`, and the native imported-merge regressions pass.
+This is a consumer-owned byte-exact import, not an independently edited fork.
+Merging the repair onto producer `main` remains unsafe because the newer
+evaluator classifies the invalid-contract fixture as `Evaluation` and does not
+compile the retained core snapshot; Lattice no longer depends on that merge.
 
 Native adapter regression command:
 
