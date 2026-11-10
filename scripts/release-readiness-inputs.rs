@@ -51,18 +51,6 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     }
     let native = fs::canonicalize(&args[0])?;
     let root = std::env::current_dir()?.canonicalize()?;
-    let policy_path = root.join("cairn-policy/generated/cairn-policy.json");
-    let policy_bytes = read_bounded(&policy_path)?;
-    let policy: Value = serde_json::from_slice(&policy_bytes)?;
-    let selected = &policy["release_readiness_policy"];
-    if selected["mcp_completion_contract"] != core::CONTRACT_PATH
-        || selected["mcp_completion_results"] != core::RESULTS_PATH
-    {
-        return Err(
-            "selected release policy must declare the maintained target/release-readiness MCP observation outputs"
-                .into(),
-        );
-    }
     let output = root.join(core::OUTPUT_ROOT);
     fs::create_dir_all(&output)?;
     if !output.canonicalize()?.starts_with(&root) {
@@ -83,6 +71,18 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(error) => return Err(error.into()),
         }
+    }
+    let policy_path = root.join("cairn-policy/generated/cairn-policy.json");
+    let policy_bytes = read_bounded(&policy_path)?;
+    let policy: Value = serde_json::from_slice(&policy_bytes)?;
+    let selected = &policy["release_readiness_policy"];
+    if selected["mcp_completion_contract"] != core::CONTRACT_PATH
+        || selected["mcp_completion_results"] != core::RESULTS_PATH
+    {
+        return Err(
+            "selected release policy must declare the maintained target/release-readiness MCP observation outputs"
+                .into(),
+        );
     }
     let subject = source_manifest(&root)?;
     let subject_hash = core::json_hash(&subject);
