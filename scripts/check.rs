@@ -565,6 +565,7 @@ fn validate_spec_text_with_seen(path: &str, text: &str, marker_ids: &mut BTreeSe
         return diagnostics;
     }
     let mut fence_start = None;
+    let mut saw_requirement = false;
 
     for (line_index, line) in lines.iter().enumerate() {
         let trimmed = line.trim();
@@ -586,6 +587,7 @@ fn validate_spec_text_with_seen(path: &str, text: &str, marker_ids: &mut BTreeSe
             }
         }
         if let Some(title) = trimmed.strip_prefix("### Requirement:") {
+            saw_requirement = true;
             if title.trim().is_empty() {
                 diagnostics.push(diagnostic(path, line_index, "requirement heading must include a title"));
             }
@@ -600,6 +602,9 @@ fn validate_spec_text_with_seen(path: &str, text: &str, marker_ids: &mut BTreeSe
     }
     if let Some(start) = fence_start {
         diagnostics.push(diagnostic(path, start, "unclosed fenced code block"));
+    }
+    if !saw_requirement {
+        diagnostics.push(diagnostic(path, 0, "spec file must contain at least one requirement"));
     }
 
     diagnostics
@@ -798,6 +803,16 @@ mod tests {
     fn empty_specs_are_rejected() {
         let diagnostics = validate_spec_text("spec.md", " \n\t\n");
         assert!(diagnostics.iter().any(|diagnostic| diagnostic.message == "spec file must not be empty"));
+    }
+
+    #[test]
+    fn specs_without_requirements_are_rejected() {
+        let diagnostics = validate_spec_text("spec.md", "# Title\n\n## Purpose\n\nNo requirements yet.\n");
+        assert!(
+            diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.message == "spec file must contain at least one requirement")
+        );
     }
 
     #[test]
