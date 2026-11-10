@@ -243,6 +243,10 @@ rejects new finding IDs outside the reviewed baseline. The Nix command disables
 host signing keys only for that check invocation; it does not change normal
 package or release signing policy.
 
+Integration tests that invoke Cairn use `LATTICE_CAIRN_BIN`; the development
+shell sets it to the pinned native binary. Running `cargo test` outside the
+development shell can instead pick up an unrelated `cairn` from `PATH`.
+
 Accepted requirements and active changes live in [`.cairn/`](.cairn/). Keep
 implementation, examples, and their evidence aligned; generated inventories and
 model output are not completion authority. Imported snapshots must be refreshed
