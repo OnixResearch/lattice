@@ -572,6 +572,8 @@ fn validate_spec_text_with_seen(path: &str, text: &str, marker_ids: &mut BTreeSe
     let mut fence_start = None;
     let mut saw_requirement = false;
     let mut saw_purpose_section = false;
+    let mut purpose_has_content = false;
+    let mut in_purpose = false;
     let mut saw_requirements_section = false;
 
     for (line_index, line) in lines.iter().enumerate() {
@@ -585,6 +587,14 @@ fn validate_spec_text_with_seen(path: &str, text: &str, marker_ids: &mut BTreeSe
         }
         if trimmed == "## Purpose" {
             saw_purpose_section = true;
+            in_purpose = true;
+            continue;
+        }
+        if in_purpose && trimmed.starts_with("## ") {
+            in_purpose = false;
+        }
+        if in_purpose && !trimmed.is_empty() {
+            purpose_has_content = true;
         }
         if trimmed == "## Requirements" {
             saw_requirements_section = true;
@@ -624,6 +634,9 @@ fn validate_spec_text_with_seen(path: &str, text: &str, marker_ids: &mut BTreeSe
     }
     if !saw_purpose_section {
         diagnostics.push(diagnostic(path, 0, "spec file must include a Purpose section"));
+    }
+    if saw_purpose_section && !purpose_has_content {
+        diagnostics.push(diagnostic(path, 0, "Purpose section must not be empty"));
     }
 
     diagnostics
@@ -814,7 +827,7 @@ mod tests {
                 .iter()
                 .any(|diagnostic| diagnostic.message == "requirement must include at least one scenario")
         );
-        let complete = "# Title\n\n## Purpose\n\n## Requirements\n\n### Requirement: Title\nr[lattice.example] MUST hold\n\n#### Scenario: Case\nr[lattice.example.scenario]\n- GIVEN a state\n- WHEN an action\n- THEN a result\n";
+        let complete = "# Title\n\n## Purpose\n\nTest purpose.\n\n## Requirements\n\n### Requirement: Title\nr[lattice.example] MUST hold\n\n#### Scenario: Case\nr[lattice.example.scenario]\n- GIVEN a state\n- WHEN an action\n- THEN a result\n";
         assert!(validate_spec_text("spec.md", complete).is_empty());
     }
 
@@ -864,6 +877,13 @@ mod tests {
     }
 
     #[test]
+    fn empty_purpose_sections_are_rejected() {
+        let text = "# Title\n\n## Purpose\n\n## Requirements\n\n### Requirement: Title\nr[lattice.example] MUST hold\n\n#### Scenario: Case\nr[lattice.example.scenario]\n- GIVEN a state\n- WHEN an action\n- THEN a result\n";
+        let diagnostics = validate_spec_text("spec.md", text);
+        assert!(diagnostics.iter().any(|diagnostic| diagnostic.message == "Purpose section must not be empty"));
+    }
+
+    #[test]
     fn duplicate_markers_are_rejected() {
         let text = "### Requirement: Title\nr[lattice.example] MUST hold\n\n#### Scenario: Case\nr[lattice.example] MUST hold\n- GIVEN a state\n- WHEN an action\n- THEN a result\n";
         let diagnostics = validate_spec_text("spec.md", text);
@@ -879,7 +899,7 @@ mod tests {
 
     #[test]
     fn fenced_headings_are_ignored_and_fences_must_close() {
-        let text = "# Title\n\n## Purpose\n\n## Requirements\n\n### Requirement: Title\nr[lattice.example] MUST hold\n\n#### Scenario: Case\nr[lattice.example.scenario]\n- GIVEN a state\n- WHEN an action\n- THEN a result\n\n```\n### Requirement: Not a heading\n```\n";
+        let text = "# Title\n\n## Purpose\n\nTest purpose.\n\n## Requirements\n\n### Requirement: Title\nr[lattice.example] MUST hold\n\n#### Scenario: Case\nr[lattice.example.scenario]\n- GIVEN a state\n- WHEN an action\n- THEN a result\n\n```\n### Requirement: Not a heading\n```\n";
         assert!(validate_spec_text("spec.md", text).is_empty());
         let unclosed = "### Requirement: Title\nr[lattice.example] MUST hold\n\n#### Scenario: Case\nr[lattice.example.scenario]\n- GIVEN a state\n- WHEN an action\n- THEN a result\n\n```\n";
         let diagnostics = validate_spec_text("spec.md", unclosed);
@@ -913,13 +933,13 @@ mod tests {
         let mut seen = BTreeSet::new();
         let first = validate_spec_text_with_seen(
             "a.md",
-            "# Title A\n\n## Purpose\n\n## Requirements\n\n### Requirement: A\nr[lattice.example] MUST hold\n\n#### Scenario: A\nr[lattice.example.scenario]\n- GIVEN a state\n- WHEN an action\n- THEN a result\n",
+            "# Title A\n\n## Purpose\n\nPurpose A.\n\n## Requirements\n\n### Requirement: A\nr[lattice.example] MUST hold\n\n#### Scenario: A\nr[lattice.example.scenario]\n- GIVEN a state\n- WHEN an action\n- THEN a result\n",
             &mut seen,
         );
         assert!(first.is_empty());
         let second = validate_spec_text_with_seen(
             "b.md",
-            "# Title B\n\n## Purpose\n\n## Requirements\n\n### Requirement: B\nr[lattice.example] MUST hold\n\n#### Scenario: B\nr[lattice.example.other]\n- GIVEN a state\n- WHEN an action\n- THEN a result\n",
+            "# Title B\n\n## Purpose\n\nPurpose B.\n\n## Requirements\n\n### Requirement: B\nr[lattice.example] MUST hold\n\n#### Scenario: B\nr[lattice.example.other]\n- GIVEN a state\n- WHEN an action\n- THEN a result\n",
             &mut seen,
         );
         assert!(second.iter().any(|diagnostic| diagnostic.message == "duplicate r[...] marker identifier"));
