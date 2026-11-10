@@ -99,8 +99,8 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
         .spawn()?;
     let stdout = child.stdout.take().ok_or("native stdout is unavailable")?;
     let stderr = child.stderr.take().ok_or("native stderr is unavailable")?;
-    let stdout_reader = std::thread::spawn(move || read_stream(stdout));
-    let stderr_reader = std::thread::spawn(move || read_stream(stderr));
+    let stdout_reader = std::thread::spawn(move || read_stream(stdout, "native stdout"));
+    let stderr_reader = std::thread::spawn(move || read_stream(stderr, "native stderr"));
     let status = child.wait()?;
     let stdout = stdout_reader.join().map_err(|_| "native stdout reader failed")??;
     let stderr = stderr_reader.join().map_err(|_| "native stderr reader failed")??;
@@ -143,18 +143,19 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     Ok(inputs.passed)
 }
 
-fn read_stream(reader: impl Read) -> std::io::Result<Vec<u8>> {
+fn read_stream(reader: impl Read, label: &str) -> std::io::Result<Vec<u8>> {
     let mut bytes = Vec::new();
     reader.take(MAX_STREAM_BYTES + 1).read_to_end(&mut bytes)?;
     if bytes.len() as u64 > MAX_STREAM_BYTES {
-        return Err(std::io::Error::other("stream exceeds the 16 MiB observation bound"));
+        return Err(std::io::Error::other(format!("{label} exceeds the 16 MiB observation bound")));
     }
     Ok(bytes)
 }
 
 fn read_bounded(path: &Path) -> std::io::Result<Vec<u8>> {
     let mut file = fs::File::open(path)?;
-    read_stream(&mut file).map_err(|error| std::io::Error::new(error.kind(), format!("{}: {error}", path.display())))
+    read_stream(&mut file, "file")
+        .map_err(|error| std::io::Error::new(error.kind(), format!("{}: {error}", path.display())))
 }
 
 fn file_hash(path: &Path) -> std::io::Result<String> {
