@@ -137,7 +137,9 @@ fn write_output(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 fn source_manifest(root: &Path) -> Result<Value, Box<dyn std::error::Error>> {
     let mut pending = ["src", "crates", "tests", "scripts", "examples", "docs", ".cairn", "cairn-policy",
         "builtins", "contracts", "vendor-cargo-deps", "fixtures/release-readiness", "Cargo.toml",
-        "Cargo.lock", "flake.nix", "flake.lock", "README.md"]
+        "Cargo.lock", "flake.nix", "flake.lock", "README.md", "rust-toolchain.toml",
+        ".cargo/config.toml", "clippy.toml", "dylint.toml", "rustfmt.toml", "octet-baseline.json",
+        ".pre-commit-config.yaml", ".config/nextest.toml"]
         .into_iter().map(PathBuf::from).collect::<Vec<_>>();
     let mut files = std::collections::BTreeMap::new();
     while let Some(relative) = pending.pop() {
