@@ -69,6 +69,11 @@ pub fn completion_inputs(
     let evidence_hash = observation["stdout_hash"].as_str().ok_or("native stdout identity is absent")?;
     let stderr_hash = observation["stderr_hash"].as_str().ok_or("native stderr identity is absent")?;
     let native_hash = observation["native_binary_hash"].as_str().ok_or("native executable identity is absent")?;
+    let observed_subject =
+        observation["subject_hash"].as_str().ok_or("native observation subject identity is absent")?;
+    if observed_subject != subject_hash {
+        return Err("native observation subject identity does not match the source manifest".to_string());
+    }
     for hash in [subject_hash, evidence_hash, stderr_hash, native_hash] {
         if hash.len() != 64 || !hash.bytes().all(|byte| byte.is_ascii_hexdigit()) {
             return Err("observed identities must be BLAKE3 hex digests".to_string());
