@@ -264,6 +264,23 @@ fn manifest_bounds_reject_oversized_manifests() {
 }
 
 #[test]
+fn manifest_path_keys_preserve_exact_utf8_paths_and_reject_non_utf8() {
+    assert_eq!(
+        release_inputs::manifest_path_key(std::path::Path::new("cairn-policy/default.ncl")).expect("UTF-8 path"),
+        "cairn-policy/default.ncl"
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        let path = std::path::Path::new(std::ffi::OsStr::from_bytes(b"cairn-policy/\xff"));
+        assert!(
+            release_inputs::manifest_path_key(path).is_err(),
+            "a non-UTF-8 path must not be lossily collapsed into the manifest"
+        );
+    }
+}
+
+#[test]
 fn completion_inputs_reject_malformed_identity_hashes() -> TestResult {
     let hash = release_inputs::json_hash(&json!("observed-test-bytes"));
     let validation = json!({"isError": false, "structuredContent": {"valid": true, "mcp": {"read_only": true}}});

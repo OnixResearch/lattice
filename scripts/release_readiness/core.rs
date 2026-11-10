@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use serde_json::Value;
 use serde_json::json;
 
@@ -27,6 +29,12 @@ pub fn check_manifest_bounds(file_count: usize, total_bytes: u64) -> Result<(), 
         return Err(format!("release source manifest has {total_bytes} bytes; limit {MAX_MANIFEST_BYTES}"));
     }
     Ok(())
+}
+
+pub fn manifest_path_key(path: &Path) -> Result<String, String> {
+    path.to_str()
+        .map(str::to_owned)
+        .ok_or_else(|| format!("release source manifest rejects non-UTF-8 path: {}", path.display()))
 }
 
 #[derive(Debug)]

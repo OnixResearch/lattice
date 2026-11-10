@@ -248,8 +248,10 @@ fn source_manifest(root: &Path) -> Result<Value, Box<dyn std::error::Error>> {
             let bytes = read_bounded(&path)?;
             total_bytes =
                 total_bytes.checked_add(bytes.len() as u64).ok_or("release source manifest byte count overflow")?;
+            let key = core::manifest_path_key(&relative)
+                .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))?;
             let digest = blake3::hash(&bytes).to_hex().to_string();
-            files.insert(relative.to_string_lossy().into_owned(), digest);
+            files.insert(key, digest);
             core::check_manifest_bounds(files.len(), total_bytes)?;
         } else {
             return Err(format!("release source manifest rejects special file {}", relative.display()).into());
