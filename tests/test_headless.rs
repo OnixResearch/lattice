@@ -36,6 +36,7 @@ use lattice::engine::workflow::Workflow;
 use lattice::headless::HeadlessProcessResult;
 use lattice::headless::HeadlessRunError;
 use lattice::headless::HeadlessRunStatus;
+use lattice::headless::HeadlessRunSummary;
 use lattice::headless::process_result_for_summary;
 use lattice::headless::render_run_summary_text;
 use lattice::headless::run_saved_workflow;
@@ -713,6 +714,24 @@ fn summary_counts_skipped_dependents_as_recorded_steps() {
     assert_eq!(summary.completed, 0);
     assert_eq!(summary.failures, 1);
     assert_eq!(summary.status, HeadlessRunStatus::Failed);
+}
+
+#[test]
+fn text_summary_labels_recorded_results() {
+    let summary = HeadlessRunSummary {
+        run_id: RunId(7),
+        workflow_name: "summary".to_string(),
+        status: HeadlessRunStatus::Failed,
+        node_count: 3,
+        steps_run: 3,
+        completed: 0,
+        failures: 1,
+        cache_hits: 0,
+    };
+    assert_eq!(
+        render_run_summary_text(&summary),
+        "run:7 | failed | 3 nodes | 3 results | 1 failures | 0 cache hits"
+    );
 }
 
 // r[verify n8nclone.workflow_execution.headless.errors.load_failure]
