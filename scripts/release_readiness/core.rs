@@ -29,6 +29,7 @@ pub fn check_manifest_bounds(file_count: usize, total_bytes: u64) -> Result<(), 
     Ok(())
 }
 
+#[derive(Debug)]
 pub struct CompletionInputs {
     pub contract: Value,
     pub results: Value,
