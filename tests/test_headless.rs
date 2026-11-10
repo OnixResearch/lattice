@@ -734,6 +734,22 @@ fn text_summary_labels_recorded_results() {
     );
 }
 
+#[test]
+fn suspended_summary_is_not_a_process_failure() {
+    let summary = HeadlessRunSummary {
+        run_id: RunId(8),
+        workflow_name: "approval".to_string(),
+        status: HeadlessRunStatus::Suspended,
+        node_count: 1,
+        steps_run: 1,
+        completed: 0,
+        failures: 0,
+        cache_hits: 0,
+    };
+    assert_eq!(process_result_for_summary(&summary), HeadlessProcessResult::Success);
+    assert!(render_run_summary_text(&summary).contains("suspended"));
+}
+
 // r[verify n8nclone.workflow_execution.headless.errors.load_failure]
 // r[verify n8nclone.workflow_execution.headless.run.missing]
 // r[verify n8nclone.workflow_execution.headless.errors]
