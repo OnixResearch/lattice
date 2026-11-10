@@ -153,11 +153,17 @@ impl<V> Memoizer<V> {
                 accesses_since_promotion: 0,
             });
 
-            let order = eviction_order(&guard, self.config.promotion_threshold)?;
+            let active_entries = usize_to_u64(guard.entries.len())?;
+            let high_watermark_entries = usize_to_u64(self.config.high_watermark_entries)?;
+            let order = if active_entries > high_watermark_entries {
+                eviction_order(&guard, self.config.promotion_threshold)?
+            } else {
+                Vec::new()
+            };
             let trim = super::core::watermark_trim_plan(super::core::WatermarkInput {
-                active_entries: usize_to_u64(guard.entries.len())?,
+                active_entries,
                 low_watermark_entries: usize_to_u64(self.config.low_watermark_entries)?,
-                high_watermark_entries: usize_to_u64(self.config.high_watermark_entries)?,
+                high_watermark_entries,
                 eviction_order: &order,
             })?;
             for evicted_key in trim.evict {
