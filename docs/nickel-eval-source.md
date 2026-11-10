@@ -74,9 +74,11 @@ from a standard dependency or root patch. Admission still requires the producer
 
 Merging the repair onto the current producer `main` is not mechanically safe:
 the newer evaluator classifies the invalid imported-contract fixture as
-`Evaluation` rather than `ContractViolation`, so the producer's own regression
-fails until that behavior is reconciled. This is producer work, not a reason to
-change Lattice's expected failure category.
+`Evaluation` rather than `ContractViolation`, and its dependency selection does
+not compile the retained core `0.18.0` snapshot. A producer-main admission
+therefore needs a dedicated rebase against the current dependency cohort, not a
+mechanical merge. This is producer work, not a reason to change Lattice's
+expected failure category.
 
 Native adapter regression command:
 
