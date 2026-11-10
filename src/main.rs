@@ -458,7 +458,6 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
     }
 
     let app_config = config::load_app_config(&config_path)?;
-    setup_logging(args.verbose, &app_config.data_dir);
 
     if let Some(CliCommand::Runs(runs_args)) = &args.command {
         return Ok(run_runs_command(&app_config, runs_args));
@@ -479,6 +478,7 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
     if let Err(e) = std::fs::create_dir_all(&app_config.data_dir) {
         tracing::warn!(error = %e, "failed to create data dir");
     }
+    setup_logging(args.verbose, &app_config.data_dir);
 
     info!(config = ?config_path, data_dir = ?app_config.data_dir, "starting lattice");
 
