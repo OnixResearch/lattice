@@ -60,9 +60,16 @@ fn validate_source_closure(closure: &SourceClosure<'_>) -> Result<(), String> {
     if !closure.manual_tests.contains("pub(super) mod assertions;") {
         return Err("Rats manual tests no longer reference the assertions module".to_string());
     }
-    if !closure.check_script.contains(
-        "const FOCUSED_CONSUMER_CHECK_ARGS: &[&str] = &[\"check\", \"--package\", \"lattice\", \"--all-targets\"];",
-    ) {
+    let focused_args = closure
+        .check_script
+        .split("const FOCUSED_CONSUMER_CHECK_ARGS")
+        .nth(1)
+        .and_then(|tail| tail.split(';').next())
+        .unwrap_or_default();
+    if !["\"check\"", "\"--package\"", "\"lattice\"", "\"--all-targets\""]
+        .iter()
+        .all(|token| focused_args.contains(token))
+    {
         return Err("focused Lattice consumer compile rail is missing".to_string());
     }
     let exact_source_asset = "${sourceRoot}/vendor-cargo-deps/rats/source/SOURCE";
@@ -158,8 +165,7 @@ fn rats_source_closure_rejects_revision_missing_module_snapshot_and_compile_drif
     let complete_sync = format!(
         "const EXPECTED_REVISION: &str = \"{EXPECTED_RATS_REVISION}\"; verify_source_head(&source_root)?; [\"rev-parse\", \"HEAD\"]"
     );
-    let complete_check =
-        "const FOCUSED_CONSUMER_CHECK_ARGS: &[&str] = &[\"check\", \"--package\", \"lattice\", \"--all-targets\"];";
+    let complete_check = "const FOCUSED_CONSUMER_CHECK_ARGS: &[&str] = &[\"check\", \"--package\", \"lattice\", \"--all-targets\", \"--locked\"];";
     let complete_flake = format!(
         "${{sourceRoot}}/vendor-cargo-deps/rats/source/SOURCE ${{sourceRoot}}/vendor-cargo-deps/rats/source/{RATCORE_GENERATED_ROOT}/ ${{sourceRoot}}/vendor-cargo-deps/rats/source/{GENERATED_DOCS_ROOT}/ ${{sourceRoot}}/vendor-cargo-deps/rats/source/{METEORITE_GENERATED_ROOT}/ ${{sourceRoot}}/vendor-cargo-deps/rats/source/{THEME_ROOT}/ isRatsCompileTimeAssetPath path"
     );
