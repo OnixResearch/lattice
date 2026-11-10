@@ -129,6 +129,7 @@ const CLIPPY_ARGS: &[&str] = &[
     "--workspace",
     "--exclude",
     "lattice-repository-validation-fixture",
+    "--all-features",
     "--all-targets",
     "--no-deps",
     "--locked",
