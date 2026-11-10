@@ -19,6 +19,8 @@ const LINE_NUMBER_BASE: usize = 1;
 const SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "scripts/check.rs"];
 const OPERATOR_E2E_SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "--edition", "2024", "scripts/operator-e2e.rs"];
 const INVENTORY_SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "--edition", "2024", "scripts/traceability-inventory.rs"];
+const RELEASE_INPUTS_SCRIPT_FORMAT_ARGS: &[&str] =
+    &["--check", "--edition", "2024", "scripts/release-readiness-inputs.rs"];
 const OCTET_MIGRATION_FORMAT_ARGS: &[&str] = &[
     "--check",
     "--edition",
@@ -212,6 +214,12 @@ const COMMAND_STEPS: &[CheckStep] = &[
         name: "orchestration identity script format",
         program: RUSTFMT_PROGRAM,
         args: ORCHESTRATION_IDENTITY_SCRIPT_FORMAT_ARGS,
+        use_repo_local_target: false,
+    },
+    CheckStep {
+        name: "release inputs script format",
+        program: RUSTFMT_PROGRAM,
+        args: RELEASE_INPUTS_SCRIPT_FORMAT_ARGS,
         use_repo_local_target: false,
     },
     CheckStep {

@@ -13,11 +13,16 @@ serde_json = "1.0.149"
 #[path = "release_readiness/core.rs"]
 mod core;
 
-use serde_json::{Value, json};
 use std::fs;
 use std::io::Read;
-use std::path::{Path, PathBuf};
-use std::process::{Command, ExitCode, Stdio};
+use std::path::Path;
+use std::path::PathBuf;
+use std::process::Command;
+use std::process::ExitCode;
+use std::process::Stdio;
+
+use serde_json::Value;
+use serde_json::json;
 
 const MAX_BYTES: u64 = 16 * 1024 * 1024;
 const OUTPUT: &str = "target/release-readiness";
@@ -26,7 +31,13 @@ const RESULTS: &str = "target/release-readiness/mcp-results.json";
 
 fn main() -> ExitCode {
     match run() {
-        Ok(passed) => if passed { ExitCode::SUCCESS } else { ExitCode::FAILURE },
+        Ok(passed) => {
+            if passed {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::FAILURE
+            }
+        }
         Err(error) => {
             eprintln!("release input observation failed: {error}");
             ExitCode::FAILURE
@@ -47,7 +58,10 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     let policy: Value = serde_json::from_slice(&policy_bytes)?;
     let selected = &policy["release_readiness_policy"];
     if selected["mcp_completion_contract"] != CONTRACT || selected["mcp_completion_results"] != RESULTS {
-        return Err("selected release policy must declare the maintained target/release-readiness MCP observation outputs".into());
+        return Err(
+            "selected release policy must declare the maintained target/release-readiness MCP observation outputs"
+                .into(),
+        );
     }
     let output = root.join(OUTPUT);
     fs::create_dir_all(&output)?;
@@ -69,11 +83,22 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     std::io::copy(&mut fs::File::open(&native)?, &mut native_hasher)?;
     let native_binary_hash = native_hasher.finalize().to_hex().to_string();
     let request = json!({"root": root, "policy": policy_path});
-    let command = vec![native.to_str().ok_or("native path is not UTF-8")?.to_string(),
-        "mcp".to_string(), "--call".to_string(), "cairn_validate".to_string(), request.to_string()];
-    let mut child = Command::new("timeout").arg("60s").args(&command)
-        .current_dir(&root).env_remove("CAIRN_GLOBAL_REGISTRY")
-        .stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn()?;
+    let command = vec![
+        native.to_str().ok_or("native path is not UTF-8")?.to_string(),
+        "mcp".to_string(),
+        "--call".to_string(),
+        "cairn_validate".to_string(),
+        request.to_string(),
+    ];
+    let mut child = Command::new("timeout")
+        .arg("60s")
+        .args(&command)
+        .current_dir(&root)
+        .env_remove("CAIRN_GLOBAL_REGISTRY")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
     let stdout = child.stdout.take().ok_or("native stdout is unavailable")?;
     let stderr = child.stderr.take().ok_or("native stderr is unavailable")?;
     let stdout_reader = std::thread::spawn(move || read_stream(stdout));
@@ -102,9 +127,12 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     write_json(&output.join("observation.json"), &observation)?;
     write_json(&root.join(CONTRACT), &inputs.contract)?;
     write_json(&root.join(RESULTS), &inputs.results)?;
-    println!("{}", json!({"command": "lattice release MCP input observation", "passed": inputs.passed,
+    println!(
+        "{}",
+        json!({"command": "lattice release MCP input observation", "passed": inputs.passed,
         "subject_hash": subject_hash, "policy_hash": core::json_hash(&policy),
-        "observation_hash": core::json_hash(&observation), "contract": CONTRACT, "results": RESULTS}));
+        "observation_hash": core::json_hash(&observation), "contract": CONTRACT, "results": RESULTS})
+    );
     Ok(inputs.passed)
 }
 
@@ -135,13 +163,42 @@ fn write_output(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 }
 
 fn source_manifest(root: &Path) -> Result<Value, Box<dyn std::error::Error>> {
-    let mut pending = ["src", "crates", "tests", "scripts", "examples", "docs", ".cairn", "cairn-policy",
-        "builtins", "contracts", "evidence", "policy", "profiles", "verus", "vendor-cargo-deps",
-        "fixtures/release-readiness", "Cargo.toml", "Cargo.lock", "flake.nix", "flake.lock", "LICENSE",
-        "README.md", "rust-toolchain.toml",
-        ".cargo/config.toml", "clippy.toml", "dylint.toml", "rustfmt.toml", "octet-baseline.json",
-        ".pre-commit-config.yaml", ".config/nextest.toml", ".github/workflows/check.yml"]
-        .into_iter().map(PathBuf::from).collect::<Vec<_>>();
+    let mut pending = [
+        "src",
+        "crates",
+        "tests",
+        "scripts",
+        "examples",
+        "docs",
+        ".cairn",
+        "cairn-policy",
+        "builtins",
+        "contracts",
+        "evidence",
+        "policy",
+        "profiles",
+        "verus",
+        "vendor-cargo-deps",
+        "fixtures/release-readiness",
+        "Cargo.toml",
+        "Cargo.lock",
+        "flake.nix",
+        "flake.lock",
+        "LICENSE",
+        "README.md",
+        "rust-toolchain.toml",
+        ".cargo/config.toml",
+        "clippy.toml",
+        "dylint.toml",
+        "rustfmt.toml",
+        "octet-baseline.json",
+        ".pre-commit-config.yaml",
+        ".config/nextest.toml",
+        ".github/workflows/check.yml",
+    ]
+    .into_iter()
+    .map(PathBuf::from)
+    .collect::<Vec<_>>();
     let mut files = std::collections::BTreeMap::new();
     while let Some(relative) = pending.pop() {
         let path = root.join(&relative);
