@@ -19,9 +19,12 @@ use lattice::config::render_template_command;
 use lattice::engine::effect::authority;
 use lattice::engine::effect::dispatch;
 use lattice::engine::effect::execution;
+use lattice::engine::executor::NodeStatus;
 use lattice::engine::executor::RunId;
+use lattice::engine::executor::StepResult;
 use lattice::engine::executor::node_execution_cache_key;
 use lattice::engine::runner::RunnerEventKind;
+use lattice::engine::value::ContentHash;
 use lattice::engine::value::TypeTag;
 use lattice::engine::value::Value;
 use lattice::engine::value::ValueData;
@@ -38,6 +41,7 @@ use lattice::headless::render_run_summary_text;
 use lattice::headless::run_saved_workflow;
 use lattice::headless::run_saved_workflow_with_agent_runtime_config_and_authority_provider;
 use lattice::headless::run_saved_workflow_with_authority_provider;
+use lattice::headless::summarize_run;
 use lattice::store::RunNodeDetailStatus;
 use lattice::store::Store;
 
@@ -676,6 +680,39 @@ fn cli_run_saved_workflow_emits_json_summary() {
     assert_eq!(summary.workflow_name, SUCCESS_WORKFLOW_NAME);
     assert_eq!(summary.status, HeadlessRunStatus::Failed);
     assert_eq!(summary.failures, ONE_FAILURE);
+}
+
+#[test]
+fn summary_counts_skipped_dependents_as_recorded_steps() {
+    let mut workflow = Workflow::new("summary", lattice::engine::workflow::WorkflowTimestamp::epoch());
+    let first = workflow.add_shell_node("first", "true");
+    let second = workflow.add_shell_node("second", "true");
+    let third = workflow.add_shell_node("third", "true");
+    let hash = ContentHash([0; 32]);
+    let results = vec![
+        StepResult {
+            node_id: first,
+            status: NodeStatus::Failed {
+                error: "denied".to_string(),
+            },
+            input_hash: hash,
+        },
+        StepResult {
+            node_id: second,
+            status: NodeStatus::Skipped,
+            input_hash: hash,
+        },
+        StepResult {
+            node_id: third,
+            status: NodeStatus::Skipped,
+            input_hash: hash,
+        },
+    ];
+    let summary = summarize_run(RunId(1), &workflow, &results);
+    assert_eq!(summary.steps_run, 3);
+    assert_eq!(summary.completed, 0);
+    assert_eq!(summary.failures, 1);
+    assert_eq!(summary.status, HeadlessRunStatus::Failed);
 }
 
 // r[verify n8nclone.workflow_execution.headless.errors.load_failure]
