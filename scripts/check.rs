@@ -510,10 +510,16 @@ fn validate_spec_text(path: &str, text: &str) -> Vec<SpecDiagnostic> {
 
     for (line_index, line) in lines.iter().enumerate() {
         let trimmed = line.trim();
-        if trimmed.starts_with("### Requirement:") {
+        if let Some(title) = trimmed.strip_prefix("### Requirement:") {
+            if title.trim().is_empty() {
+                diagnostics.push(diagnostic(path, line_index, "requirement heading must include a title"));
+            }
             validate_requirement(path, &lines, line_index, &mut diagnostics);
         }
-        if trimmed.starts_with("#### Scenario:") {
+        if let Some(title) = trimmed.strip_prefix("#### Scenario:") {
+            if title.trim().is_empty() {
+                diagnostics.push(diagnostic(path, line_index, "scenario heading must include a title"));
+            }
             validate_scenario(path, &lines, line_index, &mut diagnostics);
         }
     }
@@ -528,7 +534,7 @@ fn is_marker(line: &str) -> bool {
     let Some((id, _)) = rest.split_once(']') else {
         return false;
     };
-    !id.is_empty() && !id.contains('[')
+    !id.is_empty() && !id.contains('[') && !id.chars().any(char::is_whitespace)
 }
 
 fn validate_requirement(path: &str, lines: &[&str], heading_index: usize, diagnostics: &mut Vec<SpecDiagnostic>) {
@@ -623,6 +629,7 @@ fn status_exit_code(code: Option<i32>) -> ExitCode {
 mod tests {
     use super::is_clause;
     use super::is_marker;
+    use super::validate_spec_text;
 
     #[test]
     fn markers_require_a_closed_nonempty_identifier() {
@@ -632,6 +639,7 @@ mod tests {
         assert!(!is_marker("r[]"));
         assert!(!is_marker("r[lattice.example"));
         assert!(!is_marker("r[[nested]]"));
+        assert!(!is_marker("r[two words]"));
         assert!(!is_marker("not-a-marker"));
     }
 
@@ -644,5 +652,17 @@ mod tests {
         assert!(!is_clause("- GIVEN   ", "- GIVEN"));
         assert!(!is_clause("- WHENEVER a condition", "- WHEN"));
         assert!(!is_clause("GIVEN a state", "- GIVEN"));
+    }
+
+    #[test]
+    fn headings_require_titles() {
+        let text = "### Requirement:\nr[lattice.example] MUST hold\n\n#### Scenario:\nr[lattice.example.scenario]\n- GIVEN a state\n- WHEN an action\n- THEN a result\n";
+        let diagnostics = validate_spec_text("spec.md", text);
+        assert!(
+            diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.message == "requirement heading must include a title")
+        );
+        assert!(diagnostics.iter().any(|diagnostic| diagnostic.message == "scenario heading must include a title"));
     }
 }
