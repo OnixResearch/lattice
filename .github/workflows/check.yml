@@ -49,6 +49,7 @@ jobs:
         run: nix flake check -L --option secret-key-files ''
 
       - name: Verify gates left no tracked changes
+        if: always()
         run: |
           git status --short
           git diff --exit-code
