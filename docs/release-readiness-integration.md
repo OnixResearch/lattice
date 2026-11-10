@@ -45,8 +45,8 @@ directories and vendored lifecycle or agent metadata. The manifest admits at
 most 50,000 files, each at most 16 MiB, totaling at most 4 GiB. Source, policy,
 and the native executable must remain unchanged while the observation executes;
 all three are rechecked before completion inputs are written. The script
-removes old completion inputs before a new attempt so interrupted or malformed
-observations cannot silently reuse them.
+removes old evidence and completion inputs before a new attempt so interrupted
+or malformed observations cannot silently reuse them.
 Regenerate after any covered source or policy edit. Generated target files are
 local observations, not checked-in fixtures or completion authority.
 

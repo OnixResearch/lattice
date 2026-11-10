@@ -68,9 +68,16 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     if !output.canonicalize()?.starts_with(&root) {
         return Err("release observation output escapes repository root".into());
     }
-    // An interrupted or rejected new observation must not leave old completion
-    // inputs eligible for a later assessment.
-    for path in [root.join(core::CONTRACT_PATH), root.join(core::RESULTS_PATH)] {
+    // An interrupted or rejected new observation must not leave old evidence or
+    // completion inputs eligible for a later assessment.
+    for path in [
+        root.join(core::CONTRACT_PATH),
+        root.join(core::RESULTS_PATH),
+        output.join("validation.json"),
+        output.join("validation.stderr"),
+        output.join("source-manifest.json"),
+        output.join("observation.json"),
+    ] {
         match fs::remove_file(path) {
             Ok(()) => {}
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
