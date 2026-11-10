@@ -78,9 +78,7 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     }
     let subject = source_manifest(&root)?;
     let subject_hash = core::json_hash(&subject);
-    let mut native_hasher = blake3::Hasher::new();
-    std::io::copy(&mut fs::File::open(&native)?, &mut native_hasher)?;
-    let native_binary_hash = native_hasher.finalize().to_hex().to_string();
+    let native_binary_hash = file_hash(&native)?;
     let request = json!({"root": root, "policy": policy_path});
     let command = vec![
         native.to_str().ok_or("native path is not UTF-8")?.to_string(),
@@ -124,8 +122,14 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     exit_code.ok_or("native observation terminated without an exit code")?;
     let validation: Value = serde_json::from_slice(&stdout)?;
     let inputs = core::completion_inputs(&policy, &command, &validation, &observation, &subject_hash)?;
-    if source_manifest(&root)? != subject || read_bounded(&policy_path)? != policy_bytes {
-        return Err("repository or policy changed during MCP observation; no completion inputs written".into());
+    if source_manifest(&root)? != subject
+        || read_bounded(&policy_path)? != policy_bytes
+        || file_hash(&native)? != native_binary_hash
+    {
+        return Err(
+            "repository, policy, or native executable changed during MCP observation; no completion inputs written"
+                .into(),
+        );
     }
     write_json(&root.join(core::CONTRACT_PATH), &inputs.contract)?;
     write_json(&root.join(core::RESULTS_PATH), &inputs.results)?;
@@ -149,6 +153,12 @@ fn read_stream(reader: impl Read) -> std::io::Result<Vec<u8>> {
 
 fn read_bounded(path: &Path) -> std::io::Result<Vec<u8>> {
     read_stream(fs::File::open(path)?)
+}
+
+fn file_hash(path: &Path) -> std::io::Result<String> {
+    let mut hasher = blake3::Hasher::new();
+    std::io::copy(&mut fs::File::open(path)?, &mut hasher)?;
+    Ok(hasher.finalize().to_hex().to_string())
 }
 
 fn write_json(path: &Path, value: &Value) -> std::io::Result<()> {
