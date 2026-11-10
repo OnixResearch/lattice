@@ -10,8 +10,10 @@ use serde_json::json;
 
 fn observed_inputs(valid: bool, exit_code: i32) -> Result<release_inputs::CompletionInputs, String> {
     let hash = release_inputs::json_hash(&json!("observed-test-bytes"));
+    let policy = json!({"name": "consumer-policy"});
+    let policy_hash = release_inputs::json_hash(&policy);
     release_inputs::completion_inputs(
-        &json!({"name": "consumer-policy"}),
+        &policy,
         &[
             "native-cairn".into(),
             "mcp".into(),
@@ -19,7 +21,7 @@ fn observed_inputs(valid: bool, exit_code: i32) -> Result<release_inputs::Comple
             "cairn_validate".into(),
         ],
         &json!({"isError": false, "structuredContent": {"valid": valid, "mcp": {"read_only": true}}}),
-        &json!({"exit_code": exit_code, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash, "subject_hash": hash}),
+        &json!({"exit_code": exit_code, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash, "subject_hash": hash, "policy_hash": policy_hash}),
         &hash,
     )
 }
@@ -56,13 +58,13 @@ fn mcp_completion_status_requires_both_native_success_and_passing_verdict() -> T
             &json!({}),
             &["cairn".into()],
             &json!({"valid": true}),
-            &json!({"exit_code": 0, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash, "subject_hash": hash}),
+            &json!({"exit_code": 0, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash, "subject_hash": hash, "policy_hash": release_inputs::json_hash(&json!({}))}),
             &hash
         )
         .is_err(),
         "a CLI-shaped verdict must not be relabelled as MCP execution evidence"
     );
-    let valid_observation = json!({"exit_code": 0, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash, "subject_hash": hash});
+    let valid_observation = json!({"exit_code": 0, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash, "subject_hash": hash, "policy_hash": release_inputs::json_hash(&json!({}))});
     for validation in [
         json!({"isError": true, "structuredContent": {"valid": true, "mcp": {"read_only": true}}}),
         json!({"structuredContent": {"valid": true, "mcp": {"read_only": true}}}),
@@ -156,8 +158,14 @@ fn manifest_bounds_reject_oversized_manifests() {
 fn completion_inputs_reject_malformed_identity_hashes() -> TestResult {
     let hash = release_inputs::json_hash(&json!("observed-test-bytes"));
     let validation = json!({"isError": false, "structuredContent": {"valid": true, "mcp": {"read_only": true}}});
-    for field in ["stdout_hash", "stderr_hash", "native_binary_hash", "subject_hash"] {
-        let mut observation = json!({"exit_code": 0, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash, "subject_hash": hash});
+    for field in [
+        "stdout_hash",
+        "stderr_hash",
+        "native_binary_hash",
+        "subject_hash",
+        "policy_hash",
+    ] {
+        let mut observation = json!({"exit_code": 0, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash, "subject_hash": hash, "policy_hash": release_inputs::json_hash(&json!({}))});
         observation[field] = json!("not-a-blake3-digest");
         assert!(
             release_inputs::completion_inputs(&json!({}), &["cairn".into()], &validation, &observation, &hash).is_err(),
@@ -175,17 +183,26 @@ fn completion_inputs_reject_malformed_identity_hashes() -> TestResult {
         "stderr_hash": hash,
         "native_binary_hash": hash,
         "subject_hash": release_inputs::json_hash(&json!("different-subject")),
+        "policy_hash": release_inputs::json_hash(&json!({})),
     });
     assert!(
         release_inputs::completion_inputs(&json!({}), &["cairn".into()], &validation, &mismatched, &hash).is_err(),
         "a mismatched observation subject was accepted"
+    );
+    let mut mismatched_policy = mismatched.clone();
+    mismatched_policy["subject_hash"] = json!(hash);
+    mismatched_policy["policy_hash"] = json!(release_inputs::json_hash(&json!("different-policy")));
+    assert!(
+        release_inputs::completion_inputs(&json!({}), &["cairn".into()], &validation, &mismatched_policy, &hash)
+            .is_err(),
+        "a mismatched observation policy was accepted"
     );
     assert!(
         release_inputs::completion_inputs(
             &json!({}),
             &["cairn".into()],
             &validation,
-            &json!({"exit_code": 0, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash, "subject_hash": hash}),
+            &json!({"exit_code": 0, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash, "subject_hash": hash, "policy_hash": release_inputs::json_hash(&json!({}))}),
             "not-a-blake3-digest"
         )
         .is_err(),

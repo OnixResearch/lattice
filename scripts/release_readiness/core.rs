@@ -74,7 +74,18 @@ pub fn completion_inputs(
     if observed_subject != subject_hash {
         return Err("native observation subject identity does not match the source manifest".to_string());
     }
-    for hash in [subject_hash, evidence_hash, stderr_hash, native_hash] {
+    let policy_hash = json_hash(policy);
+    let observed_policy = observation["policy_hash"].as_str().ok_or("native observation policy identity is absent")?;
+    if observed_policy != policy_hash {
+        return Err("native observation policy identity does not match the admitted policy".to_string());
+    }
+    for hash in [
+        subject_hash,
+        evidence_hash,
+        stderr_hash,
+        native_hash,
+        policy_hash.as_str(),
+    ] {
         if hash.len() != 64 || !hash.bytes().all(|byte| byte.is_ascii_hexdigit()) {
             return Err("observed identities must be BLAKE3 hex digests".to_string());
         }
@@ -93,7 +104,6 @@ pub fn completion_inputs(
         "native_binary_hash": native_hash,
         "boundary": "one observed native MCP lifecycle validation, not heavyweight release gates or source correctness",
     }));
-    let policy_hash = json_hash(policy);
     let contract = json!({
         "schema": "cairn.agent-completion.v2", "repository_id": "onixresearch/lattice",
         "registry_id": "lattice-release-mcp-observation-v1", "registry_hash": registry_hash,
