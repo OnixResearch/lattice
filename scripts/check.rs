@@ -565,6 +565,14 @@ fn validate_requirement(path: &str, lines: &[&str], heading_index: usize, diagno
             "requirement marker line must include MUST, SHOULD, SHALL, or MAY",
         ));
     }
+    let has_scenario = lines
+        .iter()
+        .skip(marker_index + LINE_NUMBER_BASE)
+        .take_while(|line| !line.trim_start().starts_with("### Requirement:"))
+        .any(|line| line.trim_start().starts_with("#### Scenario:"));
+    if !has_scenario {
+        diagnostics.push(diagnostic(path, heading_index, "requirement must include at least one scenario"));
+    }
 }
 
 fn is_clause(line: &str, keyword: &str) -> bool {
@@ -667,5 +675,18 @@ mod tests {
                 .any(|diagnostic| diagnostic.message == "requirement heading must include a title")
         );
         assert!(diagnostics.iter().any(|diagnostic| diagnostic.message == "scenario heading must include a title"));
+    }
+
+    #[test]
+    fn requirements_require_a_scenario() {
+        let text = "### Requirement: Title\nr[lattice.example] MUST hold\n";
+        let diagnostics = validate_spec_text("spec.md", text);
+        assert!(
+            diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.message == "requirement must include at least one scenario")
+        );
+        let complete = "### Requirement: Title\nr[lattice.example] MUST hold\n\n#### Scenario: Case\nr[lattice.example.scenario]\n- GIVEN a state\n- WHEN an action\n- THEN a result\n";
+        assert!(validate_spec_text("spec.md", complete).is_empty());
     }
 }
