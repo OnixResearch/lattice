@@ -85,6 +85,20 @@ fn missing_and_dangling_linkage_fails_closed_without_hiding_unrelated_debt() -> 
 
 // r[verify lattice.repository_validation.traceability_sources.scenario.unsafe-root]
 #[test]
+fn generated_release_selection_matches_policy_source() -> TestResult {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let output = std::process::Command::new("nickel")
+        .current_dir(root)
+        .args(["export", "--format", "json", "cairn-policy/default.ncl"])
+        .output()?;
+    assert!(output.status.success(), "policy source export failed: {}", String::from_utf8_lossy(&output.stderr));
+    let source: Value = serde_json::from_slice(&output.stdout)?;
+    let generated: Value = serde_json::from_str(GENERATED_POLICY)?;
+    assert_eq!(source["release_readiness_policy"], generated["release_readiness_policy"]);
+    Ok(())
+}
+
+#[test]
 fn nickel_export_rejects_unsafe_roots_before_evidence_discovery() -> TestResult {
     let fixture = Fixture::new()?;
     let contracts = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("cairn-policy/contracts.ncl");
