@@ -316,7 +316,7 @@
       "evidence": [
         {
           "path": "tests/test_animus_agent.rs",
-          "blake3": "de7c1f82d982a2839c17d66342b6baba90913af0005e11c97f7916f5ba6c26d8"
+          "blake3": "6228ff75b4c6a9d1dbfb39b4ad88c18643792b6a0be979f6cfd4eb333bad88c7"
         }
       ],
       "rationale_code": "assertions.missing-route-request-unchanged-zero-dispatch"
@@ -328,7 +328,7 @@
       "evidence": [
         {
           "path": "tests/test_animus_agent.rs",
-          "blake3": "de7c1f82d982a2839c17d66342b6baba90913af0005e11c97f7916f5ba6c26d8"
+          "blake3": "6228ff75b4c6a9d1dbfb39b4ad88c18643792b6a0be979f6cfd4eb333bad88c7"
         }
       ],
       "rationale_code": "assertions.existing-route-bypasses-animus"
@@ -344,7 +344,7 @@
         },
         {
           "path": "tests/test_animus_agent.rs",
-          "blake3": "de7c1f82d982a2839c17d66342b6baba90913af0005e11c97f7916f5ba6c26d8"
+          "blake3": "6228ff75b4c6a9d1dbfb39b4ad88c18643792b6a0be979f6cfd4eb333bad88c7"
         }
       ],
       "rationale_code": "assertions.transport-only-credential-omission"
@@ -360,7 +360,7 @@
         },
         {
           "path": "tests/test_animus_agent.rs",
-          "blake3": "de7c1f82d982a2839c17d66342b6baba90913af0005e11c97f7916f5ba6c26d8"
+          "blake3": "6228ff75b4c6a9d1dbfb39b4ad88c18643792b6a0be979f6cfd4eb333bad88c7"
         }
       ],
       "rationale_code": "assertions.redacted-single-provider-failure"
@@ -384,7 +384,7 @@
       "evidence": [
         {
           "path": "tests/test_animus_agent.rs",
-          "blake3": "de7c1f82d982a2839c17d66342b6baba90913af0005e11c97f7916f5ba6c26d8"
+          "blake3": "6228ff75b4c6a9d1dbfb39b4ad88c18643792b6a0be979f6cfd4eb333bad88c7"
         }
       ],
       "rationale_code": "assertions.fixed-loop-dispatches-once-and-returns"
@@ -412,7 +412,7 @@
         },
         {
           "path": "tests/test_animus_agent.rs",
-          "blake3": "de7c1f82d982a2839c17d66342b6baba90913af0005e11c97f7916f5ba6c26d8"
+          "blake3": "6228ff75b4c6a9d1dbfb39b4ad88c18643792b6a0be979f6cfd4eb333bad88c7"
         }
       ],
       "rationale_code": "assertions.identity-admission-rejects-before-shell"
@@ -428,7 +428,7 @@
         },
         {
           "path": "tests/test_animus_agent.rs",
-          "blake3": "de7c1f82d982a2839c17d66342b6baba90913af0005e11c97f7916f5ba6c26d8"
+          "blake3": "6228ff75b4c6a9d1dbfb39b4ad88c18643792b6a0be979f6cfd4eb333bad88c7"
         }
       ],
       "rationale_code": "assertions.authority-content-remains-ordinary-output"
@@ -440,7 +440,7 @@
       "evidence": [
         {
           "path": "tests/test_animus_agent.rs",
-          "blake3": "de7c1f82d982a2839c17d66342b6baba90913af0005e11c97f7916f5ba6c26d8"
+          "blake3": "6228ff75b4c6a9d1dbfb39b4ad88c18643792b6a0be979f6cfd4eb333bad88c7"
         }
       ],
       "rationale_code": "assertions.runner-executes-one-typed-animus-node"
@@ -468,7 +468,7 @@
       "evidence": [
         {
           "path": "tests/test_animus_agent.rs",
-          "blake3": "de7c1f82d982a2839c17d66342b6baba90913af0005e11c97f7916f5ba6c26d8"
+          "blake3": "6228ff75b4c6a9d1dbfb39b4ad88c18643792b6a0be979f6cfd4eb333bad88c7"
         }
       ],
       "rationale_code": "assertions.text-json-values-and-safe-metadata"
@@ -484,7 +484,7 @@
         },
         {
           "path": "tests/test_animus_agent.rs",
-          "blake3": "de7c1f82d982a2839c17d66342b6baba90913af0005e11c97f7916f5ba6c26d8"
+          "blake3": "6228ff75b4c6a9d1dbfb39b4ad88c18643792b6a0be979f6cfd4eb333bad88c7"
         }
       ],
       "rationale_code": "assertions.unsupported-preflight-zero-dispatch"

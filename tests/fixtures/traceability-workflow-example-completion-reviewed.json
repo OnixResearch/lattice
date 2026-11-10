@@ -1183,7 +1183,7 @@
         },
         {
           "path": "tests/test_image_workflow_example.rs",
-          "blake3": "690286aaa1bf387d5ef733ff05ff242371e4778e4365871edd71cd9ce19078bd"
+          "blake3": "8642d986f9b72f5f42ab7f26d71b1883f6b099cc47ec6d4f2177e2143cb9f194"
         }
       ],
       "rationale_code": "assertions.unsupported-format-without-partial-completion"
@@ -1199,7 +1199,7 @@
         },
         {
           "path": "tests/test_image_workflow_example.rs",
-          "blake3": "690286aaa1bf387d5ef733ff05ff242371e4778e4365871edd71cd9ce19078bd"
+          "blake3": "8642d986f9b72f5f42ab7f26d71b1883f6b099cc47ec6d4f2177e2143cb9f194"
         }
       ],
       "rationale_code": "assertions.import-execute-and-image-output"
