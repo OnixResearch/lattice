@@ -25,6 +25,7 @@ use serde_json::Value;
 use serde_json::json;
 
 const MAX_BYTES: u64 = 16 * 1024 * 1024;
+const MAX_TOTAL_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 const MAX_FILES: usize = 50_000;
 const NATIVE_TIMEOUT: &str = "60s";
 
@@ -214,6 +215,7 @@ fn source_manifest(root: &Path) -> Result<Value, Box<dyn std::error::Error>> {
     .map(PathBuf::from)
     .collect::<Vec<_>>();
     let mut files = std::collections::BTreeMap::new();
+    let mut total_bytes = 0_u64;
     while let Some(relative) = pending.pop() {
         let path = root.join(&relative);
         let metadata = fs::symlink_metadata(&path)?;
@@ -230,7 +232,13 @@ fn source_manifest(root: &Path) -> Result<Value, Box<dyn std::error::Error>> {
                 }
             }
         } else if metadata.is_file() {
-            let digest = blake3::hash(&read_bounded(&path)?).to_hex().to_string();
+            let bytes = read_bounded(&path)?;
+            total_bytes =
+                total_bytes.checked_add(bytes.len() as u64).ok_or("release source manifest byte count overflow")?;
+            if total_bytes > MAX_TOTAL_BYTES {
+                return Err(format!("release source manifest exceeds {MAX_TOTAL_BYTES} bytes").into());
+            }
+            let digest = blake3::hash(&bytes).to_hex().to_string();
             files.insert(relative.to_string_lossy().into_owned(), digest);
             if files.len() > MAX_FILES {
                 return Err(format!("release source manifest exceeds {MAX_FILES} files").into());
