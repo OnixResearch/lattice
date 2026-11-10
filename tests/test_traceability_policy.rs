@@ -137,6 +137,25 @@ fn release_selection_contract_rejects_empty_or_malformed_commands() -> TestResul
 }
 
 #[test]
+fn authored_policy_enforces_release_selection_contract() -> TestResult {
+    let fixture = Fixture::new()?;
+    let authored = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("cairn-policy/default.ncl");
+    fixture.write(
+        "policy.ncl",
+        format!(
+            "(import {}) & {{ release_readiness_policy.required_external_commands | force = [], }}\n",
+            serde_json::to_string(&authored)?
+        ),
+    )?;
+    let output = std::process::Command::new("nickel")
+        .current_dir(fixture.root.path())
+        .args(["export", "--format", "json", "policy.ncl"])
+        .output()?;
+    assert!(!output.status.success(), "the authored policy accepted an empty release gate list");
+    Ok(())
+}
+
+#[test]
 fn nickel_export_rejects_unsafe_roots_before_evidence_discovery() -> TestResult {
     let fixture = Fixture::new()?;
     let contracts = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("cairn-policy/contracts.ncl");
