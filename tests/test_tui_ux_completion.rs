@@ -94,10 +94,8 @@ const PTY_CONSTRAINED_ROWS: u16 = 6;
 const PTY_CONSTRAINED_COLUMNS: u16 = 32;
 
 fn test_config(temp_dir: &TempDir) -> AppConfig {
-    let data_dir = temp_dir.path().join("data");
-    std::fs::create_dir_all(&data_dir).expect("create app data directory");
     AppConfig {
-        data_dir,
+        data_dir: temp_dir.path().join("data"),
         ..AppConfig::default()
     }
 }
