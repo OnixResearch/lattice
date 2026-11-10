@@ -135,18 +135,20 @@ fn release_selection_contract_rejects_empty_or_malformed_commands() -> TestResul
         );
     }
     for field in ["mcp_completion_contract", "mcp_completion_results"] {
-        let mut policy = valid.clone();
-        policy["release_readiness_policy"][field] = json!("target/release-readiness/other.json");
-        fixture.write("policy.json", serde_json::to_vec(&policy)?)?;
-        let output = std::process::Command::new("nickel")
-            .current_dir(fixture.root.path())
-            .args(["export", "--format", "json", "policy.ncl"])
-            .output()?;
-        assert!(
-            !output.status.success(),
-            "unexpected {field} was accepted: {}",
-            String::from_utf8_lossy(&output.stdout)
-        );
+        for value in [json!("target/release-readiness/other.json"), json!(1)] {
+            let mut policy = valid.clone();
+            policy["release_readiness_policy"][field] = value;
+            fixture.write("policy.json", serde_json::to_vec(&policy)?)?;
+            let output = std::process::Command::new("nickel")
+                .current_dir(fixture.root.path())
+                .args(["export", "--format", "json", "policy.ncl"])
+                .output()?;
+            assert!(
+                !output.status.success(),
+                "unexpected {field} was accepted: {}",
+                String::from_utf8_lossy(&output.stdout)
+            );
+        }
     }
     Ok(())
 }
