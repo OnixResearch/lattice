@@ -49,7 +49,6 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     if args.len() != 1 || !Path::new(&args[0]).is_absolute() {
         return Err("expected one absolute native Cairn executable path; run from the Lattice root".into());
     }
-    let native = fs::canonicalize(&args[0])?;
     let root = std::env::current_dir()?.canonicalize()?;
     let output = root.join(core::OUTPUT_ROOT);
     fs::create_dir_all(&output)?;
@@ -72,6 +71,7 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             Err(error) => return Err(error.into()),
         }
     }
+    let native = fs::canonicalize(&args[0])?;
     let policy_path = root.join("cairn-policy/generated/cairn-policy.json");
     let policy_bytes = read_bounded(&policy_path)?;
     let policy: Value = serde_json::from_slice(&policy_bytes)?;
