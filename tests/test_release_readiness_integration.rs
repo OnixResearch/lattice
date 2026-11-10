@@ -424,12 +424,17 @@ fn release_selection_lists_lattice_gates_not_foreign_producer_checks() -> TestRe
     let checks = receipt["checks"].as_array().ok_or("readiness checks")?;
     assert!(checks.iter().any(|check| check["name"] == "mcp_agent_smoke" && check["passed"] == false));
     assert_eq!(
+        receipt["repository_gate_summary"]["policy"], "consumer-selected-gates",
+        "Cairn used its maintained fallback gates instead of the consumer policy; LATTICE_CAIRN_BIN may point to a binary that predates consumer-selected release gates"
+    );
+    assert_eq!(
         receipt["repository_gate_summary"]["required_commands"],
         json!([
             "scripts/check.rs",
             "octet-precommit-check",
             "nix flake check -L --option secret-key-files ''"
-        ])
+        ]),
+        "Cairn did not report the Lattice-maintained gate list"
     );
     assert_eq!(receipt["determinism_replay"]["required"], true);
     assert_eq!(receipt["determinism_replay"]["included"], false);
