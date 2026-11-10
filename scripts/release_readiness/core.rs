@@ -39,8 +39,9 @@ pub fn completion_inputs(
         .ok_or("native MCP validation receipt lacks a boolean valid verdict")?;
     let exit_code = observation["exit_code"].as_i64().ok_or("native validation did not terminate with an exit code")?;
     let evidence_hash = observation["stdout_hash"].as_str().ok_or("native stdout identity is absent")?;
+    let stderr_hash = observation["stderr_hash"].as_str().ok_or("native stderr identity is absent")?;
     let native_hash = observation["native_binary_hash"].as_str().ok_or("native executable identity is absent")?;
-    for hash in [subject_hash, evidence_hash, native_hash] {
+    for hash in [subject_hash, evidence_hash, stderr_hash, native_hash] {
         if hash.len() != 64 || !hash.bytes().all(|byte| byte.is_ascii_hexdigit()) {
             return Err("observed identities must be BLAKE3 hex digests".to_string());
         }
@@ -71,7 +72,10 @@ pub fn completion_inputs(
         "command": command, "command_hash": command_hash, "subject_hash": subject_hash,
         "registry_hash": registry_hash, "selection_hash": selection_hash, "policy_hash": policy_hash,
         "evidence_hash": evidence_hash, "execution_receipt_hash": json_hash(observation),
-        "artifacts": [{ "path": "target/release-readiness/validation.json", "hash": evidence_hash }],
+        "artifacts": [
+            { "path": "target/release-readiness/validation.json", "hash": evidence_hash },
+            { "path": "target/release-readiness/validation.stderr", "hash": stderr_hash },
+        ],
         "diagnostic": {
             "remediation_label": "inspect-native-mcp-validation", "summary": "Inspect the retained native MCP lifecycle validation observation; no heavyweight gate result is inferred.",
             "reproduction_argv": command, "working_root": "<repository-root>", "source": null,

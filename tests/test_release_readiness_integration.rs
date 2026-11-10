@@ -19,7 +19,7 @@ fn observed_inputs(valid: bool, exit_code: i32) -> Result<release_inputs::Comple
             "cairn_validate".into(),
         ],
         &json!({"isError": false, "structuredContent": {"valid": valid, "mcp": {"read_only": true}}}),
-        &json!({"exit_code": exit_code, "stdout_hash": hash, "native_binary_hash": hash}),
+        &json!({"exit_code": exit_code, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash}),
         &hash,
     )
 }
@@ -31,6 +31,7 @@ fn mcp_completion_status_requires_both_native_success_and_passing_verdict() -> T
     let passed = observed_inputs(true, 0)?;
     assert!(passed.passed);
     assert_eq!(passed.results[0]["status"], "passed");
+    assert_eq!(passed.results[0]["artifacts"][1]["path"], "target/release-readiness/validation.stderr");
     for (valid, exit_code) in [(false, 0), (true, 1), (false, 124)] {
         let failed = observed_inputs(valid, exit_code)?;
         assert!(!failed.passed);
@@ -46,11 +47,24 @@ fn mcp_completion_status_requires_both_native_success_and_passing_verdict() -> T
             &json!({}),
             &["cairn".into()],
             &json!({"valid": true}),
-            &json!({"exit_code": 0, "stdout_hash": hash, "native_binary_hash": hash}),
+            &json!({"exit_code": 0, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash}),
             &hash
         )
         .is_err(),
         "a CLI-shaped verdict must not be relabelled as MCP execution evidence"
+    );
+    let mut observation = json!({"exit_code": 0, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash});
+    observation.as_object_mut().ok_or("observation object")?.remove("stderr_hash");
+    assert!(
+        release_inputs::completion_inputs(
+            &json!({}),
+            &["cairn".into()],
+            &json!({"isError": false, "structuredContent": {"valid": true, "mcp": {"read_only": true}}}),
+            &observation,
+            &hash
+        )
+        .is_err(),
+        "an observation without a retained stderr identity must not be accepted"
     );
     Ok(())
 }

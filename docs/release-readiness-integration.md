@@ -28,8 +28,9 @@ scripts/release-readiness-inputs.rs "$NATIVE_CAIRN"
 wrapper. The script executes the actual native MCP call `cairn_validate`, with
 explicit repository root and generated policy. It retains the raw MCP envelope,
 stdout/stderr identities, exit status, executable digest, exact argv and a source
-manifest in `target/release-readiness/`. It derives completion status only from
-both the observed process status and `structuredContent.valid`. A CLI-shaped
+manifest in `target/release-readiness/`. Completion results reference both
+retained streams with their BLAKE3 identities. It derives completion status only
+from both the observed process status and `structuredContent.valid`. A CLI-shaped
 receipt is not accepted as MCP evidence. Failure is retained as non-passing; no
 passing status or heavyweight gate result is inferred.
 
