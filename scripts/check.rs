@@ -121,6 +121,10 @@ const RUNTIME_NICKEL_TYPECHECK_ARGS: &[&str] = &[
     "-c",
     "nickel typecheck cairn-policy/*.ncl policy/*.ncl profiles/*.ncl contracts/*.ncl",
 ];
+const EXAMPLE_NICKEL_TYPECHECK_ARGS: &[&str] = &[
+    "-c",
+    "nickel typecheck examples/config/*.ncl examples/orchestrations/*.ncl examples/templates/*.ncl examples/workflows/*.ncl",
+];
 const FOCUSED_CONSUMER_CHECK_ARGS: &[&str] = &["check", "--package", "lattice", "--all-targets", "--locked"];
 const ALL_FEATURES_CHECK_ARGS: &[&str] = &[
     "check",
@@ -313,6 +317,12 @@ const COMMAND_STEPS: &[CheckStep] = &[
         name: "runtime Nickel typecheck",
         program: "sh",
         args: RUNTIME_NICKEL_TYPECHECK_ARGS,
+        use_repo_local_target: false,
+    },
+    CheckStep {
+        name: "example Nickel typecheck",
+        program: "sh",
+        args: EXAMPLE_NICKEL_TYPECHECK_ARGS,
         use_repo_local_target: false,
     },
     CheckStep {
