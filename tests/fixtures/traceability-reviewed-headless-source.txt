@@ -129,7 +129,7 @@ pub fn summarize_run(run_id: RunId, workflow: &Workflow, results: &[StepResult])
 // r[impl n8nclone.workflow_execution.headless.summary]
 pub fn render_run_summary_text(summary: &HeadlessRunSummary) -> String {
     format!(
-        "{} | {} | {} nodes | {} steps | {} failures | {} cache hits",
+        "{} | {} | {} nodes | {} results | {} failures | {} cache hits",
         summary.run_id,
         summary.status.as_str(),
         summary.node_count,
