@@ -275,7 +275,9 @@ where
 fn persist_completed_outputs_to_cache(store: &impl ExecutionCache, results: &[StepResult]) {
     for step in results {
         if let NodeStatus::Completed { outputs, .. } = &step.status {
-            let _ = store.put_cache(&step.input_hash, outputs);
+            if let Err(error) = store.put_cache(&step.input_hash, outputs) {
+                tracing::warn!(error = %error, "failed to persist node result cache entry");
+            }
         }
     }
 }

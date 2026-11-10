@@ -161,7 +161,9 @@ fn run_finished_epoch_ms() -> i64 {
 pub(crate) fn persist_completed_outputs_to_cache(store: &impl crate::store::ExecutionCache, results: &[StepResult]) {
     for step in results {
         if let NodeStatus::Completed { outputs, .. } = &step.status {
-            let _ = store.put_cache(&step.input_hash, outputs);
+            if let Err(error) = store.put_cache(&step.input_hash, outputs) {
+                tracing::warn!(error = %error, "failed to persist node result cache entry");
+            }
         }
     }
 }
