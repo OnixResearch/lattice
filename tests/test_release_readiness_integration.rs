@@ -84,6 +84,17 @@ fn mcp_completion_status_requires_both_native_success_and_passing_verdict() -> T
         .is_err(),
         "an empty observed command was accepted"
     );
+    assert!(
+        release_inputs::completion_inputs(
+            &json!({}),
+            &["".into()],
+            &json!({"isError": false, "structuredContent": {"valid": true, "mcp": {"read_only": true}}}),
+            &valid_observation,
+            &hash
+        )
+        .is_err(),
+        "an empty command argument was accepted"
+    );
     for validation in [
         json!({"isError": true, "structuredContent": {"valid": true, "mcp": {"read_only": true}}}),
         json!({"structuredContent": {"valid": true, "mcp": {"read_only": true}}}),

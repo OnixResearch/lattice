@@ -62,6 +62,9 @@ pub fn completion_inputs(
     if command.is_empty() {
         return Err("observed command is empty".to_string());
     }
+    if command.iter().any(|argument| argument.is_empty()) {
+        return Err("observed command contains an empty argument".to_string());
+    }
     if validation["isError"] != false || validation["structuredContent"]["mcp"]["read_only"] != true {
         return Err("native MCP validation envelope is absent or invalid".to_string());
     }
