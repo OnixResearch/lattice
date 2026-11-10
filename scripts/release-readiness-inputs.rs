@@ -241,7 +241,16 @@ fn source_manifest(root: &Path) -> Result<Value, Box<dyn std::error::Error>> {
                 let vendor_metadata = (name == ".cairn" || name == ".pi" || name == ".autoresearch")
                     && relative.starts_with("vendor-cargo-deps");
                 let host_metadata = name == ".DS_Store" || name == "Thumbs.db";
-                if name != "target" && name != ".git" && name != ".direnv" && !host_metadata && !vendor_metadata {
+                let editor_temporary = name
+                    .to_str()
+                    .is_some_and(|name| name.ends_with(".swp") || name.ends_with(".swo") || name.ends_with('~'));
+                if name != "target"
+                    && name != ".git"
+                    && name != ".direnv"
+                    && !host_metadata
+                    && !editor_temporary
+                    && !vendor_metadata
+                {
                     pending.push(relative.join(name));
                 }
             }

@@ -12,6 +12,7 @@
 .vscode/
 *.swp
 *.swo
+*~
 
 # OS metadata
 .DS_Store
