@@ -170,6 +170,11 @@ fn native_size_bound_rejects_oversized_executables() {
 }
 
 #[test]
+fn json_hash_preserves_array_order() {
+    assert_ne!(release_inputs::json_hash(&json!({"a": [1, 2]})), release_inputs::json_hash(&json!({"a": [2, 1]})));
+}
+
+#[test]
 fn manifest_bounds_reject_oversized_manifests() {
     assert!(release_inputs::check_manifest_bounds(0, 0).is_ok());
     assert!(
