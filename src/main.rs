@@ -564,21 +564,37 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
     }
 }
 
+#[cfg(unix)]
+const PRIVATE_LOG_FILE_MODE: u32 = 0o600;
+
 fn setup_logging(verbose: bool, data_dir: &Path) {
     if std::fs::create_dir_all(data_dir).is_err() {
         return;
     }
-    let log_file = std::fs::File::create(data_dir.join(LOG_FILE_NAME)).ok();
-    if let Some(file) = log_file {
-        tracing_subscriber::fmt()
-            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env().add_directive(if verbose {
-                tracing::Level::DEBUG.into()
-            } else {
-                tracing::Level::INFO.into()
-            }))
-            .with_writer(file)
-            .init();
+    let log_path = data_dir.join(LOG_FILE_NAME);
+    let mut options = std::fs::OpenOptions::new();
+    options.create(true).write(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(PRIVATE_LOG_FILE_MODE);
     }
+    let Ok(file) = options.open(&log_path) else {
+        return;
+    };
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&log_path, std::fs::Permissions::from_mode(PRIVATE_LOG_FILE_MODE));
+    }
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env().add_directive(if verbose {
+            tracing::Level::DEBUG.into()
+        } else {
+            tracing::Level::INFO.into()
+        }))
+        .with_writer(file)
+        .init();
 }
 
 // r[impl n8nclone.operator_diagnostics.doctor_command]
