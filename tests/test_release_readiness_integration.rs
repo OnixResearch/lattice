@@ -92,16 +92,22 @@ fn mcp_completion_status_requires_both_native_success_and_passing_verdict() -> T
 }
 
 #[test]
-fn observation_paths_share_the_output_root() {
-    for path in [
+fn observation_paths_share_the_output_root_and_are_distinct() {
+    let paths = [
         release_inputs::CONTRACT_PATH,
         release_inputs::RESULTS_PATH,
         release_inputs::VALIDATION_PATH,
         release_inputs::STDERR_PATH,
         release_inputs::SOURCE_MANIFEST_PATH,
         release_inputs::OBSERVATION_PATH,
-    ] {
+    ];
+    for path in paths {
         assert!(path.starts_with(release_inputs::OUTPUT_ROOT), "{path}");
+    }
+    for (index, path) in paths.iter().enumerate() {
+        for other in &paths[index + 1..] {
+            assert_ne!(path, other);
+        }
     }
 }
 
