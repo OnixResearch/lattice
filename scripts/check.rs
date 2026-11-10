@@ -139,7 +139,7 @@ const POLICY_FRESHNESS_ARGS: &[&str] = &[
 ];
 const RUNTIME_NICKEL_TYPECHECK_ARGS: &[&str] = &[
     "-c",
-    "nickel typecheck cairn-policy/*.ncl policy/*.ncl profiles/*.ncl contracts/*.ncl builtins/*/*.ncl builtins/workflow-templates/*/*.ncl",
+    "nickel typecheck cairn-policy/*.ncl policy/*.ncl profiles/*.ncl contracts/*.ncl builtins/*/*.ncl builtins/agent-evaluations/requests/*.ncl builtins/workflow-templates/*/*.ncl",
 ];
 const EXAMPLE_NICKEL_TYPECHECK_ARGS: &[&str] = &[
     "-c",
