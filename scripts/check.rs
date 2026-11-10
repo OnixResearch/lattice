@@ -18,6 +18,10 @@ const PROCESS_STATUS_CODE_OVERFLOW_EXIT_CODE: u8 = 255;
 const LINE_NUMBER_BASE: usize = 1;
 
 const SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "--edition", "2024", "scripts/check.rs"];
+const CHECK_SCRIPT_TEST_ARGS: &[&str] = &[
+    "-c",
+    "rustc --test --edition 2024 scripts/check.rs -o \"${CARGO_TARGET_DIR:-target}/lattice-check-tests\" && \"${CARGO_TARGET_DIR:-target}/lattice-check-tests\"",
+];
 const OPERATOR_E2E_SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "--edition", "2024", "scripts/operator-e2e.rs"];
 const INVENTORY_SCRIPT_FORMAT_ARGS: &[&str] = &[
     "--check",
@@ -190,6 +194,12 @@ const COMMAND_STEPS: &[CheckStep] = &[
         program: RUSTFMT_PROGRAM,
         args: SCRIPT_FORMAT_ARGS,
         use_repo_local_target: false,
+    },
+    CheckStep {
+        name: "check script tests",
+        program: "sh",
+        args: CHECK_SCRIPT_TEST_ARGS,
+        use_repo_local_target: true,
     },
     CheckStep {
         name: "operator E2E script format",
