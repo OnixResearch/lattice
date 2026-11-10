@@ -34,9 +34,10 @@ receipt is not accepted as MCP evidence. Failure is retained as non-passing; no
 passing status or heavyweight gate result is inferred.
 
 The source manifest covers maintained source, crates, tests, scripts, examples,
-docs, lifecycle, policy, release vectors and root manifests/lockfiles, excluding
-nested build/VCS directories. Source and policy must remain unchanged while the
-observation executes. The script removes old completion inputs before a new
+docs, builtins, contracts, lifecycle, policy, release vectors, vendored source
+snapshots, and root manifests/lockfiles, excluding nested build/VCS directories
+and vendored lifecycle artifacts. Source and policy must remain unchanged while
+the observation executes. The script removes old completion inputs before a new
 attempt so interrupted or malformed observations cannot silently reuse them.
 Regenerate after any covered source or policy edit. Generated target files are
 local observations, not checked-in fixtures or completion authority.

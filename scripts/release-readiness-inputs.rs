@@ -136,7 +136,8 @@ fn write_output(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 
 fn source_manifest(root: &Path) -> Result<Value, Box<dyn std::error::Error>> {
     let mut pending = ["src", "crates", "tests", "scripts", "examples", "docs", ".cairn", "cairn-policy",
-        "fixtures/release-readiness", "Cargo.toml", "Cargo.lock", "flake.nix", "flake.lock", "README.md"]
+        "builtins", "contracts", "vendor-cargo-deps", "fixtures/release-readiness", "Cargo.toml",
+        "Cargo.lock", "flake.nix", "flake.lock", "README.md"]
         .into_iter().map(PathBuf::from).collect::<Vec<_>>();
     let mut files = std::collections::BTreeMap::new();
     while let Some(relative) = pending.pop() {
@@ -148,7 +149,8 @@ fn source_manifest(root: &Path) -> Result<Value, Box<dyn std::error::Error>> {
         if metadata.is_dir() {
             for entry in fs::read_dir(&path)? {
                 let name = entry?.file_name();
-                if name != "target" && name != ".git" && name != ".direnv" {
+                let vendor_lifecycle = name == ".cairn" && relative.starts_with("vendor-cargo-deps");
+                if name != "target" && name != ".git" && name != ".direnv" && !vendor_lifecycle {
                     pending.push(relative.join(name));
                 }
             }
