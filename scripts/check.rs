@@ -117,7 +117,10 @@ const POLICY_TYPECHECK_ARGS: &[&str] = &[
     "cairn-policy/default.ncl",
     "cairn-policy/traceability-inventory.ncl",
 ];
-const RUNTIME_NICKEL_TYPECHECK_ARGS: &[&str] = &["-c", "nickel typecheck policy/*.ncl profiles/*.ncl contracts/*.ncl"];
+const RUNTIME_NICKEL_TYPECHECK_ARGS: &[&str] = &[
+    "-c",
+    "nickel typecheck cairn-policy/*.ncl policy/*.ncl profiles/*.ncl contracts/*.ncl",
+];
 const FOCUSED_CONSUMER_CHECK_ARGS: &[&str] = &["check", "--package", "lattice", "--all-targets", "--locked"];
 const ALL_FEATURES_CHECK_ARGS: &[&str] = &[
     "check",
