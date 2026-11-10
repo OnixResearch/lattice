@@ -137,7 +137,7 @@ const ALL_FEATURES_CHECK_ARGS: &[&str] = &[
     "--all-targets",
     "--locked",
 ];
-const ALL_FEATURES_LIB_TEST_ARGS: &[&str] = &["test", "--package", "lattice", "--all-features", "--lib", "--locked"];
+const ALL_FEATURES_TEST_ARGS: &[&str] = &["test", "--workspace", "--all-features", "--locked"];
 // r[impl lattice.agent_evaluation.verification]
 const AGENT_EVALUATION_TEST_ARGS: &[&str] = &[
     "test",
@@ -356,7 +356,7 @@ const COMMAND_STEPS: &[CheckStep] = &[
     CheckStep {
         name: "all features tests",
         program: CARGO_PROGRAM,
-        args: ALL_FEATURES_LIB_TEST_ARGS,
+        args: ALL_FEATURES_TEST_ARGS,
         use_repo_local_target: true,
     },
     CheckStep {
