@@ -42,19 +42,17 @@ unchanged. The producer owns `scripts/import-nickel-core.py`, the source patch,
 MIT notice, complete package snapshot at `vendor/nickel-lang-core-0.18.0`, and
 exact provenance checks; Lattice does not carry an independently edited copy.
 
-Cargo patch tables are root-only. Integration must select `nickel-lang-core`
-from the **same immutable public producer revision** as `nickel-eval`, align its
-Cargo/Nix source closure, and verify anonymous acquisition before the correction
-is admitted. The original pin above describes the current baseline; this document
-does not claim that a new producer object has already been published or that
-Lattice's final admitted dependency path has already passed verification.
+Cargo patch tables are root-only. Lattice selects `nickel-lang-core` from the
+**same immutable producer revision** as `nickel-eval` through a byte-exact
+vendored snapshot and a root patch entry, and records the producer revision and
+anonymous source URL in the snapshot provenance.
 
-The producer's owning Rust `1.90.0` environment has passed all 43 tests, including
+The producer's owning Rust `1.90.0` environment passed all 43 tests, including
 the five imported-container regressions, and strict Clippy. Its native retained
 fixture smoke produced the complete expected value below, matching the pinned
-external CLI's observed value. These local producer checks do not replace
-immutable publication, exact consumer dependency admission, or Lattice's final
-native profile smoke.
+external CLI's observed value. The admitted snapshot retains those producer
+checks; Lattice's native adapter regressions pass against the vendored selection.
+Neither result is a claim of arbitrary evaluator equivalence or Nickel soundness.
 
 ### Admitted import repair
 
