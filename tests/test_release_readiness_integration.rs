@@ -43,6 +43,10 @@ fn mcp_completion_status_requires_both_native_success_and_passing_verdict() -> T
     assert!(passed.passed);
     assert_eq!(passed.results[0]["status"], "passed");
     assert_eq!(passed.results[0]["artifacts"][1]["path"], release_inputs::STDERR_PATH);
+    let subject_hash = release_inputs::json_hash(&json!("observed-test-bytes"));
+    assert_eq!(passed.results[0]["subject_hash"], subject_hash);
+    assert_eq!(passed.contract["final_subject_hash"], subject_hash);
+    assert_eq!(passed.results[0]["policy_hash"], release_inputs::json_hash(&json!({"name": "consumer-policy"})));
     for (valid, exit_code) in [(false, 0), (true, 1), (false, 124)] {
         let failed = observed_inputs(valid, exit_code)?;
         assert!(!failed.passed);
