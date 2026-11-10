@@ -388,14 +388,6 @@ struct CheckError {
 }
 
 impl CheckError {
-    fn failed_step(step_name: &str, exit_code: ExitCode) -> Self {
-        Self {
-            step_name: step_name.to_string(),
-            detail: None,
-            exit_code,
-        }
-    }
-
     fn with_detail(step_name: &str, detail: String) -> Self {
         Self {
             step_name: step_name.to_string(),
@@ -445,15 +437,29 @@ fn run_step(step: CheckStep) -> Result<(), CheckError> {
         command.env(CARGO_TARGET_DIR_KEY, REPO_LOCAL_TARGET_DIR);
     }
 
-    let status = command
-        .status()
-        .map_err(|_| CheckError::failed_step(step.name, ExitCode::from(GENERIC_FAILURE_EXIT_CODE)))?;
+    let status = command.status().map_err(|error| CheckError {
+        step_name: step.name.to_string(),
+        detail: Some(format!("failed to run '{}': {error}", rendered_command(step))),
+        exit_code: ExitCode::from(GENERIC_FAILURE_EXIT_CODE),
+    })?;
 
     if status.success() {
         return Ok(());
     }
 
-    Err(CheckError::failed_step(step.name, status_exit_code(status.code())))
+    Err(CheckError {
+        step_name: step.name.to_string(),
+        detail: Some(format!("command failed: {}", rendered_command(step))),
+        exit_code: status_exit_code(status.code()),
+    })
+}
+
+fn rendered_command(step: CheckStep) -> String {
+    if step.args.is_empty() {
+        step.program.to_string()
+    } else {
+        format!("{} {}", step.program, step.args.join(" "))
+    }
 }
 
 fn run_cairn_spec_validation() -> Result<(), CheckError> {
