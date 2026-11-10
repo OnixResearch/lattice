@@ -80,6 +80,12 @@ therefore needs a dedicated rebase against the current dependency cohort, not a
 mechanical merge. This is producer work, not a reason to change Lattice's
 expected failure category.
 
+A local path patch of the published repair against Lattice's current lock was
+verified to compile and pass all three imported-merge regressions. Admission
+still requires choosing a repository-owned vendored snapshot or an equivalent
+producer publication; the verification does not justify an uncommitted local
+path dependency.
+
 Native adapter regression command:
 
 ```sh
