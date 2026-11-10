@@ -175,6 +175,17 @@ fn json_hash_preserves_array_order() {
 }
 
 #[test]
+fn json_hash_ignores_object_key_order() {
+    let mut left = serde_json::Map::new();
+    left.insert("a".to_string(), json!(1));
+    left.insert("b".to_string(), json!(2));
+    let mut right = serde_json::Map::new();
+    right.insert("b".to_string(), json!(2));
+    right.insert("a".to_string(), json!(1));
+    assert_eq!(release_inputs::json_hash(&Value::Object(left)), release_inputs::json_hash(&Value::Object(right)));
+}
+
+#[test]
 fn manifest_bounds_reject_oversized_manifests() {
     assert!(release_inputs::check_manifest_bounds(0, 0).is_ok());
     assert!(
