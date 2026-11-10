@@ -114,7 +114,12 @@ fn release_selection_contract_rejects_empty_or_malformed_commands() -> TestResul
         ),
     )?;
     let valid: Value = serde_json::from_str(GENERATED_POLICY)?;
-    for commands in [json!([]), json!([""]), json!([1])] {
+    for commands in [
+        json!([]),
+        json!([""]),
+        json!([1]),
+        json!(["scripts/check.rs", "scripts/check.rs"]),
+    ] {
         let mut policy = valid.clone();
         policy["release_readiness_policy"]["required_external_commands"] = commands;
         fixture.write("policy.json", serde_json::to_vec(&policy)?)?;
