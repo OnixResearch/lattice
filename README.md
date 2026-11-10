@@ -247,7 +247,8 @@ package or release signing policy.
 Integration tests that invoke Cairn require `LATTICE_CAIRN_BIN`; the
 development shell sets it to the pinned native binary. Running `cargo test`
 outside the development shell fails closed instead of using an unrelated
-`cairn` from `PATH`.
+`cairn` from `PATH`. If an existing shell still points at an older store path,
+rerun `nix develop` so gate-selection tests use the pinned binary.
 
 Accepted requirements and active changes live in [`.cairn/`](.cairn/). Keep
 implementation, examples, and their evidence aligned; generated inventories and
