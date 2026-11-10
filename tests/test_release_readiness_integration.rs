@@ -186,6 +186,11 @@ fn json_hash_ignores_object_key_order() {
 }
 
 #[test]
+fn json_hash_distinguishes_null_from_absent() {
+    assert_ne!(release_inputs::json_hash(&json!({"a": null})), release_inputs::json_hash(&json!({})));
+}
+
+#[test]
 fn manifest_bounds_reject_oversized_manifests() {
     assert!(release_inputs::check_manifest_bounds(0, 0).is_ok());
     assert!(
