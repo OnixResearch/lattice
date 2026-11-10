@@ -33,6 +33,14 @@ The client does not retry automatically.
 
 After an unknown dispatch, `RecoverDispatch` uses the original admitted request to look up the exact acceptance. Observation-only recovery fails closed.
 
+## Fixture generation
+
+The transport fixture generator is exposed as `emit-transport-fixtures` so its Cargo target name stays unique from the contract crate's generator:
+
+```text
+cargo run --manifest-path crates/lattice-workflow-contract/transport/Cargo.toml --example emit-transport-fixtures
+```
+
 ## Verification
 
 From the Lattice repository root:
