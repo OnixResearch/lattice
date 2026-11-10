@@ -485,11 +485,12 @@ fn run_cairn_spec_validation() -> Result<(), CheckError> {
     let spec_files = collect_spec_files(Path::new(CAIRN_SPECS_DIR))
         .map_err(|error| CheckError::with_detail("cairn specs", error.to_string()))?;
     let mut diagnostics = Vec::new();
+    let mut marker_ids = BTreeSet::new();
 
     for path in spec_files {
         let text = fs::read_to_string(&path)
             .map_err(|error| CheckError::with_detail("cairn specs", format!("{}: {error}", path.display())))?;
-        diagnostics.extend(validate_spec_text(&path.display().to_string(), &text));
+        diagnostics.extend(validate_spec_text_with_seen(&path.display().to_string(), &text, &mut marker_ids));
     }
 
     if diagnostics.is_empty() {
@@ -523,9 +524,12 @@ fn collect_spec_files_into(path: &Path, files: &mut Vec<PathBuf>) -> Result<(), 
 }
 
 fn validate_spec_text(path: &str, text: &str) -> Vec<SpecDiagnostic> {
+    validate_spec_text_with_seen(path, text, &mut BTreeSet::new())
+}
+
+fn validate_spec_text_with_seen(path: &str, text: &str, marker_ids: &mut BTreeSet<String>) -> Vec<SpecDiagnostic> {
     let lines = text.lines().collect::<Vec<_>>();
     let mut diagnostics = Vec::new();
-    let mut marker_ids = BTreeSet::new();
     let mut fence_start = None;
 
     for (line_index, line) in lines.iter().enumerate() {
@@ -538,7 +542,7 @@ fn validate_spec_text(path: &str, text: &str) -> Vec<SpecDiagnostic> {
             continue;
         }
         if let Some(id) = marker_id(trimmed) {
-            if !marker_ids.insert(id) {
+            if !marker_ids.insert(id.to_string()) {
                 diagnostics.push(diagnostic(path, line_index, "duplicate r[...] marker identifier"));
             }
         }
@@ -695,9 +699,13 @@ fn status_exit_code(code: Option<i32>) -> ExitCode {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use super::is_clause;
     use super::is_marker;
+    use super::run_cairn_spec_validation;
     use super::validate_spec_text;
+    use super::validate_spec_text_with_seen;
 
     #[test]
     fn markers_require_a_closed_nonempty_identifier() {
@@ -783,5 +791,27 @@ mod tests {
                 )
             );
         }
+    }
+
+    #[test]
+    fn duplicate_markers_across_files_are_rejected() {
+        let mut seen = BTreeSet::new();
+        let first = validate_spec_text_with_seen(
+            "a.md",
+            "### Requirement: A\nr[lattice.example] MUST hold\n\n#### Scenario: A\nr[lattice.example.scenario]\n- GIVEN a state\n- WHEN an action\n- THEN a result\n",
+            &mut seen,
+        );
+        assert!(first.is_empty());
+        let second = validate_spec_text_with_seen(
+            "b.md",
+            "### Requirement: B\nr[lattice.example] MUST hold\n\n#### Scenario: B\nr[lattice.example.other]\n- GIVEN a state\n- WHEN an action\n- THEN a result\n",
+            &mut seen,
+        );
+        assert!(second.iter().any(|diagnostic| diagnostic.message == "duplicate r[...] marker identifier"));
+    }
+
+    #[test]
+    fn maintained_specs_validate() {
+        run_cairn_spec_validation().expect("maintained specs validate");
     }
 }
