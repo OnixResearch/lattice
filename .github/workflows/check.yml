@@ -47,6 +47,11 @@ jobs:
           CARGO_NET_GIT_FETCH_WITH_CLI: "true"
         run: ./scripts/check.rs
 
+      - name: Observe release inputs
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+        run: nix develop . -c sh -c 'CARGO_TARGET_DIR=/tmp/lattice-release-inputs cargo -q -Zscript scripts/release-readiness-inputs.rs "$LATTICE_CAIRN_BIN"'
+
       - name: Run Octet precommit gate
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: "true"
