@@ -4,6 +4,18 @@ use serde_json::json;
 pub const OUTPUT_ROOT: &str = "target/release-readiness";
 pub const CONTRACT_PATH: &str = "target/release-readiness/mcp-contract.json";
 pub const RESULTS_PATH: &str = "target/release-readiness/mcp-results.json";
+pub const MAX_MANIFEST_FILES: usize = 50_000;
+pub const MAX_MANIFEST_BYTES: u64 = 4 * 1024 * 1024 * 1024;
+
+pub fn check_manifest_bounds(file_count: usize, total_bytes: u64) -> Result<(), String> {
+    if file_count > MAX_MANIFEST_FILES {
+        return Err(format!("release source manifest exceeds {MAX_MANIFEST_FILES} files"));
+    }
+    if total_bytes > MAX_MANIFEST_BYTES {
+        return Err(format!("release source manifest exceeds {MAX_MANIFEST_BYTES} bytes"));
+    }
+    Ok(())
+}
 
 pub struct CompletionInputs {
     pub contract: Value,

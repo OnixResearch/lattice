@@ -92,6 +92,17 @@ fn mcp_completion_status_requires_both_native_success_and_passing_verdict() -> T
 }
 
 #[test]
+fn manifest_bounds_reject_oversized_manifests() {
+    assert!(release_inputs::check_manifest_bounds(0, 0).is_ok());
+    assert!(
+        release_inputs::check_manifest_bounds(release_inputs::MAX_MANIFEST_FILES, release_inputs::MAX_MANIFEST_BYTES)
+            .is_ok()
+    );
+    assert!(release_inputs::check_manifest_bounds(release_inputs::MAX_MANIFEST_FILES + 1, 0).is_err());
+    assert!(release_inputs::check_manifest_bounds(0, release_inputs::MAX_MANIFEST_BYTES + 1).is_err());
+}
+
+#[test]
 fn completion_inputs_reject_malformed_identity_hashes() -> TestResult {
     let hash = release_inputs::json_hash(&json!("observed-test-bytes"));
     let validation = json!({"isError": false, "structuredContent": {"valid": true, "mcp": {"read_only": true}}});
