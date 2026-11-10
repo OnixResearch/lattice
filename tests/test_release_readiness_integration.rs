@@ -92,6 +92,20 @@ fn mcp_completion_status_requires_both_native_success_and_passing_verdict() -> T
 }
 
 #[test]
+fn observation_paths_share_the_output_root() {
+    for path in [
+        release_inputs::CONTRACT_PATH,
+        release_inputs::RESULTS_PATH,
+        release_inputs::VALIDATION_PATH,
+        release_inputs::STDERR_PATH,
+        release_inputs::SOURCE_MANIFEST_PATH,
+        release_inputs::OBSERVATION_PATH,
+    ] {
+        assert!(path.starts_with(release_inputs::OUTPUT_ROOT), "{path}");
+    }
+}
+
+#[test]
 fn native_size_bound_rejects_oversized_executables() {
     assert!(release_inputs::check_native_size(release_inputs::MAX_NATIVE_BYTES).is_ok());
     assert!(release_inputs::check_native_size(release_inputs::MAX_NATIVE_BYTES + 1).is_err());
