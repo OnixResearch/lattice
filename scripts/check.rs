@@ -541,9 +541,14 @@ fn validate_spec_text_with_seen(path: &str, text: &str, marker_ids: &mut BTreeSe
         if fence_start.is_some() {
             continue;
         }
-        if let Some(id) = marker_id(trimmed) {
-            if !marker_ids.insert(id.to_string()) {
-                diagnostics.push(diagnostic(path, line_index, "duplicate r[...] marker identifier"));
+        if trimmed.starts_with("r[") {
+            match marker_id(trimmed) {
+                Some(id) => {
+                    if !marker_ids.insert(id.to_string()) {
+                        diagnostics.push(diagnostic(path, line_index, "duplicate r[...] marker identifier"));
+                    }
+                }
+                None => diagnostics.push(diagnostic(path, line_index, "malformed r[...] marker")),
             }
         }
         if let Some(title) = trimmed.strip_prefix("### Requirement:") {
@@ -760,6 +765,13 @@ mod tests {
         let text = "### Requirement: Title\nr[lattice.example] MUST hold\n\n#### Scenario: Case\nr[lattice.example] MUST hold\n- GIVEN a state\n- WHEN an action\n- THEN a result\n";
         let diagnostics = validate_spec_text("spec.md", text);
         assert!(diagnostics.iter().any(|diagnostic| diagnostic.message == "duplicate r[...] marker identifier"));
+    }
+
+    #[test]
+    fn malformed_marker_lines_are_rejected() {
+        let text = "### Requirement: Title\nr[lattice.example] MUST hold\nr[broken\n\n#### Scenario: Case\nr[lattice.example.scenario]\n- GIVEN a state\n- WHEN an action\n- THEN a result\n";
+        let diagnostics = validate_spec_text("spec.md", text);
+        assert!(diagnostics.iter().any(|diagnostic| diagnostic.message == "malformed r[...] marker"));
     }
 
     #[test]
