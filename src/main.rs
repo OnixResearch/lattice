@@ -31,7 +31,7 @@ use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 use tracing::info;
 
-const LOG_FILE_PATH: &str = "/tmp/lattice.log";
+const LOG_FILE_NAME: &str = "lattice.log";
 const DEFAULT_TRIGGER_HISTORY_LIMIT: usize = 20;
 const ENV_CREDENTIAL_PROVIDER_ID: &str = "env";
 const ENV_CREDENTIAL_PROVIDER_NAME: &str = "Environment";
@@ -439,7 +439,6 @@ async fn main() -> ExitCode {
 
 async fn run_main() -> Result<ExitCode, lattice::error::Error> {
     let args = Args::parse();
-    setup_logging(args.verbose);
 
     let config_path = resolve_config_path(args.config.as_deref(), args.init);
 
@@ -459,6 +458,7 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
     }
 
     let app_config = config::load_app_config(&config_path)?;
+    setup_logging(args.verbose, &app_config.data_dir);
 
     if let Some(CliCommand::Runs(runs_args)) = &args.command {
         return Ok(run_runs_command(&app_config, runs_args));
@@ -564,8 +564,11 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
     }
 }
 
-fn setup_logging(verbose: bool) {
-    let log_file = std::fs::File::create(LOG_FILE_PATH).ok();
+fn setup_logging(verbose: bool, data_dir: &Path) {
+    if std::fs::create_dir_all(data_dir).is_err() {
+        return;
+    }
+    let log_file = std::fs::File::create(data_dir.join(LOG_FILE_NAME)).ok();
     if let Some(file) = log_file {
         tracing_subscriber::fmt()
             .with_env_filter(tracing_subscriber::EnvFilter::from_default_env().add_directive(if verbose {
