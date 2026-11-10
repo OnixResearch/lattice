@@ -32,7 +32,8 @@ manifest in `target/release-readiness/`. Completion results reference both
 retained streams with their BLAKE3 identities. It derives completion status only
 from both the observed process status and `structuredContent.valid`. A CLI-shaped
 receipt is not accepted as MCP evidence. Failure is retained as non-passing; no
-passing status or heavyweight gate result is inferred.
+passing status or heavyweight gate result is inferred. Malformed or timed-out
+responses retain their raw streams and observation without completion inputs.
 
 The source manifest covers maintained source, crates, tests, scripts, examples,
 docs, builtins, contracts, evidence, policy, profiles, Verus sources, lifecycle,

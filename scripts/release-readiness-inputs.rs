@@ -105,7 +105,6 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
     let status = child.wait()?;
     let stdout = stdout_reader.join().map_err(|_| "native stdout reader failed")??;
     let stderr = stderr_reader.join().map_err(|_| "native stderr reader failed")??;
-    let validation: Value = serde_json::from_slice(&stdout)?;
     let observation = json!({
         "schema": "lattice.release-mcp-observation.v1", "command": command,
         "exit_code": status.code().ok_or("native observation terminated without an exit code")?,
@@ -115,15 +114,17 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
         "stderr_hash": blake3::hash(&stderr).to_hex().to_string(),
         "boundary": "actual native MCP lifecycle validation only; heavyweight gates, source correctness and release authorization are not inferred",
     });
-    let inputs = core::completion_inputs(&policy, &command, &validation, &observation, &subject_hash)?;
-    if source_manifest(&root)? != subject || read_bounded(&policy_path)? != policy_bytes {
-        return Err("repository or policy changed during MCP observation; no completion inputs written".into());
-    }
-    // Retain real bytes before their referencing completion records.
+    // Retain real bytes before parsing them or deriving completion records, so
+    // malformed observations remain inspectable.
     write_output(&output.join("validation.json"), &stdout)?;
     write_output(&output.join("validation.stderr"), &stderr)?;
     write_json(&output.join("source-manifest.json"), &subject)?;
     write_json(&output.join("observation.json"), &observation)?;
+    let validation: Value = serde_json::from_slice(&stdout)?;
+    let inputs = core::completion_inputs(&policy, &command, &validation, &observation, &subject_hash)?;
+    if source_manifest(&root)? != subject || read_bounded(&policy_path)? != policy_bytes {
+        return Err("repository or policy changed during MCP observation; no completion inputs written".into());
+    }
     write_json(&root.join(core::CONTRACT_PATH), &inputs.contract)?;
     write_json(&root.join(core::RESULTS_PATH), &inputs.results)?;
     println!(
