@@ -26,7 +26,8 @@ impl Fixture {
     }
 
     pub fn command(&self) -> Command {
-        let program = std::env::var_os("LATTICE_CAIRN_BIN").unwrap_or_else(|| "cairn".into());
+        let program = std::env::var_os("LATTICE_CAIRN_BIN")
+            .expect("LATTICE_CAIRN_BIN must point at the pinned native Cairn binary; run inside nix develop");
         let mut command = Command::new(program);
         command.current_dir(self.root.path()).env_remove("CAIRN_GLOBAL_REGISTRY");
         command
