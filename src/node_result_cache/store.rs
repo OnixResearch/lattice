@@ -135,7 +135,7 @@ impl<V> Memoizer<V> {
             let mut guard = self.state.lock().map_err(|_| Error::LockPoisoned)?;
             let generation = next_generation(guard.generation)?;
             guard.generation = generation;
-            let mut deferred = Vec::with_capacity(self.config.capacity_entries.get());
+            let mut deferred = Vec::new();
 
             if let Some(replaced) = guard.entries.remove(&key) {
                 deferred.push((key, replaced.value));
