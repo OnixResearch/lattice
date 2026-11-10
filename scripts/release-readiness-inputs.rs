@@ -6,8 +6,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-blake3 = "1.8.3"
-serde_json = "1.0.149"
+blake3 = "=1.8.5"
+serde_json = "=1.0.149"
 ---
 
 #[path = "release_readiness/core.rs"]
