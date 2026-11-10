@@ -31,16 +31,19 @@ jobs:
         run: git config --global url.https://github.com/.insteadOf ssh://git@github.com/
 
       - name: Run hardened check harness
+        timeout-minutes: 240
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: "true"
         run: ./scripts/check.rs
 
       - name: Run Octet precommit gate
+        timeout-minutes: 60
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: "true"
         run: nix develop . -c octet-precommit-check
 
       - name: Run Nix flake checks
+        timeout-minutes: 240
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: "true"
         run: nix flake check -L --option secret-key-files ''
