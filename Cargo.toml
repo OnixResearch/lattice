@@ -105,7 +105,6 @@ rat-tree = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-tree" }
 rat-table = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-table" }
 rat-editor = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-editor" }
 home = "0.5.12"
-dirs-next = "2.0.0"
 cap-std = "4.0.2"
 bounded-exec = { git = "https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git", rev = "29dac88ecded94457572db3fdfaaaab95fa91525" }
 which = "8.0.0"
