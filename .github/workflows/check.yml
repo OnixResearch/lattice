@@ -36,6 +36,8 @@ jobs:
         run: ./scripts/check.rs
 
       - name: Run Octet precommit gate
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: "true"
         run: nix develop . -c octet-precommit-check
 
       - name: Run Nix flake checks
