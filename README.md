@@ -238,10 +238,11 @@ nix flake check -L --option secret-key-files ''
 ```
 
 `scripts/check.rs` runs operator end-to-end checks, boundary guards, formatting,
-Nickel policy and example typechecks, focused checks, tests, Clippy, and
-specification validation. The Octet gate rejects new finding IDs outside the
-reviewed baseline. The Nix command disables host signing keys only for that
-check invocation; it does not change normal package or release signing policy.
+Nickel policy typechecks and generated-policy freshness, example typechecks,
+focused checks, tests, Clippy, and specification validation. The Octet gate
+rejects new finding IDs outside the reviewed baseline. The Nix command disables
+host signing keys only for that check invocation; it does not change normal
+package or release signing policy.
 
 Integration tests that invoke Cairn require `LATTICE_CAIRN_BIN`; the
 development shell sets it to the pinned native binary. Running `cargo test`
