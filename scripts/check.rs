@@ -100,7 +100,7 @@ const OPERATION_CONTRACT_TEST_ARGS: &[&str] = &[
     "--test",
     "test_operation_cli",
 ];
-const TEST_ARGS: &[&str] = &["test", "--workspace"];
+const TEST_ARGS: &[&str] = &["test", "--workspace", "--locked"];
 const CLIPPY_ARGS: &[&str] = &[
     "clippy",
     "--workspace",
@@ -108,6 +108,7 @@ const CLIPPY_ARGS: &[&str] = &[
     "lattice-repository-validation-fixture",
     "--all-targets",
     "--no-deps",
+    "--locked",
     "--",
     "-D",
     "warnings",
