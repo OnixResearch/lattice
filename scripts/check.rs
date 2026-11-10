@@ -558,6 +558,12 @@ fn validate_requirement(path: &str, lines: &[&str], heading_index: usize, diagno
     }
 }
 
+fn is_clause(line: &str, keyword: &str) -> bool {
+    line.strip_prefix(keyword)
+        .and_then(|rest| rest.strip_prefix(' '))
+        .is_some_and(|text| !text.trim().is_empty())
+}
+
 fn validate_scenario(path: &str, lines: &[&str], heading_index: usize, diagnostics: &mut Vec<SpecDiagnostic>) {
     let Some(marker_index) = next_nonempty_line_index(lines, heading_index) else {
         diagnostics.push(diagnostic(path, heading_index, "scenario heading must be followed by an r[...] marker line"));
@@ -576,11 +582,11 @@ fn validate_scenario(path: &str, lines: &[&str], heading_index: usize, diagnosti
     let scenario_text = scenario_lines.map(|line| line.trim()).collect::<Vec<_>>();
 
     for required_clause in ["- GIVEN", "- WHEN", "- THEN"] {
-        if !scenario_text.iter().any(|line| line.starts_with(required_clause)) {
+        if !scenario_text.iter().any(|line| is_clause(line, required_clause)) {
             diagnostics.push(diagnostic(
                 path,
                 heading_index,
-                &format!("scenario must include a {required_clause} clause"),
+                &format!("scenario must include a non-empty {required_clause} clause"),
             ));
         }
     }
@@ -615,6 +621,7 @@ fn status_exit_code(code: Option<i32>) -> ExitCode {
 
 #[cfg(test)]
 mod tests {
+    use super::is_clause;
     use super::is_marker;
 
     #[test]
@@ -626,5 +633,16 @@ mod tests {
         assert!(!is_marker("r[lattice.example"));
         assert!(!is_marker("r[[nested]]"));
         assert!(!is_marker("not-a-marker"));
+    }
+
+    #[test]
+    fn clauses_require_separated_non_empty_text() {
+        assert!(is_clause("- GIVEN a state", "- GIVEN"));
+        assert!(is_clause("- WHEN  an action", "- WHEN"));
+        assert!(is_clause("- THEN a result", "- THEN"));
+        assert!(!is_clause("- GIVEN", "- GIVEN"));
+        assert!(!is_clause("- GIVEN   ", "- GIVEN"));
+        assert!(!is_clause("- WHENEVER a condition", "- WHEN"));
+        assert!(!is_clause("GIVEN a state", "- GIVEN"));
     }
 }
