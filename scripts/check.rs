@@ -112,8 +112,11 @@ const FORMAT_CHECK_ARGS: &[&str] = &[
     "--package",
     "lattice-workflow-transport",
 ];
-const POLICY_TYPECHECK_ARGS: &[&str] = &["typecheck", "cairn-policy/default.ncl"];
-const INVENTORY_POLICY_TYPECHECK_ARGS: &[&str] = &["typecheck", "cairn-policy/traceability-inventory.ncl"];
+const POLICY_TYPECHECK_ARGS: &[&str] = &[
+    "typecheck",
+    "cairn-policy/default.ncl",
+    "cairn-policy/traceability-inventory.ncl",
+];
 const FOCUSED_CONSUMER_CHECK_ARGS: &[&str] = &["check", "--package", "lattice", "--all-targets", "--locked"];
 const ALL_FEATURES_CHECK_ARGS: &[&str] = &[
     "check",
@@ -300,12 +303,6 @@ const COMMAND_STEPS: &[CheckStep] = &[
         name: "policy typecheck",
         program: "nickel",
         args: POLICY_TYPECHECK_ARGS,
-        use_repo_local_target: false,
-    },
-    CheckStep {
-        name: "inventory policy typecheck",
-        program: "nickel",
-        args: INVENTORY_POLICY_TYPECHECK_ARGS,
         use_repo_local_target: false,
     },
     CheckStep {
