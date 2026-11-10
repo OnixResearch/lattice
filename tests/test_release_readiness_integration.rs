@@ -103,6 +103,9 @@ fn observation_paths_share_the_output_root_and_are_distinct() {
     ];
     for path in paths {
         assert!(path.starts_with(release_inputs::OUTPUT_ROOT), "{path}");
+        let parsed = std::path::Path::new(path);
+        assert!(parsed.is_relative(), "{path}");
+        assert!(parsed.components().all(|component| matches!(component, std::path::Component::Normal(_))), "{path}");
     }
     for (index, path) in paths.iter().enumerate() {
         for other in &paths[index + 1..] {
