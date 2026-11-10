@@ -68,12 +68,13 @@ and their lockfiles; do not substitute sibling checkouts or floating revisions.
 
 The component and asynchronous CI adapters also consume exact native Basalt,
 Mantle and hardened-runtime snapshots under `vendor-cargo-deps/`, with producer
-revisions and archive members recorded in each `SOURCE`. Maintain them through
-the [repository-owned import procedure](vendor-cargo-deps/README.md), not sibling
-dependency overrides or edits to imported source. Local correction cohorts are
-not remote-publication evidence. The actual Valence build-service validator is
-separately locked to `15e72b5a330b08139ac7c809ac31e7e87f825b22` over GitHub SSH;
-it and its exact Artifact dependencies require authorized acquisition or caches.
+revisions and archive selections recorded in each `SOURCE` or the vendor import
+notes. Maintain them through the [repository-owned import
+procedure](vendor-cargo-deps/README.md), not sibling dependency overrides or
+edits to imported source. Local correction cohorts are not remote-publication
+evidence. The actual Valence build-service validator is separately locked to
+`15e72b5a330b08139ac7c809ac31e7e87f825b22` over GitHub SSH; it and its exact
+Artifact dependencies require authorized acquisition or caches.
 
 ### Import and export a workflow
 
