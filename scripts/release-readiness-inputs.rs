@@ -1,4 +1,4 @@
-#!/usr/bin/env -S CARGO_TARGET_DIR=/tmp/lattice-release-inputs nix shell "github:nix-community/fenix?rev=7b33c6466f781cd699fe250c5b69dc4193da67a7#minimal.toolchain" nixpkgs#gcc -c cargo -q -Zscript
+#!/usr/bin/env -S CARGO_TARGET_DIR=/tmp/lattice-release-inputs nix shell "github:nix-community/fenix?rev=7b33c6466f781cd699fe250c5b69dc4193da67a7#minimal.toolchain" nixpkgs#gcc nixpkgs#coreutils -c cargo -q -Zscript
 ---cargo
 [package]
 name = "lattice-release-readiness-inputs"
