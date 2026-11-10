@@ -567,10 +567,7 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
 #[cfg(unix)]
 const PRIVATE_LOG_FILE_MODE: u32 = 0o600;
 
-fn setup_logging(verbose: bool, data_dir: &Path) {
-    if std::fs::create_dir_all(data_dir).is_err() {
-        return;
-    }
+fn open_log_file(data_dir: &Path) -> std::io::Result<std::fs::File> {
     let log_path = data_dir.join(LOG_FILE_NAME);
     let mut options = std::fs::OpenOptions::new();
     options.create(true).write(true).truncate(true);
@@ -579,14 +576,22 @@ fn setup_logging(verbose: bool, data_dir: &Path) {
         use std::os::unix::fs::OpenOptionsExt;
         options.mode(PRIVATE_LOG_FILE_MODE);
     }
-    let Ok(file) = options.open(&log_path) else {
-        return;
-    };
+    let file = options.open(&log_path)?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(&log_path, std::fs::Permissions::from_mode(PRIVATE_LOG_FILE_MODE));
+        std::fs::set_permissions(&log_path, std::fs::Permissions::from_mode(PRIVATE_LOG_FILE_MODE))?;
     }
+    Ok(file)
+}
+
+fn setup_logging(verbose: bool, data_dir: &Path) {
+    if std::fs::create_dir_all(data_dir).is_err() {
+        return;
+    }
+    let Ok(file) = open_log_file(data_dir) else {
+        return;
+    };
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env().add_directive(if verbose {
             tracing::Level::DEBUG.into()
@@ -2038,4 +2043,21 @@ fn init_config(config_path: &Path) -> Result<(), lattice::error::Error> {
         .map_err(|error| lattice::error::Error::Config {
             message: error.to_string(),
         })
+}
+
+#[cfg(test)]
+mod tests {
+    #[cfg(unix)]
+    #[test]
+    fn log_file_is_private() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let directory = tempfile::tempdir().expect("temporary log directory");
+        super::open_log_file(directory.path()).expect("log file opens");
+        let mode = std::fs::metadata(directory.path().join(super::LOG_FILE_NAME))
+            .expect("log file exists")
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, super::PRIVATE_LOG_FILE_MODE);
+    }
 }
