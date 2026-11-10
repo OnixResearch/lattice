@@ -8,4 +8,9 @@ lifecycle, workflow, receipt, and validation policy.
 
 `traceability-contracts.ncl` adds Lattice-owned component-wise admission for those roots. It rejects absolute, empty, dot, parent-traversing and non-normalized components without changing either upstream snapshot.
 
+`release-selection-contracts.ncl` adds Lattice-owned admission for the release
+selection extension: a non-empty list of unique, non-empty command strings plus
+explicit completion output paths. `default.ncl` applies this contract to the
+authored policy; it is not test-only metadata.
+
 The snapshot supplies policy structure only. It does not transfer Cairn correctness, Lattice correctness, release authority, or evidence authority.
