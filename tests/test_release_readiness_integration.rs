@@ -203,6 +203,13 @@ fn manifest_bounds_reject_oversized_manifests() {
     let byte_error =
         release_inputs::check_manifest_bounds(0, release_inputs::MAX_MANIFEST_BYTES + 1).expect_err("byte limit");
     assert!(byte_error.contains(&(release_inputs::MAX_MANIFEST_BYTES + 1).to_string()));
+    assert!(
+        release_inputs::check_manifest_bounds(
+            release_inputs::MAX_MANIFEST_FILES + 1,
+            release_inputs::MAX_MANIFEST_BYTES + 1
+        )
+        .is_err()
+    );
 }
 
 #[test]
