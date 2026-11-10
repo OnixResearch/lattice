@@ -117,6 +117,7 @@ fn release_selection_contract_rejects_empty_or_malformed_commands() -> TestResul
     for commands in [
         json!([]),
         json!([""]),
+        json!(["   "]),
         json!([1]),
         json!(["scripts/check.rs", "scripts/check.rs"]),
     ] {

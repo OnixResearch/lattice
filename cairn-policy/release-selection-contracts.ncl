@@ -5,7 +5,7 @@
 let Commands = std.contract.from_predicate (fun values =>
   std.is_array values
   && std.array.length values > 0
-  && std.array.all (fun value => std.is_string value && std.string.length value > 0) values
+  && std.array.all (fun value => std.is_string value && std.string.trim value != "") values
   && std.array.all
     (fun value => std.array.length (std.array.filter (fun other => other == value) values) == 1)
     values
