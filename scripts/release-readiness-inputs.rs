@@ -25,6 +25,7 @@ use serde_json::Value;
 use serde_json::json;
 
 const MAX_BYTES: u64 = 16 * 1024 * 1024;
+const MAX_FILES: usize = 50_000;
 const NATIVE_TIMEOUT: &str = "60s";
 
 fn main() -> ExitCode {
@@ -231,6 +232,9 @@ fn source_manifest(root: &Path) -> Result<Value, Box<dyn std::error::Error>> {
         } else if metadata.is_file() {
             let digest = blake3::hash(&read_bounded(&path)?).to_hex().to_string();
             files.insert(relative.to_string_lossy().into_owned(), digest);
+            if files.len() > MAX_FILES {
+                return Err(format!("release source manifest exceeds {MAX_FILES} files").into());
+            }
         } else {
             return Err(format!("release source manifest rejects special file {}", relative.display()).into());
         }
