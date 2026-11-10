@@ -100,6 +100,14 @@ const FORMAT_CHECK_ARGS: &[&str] = &[
     "lattice-workflow-transport",
 ];
 const FOCUSED_CONSUMER_CHECK_ARGS: &[&str] = &["check", "--package", "lattice", "--all-targets"];
+const ALL_FEATURES_CHECK_ARGS: &[&str] = &[
+    "check",
+    "--package",
+    "lattice",
+    "--all-features",
+    "--all-targets",
+    "--locked",
+];
 // r[impl lattice.agent_evaluation.verification]
 const AGENT_EVALUATION_TEST_ARGS: &[&str] = &[
     "test",
@@ -270,6 +278,12 @@ const COMMAND_STEPS: &[CheckStep] = &[
         name: "operation contracts",
         program: CARGO_PROGRAM,
         args: OPERATION_CONTRACT_TEST_ARGS,
+        use_repo_local_target: true,
+    },
+    CheckStep {
+        name: "all features",
+        program: CARGO_PROGRAM,
+        args: ALL_FEATURES_CHECK_ARGS,
         use_repo_local_target: true,
     },
     CheckStep {
