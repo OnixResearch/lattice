@@ -21,7 +21,7 @@ fn observed_inputs(valid: bool, exit_code: i32) -> Result<release_inputs::Comple
             "cairn_validate".into(),
         ],
         &json!({"isError": false, "structuredContent": {"valid": valid, "mcp": {"read_only": true}}}),
-        &json!({"exit_code": exit_code, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash, "subject_hash": hash, "policy_hash": policy_hash}),
+        &json!({"command": ["native-cairn", "mcp", "--call", "cairn_validate"], "exit_code": exit_code, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash, "subject_hash": hash, "policy_hash": policy_hash}),
         &hash,
     )
 }
@@ -66,13 +66,13 @@ fn mcp_completion_status_requires_both_native_success_and_passing_verdict() -> T
             &json!({}),
             &["cairn".into()],
             &json!({"valid": true}),
-            &json!({"exit_code": 0, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash, "subject_hash": hash, "policy_hash": release_inputs::json_hash(&json!({}))}),
+            &json!({"command": ["cairn"], "exit_code": 0, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash, "subject_hash": hash, "policy_hash": release_inputs::json_hash(&json!({}))}),
             &hash
         )
         .is_err(),
         "a CLI-shaped verdict must not be relabelled as MCP execution evidence"
     );
-    let valid_observation = json!({"exit_code": 0, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash, "subject_hash": hash, "policy_hash": release_inputs::json_hash(&json!({}))});
+    let valid_observation = json!({"command": ["cairn"], "exit_code": 0, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash, "subject_hash": hash, "policy_hash": release_inputs::json_hash(&json!({}))});
     assert!(
         release_inputs::completion_inputs(
             &json!({}),
@@ -134,6 +134,43 @@ fn mcp_completion_status_requires_both_native_success_and_passing_verdict() -> T
         )
         .is_err(),
         "an observation without a retained stderr identity must not be accepted"
+    );
+    Ok(())
+}
+
+#[test]
+fn completion_inputs_bind_the_observed_command() -> TestResult {
+    // r[verify lattice.release_integration.inputs.mcp]
+    let policy = json!({});
+    let hash = release_inputs::json_hash(&json!("observed-test-bytes"));
+    let validation = json!({"isError": false, "structuredContent": {"valid": true, "mcp": {"read_only": true}}});
+    let command = vec![
+        "cairn".to_string(),
+        "mcp".to_string(),
+        "--call".to_string(),
+        "cairn_validate".to_string(),
+    ];
+    let observation = json!({
+        "command": ["cairn", "mcp", "--call", "cairn_validate"],
+        "exit_code": 0,
+        "stdout_hash": hash,
+        "stderr_hash": hash,
+        "native_binary_hash": hash,
+        "subject_hash": hash,
+        "policy_hash": release_inputs::json_hash(&policy),
+    });
+    assert!(release_inputs::completion_inputs(&policy, &command, &validation, &observation, &hash).is_ok());
+    let mut mismatched = observation.clone();
+    mismatched["command"] = json!(["cairn", "mcp", "--call", "cairn_status"]);
+    assert!(
+        release_inputs::completion_inputs(&policy, &command, &validation, &mismatched, &hash).is_err(),
+        "an observation for a different command was accepted"
+    );
+    let mut missing = observation;
+    missing.as_object_mut().ok_or("observation object")?.remove("command");
+    assert!(
+        release_inputs::completion_inputs(&policy, &command, &validation, &missing, &hash).is_err(),
+        "an observation without a command was accepted"
     );
     Ok(())
 }
@@ -237,7 +274,7 @@ fn completion_inputs_reject_malformed_identity_hashes() -> TestResult {
         "subject_hash",
         "policy_hash",
     ] {
-        let mut observation = json!({"exit_code": 0, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash, "subject_hash": hash, "policy_hash": release_inputs::json_hash(&json!({}))});
+        let mut observation = json!({"command": ["cairn"], "exit_code": 0, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash, "subject_hash": hash, "policy_hash": release_inputs::json_hash(&json!({}))});
         observation[field] = json!("not-a-blake3-digest");
         assert!(
             release_inputs::completion_inputs(&json!({}), &["cairn".into()], &validation, &observation, &hash).is_err(),
@@ -251,6 +288,7 @@ fn completion_inputs_reject_malformed_identity_hashes() -> TestResult {
     }
     let uppercase = "A".repeat(64);
     let uppercase_observation = json!({
+        "command": ["cairn"],
         "exit_code": 0,
         "stdout_hash": uppercase,
         "stderr_hash": hash,
@@ -264,6 +302,7 @@ fn completion_inputs_reject_malformed_identity_hashes() -> TestResult {
         "an uppercase identity was accepted"
     );
     let uppercase_subject_observation = json!({
+        "command": ["cairn"],
         "exit_code": 0,
         "stdout_hash": hash,
         "stderr_hash": hash,
@@ -283,6 +322,7 @@ fn completion_inputs_reject_malformed_identity_hashes() -> TestResult {
         "an uppercase subject identity was accepted"
     );
     let mismatched = json!({
+        "command": ["cairn"],
         "exit_code": 0,
         "stdout_hash": hash,
         "stderr_hash": hash,
@@ -307,7 +347,7 @@ fn completion_inputs_reject_malformed_identity_hashes() -> TestResult {
             &json!({}),
             &["cairn".into()],
             &validation,
-            &json!({"exit_code": 0, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash, "subject_hash": hash, "policy_hash": release_inputs::json_hash(&json!({}))}),
+            &json!({"command": ["cairn"], "exit_code": 0, "stdout_hash": hash, "stderr_hash": hash, "native_binary_hash": hash, "subject_hash": hash, "policy_hash": release_inputs::json_hash(&json!({}))}),
             "not-a-blake3-digest"
         )
         .is_err(),

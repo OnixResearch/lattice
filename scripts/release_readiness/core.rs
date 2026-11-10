@@ -66,6 +66,15 @@ pub fn completion_inputs(
     if command.iter().any(|argument| argument.is_empty()) {
         return Err("observed command contains an empty argument".to_string());
     }
+    let observed_command = observation["command"].as_array().ok_or("native observation command is absent")?;
+    if observed_command.len() != command.len()
+        || observed_command
+            .iter()
+            .zip(command)
+            .any(|(observed, expected)| observed.as_str() != Some(expected.as_str()))
+    {
+        return Err("native observation command does not match the observed invocation".to_string());
+    }
     if validation["isError"] != false || validation["structuredContent"]["mcp"]["read_only"] != true {
         return Err("native MCP validation envelope is absent or invalid".to_string());
     }
