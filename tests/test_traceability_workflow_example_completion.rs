@@ -128,7 +128,7 @@ fn both_workflow_example_rows_are_exact_byte_bound_and_unpromoted() {
     assert!(marker_issues.is_empty(), "marker issues: {marker_issues:?}");
     for row in report.rows.iter().filter(|row| IDS.contains(&row.requirement_id.as_str())) {
         for evidence in &row.evidence {
-            assert_eq!(actual.get(evidence.path.as_str()), Some(&evidence.blake3));
+            assert_eq!(actual.get(evidence.path.as_str()), Some(&evidence.blake3), "evidence path {}", evidence.path);
         }
     }
 }

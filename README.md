@@ -124,6 +124,8 @@ cargo run --locked -- --config "$demo/config.ncl" authority inspect daily-digest
 
 Inspection prints exact workflow, machine, and policy identities and required
 grant tuples. It does not grant authority, change the store, or execute nodes.
+Runtime file logs live at `$data_dir/lattice.log` with owner-only permissions on
+Unix; pass `--verbose` to select debug-level records.
 Follow the [operator-profile steps](docs/choregraph-effect-authority.md#standalone-operator-profile)
 to review those requirements, select a finite-lived profile, and rerun the same
 command. The same configured provider is used by TUI, scheduler, orchestration,

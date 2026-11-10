@@ -282,7 +282,12 @@ fn all_agent_runtime_rows_are_exact_byte_bound_and_unpromoted() {
     );
     for row in report.rows.iter().filter(|row| SELECTED.contains(&row.requirement_id.as_str())) {
         for evidence in &row.evidence {
-            assert_eq!(blake3::hash(source(&evidence.path).as_bytes()).to_hex().to_string(), evidence.blake3);
+            assert_eq!(
+                blake3::hash(source(&evidence.path).as_bytes()).to_hex().to_string(),
+                evidence.blake3,
+                "evidence path {}",
+                evidence.path
+            );
         }
     }
 }

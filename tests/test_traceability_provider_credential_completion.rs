@@ -240,7 +240,12 @@ fn seven_provider_rows_retain_their_historical_exact_review() {
         if selected.contains(row.requirement_id.as_str()) {
             assert_eq!(row.classification, EXACT_CLASSIFICATION);
             for evidence in &row.evidence {
-                assert_eq!(hashes.get(evidence.path.as_str()), Some(&evidence.blake3));
+                assert_eq!(
+                    hashes.get(evidence.path.as_str()),
+                    Some(&evidence.blake3),
+                    "evidence path {}",
+                    evidence.path
+                );
             }
         } else if row.classification != UNASSESSED_CLASSIFICATION {
             assert_eq!(row.classification, PARTIAL_CLASSIFICATION);

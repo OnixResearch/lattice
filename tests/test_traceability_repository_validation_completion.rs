@@ -278,7 +278,12 @@ fn all_repository_validation_rows_are_exact_byte_bound_and_unpromoted() {
     assert_eq!(selected.count(), SELECTED_COUNT);
     for row in report.rows.iter().filter(|row| SELECTED_IDS.contains(&row.requirement_id.as_str())) {
         for evidence in &row.evidence {
-            assert_eq!(blake3::hash(source(&evidence.path).as_bytes()).to_hex().to_string(), evidence.blake3);
+            assert_eq!(
+                blake3::hash(source(&evidence.path).as_bytes()).to_hex().to_string(),
+                evidence.blake3,
+                "evidence path {}",
+                evidence.path
+            );
         }
     }
 }
