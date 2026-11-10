@@ -51,6 +51,10 @@ The policy declares these actual input paths:
 - `target/release-readiness/mcp-results.json`
 - `fixtures/release-readiness/canonicalization.json`
 
+The GitHub check workflow runs the hardened harness, the Octet precommit gate,
+and the Nix flake checks in that order, then rejects any tracked or untracked
+output left outside ignored paths.
+
 The completion contract selects only the observed native MCP lifecycle
 validation. Its BLAKE3 identities bind the exact command, policy, source manifest,
 raw evidence and observed process facts. It does not claim that tests, Octet,
