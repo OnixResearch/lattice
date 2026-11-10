@@ -42,9 +42,10 @@ docs, builtins, contracts, evidence, policy, profiles, Verus sources, lifecycle,
 release vectors, vendored source snapshots, root manifests/lockfiles, license,
 and toolchain, CI, or check configuration, excluding nested build/VCS
 directories and vendored lifecycle or agent metadata, as well as host metadata
-files such as `.DS_Store` and `Thumbs.db` and editor temporary files such as
-`.swp`, `.swo`, and `~` backups. Non-UTF-8 paths are rejected rather
-than lossily collapsed into a manifest key. The manifest admits
+files such as `.DS_Store` and `Thumbs.db`, editor temporary files such as
+`.swp`, `.swo`, and `~` backups, IDE directories, and runtime databases or
+sockets. Non-UTF-8 paths are rejected rather than lossily collapsed into a
+manifest key. The manifest admits
 at most 50,000 files, each at most 16 MiB, totaling at most 4 GiB. Source, policy,
 and the native executable must remain unchanged while the observation executes;
 all three are rechecked before completion inputs are written. The script
