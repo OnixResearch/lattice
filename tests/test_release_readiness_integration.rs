@@ -90,6 +90,11 @@ fn completion_inputs_reject_malformed_identity_hashes() -> TestResult {
             release_inputs::completion_inputs(&json!({}), &["cairn".into()], &validation, &observation, &hash).is_err(),
             "malformed {field} was accepted"
         );
+        observation.as_object_mut().ok_or("observation object")?.remove(field);
+        assert!(
+            release_inputs::completion_inputs(&json!({}), &["cairn".into()], &validation, &observation, &hash).is_err(),
+            "missing {field} was accepted"
+        );
     }
     assert!(
         release_inputs::completion_inputs(
