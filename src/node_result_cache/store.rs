@@ -155,14 +155,17 @@ impl<V> Memoizer<V> {
 
             let active_entries = usize_to_u64(guard.entries.len())?;
             let high_watermark_entries = usize_to_u64(self.config.high_watermark_entries)?;
+            let low_watermark_entries = usize_to_u64(self.config.low_watermark_entries)?;
             let order = if active_entries > high_watermark_entries {
-                eviction_order(&guard, self.config.promotion_threshold)?
+                let remove_count =
+                    usize::try_from(active_entries - low_watermark_entries).map_err(|_| Error::CountOverflow)?;
+                eviction_order(&guard, self.config.promotion_threshold, remove_count)?
             } else {
                 Vec::new()
             };
             let trim = super::core::watermark_trim_plan(super::core::WatermarkInput {
                 active_entries,
-                low_watermark_entries: usize_to_u64(self.config.low_watermark_entries)?,
+                low_watermark_entries,
                 high_watermark_entries,
                 eviction_order: &order,
             })?;
@@ -236,10 +239,11 @@ fn select_from_state<V>(state: &State<V>, promotion_threshold: u8) -> Result<Opt
     super::core::select_eviction(&records(state), promotion_threshold).map_err(Error::from)
 }
 
-fn eviction_order<V>(state: &State<V>, promotion_threshold: u8) -> Result<Vec<super::core::Key>, Error> {
+fn eviction_order<V>(state: &State<V>, promotion_threshold: u8, limit: usize) -> Result<Vec<super::core::Key>, Error> {
     let mut candidates = records(state);
-    let mut order = Vec::with_capacity(candidates.len());
-    while !candidates.is_empty() {
+    let limit = limit.min(candidates.len());
+    let mut order = Vec::with_capacity(limit);
+    while order.len() < limit {
         let selected =
             super::core::select_eviction(&candidates, promotion_threshold)?.ok_or(Error::PlannedEntryMissing)?;
         order.push(selected);
