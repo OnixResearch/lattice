@@ -222,8 +222,9 @@ fn source_manifest(root: &Path) -> Result<Value, Box<dyn std::error::Error>> {
         if metadata.is_dir() {
             for entry in fs::read_dir(&path)? {
                 let name = entry?.file_name();
-                let vendor_lifecycle = name == ".cairn" && relative.starts_with("vendor-cargo-deps");
-                if name != "target" && name != ".git" && name != ".direnv" && !vendor_lifecycle {
+                let vendor_metadata = (name == ".cairn" || name == ".pi" || name == ".autoresearch")
+                    && relative.starts_with("vendor-cargo-deps");
+                if name != "target" && name != ".git" && name != ".direnv" && !vendor_metadata {
                     pending.push(relative.join(name));
                 }
             }
