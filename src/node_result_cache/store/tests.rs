@@ -126,6 +126,21 @@ fn map_execution_error(error: LookupOrExecuteError<&'static str>) -> Error {
     }
 }
 
+#[test]
+fn cache_insert_failure_preserves_the_executed_value() -> Result<(), Error> {
+    let memoizer =
+        Memoizer::new(config(Some(SINGLE_SLOT_CAPACITY), super::super::core::STRICT_LRU_PROMOTION_THRESHOLD))?;
+    {
+        let mut state = memoizer.state.lock().map_err(|_| Error::LockPoisoned)?;
+        state.generation = u64::MAX - 1;
+    }
+    let value = memoizer
+        .get_or_execute(key(FIRST_KEY_BYTE), || Ok::<_, &'static str>("value"))
+        .map_err(map_execution_error)?;
+    assert_eq!(*value, "value");
+    Ok(())
+}
+
 struct DropProbe {
     state: Weak<std::sync::Mutex<State<DropProbe>>>,
     dropped_after_unlock: std::sync::Arc<AtomicBool>,

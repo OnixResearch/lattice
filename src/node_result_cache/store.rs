@@ -133,7 +133,10 @@ impl<V> Memoizer<V> {
     // r[impl lattice.node_result_cache.bound]
     // r[impl lattice.node_result_cache.deferral]
     pub fn insert(&self, key: super::core::Key, value: V) -> Result<Inserted<V>, Error> {
-        let value = std::sync::Arc::new(value);
+        self.insert_arc(key, std::sync::Arc::new(value))
+    }
+
+    fn insert_arc(&self, key: super::core::Key, value: std::sync::Arc<V>) -> Result<Inserted<V>, Error> {
         let (report, deferred_values) = {
             let mut guard = self.state.lock().map_err(|_| Error::LockPoisoned)?;
             let generation = next_generation(guard.generation)?;
@@ -197,8 +200,14 @@ impl<V> Memoizer<V> {
         if let Some(value) = self.get(key).map_err(LookupOrExecuteError::Store)? {
             return Ok(value);
         }
-        let value = execute().map_err(LookupOrExecuteError::Executor)?;
-        self.insert(key, value).map(|inserted| inserted.value).map_err(LookupOrExecuteError::Store)
+        let value = std::sync::Arc::new(execute().map_err(LookupOrExecuteError::Executor)?);
+        match self.insert_arc(key, std::sync::Arc::clone(&value)) {
+            Ok(inserted) => Ok(inserted.value),
+            Err(error) => {
+                tracing::warn!(error = %error, "failed to cache executed node result");
+                Ok(value)
+            }
+        }
     }
 }
 

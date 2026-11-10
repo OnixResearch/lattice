@@ -51,8 +51,9 @@ after the guard is released. This prevents user destructors from running in the
 synchronization boundary.
 
 `get_or_execute` returns a cached value on a hit. On a miss, it calls the
-supplied executor closure without changing the executor result or error. A
-concurrent miss can still execute more than once because the cache is advisory.
+supplied executor closure without changing the executor result or error; a
+cache insert failure is logged and the executed value is returned. A concurrent
+miss can still execute more than once because the cache is advisory.
 
 ## Contract status
 
