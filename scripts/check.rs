@@ -64,6 +64,9 @@ const ORCHESTRATION_IDENTITY_SCRIPT_FORMAT_ARGS: &[&str] = &[
     "2024",
     "scripts/check-orchestration-identity-boundary.rs",
 ];
+// Cargo scripts generate their own lockfile under the target directory; a fresh
+// target has none, so these invocations cannot use --locked. Each script pins
+// its direct dependencies exactly.
 const INVENTORY_SCRIPT_SMOKE_ARGS: &[&str] = &[
     "-q",
     "-Zscript",
