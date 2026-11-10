@@ -123,6 +123,9 @@ mantle-wasm-consumer-verifier = { path = "vendor-cargo-deps/mantle/crates/mantle
 valence-core = { git = "ssh://git@github.com/OnixResearch/valence.git", rev = "15e72b5a330b08139ac7c809ac31e7e87f825b22" }
 zeroize = "1"
 
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [dev-dependencies]
 nickel-lang-core = "=0.18.0"
 pretty_assertions = "1.4"

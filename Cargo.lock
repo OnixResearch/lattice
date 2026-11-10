@@ -3173,6 +3173,7 @@ dependencies = [
  "lattice-repository-validation-fixture",
  "lattice-workflow-contract",
  "lattice-workflow-transport",
+ "libc",
  "madsim",
  "mantle-build-contract",
  "mantle-wasm-consumer-verifier",

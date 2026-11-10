@@ -574,7 +574,7 @@ fn open_log_file(data_dir: &Path) -> std::io::Result<std::fs::File> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;
-        options.mode(PRIVATE_LOG_FILE_MODE);
+        options.mode(PRIVATE_LOG_FILE_MODE).custom_flags(libc::O_NOFOLLOW);
     }
     let file = options.open(&log_path)?;
     #[cfg(unix)]
@@ -2059,5 +2059,17 @@ mod tests {
             .permissions()
             .mode();
         assert_eq!(mode & 0o777, super::PRIVATE_LOG_FILE_MODE);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn log_file_open_rejects_symlink() {
+        let directory = tempfile::tempdir().expect("temporary log directory");
+        let victim = directory.path().join("victim");
+        std::fs::write(&victim, b"keep").expect("victim file writes");
+        std::os::unix::fs::symlink(&victim, directory.path().join(super::LOG_FILE_NAME)).expect("log symlink creates");
+
+        assert!(super::open_log_file(directory.path()).is_err());
+        assert_eq!(std::fs::read(victim).expect("victim file reads"), b"keep");
     }
 }
