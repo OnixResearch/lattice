@@ -1,4 +1,12 @@
-use crate::{ActivationReceipt, AdmissionError, AdmittedBinding, BindingPlan, BindingRequest, PaneObservation, SourceIdentity, TILE_REVISION, Trigger};
+use crate::ActivationReceipt;
+use crate::AdmissionError;
+use crate::AdmittedBinding;
+use crate::BindingPlan;
+use crate::BindingRequest;
+use crate::PaneObservation;
+use crate::SourceIdentity;
+use crate::TILE_REVISION;
+use crate::Trigger;
 
 fn validate_source(source: &SourceIdentity) -> Result<(), AdmissionError> {
     if source.producer_revision.is_empty() {
@@ -20,7 +28,6 @@ pub fn validate_request(request: &BindingRequest) -> Result<(), AdmissionError> 
     Ok(())
 }
 
-
 // r[impl lattice.compose_surface.admission]
 pub fn admit(observation: PaneObservation, request: BindingRequest) -> Result<AdmittedBinding, AdmissionError> {
     validate_request(&request)?;
@@ -41,7 +48,10 @@ pub fn admit(observation: PaneObservation, request: BindingRequest) -> Result<Ad
 // r[impl lattice.compose_surface.plan]
 pub fn plan(admitted: AdmittedBinding) -> Result<BindingPlan, AdmissionError> {
     let binding_identity = crate::identity::binding(&admitted.request)?;
-    Ok(BindingPlan { admitted, binding_identity })
+    Ok(BindingPlan {
+        admitted,
+        binding_identity,
+    })
 }
 
 /// Checks all fields against the exact admitted plan, not just a supplied hash.

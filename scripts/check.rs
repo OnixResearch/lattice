@@ -83,7 +83,22 @@ const ORCHESTRATION_IDENTITY_SELF_TEST_ARGS: &[&str] = &[
 const ORCHESTRATION_IDENTITY_CHECK_ARGS: &[&str] =
     &["-q", "-Zscript", "scripts/check-orchestration-identity-boundary.rs"];
 const OPERATOR_E2E_SCRIPT_ARGS: &[&str] = &["-q", "-Zscript", "scripts/operator-e2e.rs"];
-const FORMAT_CHECK_ARGS: &[&str] = &["fmt", "--check", "--package", "lattice"];
+const FORMAT_CHECK_ARGS: &[&str] = &[
+    "fmt",
+    "--check",
+    "--package",
+    "lattice",
+    "--package",
+    "budget-ledger-core",
+    "--package",
+    "lattice-core",
+    "--package",
+    "lattice-compose-binding",
+    "--package",
+    "lattice-workflow-contract",
+    "--package",
+    "lattice-workflow-transport",
+];
 const FOCUSED_CONSUMER_CHECK_ARGS: &[&str] = &["check", "--package", "lattice", "--all-targets"];
 // r[impl lattice.agent_evaluation.verification]
 const AGENT_EVALUATION_TEST_ARGS: &[&str] = &[

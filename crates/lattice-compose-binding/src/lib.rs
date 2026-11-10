@@ -10,7 +10,10 @@ mod model;
 mod planning;
 
 pub use model::*;
-pub use planning::{admit, plan, validate_receipt, validate_request};
+pub use planning::admit;
+pub use planning::plan;
+pub use planning::validate_receipt;
+pub use planning::validate_request;
 
 #[cfg(test)]
 mod tests;

@@ -4,9 +4,12 @@
     reason = "closed boundary fixtures fail immediately on setup or rejection errors"
 )]
 
-use super::*;
-use alloc::{format, string::ToString};
+use alloc::format;
+use alloc::string::ToString;
+
 use lattice_workflow_contract::Identity;
+
+use super::*;
 
 fn identity(byte: char) -> Identity {
     Identity::new(format!("b3:{}", byte.to_string().repeat(64))).unwrap()
@@ -76,19 +79,25 @@ fn every_dto_field_is_required_and_unknown_fields_are_closed() {
     let observation_json = serde_json::to_value(observation).unwrap();
     let request_json = serde_json::to_value(request).unwrap();
     for (wire, observation_type) in [(observation_json, true), (request_json, false)] {
-        let mut paths = alloc::vec![alloc::vec::Vec::<alloc::string::String>::new(), alloc::vec!["source".to_string()]];
+        let mut paths = alloc::vec![alloc::vec::Vec::<alloc::string::String>::new(), alloc::vec![
+            "source".to_string()
+        ]];
         if !observation_type {
             paths.push(alloc::vec!["capability_context".to_string()]);
             paths.push(alloc::vec!["trigger".to_string()]);
         }
         for path in paths {
             let mut at = &wire;
-            for segment in &path { at = &at[segment]; }
+            for segment in &path {
+                at = &at[segment];
+            }
             let keys = at.as_object().unwrap().keys().cloned().collect::<alloc::vec::Vec<_>>();
             for key in keys {
                 let mut bad = wire.clone();
                 let mut at = &mut bad;
-                for segment in &path { at = &mut at[segment]; }
+                for segment in &path {
+                    at = &mut at[segment];
+                }
                 at.as_object_mut().unwrap().remove(&key);
                 if observation_type {
                     assert!(serde_json::from_value::<PaneObservation>(bad).is_err(), "missing {path:?}/{key}");
@@ -98,10 +107,15 @@ fn every_dto_field_is_required_and_unknown_fields_are_closed() {
             }
             let mut bad = wire.clone();
             let mut at = &mut bad;
-            for segment in &path { at = &mut at[segment]; }
+            for segment in &path {
+                at = &mut at[segment];
+            }
             at.as_object_mut().unwrap().insert("raw_screen".to_string(), "secret".into());
-            if observation_type { assert!(serde_json::from_value::<PaneObservation>(bad).is_err()); }
-            else { assert!(serde_json::from_value::<BindingRequest>(bad).is_err()); }
+            if observation_type {
+                assert!(serde_json::from_value::<PaneObservation>(bad).is_err());
+            } else {
+                assert!(serde_json::from_value::<BindingRequest>(bad).is_err());
+            }
         }
     }
 }
@@ -113,14 +127,22 @@ fn every_dto_field_is_required_and_unknown_fields_are_closed() {
 #[test]
 fn stale_missing_unknown_and_unauthorized_sources_reject() {
     let (observation, request) = fixture();
-    for (revision, error) in [("", AdmissionError::MissingSourceRevision), ("main", AdmissionError::UnknownSourceRevision), (&"a".repeat(40), AdmissionError::UnknownSourceRevision)] {
+    for (revision, error) in [
+        ("", AdmissionError::MissingSourceRevision),
+        ("main", AdmissionError::UnknownSourceRevision),
+        (&"a".repeat(40), AdmissionError::UnknownSourceRevision),
+    ] {
         let mut bad = request.clone();
         bad.source.producer_revision = revision.to_string();
         assert_eq!(admit(observation.clone(), bad), Err(error));
     }
     for dimension in 0..3 {
         let mut bad = request.clone();
-        match dimension { 0 => bad.source.session_id = 0, 1 => bad.source.pane_id = 0, _ => bad.source.workspace_revision = 0 }
+        match dimension {
+            0 => bad.source.session_id = 0,
+            1 => bad.source.pane_id = 0,
+            _ => bad.source.workspace_revision = 0,
+        }
         assert_eq!(admit(observation.clone(), bad), Err(AdmissionError::InvalidSourceIdentity));
     }
     let mut stale = observation.clone();
@@ -172,8 +194,14 @@ fn receipts_bind_exact_metadata_and_reject_tampering_or_success_claims() {
 fn canonical_identity_bytes_are_stable_and_upper_numeric_bounds_remain_admissible() {
     let (observation, request) = fixture();
     let baseline = planned(observation.clone(), request.clone());
-    assert_eq!(baseline.binding_identity().as_str(), "b3:ae290bfbb5090098b04fefeef43e2b9159f1c463c38ad5971db55716b19332a3");
-    assert_eq!(baseline.receipt().unwrap().identity.as_str(), "b3:7f6b771f92c3432cdf17e29e71cce31d838a87a0adb9305843cabe917af328f7");
+    assert_eq!(
+        baseline.binding_identity().as_str(),
+        "b3:ae290bfbb5090098b04fefeef43e2b9159f1c463c38ad5971db55716b19332a3"
+    );
+    assert_eq!(
+        baseline.receipt().unwrap().identity.as_str(),
+        "b3:7f6b771f92c3432cdf17e29e71cce31d838a87a0adb9305843cabe917af328f7"
+    );
     let mut upper = request;
     upper.source.session_id = u64::MAX;
     upper.source.pane_id = u64::MAX;

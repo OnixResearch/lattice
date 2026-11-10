@@ -1,6 +1,16 @@
-use crate::{ActivationReceipt, AdmissionError, BindingPlan, BindingRequest, PaneLifecycle, ReceiptClaim, ReceiptSchema, SourceIdentity, Trigger};
 use alloc::string::String;
+
 use lattice_workflow_contract::Identity;
+
+use crate::ActivationReceipt;
+use crate::AdmissionError;
+use crate::BindingPlan;
+use crate::BindingRequest;
+use crate::PaneLifecycle;
+use crate::ReceiptClaim;
+use crate::ReceiptSchema;
+use crate::SourceIdentity;
+use crate::Trigger;
 
 /// Domain-separated, labelled, length-prefixed bytes; independent of JSON order.
 struct Frame(blake3::Hasher);

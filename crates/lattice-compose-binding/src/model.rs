@@ -1,6 +1,8 @@
 use alloc::string::String;
+
 use lattice_workflow_contract::Identity;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 
 /// Exact reviewed producer of WorkspaceInspectResponse; not a daemon-truth claim.
 // r[impl lattice.compose_surface.dependency]
