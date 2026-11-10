@@ -127,8 +127,12 @@ fn manifest_bounds_reject_oversized_manifests() {
         release_inputs::check_manifest_bounds(release_inputs::MAX_MANIFEST_FILES, release_inputs::MAX_MANIFEST_BYTES)
             .is_ok()
     );
-    assert!(release_inputs::check_manifest_bounds(release_inputs::MAX_MANIFEST_FILES + 1, 0).is_err());
-    assert!(release_inputs::check_manifest_bounds(0, release_inputs::MAX_MANIFEST_BYTES + 1).is_err());
+    let file_error =
+        release_inputs::check_manifest_bounds(release_inputs::MAX_MANIFEST_FILES + 1, 0).expect_err("file-count limit");
+    assert!(file_error.contains(&(release_inputs::MAX_MANIFEST_FILES + 1).to_string()));
+    let byte_error =
+        release_inputs::check_manifest_bounds(0, release_inputs::MAX_MANIFEST_BYTES + 1).expect_err("byte limit");
+    assert!(byte_error.contains(&(release_inputs::MAX_MANIFEST_BYTES + 1).to_string()));
 }
 
 #[test]
