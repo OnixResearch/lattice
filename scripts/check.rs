@@ -59,6 +59,8 @@ const WORKFLOW_BOUNDARY_SCRIPT_FORMAT_ARGS: &[&str] = &[
     "2024",
     "scripts/check-workflow-domain-boundaries.rs",
 ];
+const BUDGET_LEDGER_PURITY_SCRIPT_FORMAT_ARGS: &[&str] =
+    &["--check", "--edition", "2024", "scripts/check-budget-ledger-purity.rs"];
 const EFFECT_AUTHORITY_SCRIPT_FORMAT_ARGS: &[&str] = &[
     "--check",
     "--edition",
@@ -101,6 +103,7 @@ const WORKFLOW_BOUNDARY_SELF_TEST_ARGS: &[&str] = &[
     "--self-test",
 ];
 const WORKFLOW_BOUNDARY_CHECK_ARGS: &[&str] = &["-q", "-Zscript", "scripts/check-workflow-domain-boundaries.rs"];
+const BUDGET_LEDGER_PURITY_CHECK_ARGS: &[&str] = &["-q", "-Zscript", "scripts/check-budget-ledger-purity.rs"];
 const EFFECT_AUTHORITY_CHECK_ARGS: &[&str] = &["-q", "-Zscript", "scripts/check-choregraph-effect-authority.rs"];
 const ROLE_PROTOCOL_CHECK_ARGS: &[&str] = &["-q", "-Zscript", "scripts/check-role-protocol-boundary.rs"];
 const ORCHESTRATION_IDENTITY_SELF_TEST_ARGS: &[&str] = &[
@@ -246,6 +249,12 @@ const COMMAND_STEPS: &[CheckStep] = &[
         use_repo_local_target: false,
     },
     CheckStep {
+        name: "budget ledger purity script format",
+        program: RUSTFMT_PROGRAM,
+        args: BUDGET_LEDGER_PURITY_SCRIPT_FORMAT_ARGS,
+        use_repo_local_target: false,
+    },
+    CheckStep {
         name: "effect authority script format",
         program: RUSTFMT_PROGRAM,
         args: EFFECT_AUTHORITY_SCRIPT_FORMAT_ARGS,
@@ -291,6 +300,12 @@ const COMMAND_STEPS: &[CheckStep] = &[
         name: "workflow boundary guard",
         program: CARGO_PROGRAM,
         args: WORKFLOW_BOUNDARY_CHECK_ARGS,
+        use_repo_local_target: true,
+    },
+    CheckStep {
+        name: "budget ledger purity guard",
+        program: CARGO_PROGRAM,
+        args: BUDGET_LEDGER_PURITY_CHECK_ARGS,
         use_repo_local_target: true,
     },
     CheckStep {
