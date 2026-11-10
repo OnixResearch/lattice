@@ -86,13 +86,15 @@ policy="$PWD/cairn-policy/generated/cairn-policy.json"
 ```
 
 Do not run final replay before the integrated tree and real MCP inputs are final.
-The seven owned replay cases are status, validate, MCP catalog, MCP status, MCP
-agent smoke, canonicalization freshness and release readiness. Status and validate
-include cross-root comparison; target-input release cases run read-only repeated
-comparisons in place. The consumer surface inventory describes those actual
-Lattice release surfaces. It does not promise Cairn self-host legacy migration,
-agent fixture, or demo-change fixtures that Lattice does not own. Producer
-self-host defaults remain unchanged.
+The `release` replay group selects status, validate, MCP catalog, agent
+completion validation, agent receipt validation and release readiness. The
+broader `full` group also covers MCP status, canonicalization freshness,
+migration and view dry runs, and the remaining policy-owned cases. Status and
+validate include cross-root comparison; target-input release cases run read-only
+repeated comparisons in place. The consumer surface inventory describes those
+actual Lattice release surfaces. It does not promise Cairn self-host legacy
+migration, agent fixture, or demo-change fixtures that Lattice does not own.
+Producer self-host defaults remain unchanged.
 
 The maintained corpus is authored for Lattice workflow exchange values. Object
 key order is canonical; node sequence order and absent-versus-null output retain
