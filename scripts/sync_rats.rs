@@ -196,8 +196,8 @@ fn stage_snapshot(worktree_root: &Path, staging_root: &Path) -> Result<(), Strin
 fn write_import_workspace(destination_parent: &Path) -> Result<(), String> {
     let manifest_path = destination_parent.join("Cargo.toml");
     if manifest_path.exists() {
-        let existing = fs::read_to_string(&manifest_path)
-            .map_err(|error| format!("read Rats import workspace: {error}"))?;
+        let existing =
+            fs::read_to_string(&manifest_path).map_err(|error| format!("read Rats import workspace: {error}"))?;
         if existing != IMPORT_WORKSPACE_MANIFEST {
             return Err(format!("refusing to overwrite unrelated workspace {}", manifest_path.display()));
         }

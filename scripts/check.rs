@@ -45,6 +45,14 @@ const OCTET_MIGRATION_FORMAT_ARGS: &[&str] = &[
     "scripts/octet_baseline_migration.rs",
 ];
 const TOON_SYNC_SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "--edition", "2024", "scripts/sync_toon_format.rs"];
+const VENDOR_SYNC_SCRIPT_FORMAT_ARGS: &[&str] = &[
+    "--check",
+    "--edition",
+    "2024",
+    "scripts/sync-vendored-sibling.rs",
+    "scripts/sync_animus.rs",
+    "scripts/sync_rats.rs",
+];
 const WORKFLOW_BOUNDARY_SCRIPT_FORMAT_ARGS: &[&str] = &[
     "--check",
     "--edition",
@@ -223,6 +231,12 @@ const COMMAND_STEPS: &[CheckStep] = &[
         name: "TOON sync script format",
         program: RUSTFMT_PROGRAM,
         args: TOON_SYNC_SCRIPT_FORMAT_ARGS,
+        use_repo_local_target: false,
+    },
+    CheckStep {
+        name: "vendor sync script format",
+        program: RUSTFMT_PROGRAM,
+        args: VENDOR_SYNC_SCRIPT_FORMAT_ARGS,
         use_repo_local_target: false,
     },
     CheckStep {
@@ -523,6 +537,7 @@ fn collect_spec_files_into(path: &Path, files: &mut Vec<PathBuf>) -> Result<(), 
     Ok(())
 }
 
+#[cfg(test)]
 fn validate_spec_text(path: &str, text: &str) -> Vec<SpecDiagnostic> {
     validate_spec_text_with_seen(path, text, &mut BTreeSet::new())
 }
