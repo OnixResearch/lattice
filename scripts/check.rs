@@ -120,7 +120,10 @@ const POLICY_TYPECHECK_ARGS: &[&str] = &[
     "cairn-policy/default.ncl",
     "cairn-policy/traceability-inventory.ncl",
 ];
-const POLICY_FRESHNESS_ARGS: &[&str] = &["-c", "\"${LATTICE_CAIRN_BIN:-cairn}\" policy export --check"];
+const POLICY_FRESHNESS_ARGS: &[&str] = &[
+    "-c",
+    "\"${LATTICE_CAIRN_BIN:-cairn}\" policy export --source cairn-policy/default.ncl --output cairn-policy/generated/cairn-policy.json --check",
+];
 const RUNTIME_NICKEL_TYPECHECK_ARGS: &[&str] = &[
     "-c",
     "nickel typecheck cairn-policy/*.ncl policy/*.ncl profiles/*.ncl contracts/*.ncl",
