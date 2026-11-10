@@ -67,7 +67,6 @@ const ORCHESTRATION_IDENTITY_SCRIPT_FORMAT_ARGS: &[&str] = &[
 const INVENTORY_SCRIPT_SMOKE_ARGS: &[&str] = &[
     "-q",
     "-Zscript",
-    "--locked",
     "scripts/traceability-inventory.rs",
     "hash",
     "tests/fixtures/traceability-inventory-coverage.json",
@@ -76,7 +75,6 @@ const TOON_SYNC_SCRIPT_TEST_ARGS: &[&str] = &[
     "-q",
     "-Zscript",
     "test",
-    "--locked",
     "--manifest-path",
     "scripts/sync_toon_format.rs",
 ];
