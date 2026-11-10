@@ -45,11 +45,10 @@ fn main() -> ExitCode {
 
 // r[impl lattice.release_integration.inputs]
 fn run() -> Result<bool, Box<dyn std::error::Error>> {
-    let args = std::env::args_os().skip(1).collect::<Vec<_>>();
-    if args.len() != 1 || !Path::new(&args[0]).is_absolute() {
-        return Err("expected one absolute native Cairn executable path; run from the Lattice root".into());
-    }
     let root = std::env::current_dir()?.canonicalize()?;
+    if !root.join("Cargo.toml").is_file() {
+        return Err("run from the Lattice root".into());
+    }
     let output = root.join(core::OUTPUT_ROOT);
     fs::create_dir_all(&output)?;
     if !output.canonicalize()?.starts_with(&root) {
@@ -70,6 +69,10 @@ fn run() -> Result<bool, Box<dyn std::error::Error>> {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(error) => return Err(error.into()),
         }
+    }
+    let args = std::env::args_os().skip(1).collect::<Vec<_>>();
+    if args.len() != 1 || !Path::new(&args[0]).is_absolute() {
+        return Err("expected one absolute native Cairn executable path; run from the Lattice root".into());
     }
     let native = fs::canonicalize(&args[0])?;
     let policy_path = root.join("cairn-policy/generated/cairn-policy.json");
