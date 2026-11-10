@@ -155,16 +155,6 @@ const OPERATION_CONTRACT_TEST_ARGS: &[&str] = &[
     "test_operation_cli",
     "--locked",
 ];
-const SECRETSPEC_TEST_ARGS: &[&str] = &[
-    "test",
-    "--package",
-    "lattice",
-    "--features",
-    "animus-secretspec",
-    "--test",
-    "test_secretspec_credentials",
-    "--locked",
-];
 const TEST_ARGS: &[&str] = &["test", "--workspace", "--locked"];
 const CLIPPY_ARGS: &[&str] = &[
     "clippy",
@@ -357,12 +347,6 @@ const COMMAND_STEPS: &[CheckStep] = &[
         name: "all features tests",
         program: CARGO_PROGRAM,
         args: ALL_FEATURES_TEST_ARGS,
-        use_repo_local_target: true,
-    },
-    CheckStep {
-        name: "secretspec credentials",
-        program: CARGO_PROGRAM,
-        args: SECRETSPEC_TEST_ARGS,
         use_repo_local_target: true,
     },
     CheckStep {
