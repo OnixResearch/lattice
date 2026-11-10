@@ -25,6 +25,7 @@ use serde_json::Value;
 use serde_json::json;
 
 const MAX_STREAM_BYTES: u64 = 16 * 1024 * 1024;
+const MAX_NATIVE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const NATIVE_TIMEOUT: &str = "60s";
 
 fn main() -> ExitCode {
@@ -159,8 +160,12 @@ fn read_bounded(path: &Path) -> std::io::Result<Vec<u8>> {
 }
 
 fn file_hash(path: &Path) -> std::io::Result<String> {
+    let mut file = fs::File::open(path)?;
+    if file.metadata()?.len() > MAX_NATIVE_BYTES {
+        return Err(std::io::Error::other(format!("native executable exceeds the {MAX_NATIVE_BYTES}-byte bound")));
+    }
     let mut hasher = blake3::Hasher::new();
-    std::io::copy(&mut fs::File::open(path)?, &mut hasher)?;
+    std::io::copy(&mut file, &mut hasher)?;
     Ok(hasher.finalize().to_hex().to_string())
 }
 
