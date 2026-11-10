@@ -36,7 +36,7 @@ passing status or heavyweight gate result is inferred.
 
 The source manifest covers maintained source, crates, tests, scripts, examples,
 docs, builtins, contracts, lifecycle, policy, release vectors, vendored source
-snapshots, root manifests/lockfiles, and toolchain or check configuration,
+snapshots, root manifests/lockfiles, and toolchain, CI, or check configuration,
 excluding nested build/VCS directories and vendored lifecycle artifacts. Source
 and policy must remain unchanged while the observation executes. The script
 removes old completion inputs before a new attempt so interrupted or malformed

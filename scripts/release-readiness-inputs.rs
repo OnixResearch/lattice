@@ -139,7 +139,7 @@ fn source_manifest(root: &Path) -> Result<Value, Box<dyn std::error::Error>> {
         "builtins", "contracts", "vendor-cargo-deps", "fixtures/release-readiness", "Cargo.toml",
         "Cargo.lock", "flake.nix", "flake.lock", "README.md", "rust-toolchain.toml",
         ".cargo/config.toml", "clippy.toml", "dylint.toml", "rustfmt.toml", "octet-baseline.json",
-        ".pre-commit-config.yaml", ".config/nextest.toml"]
+        ".pre-commit-config.yaml", ".config/nextest.toml", ".github/workflows/check.yml"]
         .into_iter().map(PathBuf::from).collect::<Vec<_>>();
     let mut files = std::collections::BTreeMap::new();
     while let Some(relative) = pending.pop() {
