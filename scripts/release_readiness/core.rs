@@ -6,6 +6,14 @@ pub const CONTRACT_PATH: &str = "target/release-readiness/mcp-contract.json";
 pub const RESULTS_PATH: &str = "target/release-readiness/mcp-results.json";
 pub const MAX_MANIFEST_FILES: usize = 50_000;
 pub const MAX_MANIFEST_BYTES: u64 = 4 * 1024 * 1024 * 1024;
+pub const MAX_NATIVE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+
+pub fn check_native_size(bytes: u64) -> Result<(), String> {
+    if bytes > MAX_NATIVE_BYTES {
+        return Err(format!("native executable exceeds the {MAX_NATIVE_BYTES}-byte bound"));
+    }
+    Ok(())
+}
 
 pub fn check_manifest_bounds(file_count: usize, total_bytes: u64) -> Result<(), String> {
     if file_count > MAX_MANIFEST_FILES {

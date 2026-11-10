@@ -92,6 +92,12 @@ fn mcp_completion_status_requires_both_native_success_and_passing_verdict() -> T
 }
 
 #[test]
+fn native_size_bound_rejects_oversized_executables() {
+    assert!(release_inputs::check_native_size(release_inputs::MAX_NATIVE_BYTES).is_ok());
+    assert!(release_inputs::check_native_size(release_inputs::MAX_NATIVE_BYTES + 1).is_err());
+}
+
+#[test]
 fn manifest_bounds_reject_oversized_manifests() {
     assert!(release_inputs::check_manifest_bounds(0, 0).is_ok());
     assert!(
