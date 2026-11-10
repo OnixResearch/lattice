@@ -1,5 +1,6 @@
 #!/usr/bin/env -S nix develop . -c cargo -q -Zscript
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -514,9 +515,15 @@ fn collect_spec_files_into(path: &Path, files: &mut Vec<PathBuf>) -> Result<(), 
 fn validate_spec_text(path: &str, text: &str) -> Vec<SpecDiagnostic> {
     let lines = text.lines().collect::<Vec<_>>();
     let mut diagnostics = Vec::new();
+    let mut marker_ids = BTreeSet::new();
 
     for (line_index, line) in lines.iter().enumerate() {
         let trimmed = line.trim();
+        if let Some(id) = marker_id(trimmed) {
+            if !marker_ids.insert(id) {
+                diagnostics.push(diagnostic(path, line_index, "duplicate r[...] marker identifier"));
+            }
+        }
         if let Some(title) = trimmed.strip_prefix("### Requirement:") {
             if title.trim().is_empty() {
                 diagnostics.push(diagnostic(path, line_index, "requirement heading must include a title"));
@@ -534,14 +541,14 @@ fn validate_spec_text(path: &str, text: &str) -> Vec<SpecDiagnostic> {
     diagnostics
 }
 
+fn marker_id(line: &str) -> Option<&str> {
+    let rest = line.strip_prefix("r[")?;
+    let (id, _) = rest.split_once(']')?;
+    (!id.is_empty() && !id.contains('[') && !id.chars().any(char::is_whitespace)).then_some(id)
+}
+
 fn is_marker(line: &str) -> bool {
-    let Some(rest) = line.strip_prefix("r[") else {
-        return false;
-    };
-    let Some((id, _)) = rest.split_once(']') else {
-        return false;
-    };
-    !id.is_empty() && !id.contains('[') && !id.chars().any(char::is_whitespace)
+    marker_id(line).is_some()
 }
 
 fn validate_requirement(path: &str, lines: &[&str], heading_index: usize, diagnostics: &mut Vec<SpecDiagnostic>) {
@@ -692,5 +699,12 @@ mod tests {
         );
         let complete = "### Requirement: Title\nr[lattice.example] MUST hold\n\n#### Scenario: Case\nr[lattice.example.scenario]\n- GIVEN a state\n- WHEN an action\n- THEN a result\n";
         assert!(validate_spec_text("spec.md", complete).is_empty());
+    }
+
+    #[test]
+    fn duplicate_markers_are_rejected() {
+        let text = "### Requirement: Title\nr[lattice.example] MUST hold\n\n#### Scenario: Case\nr[lattice.example] MUST hold\n- GIVEN a state\n- WHEN an action\n- THEN a result\n";
+        let diagnostics = validate_spec_text("spec.md", text);
+        assert!(diagnostics.iter().any(|diagnostic| diagnostic.message == "duplicate r[...] marker identifier"));
     }
 }
