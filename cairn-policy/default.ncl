@@ -1,5 +1,6 @@
 let Upstream = import "upstream-default.ncl" in
 let LocalContracts = import "traceability-contracts.ncl" in
+let ReleaseContracts = import "release-selection-contracts.ncl" in
 # r[impl lattice.repository_validation.traceability_sources]
 let LatticeTraceabilityProfile = {
   id = "cairn-default",
@@ -45,7 +46,7 @@ let TrellisTraceabilityProfile = {
   assurance_level = "declared",
   anchor_kind = "exact_marker_bytes",
 } in
-Upstream & {
+Upstream & ReleaseContracts.Policy & {
   name | force = "lattice-default",
   release_readiness_policy = {
     required_external_commands = [
