@@ -182,7 +182,7 @@ fn write_json(path: &Path, value: &Value) -> std::io::Result<()> {
 
 fn write_output(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     if fs::symlink_metadata(path).is_ok_and(|metadata| metadata.file_type().is_symlink()) {
-        return Err(std::io::Error::other("observation outputs must not be symlinks"));
+        return Err(std::io::Error::other(format!("observation output must not be a symlink: {}", path.display())));
     }
     fs::write(path, bytes)
 }
