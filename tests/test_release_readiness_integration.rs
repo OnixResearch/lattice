@@ -117,7 +117,9 @@ fn observation_paths_share_the_output_root_and_are_distinct() {
 #[test]
 fn native_size_bound_rejects_oversized_executables() {
     assert!(release_inputs::check_native_size(release_inputs::MAX_NATIVE_BYTES).is_ok());
-    assert!(release_inputs::check_native_size(release_inputs::MAX_NATIVE_BYTES + 1).is_err());
+    let error = release_inputs::check_native_size(release_inputs::MAX_NATIVE_BYTES + 1).expect_err("native size limit");
+    assert!(error.contains(&(release_inputs::MAX_NATIVE_BYTES + 1).to_string()));
+    assert!(error.contains(&release_inputs::MAX_NATIVE_BYTES.to_string()));
 }
 
 #[test]
