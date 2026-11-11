@@ -796,6 +796,25 @@ fn workspace_render_exposes_all_panels_and_keyboard_authoring_actions() {
     assert!(palette.contains("Add Node (all built-in kinds)"), "authoring action missing: {palette}");
 }
 
+// r[verify n8nclone.tui_ux.workspace]
+// r[verify n8nclone.tui_ux.keyboard_first]
+#[test]
+fn rows_view_renders_topological_metadata_columns() {
+    let temp_dir = tempfile::tempdir().expect("temporary app directory");
+    let mut app = App::new(test_config(&temp_dir));
+    app.add_shell_node("First", "true");
+    app.add_shell_node("Second", "true");
+    app.toggle_canvas_view();
+
+    let rendered = rendered_frame_text(&mut app);
+
+    for surface in [
+        "NODE", "KIND", "STATUS", "TIME", "TOKENS", "COST", "ATT", "First", "Second",
+    ] {
+        assert!(rendered.contains(surface), "missing {surface}: {rendered}");
+    }
+}
+
 // r[verify n8nclone.tui_ux.background_runs.long_running]
 // r[verify n8nclone.tui_ux.background_runs.responsive]
 // r[verify n8nclone.tui_ux.replay_debugger.active_run.stream]
