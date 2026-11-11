@@ -622,6 +622,35 @@ mod tests {
         assert!(store.load_candidate_receipt("attempt-1").expect("receipt lookup").is_none());
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn unknown_worker_outcome_is_persisted_without_a_candidate() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let directory = tempfile::tempdir().expect("temporary workspace");
+        let root = directory.path().join("workspace");
+        std::fs::create_dir_all(root.join("src")).expect("source directory");
+        std::fs::write(root.join("src/main.rs"), b"same").expect("base source");
+        let store = Store::new(directory.path().join("store.redb")).expect("store opens");
+
+        let outcome = run_and_publish_candidate_worker(
+            &request(&root, "/run/current-system/sw/bin/chmod 000 src/main.rs"),
+            &RuntimeConfig::default(),
+            &AtomicBool::new(false),
+            &store,
+        )
+        .expect("worker runs");
+
+        assert!(matches!(outcome, CandidateWorkerOutcome::Unknown { .. }), "{outcome:?}");
+        let result = store.load_candidate_attempt_result("attempt-1").expect("result loads").expect("result exists");
+        assert_eq!(result.disposition, CandidateDisposition::Unknown);
+        assert!(result.blocker.is_some());
+        assert!(result.receipt.is_none());
+        assert!(store.load_candidate_receipt("attempt-1").expect("receipt lookup").is_none());
+        std::fs::set_permissions(root.join("src/main.rs"), std::fs::Permissions::from_mode(0o644))
+            .expect("restore source");
+    }
+
     #[test]
     fn reconciliation_reports_missing_and_incomplete_publication() {
         let directory = tempfile::tempdir().expect("temporary workspace");
