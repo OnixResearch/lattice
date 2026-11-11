@@ -18,6 +18,7 @@ use crate::candidate::CandidateDisposition;
 use crate::candidate::CandidateReceipt;
 use crate::candidate::CandidateReceiptError;
 use crate::candidate::produced_receipt_from_snapshots;
+use crate::candidate::validate_candidate_path;
 use crate::candidate_capture::CandidateCaptureError;
 use crate::candidate_capture::WorkspaceBoundary;
 use crate::candidate_capture::capture_workspace;
@@ -205,6 +206,13 @@ pub fn reconcile_candidate_attempt(store: &Store, attempt_id: &str) -> Result<Ca
                     blocker: "attempt result and stored receipt disagree".to_string(),
                 });
             }
+            for path in &result.published_artifacts {
+                if store.load_candidate_artifact(attempt_id, path)?.is_none() {
+                    return Ok(CandidateRecovery::Incomplete {
+                        blocker: format!("published artifact is missing for {path}"),
+                    });
+                }
+            }
             Ok(CandidateRecovery::Published(result))
         }
         (Some(result), _) => Ok(CandidateRecovery::Published(result)),
@@ -276,6 +284,7 @@ pub struct CandidateAttemptResult {
     pub schema: String,
     pub disposition: CandidateDisposition,
     pub receipt: Option<CandidateReceipt>,
+    pub published_artifacts: Vec<String>,
     pub stdout_blake3: String,
     pub stderr_blake3: String,
     pub blocker: Option<String>,
@@ -286,34 +295,42 @@ pub const CANDIDATE_ATTEMPT_RESULT_SCHEMA: &str = "lattice.candidate-attempt-res
 impl CandidateAttemptResult {
     /// Project a worker outcome without retaining raw output bytes.
     pub fn from_outcome(outcome: &CandidateWorkerOutcome) -> Self {
-        let (disposition, receipt, stdout, stderr, blocker) = match outcome {
+        let (disposition, receipt, published_artifacts, stdout, stderr, blocker) = match outcome {
             CandidateWorkerOutcome::Produced {
                 receipt,
+                changed_files,
                 stdout,
                 stderr,
-                ..
-            } => (CandidateDisposition::Produced, Some(receipt.as_ref().clone()), stdout, stderr, None),
+            } => (
+                CandidateDisposition::Produced,
+                Some(receipt.as_ref().clone()),
+                changed_files.keys().cloned().collect(),
+                stdout,
+                stderr,
+                None,
+            ),
             CandidateWorkerOutcome::Blocked { blocker } => {
-                (CandidateDisposition::Blocked, None, &Vec::new(), &Vec::new(), Some(blocker.clone()))
+                (CandidateDisposition::Blocked, None, Vec::new(), &Vec::new(), &Vec::new(), Some(blocker.clone()))
             }
             CandidateWorkerOutcome::Failed {
                 blocker,
                 stdout,
                 stderr,
-            } => (CandidateDisposition::Failed, None, stdout, stderr, Some(blocker.clone())),
+            } => (CandidateDisposition::Failed, None, Vec::new(), stdout, stderr, Some(blocker.clone())),
             CandidateWorkerOutcome::Cancelled => {
-                (CandidateDisposition::Cancelled, None, &Vec::new(), &Vec::new(), None)
+                (CandidateDisposition::Cancelled, None, Vec::new(), &Vec::new(), &Vec::new(), None)
             }
             CandidateWorkerOutcome::Unknown {
                 blocker,
                 stdout,
                 stderr,
-            } => (CandidateDisposition::Unknown, None, stdout, stderr, Some(blocker.clone())),
+            } => (CandidateDisposition::Unknown, None, Vec::new(), stdout, stderr, Some(blocker.clone())),
         };
         Self {
             schema: CANDIDATE_ATTEMPT_RESULT_SCHEMA.to_string(),
             disposition,
             receipt,
+            published_artifacts,
             stdout_blake3: blake3_identity(stdout),
             stderr_blake3: blake3_identity(stderr),
             blocker,
@@ -327,6 +344,12 @@ impl CandidateAttemptResult {
         if !is_blake3(&self.stdout_blake3) || !is_blake3(&self.stderr_blake3) {
             return Err(CandidateWorkerError::Result("candidate output identity is malformed".to_string()));
         }
+        for path in &self.published_artifacts {
+            validate_candidate_path(path).map_err(|error| CandidateWorkerError::Result(error.to_string()))?;
+        }
+        if self.published_artifacts.windows(2).any(|window| window[0] >= window[1]) {
+            return Err(CandidateWorkerError::Result("published artifact paths must be sorted and unique".to_string()));
+        }
         match self.disposition {
             CandidateDisposition::Produced => {
                 let receipt = self
@@ -334,6 +357,11 @@ impl CandidateAttemptResult {
                     .as_ref()
                     .ok_or_else(|| CandidateWorkerError::Result("produced result is missing a receipt".to_string()))?;
                 receipt.validate()?;
+                if self.published_artifacts.iter().any(|path| !receipt.changed_paths.contains(path)) {
+                    return Err(CandidateWorkerError::Result(
+                        "published artifact path is not present in the receipt".to_string(),
+                    ));
+                }
                 if self.blocker.is_some() {
                     return Err(CandidateWorkerError::Result("produced result carries a blocker".to_string()));
                 }
@@ -342,6 +370,11 @@ impl CandidateAttemptResult {
                 if self.receipt.is_some() {
                     return Err(CandidateWorkerError::Result("non-produced result carries a receipt".to_string()));
                 }
+                if !self.published_artifacts.is_empty() {
+                    return Err(CandidateWorkerError::Result(
+                        "non-produced result carries published artifacts".to_string(),
+                    ));
+                }
                 if self.blocker.is_none() {
                     return Err(CandidateWorkerError::Result("non-produced result is missing a blocker".to_string()));
                 }
@@ -349,6 +382,11 @@ impl CandidateAttemptResult {
             CandidateDisposition::Cancelled => {
                 if self.receipt.is_some() {
                     return Err(CandidateWorkerError::Result("cancelled result carries a receipt".to_string()));
+                }
+                if !self.published_artifacts.is_empty() {
+                    return Err(CandidateWorkerError::Result(
+                        "cancelled result carries published artifacts".to_string(),
+                    ));
                 }
             }
         }
@@ -555,6 +593,7 @@ mod tests {
             schema: CANDIDATE_ATTEMPT_RESULT_SCHEMA.to_string(),
             disposition: CandidateDisposition::Produced,
             receipt: Some(receipt),
+            published_artifacts: Vec::new(),
             stdout_blake3: blake3_identity(b""),
             stderr_blake3: blake3_identity(b""),
             blocker: None,
