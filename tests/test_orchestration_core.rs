@@ -13,6 +13,7 @@ use lattice::orchestration::BudgetDimensions;
 use lattice::orchestration::BudgetLedger;
 use lattice::orchestration::BudgetLimits;
 use lattice::orchestration::BudgetPolicy;
+use lattice::orchestration::BudgetUsageBasis;
 use lattice::orchestration::CompletionPolicy;
 use lattice::orchestration::DefinitionId;
 use lattice::orchestration::DispatchId;
@@ -294,6 +295,32 @@ fn successful_terminal_round_completes_and_cannot_reopen() {
     });
     let error = transition(&completed, pause).expect_err("terminal state must reject mutation");
     assert_eq!(error.code, OrchestrationDiagnosticCode::TerminalStateMutation);
+}
+
+#[test]
+fn measured_usage_is_distinct_from_the_reserved_plan() {
+    let base = base_instance(CompletionPolicy::RunSucceeded);
+    let started = start_transition(&base).instance;
+    let dispatch = started.pending_dispatch.as_ref().expect("started dispatch");
+    let reserved = started.budgets.reservations.values().next().expect("round reservation").charge;
+    let measured = BudgetCharge {
+        tokens: reserved.tokens.saturating_sub(1),
+        ..reserved
+    };
+    assert_ne!(reserved, measured);
+    let action = OrchestrationAction::RunFinishedMeasured {
+        dispatch_id: dispatch.id.clone(),
+        run_id: dispatch.run_id,
+        succeeded: true,
+        retryable_observed_failure: false,
+        measured_usage: measured,
+        safe_summary: "measured usage".to_string(),
+    };
+    let finished = transition(&started, fact(&started, action)).expect("measured completion settles").instance;
+
+    assert_eq!(finished.last_usage_basis, BudgetUsageBasis::Measured);
+    assert_eq!(finished.budgets.consumed, measured);
+    assert_ne!(finished.budgets.consumed, reserved);
 }
 
 // r[verify lattice.agent_orchestration.observed_failure_retry]

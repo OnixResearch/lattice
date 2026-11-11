@@ -211,12 +211,22 @@ pub struct OrchestrationInstance {
     pub last_event_sequence: Option<u64>,
     pub event_head: Option<super::identity::LedgerHeadId>,
     pub terminal_summary: Option<String>,
+    #[serde(default)]
+    pub last_usage_basis: BudgetUsageBasis,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OrchestrationFact {
     pub id: super::identity::FactId,
     pub action: OrchestrationAction,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BudgetUsageBasis {
+    #[default]
+    ReservedFallback,
+    Measured,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -241,6 +251,15 @@ pub enum OrchestrationAction {
         #[serde(default, skip_serializing_if = "is_false")]
         retryable_observed_failure: bool,
         observed_usage: BudgetCharge,
+        safe_summary: String,
+    },
+    RunFinishedMeasured {
+        dispatch_id: super::identity::DispatchId,
+        run_id: RunId,
+        succeeded: bool,
+        #[serde(default, skip_serializing_if = "is_false")]
+        retryable_observed_failure: bool,
+        measured_usage: BudgetCharge,
         safe_summary: String,
     },
     SubmitProposal {
@@ -663,6 +682,7 @@ pub fn new_instance(
         last_event_sequence: None,
         event_head: None,
         terminal_summary: None,
+        last_usage_basis: BudgetUsageBasis::ReservedFallback,
     };
     debug_assert_eq!(instance.workflow_revision, instance.definition.workflow);
     debug_assert_eq!(instance.budgets.policy, instance.definition.budgets);
@@ -718,6 +738,7 @@ struct RunFinishedInput<'a> {
     is_succeeded: bool,
     is_retryable_observed_failure: bool,
     observed_usage: BudgetCharge,
+    usage_basis: BudgetUsageBasis,
     safe_summary: &'a str,
 }
 
@@ -746,6 +767,23 @@ fn apply_action(
             is_succeeded: *succeeded,
             is_retryable_observed_failure: *retryable_observed_failure,
             observed_usage: *observed_usage,
+            usage_basis: BudgetUsageBasis::ReservedFallback,
+            safe_summary,
+        }),
+        OrchestrationAction::RunFinishedMeasured {
+            dispatch_id,
+            run_id,
+            succeeded,
+            retryable_observed_failure,
+            measured_usage,
+            safe_summary,
+        } => finish_run(instance, RunFinishedInput {
+            dispatch_id,
+            run_id: *run_id,
+            is_succeeded: *succeeded,
+            is_retryable_observed_failure: *retryable_observed_failure,
+            observed_usage: *measured_usage,
+            usage_basis: BudgetUsageBasis::Measured,
             safe_summary,
         }),
         OrchestrationAction::SubmitProposal { proposal } => submit_proposal(instance, proposal),
@@ -917,6 +955,7 @@ fn finish_run(
     }
     let reservation_id = super::identity::ReservationId::from_dispatch(input.dispatch_id);
     let settlement = settle_budget(&mut instance.budgets, &reservation_id, input.observed_usage)?;
+    instance.last_usage_basis = input.usage_basis;
     instance.active_run_id = None;
     instance.pending_dispatch = None;
     instance.retry.retryable_failure = None;
@@ -1126,6 +1165,7 @@ fn abandon_pending_dispatch(
     };
     let reservation_id = super::identity::ReservationId::from_dispatch(dispatch_id);
     let settlement = settle_budget(&mut instance.budgets, &reservation_id, observed_usage)?;
+    instance.last_usage_basis = BudgetUsageBasis::ReservedFallback;
     let safe_summary = match dispatch_status {
         DispatchStatus::Pending => ABANDONED_PENDING_SUMMARY,
         DispatchStatus::Acknowledged => ABANDONED_ACKNOWLEDGED_SUMMARY,

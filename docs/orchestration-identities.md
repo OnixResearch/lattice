@@ -39,6 +39,8 @@ Adapters preserve the existing external shape:
 
 These adapters do not infer identities. A malformed or wrong-role value fails before a workflow, provider, credential, scheduler, or webhook effect starts.
 
+Budget settlement distinguishes the configured reservation from measured worker usage. See [orchestration budget usage](orchestration-budget-usage.md) for the current reserved-fallback behavior and the explicit measured action.
+
 ## Compatibility
 
 The migration does not change the Nickel contracts, JSON field names, redb table names, text keys, event hash inputs, or event ordering. Existing supported records must deserialize through checked constructors and replay without effect execution.
