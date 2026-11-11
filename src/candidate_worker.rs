@@ -181,7 +181,7 @@ pub fn run_and_publish_candidate_worker(
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CandidateRecovery {
-    Published(CandidateAttemptResult),
+    Published(Box<CandidateAttemptResult>),
     Incomplete { blocker: String },
     Missing,
 }
@@ -217,9 +217,9 @@ pub fn reconcile_candidate_attempt(store: &Store, attempt_id: &str) -> Result<Ca
                     });
                 }
             }
-            Ok(CandidateRecovery::Published(result))
+            Ok(CandidateRecovery::Published(Box::new(result)))
         }
-        (Some(result), _) => Ok(CandidateRecovery::Published(result)),
+        (Some(result), _) => Ok(CandidateRecovery::Published(Box::new(result))),
     }
 }
 
