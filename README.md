@@ -177,6 +177,9 @@ Agent setup is explicit:
 - [Agent evaluation](docs/agent-evaluation.md) provides identity-bound plans,
   bounded drivers, and metadata-only receipts. Live evaluation requires explicit
   target and credential authority.
+- [Candidate worker boundary](docs/candidate-worker.md) defines the bounded
+  command route, workspace snapshot receipt, clear environment, and explicit
+  non-claims for candidate-producing attempts.
 
 Do not put plaintext credentials in Nickel. Use credential references and the
 selected provider's delivery mechanism. A configured model or agent runtime is
