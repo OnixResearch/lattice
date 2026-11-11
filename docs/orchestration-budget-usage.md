@@ -45,7 +45,9 @@ subagent calls, tokens, cost, and duration.
 or claim completeness. Estimated or unknown observations never expose measured
 tokens or cost. Complete observations must carry at least one value.
 
-The store persists observations by attempt identity. Identical writes are
-idempotent; different content for the same attempt is rejected. This contract is
-not yet wired into orchestration settlement; the current shell measures only the
-enforced token, duration, and cost dimensions described above.
+The store persists observations by attempt identity and indexes them by run
+identity. Identical writes are idempotent; different content for the same attempt
+or run is rejected. A complete `run`-scoped observation whose run and dispatch
+match is used for the enforced token, duration, and cost dimensions before the
+shell falls back to run-detail aggregation. `node`-scoped observations are not
+used for whole-run settlement.

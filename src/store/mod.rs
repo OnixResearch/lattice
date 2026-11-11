@@ -72,6 +72,7 @@ const WORKFLOW_EXCHANGE_REQUEST_INDEX: TableDefinition<&str, &str> =
 const CANDIDATE_RECEIPTS: TableDefinition<&str, &[u8]> = TableDefinition::new("candidate_receipts_v1");
 const CANDIDATE_ARTIFACTS: TableDefinition<&str, &[u8]> = TableDefinition::new("candidate_artifacts_v1");
 const COMMAND_WORKER_USAGE: TableDefinition<&str, &[u8]> = TableDefinition::new("command_worker_usage_v1");
+const COMMAND_WORKER_USAGE_BY_RUN: TableDefinition<u64, &str> = TableDefinition::new("command_worker_usage_by_run_v1");
 const CANDIDATE_ATTEMPT_RESULTS: TableDefinition<&str, &[u8]> = TableDefinition::new("candidate_attempt_results_v1");
 const WORKFLOW_EXCHANGE_IDEMPOTENCY_INDEX: TableDefinition<&str, &str> =
     TableDefinition::new("workflow_exchange_idempotency_index_v1");
@@ -346,6 +347,8 @@ impl Store {
             let _ = txn.open_table(CANDIDATE_RECEIPTS).map_err(|error| StoreError::Table(error.to_string()))?;
             let _ = txn.open_table(CANDIDATE_ARTIFACTS).map_err(|error| StoreError::Table(error.to_string()))?;
             let _ = txn.open_table(COMMAND_WORKER_USAGE).map_err(|error| StoreError::Table(error.to_string()))?;
+            let _ =
+                txn.open_table(COMMAND_WORKER_USAGE_BY_RUN).map_err(|error| StoreError::Table(error.to_string()))?;
             let _ = txn.open_table(CANDIDATE_ATTEMPT_RESULTS).map_err(|error| StoreError::Table(error.to_string()))?;
             ensure_operation_data_tables(&txn)?;
             quarantine::fence_pending(&txn)?;
@@ -516,6 +519,21 @@ impl Store {
                 .insert(observation.attempt_id.as_str(), data.as_bytes())
                 .map_err(|error| StoreError::Db(error.to_string()))?;
         }
+        {
+            let mut index =
+                txn.open_table(COMMAND_WORKER_USAGE_BY_RUN).map_err(|error| StoreError::Table(error.to_string()))?;
+            if let Some(existing) = index.get(observation.run_id).map_err(|error| StoreError::Db(error.to_string()))? {
+                if existing.value() != observation.attempt_id.as_str() {
+                    return Err(StoreError::Conflict(
+                        "run already has a different command-worker usage observation".to_string(),
+                    ));
+                }
+            } else {
+                index
+                    .insert(observation.run_id, observation.attempt_id.as_str())
+                    .map_err(|error| StoreError::Db(error.to_string()))?;
+            }
+        }
         txn.commit().map_err(|error| StoreError::Db(error.to_string()))?;
         Ok(())
     }
@@ -528,6 +546,31 @@ impl Store {
         let txn = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
         let table = txn.open_table(COMMAND_WORKER_USAGE).map_err(|error| StoreError::Table(error.to_string()))?;
         match table.get(attempt_id).map_err(|error| StoreError::Db(error.to_string()))? {
+            Some(data) => {
+                let text =
+                    std::str::from_utf8(data.value()).map_err(|error| StoreError::Deserialize(error.to_string()))?;
+                let observation = crate::orchestration::CommandWorkerUsageObservation::from_json(text)
+                    .map_err(|error| StoreError::Deserialize(error.to_string()))?;
+                Ok(Some(observation))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Load the command-worker usage observation indexed by run identity.
+    pub fn load_command_worker_usage_for_run(
+        &self,
+        run_id: crate::engine::executor::RunId,
+    ) -> Result<Option<crate::orchestration::CommandWorkerUsageObservation>, StoreError> {
+        let txn = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
+        let index =
+            txn.open_table(COMMAND_WORKER_USAGE_BY_RUN).map_err(|error| StoreError::Table(error.to_string()))?;
+        let Some(attempt_id) = index.get(run_id.0).map_err(|error| StoreError::Db(error.to_string()))? else {
+            return Ok(None);
+        };
+        let attempt_id = attempt_id.value().to_string();
+        let table = txn.open_table(COMMAND_WORKER_USAGE).map_err(|error| StoreError::Table(error.to_string()))?;
+        match table.get(attempt_id.as_str()).map_err(|error| StoreError::Db(error.to_string()))? {
             Some(data) => {
                 let text =
                     std::str::from_utf8(data.value()).map_err(|error| StoreError::Deserialize(error.to_string()))?;

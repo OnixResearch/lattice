@@ -31,6 +31,7 @@ use crate::orchestration::core::OrchestrationTriggerContext;
 use crate::orchestration::core::OrchestrationTriggerKind;
 use crate::orchestration::core::ReplayReport;
 use crate::orchestration::core::RevisionProposal;
+use crate::orchestration::usage::UsageScope;
 use crate::store::Store;
 use crate::store::StoreError;
 use crate::store::TriggerAdmissionWrite;
@@ -539,20 +540,48 @@ fn finish_action(
     safe_summary: String,
 ) -> OrchestrationAction {
     let observed_usage = observed_usage(instance, &dispatch_id).unwrap_or_default();
-    let tokens = if instance.definition.budgets.enforced.tokens {
-        measured_agent_tokens(store, instance, run_id)
+    let persisted = store.load_command_worker_usage_for_run(run_id).ok().flatten().filter(|observation| {
+        observation.scope == UsageScope::Run
+            && observation.run_id == run_id.0
+            && observation.dispatch_id == dispatch_id.as_str()
+            && observation.validate().is_ok()
+            && observation.complete
+    });
+    let (tokens, duration, cost) = if let Some(observation) = persisted {
+        (
+            if instance.definition.budgets.enforced.tokens {
+                observation.measured_tokens()
+            } else {
+                None
+            },
+            if instance.definition.budgets.enforced.duration_millis && !observation.is_estimated_or_unknown() {
+                observation.duration_millis
+            } else {
+                None
+            },
+            if instance.definition.budgets.enforced.monetary_microunits {
+                observation.measured_cost_microunits()
+            } else {
+                None
+            },
+        )
     } else {
-        None
-    };
-    let duration = if instance.definition.budgets.enforced.duration_millis {
-        measured_run_duration(store, run_id)
-    } else {
-        None
-    };
-    let cost = if instance.definition.budgets.enforced.monetary_microunits {
-        measured_agent_cost(store, instance, run_id)
-    } else {
-        None
+        let tokens = if instance.definition.budgets.enforced.tokens {
+            measured_agent_tokens(store, instance, run_id)
+        } else {
+            None
+        };
+        let duration = if instance.definition.budgets.enforced.duration_millis {
+            measured_run_duration(store, run_id)
+        } else {
+            None
+        };
+        let cost = if instance.definition.budgets.enforced.monetary_microunits {
+            measured_agent_cost(store, instance, run_id)
+        } else {
+            None
+        };
+        (tokens, duration, cost)
     };
     if tokens.is_none() && duration.is_none() && cost.is_none() {
         return OrchestrationAction::RunFinished {

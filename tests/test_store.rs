@@ -118,6 +118,7 @@ fn command_worker_usage_persists_and_revalidates() {
     let (store, _dir) = common::temp_store();
     let observation = CommandWorkerUsageObservation {
         schema: lattice::orchestration::USAGE_OBSERVATION_SCHEMA.to_string(),
+        scope: lattice::orchestration::UsageScope::Run,
         workflow_revision: "revision-1".to_string(),
         instance_id: "instance-1".to_string(),
         dispatch_id: "dispatch-1".to_string(),
@@ -138,6 +139,11 @@ fn command_worker_usage_persists_and_revalidates() {
     store.save_command_worker_usage(&observation).expect("usage saves");
     store.save_command_worker_usage(&observation).expect("identical usage is idempotent");
     assert_eq!(store.load_command_worker_usage("attempt-usage").expect("usage loads"), Some(observation.clone()));
+    assert_eq!(
+        store.load_command_worker_usage_for_run(RunId(7)).expect("run usage loads"),
+        Some(observation.clone())
+    );
+    assert_eq!(store.load_command_worker_usage_for_run(RunId(8)).expect("missing run usage"), None);
 
     let mut conflicting = observation.clone();
     conflicting.tokens = Some(9_999);

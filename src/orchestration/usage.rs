@@ -19,9 +19,17 @@ pub enum UsageProvenance {
     Unknown,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UsageScope {
+    Run,
+    Node,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CommandWorkerUsageObservation {
     pub schema: String,
+    pub scope: UsageScope,
     pub workflow_revision: String,
     pub instance_id: String,
     pub dispatch_id: String,
@@ -133,6 +141,7 @@ mod tests {
     fn observation() -> CommandWorkerUsageObservation {
         CommandWorkerUsageObservation {
             schema: USAGE_OBSERVATION_SCHEMA.to_string(),
+            scope: UsageScope::Run,
             workflow_revision: "revision-1".to_string(),
             instance_id: "instance-1".to_string(),
             dispatch_id: "dispatch-1".to_string(),
