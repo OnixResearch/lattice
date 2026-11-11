@@ -131,6 +131,8 @@ pub enum NodeRunStatus {
 pub struct AppRunState {
     pub active: bool,
     pub node_statuses: HashMap<u64, NodeRunStatus>,
+    pub node_started: HashMap<u64, std::time::Instant>,
+    pub node_durations_millis: HashMap<u64, u64>,
     pub active_replay_timeline: Option<ReplayTimeline>,
 }
 
@@ -139,6 +141,8 @@ impl AppRunState {
         Self {
             active: false,
             node_statuses: HashMap::new(),
+            node_started: HashMap::new(),
+            node_durations_millis: HashMap::new(),
             active_replay_timeline: None,
         }
     }
@@ -158,6 +162,7 @@ enum RunEvent {
         run_id: RunId,
         events: Vec<crate::replay::ReplayEventRecord>,
     },
+    NodeProgress(crate::engine::executor::NodeProgress),
     Completed {
         run_id: RunId,
         workflow: Box<Workflow>,
@@ -2731,6 +2736,8 @@ impl App {
         self.run_state = AppRunState {
             active: true,
             node_statuses,
+            node_started: HashMap::new(),
+            node_durations_millis: HashMap::new(),
             active_replay_timeline: None,
         };
         self.output.push_line(message);
@@ -2751,7 +2758,17 @@ impl App {
             {
                 return;
             }
-            let mut executor = executor_factory().with_cancellation(executor_cancellation);
+            let (progress_sender, mut progress_receiver) = mpsc::unbounded_channel();
+            let progress_events = sender.clone();
+            tokio::spawn(async move {
+                while let Some(progress) = progress_receiver.recv().await {
+                    if progress_events.send(RunEvent::NodeProgress(progress)).is_err() {
+                        break;
+                    }
+                }
+            });
+            let mut executor =
+                executor_factory().with_progress_sender(progress_sender).with_cancellation(executor_cancellation);
             let cache = HashMap::new();
             let results = match authority_provider.load(run_id, authority_store) {
                 Ok(authority) => executor.run_authorized(&workflow, &cache, &authority).await.1,
@@ -2844,6 +2861,21 @@ impl App {
                         self.run_state.active_replay_timeline = Some(timeline);
                     }
                 }
+                RunEvent::NodeProgress(progress) => match progress {
+                    crate::engine::executor::NodeProgress::Started { node_id } => {
+                        self.run_state.node_started.insert(node_id.0, std::time::Instant::now());
+                        if matches!(self.run_state.node_statuses.get(&node_id.0), None | Some(NodeRunStatus::Pending)) {
+                            self.run_state.node_statuses.insert(node_id.0, NodeRunStatus::Running);
+                        }
+                    }
+                    crate::engine::executor::NodeProgress::Finished {
+                        node_id,
+                        duration_millis,
+                    } => {
+                        self.run_state.node_started.remove(&node_id.0);
+                        self.run_state.node_durations_millis.insert(node_id.0, duration_millis);
+                    }
+                },
                 RunEvent::Completed {
                     run_id,
                     workflow,

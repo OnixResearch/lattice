@@ -1158,6 +1158,17 @@ pub enum NodeStatus {
 }
 
 /// Result of executing a single step (one node).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NodeProgress {
+    Started {
+        node_id: crate::engine::workflow::NodeId,
+    },
+    Finished {
+        node_id: crate::engine::workflow::NodeId,
+        duration_millis: u64,
+    },
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StepResult {
     pub node_id: crate::engine::workflow::NodeId,
@@ -1250,6 +1261,7 @@ pub struct Executor {
     pub(super) frontier_policy: lattice_core::scheduling::CapacityPolicy,
     frontier_conflicts: BTreeMap<u64, lattice_core::scheduling::ConflictState>,
     observed_completion_order: Vec<crate::engine::workflow::NodeId>,
+    progress_sender: Option<tokio::sync::mpsc::UnboundedSender<NodeProgress>>,
 }
 
 // r[impl n8nclone.workflow_execution.image_input_nodes.production_io.default_executor]
@@ -1289,6 +1301,7 @@ impl Executor {
             frontier_policy: crate::engine::frontier::serial_capacity_policy(),
             frontier_conflicts: BTreeMap::new(),
             observed_completion_order: Vec::new(),
+            progress_sender: None,
         }
     }
 
@@ -1397,6 +1410,15 @@ impl Executor {
     pub fn with_cancellation(mut self, cancellation: std::sync::Arc<std::sync::atomic::AtomicBool>) -> Self {
         self.cancellation = cancellation;
         self
+    }
+
+    pub fn with_progress_sender(mut self, sender: tokio::sync::mpsc::UnboundedSender<NodeProgress>) -> Self {
+        self.progress_sender = Some(sender);
+        self
+    }
+
+    pub(crate) fn progress_sender(&self) -> Option<tokio::sync::mpsc::UnboundedSender<NodeProgress>> {
+        self.progress_sender.clone()
     }
 
     // r[impl lattice.workflow_interchange.shell_success]
@@ -2841,6 +2863,11 @@ impl Executor {
                 Some(session) => EffectExecution::Product(session),
                 None => EffectExecution::Compatibility,
             };
+            let progress = self.progress_sender();
+            if let Some(sender) = progress.as_ref() {
+                let _ = sender.send(NodeProgress::Started { node_id });
+            }
+            let started = std::time::Instant::now();
             let step = self
                 .execute_node_with_expression_context(NodeExecution {
                     workflow,
@@ -2852,6 +2879,12 @@ impl Executor {
                     effect,
                 })
                 .await;
+            if let Some(sender) = progress.as_ref() {
+                let _ = sender.send(NodeProgress::Finished {
+                    node_id: step.node_id,
+                    duration_millis: u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
+                });
+            }
             let step = match product_session.as_ref() {
                 Some(session) => match session.lock().finish(node_id, &step.status) {
                     Ok(()) => step,

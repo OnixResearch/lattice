@@ -18,6 +18,7 @@ use support::*;
 
 use crate::engine::executor::EffectExecution;
 use crate::engine::executor::NodeExecution;
+use crate::engine::executor::NodeProgress;
 use crate::engine::executor::NodeStatus;
 use crate::engine::executor::StepResult;
 use crate::engine::runner;
@@ -174,11 +175,18 @@ pub(crate) async fn run(request: RunRequest<'_>) -> RunOutcome {
             running.insert(node_id.0, prepared.reservation.clone());
             runner_states.insert(node_id.0, runner::RunnerStepState::Running);
             let session = product_session.clone();
+            let progress = executor.progress_sender();
             in_flight.push(async move {
                 let effect = match session.as_ref() {
                     Some(session) => EffectExecution::Product(session),
                     None => EffectExecution::Compatibility,
                 };
+                if let Some(sender) = progress.as_ref() {
+                    let _ = sender.send(NodeProgress::Started {
+                        node_id: prepared.node_id,
+                    });
+                }
+                let started = std::time::Instant::now();
                 let step = executor
                     .execute_node_with_expression_context(NodeExecution {
                         workflow,
@@ -190,6 +198,12 @@ pub(crate) async fn run(request: RunRequest<'_>) -> RunOutcome {
                         effect,
                     })
                     .await;
+                if let Some(sender) = progress.as_ref() {
+                    let _ = sender.send(NodeProgress::Finished {
+                        node_id: step.node_id,
+                        duration_millis: u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
+                    });
+                }
                 (step, prepared.reservation)
             });
             dispatched_count = dispatched_count.saturating_add(1);

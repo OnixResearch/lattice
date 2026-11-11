@@ -143,6 +143,8 @@ pub fn render_rows(
     layout: &RowsLayout,
     workflow: &Workflow,
     statuses: &HashMap<u64, NodeRunStatus>,
+    started: &HashMap<u64, std::time::Instant>,
+    durations_millis: &HashMap<u64, u64>,
     outputs: &[RunOutputLine],
     selected: &BTreeSet<NodeId>,
     focused: Option<NodeId>,
@@ -151,7 +153,7 @@ pub fn render_rows(
 ) {
     let mut lines = Vec::with_capacity(layout.rows.len().saturating_add(2));
     lines.push(Line::styled(
-        format!("  #  LN  {:<20} {:<10} {:<9} OUTPUT", "NODE", "KIND", "STATUS"),
+        format!("  #  LN  {:<20} {:<10} {:<9} {:<8} OUTPUT", "NODE", "KIND", "STATUS", "TIME"),
         Style::default().fg(Color::DarkGray),
     ));
     for (index, row) in layout.rows.iter().enumerate() {
@@ -168,15 +170,17 @@ pub fn render_rows(
             row.lane.to_string()
         };
         let status = status_text(statuses.get(&row.node_id.0).copied());
+        let duration = duration_text(durations_millis.get(&row.node_id.0), started.get(&row.node_id.0));
         let output = latest_node_output_records(outputs, workflow, row.node_id)
             .last()
             .map(|record| bounded_output(&record.text))
             .unwrap_or_default();
         let text = format!(
-            "{marker}{index:>3} {lane:>3}  {:<20} {:<10} {:<9} {}",
+            "{marker}{index:>3} {lane:>3}  {:<20} {:<10} {:<9} {:<8} {}",
             bounded_label(&row.label),
             row.kind,
             status,
+            duration,
             output
         );
         let style = if selected.contains(&row.node_id) {
@@ -205,6 +209,27 @@ fn status_text(status: Option<NodeRunStatus>) -> &'static str {
         Some(NodeRunStatus::Failed) => "failed",
         Some(NodeRunStatus::Skipped) => "skipped",
         None => "idle",
+    }
+}
+
+fn duration_text(finished_millis: Option<&u64>, started: Option<&std::time::Instant>) -> String {
+    if let Some(millis) = finished_millis {
+        return if *millis >= 1_000 {
+            format!("{:.1}s", *millis as f64 / 1_000.0)
+        } else {
+            format!("{millis}ms")
+        };
+    }
+    match started {
+        Some(started) => {
+            let millis = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+            if millis >= 1_000 {
+                format!("{:.1}s", millis as f64 / 1_000.0)
+            } else {
+                format!("{millis}ms")
+            }
+        }
+        None => "—".to_string(),
     }
 }
 
@@ -300,6 +325,8 @@ mod tests {
             &layout,
             &workflow,
             &statuses,
+            &HashMap::new(),
+            &HashMap::from([(node_id.0, 42_u64)]),
             &outputs,
             &BTreeSet::from([node_id]),
             Some(node_id),
@@ -314,6 +341,7 @@ mod tests {
             .join("\n");
         assert!(rendered.contains("NODE"));
         assert!(rendered.contains("completed"));
+        assert!(rendered.contains("42ms"));
         assert!(rendered.contains("bounded output"));
     }
 }

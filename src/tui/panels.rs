@@ -246,6 +246,8 @@ fn render_canvas(app: &mut App, area: Rect, buf: &mut Buffer) {
             &layout,
             &app.workflow,
             &app.run_state.node_statuses,
+            &app.run_state.node_started,
+            &app.run_state.node_durations_millis,
             &app.run_output_lines,
             &selected,
             focused,
