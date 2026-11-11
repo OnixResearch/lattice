@@ -145,6 +145,7 @@ pub mod operation_data;
 pub mod operation_pack;
 pub mod orchestration;
 pub mod process;
+pub mod pure_inet_profile;
 mod reconciliation;
 pub mod protocol_cli {
     pub use crate::engine::protocol::cli::*;

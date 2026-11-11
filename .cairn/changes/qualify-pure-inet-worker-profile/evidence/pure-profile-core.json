@@ -1,0 +1,35 @@
+{
+  "schema": "lattice.pure_inet_profile.core_evidence.v1",
+  "recorded_at": "2026-11-11",
+  "scope": "Pure Lattice-side profile validation and wrapping-i64 reference evaluation; no producer process, operation-pack dispatch, or consumer publication.",
+  "implementation": {
+    "module": "src/pure_inet_profile.rs",
+    "exports": [
+      "PureOperation",
+      "PureInputs",
+      "PureProgram",
+      "parse_canonical_i64",
+      "format_canonical_i64",
+      "canonical_i64_from_json"
+    ]
+  },
+  "command": "cargo test --lib --locked pure_inet_profile",
+  "result": {
+    "passed": 6,
+    "failed": 0
+  },
+  "covered": [
+    "exact i64 minimum, maximum, zero, and values beyond binary64 exact range",
+    "wrapping Add, Sub, and Mul",
+    "shared expressions",
+    "rejection of leading plus, negative zero, leading zeroes, whitespace, fractions, hex, and out-of-range decimals",
+    "rejection of JSON numbers as integer transport",
+    "rejection of empty, underflowing, oversized-arity, and invalid-input-index programs"
+  ],
+  "non_claims": [
+    "This does not execute or qualify a producer worker.",
+    "This does not define the Noble producer wire format or CLI.",
+    "This does not add an operation-pack runtime, workflow node, scheduler, or effect route.",
+    "Passing pure tests does not establish OS sandboxing, publication, or consumer acceptance."
+  ]
+}
