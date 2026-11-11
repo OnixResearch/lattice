@@ -70,6 +70,7 @@ const WORKFLOW_EXCHANGE_EXECUTIONS: TableDefinition<&str, &[u8]> =
 const WORKFLOW_EXCHANGE_REQUEST_INDEX: TableDefinition<&str, &str> =
     TableDefinition::new("workflow_exchange_request_index_v1");
 const CANDIDATE_RECEIPTS: TableDefinition<&str, &[u8]> = TableDefinition::new("candidate_receipts_v1");
+const CANDIDATE_ARTIFACTS: TableDefinition<&str, &[u8]> = TableDefinition::new("candidate_artifacts_v1");
 const WORKFLOW_EXCHANGE_IDEMPOTENCY_INDEX: TableDefinition<&str, &str> =
     TableDefinition::new("workflow_exchange_idempotency_index_v1");
 const ORCHESTRATION_INSTANCE_COUNTER_KEY: &str = "instance_sequence";
@@ -341,6 +342,7 @@ impl Store {
                 .open_table(WORKFLOW_EXCHANGE_IDEMPOTENCY_INDEX)
                 .map_err(|error| StoreError::Table(error.to_string()))?;
             let _ = txn.open_table(CANDIDATE_RECEIPTS).map_err(|error| StoreError::Table(error.to_string()))?;
+            let _ = txn.open_table(CANDIDATE_ARTIFACTS).map_err(|error| StoreError::Table(error.to_string()))?;
             ensure_operation_data_tables(&txn)?;
             quarantine::fence_pending(&txn)?;
         }
@@ -407,6 +409,56 @@ impl Store {
             }
             None => Ok(None),
         }
+    }
+
+    /// Persist one candidate file's exact bytes by attempt and relative path.
+    pub fn save_candidate_artifact(&self, attempt_id: &str, path: &str, bytes: &[u8]) -> Result<(), StoreError> {
+        self.ensure_not_quarantined()?;
+        if attempt_id.is_empty() || attempt_id.chars().any(char::is_control) {
+            return Err(StoreError::Serialize("candidate attempt identity is invalid".to_string()));
+        }
+        crate::candidate::validate_candidate_path(path).map_err(|error| StoreError::Serialize(error.to_string()))?;
+        let key = candidate_artifact_key(attempt_id, path);
+        let txn = self.db.begin_write().map_err(|error| StoreError::Db(error.to_string()))?;
+        {
+            let mut table =
+                txn.open_table(CANDIDATE_ARTIFACTS).map_err(|error| StoreError::Table(error.to_string()))?;
+            table.insert(key.as_str(), bytes).map_err(|error| StoreError::Db(error.to_string()))?;
+        }
+        txn.commit().map_err(|error| StoreError::Db(error.to_string()))?;
+        Ok(())
+    }
+
+    /// Load one candidate file's exact bytes.
+    pub fn load_candidate_artifact(&self, attempt_id: &str, path: &str) -> Result<Option<Vec<u8>>, StoreError> {
+        crate::candidate::validate_candidate_path(path).map_err(|error| StoreError::Deserialize(error.to_string()))?;
+        let key = candidate_artifact_key(attempt_id, path);
+        let txn = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
+        let table = txn.open_table(CANDIDATE_ARTIFACTS).map_err(|error| StoreError::Table(error.to_string()))?;
+        Ok(table
+            .get(key.as_str())
+            .map_err(|error| StoreError::Db(error.to_string()))?
+            .map(|data| data.value().to_vec()))
+    }
+
+    /// Load all candidate file bytes retained for one attempt.
+    pub fn list_candidate_artifacts(
+        &self,
+        attempt_id: &str,
+    ) -> Result<std::collections::BTreeMap<String, Vec<u8>>, StoreError> {
+        let txn = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
+        let table = txn.open_table(CANDIDATE_ARTIFACTS).map_err(|error| StoreError::Table(error.to_string()))?;
+        let mut artifacts = std::collections::BTreeMap::new();
+        for entry in table.iter().map_err(|error| StoreError::Db(error.to_string()))? {
+            let (key, value) = entry.map_err(|error| StoreError::Db(error.to_string()))?;
+            let key = key.value();
+            if let Some((owner, path)) = key.split_once('\0')
+                && owner == attempt_id
+            {
+                artifacts.insert(path.to_string(), value.value().to_vec());
+            }
+        }
+        Ok(artifacts)
     }
 
     /// Load a workflow by name.
@@ -1060,6 +1112,10 @@ impl Store {
 
 fn identity_admission_error(error: crate::orchestration::AdmissionError) -> StoreError {
     StoreError::Deserialize(error.to_string())
+}
+
+fn candidate_artifact_key(attempt_id: &str, path: &str) -> String {
+    format!("{attempt_id}\0{path}")
 }
 
 fn serialize<T: Serialize + ?Sized>(value: &T) -> Result<Vec<u8>, StoreError> {

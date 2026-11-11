@@ -31,8 +31,9 @@ capture or receipt derivation is `Unknown` and retains the process output.
 
 Receipts can be serialized only after admission and persisted by attempt
 identity through the store. Loading revalidates the receipt. `run_and_publish_candidate_worker`
-persists a produced receipt; if durable publication fails, it returns `Unknown`
-with the process output rather than claiming success.
+persists a produced receipt and the exact bytes of changed/added files; if
+durable publication fails, it returns `Unknown` with the process output rather
+than claiming success. Deleted files have no artifact bytes.
 
 `verify_receipt_from_snapshots` independently checks expected work, attempt,
 fence, and workspace bindings and recomputes the identities and changed paths
@@ -42,6 +43,7 @@ from the actual snapshots. Crossed bindings and stale snapshots are rejected.
 
 This boundary does not provide OS-level read/write isolation, prevent a worker
 from reading host files outside the admitted root, deny publisher credentials by
-kernel policy, publish candidate file bytes, or prove candidate correctness. The
-workspace boundary is admission data and a clear-environment process route, not
-a sandbox. Independent verification and publication remain separate authority.
+kernel policy, or prove candidate correctness. The workspace boundary is
+admission data and a clear-environment process route, not a sandbox. Local
+receipt/artifact persistence is not external publication, independent
+acceptance, or landing authority.

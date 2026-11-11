@@ -245,18 +245,28 @@ fn validate_changed_paths(paths: &[String]) -> Result<(), CandidateReceiptError>
     }
     let mut previous: Option<&str> = None;
     for path in paths {
-        if path.is_empty()
-            || path.len() > MAX_IDENTIFIER_BYTES
-            || path.starts_with('/')
-            || path.starts_with('\\')
-            || path.split('/').any(|component| component == ".." || component.is_empty())
-        {
-            return Err(CandidateReceiptError::InvalidChangedPath);
-        }
+        validate_path(path)?;
         if previous.is_some_and(|previous| previous >= path.as_str()) {
             return Err(CandidateReceiptError::ChangedPathsNotCanonical);
         }
         previous = Some(path);
+    }
+    Ok(())
+}
+
+/// Validate one relative candidate path before storing artifact bytes.
+pub fn validate_candidate_path(path: &str) -> Result<(), CandidateReceiptError> {
+    validate_path(path)
+}
+
+fn validate_path(path: &str) -> Result<(), CandidateReceiptError> {
+    if path.is_empty()
+        || path.len() > MAX_IDENTIFIER_BYTES
+        || path.starts_with('/')
+        || path.starts_with('\\')
+        || path.split('/').any(|component| component == ".." || component.is_empty())
+    {
+        return Err(CandidateReceiptError::InvalidChangedPath);
     }
     Ok(())
 }

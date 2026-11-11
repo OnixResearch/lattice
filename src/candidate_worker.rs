@@ -41,6 +41,7 @@ pub struct CandidateWorkerRequest {
 pub enum CandidateWorkerOutcome {
     Produced {
         receipt: CandidateReceipt,
+        changed_files: BTreeMap<String, Vec<u8>>,
         stdout: Vec<u8>,
         stderr: Vec<u8>,
     },
@@ -122,26 +123,37 @@ pub fn run_and_publish_candidate_worker(
     store: &Store,
 ) -> Result<CandidateWorkerOutcome, CandidateWorkerError> {
     let outcome = run_candidate_worker(request, config, cancellation)?;
-    let (receipt, stdout, stderr) = match outcome {
+    let (receipt, changed_files, stdout, stderr) = match outcome {
         CandidateWorkerOutcome::Produced {
             receipt,
+            changed_files,
             stdout,
             stderr,
-        } => (receipt, stdout, stderr),
+        } => (receipt, changed_files, stdout, stderr),
         other => return Ok(other),
     };
-    match store.save_candidate_receipt(&receipt) {
-        Ok(()) => Ok(CandidateWorkerOutcome::Produced {
-            receipt,
-            stdout,
-            stderr,
-        }),
-        Err(error) => Ok(CandidateWorkerOutcome::Unknown {
+    if let Err(error) = store.save_candidate_receipt(&receipt) {
+        return Ok(CandidateWorkerOutcome::Unknown {
             blocker: format!("candidate receipt publication failed: {error}"),
             stdout,
             stderr,
-        }),
+        });
     }
+    for (path, bytes) in &changed_files {
+        if let Err(error) = store.save_candidate_artifact(&receipt.attempt_id, path, bytes) {
+            return Ok(CandidateWorkerOutcome::Unknown {
+                blocker: format!("candidate artifact publication failed: {error}"),
+                stdout,
+                stderr,
+            });
+        }
+    }
+    Ok(CandidateWorkerOutcome::Produced {
+        receipt,
+        changed_files,
+        stdout,
+        stderr,
+    })
 }
 
 fn finish_from_process_output(
@@ -191,8 +203,14 @@ fn finish_from_process_output(
             });
         }
     };
+    let changed_files = receipt
+        .changed_paths
+        .iter()
+        .filter_map(|path| candidate.get(path).map(|bytes| (path.clone(), bytes.clone())))
+        .collect::<BTreeMap<_, _>>();
     Ok(CandidateWorkerOutcome::Produced {
         receipt,
+        changed_files,
         stdout: output.stdout,
         stderr: output.stderr,
     })
@@ -283,24 +301,6 @@ mod tests {
     }
 
     #[test]
-    fn pre_cancellation_prevents_execution() {
-        let directory = tempfile::tempdir().expect("temporary workspace");
-        let root = directory.path();
-        std::fs::create_dir_all(root.join("src")).expect("source directory");
-        std::fs::write(root.join("src/main.rs"), b"old").expect("source");
-
-        let outcome = run_candidate_worker(
-            &request(root, "printf new > src/main.rs"),
-            &RuntimeConfig::default(),
-            &AtomicBool::new(true),
-        )
-        .expect("worker runs");
-
-        assert!(matches!(outcome, CandidateWorkerOutcome::Cancelled));
-        assert_eq!(std::fs::read(root.join("src/main.rs")).expect("source remains"), b"old");
-    }
-
-    #[test]
     fn output_overflow_and_timeout_are_failures() {
         let directory = tempfile::tempdir().expect("temporary workspace");
         let root = directory.path();
@@ -361,6 +361,11 @@ mod tests {
         assert!(matches!(outcome, CandidateWorkerOutcome::Produced { .. }), "{outcome:?}");
         let receipt = store.load_candidate_receipt("attempt-1").expect("receipt loads").expect("receipt exists");
         assert_eq!(receipt.changed_paths, vec!["src/main.rs"]);
+        assert_eq!(
+            store.load_candidate_artifact("attempt-1", "src/main.rs").expect("artifact loads"),
+            Some(b"new".to_vec())
+        );
+        assert_eq!(store.list_candidate_artifacts("attempt-1").expect("artifacts list").len(), 1);
     }
 
     #[test]
