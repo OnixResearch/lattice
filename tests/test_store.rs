@@ -70,6 +70,14 @@ fn candidate_receipts_persist_and_revalidate() {
     let mut invalid = receipt;
     invalid.changed_paths = vec!["../escape".to_string()];
     assert!(store.save_candidate_receipt(&invalid).is_err());
+
+    store.save_candidate_artifact("attempt-1", "src/lib.rs", b"artifact").expect("artifact saves");
+    assert_eq!(
+        store.load_candidate_artifact("attempt-1", "src/lib.rs").expect("artifact loads"),
+        Some(b"artifact".to_vec())
+    );
+    assert!(store.save_candidate_artifact("attempt-1", "../escape", b"x").is_err());
+    assert!(store.load_candidate_artifact("attempt-1", "../escape").is_err());
 }
 
 #[test]
