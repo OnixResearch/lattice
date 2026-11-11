@@ -374,6 +374,34 @@ fn measured_duration_basis_remains_distinct() {
     assert!(finished.budgets.breached);
 }
 
+#[test]
+fn measured_token_and_duration_basis_remains_distinct() {
+    let base = base_instance(CompletionPolicy::RunSucceeded);
+    let started = start_transition(&base).instance;
+    let dispatch = started.pending_dispatch.as_ref().expect("started dispatch");
+    let reserved = started.budgets.reservations.values().next().expect("round reservation").charge;
+    let measured = BudgetCharge {
+        tokens: reserved.tokens.saturating_sub(1),
+        duration_millis: reserved.duration_millis.saturating_add(1),
+        ..reserved
+    };
+    let action = OrchestrationAction::RunFinishedMeasured {
+        dispatch_id: dispatch.id.clone(),
+        run_id: dispatch.run_id,
+        succeeded: true,
+        retryable_observed_failure: false,
+        measured_usage: measured,
+        usage_basis: BudgetUsageBasis::MeasuredTokensAndDuration,
+        safe_summary: "measured tokens and duration".to_string(),
+    };
+    let finished = transition(&started, fact(&started, action))
+        .expect("measured token and duration completion settles")
+        .instance;
+
+    assert_eq!(finished.last_usage_basis, BudgetUsageBasis::MeasuredTokensAndDuration);
+    assert_eq!(finished.budgets.consumed, measured);
+}
+
 // r[verify lattice.agent_orchestration.observed_failure_retry]
 // r[verify lattice.agent_orchestration.retry_round]
 #[test]
