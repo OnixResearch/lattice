@@ -32,3 +32,20 @@ Orchestration keeps reservation, settlement, and usage provenance separate.
 This boundary does not provide provider billing, exact token or cost ceilings,
 or recovery of an observation that was never persisted. Those remain explicit
 compatibility and accounting work.
+
+## Versioned usage observations
+
+`CommandWorkerUsageObservation` is the durable per-attempt observation contract.
+It binds workflow/instance/dispatch/run/node/invocation, worker profile, and
+attempt identity, and records optional agent invocations, model requests,
+subagent calls, tokens, cost, and duration.
+
+`host_measured`, `provider_reported`, `worker_reported`, `estimated`, and
+`unknown` provenance remain distinct. Unknown observations cannot carry values
+or claim completeness. Estimated or unknown observations never expose measured
+tokens or cost. Complete observations must carry at least one value.
+
+The store persists observations by attempt identity. Identical writes are
+idempotent; different content for the same attempt is rejected. This contract is
+not yet wired into orchestration settlement; the current shell measures only the
+enforced token, duration, and cost dimensions described above.
