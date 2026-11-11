@@ -613,6 +613,33 @@ fn operator_e2e_tui_process_inspects_failure_and_explicitly_reruns_fresh_identit
     }
 }
 
+// r[verify n8nclone.tui_ux.keyboard_first]
+#[cfg(unix)]
+#[test]
+fn operator_e2e_tui_toggles_between_graph_and_rows_views() {
+    let temp_dir = tempfile::tempdir().expect("temporary rows-view PTY directory");
+    let config_path = write_cli_config(&temp_dir);
+    save_operator_tui_workflow(&temp_dir);
+    let mut session = TuiPtySession::start(&config_path, temp_dir.path());
+
+    session.wait(TUI_WORKSPACE_SURFACES, "the initial rows-view workspace");
+    let cursor = session.cursor();
+    session.input(TUI_OPEN_WORKFLOW_INPUT, "open populated workflow");
+    session.wait_fresh(cursor, &["Open Workflow", TUI_WORKFLOW_NAME], "the populated workflow browser");
+    let cursor = session.cursor();
+    session.input(TUI_CONFIRM_INPUT, "select populated workflow");
+    session.wait_fresh(cursor, &[TUI_NODE_LABEL], "the populated workflow");
+    let cursor = session.cursor();
+    session.input(b"v", "toggle the rows view");
+    session.wait_fresh(cursor, &["NODE", "KIND", "STATUS", "TIME", "TOKENS", "COST", "ATT"], "the rows view");
+    session.input(b"v", "toggle back to the graph view");
+    session.wait(&[TUI_NODE_LABEL, "C-W: fields"], "the graph view");
+    session.input(TUI_QUIT_INPUT, "quit after rows-view toggle");
+    let (status, transcript) = session.finish();
+
+    assert!(status.success(), "TUI exit status: {status}; transcript: {transcript}");
+}
+
 // r[verify lattice.tui_ux.process_failure_recovery.scenario.diagnostics]
 #[cfg(unix)]
 #[test]
