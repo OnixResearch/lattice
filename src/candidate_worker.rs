@@ -651,6 +651,26 @@ mod tests {
     }
 
     #[test]
+    fn bubblewrap_isolation_rejects_writes_outside_the_workspace() {
+        let Ok(sandbox) = std::env::var("LATTICE_BWRAP") else {
+            return;
+        };
+        let directory = tempfile::tempdir().expect("temporary workspace");
+        let root = directory.path();
+        std::fs::create_dir_all(root.join("src")).expect("source directory");
+        std::fs::write(root.join("src/main.rs"), b"old").expect("base source");
+        let mut isolated = request(root, "printf nope > /tmp/lattice-leak && printf new > src/main.rs");
+        isolated.require_isolation = true;
+        isolated.sandbox_program = Some(sandbox);
+
+        let outcome =
+            run_candidate_worker(&isolated, &RuntimeConfig::default(), &AtomicBool::new(false)).expect("worker runs");
+
+        assert!(matches!(outcome, CandidateWorkerOutcome::Failed { .. }), "{outcome:?}");
+        assert_eq!(std::fs::read(root.join("src/main.rs")).expect("source remains"), b"old");
+    }
+
+    #[test]
     fn changes_outside_the_admitted_write_boundary_are_rejected() {
         let directory = tempfile::tempdir().expect("temporary workspace");
         let root = directory.path();
