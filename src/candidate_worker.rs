@@ -719,6 +719,24 @@ mod tests {
     }
 
     #[test]
+    fn cancelled_and_unknown_results_are_valid_non_success() {
+        let cancelled = CandidateAttemptResult::from_outcome(&CandidateWorkerOutcome::Cancelled);
+        assert_eq!(cancelled.disposition, CandidateDisposition::Cancelled);
+        assert!(cancelled.receipt.is_none());
+        assert!(cancelled.published_artifacts.is_empty());
+        assert!(cancelled.validate().is_ok());
+
+        let unknown = CandidateAttemptResult::from_outcome(&CandidateWorkerOutcome::Unknown {
+            blocker: "capture interrupted".to_string(),
+            stdout: b"partial".to_vec(),
+            stderr: Vec::new(),
+        });
+        assert_eq!(unknown.disposition, CandidateDisposition::Unknown);
+        assert!(unknown.blocker.is_some());
+        assert!(unknown.validate().is_ok());
+    }
+
+    #[test]
     fn attempt_result_rejects_invalid_artifact_paths() {
         let receipt = CandidateReceipt {
             schema: crate::candidate::CANDIDATE_RECEIPT_SCHEMA.to_string(),
