@@ -228,6 +228,8 @@ pub enum BudgetUsageBasis {
     ReservedFallback,
     Measured,
     MeasuredTokens,
+    MeasuredDuration,
+    MeasuredTokensAndDuration,
 }
 
 impl BudgetUsageBasis {

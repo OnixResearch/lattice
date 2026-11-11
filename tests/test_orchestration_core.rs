@@ -349,6 +349,31 @@ fn measured_token_usage_basis_remains_distinct_from_full_measurement() {
     assert_eq!(finished.budgets.consumed, measured);
 }
 
+#[test]
+fn measured_duration_basis_remains_distinct() {
+    let base = base_instance(CompletionPolicy::RunSucceeded);
+    let started = start_transition(&base).instance;
+    let dispatch = started.pending_dispatch.as_ref().expect("started dispatch");
+    let reserved = started.budgets.reservations.values().next().expect("round reservation").charge;
+    let measured = BudgetCharge {
+        duration_millis: reserved.duration_millis.saturating_add(1),
+        ..reserved
+    };
+    let action = OrchestrationAction::RunFinishedMeasured {
+        dispatch_id: dispatch.id.clone(),
+        run_id: dispatch.run_id,
+        succeeded: true,
+        retryable_observed_failure: false,
+        measured_usage: measured,
+        usage_basis: BudgetUsageBasis::MeasuredDuration,
+        safe_summary: "measured duration".to_string(),
+    };
+    let finished = transition(&started, fact(&started, action)).expect("measured duration completion settles").instance;
+    assert_eq!(finished.last_usage_basis, BudgetUsageBasis::MeasuredDuration);
+    assert_eq!(finished.budgets.consumed, measured);
+    assert!(finished.budgets.breached);
+}
+
 // r[verify lattice.agent_orchestration.observed_failure_retry]
 // r[verify lattice.agent_orchestration.retry_round]
 #[test]

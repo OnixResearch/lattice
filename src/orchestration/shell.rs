@@ -375,30 +375,11 @@ async fn execute_started_round(
         }
         Err(_) => (false, false, guarded_summary.unwrap_or_else(|| UNOBSERVED_ROUND_FAILURE_SUMMARY.to_string())),
     };
-    let observed_usage = observed_usage(&current, &intent.id).unwrap_or_default();
-    let action = if let Some(tokens) = measured_agent_tokens(store, &current, run_id) {
-        let mut measured_usage = observed_usage;
-        measured_usage.tokens = tokens;
-        OrchestrationAction::RunFinishedMeasured {
-            dispatch_id: intent.id,
-            run_id,
-            succeeded: is_succeeded,
-            retryable_observed_failure: is_retryable_observed_failure,
-            measured_usage,
-            usage_basis: BudgetUsageBasis::MeasuredTokens,
-            safe_summary: summary,
-        }
-    } else {
-        OrchestrationAction::RunFinished {
-            dispatch_id: intent.id,
-            run_id,
-            succeeded: is_succeeded,
-            retryable_observed_failure: is_retryable_observed_failure,
-            observed_usage,
-            safe_summary: summary,
-        }
-    };
-    apply_and_commit(store, &current, action)
+    apply_and_commit(
+        store,
+        &current,
+        finish_action(store, &current, intent.id, run_id, is_succeeded, is_retryable_observed_failure, summary),
+    )
 }
 
 // r[impl lattice.agent_orchestration.observed_failure_retry]
@@ -518,6 +499,67 @@ fn usage_tokens(value: &serde_json::Value) -> Option<u64> {
             .and_then(serde_json::Value::as_u64)?;
         input.checked_add(output)
     })
+}
+
+fn measured_run_duration(store: &Store, run_id: RunId) -> Option<u64> {
+    let record = store.load_run(run_id).ok()??;
+    let finished = record.finished_epoch_ms?;
+    let elapsed = finished.checked_sub(record.started_epoch_ms)?;
+    u64::try_from(elapsed).ok()
+}
+
+fn finish_action(
+    store: &Store,
+    instance: &OrchestrationInstance,
+    dispatch_id: crate::orchestration::DispatchId,
+    run_id: RunId,
+    succeeded: bool,
+    retryable_observed_failure: bool,
+    safe_summary: String,
+) -> OrchestrationAction {
+    let observed_usage = observed_usage(instance, &dispatch_id).unwrap_or_default();
+    let tokens = if instance.definition.budgets.enforced.tokens {
+        measured_agent_tokens(store, instance, run_id)
+    } else {
+        None
+    };
+    let duration = if instance.definition.budgets.enforced.duration_millis {
+        measured_run_duration(store, run_id)
+    } else {
+        None
+    };
+    if tokens.is_none() && duration.is_none() {
+        return OrchestrationAction::RunFinished {
+            dispatch_id,
+            run_id,
+            succeeded,
+            retryable_observed_failure,
+            observed_usage,
+            safe_summary,
+        };
+    }
+    let usage_basis = match (tokens, duration) {
+        (Some(_), Some(_)) => BudgetUsageBasis::MeasuredTokensAndDuration,
+        (Some(_), None) => BudgetUsageBasis::MeasuredTokens,
+        (None, Some(_)) => BudgetUsageBasis::MeasuredDuration,
+        (None, None) => BudgetUsageBasis::ReservedFallback,
+    };
+    let mut measured_usage = observed_usage;
+    if let Some(tokens) = tokens {
+        measured_usage.tokens = tokens;
+    }
+    if let Some(duration) = duration {
+        measured_usage.duration_millis = duration;
+    }
+    OrchestrationAction::RunFinishedMeasured {
+        dispatch_id,
+        run_id,
+        succeeded,
+        retryable_observed_failure,
+        measured_usage,
+        usage_basis,
+        safe_summary,
+    }
 }
 
 fn safe_run_summary(summary: &headless::HeadlessRunSummary) -> String {
@@ -802,35 +844,24 @@ fn reconcile_run_record(
     intent: &DispatchIntent,
     record: &crate::store::RunRecord,
 ) -> Result<OrchestrationInstance, OrchestrationShellError> {
-    let observed_usage = observed_usage(instance, &intent.id).unwrap_or_default();
     let is_succeeded = record.failures == 0;
     let is_retryable_observed_failure =
         !is_succeeded && record.finished_epoch_ms.is_some() && instance.definition.retry.is_some();
     let guarded_summary = crate::guarded::status::optional(store, intent.run_id, &instance.definition.id)?;
     let summary = guarded_summary.unwrap_or_else(|| crate::guarded::status::recovered_fallback(record));
-    let action = if let Some(tokens) = measured_agent_tokens(store, instance, intent.run_id) {
-        let mut measured_usage = observed_usage;
-        measured_usage.tokens = tokens;
-        OrchestrationAction::RunFinishedMeasured {
-            dispatch_id: intent.id.clone(),
-            run_id: intent.run_id,
-            succeeded: is_succeeded,
-            retryable_observed_failure: is_retryable_observed_failure,
-            measured_usage,
-            usage_basis: BudgetUsageBasis::MeasuredTokens,
-            safe_summary: summary,
-        }
-    } else {
-        OrchestrationAction::RunFinished {
-            dispatch_id: intent.id.clone(),
-            run_id: intent.run_id,
-            succeeded: is_succeeded,
-            retryable_observed_failure: is_retryable_observed_failure,
-            observed_usage,
-            safe_summary: summary,
-        }
-    };
-    apply_and_commit(store, instance, action)
+    apply_and_commit(
+        store,
+        instance,
+        finish_action(
+            store,
+            instance,
+            intent.id.clone(),
+            intent.run_id,
+            is_succeeded,
+            is_retryable_observed_failure,
+            summary,
+        ),
+    )
 }
 
 pub fn load_instance(store: &Store, instance_id: &str) -> Result<OrchestrationInstance, OrchestrationShellError> {

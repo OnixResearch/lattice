@@ -10,12 +10,17 @@ Orchestration keeps reservation, settlement, and usage provenance separate.
 - `RunFinishedMeasured` settles with an explicitly supplied measured
   `BudgetCharge` and a `usage_basis`. A fully measured receipt uses `measured`;
   a receipt where only provider-reported tokens were observed uses
-  `measured_tokens`, and the remaining dimensions retain their reservation
-  values. Older events without a basis deserialize as `measured`.
+  `measured_tokens`; host-observed duration uses `measured_duration`; both
+  partial dimensions use `measured_tokens_and_duration`. Dimensions that are
+  not enforced remain at their reservation values. Older events without a basis
+  deserialize as `measured`.
 - When the shell can read provider-reported `usage` metadata from every completed
-  Agent node in the owned run, it sums those tokens and settles with
-  `measured_tokens`. If any Agent node lacks usable metadata, the shell keeps the
-  reserved fallback rather than synthesizing a partial measured receipt.
+  Agent node in the owned run, it sums those tokens. It derives duration from the
+  owned run record's start and finish timestamps. Measurement is applied only for
+  budget dimensions the selected policy enforces; unenforced dimensions are not
+  silently relabelled as measured. If an enforced observation is unavailable,
+  the shell keeps the reserved fallback rather than synthesizing a partial
+  measured receipt.
 - A missing or incomplete observation is not zero. The current shell does not
   synthesize a measured receipt; callers that cannot supply measured usage keep
   the reserved fallback.
