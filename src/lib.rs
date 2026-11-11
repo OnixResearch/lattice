@@ -117,6 +117,7 @@ pub mod agent_node;
 pub mod animus_agent;
 pub mod candidate;
 pub mod candidate_capture;
+pub mod candidate_worker;
 mod capability;
 pub mod compose_surface;
 pub mod config;
