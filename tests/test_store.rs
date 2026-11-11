@@ -66,6 +66,31 @@ fn candidate_receipts_persist_and_revalidate() {
 }
 
 #[test]
+fn candidate_receipts_survive_store_reopen() {
+    let directory = tempfile::TempDir::new().expect("temporary directory");
+    let path = directory.path().join("receipts.redb");
+    let receipt = CandidateReceipt {
+        schema: lattice::candidate::CANDIDATE_RECEIPT_SCHEMA.to_string(),
+        work_id: "work-1".to_string(),
+        attempt_id: "attempt-reopen".to_string(),
+        fence: "7".to_string(),
+        workspace_id: "workspace-1".to_string(),
+        base_identity: "a".repeat(64),
+        candidate_identity: Some("b".repeat(64)),
+        diff_identity: Some("c".repeat(64)),
+        changed_paths: vec!["src/lib.rs".to_string()],
+        disposition: CandidateDisposition::Produced,
+        blockers: Vec::new(),
+    };
+    {
+        let store = Store::new(&path).expect("store opens");
+        store.save_candidate_receipt(&receipt).expect("receipt saves");
+    }
+    let store = Store::new(&path).expect("store reopens");
+    assert_eq!(store.load_candidate_receipt("attempt-reopen").expect("receipt loads"), Some(receipt));
+}
+
+#[test]
 fn store_open_is_idempotent() {
     let dir = tempfile::TempDir::new().unwrap();
     let path = dir.path().join("test.redb");
