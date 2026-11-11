@@ -1,0 +1,32 @@
+{
+  "schema": "lattice.pure_inet_profile.outcome_evidence.v1",
+  "recorded_at": "2026-11-11",
+  "scope": "Pure normalized evaluation outcomes and result-usability decision; worker/process integration remains open.",
+  "implementation": {
+    "module": "src/pure_inet_profile.rs",
+    "type": "PureEvaluationOutcome",
+    "variants": [
+      "Complete { result }",
+      "Partial",
+      "Invalid",
+      "Exhausted",
+      "Failed",
+      "Cancelled",
+      "Unknown"
+    ]
+  },
+  "command": "cargo test --lib --locked pure_inet_profile",
+  "result": {
+    "passed": 11,
+    "failed": 0
+  },
+  "covered": [
+    "only Complete supplies a usable result",
+    "Partial, Invalid, Exhausted, Failed, Cancelled, and Unknown never supply a result"
+  ],
+  "non_claims": [
+    "This does not classify real process or worker observations.",
+    "This does not publish artifacts or prove publication success.",
+    "Task 2.4 remains open until the admitted adapter maps actual process/evaluator observations into this decision."
+  ]
+}

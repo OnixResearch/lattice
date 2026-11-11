@@ -152,6 +152,35 @@ pub fn format_canonical_i64(value: i64) -> String {
     value.to_string()
 }
 
+/// Normalized evaluation observation, separate from process disposition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PureEvaluationOutcome {
+    /// Complete evaluation satisfying the admitted output contract.
+    Complete { result: i64 },
+    /// Explicitly partial evaluation, even when the process exited zero.
+    Partial,
+    /// Invalid program, output shape, or identity binding.
+    Invalid,
+    /// Work, arena, memory, output, or deadline ceiling exhausted.
+    Exhausted,
+    /// Ordinary worker failure.
+    Failed,
+    /// Observed cancellation.
+    Cancelled,
+    /// Lost, interrupted, or otherwise unobserved outcome.
+    Unknown,
+}
+
+impl PureEvaluationOutcome {
+    /// Only a complete, identity-checked evaluation may supply a usable result.
+    pub fn usable_result(self) -> Option<i64> {
+        match self {
+            Self::Complete { result } => Some(result),
+            Self::Partial | Self::Invalid | Self::Exhausted | Self::Failed | Self::Cancelled | Self::Unknown => None,
+        }
+    }
+}
+
 /// Version of the host-side invocation envelope.
 pub const INVOCATION_SCHEMA: &str = "lattice.pure-inet-invocation.v1";
 
@@ -521,6 +550,21 @@ mod tests {
         let mut narrow = envelope();
         narrow.limits.max_program_operations = 2;
         assert_eq!(narrow.validate(), Err(PureProfileError::ProgramExceedsAdmittedLimit));
+    }
+
+    #[test]
+    fn only_complete_evaluation_supplies_a_usable_result() {
+        assert_eq!(PureEvaluationOutcome::Complete { result: 42 }.usable_result(), Some(42));
+        for outcome in [
+            PureEvaluationOutcome::Partial,
+            PureEvaluationOutcome::Invalid,
+            PureEvaluationOutcome::Exhausted,
+            PureEvaluationOutcome::Failed,
+            PureEvaluationOutcome::Cancelled,
+            PureEvaluationOutcome::Unknown,
+        ] {
+            assert_eq!(outcome.usable_result(), None, "{outcome:?}");
+        }
     }
 
     #[test]
