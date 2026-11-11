@@ -1,0 +1,19 @@
+{
+  "schema": "lattice.pure_inet_profile.baseline_evidence.v1",
+  "recorded_at": "2026-11-11",
+  "scope": "Source-inspected baseline for the existing operation-pack, process, authority, and operation-data routes before profile integration.",
+  "baseline": {
+    "operation_pack_route": "src/operation_pack/shell/execution.rs admits the exact pack/runtime and executes the declared operation",
+    "process_route": "src/process/shell.rs owns bounded process execution, clear environment, cancellation, and teardown",
+    "authority_route": "src/engine/effect/runtime.rs owns exact authorized process requests",
+    "result_route": "src/operation_data/model.rs owns result identity, retention, and publication outcomes"
+  },
+  "behavior_preservation": {
+    "change": "The pure profile core is additive and does not alter any existing route selection.",
+    "verification": "cargo test --lib --locked pure_inet_profile: 6 passed; full library suite previously 276 passed after the wire compatibility fix."
+  },
+  "non_claims": [
+    "Source inspection is not an execution qualification.",
+    "No producer worker, operation pack, or process dispatch is added by this baseline record."
+  ]
+}

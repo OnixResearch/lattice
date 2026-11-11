@@ -2,7 +2,7 @@
 
 ## Phase 1: Contract and producer qualification
 
-- [ ] [serial] 1.1 Record the current operation-pack/process/data/authority baseline and preserve existing behavior when the profile is not selected. r[lattice.pure_inet_profile.route]
+- [x] [serial] 1.1 Record the current operation-pack/process/data/authority baseline and preserve existing behavior when the profile is not selected. r[lattice.pure_inet_profile.route]
 - [ ] [serial] 1.2 Consume Noble #37's qualified immutable pure-program serialization, bounded evaluator entry point, executable, build/toolchain, and exact compatibility evidence; leave unavailable producer contracts visibly blocked and invent no CLI flags. r[lattice.pure_inet_profile.identity] r[lattice.pure_inet_profile.bounds]
 - [ ] [serial] 1.3 Define the Lattice envelope around the shared producer contract with complete program/input/rule/runtime/extrinsic/profile/limit/output/attempt bindings, without another net format or global work identity. r[lattice.pure_inet_profile.identity] r[lattice.pure_inet_profile.ownership]
 - [x] [serial] 1.4 Bind the two-input, one-output wrapping-i64 acyclic Input/Const/Add/Sub/Mul vocabulary and exact canonical decimal strings; reject JSON numbers, unsupported operations, ambient effects, native registration, and undeclared extensions. r[lattice.pure_inet_profile.purity]
