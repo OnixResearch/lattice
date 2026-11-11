@@ -465,6 +465,19 @@ fn observed_usage(
 }
 
 fn measured_agent_tokens(store: &Store, instance: &OrchestrationInstance, run_id: RunId) -> Option<u64> {
+    measured_agent_usage(store, instance, run_id, usage_tokens)
+}
+
+fn measured_agent_cost(store: &Store, instance: &OrchestrationInstance, run_id: RunId) -> Option<u64> {
+    measured_agent_usage(store, instance, run_id, usage_cost)
+}
+
+fn measured_agent_usage(
+    store: &Store,
+    instance: &OrchestrationInstance,
+    run_id: RunId,
+    extract: impl Fn(&serde_json::Value) -> Option<u64>,
+) -> Option<u64> {
     let workflow = store.load_workflow(&instance.definition.workflow.workflow_name).ok()??;
     let agent_nodes = workflow
         .configs
@@ -481,7 +494,7 @@ fn measured_agent_tokens(store: &Store, instance: &OrchestrationInstance, run_id
         let detail = details.nodes.iter().find(|detail| detail.node_id == crate::engine::workflow::NodeId(node_id))?;
         let metadata = detail.outputs.iter().find(|output| output.port_label == "metadata")?;
         let value: serde_json::Value = serde_json::from_str(&metadata.text).ok()?;
-        total = total.checked_add(usage_tokens(&value)?)?;
+        total = total.checked_add(extract(&value)?)?;
     }
     Some(total)
 }
@@ -499,6 +512,14 @@ fn usage_tokens(value: &serde_json::Value) -> Option<u64> {
             .and_then(serde_json::Value::as_u64)?;
         input.checked_add(output)
     })
+}
+
+fn usage_cost(value: &serde_json::Value) -> Option<u64> {
+    let usage = value.get("usage")?;
+    usage
+        .get("total_cost_microunits")
+        .or_else(|| usage.get("cost_microunits"))
+        .and_then(serde_json::Value::as_u64)
 }
 
 fn measured_run_duration(store: &Store, run_id: RunId) -> Option<u64> {
@@ -528,7 +549,12 @@ fn finish_action(
     } else {
         None
     };
-    if tokens.is_none() && duration.is_none() {
+    let cost = if instance.definition.budgets.enforced.monetary_microunits {
+        measured_agent_cost(store, instance, run_id)
+    } else {
+        None
+    };
+    if tokens.is_none() && duration.is_none() && cost.is_none() {
         return OrchestrationAction::RunFinished {
             dispatch_id,
             run_id,
@@ -538,11 +564,15 @@ fn finish_action(
             safe_summary,
         };
     }
-    let usage_basis = match (tokens, duration) {
-        (Some(_), Some(_)) => BudgetUsageBasis::MeasuredTokensAndDuration,
-        (Some(_), None) => BudgetUsageBasis::MeasuredTokens,
-        (None, Some(_)) => BudgetUsageBasis::MeasuredDuration,
-        (None, None) => BudgetUsageBasis::ReservedFallback,
+    let usage_basis = match (tokens.is_some(), duration.is_some(), cost.is_some()) {
+        (true, true, true) => BudgetUsageBasis::MeasuredTokensDurationAndCost,
+        (true, true, false) => BudgetUsageBasis::MeasuredTokensAndDuration,
+        (true, false, true) => BudgetUsageBasis::MeasuredTokensAndCost,
+        (false, true, true) => BudgetUsageBasis::MeasuredDurationAndCost,
+        (true, false, false) => BudgetUsageBasis::MeasuredTokens,
+        (false, true, false) => BudgetUsageBasis::MeasuredDuration,
+        (false, false, true) => BudgetUsageBasis::MeasuredCost,
+        (false, false, false) => BudgetUsageBasis::ReservedFallback,
     };
     let mut measured_usage = observed_usage;
     if let Some(tokens) = tokens {
@@ -550,6 +580,9 @@ fn finish_action(
     }
     if let Some(duration) = duration {
         measured_usage.duration_millis = duration;
+    }
+    if let Some(cost) = cost {
+        measured_usage.monetary_microunits = cost;
     }
     OrchestrationAction::RunFinishedMeasured {
         dispatch_id,
@@ -887,7 +920,16 @@ fn identity_error(error: crate::orchestration::AdmissionError) -> OrchestrationS
 
 #[cfg(test)]
 mod tests {
+    use super::usage_cost;
     use super::usage_tokens;
+
+    #[test]
+    fn usage_cost_supports_total_and_short_shapes() {
+        assert_eq!(usage_cost(&serde_json::json!({"usage": {"total_cost_microunits": 42}})), Some(42));
+        assert_eq!(usage_cost(&serde_json::json!({"usage": {"cost_microunits": 42}})), Some(42));
+        assert_eq!(usage_cost(&serde_json::json!({"usage": {}})), None);
+        assert_eq!(usage_cost(&serde_json::json!({"usage": {"total_cost_microunits": "42"}})), None);
+    }
 
     #[test]
     fn usage_tokens_supports_total_and_component_shapes() {

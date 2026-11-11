@@ -229,7 +229,11 @@ pub enum BudgetUsageBasis {
     Measured,
     MeasuredTokens,
     MeasuredDuration,
+    MeasuredCost,
     MeasuredTokensAndDuration,
+    MeasuredTokensAndCost,
+    MeasuredDurationAndCost,
+    MeasuredTokensDurationAndCost,
 }
 
 impl BudgetUsageBasis {
