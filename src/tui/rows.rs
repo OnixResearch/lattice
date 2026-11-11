@@ -139,21 +139,36 @@ pub fn node_kind_label(config: Option<&NodeConfig>) -> &'static str {
     }
 }
 
+pub struct RowsRenderData<'a> {
+    pub statuses: &'a HashMap<u64, NodeRunStatus>,
+    pub started: &'a HashMap<u64, std::time::Instant>,
+    pub durations_millis: &'a HashMap<u64, u64>,
+    pub tokens: &'a HashMap<u64, u64>,
+    pub costs_microunits: &'a HashMap<u64, u64>,
+    pub attempts: &'a HashMap<u64, u32>,
+    pub outputs: &'a [RunOutputLine],
+    pub selected: &'a BTreeSet<NodeId>,
+    pub focused: Option<NodeId>,
+}
+
 pub fn render_rows(
     layout: &RowsLayout,
     workflow: &Workflow,
-    statuses: &HashMap<u64, NodeRunStatus>,
-    started: &HashMap<u64, std::time::Instant>,
-    durations_millis: &HashMap<u64, u64>,
-    tokens: &HashMap<u64, u64>,
-    costs_microunits: &HashMap<u64, u64>,
-    attempts: &HashMap<u64, u32>,
-    outputs: &[RunOutputLine],
-    selected: &BTreeSet<NodeId>,
-    focused: Option<NodeId>,
+    data: RowsRenderData<'_>,
     area: Rect,
     buffer: &mut Buffer,
 ) {
+    let RowsRenderData {
+        statuses,
+        started,
+        durations_millis,
+        tokens,
+        costs_microunits,
+        attempts,
+        outputs,
+        selected,
+        focused,
+    } = data;
     let mut lines = Vec::with_capacity(layout.rows.len().saturating_add(2));
     lines.push(Line::styled(
         format!(
@@ -364,15 +379,17 @@ mod tests {
         render_rows(
             &layout,
             &workflow,
-            &statuses,
-            &HashMap::new(),
-            &HashMap::from([(node_id.0, 42_u64)]),
-            &HashMap::from([(node_id.0, 1_234_u64)]),
-            &HashMap::from([(node_id.0, 567_u64)]),
-            &HashMap::from([(node_id.0, 2_u32)]),
-            &outputs,
-            &BTreeSet::from([node_id]),
-            Some(node_id),
+            RowsRenderData {
+                statuses: &statuses,
+                started: &HashMap::new(),
+                durations_millis: &HashMap::from([(node_id.0, 42_u64)]),
+                tokens: &HashMap::from([(node_id.0, 1_234_u64)]),
+                costs_microunits: &HashMap::from([(node_id.0, 567_u64)]),
+                attempts: &HashMap::from([(node_id.0, 2_u32)]),
+                outputs: &outputs,
+                selected: &BTreeSet::from([node_id]),
+                focused: Some(node_id),
+            },
             buffer.area,
             &mut buffer,
         );

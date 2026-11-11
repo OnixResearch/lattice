@@ -42,7 +42,7 @@ pub struct CandidateWorkerRequest {
 #[derive(Debug)]
 pub enum CandidateWorkerOutcome {
     Produced {
-        receipt: CandidateReceipt,
+        receipt: Box<CandidateReceipt>,
         changed_files: BTreeMap<String, Vec<u8>>,
         stdout: Vec<u8>,
         stderr: Vec<u8>,
@@ -211,7 +211,7 @@ fn finish_from_process_output(
         .filter_map(|path| candidate.get(path).map(|bytes| (path.clone(), bytes.clone())))
         .collect::<BTreeMap<_, _>>();
     Ok(CandidateWorkerOutcome::Produced {
-        receipt,
+        receipt: Box::new(receipt),
         changed_files,
         stdout: output.stdout,
         stderr: output.stderr,
@@ -239,7 +239,7 @@ impl CandidateAttemptResult {
                 stdout,
                 stderr,
                 ..
-            } => (CandidateDisposition::Produced, Some(receipt.clone()), stdout, stderr, None),
+            } => (CandidateDisposition::Produced, Some(receipt.as_ref().clone()), stdout, stderr, None),
             CandidateWorkerOutcome::Blocked { blocker } => {
                 (CandidateDisposition::Blocked, None, &Vec::new(), &Vec::new(), Some(blocker.clone()))
             }
@@ -489,7 +489,7 @@ mod tests {
             blockers: Vec::new(),
         };
         let outcome = CandidateWorkerOutcome::Produced {
-            receipt: receipt.clone(),
+            receipt: Box::new(receipt.clone()),
             changed_files: BTreeMap::new(),
             stdout: b"stdout".to_vec(),
             stderr: b"stderr".to_vec(),
