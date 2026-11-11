@@ -60,6 +60,83 @@ pub fn capture_workspace(root: &Path) -> Result<BTreeMap<String, Vec<u8>>, Candi
     Ok(snapshot)
 }
 
+/// Admitted workspace boundary for one candidate-producing attempt.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkspaceBoundary {
+    pub root: PathBuf,
+    pub read_paths: Vec<String>,
+    pub write_paths: Vec<String>,
+    pub network: bool,
+    pub credentials: bool,
+}
+
+/// Admit relative read/write paths under an existing root without symlink escape.
+pub fn admit_workspace_boundary(
+    root: &Path,
+    read_paths: &[String],
+    write_paths: &[String],
+    network: bool,
+    credentials: bool,
+) -> Result<WorkspaceBoundary, CandidateCaptureError> {
+    let root = std::fs::canonicalize(root).map_err(CandidateCaptureError::Io)?;
+    let metadata = std::fs::symlink_metadata(&root).map_err(CandidateCaptureError::Io)?;
+    if !metadata.is_dir() {
+        return Err(CandidateCaptureError::RootNotDirectory);
+    }
+    let read_paths = canonical_relative_paths(&root, read_paths)?;
+    let write_paths = canonical_relative_paths(&root, write_paths)?;
+    for write in &write_paths {
+        if !read_paths.iter().any(|read| write == read || write.starts_with(&format!("{read}/"))) {
+            return Err(CandidateCaptureError::WriteOutsideRead);
+        }
+    }
+    Ok(WorkspaceBoundary {
+        root,
+        read_paths,
+        write_paths,
+        network,
+        credentials,
+    })
+}
+
+fn canonical_relative_paths(root: &Path, paths: &[String]) -> Result<Vec<String>, CandidateCaptureError> {
+    let mut admitted = Vec::with_capacity(paths.len());
+    for path in paths {
+        if path.is_empty() || path.starts_with('/') || path.starts_with('\\') {
+            return Err(CandidateCaptureError::InvalidPath);
+        }
+        let mut parts = Vec::new();
+        for component in Path::new(path).components() {
+            let std::path::Component::Normal(part) = component else {
+                return Err(CandidateCaptureError::InvalidPath);
+            };
+            parts.push(part.to_str().ok_or(CandidateCaptureError::NonUtf8Path)?);
+        }
+        if parts.is_empty() {
+            return Err(CandidateCaptureError::InvalidPath);
+        }
+        let candidate = root.join(parts.iter().collect::<PathBuf>());
+        let canonical = match std::fs::canonicalize(&candidate) {
+            Ok(path) => path,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                let parent = candidate.parent().ok_or(CandidateCaptureError::InvalidPath)?;
+                let parent = std::fs::canonicalize(parent).map_err(CandidateCaptureError::Io)?;
+                parent.join(candidate.file_name().ok_or(CandidateCaptureError::InvalidPath)?)
+            }
+            Err(error) => return Err(CandidateCaptureError::Io(error)),
+        };
+        if !canonical.starts_with(root) {
+            return Err(CandidateCaptureError::BoundaryEscape);
+        }
+        admitted.push(parts.join("/"));
+    }
+    admitted.sort();
+    if admitted.windows(2).any(|window| window[0] == window[1]) {
+        return Err(CandidateCaptureError::DuplicateBoundaryPath);
+    }
+    Ok(admitted)
+}
+
 fn path_key(path: &Path) -> Result<String, CandidateCaptureError> {
     let mut parts = Vec::new();
     for component in path.components() {
@@ -86,6 +163,12 @@ pub enum CandidateCaptureError {
     InvalidPath,
     #[error("workspace snapshot exceeds the admitted file or byte bound")]
     TooLarge,
+    #[error("workspace boundary path escapes the admitted root")]
+    BoundaryEscape,
+    #[error("workspace write path is not covered by a read path")]
+    WriteOutsideRead,
+    #[error("workspace boundary path is duplicated")]
+    DuplicateBoundaryPath,
     #[error("workspace read failed: {0}")]
     Io(#[from] std::io::Error),
 }
@@ -123,5 +206,60 @@ mod tests {
         std::os::unix::fs::symlink(root.join("real"), root.join("link")).expect("symlink");
 
         assert!(matches!(capture_workspace(root), Err(CandidateCaptureError::SymlinkRejected)));
+    }
+
+    #[test]
+    fn admits_read_and_write_paths_within_the_root() {
+        let directory = tempfile::tempdir().expect("temporary workspace");
+        let root = directory.path();
+        std::fs::create_dir_all(root.join("src/nested")).expect("source directory");
+        std::fs::write(root.join("src/main.rs"), b"main").expect("source file");
+
+        let boundary = admit_workspace_boundary(
+            root,
+            &["src".to_string(), "src/nested".to_string()],
+            &["src".to_string(), "src/new.rs".to_string()],
+            false,
+            false,
+        )
+        .expect("boundary admits");
+        assert_eq!(boundary.read_paths, vec!["src", "src/nested"]);
+        assert_eq!(boundary.write_paths, vec!["src", "src/new.rs"]);
+        assert!(!boundary.network);
+        assert!(!boundary.credentials);
+    }
+
+    #[test]
+    fn rejects_escaping_outside_and_uncovered_write_paths() {
+        let directory = tempfile::tempdir().expect("temporary workspace");
+        let root = directory.path();
+        std::fs::create_dir_all(root.join("src")).expect("source directory");
+
+        assert!(matches!(
+            admit_workspace_boundary(root, &["../outside".to_string()], &[], false, false),
+            Err(CandidateCaptureError::InvalidPath)
+        ));
+        assert!(matches!(
+            admit_workspace_boundary(root, &["src".to_string()], &["docs".to_string()], false, false),
+            Err(CandidateCaptureError::WriteOutsideRead)
+        ));
+        assert!(matches!(
+            admit_workspace_boundary(root, &["src".to_string(), "src".to_string()], &[], false, false),
+            Err(CandidateCaptureError::DuplicateBoundaryPath)
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn rejects_symlink_escape_from_the_boundary() {
+        let directory = tempfile::tempdir().expect("temporary workspace");
+        let root = directory.path();
+        let outside = tempfile::tempdir().expect("outside directory");
+        std::os::unix::fs::symlink(outside.path(), root.join("escape")).expect("symlink");
+
+        assert!(matches!(
+            admit_workspace_boundary(root, &["escape".to_string()], &[], false, false),
+            Err(CandidateCaptureError::BoundaryEscape)
+        ));
     }
 }
