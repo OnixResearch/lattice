@@ -1,0 +1,30 @@
+{
+  "schema": "lattice.pure_inet_profile.byte_remeasurement.v1",
+  "recorded_at": "2026-11-11",
+  "scope": "Pure byte identity remeasurement helpers; dispatch and output-admission wiring remain open.",
+  "implementation": {
+    "module": "src/pure_inet_profile.rs",
+    "functions": [
+      "blake3_identity",
+      "verify_identity",
+      "verify_program_bytes",
+      "verify_input_bytes",
+      "verify_output_identity"
+    ]
+  },
+  "command": "cargo test --lib --locked pure_inet_profile",
+  "result": {
+    "passed": 10,
+    "failed": 0
+  },
+  "covered": [
+    "exact program and input bytes match their admitted BLAKE3 identities",
+    "changed program, input, and output bytes are rejected",
+    "malformed expected identities are rejected"
+  ],
+  "non_claims": [
+    "This does not wire remeasurement into operation-pack dispatch.",
+    "This does not validate effective resource or authority bindings.",
+    "Task 2.2 remains open until the admitted process route calls these checks before dispatch and before output admission."
+  ]
+}

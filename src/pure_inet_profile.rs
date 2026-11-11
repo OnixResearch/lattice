@@ -285,6 +285,39 @@ fn is_lowercase_blake3(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+/// Hash exact bytes with BLAKE3 and return the lowercase hex identity.
+pub fn blake3_identity(bytes: &[u8]) -> String {
+    blake3::hash(bytes).to_hex().to_string()
+}
+
+/// Reject changed bytes or a malformed expected identity before use.
+pub fn verify_identity(expected: &str, bytes: &[u8]) -> Result<(), PureProfileError> {
+    if !is_lowercase_blake3(expected) {
+        return Err(PureProfileError::InvalidBindingIdentity);
+    }
+    if blake3_identity(bytes) != expected {
+        return Err(PureProfileError::IdentityMismatch);
+    }
+    Ok(())
+}
+
+/// Remeasure the admitted program bytes before dispatch.
+pub fn verify_program_bytes(binding: &PureComputationBinding, bytes: &[u8]) -> Result<(), PureProfileError> {
+    binding.validate()?;
+    verify_identity(&binding.program_identity, bytes)
+}
+
+/// Remeasure the admitted input bytes before dispatch.
+pub fn verify_input_bytes(binding: &PureComputationBinding, bytes: &[u8]) -> Result<(), PureProfileError> {
+    binding.validate()?;
+    verify_identity(&binding.input_identity, bytes)
+}
+
+/// Validate a returned output identity before output admission.
+pub fn verify_output_identity(expected: &str, bytes: &[u8]) -> Result<(), PureProfileError> {
+    verify_identity(expected, bytes)
+}
+
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum PureProfileError {
     #[error("pure interaction-net program must contain at least one operation")]
@@ -311,6 +344,8 @@ pub enum PureProfileError {
     InvalidBindingIdentifier,
     #[error("pure interaction-net binding identity must be one lowercase BLAKE3 hex digest")]
     InvalidBindingIdentity,
+    #[error("pure interaction-net bytes do not match the admitted identity")]
+    IdentityMismatch,
     #[error("pure interaction-net limits are zero, oversized, or exceed the profile ceiling")]
     InvalidLimits,
     #[error("pure interaction-net program exceeds the admitted operation limit")]
@@ -486,5 +521,30 @@ mod tests {
         let mut narrow = envelope();
         narrow.limits.max_program_operations = 2;
         assert_eq!(narrow.validate(), Err(PureProfileError::ProgramExceedsAdmittedLimit));
+    }
+
+    #[test]
+    fn byte_remeasurement_rejects_changed_or_crossed_bytes() {
+        let program_bytes = b"program";
+        let input_bytes = b"inputs";
+        let output_bytes = b"output";
+        let mut binding = binding();
+        binding.program_identity = blake3_identity(program_bytes);
+        binding.input_identity = blake3_identity(input_bytes);
+
+        assert_eq!(verify_program_bytes(&binding, program_bytes), Ok(()));
+        assert_eq!(verify_input_bytes(&binding, input_bytes), Ok(()));
+        assert_eq!(verify_output_identity(&blake3_identity(output_bytes), output_bytes), Ok(()));
+
+        assert_eq!(verify_program_bytes(&binding, b"changed program"), Err(PureProfileError::IdentityMismatch));
+        assert_eq!(verify_input_bytes(&binding, b"changed inputs"), Err(PureProfileError::IdentityMismatch));
+        assert_eq!(
+            verify_output_identity(&blake3_identity(output_bytes), b"changed output"),
+            Err(PureProfileError::IdentityMismatch)
+        );
+        assert_eq!(
+            verify_output_identity("A".repeat(64).as_str(), output_bytes),
+            Err(PureProfileError::InvalidBindingIdentity)
+        );
     }
 }
