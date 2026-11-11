@@ -1,0 +1,28 @@
+{
+  "schema": "lattice.release_integration.consumer_gate_selection.v1",
+  "recorded_at": "2026-11-11",
+  "producer": {
+    "repository": "cairn",
+    "commit": "03db428c0872c60a77a5cb281c23d4b6cef93b9e",
+    "change": "Pass the loaded consumer policy into the repository gate summary"
+  },
+  "command": "LATTICE_CAIRN_BIN=/home/brittonr/.cargo-target/debug/cairn cargo test --test test_release_readiness_integration --locked release_selection_lists_lattice_gates_not_foreign_producer_checks -- --nocapture",
+  "result": {
+    "passed": 1,
+    "failed": 0
+  },
+  "observed": {
+    "policy": "consumer-selected-gates",
+    "required_commands": [
+      "scripts/check.rs",
+      "octet-precommit-check",
+      "nix flake check -L --option secret-key-files ''"
+    ],
+    "producer_self_host_tests": "29 passed; 0 failed in cairn-cli release_receipts"
+  },
+  "non_claims": [
+    "This proves the selected consumer policy is propagated into the release receipt.",
+    "It does not prove the listed heavyweight commands pass.",
+    "It does not establish release eligibility, publication, or an exact public producer cohort."
+  ]
+}
