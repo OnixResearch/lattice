@@ -115,6 +115,9 @@ fn canonical_relative_paths(root: &Path, paths: &[String]) -> Result<Vec<String>
         if parts.is_empty() {
             return Err(CandidateCaptureError::InvalidPath);
         }
+        if parts.iter().any(|part| matches!(*part, ".git" | ".jj")) {
+            return Err(CandidateCaptureError::VcsMetadataRejected);
+        }
         let candidate = root.join(parts.iter().collect::<PathBuf>());
         let canonical = match std::fs::canonicalize(&candidate) {
             Ok(path) => path,
@@ -169,6 +172,8 @@ pub enum CandidateCaptureError {
     WriteOutsideRead,
     #[error("workspace boundary path is duplicated")]
     DuplicateBoundaryPath,
+    #[error("workspace boundary does not admit VCS metadata")]
+    VcsMetadataRejected,
     #[error("workspace read failed: {0}")]
     Io(#[from] std::io::Error),
 }
@@ -227,6 +232,23 @@ mod tests {
         assert_eq!(boundary.write_paths, vec!["src", "src/new.rs"]);
         assert!(!boundary.network);
         assert!(!boundary.credentials);
+    }
+
+    #[test]
+    fn rejects_vcs_metadata_boundaries() {
+        let directory = tempfile::tempdir().expect("temporary workspace");
+        let root = directory.path();
+        std::fs::create_dir_all(root.join(".git")).expect("git metadata");
+        std::fs::create_dir_all(root.join("src")).expect("source directory");
+
+        assert!(matches!(
+            admit_workspace_boundary(root, &[".git".to_string()], &[], false, false),
+            Err(CandidateCaptureError::VcsMetadataRejected)
+        ));
+        assert!(matches!(
+            admit_workspace_boundary(root, &["src".to_string()], &["src/.git/config".to_string()], false, false),
+            Err(CandidateCaptureError::VcsMetadataRejected)
+        ));
     }
 
     #[test]
