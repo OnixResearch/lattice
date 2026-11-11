@@ -328,4 +328,33 @@ mod tests {
         assert!(matches!(outcome, CandidateWorkerOutcome::Produced { .. }), "{outcome:?}");
         assert_eq!(std::fs::read(root.join("src/home")).expect("environment probe"), b"");
     }
+
+    #[test]
+    fn in_flight_cancellation_stops_the_worker_before_late_write() {
+        use std::sync::Arc;
+        use std::sync::atomic::Ordering;
+        use std::time::Duration;
+
+        let directory = tempfile::tempdir().expect("temporary workspace");
+        let root = directory.path();
+        std::fs::create_dir_all(root.join("src")).expect("source directory");
+        std::fs::write(root.join("src/main.rs"), b"same").expect("source");
+
+        let cancellation = Arc::new(AtomicBool::new(false));
+        let signal = Arc::clone(&cancellation);
+        let canceller = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(100));
+            signal.store(true, Ordering::Release);
+        });
+        let outcome = run_candidate_worker(
+            &request(root, "/run/current-system/sw/bin/sleep 1; printf leaked > src/leak"),
+            &RuntimeConfig::default(),
+            cancellation.as_ref(),
+        )
+        .expect("worker runs");
+        canceller.join().expect("canceller joins");
+
+        assert!(matches!(outcome, CandidateWorkerOutcome::Cancelled), "{outcome:?}");
+        assert!(!root.join("src/leak").exists());
+    }
 }
