@@ -14,6 +14,7 @@ use thiserror::Error;
 use crate::agent_node::ProcessError;
 use crate::agent_node::ProcessOutput;
 use crate::agent_node::ProcessRequest;
+use crate::candidate::CandidateDisposition;
 use crate::candidate::CandidateReceipt;
 use crate::candidate::CandidateReceiptError;
 use crate::candidate::produced_receipt_from_snapshots;
@@ -22,6 +23,7 @@ use crate::candidate_capture::WorkspaceBoundary;
 use crate::candidate_capture::capture_workspace;
 use crate::process::core::RuntimeConfig;
 use crate::process::shell::run_bounded_clear_environment_with_cancellation;
+use crate::pure_inet_profile::blake3_identity;
 use crate::store::Store;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -216,6 +218,107 @@ fn finish_from_process_output(
     })
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct CandidateAttemptResult {
+    pub schema: String,
+    pub disposition: CandidateDisposition,
+    pub receipt: Option<CandidateReceipt>,
+    pub stdout_blake3: String,
+    pub stderr_blake3: String,
+    pub blocker: Option<String>,
+}
+
+pub const CANDIDATE_ATTEMPT_RESULT_SCHEMA: &str = "lattice.candidate-attempt-result.v1";
+
+impl CandidateAttemptResult {
+    /// Project a worker outcome without retaining raw output bytes.
+    pub fn from_outcome(outcome: &CandidateWorkerOutcome) -> Self {
+        let (disposition, receipt, stdout, stderr, blocker) = match outcome {
+            CandidateWorkerOutcome::Produced {
+                receipt,
+                stdout,
+                stderr,
+                ..
+            } => (CandidateDisposition::Produced, Some(receipt.clone()), stdout, stderr, None),
+            CandidateWorkerOutcome::Blocked { blocker } => {
+                (CandidateDisposition::Blocked, None, &Vec::new(), &Vec::new(), Some(blocker.clone()))
+            }
+            CandidateWorkerOutcome::Failed {
+                blocker,
+                stdout,
+                stderr,
+            } => (CandidateDisposition::Failed, None, stdout, stderr, Some(blocker.clone())),
+            CandidateWorkerOutcome::Cancelled => {
+                (CandidateDisposition::Cancelled, None, &Vec::new(), &Vec::new(), None)
+            }
+            CandidateWorkerOutcome::Unknown {
+                blocker,
+                stdout,
+                stderr,
+            } => (CandidateDisposition::Unknown, None, stdout, stderr, Some(blocker.clone())),
+        };
+        Self {
+            schema: CANDIDATE_ATTEMPT_RESULT_SCHEMA.to_string(),
+            disposition,
+            receipt,
+            stdout_blake3: blake3_identity(stdout),
+            stderr_blake3: blake3_identity(stderr),
+            blocker,
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), CandidateWorkerError> {
+        if self.schema != CANDIDATE_ATTEMPT_RESULT_SCHEMA {
+            return Err(CandidateWorkerError::Result("unsupported candidate result schema".to_string()));
+        }
+        if !is_blake3(&self.stdout_blake3) || !is_blake3(&self.stderr_blake3) {
+            return Err(CandidateWorkerError::Result("candidate output identity is malformed".to_string()));
+        }
+        match self.disposition {
+            CandidateDisposition::Produced => {
+                let receipt = self
+                    .receipt
+                    .as_ref()
+                    .ok_or_else(|| CandidateWorkerError::Result("produced result is missing a receipt".to_string()))?;
+                receipt.validate()?;
+                if self.blocker.is_some() {
+                    return Err(CandidateWorkerError::Result("produced result carries a blocker".to_string()));
+                }
+            }
+            CandidateDisposition::Blocked | CandidateDisposition::Failed | CandidateDisposition::Unknown => {
+                if self.receipt.is_some() {
+                    return Err(CandidateWorkerError::Result("non-produced result carries a receipt".to_string()));
+                }
+                if self.blocker.is_none() {
+                    return Err(CandidateWorkerError::Result("non-produced result is missing a blocker".to_string()));
+                }
+            }
+            CandidateDisposition::Cancelled => {
+                if self.receipt.is_some() {
+                    return Err(CandidateWorkerError::Result("cancelled result carries a receipt".to_string()));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn to_json(&self) -> Result<String, CandidateWorkerError> {
+        self.validate()?;
+        serde_json::to_string(self).map_err(|error| CandidateWorkerError::Result(error.to_string()))
+    }
+
+    pub fn from_json(text: &str) -> Result<Self, CandidateWorkerError> {
+        let result: Self =
+            serde_json::from_str(text).map_err(|error| CandidateWorkerError::Result(error.to_string()))?;
+        result.validate()?;
+        Ok(result)
+    }
+}
+
+fn is_blake3(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 #[derive(Debug, Error)]
 pub enum CandidateWorkerError {
     #[error("workspace capture failed: {0}")]
@@ -224,6 +327,8 @@ pub enum CandidateWorkerError {
     Receipt(#[from] CandidateReceiptError),
     #[error("workspace root is not valid UTF-8")]
     NonUtf8Root,
+    #[error("candidate attempt result is invalid: {0}")]
+    Result(String),
 }
 
 #[cfg(test)]
@@ -366,6 +471,41 @@ mod tests {
             Some(b"new".to_vec())
         );
         assert_eq!(store.list_candidate_artifacts("attempt-1").expect("artifacts list").len(), 1);
+    }
+
+    #[test]
+    fn attempt_result_hashes_outputs_and_round_trips() {
+        let receipt = CandidateReceipt {
+            schema: crate::candidate::CANDIDATE_RECEIPT_SCHEMA.to_string(),
+            work_id: "work-1".to_string(),
+            attempt_id: "attempt-1".to_string(),
+            fence: "7".to_string(),
+            workspace_id: "workspace-1".to_string(),
+            base_identity: "a".repeat(64),
+            candidate_identity: Some("b".repeat(64)),
+            diff_identity: Some("c".repeat(64)),
+            changed_paths: vec!["src/main.rs".to_string()],
+            disposition: CandidateDisposition::Produced,
+            blockers: Vec::new(),
+        };
+        let outcome = CandidateWorkerOutcome::Produced {
+            receipt: receipt.clone(),
+            changed_files: BTreeMap::new(),
+            stdout: b"stdout".to_vec(),
+            stderr: b"stderr".to_vec(),
+        };
+        let result = CandidateAttemptResult::from_outcome(&outcome);
+        assert_eq!(result.stdout_blake3, blake3_identity(b"stdout"));
+        assert_eq!(result.stderr_blake3, blake3_identity(b"stderr"));
+        let json = result.to_json().expect("result serializes");
+        let parsed = CandidateAttemptResult::from_json(&json).expect("result parses");
+        assert_eq!(parsed, result);
+
+        let mut invalid = CandidateAttemptResult::from_outcome(&CandidateWorkerOutcome::Blocked {
+            blocker: "blocked".to_string(),
+        });
+        invalid.receipt = Some(receipt);
+        assert!(invalid.validate().is_err());
     }
 
     #[test]
