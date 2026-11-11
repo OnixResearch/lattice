@@ -180,6 +180,9 @@ Agent setup is explicit:
 - [Candidate worker boundary](docs/candidate-worker.md) defines the bounded
   command route, workspace snapshot receipt, clear environment, and explicit
   non-claims for candidate-producing attempts.
+- [Orchestration budget usage](docs/orchestration-budget-usage.md) distinguishes
+  reservations from measured tokens, duration, and cost, and defines the
+  versioned command-worker usage observation contract.
 
 Do not put plaintext credentials in Nickel. Use credential references and the
 selected provider's delivery mechanism. A configured model or agent runtime is
