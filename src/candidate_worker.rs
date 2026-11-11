@@ -652,6 +652,41 @@ mod tests {
     }
 
     #[test]
+    fn cancelled_worker_outcome_is_persisted_without_a_candidate() {
+        use std::sync::Arc;
+        use std::sync::atomic::Ordering;
+        use std::time::Duration;
+
+        let directory = tempfile::tempdir().expect("temporary workspace");
+        let root = directory.path().join("workspace");
+        std::fs::create_dir_all(root.join("src")).expect("source directory");
+        std::fs::write(root.join("src/main.rs"), b"same").expect("base source");
+        let store = Store::new(directory.path().join("store.redb")).expect("store opens");
+        let cancellation = Arc::new(AtomicBool::new(false));
+        let signal = Arc::clone(&cancellation);
+        let canceller = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(100));
+            signal.store(true, Ordering::Release);
+        });
+
+        let outcome = run_and_publish_candidate_worker(
+            &request(&root, "/run/current-system/sw/bin/sleep 1; printf leaked > src/leak"),
+            &RuntimeConfig::default(),
+            cancellation.as_ref(),
+            &store,
+        )
+        .expect("worker runs");
+        canceller.join().expect("canceller joins");
+
+        assert!(matches!(outcome, CandidateWorkerOutcome::Cancelled), "{outcome:?}");
+        let result = store.load_candidate_attempt_result("attempt-1").expect("result loads").expect("result exists");
+        assert_eq!(result.disposition, CandidateDisposition::Cancelled);
+        assert!(result.receipt.is_none());
+        assert!(store.load_candidate_receipt("attempt-1").expect("receipt lookup").is_none());
+        assert!(!root.join("src/leak").exists());
+    }
+
+    #[test]
     fn reconciliation_reports_missing_and_incomplete_publication() {
         let directory = tempfile::tempdir().expect("temporary workspace");
         let store = Store::new(directory.path().join("reconcile.redb")).expect("store opens");
