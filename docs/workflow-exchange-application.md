@@ -88,7 +88,9 @@ the exchange completion was persisted. A late request flag cannot rewrite it as
 `Cancelled`. Unknown/lost workers, persistence failures, timeouts and remote
 effects retain their existing recovery semantics; no remote cancellation or
 automatic redispatch is implied. Consumers need a corrected producer executable,
-not a contract-import refresh or consumer-side outcome relabeling.
+not a contract-import refresh or consumer-side outcome relabeling. See the
+[consumer runtime compatibility record](workflow-exchange-consumer-compatibility.md)
+for the named revision and licensing boundary.
 
 The compiler prerequisites are repaired without disabling Tile, component
 execution or asynchronous CI. Tile remains an exact Git dependency; the shared
