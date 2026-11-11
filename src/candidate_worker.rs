@@ -35,6 +35,7 @@ pub struct CandidateWorkerRequest {
     pub program: String,
     pub args: Vec<String>,
     pub boundary: WorkspaceBoundary,
+    pub require_isolation: bool,
     pub timeout_secs: u64,
     pub output_limit_bytes: usize,
 }
@@ -77,6 +78,11 @@ pub fn run_candidate_worker(
     if request.boundary.credentials {
         return Ok(CandidateWorkerOutcome::Blocked {
             blocker: "candidate worker does not admit credential-bearing workspaces".to_string(),
+        });
+    }
+    if request.require_isolation {
+        return Ok(CandidateWorkerOutcome::Blocked {
+            blocker: "no qualified workspace isolation provider is admitted".to_string(),
         });
     }
     let root = request.boundary.root.as_path();
@@ -364,6 +370,7 @@ mod tests {
             program: "sh".to_string(),
             args: vec!["-c".to_string(), command.to_string()],
             boundary: boundary(root),
+            require_isolation: false,
             timeout_secs: 5,
             output_limit_bytes: 4_096,
         }
@@ -554,6 +561,22 @@ mod tests {
         let mut request = request(root, "printf new > src/main.rs");
         request.boundary = admit_workspace_boundary(root, &["src".to_string()], &["src".to_string()], false, true)
             .expect("credential boundary admits structurally");
+        let outcome =
+            run_candidate_worker(&request, &RuntimeConfig::default(), &AtomicBool::new(false)).expect("worker runs");
+
+        assert!(matches!(outcome, CandidateWorkerOutcome::Blocked { .. }), "{outcome:?}");
+        assert_eq!(std::fs::read(root.join("src/main.rs")).expect("source remains"), b"old");
+    }
+
+    #[test]
+    fn required_isolation_without_provider_is_blocked() {
+        let directory = tempfile::tempdir().expect("temporary workspace");
+        let root = directory.path();
+        std::fs::create_dir_all(root.join("src")).expect("source directory");
+        std::fs::write(root.join("src/main.rs"), b"old").expect("source");
+
+        let mut request = request(root, "printf new > src/main.rs");
+        request.require_isolation = true;
         let outcome =
             run_candidate_worker(&request, &RuntimeConfig::default(), &AtomicBool::new(false)).expect("worker runs");
 

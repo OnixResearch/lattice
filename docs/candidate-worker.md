@@ -11,12 +11,14 @@ A `CandidateWorkerRequest` binds:
 - work, attempt, fence, and workspace identities;
 - an admitted `WorkspaceBoundary` root, read paths, write paths, and network or
   credential policy;
-- the executable, arguments, positive deadline, and output limit.
+- the executable, arguments, positive deadline, output limit, and whether
+  OS-level isolation is required.
 
 The worker runs with a clear environment and the admitted workspace root as its
 current directory. It does not inherit host environment values. A boundary that
 requests credentials is refused before execution; the worker has no credential
-provider or publisher authority.
+provider or publisher authority. If isolation is required, the worker fails
+closed because no qualified isolation provider is admitted.
 
 ## Result
 
