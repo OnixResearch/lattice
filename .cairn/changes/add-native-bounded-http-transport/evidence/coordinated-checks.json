@@ -1,0 +1,31 @@
+{
+  "schema": "lattice.native_http.coordinated_checks.v1",
+  "recorded_at": "2026-11-11",
+  "commands": [
+    {
+      "command": "cargo test --lib --locked",
+      "result": "276 passed; 0 failed"
+    },
+    {
+      "command": "cargo test --test test_native_http_authority --locked",
+      "result": "1 passed; 0 failed"
+    },
+    {
+      "command": "cargo test --workspace --locked",
+      "result": "all non-environmental tests passed; the only failure was outcome_machine_lifecycle requiring LATTICE_CAIRN_BIN"
+    },
+    {
+      "command": "LATTICE_CAIRN_BIN=$(command -v cairn) cargo test --test outcome_machine_lifecycle --locked",
+      "result": "1 passed; 0 failed"
+    }
+  ],
+  "environmental_notes": [
+    "cargo fmt --check reports the intentionally unformatted tests/fixtures/repository-validation/vendor-dependency/src/coverage/result.rs fixture.",
+    "cargo clippy --workspace --all-targets -- -D warnings reports the intentional clippy::ptr_arg violation in tests/fixtures/repository-validation/vendor-dependency/src/lib.rs.",
+    "Those fixture findings are existing lint-boundary fixtures, not regressions in this change."
+  ],
+  "non_claims": [
+    "These checks do not establish release eligibility or Nix sandbox admission.",
+    "The lifecycle test used the locally available cairn binary, not a newly built pinned cohort."
+  ]
+}

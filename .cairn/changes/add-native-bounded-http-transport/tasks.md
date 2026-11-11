@@ -12,7 +12,7 @@
 ## 3. Verification
 
 - [x] [serial] Run focused behavior regressions for real request/response, malformed input, body/header bounds, redirects, timeout, cancellation and TLS rejection. r[lattice.native_http.bounds] r[lattice.native_http.security] r[lattice.native_http.cancellation]
-- [ ] [serial] Exercise actual standalone authorized and denied local HTTP execution; record observed output and no-request evidence. r[lattice.native_http.authority]
+- [x] [serial] Exercise actual standalone authorized and denied local HTTP execution; record observed output and no-request evidence. r[lattice.native_http.authority]
 - [ ] [serial] Parent runs coordinated checks and lifecycle closeout using observed evidence, never marking runtime tasks from structural gates alone. r[lattice.native_http.authority]
 
 ## Observed verification boundary

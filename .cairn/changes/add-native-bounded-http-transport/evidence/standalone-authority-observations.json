@@ -1,0 +1,25 @@
+{
+  "schema": "lattice.native_http.standalone_authority_observations.v1",
+  "recorded_at": "2026-11-11",
+  "scope": "Actual standalone CLI with the stock native HTTP client, an operator authority profile, and a local TCP server; authorized and missing-authority paths in one test.",
+  "command": "cargo test --test test_native_http_authority --locked",
+  "result": {
+    "passed": 1,
+    "failed": 0,
+    "test": "actual_cli_authorized_http_reaches_server_and_missing_authority_does_not"
+  },
+  "source_blake3": {
+    "src/http.rs": "00b19955a6f3dd748a9eeafdf0933ff93933942252b6f82cc879721f8ab9198e",
+    "src/http/native.rs": "d2879be69b21d09944de1407d94e6dbacca5f0b36ef361a827e8c8f31673e4df",
+    "tests/test_native_http_authority.rs": "68443199c61fd56d74e9798ad44c757ca08a087079b77afe2635c357a98ced28"
+  },
+  "observed": {
+    "denied": "The CLI failed before dispatch and the local listener accepted no connection.",
+    "allowed": "The CLI dispatched GET /observed, the local server returned HTTP 200 with the eight-byte body 'observed', and the listener accepted no second connection."
+  },
+  "non_claims": [
+    "This proves only the exercised standalone allowed and denied local HTTP paths.",
+    "It does not prove arbitrary peer trust, DNS admission, sandboxing, TLS peer behavior, or release eligibility.",
+    "The local server is a test fixture, not a production peer."
+  ]
+}
