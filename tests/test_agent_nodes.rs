@@ -6,6 +6,10 @@ use std::fs;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
+use std::time::Duration;
+use std::time::Instant;
 
 use lattice::agent_node::AgentAdapter;
 use lattice::agent_node::AgentCommandOutput;
@@ -364,6 +368,80 @@ fn production_pi_text_adapter_executes_command() {
 
     assert_eq!(response.output, AgentOutput::Text(RUNTIME_TEXT_OUTPUT.to_string()));
     assert_eq!(response.metadata["adapter"], "pi");
+}
+
+// r[verify n8nclone.workflow_execution.agent_nodes.production_adapters.command]
+// r[verify n8nclone.workflow_execution.agent_nodes.production_adapters.route]
+#[cfg(unix)]
+#[test]
+fn production_command_adapter_honors_pre_execution_cancellation() {
+    let temp_dir = tempfile::tempdir().expect("temporary fake agent directory");
+    let marker = temp_dir.path().join("pre-cancel-marker");
+    let command = write_agent_script(&temp_dir, &format!("#!/bin/sh\nprintf started > '{}'\n", marker.display()));
+    let adapter = ProductionAgentAdapter::new(runtime_config_for_script(Some(command), None));
+    let request = agent_request(AgentTarget::Pi, AgentOutputMode::Text);
+    let cancellation = AtomicBool::new(true);
+
+    let error = adapter
+        .execute_with_cancellation(&request, &AgentExecutionContext::default(), Some(&cancellation))
+        .expect_err("pre-execution cancellation prevents the command");
+
+    assert!(error.to_string().contains("process cancelled"), "error: {error}");
+    assert!(!marker.exists(), "the command must not run after pre-execution cancellation");
+}
+
+// r[verify n8nclone.workflow_execution.agent_nodes.production_adapters.command]
+#[cfg(unix)]
+#[test]
+fn production_command_adapter_cancels_a_running_process_promptly() {
+    let temp_dir = tempfile::tempdir().expect("temporary fake agent directory");
+    let command = write_agent_script(&temp_dir, "#!/bin/sh\nsleep 30\n");
+    let adapter = ProductionAgentAdapter::new(runtime_config_for_script(Some(command), None));
+    let request = agent_request(AgentTarget::Pi, AgentOutputMode::Text);
+    let cancellation = Arc::new(AtomicBool::new(false));
+    let signal = Arc::clone(&cancellation);
+    let setter = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(100));
+        signal.store(true, Ordering::SeqCst);
+    });
+    let started = Instant::now();
+
+    let error = adapter
+        .execute_with_cancellation(&request, &AgentExecutionContext::default(), Some(&cancellation))
+        .expect_err("running command observes cancellation");
+    setter.join().expect("cancellation setter joins");
+
+    assert!(error.to_string().contains("process cancelled"), "error: {error}");
+    assert!(started.elapsed() < Duration::from_secs(10), "cancellation waited for the process timeout");
+}
+
+// r[verify n8nclone.workflow_execution.agent_nodes.production_adapters.command]
+#[cfg(unix)]
+#[test]
+fn production_command_cancellation_terminates_descendants() {
+    let temp_dir = tempfile::tempdir().expect("temporary fake agent directory");
+    let marker = temp_dir.path().join("descendant-marker");
+    let command = write_agent_script(
+        &temp_dir,
+        &format!("#!/bin/sh\n( sleep 2; printf after > '{}' ) &\nwait\n", marker.display()),
+    );
+    let adapter = ProductionAgentAdapter::new(runtime_config_for_script(Some(command), None));
+    let request = agent_request(AgentTarget::Pi, AgentOutputMode::Text);
+    let cancellation = Arc::new(AtomicBool::new(false));
+    let signal = Arc::clone(&cancellation);
+    let setter = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(100));
+        signal.store(true, Ordering::SeqCst);
+    });
+
+    let error = adapter
+        .execute_with_cancellation(&request, &AgentExecutionContext::default(), Some(&cancellation))
+        .expect_err("running command observes cancellation");
+    setter.join().expect("cancellation setter joins");
+    std::thread::sleep(Duration::from_secs(3));
+
+    assert!(error.to_string().contains("process cancelled"), "error: {error}");
+    assert!(!marker.exists(), "a descendant must not outlive the cancelled process group");
 }
 
 // r[verify n8nclone.workflow_execution.agent_nodes.production_adapters.command]

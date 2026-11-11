@@ -245,6 +245,20 @@ pub trait AgentAdapter: Send + Sync {
     /// Planning must not resolve credentials, contact a backend, or perform an effect.
     fn execution_identity(&self, request: &AgentRequest) -> Result<String, AgentError>;
     fn execute(&self, request: &AgentRequest, context: &ExecutionContext) -> Result<AgentResponse, AgentError>;
+
+    /// Execute with an optional run cancellation signal.
+    ///
+    /// Adapters that can propagate cancellation into their effects should
+    /// override this method. The default preserves the existing behavior.
+    fn execute_with_cancellation(
+        &self,
+        request: &AgentRequest,
+        context: &ExecutionContext,
+        cancellation: Option<&std::sync::atomic::AtomicBool>,
+    ) -> Result<AgentResponse, AgentError> {
+        let _ = cancellation;
+        self.execute(request, context)
+    }
 }
 
 #[derive(Debug, Default)]
@@ -464,11 +478,19 @@ impl AgentAdapter for ProductionAgentAdapter {
         Ok(format!("blake3:{}", hasher.finalize().to_hex()))
     }
     fn execute(&self, request: &AgentRequest, context: &ExecutionContext) -> Result<AgentResponse, AgentError> {
+        self.execute_with_cancellation(request, context, None)
+    }
+    fn execute_with_cancellation(
+        &self,
+        request: &AgentRequest,
+        context: &ExecutionContext,
+        cancellation: Option<&std::sync::atomic::AtomicBool>,
+    ) -> Result<AgentResponse, AgentError> {
         let projection = self.config.structured_input_projection.for_target(request.target);
         let response = match runtime_route_for_target(&self.config, request.target)? {
             RuntimeRoute::Command => {
                 let plan = plan_agent_command(&self.config, request)?;
-                let output = run_agent_command(&plan, &self.config.local_process, context)?;
+                let output = run_agent_command(&plan, &self.config.local_process, context, cancellation)?;
                 decode_agent_command_output(&plan, &output)
             }
             RuntimeRoute::OpenAi(runtime) => {
@@ -771,12 +793,16 @@ fn run_agent_command(
     plan: &AgentCommandPlan,
     config: &crate::process::core::RuntimeConfig,
     context: &ExecutionContext,
+    cancellation: Option<&std::sync::atomic::AtomicBool>,
 ) -> Result<AgentCommandOutput, AgentError> {
     let mut request = ExecutionProcessRequest(process_request_for_agent_command(plan));
     request.0.env.clone_from(&context.secret_env);
-    let output = ProductionProcessRunner::new(config.clone())
-        .run(&request.0)
-        .map_err(|error| AgentError::Adapter(context.redact(&error.to_string())))?;
+    let runner = ProductionProcessRunner::new(config.clone());
+    let output = match cancellation {
+        Some(signal) => runner.run_with_cancellation(&request.0, signal),
+        None => runner.run(&request.0),
+    }
+    .map_err(|error| AgentError::Adapter(context.redact(&error.to_string())))?;
     Ok(agent_command_output_from_process_output(output))
 }
 

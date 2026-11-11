@@ -68,7 +68,7 @@ impl<'a> Recipe<'a> {
         let mut resolved =
             self.bindings.resolve(subject, Some(self.cancellation)).map_err(|_| Error::AdapterRejected)?;
         let context = ExecutionContext::new(std::mem::take(&mut resolved.env));
-        execute_redacted(self.adapter, &request, &context).map_err(|_| Error::AdapterRejected)
+        execute_redacted(self.adapter, &request, &context, Some(self.cancellation)).map_err(|_| Error::AdapterRejected)
     }
 }
 
@@ -98,15 +98,17 @@ pub(crate) fn execute_redacted(
     adapter: &dyn AgentAdapter,
     request: &AgentRequest,
     context: &ExecutionContext,
+    cancellation: Option<&std::sync::atomic::AtomicBool>,
 ) -> Result<AgentResponse, AgentError> {
-    let mut response = adapter.execute(request, context).map_err(|error| match error {
-        AgentError::UnsupportedTarget(text) => AgentError::UnsupportedTarget(context.redact(&text)),
-        AgentError::PreflightRejected(text) => AgentError::PreflightRejected(context.redact(&text)),
-        AgentError::Credential(text) => AgentError::Credential(context.redact(&text)),
-        AgentError::Session(text) => AgentError::Session(context.redact(&text)),
-        AgentError::Adapter(text) => AgentError::Adapter(context.redact(&text)),
-        other => other,
-    })?;
+    let mut response =
+        adapter.execute_with_cancellation(request, context, cancellation).map_err(|error| match error {
+            AgentError::UnsupportedTarget(text) => AgentError::UnsupportedTarget(context.redact(&text)),
+            AgentError::PreflightRejected(text) => AgentError::PreflightRejected(context.redact(&text)),
+            AgentError::Credential(text) => AgentError::Credential(context.redact(&text)),
+            AgentError::Session(text) => AgentError::Session(context.redact(&text)),
+            AgentError::Adapter(text) => AgentError::Adapter(context.redact(&text)),
+            other => other,
+        })?;
     match &mut response.output {
         AgentOutput::Text(text) => redact_string(text, context),
         AgentOutput::Json(json) => redact_json(json, context),

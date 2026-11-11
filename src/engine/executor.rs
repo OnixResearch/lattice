@@ -2248,8 +2248,13 @@ impl Executor {
                         })
                         .and_then(|mut resolved| {
                             let context = agent_node::ExecutionContext::new(std::mem::take(&mut resolved.env));
-                            agent_node::authority::execute_redacted(self.agent_adapter.as_ref(), &request, &context)
-                                .map_err(|error| error.to_string())
+                            agent_node::authority::execute_redacted(
+                                self.agent_adapter.as_ref(),
+                                &request,
+                                &context,
+                                Some(self.cancellation.as_ref()),
+                            )
+                            .map_err(|error| error.to_string())
                         }),
                 };
                 match response {
