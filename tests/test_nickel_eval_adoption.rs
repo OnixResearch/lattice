@@ -5,11 +5,13 @@ use nickel_lang_core::program::ProgramBuilder;
 use nickel_lang_core::serialize::ExportFormat;
 use nickel_lang_core::serialize::{self};
 
-const PRODUCT_FIXTURES: [&str; 4] = [
+const PRODUCT_FIXTURES: [&str; 6] = [
     "examples/config/animus-agent.ncl",
     "examples/templates/complex-sort-lines.ncl",
     "examples/workflows/complex-text-normalization.ncl",
+    "examples/workflows/bounded-build-loop.ncl",
     "examples/orchestrations/llm-review-loop.ncl",
+    "examples/orchestrations/bounded-build-loop.ncl",
 ];
 const PROPOSAL_FIXTURE: &str = r#"{ proposal_id = "review-1", revision = 1, accepted = false }"#;
 
