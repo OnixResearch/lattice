@@ -30,12 +30,18 @@ output overflow are failures. Observed cancellation is distinct. An interrupted
 capture or receipt derivation is `Unknown` and retains the process output.
 
 Receipts can be serialized only after admission and persisted by attempt
-identity through the store. Loading revalidates the receipt.
+identity through the store. Loading revalidates the receipt. `run_and_publish_candidate_worker`
+persists a produced receipt; if durable publication fails, it returns `Unknown`
+with the process output rather than claiming success.
+
+`verify_receipt_from_snapshots` independently checks expected work, attempt,
+fence, and workspace bindings and recomputes the identities and changed paths
+from the actual snapshots. Crossed bindings and stale snapshots are rejected.
 
 ## Non-claims
 
 This boundary does not provide OS-level read/write isolation, prevent a worker
 from reading host files outside the admitted root, deny publisher credentials by
-kernel policy, publish candidate bytes, or prove candidate correctness. The
+kernel policy, publish candidate file bytes, or prove candidate correctness. The
 workspace boundary is admission data and a clear-environment process route, not
 a sandbox. Independent verification and publication remain separate authority.
