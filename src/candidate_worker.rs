@@ -52,6 +52,11 @@ pub enum CandidateWorkerOutcome {
         stderr: Vec<u8>,
     },
     Cancelled,
+    Unknown {
+        blocker: String,
+        stdout: Vec<u8>,
+        stderr: Vec<u8>,
+    },
 }
 
 /// Run one worker and derive a candidate receipt from the actual workspace.
@@ -121,7 +126,16 @@ fn finish_from_process_output(
             stderr: output.stderr,
         });
     }
-    let candidate = capture_workspace(root)?;
+    let candidate = match capture_workspace(root) {
+        Ok(candidate) => candidate,
+        Err(error) => {
+            return Ok(CandidateWorkerOutcome::Unknown {
+                blocker: format!("candidate capture failed: {error}"),
+                stdout: output.stdout,
+                stderr: output.stderr,
+            });
+        }
+    };
     let receipt = match produced_receipt_from_snapshots(
         request.work_id.clone(),
         request.attempt_id.clone(),
@@ -138,7 +152,13 @@ fn finish_from_process_output(
                 stderr: output.stderr,
             });
         }
-        Err(error) => return Err(CandidateWorkerError::Receipt(error)),
+        Err(error) => {
+            return Ok(CandidateWorkerOutcome::Unknown {
+                blocker: format!("candidate receipt failed: {error}"),
+                stdout: output.stdout,
+                stderr: output.stderr,
+            });
+        }
     };
     Ok(CandidateWorkerOutcome::Produced {
         receipt,
@@ -267,5 +287,27 @@ mod tests {
         let outcome =
             run_candidate_worker(&timed, &RuntimeConfig::default(), &AtomicBool::new(false)).expect("worker runs");
         assert!(matches!(outcome, CandidateWorkerOutcome::Failed { .. }));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn interrupted_candidate_capture_is_unknown() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let directory = tempfile::tempdir().expect("temporary workspace");
+        let root = directory.path();
+        std::fs::create_dir_all(root.join("src")).expect("source directory");
+        std::fs::write(root.join("src/main.rs"), b"same").expect("source");
+
+        let outcome = run_candidate_worker(
+            &request(root, "/run/current-system/sw/bin/chmod 000 src/main.rs"),
+            &RuntimeConfig::default(),
+            &AtomicBool::new(false),
+        )
+        .expect("worker runs");
+
+        assert!(matches!(outcome, CandidateWorkerOutcome::Unknown { .. }), "{outcome:?}");
+        std::fs::set_permissions(root.join("src/main.rs"), std::fs::Permissions::from_mode(0o644))
+            .expect("restore source");
     }
 }
