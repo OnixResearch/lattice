@@ -115,6 +115,7 @@ pub mod agent_evaluation;
 // r[impl lattice.architecture.core_crate.compatibility]
 pub mod agent_node;
 pub mod animus_agent;
+pub mod candidate;
 mod capability;
 pub mod compose_surface;
 pub mod config;
