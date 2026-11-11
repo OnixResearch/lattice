@@ -530,6 +530,38 @@ fn measured_run_duration(store: &Store, run_id: RunId) -> Option<u64> {
     u64::try_from(elapsed).ok()
 }
 
+fn persisted_run_usage(
+    store: &Store,
+    policy: &crate::orchestration::core::BudgetPolicy,
+    dispatch_id: &crate::orchestration::DispatchId,
+    run_id: RunId,
+) -> Option<(Option<u64>, Option<u64>, Option<u64>)> {
+    let observation = store.load_command_worker_usage_for_run(run_id).ok().flatten().filter(|observation| {
+        observation.scope == UsageScope::Run
+            && observation.run_id == run_id.0
+            && observation.dispatch_id == dispatch_id.as_str()
+            && observation.validate().is_ok()
+            && observation.complete
+    })?;
+    Some((
+        if policy.enforced.tokens {
+            observation.measured_tokens()
+        } else {
+            None
+        },
+        if policy.enforced.duration_millis && !observation.is_estimated_or_unknown() {
+            observation.duration_millis
+        } else {
+            None
+        },
+        if policy.enforced.monetary_microunits {
+            observation.measured_cost_microunits()
+        } else {
+            None
+        },
+    ))
+}
+
 fn finish_action(
     store: &Store,
     instance: &OrchestrationInstance,
@@ -540,49 +572,25 @@ fn finish_action(
     safe_summary: String,
 ) -> OrchestrationAction {
     let observed_usage = observed_usage(instance, &dispatch_id).unwrap_or_default();
-    let persisted = store.load_command_worker_usage_for_run(run_id).ok().flatten().filter(|observation| {
-        observation.scope == UsageScope::Run
-            && observation.run_id == run_id.0
-            && observation.dispatch_id == dispatch_id.as_str()
-            && observation.validate().is_ok()
-            && observation.complete
-    });
-    let (tokens, duration, cost) = if let Some(observation) = persisted {
-        (
-            if instance.definition.budgets.enforced.tokens {
-                observation.measured_tokens()
+    let (tokens, duration, cost) = persisted_run_usage(store, &instance.definition.budgets, &dispatch_id, run_id)
+        .unwrap_or_else(|| {
+            let tokens = if instance.definition.budgets.enforced.tokens {
+                measured_agent_tokens(store, instance, run_id)
             } else {
                 None
-            },
-            if instance.definition.budgets.enforced.duration_millis && !observation.is_estimated_or_unknown() {
-                observation.duration_millis
+            };
+            let duration = if instance.definition.budgets.enforced.duration_millis {
+                measured_run_duration(store, run_id)
             } else {
                 None
-            },
-            if instance.definition.budgets.enforced.monetary_microunits {
-                observation.measured_cost_microunits()
+            };
+            let cost = if instance.definition.budgets.enforced.monetary_microunits {
+                measured_agent_cost(store, instance, run_id)
             } else {
                 None
-            },
-        )
-    } else {
-        let tokens = if instance.definition.budgets.enforced.tokens {
-            measured_agent_tokens(store, instance, run_id)
-        } else {
-            None
-        };
-        let duration = if instance.definition.budgets.enforced.duration_millis {
-            measured_run_duration(store, run_id)
-        } else {
-            None
-        };
-        let cost = if instance.definition.budgets.enforced.monetary_microunits {
-            measured_agent_cost(store, instance, run_id)
-        } else {
-            None
-        };
-        (tokens, duration, cost)
-    };
+            };
+            (tokens, duration, cost)
+        });
     if tokens.is_none() && duration.is_none() && cost.is_none() {
         return OrchestrationAction::RunFinished {
             dispatch_id,
@@ -949,8 +957,67 @@ fn identity_error(error: crate::orchestration::AdmissionError) -> OrchestrationS
 
 #[cfg(test)]
 mod tests {
+    use super::persisted_run_usage;
     use super::usage_cost;
     use super::usage_tokens;
+    use crate::engine::executor::RunId;
+    use crate::orchestration::CommandWorkerUsageObservation;
+    use crate::orchestration::DispatchId;
+    use crate::orchestration::USAGE_OBSERVATION_SCHEMA;
+    use crate::orchestration::UsageProvenance;
+    use crate::orchestration::UsageScope;
+    use crate::orchestration::core::BudgetDimensions;
+    use crate::orchestration::core::BudgetPolicy;
+    use crate::store::Store;
+
+    #[test]
+    fn run_scoped_usage_is_selected_only_for_matching_enforced_dimensions() {
+        let directory = tempfile::tempdir().expect("temporary store");
+        let store = Store::new(directory.path().join("usage.redb")).expect("store opens");
+        let dispatch = DispatchId::try_from_hex("d".repeat(64)).expect("dispatch identity");
+        let observation = CommandWorkerUsageObservation {
+            schema: USAGE_OBSERVATION_SCHEMA.to_string(),
+            scope: UsageScope::Run,
+            workflow_revision: "revision-1".to_string(),
+            instance_id: "instance-1".to_string(),
+            dispatch_id: dispatch.as_str().to_string(),
+            run_id: 7,
+            node_id: 0,
+            invocation_id: "invocation-1".to_string(),
+            worker_profile: "profile-1".to_string(),
+            attempt_id: "attempt-1".to_string(),
+            agent_invocations: Some(1),
+            model_requests: Some(2),
+            subagent_calls: Some(1),
+            tokens: Some(123),
+            cost_microunits: Some(456),
+            duration_millis: Some(789),
+            provenance: UsageProvenance::ProviderReported,
+            complete: true,
+        };
+        store.save_command_worker_usage(&observation).expect("usage saves");
+
+        let enforced = BudgetPolicy {
+            enforced: BudgetDimensions {
+                tokens: true,
+                monetary_microunits: true,
+                duration_millis: true,
+                ..BudgetDimensions::default()
+            },
+            ..BudgetPolicy::default()
+        };
+        assert_eq!(
+            persisted_run_usage(&store, &enforced, &dispatch, RunId(7)),
+            Some((Some(123), Some(789), Some(456)))
+        );
+        assert_eq!(
+            persisted_run_usage(&store, &BudgetPolicy::default(), &dispatch, RunId(7)),
+            Some((None, None, None))
+        );
+        let other = DispatchId::try_from_hex("e".repeat(64)).expect("other dispatch");
+        assert_eq!(persisted_run_usage(&store, &enforced, &other, RunId(7)), None);
+        assert_eq!(persisted_run_usage(&store, &enforced, &dispatch, RunId(8)), None);
+    }
 
     #[test]
     fn usage_cost_supports_total_and_short_shapes() {
