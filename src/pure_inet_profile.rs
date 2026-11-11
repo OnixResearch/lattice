@@ -152,6 +152,139 @@ pub fn format_canonical_i64(value: i64) -> String {
     value.to_string()
 }
 
+/// Version of the host-side invocation envelope.
+pub const INVOCATION_SCHEMA: &str = "lattice.pure-inet-invocation.v1";
+
+/// Bounds free-form binding identifiers before admission.
+pub const MAX_IDENTIFIER_BYTES: usize = 256;
+
+/// Exact immutable bindings for one pure computation invocation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PureComputationBinding {
+    pub workflow_revision: String,
+    pub instance_id: String,
+    pub dispatch_id: String,
+    pub run_id: String,
+    pub attempt_id: String,
+    pub program_identity: String,
+    pub input_identity: String,
+    pub producer_revision: String,
+    pub rule_revision: String,
+    pub runtime_identity: String,
+    pub executable_identity: String,
+    pub profile_identity: String,
+    pub extrinsic_profile_identity: String,
+    pub output_contract_identity: String,
+}
+
+impl PureComputationBinding {
+    /// Admit only bounded identifiers and exact lowercase BLAKE3 identities.
+    pub fn validate(&self) -> Result<(), PureProfileError> {
+        for identifier in [
+            &self.workflow_revision,
+            &self.instance_id,
+            &self.dispatch_id,
+            &self.run_id,
+            &self.attempt_id,
+            &self.producer_revision,
+            &self.rule_revision,
+        ] {
+            validate_identifier(identifier)?;
+        }
+        for identity in [
+            &self.program_identity,
+            &self.input_identity,
+            &self.runtime_identity,
+            &self.executable_identity,
+            &self.profile_identity,
+            &self.extrinsic_profile_identity,
+            &self.output_contract_identity,
+        ] {
+            if !is_lowercase_blake3(identity) {
+                return Err(PureProfileError::InvalidBindingIdentity);
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Effective profile limits admitted before dispatch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PureLimits {
+    pub max_program_operations: usize,
+    pub max_input_bytes: usize,
+    pub max_output_bytes: usize,
+    pub deadline_millis: u64,
+}
+
+impl Default for PureLimits {
+    fn default() -> Self {
+        Self {
+            max_program_operations: MAX_PROGRAM_OPERATIONS,
+            max_input_bytes: 4_096,
+            max_output_bytes: 4_096,
+            deadline_millis: 60_000,
+        }
+    }
+}
+
+impl PureLimits {
+    pub fn validate(&self) -> Result<(), PureProfileError> {
+        if !(1..=MAX_PROGRAM_OPERATIONS).contains(&self.max_program_operations)
+            || self.max_input_bytes == 0
+            || self.max_input_bytes > 16 * 1024 * 1024
+            || self.max_output_bytes == 0
+            || self.max_output_bytes > 16 * 1024 * 1024
+            || !(1..=300_000).contains(&self.deadline_millis)
+        {
+            return Err(PureProfileError::InvalidLimits);
+        }
+        Ok(())
+    }
+}
+
+/// Host-side envelope that binds one pure program and inputs to an attempt.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PureInvocationEnvelope {
+    pub schema: String,
+    pub binding: PureComputationBinding,
+    pub limits: PureLimits,
+    pub program: PureProgram,
+    pub inputs: PureInputs,
+}
+
+impl PureInvocationEnvelope {
+    /// Validate the schema, bindings, limits, and admitted program size.
+    pub fn validate(&self) -> Result<(), PureProfileError> {
+        if self.schema != INVOCATION_SCHEMA {
+            return Err(PureProfileError::InvalidSchema);
+        }
+        self.binding.validate()?;
+        self.limits.validate()?;
+        if self.program.operations.len() > self.limits.max_program_operations {
+            return Err(PureProfileError::ProgramExceedsAdmittedLimit);
+        }
+        Ok(())
+    }
+
+    /// Evaluate only after the envelope is admitted.
+    pub fn evaluate_canonical(&self) -> Result<String, PureProfileError> {
+        self.validate()?;
+        self.program.evaluate_canonical(self.inputs)
+    }
+}
+
+fn validate_identifier(value: &str) -> Result<(), PureProfileError> {
+    if value.is_empty() || value.len() > MAX_IDENTIFIER_BYTES || value.chars().any(char::is_control) {
+        return Err(PureProfileError::InvalidBindingIdentifier);
+    }
+    Ok(())
+}
+
+fn is_lowercase_blake3(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum PureProfileError {
     #[error("pure interaction-net program must contain at least one operation")]
@@ -172,6 +305,16 @@ pub enum PureProfileError {
     IntegerOutOfRange,
     #[error("integer must be carried as a string, not a JSON number")]
     NonStringInteger,
+    #[error("pure interaction-net invocation schema is not supported")]
+    InvalidSchema,
+    #[error("pure interaction-net binding identifier is empty, unbounded, or contains control characters")]
+    InvalidBindingIdentifier,
+    #[error("pure interaction-net binding identity must be one lowercase BLAKE3 hex digest")]
+    InvalidBindingIdentity,
+    #[error("pure interaction-net limits are zero, oversized, or exceed the profile ceiling")]
+    InvalidLimits,
+    #[error("pure interaction-net program exceeds the admitted operation limit")]
+    ProgramExceedsAdmittedLimit,
 }
 
 #[cfg(test)]
@@ -271,5 +414,77 @@ mod tests {
             PureProgram::new(vec![PureOperation::Const(1), PureOperation::Add]),
             Err(PureProfileError::StackUnderflow)
         );
+    }
+
+    fn binding() -> PureComputationBinding {
+        let identity = "a".repeat(64);
+        PureComputationBinding {
+            workflow_revision: identity.clone(),
+            instance_id: "instance-1".to_string(),
+            dispatch_id: "dispatch-1".to_string(),
+            run_id: "run-1".to_string(),
+            attempt_id: "attempt-1".to_string(),
+            program_identity: identity.clone(),
+            input_identity: identity.clone(),
+            producer_revision: "noble-revision".to_string(),
+            rule_revision: "rules-v1".to_string(),
+            runtime_identity: identity.clone(),
+            executable_identity: identity.clone(),
+            profile_identity: identity.clone(),
+            extrinsic_profile_identity: identity.clone(),
+            output_contract_identity: identity,
+        }
+    }
+
+    fn envelope() -> PureInvocationEnvelope {
+        PureInvocationEnvelope {
+            schema: INVOCATION_SCHEMA.to_string(),
+            binding: binding(),
+            limits: PureLimits::default(),
+            program: PureProgram::new(vec![PureOperation::Input(0), PureOperation::Input(1), PureOperation::Add])
+                .expect("program admits"),
+            inputs: inputs(20, 22),
+        }
+    }
+
+    #[test]
+    fn invocation_envelope_admits_complete_bindings() {
+        let envelope = envelope();
+        assert_eq!(envelope.validate(), Ok(()));
+        assert_eq!(envelope.evaluate_canonical(), Ok("42".to_string()));
+    }
+
+    #[test]
+    fn invocation_envelope_rejects_crossed_or_malformed_bindings() {
+        let mut wrong_schema = envelope();
+        wrong_schema.schema = "other".to_string();
+        assert_eq!(wrong_schema.validate(), Err(PureProfileError::InvalidSchema));
+
+        let mut upper_identity = envelope();
+        upper_identity.binding.program_identity = "A".repeat(64);
+        assert_eq!(upper_identity.validate(), Err(PureProfileError::InvalidBindingIdentity));
+
+        let mut short_identity = envelope();
+        short_identity.binding.input_identity = "a".repeat(63);
+        assert_eq!(short_identity.validate(), Err(PureProfileError::InvalidBindingIdentity));
+
+        let mut empty_id = envelope();
+        empty_id.binding.attempt_id.clear();
+        assert_eq!(empty_id.validate(), Err(PureProfileError::InvalidBindingIdentifier));
+
+        let mut control_id = envelope();
+        control_id.binding.run_id = "run\n1".to_string();
+        assert_eq!(control_id.validate(), Err(PureProfileError::InvalidBindingIdentifier));
+    }
+
+    #[test]
+    fn invocation_envelope_rejects_limits_and_program_over_admission() {
+        let mut bad_limits = envelope();
+        bad_limits.limits.deadline_millis = 0;
+        assert_eq!(bad_limits.validate(), Err(PureProfileError::InvalidLimits));
+
+        let mut narrow = envelope();
+        narrow.limits.max_program_operations = 2;
+        assert_eq!(narrow.validate(), Err(PureProfileError::ProgramExceedsAdmittedLimit));
     }
 }

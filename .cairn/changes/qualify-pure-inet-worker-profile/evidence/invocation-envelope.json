@@ -1,0 +1,50 @@
+{
+  "schema": "lattice.pure_inet_profile.envelope_evidence.v1",
+  "recorded_at": "2026-11-11",
+  "scope": "Host-side invocation envelope and exact binding admission; no producer wire format, byte remeasurement, or process dispatch.",
+  "implementation": {
+    "module": "src/pure_inet_profile.rs",
+    "schema": "lattice.pure-inet-invocation.v1",
+    "bindings": [
+      "workflow_revision",
+      "instance_id",
+      "dispatch_id",
+      "run_id",
+      "attempt_id",
+      "program_identity",
+      "input_identity",
+      "producer_revision",
+      "rule_revision",
+      "runtime_identity",
+      "executable_identity",
+      "profile_identity",
+      "extrinsic_profile_identity",
+      "output_contract_identity"
+    ],
+    "limits": [
+      "max_program_operations",
+      "max_input_bytes",
+      "max_output_bytes",
+      "deadline_millis"
+    ]
+  },
+  "command": "cargo test --lib --locked pure_inet_profile",
+  "result": {
+    "passed": 9,
+    "failed": 0
+  },
+  "covered": [
+    "complete binding admission",
+    "schema mismatch",
+    "uppercase, short, and malformed BLAKE3 identities",
+    "empty and control-character identifiers",
+    "invalid limits",
+    "program larger than the admitted operation limit",
+    "evaluation only after envelope admission"
+  ],
+  "non_claims": [
+    "The envelope does not define or replace Noble #37's producer wire contract.",
+    "Identity strings are admitted syntactically; byte remeasurement remains task 2.2.",
+    "No worker, operation pack, process, or publication route is exercised."
+  ]
+}
