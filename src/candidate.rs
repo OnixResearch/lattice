@@ -14,7 +14,8 @@ pub const MAX_CHANGED_PATHS: usize = 4_096;
 pub const MAX_SNAPSHOT_FILES: usize = 50_000;
 pub const MAX_SNAPSHOT_BYTES: usize = 512 * 1024 * 1024;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum CandidateDisposition {
     /// A host-observed candidate and diff exist.
     Produced,
@@ -28,7 +29,7 @@ pub enum CandidateDisposition {
     Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CandidateReceipt {
     pub schema: String,
     pub work_id: String,
@@ -83,6 +84,19 @@ impl CandidateReceipt {
     /// True only for a produced candidate with complete host-derived bindings.
     pub fn is_usable_candidate(&self) -> bool {
         self.validate().is_ok() && self.disposition == CandidateDisposition::Produced
+    }
+
+    /// Serialize only after the receipt passes admission.
+    pub fn to_json(&self) -> Result<String, CandidateReceiptError> {
+        self.validate()?;
+        serde_json::to_string(self).map_err(|_| CandidateReceiptError::InvalidJson)
+    }
+
+    /// Parse and validate a persisted receipt before use.
+    pub fn from_json(text: &str) -> Result<Self, CandidateReceiptError> {
+        let receipt: Self = serde_json::from_str(text).map_err(|_| CandidateReceiptError::InvalidJson)?;
+        receipt.validate()?;
+        Ok(receipt)
     }
 }
 
@@ -245,6 +259,8 @@ pub enum CandidateReceiptError {
     SnapshotTooLarge,
     #[error("candidate snapshot contains no changed path")]
     NoCandidateChanges,
+    #[error("candidate receipt JSON is malformed or does not match the schema")]
+    InvalidJson,
 }
 
 #[cfg(test)]
@@ -324,6 +340,18 @@ mod tests {
         unknown.changed_paths.clear();
         assert_eq!(unknown.validate(), Ok(()));
         assert!(!unknown.is_usable_candidate());
+    }
+
+    #[test]
+    fn receipt_json_round_trips_only_after_admission() {
+        let receipt = receipt();
+        let json = receipt.to_json().expect("valid receipt serializes");
+        assert_eq!(CandidateReceipt::from_json(&json), Ok(receipt.clone()));
+
+        let mut invalid = receipt;
+        invalid.changed_paths = vec!["../escape".to_string()];
+        assert_eq!(invalid.to_json(), Err(CandidateReceiptError::InvalidChangedPath));
+        assert_eq!(CandidateReceipt::from_json("{not-json"), Err(CandidateReceiptError::InvalidJson));
     }
 
     #[test]
