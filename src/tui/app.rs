@@ -134,6 +134,7 @@ pub struct AppRunState {
     pub node_started: HashMap<u64, std::time::Instant>,
     pub node_durations_millis: HashMap<u64, u64>,
     pub node_tokens: HashMap<u64, u64>,
+    pub node_cost_microunits: HashMap<u64, u64>,
     pub node_attempts: HashMap<u64, u32>,
     pub active_replay_timeline: Option<ReplayTimeline>,
 }
@@ -146,6 +147,7 @@ impl AppRunState {
             node_started: HashMap::new(),
             node_durations_millis: HashMap::new(),
             node_tokens: HashMap::new(),
+            node_cost_microunits: HashMap::new(),
             node_attempts: HashMap::new(),
             active_replay_timeline: None,
         }
@@ -580,12 +582,7 @@ fn node_usage_tokens(
     node_id: crate::engine::workflow::NodeId,
     outputs: &HashMap<crate::engine::workflow::PortId, Value>,
 ) -> Option<u64> {
-    let node = workflow.graph.node(node_id)?;
-    let metadata_port = node.output_ports.iter().find(|port| port.label == "metadata")?;
-    let value = outputs.get(&metadata_port.id)?;
-    let crate::engine::value::ValueData::Json(metadata) = &value.data else {
-        return None;
-    };
+    let metadata = node_metadata(workflow, node_id, outputs)?;
     let usage = metadata.get("usage")?;
     usage.get("total_tokens").and_then(serde_json::Value::as_u64).or_else(|| {
         let input = usage
@@ -598,6 +595,33 @@ fn node_usage_tokens(
             .and_then(serde_json::Value::as_u64)?;
         input.checked_add(output)
     })
+}
+
+fn node_usage_cost(
+    workflow: &Workflow,
+    node_id: crate::engine::workflow::NodeId,
+    outputs: &HashMap<crate::engine::workflow::PortId, Value>,
+) -> Option<u64> {
+    let metadata = node_metadata(workflow, node_id, outputs)?;
+    let usage = metadata.get("usage")?;
+    usage
+        .get("total_cost_microunits")
+        .or_else(|| usage.get("cost_microunits"))
+        .and_then(serde_json::Value::as_u64)
+}
+
+fn node_metadata<'a>(
+    workflow: &Workflow,
+    node_id: crate::engine::workflow::NodeId,
+    outputs: &'a HashMap<crate::engine::workflow::PortId, Value>,
+) -> Option<&'a serde_json::Value> {
+    let node = workflow.graph.node(node_id)?;
+    let metadata_port = node.output_ports.iter().find(|port| port.label == "metadata")?;
+    let value = outputs.get(&metadata_port.id)?;
+    let crate::engine::value::ValueData::Json(metadata) = &value.data else {
+        return None;
+    };
+    Some(metadata)
 }
 
 // r[impl n8nclone.tui_ux.run_history.details.persist]
@@ -2768,6 +2792,7 @@ impl App {
             node_started: HashMap::new(),
             node_durations_millis: HashMap::new(),
             node_tokens: HashMap::new(),
+            node_cost_microunits: HashMap::new(),
             node_attempts: HashMap::new(),
             active_replay_timeline: None,
         };
@@ -2935,6 +2960,9 @@ impl App {
                     self.run_state.node_statuses.insert(step.node_id.0, NodeRunStatus::Completed);
                     if let Some(tokens) = node_usage_tokens(run_workflow, step.node_id, outputs) {
                         self.run_state.node_tokens.insert(step.node_id.0, tokens);
+                    }
+                    if let Some(cost) = node_usage_cost(run_workflow, step.node_id, outputs) {
+                        self.run_state.node_cost_microunits.insert(step.node_id.0, cost);
                     }
                     let cache_tag = if *cached { " (cached)" } else { "" };
                     self.output.push_line(&format!("✓ {node_label}{cache_tag} [{}]", step.input_hash));
@@ -3993,6 +4021,9 @@ mod tests {
 
         outputs.insert(metadata_port, Value::from_json(serde_json::json!({"usage": {}})));
         assert_eq!(node_usage_tokens(&workflow, node_id, &outputs), None);
+
+        outputs.insert(metadata_port, Value::from_json(serde_json::json!({"usage": {"total_cost_microunits": 567}})));
+        assert_eq!(node_usage_cost(&workflow, node_id, &outputs), Some(567));
     }
 
     #[test]

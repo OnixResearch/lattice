@@ -146,6 +146,7 @@ pub fn render_rows(
     started: &HashMap<u64, std::time::Instant>,
     durations_millis: &HashMap<u64, u64>,
     tokens: &HashMap<u64, u64>,
+    costs_microunits: &HashMap<u64, u64>,
     attempts: &HashMap<u64, u32>,
     outputs: &[RunOutputLine],
     selected: &BTreeSet<NodeId>,
@@ -156,8 +157,8 @@ pub fn render_rows(
     let mut lines = Vec::with_capacity(layout.rows.len().saturating_add(2));
     lines.push(Line::styled(
         format!(
-            "  #  LN  {:<20} {:<10} {:<9} {:<8} {:<7} {:<3} OUTPUT",
-            "NODE", "KIND", "STATUS", "TIME", "TOKENS", "ATT"
+            "  #  LN  {:<20} {:<10} {:<9} {:<8} {:<7} {:<9} {:<3} OUTPUT",
+            "NODE", "KIND", "STATUS", "TIME", "TOKENS", "COST", "ATT"
         ),
         Style::default().fg(Color::DarkGray),
     ));
@@ -177,18 +178,20 @@ pub fn render_rows(
         let status = status_text(statuses.get(&row.node_id.0).copied());
         let duration = duration_text(durations_millis.get(&row.node_id.0), started.get(&row.node_id.0));
         let tokens = tokens_text(tokens.get(&row.node_id.0));
+        let cost = cost_text(costs_microunits.get(&row.node_id.0));
         let attempts = attempts_text(attempts.get(&row.node_id.0));
         let output = latest_node_output_records(outputs, workflow, row.node_id)
             .last()
             .map(|record| bounded_output(&record.text))
             .unwrap_or_default();
         let text = format!(
-            "{marker}{index:>3} {lane:>3}  {:<20} {:<10} {:<9} {:<8} {:<7} {:<3} {}",
+            "{marker}{index:>3} {lane:>3}  {:<20} {:<10} {:<9} {:<8} {:<7} {:<9} {:<3} {}",
             bounded_label(&row.label),
             row.kind,
             status,
             duration,
             tokens,
+            cost,
             attempts,
             output
         );
@@ -244,6 +247,10 @@ fn duration_text(finished_millis: Option<&u64>, started: Option<&std::time::Inst
 
 fn tokens_text(tokens: Option<&u64>) -> String {
     tokens.map_or_else(|| "—".to_string(), u64::to_string)
+}
+
+fn cost_text(cost_microunits: Option<&u64>) -> String {
+    cost_microunits.map_or_else(|| "—".to_string(), |cost| format!("{cost}µ"))
 }
 
 fn attempts_text(attempts: Option<&u32>) -> String {
@@ -337,7 +344,7 @@ mod tests {
             port_label: "stdout".to_string(),
             text: "bounded output".to_string(),
         }];
-        let mut buffer = Buffer::empty(Rect::new(0, 0, 120, 6));
+        let mut buffer = Buffer::empty(Rect::new(0, 0, 140, 6));
         render_rows(
             &layout,
             &workflow,
@@ -345,6 +352,7 @@ mod tests {
             &HashMap::new(),
             &HashMap::from([(node_id.0, 42_u64)]),
             &HashMap::from([(node_id.0, 1_234_u64)]),
+            &HashMap::from([(node_id.0, 567_u64)]),
             &HashMap::from([(node_id.0, 2_u32)]),
             &outputs,
             &BTreeSet::from([node_id]),
@@ -354,7 +362,7 @@ mod tests {
         );
         let rendered = buffer
             .content()
-            .chunks(120)
+            .chunks(140)
             .map(|row| row.iter().map(|cell| cell.symbol()).collect::<String>())
             .collect::<Vec<_>>()
             .join("\n");
@@ -362,6 +370,8 @@ mod tests {
         assert!(rendered.contains("completed"));
         assert!(rendered.contains("42ms"));
         assert!(rendered.contains("1234"));
+        assert!(rendered.contains("567µ"));
+        assert!(rendered.contains("COST"));
         assert!(rendered.contains("ATT"));
         assert!(rendered.contains("bounded output"));
     }
