@@ -45,9 +45,9 @@ from the actual snapshots. Crossed bindings and stale snapshots are rejected.
 
 `reconcile_candidate_attempt` reads durable records without redispatching. It
 reports `Missing` when no result or receipt exists, `Incomplete` when a produced
-result lacks its receipt, the stored records disagree, or a declared published
-artifact is absent, and `Published` when the result, receipt, and artifact paths
-agree.
+result lacks its receipt, the stored records disagree, a declared published
+artifact is absent, or only a usage observation exists, and `Published` when the
+result, receipt, and artifact paths agree.
 
 ## Non-claims
 

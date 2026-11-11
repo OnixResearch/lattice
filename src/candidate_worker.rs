@@ -190,7 +190,11 @@ pub enum CandidateRecovery {
 pub fn reconcile_candidate_attempt(store: &Store, attempt_id: &str) -> Result<CandidateRecovery, CandidateWorkerError> {
     let result = store.load_candidate_attempt_result(attempt_id)?;
     let receipt = store.load_candidate_receipt(attempt_id)?;
+    let usage = store.load_command_worker_usage(attempt_id)?;
     match (result, receipt) {
+        (None, None) if usage.is_some() => Ok(CandidateRecovery::Incomplete {
+            blocker: "usage observation exists without an attempt result".to_string(),
+        }),
         (None, None) => Ok(CandidateRecovery::Missing),
         (None, Some(_)) => Ok(CandidateRecovery::Incomplete {
             blocker: "candidate receipt exists without an attempt result".to_string(),
@@ -600,6 +604,32 @@ mod tests {
         let directory = tempfile::tempdir().expect("temporary workspace");
         let store = Store::new(directory.path().join("reconcile.redb")).expect("store opens");
         assert!(matches!(reconcile_candidate_attempt(&store, "attempt-missing"), Ok(CandidateRecovery::Missing)));
+
+        let usage = crate::orchestration::CommandWorkerUsageObservation {
+            schema: crate::orchestration::USAGE_OBSERVATION_SCHEMA.to_string(),
+            scope: crate::orchestration::UsageScope::Run,
+            workflow_revision: "revision-1".to_string(),
+            instance_id: "instance-1".to_string(),
+            dispatch_id: "dispatch-1".to_string(),
+            run_id: 7,
+            node_id: 0,
+            invocation_id: "invocation-1".to_string(),
+            worker_profile: "profile-1".to_string(),
+            attempt_id: "attempt-usage-only".to_string(),
+            agent_invocations: Some(1),
+            model_requests: None,
+            subagent_calls: None,
+            tokens: None,
+            cost_microunits: None,
+            duration_millis: Some(1),
+            provenance: crate::orchestration::UsageProvenance::HostMeasured,
+            complete: true,
+        };
+        store.save_command_worker_usage(&usage).expect("usage saves");
+        assert!(matches!(
+            reconcile_candidate_attempt(&store, "attempt-usage-only"),
+            Ok(CandidateRecovery::Incomplete { .. })
+        ));
 
         let receipt = CandidateReceipt {
             schema: crate::candidate::CANDIDATE_RECEIPT_SCHEMA.to_string(),
