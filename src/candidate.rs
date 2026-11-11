@@ -142,6 +142,38 @@ pub fn produced_receipt_from_snapshots(
     Ok(receipt)
 }
 
+/// Verify a receipt against expected attempt bindings and actual snapshots.
+pub fn verify_receipt_from_snapshots(
+    receipt: &CandidateReceipt,
+    expected_work_id: &str,
+    expected_attempt_id: &str,
+    expected_fence: &str,
+    expected_workspace_id: &str,
+    base: &BTreeMap<String, Vec<u8>>,
+    candidate: &BTreeMap<String, Vec<u8>>,
+) -> Result<(), CandidateReceiptError> {
+    receipt.validate()?;
+    if receipt.work_id != expected_work_id
+        || receipt.attempt_id != expected_attempt_id
+        || receipt.fence != expected_fence
+        || receipt.workspace_id != expected_workspace_id
+    {
+        return Err(CandidateReceiptError::BindingMismatch);
+    }
+    let expected = produced_receipt_from_snapshots(
+        expected_work_id.to_string(),
+        expected_attempt_id.to_string(),
+        expected_fence.to_string(),
+        expected_workspace_id.to_string(),
+        base,
+        candidate,
+    )?;
+    if *receipt != expected {
+        return Err(CandidateReceiptError::ReceiptMismatch);
+    }
+    Ok(())
+}
+
 fn validate_snapshot(snapshot: &BTreeMap<String, Vec<u8>>) -> Result<(), CandidateReceiptError> {
     if snapshot.len() > MAX_SNAPSHOT_FILES {
         return Err(CandidateReceiptError::SnapshotTooLarge);
@@ -261,6 +293,10 @@ pub enum CandidateReceiptError {
     NoCandidateChanges,
     #[error("candidate receipt JSON is malformed or does not match the schema")]
     InvalidJson,
+    #[error("candidate receipt does not match the expected attempt bindings")]
+    BindingMismatch,
+    #[error("candidate receipt does not match the actual workspace snapshots")]
+    ReceiptMismatch,
 }
 
 #[cfg(test)]
@@ -389,6 +425,28 @@ mod tests {
         assert_eq!(
             produced_receipt_from_snapshots("work-1", "attempt-1", "7", "workspace-1", &base, &invalid),
             Err(CandidateReceiptError::InvalidChangedPath)
+        );
+    }
+
+    #[test]
+    fn independent_verification_rejects_crossed_or_stale_receipts() {
+        let base = BTreeMap::from([("src/lib.rs".to_string(), b"old".to_vec())]);
+        let candidate = BTreeMap::from([("src/lib.rs".to_string(), b"new".to_vec())]);
+        let receipt = produced_receipt_from_snapshots("work-1", "attempt-1", "7", "workspace-1", &base, &candidate)
+            .expect("receipt derives");
+
+        assert_eq!(
+            verify_receipt_from_snapshots(&receipt, "work-1", "attempt-1", "7", "workspace-1", &base, &candidate),
+            Ok(())
+        );
+        assert_eq!(
+            verify_receipt_from_snapshots(&receipt, "work-1", "attempt-2", "7", "workspace-1", &base, &candidate),
+            Err(CandidateReceiptError::BindingMismatch)
+        );
+        let changed = BTreeMap::from([("src/lib.rs".to_string(), b"different".to_vec())]);
+        assert_eq!(
+            verify_receipt_from_snapshots(&receipt, "work-1", "attempt-1", "7", "workspace-1", &base, &changed),
+            Err(CandidateReceiptError::ReceiptMismatch)
         );
     }
 }
