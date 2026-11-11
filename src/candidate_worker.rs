@@ -369,6 +369,27 @@ mod tests {
     }
 
     #[test]
+    fn invalid_limits_are_blocked_before_execution() {
+        let directory = tempfile::tempdir().expect("temporary workspace");
+        let root = directory.path();
+        std::fs::create_dir_all(root.join("src")).expect("source directory");
+        std::fs::write(root.join("src/main.rs"), b"old").expect("source");
+
+        let mut no_deadline = request(root, "printf new > src/main.rs");
+        no_deadline.timeout_secs = 0;
+        let outcome = run_candidate_worker(&no_deadline, &RuntimeConfig::default(), &AtomicBool::new(false))
+            .expect("worker runs");
+        assert!(matches!(outcome, CandidateWorkerOutcome::Blocked { .. }));
+
+        let mut no_output = request(root, "printf new > src/main.rs");
+        no_output.output_limit_bytes = 0;
+        let outcome =
+            run_candidate_worker(&no_output, &RuntimeConfig::default(), &AtomicBool::new(false)).expect("worker runs");
+        assert!(matches!(outcome, CandidateWorkerOutcome::Blocked { .. }));
+        assert_eq!(std::fs::read(root.join("src/main.rs")).expect("source remains"), b"old");
+    }
+
+    #[test]
     fn worker_environment_is_clear() {
         let directory = tempfile::tempdir().expect("temporary workspace");
         let root = directory.path();
