@@ -14,7 +14,9 @@ A `CandidateWorkerRequest` binds:
 - the executable, arguments, positive deadline, and output limit.
 
 The worker runs with a clear environment and the admitted workspace root as its
-current directory. It does not inherit host environment values.
+current directory. It does not inherit host environment values. A boundary that
+requests credentials is refused before execution; the worker has no credential
+provider or publisher authority.
 
 ## Result
 
