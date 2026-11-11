@@ -2,8 +2,10 @@
 //!
 //! The worker is an imperative shell. It captures the admitted workspace before
 //! and after a clear-environment bounded process and derives the candidate
-//! receipt from the actual file maps. It does not provide OS isolation or
-//! publication authority.
+//! receipt from the actual file maps. When isolation is required, a configured
+//! bubblewrap executable constructs a private root with only admitted workspace
+//! paths, system read-only bases, a private network unless admitted, and no host
+//! credentials. It does not provide publication authority.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -38,6 +40,8 @@ pub struct CandidateWorkerRequest {
     pub args: Vec<String>,
     pub boundary: WorkspaceBoundary,
     pub require_isolation: bool,
+    /// Reviewed bubblewrap executable used when isolation is required.
+    pub sandbox_program: Option<String>,
     pub timeout_secs: u64,
     pub output_limit_bytes: usize,
 }
@@ -82,11 +86,6 @@ pub fn run_candidate_worker(
             blocker: "candidate worker does not admit credential-bearing workspaces".to_string(),
         });
     }
-    if request.require_isolation {
-        return Ok(CandidateWorkerOutcome::Blocked {
-            blocker: "no qualified workspace isolation provider is admitted".to_string(),
-        });
-    }
     let root = request.boundary.root.as_path();
     if !root.is_dir() {
         return Ok(CandidateWorkerOutcome::Blocked {
@@ -95,9 +94,17 @@ pub fn run_candidate_worker(
     }
     let cwd = root.to_str().ok_or(CandidateWorkerError::NonUtf8Root)?.to_string();
     let base = capture_workspace(root)?;
+    let (program, args) = if request.require_isolation {
+        match sandbox_command(request) {
+            Ok(command) => command,
+            Err(blocker) => return Ok(CandidateWorkerOutcome::Blocked { blocker }),
+        }
+    } else {
+        (request.program.clone(), request.args.clone())
+    };
     let process = ProcessRequest {
-        program: request.program.clone(),
-        args: request.args.clone(),
+        program,
+        args,
         cwd: Some(cwd),
         env: BTreeMap::new(),
         stdin: Vec::new(),
@@ -221,6 +228,125 @@ pub fn reconcile_candidate_attempt(store: &Store, attempt_id: &str) -> Result<Ca
         }
         (Some(result), _) => Ok(CandidateRecovery::Published(Box::new(result))),
     }
+}
+
+fn sandbox_command(request: &CandidateWorkerRequest) -> Result<(String, Vec<String>), String> {
+    let Some(sandbox) = request.sandbox_program.as_ref() else {
+        return Err("no reviewed workspace isolation provider is configured".to_string());
+    };
+    let sandbox =
+        std::fs::canonicalize(sandbox).map_err(|_| "configured sandbox provider is unavailable".to_string())?;
+    if !sandbox.is_file() {
+        return Err("configured sandbox provider is not a file".to_string());
+    }
+    let root =
+        std::fs::canonicalize(&request.boundary.root).map_err(|_| "workspace root is unavailable".to_string())?;
+    let program = sandbox_worker_program(&request.program, &root, &request.boundary)?;
+    let mut args = vec![
+        "--unshare-user".to_string(),
+        "--unshare-pid".to_string(),
+        "--unshare-ipc".to_string(),
+        "--unshare-uts".to_string(),
+        "--unshare-cgroup".to_string(),
+        "--die-with-parent".to_string(),
+        "--new-session".to_string(),
+        "--cap-drop".to_string(),
+        "ALL".to_string(),
+        "--clearenv".to_string(),
+        "--setenv".to_string(),
+        "PATH".to_string(),
+        "/usr/bin:/bin".to_string(),
+    ];
+    if !request.boundary.network {
+        args.push("--unshare-net".to_string());
+    }
+    for base in ["/nix/store", "/usr", "/bin", "/lib", "/lib64"] {
+        if std::path::Path::new(base).exists() {
+            args.extend(["--ro-bind".to_string(), base.to_string(), base.to_string()]);
+        }
+    }
+    if std::path::Path::new("/run/current-system/sw/bin").exists() {
+        args.extend([
+            "--ro-bind".to_string(),
+            "/run/current-system/sw/bin".to_string(),
+            "/usr/bin".to_string(),
+        ]);
+    }
+    args.extend([
+        "--proc".to_string(),
+        "/proc".to_string(),
+        "--dev".to_string(),
+        "/dev".to_string(),
+        "--dir".to_string(),
+        "/workspace".to_string(),
+        "--chdir".to_string(),
+        "/workspace".to_string(),
+    ]);
+    for read in &request.boundary.read_paths {
+        if request
+            .boundary
+            .write_paths
+            .iter()
+            .any(|write| write == read || read.starts_with(&format!("{write}/")))
+        {
+            continue;
+        }
+        let source = root.join(read);
+        if !source.exists() {
+            continue;
+        }
+        args.push("--ro-bind".to_string());
+        args.push(path_text(&source)?);
+        args.push(format!("/workspace/{read}"));
+    }
+    for write in &request.boundary.write_paths {
+        let source = root.join(write);
+        if !source.exists() {
+            return Err("isolated workspace write paths must already exist".to_string());
+        }
+        args.push("--bind".to_string());
+        args.push(path_text(&source)?);
+        args.push(format!("/workspace/{write}"));
+    }
+    args.push("--".to_string());
+    args.push(program);
+    args.extend(request.args.iter().cloned());
+    Ok((path_text(&sandbox)?, args))
+}
+
+fn sandbox_worker_program(program: &str, root: &Path, boundary: &WorkspaceBoundary) -> Result<String, String> {
+    let requested = std::path::Path::new(program);
+    let path = if requested.is_absolute() {
+        requested.to_path_buf()
+    } else if requested.components().count() > 1 {
+        root.join(requested)
+    } else {
+        which::which(program).map_err(|_| "worker program is unavailable".to_string())?
+    };
+    let canonical = std::fs::canonicalize(path).map_err(|_| "worker program is unavailable".to_string())?;
+    if !canonical.is_file() {
+        return Err("worker program is unavailable".to_string());
+    }
+    if let Ok(relative) = canonical.strip_prefix(root) {
+        let relative = relative.to_str().ok_or_else(|| "worker program path is not UTF-8".to_string())?;
+        if !boundary
+            .read_paths
+            .iter()
+            .chain(boundary.write_paths.iter())
+            .any(|admitted| relative == admitted || relative.starts_with(&format!("{admitted}/")))
+        {
+            return Err("worker program is outside the admitted workspace paths".to_string());
+        }
+        return Ok(format!("/workspace/{relative}"));
+    }
+    if ["/nix/store", "/usr", "/bin", "/lib", "/lib64"].iter().any(|base| canonical.starts_with(base)) {
+        return path_text(&canonical);
+    }
+    Err("worker program is outside the sandbox".to_string())
+}
+
+fn path_text(path: &Path) -> Result<String, String> {
+    path.to_str().map(str::to_string).ok_or_else(|| "workspace path is not UTF-8".to_string())
 }
 
 fn finish_from_process_output(
@@ -460,6 +586,7 @@ mod tests {
             args: vec!["-c".to_string(), command.to_string()],
             boundary: boundary(root),
             require_isolation: false,
+            sandbox_program: None,
             timeout_secs: 5,
             output_limit_bytes: 4_096,
         }
@@ -498,6 +625,29 @@ mod tests {
             .expect("worker runs");
 
         assert!(matches!(outcome, CandidateWorkerOutcome::Failed { .. }));
+    }
+
+    #[test]
+    fn bubblewrap_isolation_confines_workspace_and_hides_host_paths() {
+        let Ok(sandbox) = std::env::var("LATTICE_BWRAP") else {
+            return;
+        };
+        let directory = tempfile::tempdir().expect("temporary workspace");
+        let root = directory.path();
+        std::fs::create_dir_all(root.join("src")).expect("source directory");
+        std::fs::write(root.join("src/main.rs"), b"old").expect("base source");
+        let mut isolated = request(root, "if [ -e /etc/passwd ]; then exit 7; fi; printf new > src/main.rs");
+        isolated.require_isolation = true;
+        isolated.sandbox_program = Some(sandbox);
+
+        let outcome =
+            run_candidate_worker(&isolated, &RuntimeConfig::default(), &AtomicBool::new(false)).expect("worker runs");
+
+        let CandidateWorkerOutcome::Produced { receipt, .. } = outcome else {
+            panic!("expected isolated candidate, got {outcome:?}");
+        };
+        assert_eq!(receipt.changed_paths, vec!["src/main.rs"]);
+        assert_eq!(std::fs::read(root.join("src/main.rs")).expect("candidate"), b"new");
     }
 
     #[test]
