@@ -244,12 +244,10 @@ fn sandbox_command(request: &CandidateWorkerRequest) -> Result<(String, Vec<Stri
     let program = sandbox_worker_program(&request.program, &root, &request.boundary)?;
     let mut args = vec![
         "--unshare-user".to_string(),
-        "--unshare-pid".to_string(),
         "--unshare-ipc".to_string(),
         "--unshare-uts".to_string(),
         "--unshare-cgroup".to_string(),
         "--die-with-parent".to_string(),
-        "--new-session".to_string(),
         "--cap-drop".to_string(),
         "ALL".to_string(),
         "--clearenv".to_string(),
@@ -273,8 +271,6 @@ fn sandbox_command(request: &CandidateWorkerRequest) -> Result<(String, Vec<Stri
         ]);
     }
     args.extend([
-        "--proc".to_string(),
-        "/proc".to_string(),
         "--dev".to_string(),
         "/dev".to_string(),
         "--dir".to_string(),
@@ -648,6 +644,36 @@ mod tests {
         };
         assert_eq!(receipt.changed_paths, vec!["src/main.rs"]);
         assert_eq!(std::fs::read(root.join("src/main.rs")).expect("candidate"), b"new");
+    }
+
+    #[test]
+    fn bubblewrap_isolation_propagates_cancellation() {
+        use std::sync::atomic::Ordering;
+
+        let Ok(sandbox) = std::env::var("LATTICE_BWRAP") else {
+            return;
+        };
+        let directory = tempfile::tempdir().expect("temporary workspace");
+        let root = directory.path();
+        std::fs::create_dir_all(root.join("src")).expect("source directory");
+        std::fs::write(root.join("src/main.rs"), b"old").expect("base source");
+        let mut isolated = request(root, "sleep 1; printf leaked > src/leak");
+        isolated.require_isolation = true;
+        isolated.sandbox_program = Some(sandbox);
+        let signal = std::sync::Arc::new(AtomicBool::new(false));
+        let canceller = {
+            let signal = std::sync::Arc::clone(&signal);
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+                signal.store(true, Ordering::Release);
+            })
+        };
+
+        let outcome = run_candidate_worker(&isolated, &RuntimeConfig::default(), signal.as_ref()).expect("worker runs");
+        canceller.join().expect("canceller joins");
+
+        assert!(matches!(outcome, CandidateWorkerOutcome::Cancelled), "{outcome:?}");
+        assert!(!root.join("src/leak").exists());
     }
 
     #[test]
