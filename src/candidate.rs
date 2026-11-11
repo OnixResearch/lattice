@@ -4,11 +4,15 @@
 //! worker execution, diff capture, and independent verification remain shell
 //! responsibilities.
 
+use std::collections::BTreeMap;
+
 use thiserror::Error;
 
 pub const CANDIDATE_RECEIPT_SCHEMA: &str = "lattice.candidate-receipt.v1";
 pub const MAX_IDENTIFIER_BYTES: usize = 256;
 pub const MAX_CHANGED_PATHS: usize = 4_096;
+pub const MAX_SNAPSHOT_FILES: usize = 50_000;
+pub const MAX_SNAPSHOT_BYTES: usize = 512 * 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CandidateDisposition {
@@ -82,6 +86,106 @@ impl CandidateReceipt {
     }
 }
 
+/// Derive a produced receipt from host-captured base and candidate file maps.
+///
+/// The maps are the shell's actual workspace snapshot; worker-reported hashes
+/// are not accepted here. Paths must already be relative and canonical.
+pub fn produced_receipt_from_snapshots(
+    work_id: impl Into<String>,
+    attempt_id: impl Into<String>,
+    fence: impl Into<String>,
+    workspace_id: impl Into<String>,
+    base: &BTreeMap<String, Vec<u8>>,
+    candidate: &BTreeMap<String, Vec<u8>>,
+) -> Result<CandidateReceipt, CandidateReceiptError> {
+    validate_snapshot(base)?;
+    validate_snapshot(candidate)?;
+    let changed_paths = base
+        .keys()
+        .chain(candidate.keys())
+        .filter(|path| base.get(*path) != candidate.get(*path))
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    if changed_paths.is_empty() {
+        return Err(CandidateReceiptError::NoCandidateChanges);
+    }
+    let receipt = CandidateReceipt {
+        schema: CANDIDATE_RECEIPT_SCHEMA.to_string(),
+        work_id: work_id.into(),
+        attempt_id: attempt_id.into(),
+        fence: fence.into(),
+        workspace_id: workspace_id.into(),
+        base_identity: tree_identity(base),
+        candidate_identity: Some(tree_identity(candidate)),
+        diff_identity: Some(diff_identity(base, candidate, &changed_paths)),
+        changed_paths,
+        disposition: CandidateDisposition::Produced,
+        blockers: Vec::new(),
+    };
+    receipt.validate()?;
+    Ok(receipt)
+}
+
+fn validate_snapshot(snapshot: &BTreeMap<String, Vec<u8>>) -> Result<(), CandidateReceiptError> {
+    if snapshot.len() > MAX_SNAPSHOT_FILES {
+        return Err(CandidateReceiptError::SnapshotTooLarge);
+    }
+    let mut total = 0usize;
+    for (path, bytes) in snapshot {
+        validate_changed_paths(std::slice::from_ref(path))?;
+        total = total.checked_add(bytes.len()).ok_or(CandidateReceiptError::SnapshotTooLarge)?;
+    }
+    if total > MAX_SNAPSHOT_BYTES {
+        return Err(CandidateReceiptError::SnapshotTooLarge);
+    }
+    Ok(())
+}
+
+fn tree_identity(snapshot: &BTreeMap<String, Vec<u8>>) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"lattice-candidate-tree-v1");
+    update_len(&mut hasher, snapshot.len());
+    for (path, bytes) in snapshot {
+        update_len(&mut hasher, path.len());
+        hasher.update(path.as_bytes());
+        update_len(&mut hasher, bytes.len());
+        hasher.update(blake3::hash(bytes).as_bytes());
+    }
+    hasher.finalize().to_hex().to_string()
+}
+
+fn diff_identity(base: &BTreeMap<String, Vec<u8>>, candidate: &BTreeMap<String, Vec<u8>>, paths: &[String]) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"lattice-candidate-diff-v1");
+    update_len(&mut hasher, paths.len());
+    for path in paths {
+        update_len(&mut hasher, path.len());
+        hasher.update(path.as_bytes());
+        update_optional_bytes(&mut hasher, base.get(path).map(Vec::as_slice));
+        update_optional_bytes(&mut hasher, candidate.get(path).map(Vec::as_slice));
+    }
+    hasher.finalize().to_hex().to_string()
+}
+
+fn update_optional_bytes(hasher: &mut blake3::Hasher, bytes: Option<&[u8]>) {
+    match bytes {
+        Some(bytes) => {
+            hasher.update(b"present");
+            update_len(hasher, bytes.len());
+            hasher.update(blake3::hash(bytes).as_bytes());
+        }
+        None => {
+            hasher.update(b"absent");
+        }
+    }
+}
+
+fn update_len(hasher: &mut blake3::Hasher, len: usize) {
+    hasher.update(&(len as u64).to_le_bytes());
+}
+
 fn validate_identifier(value: &str) -> Result<(), CandidateReceiptError> {
     if value.is_empty() || value.len() > MAX_IDENTIFIER_BYTES || value.chars().any(char::is_control) {
         return Err(CandidateReceiptError::InvalidIdentifier);
@@ -137,6 +241,10 @@ pub enum CandidateReceiptError {
     ChangedPathsNotCanonical,
     #[error("candidate changed paths exceed the admitted count")]
     TooManyChangedPaths,
+    #[error("candidate snapshot exceeds the admitted file or byte count")]
+    SnapshotTooLarge,
+    #[error("candidate snapshot contains no changed path")]
+    NoCandidateChanges,
 }
 
 #[cfg(test)]
@@ -216,5 +324,43 @@ mod tests {
         unknown.changed_paths.clear();
         assert_eq!(unknown.validate(), Ok(()));
         assert!(!unknown.is_usable_candidate());
+    }
+
+    #[test]
+    fn snapshot_receipt_captures_changed_added_and_deleted_paths() {
+        let base = BTreeMap::from([
+            ("src/lib.rs".to_string(), b"old".to_vec()),
+            ("src/removed.rs".to_string(), b"gone".to_vec()),
+        ]);
+        let candidate = BTreeMap::from([
+            ("src/lib.rs".to_string(), b"new".to_vec()),
+            ("src/added.rs".to_string(), b"added".to_vec()),
+        ]);
+        let receipt = produced_receipt_from_snapshots("work-1", "attempt-1", "7", "workspace-1", &base, &candidate)
+            .expect("snapshot receipt derives");
+
+        assert_eq!(receipt.changed_paths, vec!["src/added.rs", "src/lib.rs", "src/removed.rs"]);
+        assert_eq!(receipt.disposition, CandidateDisposition::Produced);
+        assert!(receipt.validate().is_ok());
+        assert!(receipt.is_usable_candidate());
+
+        let repeated = produced_receipt_from_snapshots("work-1", "attempt-1", "7", "workspace-1", &base, &candidate)
+            .expect("snapshot receipt repeats");
+        assert_eq!(receipt, repeated);
+    }
+
+    #[test]
+    fn snapshot_receipt_rejects_no_change_and_invalid_paths() {
+        let base = BTreeMap::from([("src/lib.rs".to_string(), b"same".to_vec())]);
+        assert_eq!(
+            produced_receipt_from_snapshots("work-1", "attempt-1", "7", "workspace-1", &base, &base),
+            Err(CandidateReceiptError::NoCandidateChanges)
+        );
+
+        let invalid = BTreeMap::from([("../escape.rs".to_string(), b"x".to_vec())]);
+        assert_eq!(
+            produced_receipt_from_snapshots("work-1", "attempt-1", "7", "workspace-1", &base, &invalid),
+            Err(CandidateReceiptError::InvalidChangedPath)
+        );
     }
 }
