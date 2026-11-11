@@ -137,6 +137,7 @@ pub mod guarded;
 pub mod headless;
 pub mod http;
 pub mod image_node;
+pub mod implementation_attempt;
 pub mod n8n_json;
 pub mod nickel;
 pub mod node_kind_provider;
