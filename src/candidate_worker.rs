@@ -641,6 +641,41 @@ mod tests {
     }
 
     #[test]
+    fn attempt_result_rejects_invalid_artifact_paths() {
+        let receipt = CandidateReceipt {
+            schema: crate::candidate::CANDIDATE_RECEIPT_SCHEMA.to_string(),
+            work_id: "work-1".to_string(),
+            attempt_id: "attempt-1".to_string(),
+            fence: "7".to_string(),
+            workspace_id: "workspace-1".to_string(),
+            base_identity: "a".repeat(64),
+            candidate_identity: Some("b".repeat(64)),
+            diff_identity: Some("c".repeat(64)),
+            changed_paths: vec!["src/main.rs".to_string()],
+            disposition: CandidateDisposition::Produced,
+            blockers: Vec::new(),
+        };
+        let mut result = CandidateAttemptResult::from_outcome(&CandidateWorkerOutcome::Produced {
+            receipt: Box::new(receipt),
+            changed_files: BTreeMap::from([("src/main.rs".to_string(), b"main".to_vec())]),
+            stdout: Vec::new(),
+            stderr: Vec::new(),
+        });
+
+        result.published_artifacts = vec!["src/other.rs".to_string()];
+        assert!(result.validate().is_err());
+
+        result.published_artifacts = vec!["src/main.rs".to_string(), "src/main.rs".to_string()];
+        assert!(result.validate().is_err());
+
+        let mut blocked = CandidateAttemptResult::from_outcome(&CandidateWorkerOutcome::Blocked {
+            blocker: "blocked".to_string(),
+        });
+        blocked.published_artifacts = vec!["src/main.rs".to_string()];
+        assert!(blocked.validate().is_err());
+    }
+
+    #[test]
     fn invalid_limits_are_blocked_before_execution() {
         let directory = tempfile::tempdir().expect("temporary workspace");
         let root = directory.path();
