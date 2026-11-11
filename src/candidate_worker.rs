@@ -310,4 +310,22 @@ mod tests {
         std::fs::set_permissions(root.join("src/main.rs"), std::fs::Permissions::from_mode(0o644))
             .expect("restore source");
     }
+
+    #[test]
+    fn worker_environment_is_clear() {
+        let directory = tempfile::tempdir().expect("temporary workspace");
+        let root = directory.path();
+        std::fs::create_dir_all(root.join("src")).expect("source directory");
+        std::fs::write(root.join("src/main.rs"), b"same").expect("source");
+
+        let outcome = run_candidate_worker(
+            &request(root, "printf %s \"$HOME\" > src/home"),
+            &RuntimeConfig::default(),
+            &AtomicBool::new(false),
+        )
+        .expect("worker runs");
+
+        assert!(matches!(outcome, CandidateWorkerOutcome::Produced { .. }), "{outcome:?}");
+        assert_eq!(std::fs::read(root.join("src/home")).expect("environment probe"), b"");
+    }
 }
