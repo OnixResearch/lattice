@@ -270,6 +270,13 @@ fn finish_from_process_output(
             });
         }
     };
+    if !receipt.changed_paths.iter().all(|path| within_write_paths(path, &request.boundary.write_paths)) {
+        return Ok(CandidateWorkerOutcome::Failed {
+            blocker: "worker changed a path outside its admitted write boundary".to_string(),
+            stdout: output.stdout,
+            stderr: output.stderr,
+        });
+    }
     let changed_files = receipt
         .changed_paths
         .iter()
@@ -281,6 +288,10 @@ fn finish_from_process_output(
         stdout: output.stdout,
         stderr: output.stderr,
     })
+}
+
+fn within_write_paths(path: &str, write_paths: &[String]) -> bool {
+    write_paths.iter().any(|write| path == write || path.starts_with(&format!("{write}/")))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -487,6 +498,27 @@ mod tests {
             .expect("worker runs");
 
         assert!(matches!(outcome, CandidateWorkerOutcome::Failed { .. }));
+    }
+
+    #[test]
+    fn changes_outside_the_admitted_write_boundary_are_rejected() {
+        let directory = tempfile::tempdir().expect("temporary workspace");
+        let root = directory.path();
+        std::fs::create_dir_all(root.join("src")).expect("source directory");
+        std::fs::write(root.join("src/main.rs"), b"same").expect("source");
+
+        let outcome = run_candidate_worker(
+            &request(root, "printf changed > README.md"),
+            &RuntimeConfig::default(),
+            &AtomicBool::new(false),
+        )
+        .expect("worker runs");
+
+        assert!(matches!(
+            outcome,
+            CandidateWorkerOutcome::Failed { ref blocker, .. }
+                if blocker == "worker changed a path outside its admitted write boundary"
+        ));
     }
 
     #[test]
