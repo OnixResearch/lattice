@@ -125,6 +125,14 @@ pub fn run_and_publish_candidate_worker(
     store: &Store,
 ) -> Result<CandidateWorkerOutcome, CandidateWorkerError> {
     let outcome = run_candidate_worker(request, config, cancellation)?;
+    let result = crate::candidate_worker::CandidateAttemptResult::from_outcome(&outcome);
+    if let Err(error) = store.save_candidate_attempt_result(&request.attempt_id, &result) {
+        return Ok(CandidateWorkerOutcome::Unknown {
+            blocker: format!("candidate result publication failed: {error}"),
+            stdout: Vec::new(),
+            stderr: Vec::new(),
+        });
+    }
     let (receipt, changed_files, stdout, stderr) = match outcome {
         CandidateWorkerOutcome::Produced {
             receipt,
@@ -471,6 +479,8 @@ mod tests {
             Some(b"new".to_vec())
         );
         assert_eq!(store.list_candidate_artifacts("attempt-1").expect("artifacts list").len(), 1);
+        let result = store.load_candidate_attempt_result("attempt-1").expect("result loads").expect("result exists");
+        assert_eq!(result.disposition, CandidateDisposition::Produced);
     }
 
     #[test]

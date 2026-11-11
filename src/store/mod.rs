@@ -72,6 +72,7 @@ const WORKFLOW_EXCHANGE_REQUEST_INDEX: TableDefinition<&str, &str> =
 const CANDIDATE_RECEIPTS: TableDefinition<&str, &[u8]> = TableDefinition::new("candidate_receipts_v1");
 const CANDIDATE_ARTIFACTS: TableDefinition<&str, &[u8]> = TableDefinition::new("candidate_artifacts_v1");
 const COMMAND_WORKER_USAGE: TableDefinition<&str, &[u8]> = TableDefinition::new("command_worker_usage_v1");
+const CANDIDATE_ATTEMPT_RESULTS: TableDefinition<&str, &[u8]> = TableDefinition::new("candidate_attempt_results_v1");
 const WORKFLOW_EXCHANGE_IDEMPOTENCY_INDEX: TableDefinition<&str, &str> =
     TableDefinition::new("workflow_exchange_idempotency_index_v1");
 const ORCHESTRATION_INSTANCE_COUNTER_KEY: &str = "instance_sequence";
@@ -345,6 +346,7 @@ impl Store {
             let _ = txn.open_table(CANDIDATE_RECEIPTS).map_err(|error| StoreError::Table(error.to_string()))?;
             let _ = txn.open_table(CANDIDATE_ARTIFACTS).map_err(|error| StoreError::Table(error.to_string()))?;
             let _ = txn.open_table(COMMAND_WORKER_USAGE).map_err(|error| StoreError::Table(error.to_string()))?;
+            let _ = txn.open_table(CANDIDATE_ATTEMPT_RESULTS).map_err(|error| StoreError::Table(error.to_string()))?;
             ensure_operation_data_tables(&txn)?;
             quarantine::fence_pending(&txn)?;
         }
@@ -524,6 +526,58 @@ impl Store {
                 let observation = crate::orchestration::CommandWorkerUsageObservation::from_json(text)
                     .map_err(|error| StoreError::Deserialize(error.to_string()))?;
                 Ok(Some(observation))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Persist one validated candidate attempt result by attempt identity.
+    pub fn save_candidate_attempt_result(
+        &self,
+        attempt_id: &str,
+        result: &crate::candidate_worker::CandidateAttemptResult,
+    ) -> Result<(), StoreError> {
+        self.ensure_not_quarantined()?;
+        if attempt_id.is_empty() || attempt_id.chars().any(char::is_control) {
+            return Err(StoreError::Serialize("candidate attempt identity is invalid".to_string()));
+        }
+        let data = result.to_json().map_err(|error| StoreError::Serialize(error.to_string()))?;
+        let txn = self.db.begin_write().map_err(|error| StoreError::Db(error.to_string()))?;
+        {
+            let mut table =
+                txn.open_table(CANDIDATE_ATTEMPT_RESULTS).map_err(|error| StoreError::Table(error.to_string()))?;
+            if let Some(existing) = table.get(attempt_id).map_err(|error| StoreError::Db(error.to_string()))? {
+                let text = std::str::from_utf8(existing.value())
+                    .map_err(|error| StoreError::Deserialize(error.to_string()))?;
+                let existing = crate::candidate_worker::CandidateAttemptResult::from_json(text)
+                    .map_err(|error| StoreError::Deserialize(error.to_string()))?;
+                if existing != *result {
+                    return Err(StoreError::Conflict(
+                        "candidate attempt result already exists with different content".to_string(),
+                    ));
+                }
+                return Ok(());
+            }
+            table.insert(attempt_id, data.as_bytes()).map_err(|error| StoreError::Db(error.to_string()))?;
+        }
+        txn.commit().map_err(|error| StoreError::Db(error.to_string()))?;
+        Ok(())
+    }
+
+    /// Load and revalidate one candidate attempt result.
+    pub fn load_candidate_attempt_result(
+        &self,
+        attempt_id: &str,
+    ) -> Result<Option<crate::candidate_worker::CandidateAttemptResult>, StoreError> {
+        let txn = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
+        let table = txn.open_table(CANDIDATE_ATTEMPT_RESULTS).map_err(|error| StoreError::Table(error.to_string()))?;
+        match table.get(attempt_id).map_err(|error| StoreError::Db(error.to_string()))? {
+            Some(data) => {
+                let text =
+                    std::str::from_utf8(data.value()).map_err(|error| StoreError::Deserialize(error.to_string()))?;
+                let result = crate::candidate_worker::CandidateAttemptResult::from_json(text)
+                    .map_err(|error| StoreError::Deserialize(error.to_string()))?;
+                Ok(Some(result))
             }
             None => Ok(None),
         }
