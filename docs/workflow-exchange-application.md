@@ -111,7 +111,7 @@ Historical compiler failures remain in `evidence/verification.json`; no consumer
 relabeling, contract-import refresh, publication, lifecycle acceptance or
 production activation follows from this local qualification.
 
-Pause and resume fail closed. The current headless runtime cannot pause an active external effect safely.
+Pause and resume fail closed. The current headless runtime cannot pause an active external effect safely. A handler profile that advertises `pause` or `resume` is rejected before the socket is served; a cancel-only profile, including one that omits the optional `controls` block, remains valid.
 
 A non-terminal record without a live worker in the current service process becomes `Unknown`. Observation and reconciliation do not infer success or failure, and they do not redispatch.
 

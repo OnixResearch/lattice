@@ -144,6 +144,7 @@ pub(super) fn fixture(
         socket_path: std::path::PathBuf::from(TEST_SOCKET),
         transport: transport_profile(),
         maximum_active_executions: TEST_ACTIVE_EXECUTIONS,
+        controls: super::HandlerControls::default(),
         routes: vec![super::WorkflowRoute {
             profile_identity: request.profile_identity.clone(),
             graph_identity: request.graph.identity.clone(),
@@ -197,6 +198,28 @@ fn handler_profile_and_exact_route_reject_revision_drift() {
         super::validate_route(&profile.routes[0], &request, &facts),
         Err(super::RouteError::WorkflowRevision)
     );
+}
+
+// r[verify lattice.workflow_interchange.application_profile]
+// r[verify lattice.workflow_interchange.application_profile.scenario.admitted]
+#[test]
+fn handler_profile_rejects_advertised_pause_or_resume() {
+    let (_directory, _store, _workflow, _contract, _request, mut profile) = fixture(TEST_COMMAND);
+    profile.controls.pause = true;
+    assert_eq!(super::validate_handler_profile(&profile), Err(super::ProfileError::Controls));
+    profile.controls.pause = false;
+    profile.controls.resume = true;
+    assert_eq!(super::validate_handler_profile(&profile), Err(super::ProfileError::Controls));
+    profile.controls.resume = false;
+    assert_eq!(super::validate_handler_profile(&profile), Ok(()));
+}
+
+#[test]
+fn serving_rejects_a_profile_that_advertises_pause() {
+    let (_directory, store, _workflow, _contract, _request, mut profile) = fixture(TEST_COMMAND);
+    profile.controls.pause = true;
+    let result = super::ApplicationHandler::new(store, profile, crate::agent_node::AgentRuntimeConfig::default());
+    assert!(matches!(result, Err(super::ApplicationError::Profile)));
 }
 
 // r[verify lattice.workflow_interchange.source_binding]

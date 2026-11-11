@@ -66,6 +66,31 @@ pub struct WorkflowRoute {
     pub nodes: Vec<RouteNode>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HandlerControls {
+    #[serde(default = "default_cancel_control")]
+    pub cancel: bool,
+    #[serde(default)]
+    pub pause: bool,
+    #[serde(default)]
+    pub resume: bool,
+}
+
+const fn default_cancel_control() -> bool {
+    true
+}
+
+impl Default for HandlerControls {
+    fn default() -> Self {
+        Self {
+            cancel: true,
+            pause: false,
+            resume: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct HandlerProfile {
@@ -73,6 +98,8 @@ pub struct HandlerProfile {
     pub socket_path: PathBuf,
     pub transport: TransportProfile,
     pub maximum_active_executions: u32,
+    #[serde(default)]
+    pub controls: HandlerControls,
     pub routes: Vec<WorkflowRoute>,
     pub non_claims: Vec<String>,
 }
@@ -83,6 +110,7 @@ pub enum ProfileError {
     SocketPath,
     Transport,
     ActiveLimit,
+    Controls,
     RouteLimit,
     RouteOrder,
     RouteValue,

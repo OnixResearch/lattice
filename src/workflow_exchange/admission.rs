@@ -38,6 +38,9 @@ pub fn validate_handler_profile(profile: &HandlerProfile) -> Result<(), ProfileE
     {
         return Err(ProfileError::ActiveLimit);
     }
+    if profile.controls.pause || profile.controls.resume {
+        return Err(ProfileError::Controls);
+    }
     let route_count = u32::try_from(profile.routes.len()).map_err(|_| ProfileError::RouteLimit)?;
     if route_count == 0 || route_count > MAXIMUM_ROUTES {
         return Err(ProfileError::RouteLimit);

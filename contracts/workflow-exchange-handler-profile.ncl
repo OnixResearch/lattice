@@ -81,12 +81,19 @@ let RouteList = std.contract.from_predicate (fun value =>
   && std.array.length value <= MaximumRoutes
 ) in
 
+let HandlerControls = {
+  cancel | Bool,
+  pause | std.contract.from_predicate (fun value => value == false) | optional,
+  resume | std.contract.from_predicate (fun value => value == false) | optional,
+} in
+
 {
   HandlerProfile = {
     schema | ExactSchema,
     socket_path | AbsolutePath,
     transport | Transport.TransportProfile,
     maximum_active_executions | PositiveAtMost MaximumActiveExecutions,
+    controls | HandlerControls | optional,
     routes | RouteList | Array Route,
     non_claims | RequiredNonClaims,
   },
