@@ -13,6 +13,8 @@ use lattice::engine::value::ContentHash;
 use lattice::engine::value::Value;
 use lattice::engine::workflow::PortId;
 use lattice::engine::workflow::Workflow;
+use lattice::orchestration::CommandWorkerUsageObservation;
+use lattice::orchestration::UsageProvenance;
 use lattice::store::ExecutionCache;
 use lattice::store::RunOwner;
 use lattice::store::RunRecord;
@@ -88,6 +90,36 @@ fn candidate_receipts_survive_store_reopen() {
     }
     let store = Store::new(&path).expect("store reopens");
     assert_eq!(store.load_candidate_receipt("attempt-reopen").expect("receipt loads"), Some(receipt));
+}
+
+#[test]
+fn command_worker_usage_persists_and_revalidates() {
+    let (store, _dir) = common::temp_store();
+    let observation = CommandWorkerUsageObservation {
+        schema: lattice::orchestration::USAGE_OBSERVATION_SCHEMA.to_string(),
+        workflow_revision: "revision-1".to_string(),
+        instance_id: "instance-1".to_string(),
+        dispatch_id: "dispatch-1".to_string(),
+        run_id: 7,
+        node_id: 3,
+        invocation_id: "invocation-1".to_string(),
+        worker_profile: "profile-1".to_string(),
+        attempt_id: "attempt-usage".to_string(),
+        agent_invocations: Some(1),
+        model_requests: Some(2),
+        subagent_calls: Some(1),
+        tokens: Some(1_234),
+        cost_microunits: Some(567),
+        duration_millis: Some(42),
+        provenance: UsageProvenance::ProviderReported,
+        complete: true,
+    };
+    store.save_command_worker_usage(&observation).expect("usage saves");
+    assert_eq!(store.load_command_worker_usage("attempt-usage").expect("usage loads"), Some(observation.clone()));
+
+    let mut invalid = observation;
+    invalid.provenance = UsageProvenance::Unknown;
+    assert!(store.save_command_worker_usage(&invalid).is_err());
 }
 
 #[test]

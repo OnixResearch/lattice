@@ -71,6 +71,7 @@ const WORKFLOW_EXCHANGE_REQUEST_INDEX: TableDefinition<&str, &str> =
     TableDefinition::new("workflow_exchange_request_index_v1");
 const CANDIDATE_RECEIPTS: TableDefinition<&str, &[u8]> = TableDefinition::new("candidate_receipts_v1");
 const CANDIDATE_ARTIFACTS: TableDefinition<&str, &[u8]> = TableDefinition::new("candidate_artifacts_v1");
+const COMMAND_WORKER_USAGE: TableDefinition<&str, &[u8]> = TableDefinition::new("command_worker_usage_v1");
 const WORKFLOW_EXCHANGE_IDEMPOTENCY_INDEX: TableDefinition<&str, &str> =
     TableDefinition::new("workflow_exchange_idempotency_index_v1");
 const ORCHESTRATION_INSTANCE_COUNTER_KEY: &str = "instance_sequence";
@@ -343,6 +344,7 @@ impl Store {
                 .map_err(|error| StoreError::Table(error.to_string()))?;
             let _ = txn.open_table(CANDIDATE_RECEIPTS).map_err(|error| StoreError::Table(error.to_string()))?;
             let _ = txn.open_table(CANDIDATE_ARTIFACTS).map_err(|error| StoreError::Table(error.to_string()))?;
+            let _ = txn.open_table(COMMAND_WORKER_USAGE).map_err(|error| StoreError::Table(error.to_string()))?;
             ensure_operation_data_tables(&txn)?;
             quarantine::fence_pending(&txn)?;
         }
@@ -459,6 +461,44 @@ impl Store {
             }
         }
         Ok(artifacts)
+    }
+
+    /// Persist one validated command-worker usage observation by attempt.
+    pub fn save_command_worker_usage(
+        &self,
+        observation: &crate::orchestration::CommandWorkerUsageObservation,
+    ) -> Result<(), StoreError> {
+        self.ensure_not_quarantined()?;
+        let data = observation.to_json().map_err(|error| StoreError::Serialize(error.to_string()))?;
+        let txn = self.db.begin_write().map_err(|error| StoreError::Db(error.to_string()))?;
+        {
+            let mut table =
+                txn.open_table(COMMAND_WORKER_USAGE).map_err(|error| StoreError::Table(error.to_string()))?;
+            table
+                .insert(observation.attempt_id.as_str(), data.as_bytes())
+                .map_err(|error| StoreError::Db(error.to_string()))?;
+        }
+        txn.commit().map_err(|error| StoreError::Db(error.to_string()))?;
+        Ok(())
+    }
+
+    /// Load and revalidate one command-worker usage observation.
+    pub fn load_command_worker_usage(
+        &self,
+        attempt_id: &str,
+    ) -> Result<Option<crate::orchestration::CommandWorkerUsageObservation>, StoreError> {
+        let txn = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
+        let table = txn.open_table(COMMAND_WORKER_USAGE).map_err(|error| StoreError::Table(error.to_string()))?;
+        match table.get(attempt_id).map_err(|error| StoreError::Db(error.to_string()))? {
+            Some(data) => {
+                let text =
+                    std::str::from_utf8(data.value()).map_err(|error| StoreError::Deserialize(error.to_string()))?;
+                let observation = crate::orchestration::CommandWorkerUsageObservation::from_json(text)
+                    .map_err(|error| StoreError::Deserialize(error.to_string()))?;
+                Ok(Some(observation))
+            }
+            None => Ok(None),
+        }
     }
 
     /// Load a workflow by name.
