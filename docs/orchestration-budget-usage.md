@@ -51,3 +51,23 @@ or run is rejected. A complete `run`-scoped observation whose run and dispatch
 match is used for the enforced token, duration, and cost dimensions before the
 shell falls back to run-detail aggregation. `node`-scoped observations are not
 used for whole-run settlement.
+
+## Worker and profile compatibility
+
+A worker profile that supplies observations must declare, and retain in its
+compatibility evidence:
+
+- the exact worker executable and build identity;
+- the observation protocol schema and field/unit mapping;
+- the model/provider identity used for reported tokens or cost;
+- the covered interval and whether it spans one node, one invocation, or the
+  whole run;
+- how missing, partial, estimated, and conflicting telemetry is represented.
+
+Lattice accepts only the versioned observation schema and bounded attempt/run
+bindings. Unknown fields, unsupported schemas, malformed identities, and
+observations that cannot state their units or coverage are rejected rather than
+coerced. A profile or protocol change requires a new compatibility record; a
+worker name alone does not establish compatibility. Model request and subagent
+counts are retained observations, not budget dimensions, until a separate
+dimension and policy change admits them.
