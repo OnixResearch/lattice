@@ -186,6 +186,22 @@ fn durable_llm_orchestration_binds_the_checked_in_agent_graph() {
     assert!(definition.triggers.iter().any(|binding| binding.kind == OrchestrationTriggerKind::Webhook));
 }
 
+// r[verify lattice.agent_orchestration.rounds]
+// r[verify lattice.agent_orchestration.budgets]
+#[test]
+fn durable_llm_orchestration_enforces_hard_round_and_retry_caps() {
+    let definition =
+        load_definition_nickel_file(Path::new(ORCHESTRATION_FIXTURE_PATH)).expect("orchestration fixture loads");
+
+    assert!(definition.budgets.enforced.rounds);
+    assert!(definition.budgets.enforced.agent_invocations);
+    assert_eq!(definition.budgets.limits.rounds, 3);
+    assert_eq!(definition.budgets.limits.agent_invocations, 12);
+    assert_eq!(definition.budgets.per_round_upper_bound.rounds, 1);
+    assert_eq!(definition.budgets.per_round_upper_bound.agent_invocations, 4);
+    assert_eq!(definition.retry.expect("retry policy is present").max_observed_failure_retries, 1);
+}
+
 // r[verify n8nclone.workflow_execution.llm_operating_graph.scenario.feedback-boundary]
 // r[verify n8nclone.workflow_execution.llm_operating_graph]
 #[tokio::test]

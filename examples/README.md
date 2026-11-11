@@ -29,6 +29,8 @@ They are useful for demos, import/export validation, and headless regression tes
 
 The policy defines an immutable workflow identity, operator approval, resource bounds, trigger identities, and replay-safe event history.
 
+It is also the bounded planner/generator/evaluator reference loop: `Researcher` plans, `Builder` generates the structured proposal, `Reviewer` evaluates it, and `Publisher` writes the report. The policy hard-caps the loop at three rounds, four agent invocations per round, and one observed-failure retry; completion still requires an operator proposal. Replace the model-backed reviewer with a deterministic shell check when the deliverable is code that can be built and tested.
+
 Regenerate it after changing the referenced workflow topology or portable configuration:
 
 ```bash
