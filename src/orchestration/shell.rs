@@ -1020,6 +1020,44 @@ mod tests {
     }
 
     #[test]
+    fn estimated_run_usage_does_not_supply_measured_values() {
+        let directory = tempfile::tempdir().expect("temporary store");
+        let store = Store::new(directory.path().join("estimated.redb")).expect("store opens");
+        let dispatch = DispatchId::try_from_hex("f".repeat(64)).expect("dispatch identity");
+        let observation = CommandWorkerUsageObservation {
+            schema: USAGE_OBSERVATION_SCHEMA.to_string(),
+            scope: UsageScope::Run,
+            workflow_revision: "revision-1".to_string(),
+            instance_id: "instance-1".to_string(),
+            dispatch_id: dispatch.as_str().to_string(),
+            run_id: 9,
+            node_id: 0,
+            invocation_id: "invocation-1".to_string(),
+            worker_profile: "profile-1".to_string(),
+            attempt_id: "attempt-estimated".to_string(),
+            agent_invocations: Some(1),
+            model_requests: Some(2),
+            subagent_calls: Some(1),
+            tokens: Some(123),
+            cost_microunits: Some(456),
+            duration_millis: Some(789),
+            provenance: UsageProvenance::Estimated,
+            complete: true,
+        };
+        store.save_command_worker_usage(&observation).expect("usage saves");
+        let enforced = BudgetPolicy {
+            enforced: BudgetDimensions {
+                tokens: true,
+                monetary_microunits: true,
+                duration_millis: true,
+                ..BudgetDimensions::default()
+            },
+            ..BudgetPolicy::default()
+        };
+        assert_eq!(persisted_run_usage(&store, &enforced, &dispatch, RunId(9)), Some((None, None, None)));
+    }
+
+    #[test]
     fn usage_cost_supports_total_and_short_shapes() {
         assert_eq!(usage_cost(&serde_json::json!({"usage": {"total_cost_microunits": 42}})), Some(42));
         assert_eq!(usage_cost(&serde_json::json!({"usage": {"cost_microunits": 42}})), Some(42));
