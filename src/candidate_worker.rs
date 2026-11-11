@@ -230,4 +230,42 @@ mod tests {
 
         assert!(matches!(outcome, CandidateWorkerOutcome::Failed { .. }));
     }
+
+    #[test]
+    fn pre_cancellation_prevents_execution() {
+        let directory = tempfile::tempdir().expect("temporary workspace");
+        let root = directory.path();
+        std::fs::create_dir_all(root.join("src")).expect("source directory");
+        std::fs::write(root.join("src/main.rs"), b"old").expect("source");
+
+        let outcome = run_candidate_worker(
+            &request(root, "printf new > src/main.rs"),
+            &RuntimeConfig::default(),
+            &AtomicBool::new(true),
+        )
+        .expect("worker runs");
+
+        assert!(matches!(outcome, CandidateWorkerOutcome::Cancelled));
+        assert_eq!(std::fs::read(root.join("src/main.rs")).expect("source remains"), b"old");
+    }
+
+    #[test]
+    fn output_overflow_and_timeout_are_failures() {
+        let directory = tempfile::tempdir().expect("temporary workspace");
+        let root = directory.path();
+        std::fs::create_dir_all(root.join("src")).expect("source directory");
+        std::fs::write(root.join("src/main.rs"), b"same").expect("source");
+
+        let mut overflow = request(root, "printf 1234567890");
+        overflow.output_limit_bytes = 8;
+        let outcome =
+            run_candidate_worker(&overflow, &RuntimeConfig::default(), &AtomicBool::new(false)).expect("worker runs");
+        assert!(matches!(outcome, CandidateWorkerOutcome::Failed { .. }));
+
+        let mut timed = request(root, "sleep 2");
+        timed.timeout_secs = 1;
+        let outcome =
+            run_candidate_worker(&timed, &RuntimeConfig::default(), &AtomicBool::new(false)).expect("worker runs");
+        assert!(matches!(outcome, CandidateWorkerOutcome::Failed { .. }));
+    }
 }
