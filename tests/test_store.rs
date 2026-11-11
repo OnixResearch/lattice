@@ -152,6 +152,10 @@ fn command_worker_usage_persists_and_revalidates() {
         Err(lattice::store::StoreError::Conflict(_))
     ));
 
+    let mut same_run = observation.clone();
+    same_run.attempt_id = "attempt-other".to_string();
+    assert!(matches!(store.save_command_worker_usage(&same_run), Err(lattice::store::StoreError::Conflict(_))));
+
     let mut invalid = observation;
     invalid.provenance = UsageProvenance::Unknown;
     assert!(store.save_command_worker_usage(&invalid).is_err());
