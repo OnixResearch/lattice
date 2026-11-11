@@ -13,7 +13,7 @@ use thiserror::Error;
 use crate::candidate::MAX_SNAPSHOT_BYTES;
 use crate::candidate::MAX_SNAPSHOT_FILES;
 
-const IGNORED_DIRECTORIES: &[&str] = &[".git", "target"];
+const IGNORED_DIRECTORIES: &[&str] = &[".git", ".omp", ".pi", "target"];
 const IGNORED_FILES: &[&str] = &[".DS_Store", "Thumbs.db"];
 
 /// Capture a bounded deterministic map of relative UTF-8 paths to file bytes.
@@ -200,6 +200,19 @@ mod tests {
 
         assert_eq!(snapshot.keys().collect::<Vec<_>>(), vec!["README.md", "src/main.rs", "src/nested/lib.rs"]);
         assert_eq!(snapshot["src/main.rs"], b"main");
+    }
+
+    #[test]
+    fn skips_agent_runtime_metadata() {
+        let directory = tempfile::tempdir().expect("temporary workspace");
+        let root = directory.path();
+        std::fs::create_dir_all(root.join(".omp/agent")).expect("OMP metadata directory");
+        std::fs::write(root.join(".omp/agent/models.yml"), b"models").expect("OMP model metadata");
+        std::fs::write(root.join("src.rs"), b"source").expect("source file");
+
+        let snapshot = capture_workspace(root).expect("workspace captures");
+
+        assert_eq!(snapshot.keys().collect::<Vec<_>>(), vec!["src.rs"]);
     }
 
     #[cfg(unix)]

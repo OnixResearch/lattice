@@ -244,6 +244,7 @@ fn sandbox_command(request: &CandidateWorkerRequest) -> Result<(String, Vec<Stri
     let program = sandbox_worker_program(&request.program, &root, &request.boundary)?;
     let mut args = vec![
         "--unshare-user".to_string(),
+        "--unshare-pid".to_string(),
         "--unshare-ipc".to_string(),
         "--unshare-uts".to_string(),
         "--unshare-cgroup".to_string(),
@@ -254,6 +255,9 @@ fn sandbox_command(request: &CandidateWorkerRequest) -> Result<(String, Vec<Stri
         "--setenv".to_string(),
         "PATH".to_string(),
         "/usr/bin:/bin".to_string(),
+        "--setenv".to_string(),
+        "HOME".to_string(),
+        "/workspace".to_string(),
     ];
     if !request.boundary.network {
         args.push("--unshare-net".to_string());
@@ -271,6 +275,8 @@ fn sandbox_command(request: &CandidateWorkerRequest) -> Result<(String, Vec<Stri
         ]);
     }
     args.extend([
+        "--proc".to_string(),
+        "/proc".to_string(),
         "--dev".to_string(),
         "/dev".to_string(),
         "--dir".to_string(),
@@ -679,6 +685,89 @@ mod tests {
             .expect("worker runs");
 
         assert!(matches!(outcome, CandidateWorkerOutcome::Failed { .. }));
+    }
+
+    #[test]
+    fn omp_worker_produces_a_sandboxed_candidate() {
+        let (Ok(sandbox), Ok(omp), Ok(base_url), Ok(model)) = (
+            std::env::var("LATTICE_BWRAP"),
+            std::env::var("LATTICE_OMP"),
+            std::env::var("LATTICE_OMP_BASE_URL"),
+            std::env::var("LATTICE_OMP_MODEL"),
+        ) else {
+            return;
+        };
+        let directory = tempfile::tempdir().expect("temporary workspace");
+        let root = directory.path();
+        std::fs::create_dir_all(root.join(".omp/agent")).expect("OMP config directory");
+        std::fs::create_dir_all(root.join("src")).expect("source directory");
+        std::fs::write(root.join("src/main.rs"), b"pub fn answer() -> i32 { 41 }\n").expect("base source");
+        std::fs::write(
+            root.join(".omp/agent/models.yml"),
+            serde_json::json!({
+                "providers": {
+                    "qualification": {
+                        "api": "openai-completions",
+                        "apiKey": "local",
+                        "baseUrl": base_url,
+                        "models": [{
+                            "id": model,
+                            "name": "Lattice qualification",
+                            "api": "openai-completions"
+                        }]
+                    }
+                }
+            })
+            .to_string(),
+        )
+        .expect("OMP model profile");
+        let boundary = admit_workspace_boundary(
+            root,
+            &[".omp".to_string(), "src".to_string()],
+            &[".omp".to_string(), "src".to_string()],
+            true,
+            false,
+        )
+        .expect("workspace boundary");
+        let isolated = CandidateWorkerRequest {
+            work_id: "work-omp".to_string(),
+            attempt_id: "attempt-omp".to_string(),
+            fence: "9".to_string(),
+            workspace_id: "workspace-omp".to_string(),
+            program: omp,
+            args: vec![
+                "--cwd".to_string(),
+                "/workspace".to_string(),
+                "--model".to_string(),
+                model,
+                "--no-session".to_string(),
+                "-p".to_string(),
+                "--approval-mode".to_string(),
+                "yolo".to_string(),
+                "--max-time".to_string(),
+                "90s".to_string(),
+                "--max-cost".to_string(),
+                "0.10".to_string(),
+                "Use the edit tool to replace 41 with 42 in src/main.rs. Do not run commands. Reply done.".to_string(),
+            ],
+            boundary,
+            require_isolation: true,
+            sandbox_program: Some(sandbox),
+            timeout_secs: 120,
+            output_limit_bytes: 1024 * 1024,
+        };
+
+        let outcome =
+            run_candidate_worker(&isolated, &RuntimeConfig::default(), &AtomicBool::new(false)).expect("worker runs");
+
+        let result = CandidateAttemptResult::from_outcome(&outcome).with_compatibility(&isolated);
+        result.validate().expect("compatibility validates");
+        assert!(result.compatibility.is_some());
+        let CandidateWorkerOutcome::Produced { receipt, .. } = outcome else {
+            panic!("expected OMP candidate, got {outcome:?}");
+        };
+        assert_eq!(receipt.changed_paths, vec!["src/main.rs"]);
+        assert_eq!(std::fs::read(root.join("src/main.rs")).expect("candidate"), b"pub fn answer() -> i32 { 42 }\n");
     }
 
     #[test]
