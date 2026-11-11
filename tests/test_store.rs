@@ -6,6 +6,8 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use lattice::candidate::CandidateDisposition;
+use lattice::candidate::CandidateReceipt;
 use lattice::engine::executor::RunId;
 use lattice::engine::value::ContentHash;
 use lattice::engine::value::Value;
@@ -35,6 +37,32 @@ const CONCURRENT_RUN_ID_ALLOCATIONS: usize = 8;
 #[test]
 fn store_opens_successfully() {
     let (_store, _dir) = common::temp_store();
+}
+
+#[test]
+fn candidate_receipts_persist_and_revalidate() {
+    let (store, _dir) = common::temp_store();
+    let receipt = CandidateReceipt {
+        schema: lattice::candidate::CANDIDATE_RECEIPT_SCHEMA.to_string(),
+        work_id: "work-1".to_string(),
+        attempt_id: "attempt-1".to_string(),
+        fence: "7".to_string(),
+        workspace_id: "workspace-1".to_string(),
+        base_identity: "a".repeat(64),
+        candidate_identity: Some("b".repeat(64)),
+        diff_identity: Some("c".repeat(64)),
+        changed_paths: vec!["src/lib.rs".to_string()],
+        disposition: CandidateDisposition::Produced,
+        blockers: Vec::new(),
+    };
+
+    store.save_candidate_receipt(&receipt).expect("receipt saves");
+    assert_eq!(store.load_candidate_receipt("attempt-1").expect("receipt loads"), Some(receipt.clone()));
+    assert_eq!(store.load_candidate_receipt("missing").expect("missing receipt"), None);
+
+    let mut invalid = receipt;
+    invalid.changed_paths = vec!["../escape".to_string()];
+    assert!(store.save_candidate_receipt(&invalid).is_err());
 }
 
 #[test]

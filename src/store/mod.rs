@@ -69,6 +69,7 @@ const WORKFLOW_EXCHANGE_EXECUTIONS: TableDefinition<&str, &[u8]> =
     TableDefinition::new("workflow_exchange_executions_v1");
 const WORKFLOW_EXCHANGE_REQUEST_INDEX: TableDefinition<&str, &str> =
     TableDefinition::new("workflow_exchange_request_index_v1");
+const CANDIDATE_RECEIPTS: TableDefinition<&str, &[u8]> = TableDefinition::new("candidate_receipts_v1");
 const WORKFLOW_EXCHANGE_IDEMPOTENCY_INDEX: TableDefinition<&str, &str> =
     TableDefinition::new("workflow_exchange_idempotency_index_v1");
 const ORCHESTRATION_INSTANCE_COUNTER_KEY: &str = "instance_sequence";
@@ -339,6 +340,7 @@ impl Store {
             let _ = txn
                 .open_table(WORKFLOW_EXCHANGE_IDEMPOTENCY_INDEX)
                 .map_err(|error| StoreError::Table(error.to_string()))?;
+            let _ = txn.open_table(CANDIDATE_RECEIPTS).map_err(|error| StoreError::Table(error.to_string()))?;
             ensure_operation_data_tables(&txn)?;
             quarantine::fence_pending(&txn)?;
         }
@@ -371,6 +373,40 @@ impl Store {
         }
         txn.commit().map_err(|e| StoreError::Db(e.to_string()))?;
         Ok(())
+    }
+
+    /// Persist one admitted candidate receipt by attempt identity.
+    pub fn save_candidate_receipt(&self, receipt: &crate::candidate::CandidateReceipt) -> Result<(), StoreError> {
+        self.ensure_not_quarantined()?;
+        let data = receipt.to_json().map_err(|error| StoreError::Serialize(error.to_string()))?;
+        let txn = self.db.begin_write().map_err(|error| StoreError::Db(error.to_string()))?;
+        {
+            let mut table = txn.open_table(CANDIDATE_RECEIPTS).map_err(|error| StoreError::Table(error.to_string()))?;
+            table
+                .insert(receipt.attempt_id.as_str(), data.as_bytes())
+                .map_err(|error| StoreError::Db(error.to_string()))?;
+        }
+        txn.commit().map_err(|error| StoreError::Db(error.to_string()))?;
+        Ok(())
+    }
+
+    /// Load and revalidate one persisted candidate receipt.
+    pub fn load_candidate_receipt(
+        &self,
+        attempt_id: &str,
+    ) -> Result<Option<crate::candidate::CandidateReceipt>, StoreError> {
+        let txn = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
+        let table = txn.open_table(CANDIDATE_RECEIPTS).map_err(|error| StoreError::Table(error.to_string()))?;
+        match table.get(attempt_id).map_err(|error| StoreError::Db(error.to_string()))? {
+            Some(data) => {
+                let text =
+                    std::str::from_utf8(data.value()).map_err(|error| StoreError::Deserialize(error.to_string()))?;
+                let receipt = crate::candidate::CandidateReceipt::from_json(text)
+                    .map_err(|error| StoreError::Deserialize(error.to_string()))?;
+                Ok(Some(receipt))
+            }
+            None => Ok(None),
+        }
     }
 
     /// Load a workflow by name.
