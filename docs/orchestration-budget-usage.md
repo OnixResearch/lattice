@@ -8,9 +8,14 @@ Orchestration keeps reservation, settlement, and usage provenance separate.
   `OrchestrationInstance::last_usage_basis` to `reserved_fallback`. This is the
   current shell behavior: a conservative charge, not measured worker usage.
 - `RunFinishedMeasured` settles with an explicitly supplied measured
-  `BudgetCharge` and sets `last_usage_basis` to `measured`. The measured amount
-  is retained separately from the prior round's planned charge in durable event
-  history.
+  `BudgetCharge` and a `usage_basis`. A fully measured receipt uses `measured`;
+  a receipt where only provider-reported tokens were observed uses
+  `measured_tokens`, and the remaining dimensions retain their reservation
+  values. Older events without a basis deserialize as `measured`.
+- When the shell can read provider-reported `usage` metadata from every completed
+  Agent node in the owned run, it sums those tokens and settles with
+  `measured_tokens`. If any Agent node lacks usable metadata, the shell keeps the
+  reserved fallback rather than synthesizing a partial measured receipt.
 - A missing or incomplete observation is not zero. The current shell does not
   synthesize a measured receipt; callers that cannot supply measured usage keep
   the reserved fallback.

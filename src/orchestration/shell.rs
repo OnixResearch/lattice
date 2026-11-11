@@ -16,6 +16,7 @@ use crate::orchestration::core;
 use crate::orchestration::core::ApprovalDecision;
 use crate::orchestration::core::BudgetCharge;
 use crate::orchestration::core::BudgetChargePlan;
+use crate::orchestration::core::BudgetUsageBasis;
 use crate::orchestration::core::DispatchIntent;
 use crate::orchestration::core::DispatchStatus;
 use crate::orchestration::core::OrchestrationAction;
@@ -375,14 +376,29 @@ async fn execute_started_round(
         Err(_) => (false, false, guarded_summary.unwrap_or_else(|| UNOBSERVED_ROUND_FAILURE_SUMMARY.to_string())),
     };
     let observed_usage = observed_usage(&current, &intent.id).unwrap_or_default();
-    apply_and_commit(store, &current, OrchestrationAction::RunFinished {
-        dispatch_id: intent.id,
-        run_id,
-        succeeded: is_succeeded,
-        retryable_observed_failure: is_retryable_observed_failure,
-        observed_usage,
-        safe_summary: summary,
-    })
+    let action = if let Some(tokens) = measured_agent_tokens(store, &current, run_id) {
+        let mut measured_usage = observed_usage;
+        measured_usage.tokens = tokens;
+        OrchestrationAction::RunFinishedMeasured {
+            dispatch_id: intent.id,
+            run_id,
+            succeeded: is_succeeded,
+            retryable_observed_failure: is_retryable_observed_failure,
+            measured_usage,
+            usage_basis: BudgetUsageBasis::MeasuredTokens,
+            safe_summary: summary,
+        }
+    } else {
+        OrchestrationAction::RunFinished {
+            dispatch_id: intent.id,
+            run_id,
+            succeeded: is_succeeded,
+            retryable_observed_failure: is_retryable_observed_failure,
+            observed_usage,
+            safe_summary: summary,
+        }
+    };
+    apply_and_commit(store, &current, action)
 }
 
 // r[impl lattice.agent_orchestration.observed_failure_retry]
@@ -465,6 +481,43 @@ fn observed_usage(
 ) -> Option<BudgetCharge> {
     let reservation_id = crate::orchestration::ReservationId::from_dispatch(dispatch_id);
     instance.budgets.reservations.get(&reservation_id).map(|reservation| reservation.charge)
+}
+
+fn measured_agent_tokens(store: &Store, instance: &OrchestrationInstance, run_id: RunId) -> Option<u64> {
+    let workflow = store.load_workflow(&instance.definition.workflow.workflow_name).ok()??;
+    let agent_nodes = workflow
+        .configs
+        .iter()
+        .filter(|(_, config)| matches!(config, NodeConfig::Agent(_)))
+        .map(|(node_id, _)| *node_id)
+        .collect::<Vec<_>>();
+    if agent_nodes.is_empty() {
+        return None;
+    }
+    let details = store.load_run_details(run_id).ok()??;
+    let mut total = 0u64;
+    for node_id in agent_nodes {
+        let detail = details.nodes.iter().find(|detail| detail.node_id == crate::engine::workflow::NodeId(node_id))?;
+        let metadata = detail.outputs.iter().find(|output| output.port_label == "metadata")?;
+        let value: serde_json::Value = serde_json::from_str(&metadata.text).ok()?;
+        total = total.checked_add(usage_tokens(&value)?)?;
+    }
+    Some(total)
+}
+
+fn usage_tokens(value: &serde_json::Value) -> Option<u64> {
+    let usage = value.get("usage")?;
+    usage.get("total_tokens").and_then(serde_json::Value::as_u64).or_else(|| {
+        let input = usage
+            .get("input_tokens")
+            .or_else(|| usage.get("prompt_tokens"))
+            .and_then(serde_json::Value::as_u64)?;
+        let output = usage
+            .get("output_tokens")
+            .or_else(|| usage.get("completion_tokens"))
+            .and_then(serde_json::Value::as_u64)?;
+        input.checked_add(output)
+    })
 }
 
 fn safe_run_summary(summary: &headless::HeadlessRunSummary) -> String {
@@ -754,14 +807,30 @@ fn reconcile_run_record(
     let is_retryable_observed_failure =
         !is_succeeded && record.finished_epoch_ms.is_some() && instance.definition.retry.is_some();
     let guarded_summary = crate::guarded::status::optional(store, intent.run_id, &instance.definition.id)?;
-    apply_and_commit(store, instance, OrchestrationAction::RunFinished {
-        dispatch_id: intent.id.clone(),
-        run_id: intent.run_id,
-        succeeded: is_succeeded,
-        retryable_observed_failure: is_retryable_observed_failure,
-        observed_usage,
-        safe_summary: guarded_summary.unwrap_or_else(|| crate::guarded::status::recovered_fallback(record)),
-    })
+    let summary = guarded_summary.unwrap_or_else(|| crate::guarded::status::recovered_fallback(record));
+    let action = if let Some(tokens) = measured_agent_tokens(store, instance, intent.run_id) {
+        let mut measured_usage = observed_usage;
+        measured_usage.tokens = tokens;
+        OrchestrationAction::RunFinishedMeasured {
+            dispatch_id: intent.id.clone(),
+            run_id: intent.run_id,
+            succeeded: is_succeeded,
+            retryable_observed_failure: is_retryable_observed_failure,
+            measured_usage,
+            usage_basis: BudgetUsageBasis::MeasuredTokens,
+            safe_summary: summary,
+        }
+    } else {
+        OrchestrationAction::RunFinished {
+            dispatch_id: intent.id.clone(),
+            run_id: intent.run_id,
+            succeeded: is_succeeded,
+            retryable_observed_failure: is_retryable_observed_failure,
+            observed_usage,
+            safe_summary: summary,
+        }
+    };
+    apply_and_commit(store, instance, action)
 }
 
 pub fn load_instance(store: &Store, instance_id: &str) -> Result<OrchestrationInstance, OrchestrationShellError> {
@@ -783,4 +852,21 @@ fn identity_error(error: crate::orchestration::AdmissionError) -> OrchestrationS
         code: OrchestrationDiagnosticCode::InvalidIdentity,
         message: error.to_string(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::usage_tokens;
+
+    #[test]
+    fn usage_tokens_supports_total_and_component_shapes() {
+        assert_eq!(usage_tokens(&serde_json::json!({"usage": {"total_tokens": 42}})), Some(42));
+        assert_eq!(
+            usage_tokens(&serde_json::json!({"usage": {"prompt_tokens": 30, "completion_tokens": 12}})),
+            Some(42)
+        );
+        assert_eq!(usage_tokens(&serde_json::json!({"usage": {"input_tokens": 30, "output_tokens": 12}})), Some(42));
+        assert_eq!(usage_tokens(&serde_json::json!({"usage": {}})), None);
+        assert_eq!(usage_tokens(&serde_json::json!({"usage": {"total_tokens": "42"}})), None);
+    }
 }

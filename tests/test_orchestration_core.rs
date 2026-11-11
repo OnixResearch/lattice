@@ -314,6 +314,7 @@ fn measured_usage_is_distinct_from_the_reserved_plan() {
         succeeded: true,
         retryable_observed_failure: false,
         measured_usage: measured,
+        usage_basis: BudgetUsageBasis::Measured,
         safe_summary: "measured usage".to_string(),
     };
     let finished = transition(&started, fact(&started, action)).expect("measured completion settles").instance;
@@ -321,6 +322,31 @@ fn measured_usage_is_distinct_from_the_reserved_plan() {
     assert_eq!(finished.last_usage_basis, BudgetUsageBasis::Measured);
     assert_eq!(finished.budgets.consumed, measured);
     assert_ne!(finished.budgets.consumed, reserved);
+}
+
+#[test]
+fn measured_token_usage_basis_remains_distinct_from_full_measurement() {
+    let base = base_instance(CompletionPolicy::RunSucceeded);
+    let started = start_transition(&base).instance;
+    let dispatch = started.pending_dispatch.as_ref().expect("started dispatch");
+    let reserved = started.budgets.reservations.values().next().expect("round reservation").charge;
+    let measured = BudgetCharge {
+        tokens: reserved.tokens.saturating_sub(1),
+        ..reserved
+    };
+    let action = OrchestrationAction::RunFinishedMeasured {
+        dispatch_id: dispatch.id.clone(),
+        run_id: dispatch.run_id,
+        succeeded: true,
+        retryable_observed_failure: false,
+        measured_usage: measured,
+        usage_basis: BudgetUsageBasis::MeasuredTokens,
+        safe_summary: "measured token usage".to_string(),
+    };
+    let finished = transition(&started, fact(&started, action)).expect("measured token completion settles").instance;
+
+    assert_eq!(finished.last_usage_basis, BudgetUsageBasis::MeasuredTokens);
+    assert_eq!(finished.budgets.consumed, measured);
 }
 
 // r[verify lattice.agent_orchestration.observed_failure_retry]

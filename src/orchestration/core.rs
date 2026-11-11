@@ -227,11 +227,16 @@ pub enum BudgetUsageBasis {
     #[default]
     ReservedFallback,
     Measured,
+    MeasuredTokens,
 }
 
 impl BudgetUsageBasis {
     fn is_reserved_fallback(&self) -> bool {
         matches!(self, Self::ReservedFallback)
+    }
+
+    fn is_measured(&self) -> bool {
+        matches!(self, Self::Measured)
     }
 }
 
@@ -266,6 +271,11 @@ pub enum OrchestrationAction {
         #[serde(default, skip_serializing_if = "is_false")]
         retryable_observed_failure: bool,
         measured_usage: BudgetCharge,
+        #[serde(
+            default = "default_measured_basis",
+            skip_serializing_if = "BudgetUsageBasis::is_measured"
+        )]
+        usage_basis: BudgetUsageBasis,
         safe_summary: String,
     },
     SubmitProposal {
@@ -432,6 +442,10 @@ pub fn current_schema_version() -> u32 {
 
 fn is_false(value: &bool) -> bool {
     !*value
+}
+
+const fn default_measured_basis() -> BudgetUsageBasis {
+    BudgetUsageBasis::Measured
 }
 
 // r[impl lattice.agent_orchestration.model]
@@ -782,6 +796,7 @@ fn apply_action(
             succeeded,
             retryable_observed_failure,
             measured_usage,
+            usage_basis,
             safe_summary,
         } => finish_run(instance, RunFinishedInput {
             dispatch_id,
@@ -789,7 +804,7 @@ fn apply_action(
             is_succeeded: *succeeded,
             is_retryable_observed_failure: *retryable_observed_failure,
             observed_usage: *measured_usage,
-            usage_basis: BudgetUsageBasis::Measured,
+            usage_basis: *usage_basis,
             safe_summary,
         }),
         OrchestrationAction::SubmitProposal { proposal } => submit_proposal(instance, proposal),
