@@ -673,6 +673,7 @@ mod tests {
         canceller.join().expect("canceller joins");
 
         assert!(matches!(outcome, CandidateWorkerOutcome::Cancelled), "{outcome:?}");
+        std::thread::sleep(std::time::Duration::from_millis(1_200));
         assert!(!root.join("src/leak").exists());
     }
 
