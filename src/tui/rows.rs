@@ -145,6 +145,7 @@ pub fn render_rows(
     statuses: &HashMap<u64, NodeRunStatus>,
     started: &HashMap<u64, std::time::Instant>,
     durations_millis: &HashMap<u64, u64>,
+    tokens: &HashMap<u64, u64>,
     outputs: &[RunOutputLine],
     selected: &BTreeSet<NodeId>,
     focused: Option<NodeId>,
@@ -153,7 +154,7 @@ pub fn render_rows(
 ) {
     let mut lines = Vec::with_capacity(layout.rows.len().saturating_add(2));
     lines.push(Line::styled(
-        format!("  #  LN  {:<20} {:<10} {:<9} {:<8} OUTPUT", "NODE", "KIND", "STATUS", "TIME"),
+        format!("  #  LN  {:<20} {:<10} {:<9} {:<8} {:<7} OUTPUT", "NODE", "KIND", "STATUS", "TIME", "TOKENS"),
         Style::default().fg(Color::DarkGray),
     ));
     for (index, row) in layout.rows.iter().enumerate() {
@@ -171,16 +172,18 @@ pub fn render_rows(
         };
         let status = status_text(statuses.get(&row.node_id.0).copied());
         let duration = duration_text(durations_millis.get(&row.node_id.0), started.get(&row.node_id.0));
+        let tokens = tokens_text(tokens.get(&row.node_id.0));
         let output = latest_node_output_records(outputs, workflow, row.node_id)
             .last()
             .map(|record| bounded_output(&record.text))
             .unwrap_or_default();
         let text = format!(
-            "{marker}{index:>3} {lane:>3}  {:<20} {:<10} {:<9} {:<8} {}",
+            "{marker}{index:>3} {lane:>3}  {:<20} {:<10} {:<9} {:<8} {:<7} {}",
             bounded_label(&row.label),
             row.kind,
             status,
             duration,
+            tokens,
             output
         );
         let style = if selected.contains(&row.node_id) {
@@ -231,6 +234,10 @@ fn duration_text(finished_millis: Option<&u64>, started: Option<&std::time::Inst
         }
         None => "—".to_string(),
     }
+}
+
+fn tokens_text(tokens: Option<&u64>) -> String {
+    tokens.map_or_else(|| "—".to_string(), u64::to_string)
 }
 
 fn bounded_label(label: &str) -> String {
@@ -320,13 +327,14 @@ mod tests {
             port_label: "stdout".to_string(),
             text: "bounded output".to_string(),
         }];
-        let mut buffer = Buffer::empty(Rect::new(0, 0, 80, 6));
+        let mut buffer = Buffer::empty(Rect::new(0, 0, 100, 6));
         render_rows(
             &layout,
             &workflow,
             &statuses,
             &HashMap::new(),
             &HashMap::from([(node_id.0, 42_u64)]),
+            &HashMap::from([(node_id.0, 1_234_u64)]),
             &outputs,
             &BTreeSet::from([node_id]),
             Some(node_id),
@@ -335,13 +343,14 @@ mod tests {
         );
         let rendered = buffer
             .content()
-            .chunks(80)
+            .chunks(100)
             .map(|row| row.iter().map(|cell| cell.symbol()).collect::<String>())
             .collect::<Vec<_>>()
             .join("\n");
         assert!(rendered.contains("NODE"));
         assert!(rendered.contains("completed"));
         assert!(rendered.contains("42ms"));
+        assert!(rendered.contains("1234"));
         assert!(rendered.contains("bounded output"));
     }
 }

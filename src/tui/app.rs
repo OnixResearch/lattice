@@ -133,6 +133,7 @@ pub struct AppRunState {
     pub node_statuses: HashMap<u64, NodeRunStatus>,
     pub node_started: HashMap<u64, std::time::Instant>,
     pub node_durations_millis: HashMap<u64, u64>,
+    pub node_tokens: HashMap<u64, u64>,
     pub active_replay_timeline: Option<ReplayTimeline>,
 }
 
@@ -143,6 +144,7 @@ impl AppRunState {
             node_statuses: HashMap::new(),
             node_started: HashMap::new(),
             node_durations_millis: HashMap::new(),
+            node_tokens: HashMap::new(),
             active_replay_timeline: None,
         }
     }
@@ -569,6 +571,31 @@ fn output_value_records(
             text: line.to_string(),
         })
         .collect()
+}
+
+fn node_usage_tokens(
+    workflow: &Workflow,
+    node_id: crate::engine::workflow::NodeId,
+    outputs: &HashMap<crate::engine::workflow::PortId, Value>,
+) -> Option<u64> {
+    let node = workflow.graph.node(node_id)?;
+    let metadata_port = node.output_ports.iter().find(|port| port.label == "metadata")?;
+    let value = outputs.get(&metadata_port.id)?;
+    let crate::engine::value::ValueData::Json(metadata) = &value.data else {
+        return None;
+    };
+    let usage = metadata.get("usage")?;
+    usage.get("total_tokens").and_then(serde_json::Value::as_u64).or_else(|| {
+        let input = usage
+            .get("input_tokens")
+            .or_else(|| usage.get("prompt_tokens"))
+            .and_then(serde_json::Value::as_u64)?;
+        let output = usage
+            .get("output_tokens")
+            .or_else(|| usage.get("completion_tokens"))
+            .and_then(serde_json::Value::as_u64)?;
+        input.checked_add(output)
+    })
 }
 
 // r[impl n8nclone.tui_ux.run_history.details.persist]
@@ -2738,6 +2765,7 @@ impl App {
             node_statuses,
             node_started: HashMap::new(),
             node_durations_millis: HashMap::new(),
+            node_tokens: HashMap::new(),
             active_replay_timeline: None,
         };
         self.output.push_line(message);
@@ -2901,6 +2929,9 @@ impl App {
             match &step.status {
                 NodeStatus::Completed { outputs, cached, .. } => {
                     self.run_state.node_statuses.insert(step.node_id.0, NodeRunStatus::Completed);
+                    if let Some(tokens) = node_usage_tokens(run_workflow, step.node_id, outputs) {
+                        self.run_state.node_tokens.insert(step.node_id.0, tokens);
+                    }
                     let cache_tag = if *cached { " (cached)" } else { "" };
                     self.output.push_line(&format!("✓ {node_label}{cache_tag} [{}]", step.input_hash));
 
@@ -3931,6 +3962,33 @@ mod tests {
 
         assert!(rendered.iter().any(|line| line.contains("image: image/png image")));
         assert!(!rendered.iter().any(|line| line.contains("raw-image-bytes")));
+    }
+
+    #[test]
+    fn node_usage_tokens_reads_total_or_prompt_completion() {
+        let mut workflow = Workflow::new("usage", crate::engine::workflow::WorkflowTimestamp::epoch());
+        let node_id = workflow.add_agent_node("Agent", AgentTarget::Clankers, "work", AgentOutputMode::Text);
+        let metadata_port = workflow
+            .graph
+            .node(node_id)
+            .expect("node")
+            .output_ports
+            .iter()
+            .find(|port| port.label == "metadata")
+            .expect("metadata port")
+            .id;
+        let mut outputs = HashMap::new();
+        outputs.insert(metadata_port, Value::from_json(serde_json::json!({"usage": {"total_tokens": 1234}})));
+        assert_eq!(node_usage_tokens(&workflow, node_id, &outputs), Some(1234));
+
+        outputs.insert(
+            metadata_port,
+            Value::from_json(serde_json::json!({"usage": {"prompt_tokens": 100, "completion_tokens": 23}})),
+        );
+        assert_eq!(node_usage_tokens(&workflow, node_id, &outputs), Some(123));
+
+        outputs.insert(metadata_port, Value::from_json(serde_json::json!({"usage": {}})));
+        assert_eq!(node_usage_tokens(&workflow, node_id, &outputs), None);
     }
 
     #[test]
