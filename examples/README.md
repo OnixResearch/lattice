@@ -22,10 +22,12 @@ They are useful for demos, import/export validation, and headless regression tes
 - `selfie-to-fine-art.ncl` — routes a selfie plus inspiration images through a generic Clankers agent node.
 - `webhook-cookbook.ncl` — imports a credential-reference authenticated webhook trigger for local listener demos.
 - `animus-bounded-agent.ncl` — runs one generic agent node through the fixed two-turn, model-only Animus leaf runtime.
+- `bounded-build-loop.ncl` — plans and generates a minimal Rust program with two agent roles, then compiles and runs it with a real `rustc` evaluator.
 
 ## Orchestrations
 
 `examples/orchestrations/llm-review-loop.ncl` adds a durable multi-round policy to the Markdown-backed LLM operating graph.
+`examples/orchestrations/bounded-build-loop.ncl` binds the planner/generator/evaluator build loop with two rounds, two agent invocations per round, and one observed-failure retry.
 
 The policy defines an immutable workflow identity, operator approval, resource bounds, trigger identities, and replay-safe event history.
 
@@ -35,6 +37,7 @@ Regenerate it after changing the referenced workflow topology or portable config
 
 ```bash
 cargo run --example generate_llm_orchestration
+cargo run --example generate_bounded_build_loop
 ```
 
 Validate and start it after importing `llm-operating-graph.ncl` into the selected store:
