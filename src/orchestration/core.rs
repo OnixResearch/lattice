@@ -211,7 +211,7 @@ pub struct OrchestrationInstance {
     pub last_event_sequence: Option<u64>,
     pub event_head: Option<super::identity::LedgerHeadId>,
     pub terminal_summary: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "BudgetUsageBasis::is_reserved_fallback")]
     pub last_usage_basis: BudgetUsageBasis,
 }
 
@@ -227,6 +227,12 @@ pub enum BudgetUsageBasis {
     #[default]
     ReservedFallback,
     Measured,
+}
+
+impl BudgetUsageBasis {
+    fn is_reserved_fallback(&self) -> bool {
+        matches!(self, Self::ReservedFallback)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
