@@ -441,6 +441,14 @@ impl Store {
         {
             let mut table =
                 txn.open_table(CANDIDATE_ARTIFACTS).map_err(|error| StoreError::Table(error.to_string()))?;
+            if let Some(existing) = table.get(key.as_str()).map_err(|error| StoreError::Db(error.to_string()))? {
+                if existing.value() != bytes {
+                    return Err(StoreError::Conflict(
+                        "candidate artifact already exists with different content".to_string(),
+                    ));
+                }
+                return Ok(());
+            }
             table.insert(key.as_str(), bytes).map_err(|error| StoreError::Db(error.to_string()))?;
         }
         txn.commit().map_err(|error| StoreError::Db(error.to_string()))?;

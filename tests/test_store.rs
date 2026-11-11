@@ -73,10 +73,17 @@ fn candidate_receipts_persist_and_revalidate() {
     assert!(store.save_candidate_receipt(&invalid).is_err());
 
     store.save_candidate_artifact("attempt-1", "src/lib.rs", b"artifact").expect("artifact saves");
+    store
+        .save_candidate_artifact("attempt-1", "src/lib.rs", b"artifact")
+        .expect("identical artifact is idempotent");
     assert_eq!(
         store.load_candidate_artifact("attempt-1", "src/lib.rs").expect("artifact loads"),
         Some(b"artifact".to_vec())
     );
+    assert!(matches!(
+        store.save_candidate_artifact("attempt-1", "src/lib.rs", b"different"),
+        Err(lattice::store::StoreError::Conflict(_))
+    ));
     assert!(store.save_candidate_artifact("attempt-1", "../escape", b"x").is_err());
     assert!(store.load_candidate_artifact("attempt-1", "../escape").is_err());
 }
