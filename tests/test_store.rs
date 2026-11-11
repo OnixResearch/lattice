@@ -151,30 +151,33 @@ fn command_worker_usage_persists_and_revalidates() {
     assert!(store.save_command_worker_usage(&invalid).is_err());
 }
 
-#[test]
-fn candidate_attempt_results_are_idempotent_and_conflict_checked() {
-    let (store, _dir) = common::temp_store();
-    let receipt = CandidateReceipt {
-        schema: lattice::candidate::CANDIDATE_RECEIPT_SCHEMA.to_string(),
-        work_id: "work-1".to_string(),
-        attempt_id: "attempt-result".to_string(),
-        fence: "7".to_string(),
-        workspace_id: "workspace-1".to_string(),
-        base_identity: "a".repeat(64),
-        candidate_identity: Some("b".repeat(64)),
-        diff_identity: Some("c".repeat(64)),
-        changed_paths: vec!["src/lib.rs".to_string()],
-        disposition: CandidateDisposition::Produced,
-        blockers: Vec::new(),
-    };
-    let result = CandidateAttemptResult {
+fn produced_attempt_result(attempt_id: &str) -> CandidateAttemptResult {
+    CandidateAttemptResult {
         schema: lattice::candidate_worker::CANDIDATE_ATTEMPT_RESULT_SCHEMA.to_string(),
         disposition: CandidateDisposition::Produced,
-        receipt: Some(receipt),
+        receipt: Some(CandidateReceipt {
+            schema: lattice::candidate::CANDIDATE_RECEIPT_SCHEMA.to_string(),
+            work_id: "work-1".to_string(),
+            attempt_id: attempt_id.to_string(),
+            fence: "7".to_string(),
+            workspace_id: "workspace-1".to_string(),
+            base_identity: "a".repeat(64),
+            candidate_identity: Some("b".repeat(64)),
+            diff_identity: Some("c".repeat(64)),
+            changed_paths: vec!["src/lib.rs".to_string()],
+            disposition: CandidateDisposition::Produced,
+            blockers: Vec::new(),
+        }),
         stdout_blake3: "d".repeat(64),
         stderr_blake3: "e".repeat(64),
         blocker: None,
-    };
+    }
+}
+
+#[test]
+fn candidate_attempt_results_are_idempotent_and_conflict_checked() {
+    let (store, _dir) = common::temp_store();
+    let result = produced_attempt_result("attempt-result");
     store.save_candidate_attempt_result("attempt-result", &result).expect("result saves");
     store
         .save_candidate_attempt_result("attempt-result", &result)
@@ -187,6 +190,19 @@ fn candidate_attempt_results_are_idempotent_and_conflict_checked() {
         store.save_candidate_attempt_result("attempt-result", &conflicting),
         Err(lattice::store::StoreError::Conflict(_))
     ));
+}
+
+#[test]
+fn candidate_attempt_results_survive_store_reopen() {
+    let directory = tempfile::TempDir::new().expect("temporary directory");
+    let path = directory.path().join("attempt-results.redb");
+    let result = produced_attempt_result("attempt-reopen-result");
+    {
+        let store = Store::new(&path).expect("store opens");
+        store.save_candidate_attempt_result("attempt-reopen-result", &result).expect("result saves");
+    }
+    let store = Store::new(&path).expect("store reopens");
+    assert_eq!(store.load_candidate_attempt_result("attempt-reopen-result").expect("result loads"), Some(result));
 }
 
 #[test]
