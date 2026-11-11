@@ -23,5 +23,6 @@ pub mod authoring;
 pub mod graph;
 pub mod input;
 pub mod panels;
+pub mod rows;
 
 pub use app::App;

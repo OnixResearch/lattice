@@ -1066,6 +1066,7 @@ pub fn palette_action(id: &str) -> Option<AppAction> {
 pub struct App {
     pub workflow: Workflow,
     pub graph_state: NodeGraphState,
+    pub canvas_view: crate::tui::rows::CanvasView,
     pub focus: FocusPanel,
     pub show_palette: bool,
     pub palette_state: FuzzyState,
@@ -1133,6 +1134,7 @@ impl App {
         Self {
             workflow,
             graph_state,
+            canvas_view: crate::tui::rows::CanvasView::Graph,
             focus: FocusPanel::Canvas,
             show_palette: false,
             palette_state,
@@ -2515,6 +2517,35 @@ impl App {
             FocusPanel::Properties => FocusPanel::Output,
             FocusPanel::Output => FocusPanel::Canvas,
         };
+    }
+
+    pub fn toggle_canvas_view(&mut self) {
+        self.canvas_view = match self.canvas_view {
+            crate::tui::rows::CanvasView::Graph => crate::tui::rows::CanvasView::Rows,
+            crate::tui::rows::CanvasView::Rows => crate::tui::rows::CanvasView::Graph,
+        };
+    }
+
+    pub fn select_row(&mut self, delta: isize) {
+        let layout = crate::tui::rows::layout(&self.workflow, crate::tui::rows::DEFAULT_MAX_LANES);
+        if layout.rows.is_empty() {
+            return;
+        }
+        let current = self
+            .graph_state
+            .focused
+            .and_then(|id| layout.rows.iter().position(|row| row.node_id.0 == id.0))
+            .unwrap_or(0);
+        let next = if delta < 0 {
+            current.saturating_sub(1)
+        } else {
+            current.saturating_add(1).min(layout.rows.len().saturating_sub(1))
+        };
+        let node_id = layout.rows[next].node_id;
+        let graph_id = crate::tui::graph::subwayrat_node_id(node_id);
+        self.graph_state.selected.clear();
+        self.graph_state.selected.insert(graph_id);
+        self.graph_state.focused = Some(graph_id);
     }
 
     // r[impl n8nclone.tui_ux.triggers.manage]

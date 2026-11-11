@@ -233,6 +233,28 @@ fn render_canvas(app: &mut App, area: Rect, buf: &mut Buffer) {
         return;
     }
 
+    if app.canvas_view == crate::tui::rows::CanvasView::Rows {
+        let layout = crate::tui::rows::layout(&app.workflow, crate::tui::rows::DEFAULT_MAX_LANES);
+        let selected = app
+            .graph_state
+            .selected
+            .iter()
+            .map(|id| crate::tui::graph::workflow_node_id(*id))
+            .collect::<std::collections::BTreeSet<_>>();
+        let focused = app.graph_state.focused.map(crate::tui::graph::workflow_node_id);
+        crate::tui::rows::render_rows(
+            &layout,
+            &app.workflow,
+            &app.run_state.node_statuses,
+            &app.run_output_lines,
+            &selected,
+            focused,
+            inner,
+            buf,
+        );
+        return;
+    }
+
     let widget = NodeGraphWidget::default();
     widget.render(inner, buf, &mut app.graph_state);
     if let Some(summary) = canvas_image_preview_summary(app) {
@@ -600,7 +622,7 @@ fn contextual_help_text(context: FooterHelpContext) -> &'static str {
 
     match context.focus {
         FocusPanel::Canvas => {
-            " e: cmd │ l: label │ t: timeout │ C-W: fields │ C-D: diagnostics │ C-R: run │ C-P: palette "
+            " e: cmd │ l: label │ t: timeout │ v: rows │ C-W: fields │ C-D: diagnostics │ C-R: run │ C-P: palette "
         }
         FocusPanel::Properties => " e: cmd │ l: label │ i: image │ p/r/o: agent │ k: creds │ C-W ",
         FocusPanel::Output => " ↑/↓: scroll │ C-P: palette │ A-Tab: focus ",
@@ -633,7 +655,7 @@ fn compact_contextual_help_text(context: FooterHelpContext) -> &'static str {
     }
 
     match context.focus {
-        FocusPanel::Canvas => " e cmd │ l label │ C-W ",
+        FocusPanel::Canvas => " e cmd │ l label │ v view │ C-W ",
         FocusPanel::Properties => " e cmd │ l label │ C-W ",
         FocusPanel::Output => " ↑/↓ scroll │ A-Tab ",
     }
@@ -1250,7 +1272,7 @@ mod tests {
     fn contextual_help_matches_canvas_and_wiring_modes() {
         assert_eq!(
             contextual_help_text(context(FocusPanel::Canvas)),
-            " e: cmd │ l: label │ t: timeout │ C-W: fields │ C-D: diagnostics │ C-R: run │ C-P: palette ",
+            " e: cmd │ l: label │ t: timeout │ v: rows │ C-W: fields │ C-D: diagnostics │ C-R: run │ C-P: palette ",
         );
 
         let wiring = FooterHelpContext {
@@ -1299,7 +1321,7 @@ mod tests {
             width: NARROW_STATUS_WIDTH,
             ..context(FocusPanel::Canvas)
         };
-        assert_eq!(contextual_help_text(narrow), " e cmd │ l label │ C-W ");
+        assert_eq!(contextual_help_text(narrow), " e cmd │ l label │ v view │ C-W ");
 
         let narrow_wiring = FooterHelpContext {
             interaction_mode: FooterInteractionMode::Wiring,

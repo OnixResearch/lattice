@@ -486,6 +486,25 @@ fn handle_canvas_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
         return None;
     }
 
+    if matches!(key.code, KeyCode::Char('v')) && accepts_palette_text(key.modifiers) {
+        app.toggle_canvas_view();
+        return None;
+    }
+
+    if app.canvas_view == crate::tui::rows::CanvasView::Rows {
+        match key.code {
+            KeyCode::Up => {
+                app.select_row(-1);
+                return None;
+            }
+            KeyCode::Down => {
+                app.select_row(1);
+                return None;
+            }
+            _ => {}
+        }
+    }
+
     if matches!(key.code, KeyCode::Delete | KeyCode::Backspace)
         && app.graph_state.selected_edge.is_none()
         && !app.graph_state.selected.is_empty()
@@ -861,6 +880,28 @@ mod tests {
 
     fn key_event(modifiers: KeyModifiers, code: KeyCode) -> Event {
         Event::Key(KeyEvent::new(code, modifiers))
+    }
+
+    #[test]
+    fn rows_view_toggles_and_arrow_keys_select_rows() {
+        let (_temp_dir, mut app) = test_app();
+        app.add_shell_node("one", "true");
+        app.add_shell_node("two", "true");
+        let first = app.workflow.graph.nodes().next().expect("first node").id;
+        let first_graph = crate::tui::graph::subwayrat_node_id(first);
+        app.graph_state.focused = Some(first_graph);
+        app.graph_state.selected = std::collections::HashSet::from([first_graph]);
+        app.focus = FocusPanel::Canvas;
+
+        assert_eq!(app.canvas_view, crate::tui::rows::CanvasView::Graph);
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char('v'))), None);
+        assert_eq!(app.canvas_view, crate::tui::rows::CanvasView::Rows);
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Down)), None);
+        assert_ne!(app.graph_state.focused, Some(first_graph));
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Up)), None);
+        assert_eq!(app.graph_state.focused, Some(first_graph));
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char('v'))), None);
+        assert_eq!(app.canvas_view, crate::tui::rows::CanvasView::Graph);
     }
 
     #[test]
