@@ -1017,6 +1017,13 @@ mod tests {
         let other = DispatchId::try_from_hex("e".repeat(64)).expect("other dispatch");
         assert_eq!(persisted_run_usage(&store, &enforced, &other, RunId(7)), None);
         assert_eq!(persisted_run_usage(&store, &enforced, &dispatch, RunId(8)), None);
+
+        let mut node_observation = observation;
+        node_observation.scope = UsageScope::Node;
+        node_observation.run_id = 10;
+        node_observation.attempt_id = "attempt-node".to_string();
+        store.save_command_worker_usage(&node_observation).expect("node usage saves");
+        assert_eq!(persisted_run_usage(&store, &enforced, &dispatch, RunId(10)), None);
     }
 
     #[test]
