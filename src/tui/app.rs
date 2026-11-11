@@ -2595,12 +2595,28 @@ impl App {
             .and_then(|id| layout.rows.iter().position(|row| row.node_id.0 == id.0))
             .unwrap_or(0);
         let next = if delta < 0 {
-            current.saturating_sub(1)
+            current.saturating_sub(delta.unsigned_abs())
         } else {
-            current.saturating_add(1).min(layout.rows.len().saturating_sub(1))
+            current.saturating_add(delta as usize).min(layout.rows.len().saturating_sub(1))
         };
-        let node_id = layout.rows[next].node_id;
-        let graph_id = crate::tui::graph::subwayrat_node_id(node_id);
+        self.focus_row(&layout, next);
+    }
+
+    /// Select the first or last row in the current topological layout.
+    pub fn select_row_boundary(&mut self, last: bool) {
+        let layout = crate::tui::rows::layout(&self.workflow, crate::tui::rows::DEFAULT_MAX_LANES);
+        if layout.rows.is_empty() {
+            return;
+        }
+        let index = if last { layout.rows.len().saturating_sub(1) } else { 0 };
+        self.focus_row(&layout, index);
+    }
+
+    fn focus_row(&mut self, layout: &crate::tui::rows::RowsLayout, index: usize) {
+        let Some(row) = layout.rows.get(index) else {
+            return;
+        };
+        let graph_id = crate::tui::graph::subwayrat_node_id(row.node_id);
         self.graph_state.selected.clear();
         self.graph_state.selected.insert(graph_id);
         self.graph_state.focused = Some(graph_id);

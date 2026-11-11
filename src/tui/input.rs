@@ -501,6 +501,22 @@ fn handle_canvas_key(app: &mut App, key: &KeyEvent) -> Option<AppAction> {
                 app.select_row(1);
                 return None;
             }
+            KeyCode::PageUp => {
+                app.select_row(-10);
+                return None;
+            }
+            KeyCode::PageDown => {
+                app.select_row(10);
+                return None;
+            }
+            KeyCode::Home => {
+                app.select_row_boundary(false);
+                return None;
+            }
+            KeyCode::End => {
+                app.select_row_boundary(true);
+                return None;
+            }
             _ => {}
         }
     }
@@ -899,6 +915,14 @@ mod tests {
         assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Down)), None);
         assert_ne!(app.graph_state.focused, Some(first_graph));
         assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Up)), None);
+        assert_eq!(app.graph_state.focused, Some(first_graph));
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::End)), None);
+        assert_ne!(app.graph_state.focused, Some(first_graph));
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Home)), None);
+        assert_eq!(app.graph_state.focused, Some(first_graph));
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::PageDown)), None);
+        assert_ne!(app.graph_state.focused, Some(first_graph));
+        assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::PageUp)), None);
         assert_eq!(app.graph_state.focused, Some(first_graph));
         assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char('v'))), None);
         assert_eq!(app.canvas_view, crate::tui::rows::CanvasView::Graph);
