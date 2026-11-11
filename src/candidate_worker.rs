@@ -22,6 +22,7 @@ use crate::candidate_capture::WorkspaceBoundary;
 use crate::candidate_capture::capture_workspace;
 use crate::process::core::RuntimeConfig;
 use crate::process::shell::run_bounded_clear_environment_with_cancellation;
+use crate::store::Store;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CandidateWorkerRequest {
@@ -111,6 +112,36 @@ pub fn run_candidate_worker(
         }
     };
     finish_from_process_output(request, root, base, output)
+}
+
+/// Run one worker and durably publish a produced receipt.
+pub fn run_and_publish_candidate_worker(
+    request: &CandidateWorkerRequest,
+    config: &RuntimeConfig,
+    cancellation: &AtomicBool,
+    store: &Store,
+) -> Result<CandidateWorkerOutcome, CandidateWorkerError> {
+    let outcome = run_candidate_worker(request, config, cancellation)?;
+    let (receipt, stdout, stderr) = match outcome {
+        CandidateWorkerOutcome::Produced {
+            receipt,
+            stdout,
+            stderr,
+        } => (receipt, stdout, stderr),
+        other => return Ok(other),
+    };
+    match store.save_candidate_receipt(&receipt) {
+        Ok(()) => Ok(CandidateWorkerOutcome::Produced {
+            receipt,
+            stdout,
+            stderr,
+        }),
+        Err(error) => Ok(CandidateWorkerOutcome::Unknown {
+            blocker: format!("candidate receipt publication failed: {error}"),
+            stdout,
+            stderr,
+        }),
+    }
 }
 
 fn finish_from_process_output(
@@ -309,6 +340,27 @@ mod tests {
         assert!(matches!(outcome, CandidateWorkerOutcome::Unknown { .. }), "{outcome:?}");
         std::fs::set_permissions(root.join("src/main.rs"), std::fs::Permissions::from_mode(0o644))
             .expect("restore source");
+    }
+
+    #[test]
+    fn produced_candidate_is_published_to_store() {
+        let directory = tempfile::tempdir().expect("temporary workspace");
+        let root = directory.path().join("workspace");
+        std::fs::create_dir_all(root.join("src")).expect("source directory");
+        std::fs::write(root.join("src/main.rs"), b"old").expect("base source");
+        let store = Store::new(directory.path().join("store.redb")).expect("store opens");
+
+        let outcome = run_and_publish_candidate_worker(
+            &request(&root, "printf new > src/main.rs"),
+            &RuntimeConfig::default(),
+            &AtomicBool::new(false),
+            &store,
+        )
+        .expect("worker runs");
+
+        assert!(matches!(outcome, CandidateWorkerOutcome::Produced { .. }), "{outcome:?}");
+        let receipt = store.load_candidate_receipt("attempt-1").expect("receipt loads").expect("receipt exists");
+        assert_eq!(receipt.changed_paths, vec!["src/main.rs"]);
     }
 
     #[test]
