@@ -59,8 +59,13 @@ fn candidate_receipts_persist_and_revalidate() {
     };
 
     store.save_candidate_receipt(&receipt).expect("receipt saves");
+    store.save_candidate_receipt(&receipt).expect("identical receipt is idempotent");
     assert_eq!(store.load_candidate_receipt("attempt-1").expect("receipt loads"), Some(receipt.clone()));
     assert_eq!(store.load_candidate_receipt("missing").expect("missing receipt"), None);
+
+    let mut conflicting = receipt.clone();
+    conflicting.changed_paths = vec!["src/other.rs".to_string()];
+    assert!(matches!(store.save_candidate_receipt(&conflicting), Err(lattice::store::StoreError::Conflict(_))));
 
     let mut invalid = receipt;
     invalid.changed_paths = vec!["../escape".to_string()];
@@ -115,7 +120,15 @@ fn command_worker_usage_persists_and_revalidates() {
         complete: true,
     };
     store.save_command_worker_usage(&observation).expect("usage saves");
+    store.save_command_worker_usage(&observation).expect("identical usage is idempotent");
     assert_eq!(store.load_command_worker_usage("attempt-usage").expect("usage loads"), Some(observation.clone()));
+
+    let mut conflicting = observation.clone();
+    conflicting.tokens = Some(9_999);
+    assert!(matches!(
+        store.save_command_worker_usage(&conflicting),
+        Err(lattice::store::StoreError::Conflict(_))
+    ));
 
     let mut invalid = observation;
     invalid.provenance = UsageProvenance::Unknown;

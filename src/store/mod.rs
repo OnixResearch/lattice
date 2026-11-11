@@ -386,6 +386,20 @@ impl Store {
         let txn = self.db.begin_write().map_err(|error| StoreError::Db(error.to_string()))?;
         {
             let mut table = txn.open_table(CANDIDATE_RECEIPTS).map_err(|error| StoreError::Table(error.to_string()))?;
+            if let Some(existing) =
+                table.get(receipt.attempt_id.as_str()).map_err(|error| StoreError::Db(error.to_string()))?
+            {
+                let text = std::str::from_utf8(existing.value())
+                    .map_err(|error| StoreError::Deserialize(error.to_string()))?;
+                let existing = crate::candidate::CandidateReceipt::from_json(text)
+                    .map_err(|error| StoreError::Deserialize(error.to_string()))?;
+                if existing != *receipt {
+                    return Err(StoreError::Conflict(
+                        "candidate receipt already exists with different content".to_string(),
+                    ));
+                }
+                return Ok(());
+            }
             table
                 .insert(receipt.attempt_id.as_str(), data.as_bytes())
                 .map_err(|error| StoreError::Db(error.to_string()))?;
@@ -474,6 +488,20 @@ impl Store {
         {
             let mut table =
                 txn.open_table(COMMAND_WORKER_USAGE).map_err(|error| StoreError::Table(error.to_string()))?;
+            if let Some(existing) =
+                table.get(observation.attempt_id.as_str()).map_err(|error| StoreError::Db(error.to_string()))?
+            {
+                let text = std::str::from_utf8(existing.value())
+                    .map_err(|error| StoreError::Deserialize(error.to_string()))?;
+                let existing = crate::orchestration::CommandWorkerUsageObservation::from_json(text)
+                    .map_err(|error| StoreError::Deserialize(error.to_string()))?;
+                if existing != *observation {
+                    return Err(StoreError::Conflict(
+                        "command-worker usage already exists with different content".to_string(),
+                    ));
+                }
+                return Ok(());
+            }
             table
                 .insert(observation.attempt_id.as_str(), data.as_bytes())
                 .map_err(|error| StoreError::Db(error.to_string()))?;
