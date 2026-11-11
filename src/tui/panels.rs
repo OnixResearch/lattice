@@ -234,6 +234,7 @@ fn render_canvas(app: &mut App, area: Rect, buf: &mut Buffer) {
     }
 
     if app.canvas_view == crate::tui::rows::CanvasView::Rows {
+        app.rows_hit_area = Some(inner);
         let layout = crate::tui::rows::layout(&app.workflow, crate::tui::rows::DEFAULT_MAX_LANES);
         let selected = app
             .graph_state
@@ -260,6 +261,7 @@ fn render_canvas(app: &mut App, area: Rect, buf: &mut Buffer) {
         return;
     }
 
+    app.rows_hit_area = None;
     let widget = NodeGraphWidget::default();
     widget.render(inner, buf, &mut app.graph_state);
     if let Some(summary) = canvas_image_preview_summary(app) {

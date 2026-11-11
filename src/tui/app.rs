@@ -1148,6 +1148,7 @@ pub struct App {
     next_tui_run_id: u64,
     pub config: AppConfig,
     pub last_drag_canvas: Option<(i32, i32)>,
+    pub rows_hit_area: Option<ratatui::layout::Rect>,
     dirty: bool,
     confirm_quit: bool,
     executor_factory: Arc<dyn Fn() -> Executor + Send + Sync>,
@@ -1216,6 +1217,7 @@ impl App {
             next_tui_run_id,
             config,
             last_drag_canvas: None,
+            rows_hit_area: None,
             dirty: false,
             confirm_quit: false,
             executor_factory: Arc::new(move || {
@@ -2609,6 +2611,12 @@ impl App {
             return;
         }
         let index = if last { layout.rows.len().saturating_sub(1) } else { 0 };
+        self.focus_row(&layout, index);
+    }
+
+    /// Select a specific visible row index.
+    pub fn select_row_index(&mut self, index: usize) {
+        let layout = crate::tui::rows::layout(&self.workflow, crate::tui::rows::DEFAULT_MAX_LANES);
         self.focus_row(&layout, index);
     }
 

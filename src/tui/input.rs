@@ -781,6 +781,18 @@ fn handle_mouse(app: &mut App, mouse: &MouseEvent) -> Option<AppAction> {
         return None;
     }
 
+    if app.canvas_view == crate::tui::rows::CanvasView::Rows
+        && matches!(mouse.kind, MouseEventKind::Down(crossterm::event::MouseButton::Left))
+        && let Some(area) = app.rows_hit_area
+        && mouse.column >= area.x
+        && mouse.column < area.x.saturating_add(area.width)
+        && mouse.row > area.y
+        && mouse.row < area.y.saturating_add(area.height)
+    {
+        app.select_row_index(usize::from(mouse.row - area.y - 1));
+        return None;
+    }
+
     match mouse.kind {
         MouseEventKind::Down(crossterm::event::MouseButton::Left) => {
             let before = graph_counts(app);
@@ -926,6 +938,29 @@ mod tests {
         assert_eq!(app.graph_state.focused, Some(first_graph));
         assert_eq!(handle_event(&mut app, &key_event(KeyModifiers::empty(), KeyCode::Char('v'))), None);
         assert_eq!(app.canvas_view, crate::tui::rows::CanvasView::Graph);
+    }
+
+    #[test]
+    fn rows_view_mouse_click_selects_the_clicked_row() {
+        let (_temp_dir, mut app) = test_app();
+        app.add_shell_node("one", "true");
+        app.add_shell_node("two", "true");
+        app.add_shell_node("three", "true");
+        app.toggle_canvas_view();
+        let mut buffer = ratatui::buffer::Buffer::empty(ratatui::layout::Rect::new(0, 0, 120, 40));
+        crate::tui::panels::render(&mut app, buffer.area, &mut buffer);
+        let area = app.rows_hit_area.expect("rows area recorded");
+        let second = app.workflow.graph.nodes().nth(1).expect("second node").id;
+        let second_graph = crate::tui::graph::subwayrat_node_id(second);
+
+        let event = Event::Mouse(MouseEvent {
+            kind: MouseEventKind::Down(crossterm::event::MouseButton::Left),
+            column: area.x.saturating_add(2),
+            row: area.y.saturating_add(2),
+            modifiers: KeyModifiers::empty(),
+        });
+        assert_eq!(handle_event(&mut app, &event), None);
+        assert_eq!(app.graph_state.focused, Some(second_graph));
     }
 
     #[test]
