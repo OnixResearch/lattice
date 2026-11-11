@@ -210,6 +210,22 @@ pub fn render_rows(
             Style::default().fg(Color::DarkGray),
         ));
     }
+    if !durations_millis.is_empty() || !tokens.is_empty() || !costs_microunits.is_empty() || !attempts.is_empty() {
+        let total_duration = durations_millis.values().fold(0_u64, |total, value| total.saturating_add(*value));
+        let total_tokens = tokens.values().fold(0_u64, |total, value| total.saturating_add(*value));
+        let total_cost = costs_microunits.values().fold(0_u64, |total, value| total.saturating_add(*value));
+        let total_attempts = attempts.values().fold(0_u32, |total, value| total.saturating_add(*value));
+        lines.push(Line::styled(
+            format!(
+                "TOTAL  time {}  tokens {}  cost {}  attempts {}",
+                duration_text(Some(&total_duration), None),
+                total_tokens,
+                cost_text(Some(&total_cost)),
+                total_attempts
+            ),
+            Style::default().fg(Color::DarkGray),
+        ));
+    }
     Paragraph::new(lines).render(area, buffer);
 }
 
@@ -373,6 +389,7 @@ mod tests {
         assert!(rendered.contains("567µ"));
         assert!(rendered.contains("COST"));
         assert!(rendered.contains("ATT"));
+        assert!(rendered.contains("TOTAL"));
         assert!(rendered.contains("bounded output"));
     }
 }
