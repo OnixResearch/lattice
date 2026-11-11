@@ -182,6 +182,7 @@ fn produced_attempt_result(attempt_id: &str) -> CandidateAttemptResult {
         stdout_blake3: "d".repeat(64),
         stderr_blake3: "e".repeat(64),
         blocker: None,
+        compatibility: None,
     }
 }
 

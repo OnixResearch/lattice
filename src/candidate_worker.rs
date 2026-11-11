@@ -145,7 +145,7 @@ pub fn run_and_publish_candidate_worker(
     store: &Store,
 ) -> Result<CandidateWorkerOutcome, CandidateWorkerError> {
     let outcome = run_candidate_worker(request, config, cancellation)?;
-    let result = crate::candidate_worker::CandidateAttemptResult::from_outcome(&outcome);
+    let result = crate::candidate_worker::CandidateAttemptResult::from_outcome(&outcome).with_compatibility(request);
     if let Err(error) = store.save_candidate_attempt_result(&request.attempt_id, &result) {
         return Ok(CandidateWorkerOutcome::Unknown {
             blocker: format!("candidate result publication failed: {error}"),
@@ -412,6 +412,30 @@ fn finish_from_process_output(
     })
 }
 
+fn worker_compatibility(request: &CandidateWorkerRequest) -> Option<CandidateWorkerCompatibility> {
+    let program = std::path::Path::new(&request.program);
+    let program = if program.is_absolute() {
+        program.to_path_buf()
+    } else {
+        which::which(&request.program).ok()?
+    };
+    let program = std::fs::canonicalize(program).ok()?;
+    let worker_program_identity = blake3_identity(&std::fs::read(program).ok()?);
+    let workspace_provider_identity = if request.require_isolation {
+        let sandbox = request.sandbox_program.as_ref()?;
+        blake3_identity(&std::fs::read(std::fs::canonicalize(sandbox).ok()?).ok()?)
+    } else {
+        blake3_identity(b"unsandboxed")
+    };
+    Some(CandidateWorkerCompatibility {
+        schema: CANDIDATE_WORKER_COMPATIBILITY_SCHEMA.to_string(),
+        worker_program_identity,
+        environment_identity: blake3_identity(CANDIDATE_WORKER_ENVIRONMENT.as_bytes()),
+        workspace_provider_identity,
+        result_schema: CANDIDATE_ATTEMPT_RESULT_SCHEMA.to_string(),
+    })
+}
+
 fn within_write_paths(path: &str, write_paths: &[String]) -> bool {
     write_paths.iter().any(|write| path == write || path.starts_with(&format!("{write}/")))
 }
@@ -425,9 +449,23 @@ pub struct CandidateAttemptResult {
     pub stdout_blake3: String,
     pub stderr_blake3: String,
     pub blocker: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compatibility: Option<CandidateWorkerCompatibility>,
 }
 
 pub const CANDIDATE_ATTEMPT_RESULT_SCHEMA: &str = "lattice.candidate-attempt-result.v1";
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct CandidateWorkerCompatibility {
+    pub schema: String,
+    pub worker_program_identity: String,
+    pub environment_identity: String,
+    pub workspace_provider_identity: String,
+    pub result_schema: String,
+}
+
+pub const CANDIDATE_WORKER_COMPATIBILITY_SCHEMA: &str = "lattice.candidate-worker-compatibility.v1";
+pub const CANDIDATE_WORKER_ENVIRONMENT: &str = "lattice.candidate-environment.clear.v1";
 
 impl CandidateAttemptResult {
     /// Project a worker outcome without retaining raw output bytes.
@@ -471,7 +509,15 @@ impl CandidateAttemptResult {
             stdout_blake3: blake3_identity(stdout),
             stderr_blake3: blake3_identity(stderr),
             blocker,
+            compatibility: None,
         }
+    }
+
+    /// Attach the exact worker/workspace/environment identities used for this result.
+    #[must_use]
+    pub fn with_compatibility(mut self, request: &CandidateWorkerRequest) -> Self {
+        self.compatibility = worker_compatibility(request);
+        self
     }
 
     pub fn validate(&self) -> Result<(), CandidateWorkerError> {
@@ -480,6 +526,18 @@ impl CandidateAttemptResult {
         }
         if !is_blake3(&self.stdout_blake3) || !is_blake3(&self.stderr_blake3) {
             return Err(CandidateWorkerError::Result("candidate output identity is malformed".to_string()));
+        }
+        let malformed_compatibility = self.compatibility.as_ref().is_some_and(|compatibility| {
+            compatibility.schema != CANDIDATE_WORKER_COMPATIBILITY_SCHEMA
+                || compatibility.result_schema != CANDIDATE_ATTEMPT_RESULT_SCHEMA
+                || !is_blake3(&compatibility.worker_program_identity)
+                || !is_blake3(&compatibility.environment_identity)
+                || !is_blake3(&compatibility.workspace_provider_identity)
+        });
+        if malformed_compatibility {
+            return Err(CandidateWorkerError::Result(
+                "candidate worker compatibility identity is malformed".to_string(),
+            ));
         }
         for path in &self.published_artifacts {
             validate_candidate_path(path).map_err(|error| CandidateWorkerError::Result(error.to_string()))?;
@@ -639,6 +697,9 @@ mod tests {
         let outcome =
             run_candidate_worker(&isolated, &RuntimeConfig::default(), &AtomicBool::new(false)).expect("worker runs");
 
+        let result = CandidateAttemptResult::from_outcome(&outcome).with_compatibility(&isolated);
+        result.validate().expect("compatibility validates");
+        assert!(result.compatibility.is_some());
         let CandidateWorkerOutcome::Produced { receipt, .. } = outcome else {
             panic!("expected isolated candidate, got {outcome:?}");
         };
@@ -968,6 +1029,7 @@ mod tests {
             stdout_blake3: blake3_identity(b""),
             stderr_blake3: blake3_identity(b""),
             blocker: None,
+            compatibility: None,
         };
         store.save_candidate_attempt_result("attempt-incomplete", &result).expect("result saves");
         assert!(matches!(
