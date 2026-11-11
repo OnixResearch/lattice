@@ -25,6 +25,7 @@ use crate::process::core::RuntimeConfig;
 use crate::process::shell::run_bounded_clear_environment_with_cancellation;
 use crate::pure_inet_profile::blake3_identity;
 use crate::store::Store;
+use crate::store::StoreError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CandidateWorkerRequest {
@@ -175,6 +176,39 @@ pub fn run_and_publish_candidate_worker(
         stdout,
         stderr,
     })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CandidateRecovery {
+    Published(CandidateAttemptResult),
+    Incomplete { blocker: String },
+    Missing,
+}
+
+/// Reconcile the durable result and receipt without redispatching work.
+pub fn reconcile_candidate_attempt(store: &Store, attempt_id: &str) -> Result<CandidateRecovery, CandidateWorkerError> {
+    let result = store.load_candidate_attempt_result(attempt_id)?;
+    let receipt = store.load_candidate_receipt(attempt_id)?;
+    match (result, receipt) {
+        (None, None) => Ok(CandidateRecovery::Missing),
+        (None, Some(_)) => Ok(CandidateRecovery::Incomplete {
+            blocker: "candidate receipt exists without an attempt result".to_string(),
+        }),
+        (Some(result), None) if result.disposition == CandidateDisposition::Produced => {
+            Ok(CandidateRecovery::Incomplete {
+                blocker: "produced attempt result exists without a receipt".to_string(),
+            })
+        }
+        (Some(result), Some(receipt)) if result.disposition == CandidateDisposition::Produced => {
+            if result.receipt.as_ref() != Some(&receipt) {
+                return Ok(CandidateRecovery::Incomplete {
+                    blocker: "attempt result and stored receipt disagree".to_string(),
+                });
+            }
+            Ok(CandidateRecovery::Published(result))
+        }
+        (Some(result), _) => Ok(CandidateRecovery::Published(result)),
+    }
 }
 
 fn finish_from_process_output(
@@ -348,6 +382,8 @@ pub enum CandidateWorkerError {
     NonUtf8Root,
     #[error("candidate attempt result is invalid: {0}")]
     Result(String),
+    #[error("candidate store operation failed: {0}")]
+    Store(#[from] StoreError),
 }
 
 #[cfg(test)]
@@ -493,6 +529,41 @@ mod tests {
         assert_eq!(store.list_candidate_artifacts("attempt-1").expect("artifacts list").len(), 1);
         let result = store.load_candidate_attempt_result("attempt-1").expect("result loads").expect("result exists");
         assert_eq!(result.disposition, CandidateDisposition::Produced);
+        assert!(matches!(reconcile_candidate_attempt(&store, "attempt-1"), Ok(CandidateRecovery::Published(_))));
+    }
+
+    #[test]
+    fn reconciliation_reports_missing_and_incomplete_publication() {
+        let directory = tempfile::tempdir().expect("temporary workspace");
+        let store = Store::new(directory.path().join("reconcile.redb")).expect("store opens");
+        assert!(matches!(reconcile_candidate_attempt(&store, "attempt-missing"), Ok(CandidateRecovery::Missing)));
+
+        let receipt = CandidateReceipt {
+            schema: crate::candidate::CANDIDATE_RECEIPT_SCHEMA.to_string(),
+            work_id: "work-1".to_string(),
+            attempt_id: "attempt-incomplete".to_string(),
+            fence: "7".to_string(),
+            workspace_id: "workspace-1".to_string(),
+            base_identity: "a".repeat(64),
+            candidate_identity: Some("b".repeat(64)),
+            diff_identity: Some("c".repeat(64)),
+            changed_paths: vec!["src/main.rs".to_string()],
+            disposition: CandidateDisposition::Produced,
+            blockers: Vec::new(),
+        };
+        let result = CandidateAttemptResult {
+            schema: CANDIDATE_ATTEMPT_RESULT_SCHEMA.to_string(),
+            disposition: CandidateDisposition::Produced,
+            receipt: Some(receipt),
+            stdout_blake3: blake3_identity(b""),
+            stderr_blake3: blake3_identity(b""),
+            blocker: None,
+        };
+        store.save_candidate_attempt_result("attempt-incomplete", &result).expect("result saves");
+        assert!(matches!(
+            reconcile_candidate_attempt(&store, "attempt-incomplete"),
+            Ok(CandidateRecovery::Incomplete { .. })
+        ));
     }
 
     #[test]

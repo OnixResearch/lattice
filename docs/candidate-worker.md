@@ -43,6 +43,11 @@ than claiming success. Deleted files have no artifact bytes.
 fence, and workspace bindings and recomputes the identities and changed paths
 from the actual snapshots. Crossed bindings and stale snapshots are rejected.
 
+`reconcile_candidate_attempt` reads durable records without redispatching. It
+reports `Missing` when no result or receipt exists, `Incomplete` when a produced
+result lacks its receipt or the stored records disagree, and `Published` when
+the result and receipt agree.
+
 ## Non-claims
 
 This boundary does not provide OS-level read/write isolation, prevent a worker
