@@ -134,6 +134,7 @@ pub struct AppRunState {
     pub node_started: HashMap<u64, std::time::Instant>,
     pub node_durations_millis: HashMap<u64, u64>,
     pub node_tokens: HashMap<u64, u64>,
+    pub node_attempts: HashMap<u64, u32>,
     pub active_replay_timeline: Option<ReplayTimeline>,
 }
 
@@ -145,6 +146,7 @@ impl AppRunState {
             node_started: HashMap::new(),
             node_durations_millis: HashMap::new(),
             node_tokens: HashMap::new(),
+            node_attempts: HashMap::new(),
             active_replay_timeline: None,
         }
     }
@@ -2766,6 +2768,7 @@ impl App {
             node_started: HashMap::new(),
             node_durations_millis: HashMap::new(),
             node_tokens: HashMap::new(),
+            node_attempts: HashMap::new(),
             active_replay_timeline: None,
         };
         self.output.push_line(message);
@@ -2892,6 +2895,7 @@ impl App {
                 RunEvent::NodeProgress(progress) => match progress {
                     crate::engine::executor::NodeProgress::Started { node_id } => {
                         self.run_state.node_started.insert(node_id.0, std::time::Instant::now());
+                        *self.run_state.node_attempts.entry(node_id.0).or_insert(0) += 1;
                         if matches!(self.run_state.node_statuses.get(&node_id.0), None | Some(NodeRunStatus::Pending)) {
                             self.run_state.node_statuses.insert(node_id.0, NodeRunStatus::Running);
                         }
