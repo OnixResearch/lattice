@@ -1,0 +1,98 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      TZ: UTC
+      RUST_BACKTRACE: "1"
+      CARGO_INCREMENTAL: "0"
+      CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31
+
+      - name: Run hardened check harness
+        run: ./scripts/check.rs
+
+      - name: Run Octet precommit gate
+        run: nix develop . -c octet-precommit-check
+
+      - name: Run Nix flake checks
+        run: nix flake check -L --option secret-key-files ''
+
+      - name: Build release package
+        run: nix build .#lattice -o result
+
+      - name: Verify release binary
+        run: |
+          set -eu
+          test -x result/bin/lattice
+          version="$(result/bin/lattice --version)"
+          tag_version="${GITHUB_REF_NAME#v}"
+          case "$version" in
+            "lattice $tag_version") ;;
+            *)
+              echo "version mismatch: binary='$version' tag='$GITHUB_REF_NAME'" >&2
+              exit 1
+              ;;
+          esac
+          result/bin/lattice --help > /dev/null
+
+      - name: Assemble release assets
+        run: |
+          set -eu
+          version="${GITHUB_REF_NAME#v}"
+          name="lattice-${version}-x86_64-linux"
+          mkdir -p "dist/${name}/bin"
+          install -m 0755 result/bin/lattice "dist/${name}/bin/lattice"
+          install -m 0644 README.md LICENSE CHANGELOG.md SECURITY.md CONTRIBUTING.md "dist/${name}/"
+          tar -czf "dist/${name}.tar.gz" -C dist "${name}"
+          (cd dist && sha256sum "${name}.tar.gz" > SHA256SUMS)
+          test -s "dist/${name}.tar.gz"
+          test -s dist/SHA256SUMS
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          notes_file="docs/release-notes-${version}.md"
+          notes_args=(--generate-notes)
+          if [ -f "$notes_file" ]; then
+            notes_args=(--notes-file "$notes_file")
+          fi
+          gh release create "${GITHUB_REF_NAME}" \
+            dist/*.tar.gz \
+            dist/SHA256SUMS \
+            --repo "${GITHUB_REPOSITORY}" \
+            --verify-tag \
+            "${notes_args[@]}" \
+            --title "Lattice ${GITHUB_REF_NAME}"
+
+      - name: Verify release left no tracked changes
+        if: success() || failure()
+        run: |
+          git status --short
+          git diff --check
+          git diff --exit-code
+          test -z "$(git status --porcelain)"

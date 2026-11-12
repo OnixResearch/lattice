@@ -3,6 +3,12 @@ name = "lattice"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
+description = "Graph-native workflow and agent runtime with durable local execution"
+repository = "https://github.com/OnixResearch/lattice"
+homepage = "https://github.com/OnixResearch/lattice"
+readme = "README.md"
+keywords = ["workflow", "automation", "agents", "nickel", "orchestration"]
+categories = ["command-line-utilities", "development-tools"]
 
 [workspace]
 # The root package is implicit; listing "." shadows nested workspace exclusions.
@@ -15,6 +21,7 @@ members = [
 ]
 default-members = ["."]
 exclude = [
+  "compose",
   "vendor-cargo-deps/rats",
   "vendor-cargo-deps/animus",
   "vendor-cargo-deps/basalt",
@@ -49,11 +56,8 @@ path = "src/main.rs"
 [dependencies]
 budget-ledger-core = { path = "crates/budget-ledger-core" }
 lattice-core = { path = "crates/lattice-core" }
-lattice-compose-binding = { path = "crates/lattice-compose-binding" }
 lattice-workflow-contract = { path = "crates/lattice-workflow-contract" }
 lattice-workflow-transport = { path = "crates/lattice-workflow-contract/transport" }
-tile-sdk = { git = "ssh://git@github.com/brittonr/tile.git", rev = "5e703953840bff72a91fec3e928682e9efb607ab" }
-tile-protocol = { git = "ssh://git@github.com/brittonr/tile.git", rev = "5e703953840bff72a91fec3e928682e9efb607ab" }
 tokio = { version = "1.50", features = ["full"] }
 futures = "0.3.32"
 async-trait = "0.1.89"
@@ -109,7 +113,7 @@ hardened-wasmtime-runtime = { path = "vendor-cargo-deps/hardened-wasmtime-runtim
 hardened-wasmtime-shell = { path = "vendor-cargo-deps/hardened-wasmtime-runtime/crates/hardened-wasmtime-shell" }
 mantle-build-contract = { path = "vendor-cargo-deps/mantle/crates/mantle-build-contract", default-features = false }
 mantle-wasm-consumer-verifier = { path = "vendor-cargo-deps/mantle/crates/mantle-wasm-consumer-verifier" }
-valence-core = { git = "ssh://git@github.com/OnixResearch/valence.git", rev = "15e72b5a330b08139ac7c809ac31e7e87f825b22" }
+valence-core = { git = "https://github.com/OnixResearch/valence.git", rev = "15e72b5a330b08139ac7c809ac31e7e87f825b22" }
 zeroize = "1"
 
 [target.'cfg(unix)'.dependencies]
@@ -134,3 +138,13 @@ animus-secretspec = ["dep:animus-std-secretspec"]
 
 [patch.crates-io]
 nickel-lang-core = { path = "vendor-cargo-deps/nickel-lang-core-0.18.0" }
+
+# Upstream manifests still name these public repositories over SSH. Patch the
+# exact revisions to their anonymous HTTPS sources so the public build closure
+# does not require an SSH key or a writable GitHub account.
+[patch."ssh://git@github.com/OnixResearch/onix-artifact.git"]
+artifact-auth-core = { git = "https://github.com/OnixResearch/onix-artifact.git", rev = "5f3962d7471d1547e044f57daeda72f56621fd52" }
+artifact-auth-ed25519 = { git = "https://github.com/OnixResearch/onix-artifact.git", rev = "5f3962d7471d1547e044f57daeda72f56621fd52" }
+
+[patch."ssh://git@github.com/OnixResearch/trellis.git"]
+verified-logic = { git = "https://github.com/OnixResearch/trellis.git", rev = "d65974b14978e1a44b0f5067beb9ef6d83317dc8" }

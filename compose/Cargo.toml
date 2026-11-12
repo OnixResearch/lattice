@@ -1,0 +1,40 @@
+[package]
+name = "lattice-compose-surface"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Explicit Tile pane observation and metadata receipt binding for Lattice"
+
+[workspace]
+# Deliberately separate from the root Lattice workspace. The public server build
+# has no Tile dependency; operators with authorized Tile source access build this
+# integration explicitly.
+members = ["."]
+
+[dependencies]
+async-trait = "0.1.89"
+lattice-compose-binding = { path = "../crates/lattice-compose-binding" }
+lattice-workflow-contract = { path = "../crates/lattice-workflow-contract" }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+thiserror = "2.0.18"
+tile-protocol = { git = "ssh://git@github.com/brittonr/tile.git", rev = "5e703953840bff72a91fec3e928682e9efb607ab" }
+tile-sdk = { git = "ssh://git@github.com/brittonr/tile.git", rev = "5e703953840bff72a91fec3e928682e9efb607ab" }
+tokio = { version = "1.50", features = ["full"] }
+
+[[example]]
+name = "compose-pane"
+path = "examples/compose-pane.rs"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+dbg_macro = "deny"
+expect_used = "deny"
+indexing_slicing = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+unwrap_used = "deny"

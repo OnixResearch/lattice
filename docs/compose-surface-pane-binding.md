@@ -25,22 +25,24 @@ persistence-field, socket-path, and secret omission flags must all be true.
 not consumed. Lattice does not copy the producer implementation or depend on a
 sibling checkout.
 
-`Cargo.toml` declares both producer crates from
-`ssh://git@github.com/brittonr/tile.git` at that reviewed revision; `Cargo.lock`
-retains the same exact source for `tile-sdk`, `tile-protocol`, and `tile-core`.
-Acquisition through this authenticated SSH route was exercised. Anonymous HTTPS
-acquisition was not established; building requires the declared source access or
-an already admitted cache, not a sibling checkout.
+`compose/Cargo.toml` declares both producer crates from
+`ssh://git@github.com/brittonr/tile.git` at that reviewed revision;
+`compose/Cargo.lock` retains the same exact source for `tile-sdk`,
+`tile-protocol`, and `tile-core`. Acquisition through this authenticated SSH
+route was exercised. Anonymous HTTPS acquisition was not established; building
+requires the declared source access or an already admitted cache, not a sibling
+checkout. This workspace is excluded from the public runtime build, public
+checks, and release artifact.
 
 Dependency-repair verification compiled this actual adapter source in a
 disposable consumer, passed its three existing positive/negative tests, and ran
 the real Tile projection with private title/cwd omission and Lattice request
 admission/rejection checks. No daemon was started or contacted. This is adapter
 and projection evidence, not a passing complete Lattice executable: the separate
-component-runtime/verifier contract remains unresolved. Once that closure is
-available, repeat the repository-owned adapter tests with
-`cargo test --locked --package lattice --lib compose_surface::`. Lattice owns
-this dependency binding and adapter; Tile retains observation authority.
+component-runtime/verifier contract remains unresolved. Repeat the
+repository-owned adapter tests from the separate compose workspace with
+`cargo test --manifest-path compose/Cargo.toml --locked`. Lattice owns this
+dependency binding and adapter; Tile retains observation authority.
 
 The daemon authority BLAKE3 identity and connected client are explicit host
 inputs. The source revision identifies the adapter's reviewed producer contract;
@@ -101,7 +103,7 @@ admission must resolve and compare the exact workflow before calling activation.
 The explicit std consumer uses the real pinned Tile SDK:
 
 ```sh
-cargo run --locked --example compose-pane -- \
+cargo run --manifest-path compose/Cargo.toml --locked --example compose-pane -- \
   "$SOCKET" "$DAEMON_BLAKE3_IDENTITY" "$REQUEST_JSON"
 ```
 
@@ -118,7 +120,7 @@ Focused regressions for the integration owner:
 
 ```sh
 cargo test --locked -p lattice-compose-binding
-cargo test --locked --lib compose_surface::tests
+cargo test --manifest-path compose/Cargo.toml --locked
 cargo check --locked -p lattice-compose-binding --lib
 ```
 

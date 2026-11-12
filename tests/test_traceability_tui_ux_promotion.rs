@@ -26,13 +26,15 @@ const COMPLETION: &str = include_str!("test_tui_ux_completion.rs");
 const BASELINE_COUNT: usize = 98;
 const CURRENT_COUNT: usize = 0;
 const PROMOTED_COUNT: usize = 98;
-const BINDING_COUNT: usize = 108;
+const BINDING_COUNT: usize = 111;
 const DOUBLE_BINDING_COUNT: usize = 2;
 const TRIPLE_BINDING_COUNT: usize = 3;
-const WORKSPACE_BINDING_COUNT: usize = 4;
+const KEYBOARD_FIRST_BINDING_COUNT: usize = 3;
+const WORKSPACE_BINDING_COUNT: usize = 5;
 const REPEATED_BINDING_COUNTS: &[(&str, usize)] = &[
     (concat!("n8n", "clone.tui_ux.agent_nodes.add_flow"), DOUBLE_BINDING_COUNT),
     (concat!("n8n", "clone.tui_ux.agent_nodes.errors"), TRIPLE_BINDING_COUNT),
+    (concat!("n8n", "clone.tui_ux.keyboard_first"), KEYBOARD_FIRST_BINDING_COUNT),
     (concat!("n8n", "clone.tui_ux.properties.discoverable_entrypoints"), DOUBLE_BINDING_COUNT),
     (concat!("n8n", "clone.tui_ux.unsaved.failed_save"), DOUBLE_BINDING_COUNT),
     (concat!("n8n", "clone.tui_ux.unsaved.mutation_marks_dirty"), DOUBLE_BINDING_COUNT),
@@ -406,6 +408,11 @@ const COMPLETION_BINDINGS: &[Binding] = &[
         "workspace_render_exposes_all_panels_and_keyboard_authoring_actions",
     ),
     (
+        concat!("n8n", "clone.tui_ux.keyboard_first"),
+        "operator_e2e_tui_toggles_between_graph_and_rows_views",
+    ),
+    (concat!("n8n", "clone.tui_ux.keyboard_first"), "rows_view_renders_topological_metadata_columns"),
+    (
         concat!("n8n", "clone.tui_ux.replay_debugger.active_run.stream"),
         "active_run_keeps_rendering_and_input_live_while_replay_events_stream",
     ),
@@ -413,6 +420,7 @@ const COMPLETION_BINDINGS: &[Binding] = &[
         concat!("n8n", "clone.tui_ux.workspace"),
         "workspace_render_exposes_all_panels_and_keyboard_authoring_actions",
     ),
+    (concat!("n8n", "clone.tui_ux.workspace"), "rows_view_renders_topological_metadata_columns"),
     (
         concat!("n8n", "clone.tui_ux.workspace.starts"),
         "workspace_render_exposes_all_panels_and_keyboard_authoring_actions",

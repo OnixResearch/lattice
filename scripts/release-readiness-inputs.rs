@@ -193,11 +193,13 @@ fn write_output(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 fn source_manifest(root: &Path) -> Result<Value, Box<dyn std::error::Error>> {
     let mut pending = [
         "src",
+        "compose",
         "crates",
         "tests",
         "scripts",
         "examples",
         "docs",
+        "deploy",
         ".cairn",
         "cairn-policy",
         "builtins",
@@ -214,6 +216,9 @@ fn source_manifest(root: &Path) -> Result<Value, Box<dyn std::error::Error>> {
         "flake.lock",
         "LICENSE",
         "README.md",
+        "SECURITY.md",
+        "CONTRIBUTING.md",
+        "CHANGELOG.md",
         "rust-toolchain.toml",
         ".cargo/config.toml",
         "clippy.toml",
@@ -223,6 +228,7 @@ fn source_manifest(root: &Path) -> Result<Value, Box<dyn std::error::Error>> {
         ".pre-commit-config.yaml",
         ".config/nextest.toml",
         ".github/workflows/check.yml",
+        ".github/workflows/release.yml",
     ]
     .into_iter()
     .map(PathBuf::from)

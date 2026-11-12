@@ -3,14 +3,14 @@ use std::io::Read;
 use std::io::Write;
 use std::time::Duration;
 
-use lattice::compose_surface::ComposeError;
-use lattice::compose_surface::ReceiptPublisher;
-use lattice::compose_surface::TileSdkPanePort;
-use lattice::compose_surface::activate;
-use lattice::compose_surface::decode_request;
 use lattice_compose_binding::ActivationReceipt;
 use lattice_compose_binding::MAXIMUM_RECEIPT_BYTES;
 use lattice_compose_binding::MAXIMUM_REQUEST_BYTES;
+use lattice_compose_surface::ComposeError;
+use lattice_compose_surface::ReceiptPublisher;
+use lattice_compose_surface::TileSdkPanePort;
+use lattice_compose_surface::activate;
+use lattice_compose_surface::decode_request;
 use lattice_workflow_contract::Identity;
 
 struct StdoutReceipt;

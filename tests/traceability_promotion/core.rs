@@ -141,7 +141,10 @@ pub fn validate_policy_excludes_promoted_ids(policy: &str, promoted_ids: &[&str]
 }
 
 fn is_supported_test_attribute(line: &str) -> bool {
-    line == "#[test]" || line == "#[tokio::test]" || (line.starts_with("#[tokio::test(") && line.ends_with(")]"))
+    line == "#[test]"
+        || line == "#[tokio::test]"
+        || (line.starts_with("#[tokio::test(") && line.ends_with(")]"))
+        || (line.starts_with("#[cfg(") && line.ends_with(")]"))
 }
 
 pub fn marker_is_attached_to_test(source: &str, test_name: &str, requirement_id: &str) -> bool {

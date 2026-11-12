@@ -25,14 +25,16 @@
 - `b3sum` independently checked the fixture canonical byte frames: 612-byte
   binding frame `ae290bfbb5090098b04fefeef43e2b9159f1c463c38ad5971db55716b19332a3`;
   369-byte receipt frame `7f6b771f92c3432cdf17e29e71cce31d838a87a0adb9305843cabe917af328f7`.
-- Parent integration now declares the two Tile crates at the exact reviewed
-  revision through authenticated GitHub SSH and refreshes Cargo's lock using
-  `cargo update -p regex`; no sibling dependency or producer source copy is added.
+- The integration now lives in the separate `compose/` workspace, which declares
+  the two Tile crates at the exact reviewed revision through authenticated
+  GitHub SSH and carries its own lockfile. The default Lattice workspace, public
+  checks, and release artifact exclude that workspace; no sibling dependency or
+  producer source copy is added.
 - A disposable consumer compiled the actual adapter source, passed its three
   existing positive/negative tests and ran actual Tile projection/redaction plus
   Lattice request admission/rejection. This did not start or contact a daemon.
 - Full application checks and a real daemon/consumer smoke remain unqualified
   because the independent component-runtime/verifier contracts are unresolved.
   The final verification task stays open. The explicit consumer remains
-  `examples/compose-pane.rs`; operator commands and claim boundaries are in
-  `docs/compose-surface-pane-binding.md`.
+  `compose/examples/compose-pane.rs`; operator commands and claim boundaries are
+  in `docs/compose-surface-pane-binding.md`.

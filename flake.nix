@@ -10,10 +10,20 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     flake-utils.url = "github:numtide/flake-utils";
-    octet.url = "github:OnixResearch/octet/bac0f3220ada38110c03498ccf2beae5ee83e642";
+    octet = {
+      url = "github:OnixResearch/octet/bac0f3220ada38110c03498ccf2beae5ee83e642";
+      # Octet locks two public producer repositories over SSH. Keep the exact
+      # revisions but acquire them anonymously over HTTPS.
+      inputs.cairn.url = "git+https://github.com/OnixResearch/cairn.git?rev=695124d459574ba7aeba6097310d237f393c243c";
+      inputs.cairn.inputs.artifact.url = "git+https://github.com/OnixResearch/onix-artifact.git?rev=e41340bec587b6d049b5cc518ec7db925dde84be";
+      inputs.valence.url = "git+https://github.com/OnixResearch/valence.git?rev=7546a78b4eeef8686c6837e187aa12420f4f03bb";
+    };
     cairn = {
-      url = "git+ssh://git@github.com/OnixResearch/cairn.git?rev=47ea1b867c44b026c030b535f9a1041950c482a0";
-      flake = false;
+      url = "git+https://github.com/OnixResearch/cairn.git?rev=47ea1b867c44b026c030b535f9a1041950c482a0";
+      # Cairn still locks two public producer repositories over SSH. Pin the
+      # same revisions to anonymous HTTPS so the Lattice flake closure is
+      # publicly acquirable.
+      inputs.artifact.url = "git+https://github.com/OnixResearch/onix-artifact.git?rev=e41340bec587b6d049b5cc518ec7db925dde84be";
     };
     role-protocol-runtime-source = {
       url = "git+https://seed.radicle.garden/z2yGPFsQZsUcFNkiyR4Dkj22BuxnC.git?rev=cbb5db0e4844b466dcd1877218eb1f00a2a7caf2";
@@ -67,9 +77,7 @@
       system:
       let
         exactNickel = nickel-1-17-0.packages.${system}.default;
-        cairnNative =
-          (builtins.getFlake (builtins.unsafeDiscardStringContext "path:${cairn}?narHash=${cairn.narHash}"))
-          .packages.${system}.cairn;
+        cairnNative = cairn.packages.${system}.cairn;
         pkgs = import nixpkgs {
           inherit system;
           overlays = [
@@ -80,10 +88,9 @@
 
         cairnCli = pkgs.writeShellApplication {
           name = "cairn";
-          runtimeInputs = [ pkgs.nix ];
           text = ''
             policy_path=${pkgs.lib.escapeShellArg "${./cairn-policy/generated/cairn-policy.json}"}
-            source_flake=${pkgs.lib.escapeShellArg "path:${cairn}"}
+            cairn_bin=${pkgs.lib.escapeShellArg "${cairnNative}/bin/cairn"}
 
             has_policy_arg=false
             for argument in "$@"; do
@@ -97,12 +104,12 @@
             case "$command" in
               agent-receipt|change|doctor|validate|release-readiness|policy|probe|steel-orchestration|traceability|tracey|migrate|gate|sync|archive)
                 if [ "$has_policy_arg" = false ]; then
-                  exec nix run "$source_flake#cairn" -- "$@" --policy "$policy_path"
+                  exec "$cairn_bin" "$@" --policy "$policy_path"
                 fi
                 ;;
             esac
 
-            exec nix run "$source_flake#cairn" -- "$@"
+            exec "$cairn_bin" "$@"
           '';
         };
 
@@ -233,6 +240,7 @@
           path:
           pkgs.lib.hasPrefix "${sourceRoot}/examples/" (toString path)
           || pkgs.lib.hasPrefix "${sourceRoot}/tests/" (toString path)
+          || pkgs.lib.hasPrefix "${sourceRoot}/fixtures/" (toString path)
           || pkgs.lib.hasPrefix "${sourceRoot}/.cairn/specs/" (toString path)
           || pkgs.lib.hasPrefix "${sourceRoot}/cairn-policy/" (toString path);
         isAnimusCompileTimeAssetPath =
@@ -399,10 +407,13 @@
             pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
           ];
 
-        # Build just the cargo dependencies for caching
+        # Build the cargo dependency closure. The real source is used instead of
+        # crane's default dummy source because the root `nickel-lang-core` patch
+        # is a path dependency of the external `nickel-lang` crate; stubbing it
+        # would remove the module surface that `nickel-lang` imports.
         cargoArtifacts = craneLib.buildDepsOnly {
+          dummySrc = src;
           inherit
-            src
             cargoVendorDir
             nativeBuildInputs
             buildInputs
@@ -1066,7 +1077,10 @@
             buildInputs
             ;
           nativeBuildInputs = nativeBuildInputs ++ [ pkgs.nickel ];
-          LATTICE_CAIRN_BIN = "${cairnNative}/bin/cairn";
+          # Tests run in the dedicated `nextest` check, which supplies the
+          # pinned Cairn binary and the full test environment. The release
+          # package build only produces the binary.
+          doCheck = false;
         };
       in
       {
@@ -1162,7 +1176,11 @@
               cargoVendorDir
               buildInputs
               ;
-            nativeBuildInputs = nativeBuildInputs ++ [ pkgs.nickel ];
+            nativeBuildInputs = nativeBuildInputs ++ [
+              pkgs.bash
+              pkgs.coreutils
+              pkgs.nickel
+            ];
             LATTICE_CAIRN_BIN = "${cairnNative}/bin/cairn";
             cargoNextestExtraArgs = "--test-threads 1";
             partitions = 1;

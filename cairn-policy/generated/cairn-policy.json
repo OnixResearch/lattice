@@ -5695,6 +5695,13 @@
             "extensions": [
               "rs"
             ],
+            "root": "compose",
+            "source_kind": "rust_source"
+          },
+          {
+            "extensions": [
+              "rs"
+            ],
             "root": "crates",
             "source_kind": "rust_source"
           },

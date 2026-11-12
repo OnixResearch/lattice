@@ -13,12 +13,21 @@ output is not permission to change the graph or expand its authority.
 
 ## Current status
 
+Lattice is a pre-1.0 release candidate. The default runtime, public checks, and
+release binary build from anonymous HTTPS sources; no SSH key or GitHub write
+access is required.
+
 The standalone CLI and TUI accept an explicit local-operator Nickel profile via
 the `effect_authority` configuration field. Without one, shell, HTTP, file, and
 Agent effects fail closed before credential resolution or adapter dispatch.
 Embedders can instead supply their own `RunContextProvider`.
 See [Choregraph effect authority](docs/choregraph-effect-authority.md) for exact
 workflow inspection, profile authoring, expiry, and file-root configuration.
+
+The optional Tile compose integration lives in the separate
+[`compose/`](compose/) workspace. It requires authorized access to the exact Tile
+revision and is not part of the default build, public checks, or release
+artifact.
 
 The quickstart begins with effect-free import and export. Executing its shell
 pipeline requires a reviewed operator profile. The standalone executor selects
@@ -41,6 +50,15 @@ and authorization does not deliver credentials.
 - **Consumer integration:** expose a bounded, identity-bound workflow contract
   and Unix-socket exchange without giving consumers Lattice's runtime internals.
 
+## Release and operations
+
+- [Documentation index](docs/README.md)
+- [Server deployment](docs/server-deployment.md) and the
+  [systemd unit](deploy/systemd/lattice-workflow-exchange.service)
+- [Release process](docs/release-process.md) and [changelog](CHANGELOG.md)
+- [Security policy](SECURITY.md) and [contribution guide](CONTRIBUTING.md)
+- [Go-to-market plan](docs/go-to-market.md)
+
 ## Getting started
 
 ### Build environment
@@ -55,16 +73,15 @@ nix develop
 cargo run --locked -- --help
 ```
 
-The current flake fetches Cairn revision
-`47ea1b867c44b026c030b535f9a1041950c482a0` and its locked Artifact input
-`e41340bec587b6d049b5cc518ec7db925dde84be` over GitHub SSH. Cargo's locked
-Choregraph closure also selects Trellis revision
-`d65974b14978e1a44b0f5067beb9ef6d83317dc8` over GitHub SSH. Authorized
-access to those exact sources (or an existing exact cache) is required; Lattice's
-public source alone does not establish an anonymously acquirable build closure.
-Other dependencies still require their locked network sources or existing
-caches. Exact sources live in [Cargo.toml](Cargo.toml), [flake.nix](flake.nix),
-and their lockfiles; do not substitute sibling checkouts or floating revisions.
+The flake and Cargo lock pin exact revisions from anonymous HTTPS sources,
+including Cairn `47ea1b867c44b026c030b535f9a1041950c482a0`, its Artifact input
+`e41340bec587b6d049b5cc518ec7db925dde84be`, and Trellis
+`d65974b14978e1a44b0f5067beb9ef6d83317dc8`. The root manifest patches the
+transitive SSH-only Artifact and Trellis references to those exact public
+revisions. Other dependencies still require their locked network sources or
+existing caches. Exact sources live in [Cargo.toml](Cargo.toml),
+[flake.nix](flake.nix), and their lockfiles; do not substitute sibling checkouts
+or floating revisions.
 
 The component and asynchronous CI adapters also consume exact native Basalt,
 Mantle and hardened-runtime snapshots under `vendor-cargo-deps/`, with producer
@@ -73,8 +90,8 @@ notes. Maintain them through the [repository-owned import
 procedure](vendor-cargo-deps/README.md), not sibling dependency overrides or
 edits to imported source. Local correction cohorts are not remote-publication
 evidence. The actual Valence build-service validator is separately locked to
-`15e72b5a330b08139ac7c809ac31e7e87f825b22` over GitHub SSH; it and its exact
-Artifact dependencies require authorized acquisition or caches.
+`15e72b5a330b08139ac7c809ac31e7e87f825b22` over anonymous HTTPS; its exact
+Artifact dependencies are patched to their public revisions.
 
 ### Import and export a workflow
 
@@ -253,6 +270,11 @@ Octet gate rejects new finding IDs outside the reviewed baseline. The Nix
 command disables host signing keys only for that check invocation; it does not
 change normal package or release signing policy.
 
+Build the release package with `nix build .#lattice` and verify
+`./result/bin/lattice --version`. The optional compose workspace is checked
+separately with `cargo test --manifest-path compose/Cargo.toml --locked`; it
+requires authorized Tile source access and is not part of the default checks.
+
 Integration tests that invoke Cairn require `LATTICE_CAIRN_BIN`; the
 development shell sets it to the pinned native binary. Running `cargo test`
 outside the development shell fails closed instead of using an unrelated
@@ -273,12 +295,13 @@ templates, documentation, and policy. See [LICENSE](LICENSE) and
 
 Previous grants cannot be revoked. Content already received under MIT retains
 those rights, including byte-identical content still present in this tree. The
-contract and transport retain their attributed historical MIT notices in
-`LICENSE-MIT-HISTORICAL`; those notices do not offer MIT for new contributions.
+contract and transport packages each retain their attributed historical MIT
+notices in a package-local `LICENSE-MIT-HISTORICAL` file; those notices do not
+offer MIT for new contributions.
 Kiln's immutable imported contract is not refreshed or relicensed by this change.
 
 Imported Rats, Animus, Basalt, Host Control, and TOON snapshots, other third-party
 material, exact old dependency pins, and historical receipts retain their own
-source-specific terms and identities. This source preparation does not publish
-a new revision or establish anonymous acquisition; the SSH and network/cache
-prerequisites above remain in force.
+source-specific terms and identities. The default build closure is anonymously
+acquirable; the optional compose workspace and exact old pins retain their own
+source-access boundaries.

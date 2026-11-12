@@ -44,7 +44,11 @@ mod doctor;
 
 // r[impl lattice.project_identity.canonical]
 #[derive(Parser, Debug)]
-#[command(name = "lattice", about = "Graph-native workflow automation in your terminal")]
+#[command(
+    name = "lattice",
+    version,
+    about = "Graph-native workflow automation in your terminal"
+)]
 struct Args {
     /// Enable verbose logging
     #[arg(short, long)]

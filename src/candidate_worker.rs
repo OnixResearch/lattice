@@ -636,6 +636,10 @@ mod tests {
             .expect("boundary admits")
     }
 
+    fn host_tool(name: &str) -> String {
+        which::which(name).expect("host test tool").to_string_lossy().into_owned()
+    }
+
     fn request(root: &Path, command: &str) -> CandidateWorkerRequest {
         CandidateWorkerRequest {
             work_id: "work-1".to_string(),
@@ -913,7 +917,7 @@ mod tests {
         std::fs::write(root.join("src/main.rs"), b"same").expect("source");
 
         let outcome = run_candidate_worker(
-            &request(root, "/run/current-system/sw/bin/chmod 000 src/main.rs"),
+            &request(root, &format!("{} 000 src/main.rs", host_tool("chmod"))),
             &RuntimeConfig::default(),
             &AtomicBool::new(false),
         )
@@ -1013,7 +1017,7 @@ mod tests {
         let store = Store::new(directory.path().join("store.redb")).expect("store opens");
 
         let outcome = run_and_publish_candidate_worker(
-            &request(&root, "/run/current-system/sw/bin/chmod 000 src/main.rs"),
+            &request(&root, &format!("{} 000 src/main.rs", host_tool("chmod"))),
             &RuntimeConfig::default(),
             &AtomicBool::new(false),
             &store,
@@ -1049,7 +1053,7 @@ mod tests {
         });
 
         let outcome = run_and_publish_candidate_worker(
-            &request(&root, "/run/current-system/sw/bin/sleep 1; printf leaked > src/leak"),
+            &request(&root, &format!("{} 1; printf leaked > src/leak", host_tool("sleep"))),
             &RuntimeConfig::default(),
             cancellation.as_ref(),
             &store,
@@ -1305,7 +1309,7 @@ mod tests {
             signal.store(true, Ordering::Release);
         });
         let outcome = run_candidate_worker(
-            &request(root, "/run/current-system/sw/bin/sleep 1; printf leaked > src/leak"),
+            &request(root, &format!("{} 1; printf leaked > src/leak", host_tool("sleep"))),
             &RuntimeConfig::default(),
             cancellation.as_ref(),
         )

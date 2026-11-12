@@ -221,7 +221,7 @@ mod tests {
 
     #[test]
     fn request_decoder_bounds_bytes_before_dto_admission() {
-        let bytes = include_bytes!("../crates/lattice-compose-binding/fixtures/request.json");
+        let bytes = include_bytes!("../../crates/lattice-compose-binding/fixtures/request.json");
         let mut maximum = bytes.to_vec();
         maximum.resize(lattice_compose_binding::MAXIMUM_REQUEST_BYTES, b' ');
         assert_eq!(decode_request(&maximum).unwrap().source.pane_id, 1);

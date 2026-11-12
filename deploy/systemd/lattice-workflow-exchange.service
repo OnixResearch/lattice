@@ -1,0 +1,40 @@
+[Unit]
+Description=Lattice durable workflow exchange
+Documentation=https://github.com/OnixResearch/lattice/blob/main/docs/server-deployment.md
+After=network.target
+ConditionPathExists=/etc/lattice/config.ncl
+ConditionPathExists=/etc/lattice/workflow-exchange-handler.ncl
+
+[Service]
+Type=simple
+User=lattice
+Group=lattice
+ExecStart=/usr/local/bin/lattice --config /etc/lattice/config.ncl workflow-exchange serve --profile /etc/lattice/workflow-exchange-handler.ncl
+Restart=on-failure
+RestartSec=5s
+
+# The store and logs stay under StateDirectory; the socket stays under
+# RuntimeDirectory. Add ReadWritePaths only for the exact configured file roots
+# that workflows must modify.
+StateDirectory=lattice
+StateDirectoryMode=0700
+RuntimeDirectory=lattice
+RuntimeDirectoryMode=0750
+# The socket is group-accessible so explicitly allowed peer users can connect.
+# The store directory stays 0700, so group access does not expose durable state.
+UMask=0007
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target
