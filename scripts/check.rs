@@ -20,7 +20,7 @@ const LINE_NUMBER_BASE: usize = 1;
 const SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "--edition", "2024", "scripts/check.rs"];
 const CHECK_SCRIPT_TEST_ARGS: &[&str] = &[
     "-c",
-    "rustc --test --edition 2024 scripts/check.rs -o \"${CARGO_TARGET_DIR:-target}/lattice-check-tests\" && \"${CARGO_TARGET_DIR:-target}/lattice-check-tests\"",
+    "mkdir -p \"${CARGO_TARGET_DIR:-target}\" && rustc --test --edition 2024 scripts/check.rs -o \"${CARGO_TARGET_DIR:-target}/lattice-check-tests\" && \"${CARGO_TARGET_DIR:-target}/lattice-check-tests\"",
 ];
 const OPERATOR_E2E_SCRIPT_FORMAT_ARGS: &[&str] = &["--check", "--edition", "2024", "scripts/operator-e2e.rs"];
 const INVENTORY_SCRIPT_FORMAT_ARGS: &[&str] = &[

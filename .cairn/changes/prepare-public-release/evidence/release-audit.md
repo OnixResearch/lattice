@@ -77,8 +77,10 @@ is preserved. `nix build .#lattice` and the bounded-exec source-identity check
 pass with the snapshot.
 
 The tag `v0.1.0` was pushed to GitHub and the release workflow was run. Earlier
-runs failed on the missing SSH rewrite and then on the unavailable Bounded Exec
-host; the workflow now includes the SSH rewrite and the vendored source. No
+runs failed on the missing SSH rewrite, the unavailable Bounded Exec host, and a
+clean-checkout harness bug where `scripts/check.rs` ran `rustc -o target/...`
+without creating `target`. The workflow now includes the SSH rewrite, the
+vendored source, and an explicit `mkdir -p` before the harness test compile. No
 GitHub release assets existed at the time of this note.
 
 Three build corrections were required and are part of this change:
