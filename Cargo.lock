@@ -161,7 +161,7 @@ version = "0.1.0"
 dependencies = [
  "animus-adapters",
  "blake3",
- "bounded-exec",
+ "bounded-exec 0.1.0 (git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525)",
  "secretspec 0.17.0 (git+https://github.com/cachix/secretspec.git?rev=a8794e46ec9664a0e1a3869cc3105d0853937e48)",
  "serde",
  "serde_json",
@@ -538,11 +538,23 @@ dependencies = [
 [[package]]
 name = "bounded-exec"
 version = "0.1.0"
-source = "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525#29dac88ecded94457572db3fdfaaaab95fa91525"
 dependencies = [
- "bounded-exec-core",
+ "bounded-exec-core 0.1.0",
  "nix 0.30.1",
 ]
+
+[[package]]
+name = "bounded-exec"
+version = "0.1.0"
+source = "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525#29dac88ecded94457572db3fdfaaaab95fa91525"
+dependencies = [
+ "bounded-exec-core 0.1.0 (git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525)",
+ "nix 0.30.1",
+]
+
+[[package]]
+name = "bounded-exec-core"
+version = "0.1.0"
 
 [[package]]
 name = "bounded-exec-core"
@@ -2823,7 +2835,7 @@ dependencies = [
  "basalt",
  "base64 0.22.1",
  "blake3",
- "bounded-exec",
+ "bounded-exec 0.1.0",
  "budget-ledger-core",
  "bytes",
  "cap-root-core",

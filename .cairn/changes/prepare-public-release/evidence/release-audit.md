@@ -58,26 +58,27 @@ Observed:
 - `scripts/check.rs` (run as `cargo -q -Zscript scripts/check.rs` in the dev
   shell): passed.
 
-## CI publication attempt
+## Bounded Exec source
 
-Tag `v0.1.0` was pushed to GitHub and the release workflow was run. It did not
-publish a release:
+The Onix git host returned HTTP 530 and the Bounded Exec Radicle seed returned
+HTTP 500 during the CI publication attempt. The exact admitted revision is
+present on the public GitHub mirror:
 
-- The first run failed before the harness because the release workflow did not
-  rewrite GitHub SSH fetches to HTTPS. The workflow now has the same rewrite
-  step as the check workflow.
-- The next runs failed fetching Bounded Exec from
-  `https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git` (HTTP 530).
-  The Bounded Exec Radicle seed also returned HTTP 500 for
-  `z2LSXA4oFgKeygzLog1K1bqonbjzy`.
-- A GitHub mirror exists and can fetch the exact revision, but
-  `r[lattice.repository_validation.radicle_bounded_exec_availability.scenario.no-fallback]`
-  explicitly forbids a GitHub Bounded Exec fallback. The release did not bypass
-  that policy.
+- Revision: `29dac88ecded94457572db3fdfaaaab95fa91525`
+- GitHub tree: `fc0b6f75a01088faf4f22be57edc073a3fe45e54`
+- Admitted local tree: `fc0b6f75a01088faf4f22be57edc073a3fe45e54` (identical)
 
-The tag and workflow remain in place. Re-running the workflow after the Onix
-host or the Bounded Exec Radicle seed provides the exact object is the next
-release action. No GitHub release assets exist yet.
+The source was imported as the repository-owned vendor snapshot
+`vendor-cargo-deps/bounded-exec/` at that exact revision. The default Cargo and
+Nix build now use the local path, so no live GitHub fallback is configured and
+`r[lattice.repository_validation.radicle_bounded_exec_availability.scenario.no-fallback]`
+is preserved. `nix build .#lattice` and the bounded-exec source-identity check
+pass with the snapshot.
+
+The tag `v0.1.0` was pushed to GitHub and the release workflow was run. Earlier
+runs failed on the missing SSH rewrite and then on the unavailable Bounded Exec
+host; the workflow now includes the SSH rewrite and the vendored source. No
+GitHub release assets existed at the time of this note.
 
 Three build corrections were required and are part of this change:
 

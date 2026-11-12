@@ -22,6 +22,7 @@ members = [
 default-members = ["."]
 exclude = [
   "compose",
+  "vendor-cargo-deps/bounded-exec",
   "vendor-cargo-deps/rats",
   "vendor-cargo-deps/animus",
   "vendor-cargo-deps/basalt",
@@ -103,7 +104,7 @@ rat-table = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-table" 
 rat-editor = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-editor" }
 home = "0.5.12"
 cap-std = "4.0.2"
-bounded-exec = { git = "https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git", rev = "29dac88ecded94457572db3fdfaaaab95fa91525" }
+bounded-exec = { path = "vendor-cargo-deps/bounded-exec/crates/bounded-exec" }
 which = "8.0.0"
 animus-adapters = { path = "vendor-cargo-deps/animus/crates/animus-adapters" }
 animus-runtime = { path = "vendor-cargo-deps/animus/crates/animus-runtime", default-features = false, features = ["steel"] }

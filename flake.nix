@@ -29,10 +29,6 @@
       url = "git+https://seed.radicle.garden/z2yGPFsQZsUcFNkiyR4Dkj22BuxnC.git?rev=cbb5db0e4844b466dcd1877218eb1f00a2a7caf2";
       flake = false;
     };
-    bounded-exec = {
-      url = "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525";
-      flake = false;
-    };
     choregraph = {
       url = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=0b2000edaf86d5a7a8601246afbc0d526f4a2a07";
       flake = false;
@@ -66,7 +62,6 @@
       octet,
       cairn,
       role-protocol-runtime-source,
-      bounded-exec,
       choregraph,
       nickel-eval,
       content-identity-core,
@@ -335,7 +330,6 @@
             );
         };
 
-        boundedExecCargoSource = "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525#29dac88ecded94457572db3fdfaaaab95fa91525";
         choregraphCargoSource = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=0b2000edaf86d5a7a8601246afbc0d526f4a2a07#0b2000edaf86d5a7a8601246afbc0d526f4a2a07";
         nickelEvalCargoSource = "git+https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=f23be09e41337de8fa729274f50023f861ae0e8a#f23be09e41337de8fa729274f50023f861ae0e8a";
         contentIdentityCoreCargoSource = "git+https://seed.radicle.garden/zA14jhTdwST4PxPBdsryc4zS7Kpq.git?rev=7f55597b5dc879b7601856e8d7fd0dbacaa2a498#7f55597b5dc879b7601856e8d7fd0dbacaa2a498";
@@ -344,11 +338,7 @@
           inherit src;
           overrideVendorGitCheckout =
             packages: checkout:
-            if builtins.all (package: package.source == boundedExecCargoSource) packages then
-              checkout.overrideAttrs (_old: {
-                src = bounded-exec;
-              })
-            else if builtins.all (package: package.source == choregraphCargoSource) packages then
+            if builtins.all (package: package.source == choregraphCargoSource) packages then
               checkout.overrideAttrs (_old: {
                 src = choregraph;
               })
@@ -607,7 +597,7 @@
               ];
             }
             ''
-              source_root=${bounded-exec}
+              source_root=${./vendor-cargo-deps/bounded-exec}
               test -f "$source_root/Cargo.toml"
               test -f "$source_root/crates/bounded-exec/Cargo.toml"
               test -f "$source_root/crates/bounded-exec-core/Cargo.toml"

@@ -1,0 +1,9 @@
+name: bounded-exec
+repository: https://github.com/OnixResearch/bounded-exec.git
+revision: 29dac88ecded94457572db3fdfaaaab95fa91525
+paths:
+- Cargo.toml
+- LICENSE
+- README.md
+- crates/bounded-exec-core
+- crates/bounded-exec
