@@ -22,4 +22,4 @@
 ## Phase 4: Remaining release actions
 
 - [x] [serial] Resolve the stale Octet baseline without bulk-accepting unreviewed findings, then run `octet-precommit-check` and `nix flake check` green on the release commit. r[lattice.public_release.evidence]
-- [ ] [serial] After explicit release authorization, tag the checked commit and publish the binary archive through the release workflow. r[lattice.public_release.artifact]
+- [ ] [serial] After explicit release authorization, tag the checked commit and publish the binary archive through the release workflow. Blocked on Bounded Exec source availability at `git.onix.computer` / its Radicle seed; GitHub fallback is forbidden by `lattice.repository_validation.radicle_bounded_exec_availability.scenario.no-fallback`. r[lattice.public_release.artifact]

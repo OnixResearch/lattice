@@ -58,6 +58,27 @@ Observed:
 - `scripts/check.rs` (run as `cargo -q -Zscript scripts/check.rs` in the dev
   shell): passed.
 
+## CI publication attempt
+
+Tag `v0.1.0` was pushed to GitHub and the release workflow was run. It did not
+publish a release:
+
+- The first run failed before the harness because the release workflow did not
+  rewrite GitHub SSH fetches to HTTPS. The workflow now has the same rewrite
+  step as the check workflow.
+- The next runs failed fetching Bounded Exec from
+  `https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git` (HTTP 530).
+  The Bounded Exec Radicle seed also returned HTTP 500 for
+  `z2LSXA4oFgKeygzLog1K1bqonbjzy`.
+- A GitHub mirror exists and can fetch the exact revision, but
+  `r[lattice.repository_validation.radicle_bounded_exec_availability.scenario.no-fallback]`
+  explicitly forbids a GitHub Bounded Exec fallback. The release did not bypass
+  that policy.
+
+The tag and workflow remain in place. Re-running the workflow after the Onix
+host or the Bounded Exec Radicle seed provides the exact object is the next
+release action. No GitHub release assets exist yet.
+
 Three build corrections were required and are part of this change:
 
 - `cargoArtifacts` now uses the real source instead of crane's dummy source,
