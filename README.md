@@ -84,9 +84,9 @@ existing caches. Exact sources live in [Cargo.toml](Cargo.toml),
 or floating revisions.
 
 The component and asynchronous CI adapters also consume exact native Basalt,
-Mantle and hardened-runtime snapshots under `vendor-cargo-deps/`, with producer
-revisions and archive selections recorded in each `SOURCE` or the vendor import
-notes. Maintain them through the [repository-owned import
+Mantle, hardened-runtime, and Bounded Exec snapshots under
+`vendor-cargo-deps/`, with producer revisions and archive selections recorded in
+each `SOURCE` or the vendor import notes. Maintain them through the [repository-owned import
 procedure](vendor-cargo-deps/README.md), not sibling dependency overrides or
 edits to imported source. Local correction cohorts are not remote-publication
 evidence. The actual Valence build-service validator is separately locked to

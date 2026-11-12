@@ -70,7 +70,8 @@ present on the public GitHub mirror:
 
 The source was imported as the repository-owned vendor snapshot
 `vendor-cargo-deps/bounded-exec/` at that exact revision. The default Cargo and
-Nix build now use the local path, so no live GitHub fallback is configured and
+Nix build now use the local path, including the transitive consumer, so no live
+GitHub fallback is configured and
 `r[lattice.repository_validation.radicle_bounded_exec_availability.scenario.no-fallback]`
 is preserved. `nix build .#lattice` and the bounded-exec source-identity check
 pass with the snapshot.

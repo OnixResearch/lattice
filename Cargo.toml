@@ -149,3 +149,9 @@ artifact-auth-ed25519 = { git = "https://github.com/OnixResearch/onix-artifact.g
 
 [patch."ssh://git@github.com/OnixResearch/trellis.git"]
 verified-logic = { git = "https://github.com/OnixResearch/trellis.git", rev = "d65974b14978e1a44b0f5067beb9ef6d83317dc8" }
+
+# The vendored snapshot is the single public source for both the direct and
+# transitive Bounded Exec dependency.
+[patch."https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git"]
+bounded-exec = { path = "vendor-cargo-deps/bounded-exec/crates/bounded-exec" }
+bounded-exec-core = { path = "vendor-cargo-deps/bounded-exec/crates/bounded-exec-core" }
