@@ -86,7 +86,7 @@ impl Store {
 
     pub fn load_workflow_approval_for_run(
         &self,
-        run_id: RunId,
+        run_id: crate::engine::RunId,
     ) -> Result<Option<crate::workflow::gate::ApprovalRequest>, StoreError> {
         let txn = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
         let index =

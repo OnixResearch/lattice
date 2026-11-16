@@ -44,6 +44,7 @@ pub(crate) async fn run(request: RunRequest<'_>) -> RunOutcome {
     let mut runner_states = BTreeMap::new();
     let mut running = BTreeMap::new();
     let mut in_flight = futures::stream::FuturesUnordered::new();
+    let progress = executor.progress_sender();
 
     loop {
         let ready = match ready_frontier(runner_plan, &runner_states, product_session.as_ref()) {
@@ -110,6 +111,7 @@ pub(crate) async fn run(request: RunRequest<'_>) -> RunOutcome {
                         &mut results_by_node,
                         &mut observed_completion_order,
                         product_session.as_ref(),
+                        progress.as_ref().map(|sender| (sender, None)),
                     );
                     dispatched_count = dispatched_count.saturating_add(1);
                     continue;
@@ -131,6 +133,7 @@ pub(crate) async fn run(request: RunRequest<'_>) -> RunOutcome {
                     &mut results_by_node,
                     &mut observed_completion_order,
                     product_session.as_ref(),
+                    progress.as_ref().map(|sender| (sender, None)),
                 );
                 dispatched_count = dispatched_count.saturating_add(1);
                 continue;
@@ -145,6 +148,7 @@ pub(crate) async fn run(request: RunRequest<'_>) -> RunOutcome {
                     &mut results_by_node,
                     &mut observed_completion_order,
                     product_session.as_ref(),
+                    progress.as_ref().map(|sender| (sender, None)),
                 );
                 dispatched_count = dispatched_count.saturating_add(1);
                 continue;
@@ -165,6 +169,7 @@ pub(crate) async fn run(request: RunRequest<'_>) -> RunOutcome {
                     &mut results_by_node,
                     &mut observed_completion_order,
                     product_session.as_ref(),
+                    progress.as_ref().map(|sender| (sender, None)),
                 );
                 dispatched_count = dispatched_count.saturating_add(1);
                 continue;
@@ -175,16 +180,18 @@ pub(crate) async fn run(request: RunRequest<'_>) -> RunOutcome {
             running.insert(node_id.0, prepared.reservation.clone());
             runner_states.insert(node_id.0, runner::RunnerStepState::Running);
             let session = product_session.clone();
-            let progress = executor.progress_sender();
+            let progress = progress.clone();
             in_flight.push(async move {
                 let effect = match session.as_ref() {
                     Some(session) => EffectExecution::Product(session),
                     None => EffectExecution::Compatibility,
                 };
-                if let Some(sender) = progress.as_ref() {
-                    let _ = sender.send(NodeProgress::Started {
+                if let Some(sender) = progress.as_ref()
+                    && let Err(fault) = sender.send(NodeProgress::Started {
                         node_id: prepared.node_id,
-                    });
+                    })
+                {
+                    tracing::error!(node = ?prepared.node_id, ?fault, "executor start observation incomplete");
                 }
                 let started = std::time::Instant::now();
                 let step = executor
@@ -198,18 +205,13 @@ pub(crate) async fn run(request: RunRequest<'_>) -> RunOutcome {
                         effect,
                     })
                     .await;
-                if let Some(sender) = progress.as_ref() {
-                    let _ = sender.send(NodeProgress::Finished {
-                        node_id: step.node_id,
-                        duration_millis: u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
-                    });
-                }
-                (step, prepared.reservation)
+                let duration_millis = u64::try_from(started.elapsed().as_millis()).ok();
+                (step, prepared.reservation, duration_millis)
             });
             dispatched_count = dispatched_count.saturating_add(1);
         }
 
-        if let Some((step, reservation)) = in_flight.next().await {
+        if let Some((step, reservation, duration_millis)) = in_flight.next().await {
             let removed = running.remove(&step.node_id.0);
             debug_assert_eq!(removed, Some(reservation));
             record_completion(
@@ -219,6 +221,7 @@ pub(crate) async fn run(request: RunRequest<'_>) -> RunOutcome {
                 &mut results_by_node,
                 &mut observed_completion_order,
                 product_session.as_ref(),
+                progress.as_ref().map(|sender| (sender, duration_millis)),
             );
             continue;
         }
@@ -254,6 +257,15 @@ pub(crate) async fn run(request: RunRequest<'_>) -> RunOutcome {
             status: NodeStatus::Skipped,
             input_hash,
         };
+        if let Some(sender) = progress.as_ref()
+            && let Err(fault) = sender.send(NodeProgress::Finished {
+                node_id: step.node_id,
+                duration_millis: None,
+                result: step.clone(),
+            })
+        {
+            tracing::error!(node = ?step.node_id, ?fault, "executor finish observation incomplete");
+        }
         runner_states.insert(node_id.0, runner::RunnerStepState::Cancelled);
         observed_completion_order.push(*node_id);
         results_by_node.insert(node_id.0, step);

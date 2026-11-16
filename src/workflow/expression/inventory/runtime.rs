@@ -153,12 +153,12 @@ fn image_fields(
 
 fn agent_fields(
     consumer_node: u64,
-    settings: &crate::agent_node::AgentNodeSettings,
+    settings: &crate::agent_node::Settings,
 ) -> Result<
     Vec<lattice_core::expression_dependencies::ExpressionField>,
     Vec<lattice_core::expression_dependencies::ExpressionDependencyIssue>,
 > {
-    let crate::agent_node::AgentNodeSettings {
+    let crate::agent_node::Settings {
         target,
         prompt,
         prompt_file,

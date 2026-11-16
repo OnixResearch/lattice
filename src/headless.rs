@@ -1,7 +1,6 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::agent_node::AgentRuntimeConfig;
 use crate::engine::executor::Executor;
 use crate::engine::executor::NodeStatus;
 use crate::engine::executor::RunId;
@@ -259,7 +258,7 @@ pub async fn run_saved_workflow_with_agent_runtime_config(
     store: &Store,
     workflow_name: &str,
     run_id: RunId,
-    agent_runtime: AgentRuntimeConfig,
+    agent_runtime: crate::agent_node::RuntimeOptions,
 ) -> Result<HeadlessRunSummary, HeadlessRunError> {
     let authority_provider = crate::engine::effect::execution::UnavailableRunContextSource;
     run_saved_workflow_with_agent_runtime_config_and_authority_provider(
@@ -279,7 +278,7 @@ pub async fn run_saved_workflow_with_agent_runtime_config_and_authority_provider
     store: &Store,
     workflow_name: &str,
     run_id: RunId,
-    agent_runtime: AgentRuntimeConfig,
+    agent_runtime: crate::agent_node::RuntimeOptions,
     authority_provider: &dyn crate::engine::effect::execution::RunContextProvider,
 ) -> Result<HeadlessRunSummary, HeadlessRunError> {
     shell::run_saved_workflow_with_executor_factory(

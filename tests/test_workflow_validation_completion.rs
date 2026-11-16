@@ -2,8 +2,8 @@
 
 mod common;
 
-use lattice::agent_node::AgentOutputMode;
-use lattice::agent_node::AgentTarget;
+use lattice::agent_node::OutputMode;
+use lattice::agent_node::Target;
 use lattice::config::AppConfig;
 use lattice::control_flow::ConditionBranch;
 use lattice::control_flow::ConditionNodeConfig;
@@ -25,7 +25,7 @@ use lattice::engine::workflow::NodeRunnerSettings;
 use lattice::engine::workflow::Workflow;
 use lattice::file_node::FileOperationKind;
 use lattice::node_kind_provider::provider_for_config;
-use lattice::tui::App;
+use lattice::tui::State;
 use lattice::tui::panels;
 use lattice::workflow_validation::DiagnosticSeverity;
 use lattice::workflow_validation::WorkflowDiagnosticCode;
@@ -67,7 +67,7 @@ fn app_config(temp_dir: &tempfile::TempDir) -> AppConfig {
     }
 }
 
-fn rendered_frame_text(app: &mut App) -> String {
+fn rendered_frame_text(app: &mut State) -> String {
     let area = Rect::new(0, 0, FRAME_WIDTH, FRAME_HEIGHT);
     let mut buffer = Buffer::empty(area);
     panels::render(app, area, &mut buffer);
@@ -225,7 +225,7 @@ fn every_builtin_node_kind_has_provider_validation_and_runtime_admission() {
     workflow.add_http_node("http", "GET", "https://example.test");
     workflow.add_file_node("file", FileOperationKind::Read, "input.txt");
     workflow.add_image_input_node("image", "input.png");
-    workflow.add_agent_node("agent", AgentTarget::Pi, "prompt", AgentOutputMode::Text);
+    workflow.add_agent_node("agent", Target::Pi, "prompt", OutputMode::Text);
     workflow.add_condition_node("condition", ConditionNodeConfig {
         branches: vec![ConditionBranch {
             label: "yes".to_string(),
@@ -293,13 +293,13 @@ fn unknown_subworkflow_mapping_is_fatal_and_preserves_configuration() {
 #[test]
 fn tui_renders_ready_state_and_actionable_diagnostic_location() {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");
-    let mut ready = App::new(app_config(&temp_dir));
+    let mut ready = State::new(app_config(&temp_dir));
     ready.add_shell_node("valid", VALID_COMMAND);
     ready.open_diagnostics();
     let ready_text = rendered_frame_text(&mut ready);
     assert!(ready_text.contains("Workflow ready to run"));
 
-    let mut invalid = App::new(app_config(&temp_dir));
+    let mut invalid = State::new(app_config(&temp_dir));
     invalid.add_shell_node(NODE_LABEL, EMPTY_COMMAND);
     invalid.open_diagnostics();
     let node_id = invalid.workflow.graph.nodes().next().expect("invalid node").id;

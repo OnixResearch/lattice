@@ -5,8 +5,8 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
-use lattice::agent_node::AgentOutputMode;
-use lattice::agent_node::AgentTarget;
+use lattice::agent_node::OutputMode;
+use lattice::agent_node::Target;
 use lattice::control_flow::ConditionBranch;
 use lattice::control_flow::ConditionNodeConfig;
 use lattice::control_flow::ConditionPredicate;
@@ -22,7 +22,7 @@ use lattice::orchestration::BudgetDimensions;
 use lattice::orchestration::BudgetLimits;
 use lattice::orchestration::BudgetPolicy;
 use lattice::orchestration::CompletionPolicy;
-use lattice::orchestration::OrchestrationDefinition;
+use lattice::orchestration::Definition;
 use lattice::orchestration::RedactionPolicy;
 
 const FIXTURE_TIMESTAMP_RFC3339: &str = "2026-08-14T00:00:00Z";
@@ -168,7 +168,7 @@ fn add_agent(
 ) -> Result<NodeId, Box<dyn std::error::Error>> {
     let full_prompt_path = Path::new(bundle_root).join(prompt_path);
     let prompt = fs::read_to_string(full_prompt_path)?;
-    let node = workflow.add_agent_node(label, AgentTarget::Pi, prompt, AgentOutputMode::Text);
+    let node = workflow.add_agent_node(label, Target::Pi, prompt, OutputMode::Text);
     let Some(NodeConfig::Agent(mut settings)) = workflow.node_config(node).cloned() else {
         return Err(io::Error::other("generated agent node is missing its config").into());
     };
@@ -239,7 +239,7 @@ fn write_bundle_assets(
     let root = Path::new(bundle_root);
     fs::create_dir_all(root)?;
     fs::write(root.join("workflow.ncl"), lattice::workflow_format::workflow_to_nickel(workflow))?;
-    let definition = OrchestrationDefinition {
+    let definition = Definition {
         schema_version: lattice::orchestration::current_schema_version(),
         id: lattice::orchestration::DefinitionId::try_from_text(workflow.meta.name.clone())?,
         objective: objective.to_owned(),

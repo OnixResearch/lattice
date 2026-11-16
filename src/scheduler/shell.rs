@@ -60,7 +60,7 @@ pub fn claim_due_occurrence(
 pub async fn execute_occurrence(
     store: &crate::store::Store,
     occurrence: &super::ScheduleOccurrence,
-    agent_runtime: crate::agent_node::AgentRuntimeConfig,
+    agent_runtime: crate::agent_node::RuntimeOptions,
 ) -> Result<crate::headless::HeadlessRunSummary, Error> {
     execute_occurrence_with_authority_provider(
         store,
@@ -74,7 +74,7 @@ pub async fn execute_occurrence(
 pub async fn execute_occurrence_with_authority_provider(
     store: &crate::store::Store,
     occurrence: &super::ScheduleOccurrence,
-    agent_runtime: crate::agent_node::AgentRuntimeConfig,
+    agent_runtime: crate::agent_node::RuntimeOptions,
     authority_provider: &dyn crate::engine::effect::execution::RunContextProvider,
 ) -> Result<crate::headless::HeadlessRunSummary, Error> {
     super::validate_schedule_occurrence(occurrence).map_err(|error| Error::InvalidOccurrence(error.to_string()))?;
@@ -153,7 +153,7 @@ pub async fn retry_occurrence(
     store: &crate::store::Store,
     identity: &str,
     is_duplicate_risk_acknowledged: bool,
-    agent_runtime: crate::agent_node::AgentRuntimeConfig,
+    agent_runtime: crate::agent_node::RuntimeOptions,
 ) -> Result<super::ScheduleOccurrence, Error> {
     retry_occurrence_with_authority_provider(
         store,
@@ -169,7 +169,7 @@ pub async fn retry_occurrence_with_authority_provider(
     store: &crate::store::Store,
     identity: &str,
     is_duplicate_risk_acknowledged: bool,
-    agent_runtime: crate::agent_node::AgentRuntimeConfig,
+    agent_runtime: crate::agent_node::RuntimeOptions,
     authority_provider: &dyn crate::engine::effect::execution::RunContextProvider,
 ) -> Result<super::ScheduleOccurrence, Error> {
     let current = load_occurrence(store, identity)?;

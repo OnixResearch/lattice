@@ -14,9 +14,6 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::agent_node;
-use crate::agent_node::AgentNodeSettings;
-use crate::agent_node::AgentOutputMode;
-use crate::agent_node::AgentTarget;
 use crate::config;
 use crate::control_flow;
 use crate::control_flow::ConditionBranch;
@@ -869,7 +866,7 @@ fn node_config_to_portable(
             image_path: String::new(),
             image_allowed_roots: Vec::new(),
             image_max_bytes: 0,
-            agent_target: agent_node::agent_target_label(settings.target).to_string(),
+            agent_target: agent_node::target_label(settings.target).to_string(),
             agent_prompt: inline_agent_prompt(settings),
             agent_prompt_file: settings.prompt_file.iter().cloned().collect(),
             agent_output_mode: settings.output_mode.as_str().to_string(),
@@ -1079,7 +1076,7 @@ fn portable_secret_env(credentials: Option<&NodeCredentialRefs>) -> Vec<Portable
     secret_env
 }
 
-fn inline_agent_prompt(settings: &AgentNodeSettings) -> String {
+fn inline_agent_prompt(settings: &crate::agent_node::Settings) -> String {
     if settings.prompt_file.is_some() {
         String::new()
     } else {
@@ -1635,7 +1632,7 @@ fn portable_agent_config_to_node_config(
     debug_assert!(config.agent_session.len() <= MAX_OPTIONAL_AGENT_VALUES);
 
     let (prompt, prompt_file) = portable_agent_prompt(config, resolved_agent_prompt)?;
-    Ok(NodeConfig::Agent(AgentNodeSettings {
+    Ok(NodeConfig::Agent(crate::agent_node::Settings {
         target: parse_agent_target(config.node_id, &config.agent_target)?,
         prompt,
         prompt_file,
@@ -1832,15 +1829,18 @@ fn parse_file_operation(node_id: u64, operation: &str) -> Result<FileOperationKi
     }
 }
 
-fn parse_agent_target(node_id: u64, target: &str) -> Result<AgentTarget, WorkflowFormatError> {
-    agent_node::parse_agent_target(target).map_err(|_| WorkflowFormatError::InvalidAgentTarget {
+fn parse_agent_target(node_id: u64, target: &str) -> Result<crate::agent_node::Target, WorkflowFormatError> {
+    agent_node::parse_target(target).map_err(|_| WorkflowFormatError::InvalidAgentTarget {
         node_id,
         target: target.to_string(),
     })
 }
 
-fn parse_agent_output_mode(node_id: u64, output_mode: &str) -> Result<AgentOutputMode, WorkflowFormatError> {
-    agent_node::parse_agent_output_mode(output_mode).map_err(|_| WorkflowFormatError::InvalidAgentOutputMode {
+fn parse_agent_output_mode(
+    node_id: u64,
+    output_mode: &str,
+) -> Result<crate::agent_node::OutputMode, WorkflowFormatError> {
+    agent_node::parse_output_mode(output_mode).map_err(|_| WorkflowFormatError::InvalidAgentOutputMode {
         node_id,
         output_mode: output_mode.to_string(),
     })

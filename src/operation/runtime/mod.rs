@@ -235,6 +235,9 @@ pub fn process_failure(error: crate::agent_node::ProcessError) -> Observation {
         crate::agent_node::ProcessError::Spawn(_) => {
             (ObservationClass::Unknown, "operation process outcome is unavailable")
         }
+        crate::agent_node::ProcessError::Execution { .. } => {
+            (ObservationClass::Unknown, "operation process result is unavailable after possible start")
+        }
     };
     Observation {
         class,

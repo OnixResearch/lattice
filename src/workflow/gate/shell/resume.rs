@@ -13,7 +13,7 @@ pub struct ResumeExecution {
 pub async fn resume_with_authority_provider(
     store: &crate::store::Store,
     command: &super::ResumeCommand,
-    agent_runtime: crate::agent_node::AgentRuntimeConfig,
+    agent_runtime: crate::agent_node::RuntimeOptions,
     authority_provider: &dyn crate::engine::effect::execution::RunContextProvider,
 ) -> Result<ResumeExecution, Error> {
     let prepared = match admit_resume(store, command)? {
@@ -85,7 +85,7 @@ fn admit_resume(store: &crate::store::Store, command: &super::ResumeCommand) -> 
 async fn execute_remaining(
     store: &crate::store::Store,
     command: &super::ResumeCommand,
-    agent_runtime: crate::agent_node::AgentRuntimeConfig,
+    agent_runtime: crate::agent_node::RuntimeOptions,
     authority_provider: &dyn crate::engine::effect::execution::RunContextProvider,
     prepared: PreparedResume,
 ) -> Result<ExecutedResume, Error> {

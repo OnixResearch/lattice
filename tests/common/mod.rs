@@ -442,3 +442,87 @@ pub fn fake_cache_entry(
     outputs.insert(exit_port_id(workflow, node_id), Value::from_exit_code(0));
     (input_hash, outputs)
 }
+
+/// Execute the exact pending workflow through the production snapshot port and
+/// retain its typed outcome before exercising settlement/restart recovery.
+pub fn observe_pending_usage(store: &lattice::store::Store, instance: &lattice::orchestration::Instance) {
+    use lattice::orchestration::*;
+    let intent = instance.pending_dispatch.as_ref().expect("pending fixture dispatch");
+    let workflow = store
+        .load_workflow(&instance.workflow_revision.workflow_name)
+        .expect("fixture workflow loads")
+        .expect("fixture workflow exists");
+    assert_eq!(workflow_revision(&workflow).expect("workflow hashes"), instance.workflow_revision);
+    let provider = authority::TestRunContextProvider::new();
+    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().expect("fixture runtime");
+    let outcome = runtime
+        .block_on(lattice::headless::run_workflow_snapshot_with_authority_provider_and_cancellation(
+            store,
+            lattice::headless::SnapshotRunRequest {
+                workflow,
+                run_id: intent.run_id,
+                owner: lattice::store::RunOwner::Orchestration {
+                    instance_id: instance.id.clone(),
+                    dispatch_id: intent.id.clone(),
+                },
+                agent_runtime: lattice::agent_node::RuntimeOptions::default(),
+                cancellation: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            },
+            &provider,
+        ))
+        .expect("owned fixture execution");
+    let record = store.load_run(intent.run_id).expect("owned run loads").expect("owned run exists");
+    let interval = HostInterval {
+        started_epoch_ms: record.started_epoch_ms,
+        finished_epoch_ms: record.finished_epoch_ms.expect("terminal fixture"),
+    };
+    let reserved = instance
+        .budgets
+        .reservations
+        .values()
+        .find(|reservation| reservation.reservation_id.as_str() == intent.id.as_str())
+        .expect("fixture reservation")
+        .charge;
+    let mut charged = reserved;
+    if instance.definition.budgets.enforced.duration_millis {
+        charged.duration_millis = interval.duration_millis().expect("host duration");
+    }
+    store
+        .save_command_worker_usage(&CommandWorkerObservation {
+            schema: USAGE_OBSERVATION_SCHEMA.to_string(),
+            scope: Scope::HostRun,
+            workflow_revision: instance.workflow_revision.content_hash.to_string(),
+            instance_id: instance.id.to_string(),
+            dispatch_id: intent.id.to_string(),
+            run_id: intent.run_id.0,
+            node_id: 0,
+            invocation_id: intent.id.to_string(),
+            worker_profile: String::new(),
+            attempt_id: intent.id.to_string(),
+            agent_invocations: None,
+            model_requests: None,
+            subagent_calls: None,
+            tokens: None,
+            cost_microunits: None,
+            duration_millis: interval.duration_millis(),
+            provenance: UsageProvenance::HostMeasured,
+            complete: false,
+            accounting: Some(RunAccounting {
+                schema: RUN_USAGE_ACCOUNTING_SCHEMA.to_string(),
+                reserved,
+                charged,
+                host_interval: Some(interval),
+                provider_reports: Vec::new(),
+                unknown_tokens: true,
+                unknown_cost: true,
+                unknown_model_requests: true,
+                unknown_subagent_calls: true,
+                diagnostic: "production owned snapshot fixture; inference coverage unknown".to_string(),
+                outcome: Some(RunOutcomeObservation {
+                    succeeded: outcome.summary.status == lattice::headless::HeadlessRunStatus::Succeeded,
+                    cancelled: Some(outcome.cancelled),
+                }),
+            }),
+        })
+        .expect("typed fixture receipt persists before settlement");
+}

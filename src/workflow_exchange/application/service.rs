@@ -20,7 +20,7 @@ pub fn load_profile(path: &std::path::Path) -> Result<HandlerProfile, Applicatio
 pub fn serve(
     store: crate::store::Store,
     profile: HandlerProfile,
-    agent_runtime: crate::agent_node::AgentRuntimeConfig,
+    agent_runtime: crate::agent_node::RuntimeOptions,
 ) -> Result<lattice_workflow_transport::ServeReport, ApplicationError> {
     let socket_path = profile.socket_path.clone();
     let transport_profile = profile.transport.clone();
@@ -39,7 +39,7 @@ pub fn serve(
 pub fn serve(
     _store: crate::store::Store,
     _profile: HandlerProfile,
-    _agent_runtime: crate::agent_node::AgentRuntimeConfig,
+    _agent_runtime: crate::agent_node::RuntimeOptions,
 ) -> Result<lattice_workflow_transport::ServeReport, ApplicationError> {
     Err(ApplicationError::UnsupportedHost)
 }

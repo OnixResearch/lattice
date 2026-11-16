@@ -50,7 +50,7 @@ pub struct ChatPlan {
     pub api_key_env: Option<String>,
     pub timeout_secs: u64,
     pub max_response_bytes: u64,
-    pub output_mode: crate::agent_node::AgentOutputMode,
+    pub output_mode: crate::agent_node::OutputMode,
     pub body: Vec<u8>,
 }
 
@@ -84,11 +84,7 @@ struct Message {
 }
 
 pub trait Transport: Send + Sync {
-    fn execute(
-        &self,
-        plan: &ChatPlan,
-        bearer_token: Option<&str>,
-    ) -> Result<HttpResponse, crate::agent_node::AgentError>;
+    fn execute(&self, plan: &ChatPlan, bearer_token: Option<&str>) -> Result<HttpResponse, crate::agent_node::Error>;
 }
 
 pub fn default_transport() -> std::sync::Arc<dyn Transport> {

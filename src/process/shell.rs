@@ -1,7 +1,10 @@
 //! Imperative shell for resolving and executing admitted local processes.
 
+#[cfg(test)]
+mod failure_tests;
+mod output;
+
 const SUCCESS_EXIT_CODE: i32 = 0;
-const OUTPUT_OVERFLOW_SENTINEL_BYTES: usize = 1;
 const MINIMUM_PATH_COMPONENTS: usize = 1;
 const PATH_ENVIRONMENT_KEY: &str = "PATH";
 const CURRENT_DIRECTORY: &str = ".";
@@ -33,15 +36,44 @@ pub fn run_bounded_clear_environment_with_cancellation(
     run_bounded_with_environment(request, config, cancellation, bounded_exec::EnvironmentMode::Clear)
 }
 
+/// Bounded bytes survive observed timeout/cancellation/output-limit stops.
+/// Infrastructure RunError still cannot expose bytes the producer discarded.
+#[derive(Debug)]
+pub struct Observation {
+    pub output: crate::agent_node::ProcessOutput,
+    pub stop: Option<crate::agent_node::ProcessError>,
+}
+
+pub fn run_bounded_clear_environment_observed_with_cancellation(
+    request: &crate::agent_node::ProcessRequest,
+    config: &super::core::RuntimeConfig,
+    cancellation: Option<&std::sync::atomic::AtomicBool>,
+) -> Result<Observation, crate::agent_node::ProcessError> {
+    run_observed_with_environment(request, config, cancellation, bounded_exec::EnvironmentMode::Clear)
+}
+
 fn run_bounded_with_environment(
     request: &crate::agent_node::ProcessRequest,
     config: &super::core::RuntimeConfig,
     cancellation: Option<&std::sync::atomic::AtomicBool>,
     environment_mode: bounded_exec::EnvironmentMode,
 ) -> Result<crate::agent_node::ProcessOutput, crate::agent_node::ProcessError> {
+    let observation = run_observed_with_environment(request, config, cancellation, environment_mode)?;
+    match observation.stop {
+        Some(error) => Err(error),
+        None => Ok(observation.output),
+    }
+}
+
+fn run_observed_with_environment(
+    request: &crate::agent_node::ProcessRequest,
+    config: &super::core::RuntimeConfig,
+    cancellation: Option<&std::sync::atomic::AtomicBool>,
+    environment_mode: bounded_exec::EnvironmentMode,
+) -> Result<Observation, crate::agent_node::ProcessError> {
     let ambient_current_dir = std::path::Path::new(CURRENT_DIRECTORY)
         .canonicalize()
-        .map_err(|_| crate::agent_node::ProcessError::Spawn(super::core::EXECUTION_FAILURE_DIAGNOSTIC.to_owned()))?;
+        .map_err(|_| crate::agent_node::ProcessError::InvalidRequest(super::core::INVALID_CURRENT_DIR_DIAGNOSTIC))?;
     let current_dir = resolve_current_dir(request.cwd.as_deref().map(std::path::Path::new), &ambient_current_dir)?;
     if request.program.contains(NUL_CHARACTER) {
         return Err(crate::agent_node::ProcessError::InvalidRequest(super::core::INVALID_PROGRAM_DIAGNOSTIC));
@@ -137,7 +169,7 @@ fn executable_candidate(candidate: std::path::PathBuf) -> Result<std::path::Path
 fn execute_admitted(
     admitted: super::core::AdmittedRequest,
     cancellation: Option<&std::sync::atomic::AtomicBool>,
-) -> Result<crate::agent_node::ProcessOutput, crate::agent_node::ProcessError> {
+) -> Result<Observation, crate::agent_node::ProcessError> {
     debug_assert!(admitted.program.is_absolute());
     debug_assert!(admitted.current_dir.is_absolute());
     debug_assert!(admitted.stdout_max_bytes > 0);
@@ -172,49 +204,10 @@ fn execute_admitted(
         None => bounded_exec::run(bounded_request),
     }
     .map_err(map_execution_error)?;
-    classify_output(execution_output, OutputLimits {
+    Ok(output::classify(execution_output, output::Limits {
         stdout_max_bytes: admitted.stdout_max_bytes,
         stderr_max_bytes: admitted.stderr_max_bytes,
-    })
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct OutputLimits {
-    stdout_max_bytes: usize,
-    stderr_max_bytes: usize,
-}
-
-fn classify_output(
-    execution_output: bounded_exec::ExecutionOutput,
-    limits: OutputLimits,
-) -> Result<crate::agent_node::ProcessOutput, crate::agent_node::ProcessError> {
-    debug_assert!(limits.stdout_max_bytes > 0);
-    debug_assert!(limits.stderr_max_bytes > 0);
-    let stdout_facts = CaptureFacts {
-        truncated: execution_output.stdout.truncated,
-        observed_bytes: execution_output.stdout.observed_bytes,
-        limit_bytes: limits.stdout_max_bytes,
-    };
-    let stderr_facts = CaptureFacts {
-        truncated: execution_output.stderr.truncated,
-        observed_bytes: execution_output.stderr.observed_bytes,
-        limit_bytes: limits.stderr_max_bytes,
-    };
-    if stdout_facts.truncated || stderr_facts.truncated {
-        return Err(truncation_error(stdout_facts, stderr_facts));
-    }
-    match execution_output.disposition {
-        bounded_exec::Disposition::TimedOut => Err(crate::agent_node::ProcessError::Timeout),
-        bounded_exec::Disposition::Cancelled => Err(crate::agent_node::ProcessError::Cancelled),
-        bounded_exec::Disposition::OutputLimitExceeded(_) => Err(truncation_error(stdout_facts, stderr_facts)),
-        bounded_exec::Disposition::Succeeded | bounded_exec::Disposition::ExitFailed => {
-            Ok(crate::agent_node::ProcessOutput {
-                status_code: execution_output.exit_code,
-                stdout: execution_output.stdout.bytes,
-                stderr: execution_output.stderr.bytes,
-            })
-        }
-    }
+    }))
 }
 
 fn duration_millis(duration: std::time::Duration) -> Result<u64, crate::agent_node::ProcessError> {
@@ -222,28 +215,55 @@ fn duration_millis(duration: std::time::Duration) -> Result<u64, crate::agent_no
         .map_err(|_| crate::agent_node::ProcessError::InvalidRequest(super::core::INVALID_LIMIT_DIAGNOSTIC))
 }
 
-fn map_execution_error(_error: bounded_exec::RunError) -> crate::agent_node::ProcessError {
-    crate::agent_node::ProcessError::Spawn(super::core::EXECUTION_FAILURE_DIAGNOSTIC.to_owned())
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct CaptureFacts {
-    truncated: bool,
-    observed_bytes: usize,
-    limit_bytes: usize,
-}
-
-fn truncation_error(stdout: CaptureFacts, stderr: CaptureFacts) -> crate::agent_node::ProcessError {
-    let (limit_bytes, observed_bytes) = match (stdout.truncated, stderr.truncated) {
-        (true, true) => (stdout.limit_bytes.min(stderr.limit_bytes), stdout.observed_bytes.max(stderr.observed_bytes)),
-        (true, false) => (stdout.limit_bytes, stdout.observed_bytes),
-        (false, true) => (stderr.limit_bytes, stderr.observed_bytes),
-        (false, false) => {
-            (stdout.limit_bytes.min(stderr.limit_bytes), stdout.observed_bytes.max(stderr.observed_bytes))
+// r[impl lattice.candidate_worker.process_observation]
+// r[impl lattice.candidate_worker.process_observation.scenario.cleanup]
+pub(crate) fn map_execution_error(error: bounded_exec::RunError) -> crate::agent_node::ProcessError {
+    let (phase, termination) = match error {
+        bounded_exec::RunError::InvalidLimits(_)
+        | bounded_exec::RunError::EmptyProgram
+        | bounded_exec::RunError::ProgramNotAbsolute
+        | bounded_exec::RunError::EmptyCurrentDirectory
+        | bounded_exec::RunError::CurrentDirectoryNotAbsolute
+        | bounded_exec::RunError::DuplicateEnvironmentName
+        | bounded_exec::RunError::InputLimitExceeded => {
+            return crate::agent_node::ProcessError::InvalidRequest("bounded execution request rejected");
+        }
+        bounded_exec::RunError::Io {
+            operation: bounded_exec::Operation::Spawn,
+            ..
+        } => return crate::agent_node::ProcessError::Spawn(super::core::EXECUTION_FAILURE_DIAGNOSTIC.to_owned()),
+        // Wait is returned only after the pinned runner successfully reaps the child.
+        bounded_exec::RunError::Io {
+            operation: bounded_exec::Operation::Wait,
+            ..
+        } => (crate::agent_node::ProcessFailurePhase::Execution, crate::agent_node::ProcessTermination::Observed),
+        bounded_exec::RunError::Io {
+            operation: bounded_exec::Operation::Kill | bounded_exec::Operation::Reap,
+            ..
+        }
+        | bounded_exec::RunError::ChildTeardownTimedOut
+        | bounded_exec::RunError::ProcessIdentifierOverflow => {
+            (crate::agent_node::ProcessFailurePhase::Teardown, crate::agent_node::ProcessTermination::Unknown)
+        }
+        // Missing pipes and stream failures follow successful child teardown.
+        bounded_exec::RunError::MissingPipe(_)
+        | bounded_exec::RunError::CaptureCountOverflow(_)
+        | bounded_exec::RunError::WorkerDisconnected(_)
+        | bounded_exec::RunError::WorkerPanicked(_)
+        | bounded_exec::RunError::Io { .. } => {
+            (crate::agent_node::ProcessFailurePhase::Capture, crate::agent_node::ProcessTermination::Observed)
+        }
+        bounded_exec::RunError::WorkerTeardownTimedOut(_) => {
+            (crate::agent_node::ProcessFailurePhase::Teardown, crate::agent_node::ProcessTermination::Observed)
         }
     };
-    crate::agent_node::ProcessError::OutputLimitExceeded {
-        limit: limit_bytes,
-        actual: observed_bytes.max(limit_bytes.saturating_add(OUTPUT_OVERFLOW_SENTINEL_BYTES)),
-    }
+    debug_assert!(
+        termination != crate::agent_node::ProcessTermination::Unknown
+            || phase == crate::agent_node::ProcessFailurePhase::Teardown
+    );
+    debug_assert!(
+        phase != crate::agent_node::ProcessFailurePhase::Execution
+            || termination == crate::agent_node::ProcessTermination::Observed
+    );
+    crate::agent_node::ProcessError::Execution { phase, termination }
 }

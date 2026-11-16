@@ -8,13 +8,13 @@ use std::sync::Arc;
 
 use lattice::candidate::CandidateDisposition;
 use lattice::candidate::CandidateReceipt;
-use lattice::candidate_worker::CandidateAttemptResult;
+use lattice::candidate_worker::AttemptResult;
 use lattice::engine::executor::RunId;
 use lattice::engine::value::ContentHash;
 use lattice::engine::value::Value;
 use lattice::engine::workflow::PortId;
 use lattice::engine::workflow::Workflow;
-use lattice::orchestration::CommandWorkerUsageObservation;
+use lattice::orchestration::CommandWorkerObservation;
 use lattice::orchestration::UsageProvenance;
 use lattice::store::ExecutionCache;
 use lattice::store::RunOwner;
@@ -72,20 +72,62 @@ fn candidate_receipts_persist_and_revalidate() {
     invalid.changed_paths = vec!["../escape".to_string()];
     assert!(store.save_candidate_receipt(&invalid).is_err());
 
-    store.save_candidate_artifact("attempt-1", "src/lib.rs", b"artifact").expect("artifact saves");
     store
-        .save_candidate_artifact("attempt-1", "src/lib.rs", b"artifact")
+        .save_candidate_artifact(
+            lattice::store::ArtifactKey {
+                attempt_id: "attempt-1",
+                relative_path: "src/lib.rs",
+            },
+            b"artifact",
+        )
+        .expect("artifact saves");
+    store
+        .save_candidate_artifact(
+            lattice::store::ArtifactKey {
+                attempt_id: "attempt-1",
+                relative_path: "src/lib.rs",
+            },
+            b"artifact",
+        )
         .expect("identical artifact is idempotent");
     assert_eq!(
-        store.load_candidate_artifact("attempt-1", "src/lib.rs").expect("artifact loads"),
+        store
+            .load_candidate_artifact(lattice::store::ArtifactKey {
+                attempt_id: "attempt-1",
+                relative_path: "src/lib.rs"
+            })
+            .expect("artifact loads"),
         Some(b"artifact".to_vec())
     );
     assert!(matches!(
-        store.save_candidate_artifact("attempt-1", "src/lib.rs", b"different"),
+        store.save_candidate_artifact(
+            lattice::store::ArtifactKey {
+                attempt_id: "attempt-1",
+                relative_path: "src/lib.rs"
+            },
+            b"different"
+        ),
         Err(lattice::store::StoreError::Conflict(_))
     ));
-    assert!(store.save_candidate_artifact("attempt-1", "../escape", b"x").is_err());
-    assert!(store.load_candidate_artifact("attempt-1", "../escape").is_err());
+    assert!(
+        store
+            .save_candidate_artifact(
+                lattice::store::ArtifactKey {
+                    attempt_id: "attempt-1",
+                    relative_path: "../escape"
+                },
+                b"x"
+            )
+            .is_err()
+    );
+    assert!(
+        store
+            .load_candidate_artifact(lattice::store::ArtifactKey {
+                attempt_id: "attempt-1",
+                relative_path: "../escape"
+            })
+            .is_err()
+    );
 }
 
 #[test]
@@ -116,9 +158,9 @@ fn candidate_receipts_survive_store_reopen() {
 #[test]
 fn command_worker_usage_persists_and_revalidates() {
     let (store, _dir) = common::temp_store();
-    let observation = CommandWorkerUsageObservation {
+    let observation = CommandWorkerObservation {
         schema: lattice::orchestration::USAGE_OBSERVATION_SCHEMA.to_string(),
-        scope: lattice::orchestration::UsageScope::Run,
+        scope: lattice::orchestration::Scope::Run,
         workflow_revision: "revision-1".to_string(),
         instance_id: "instance-1".to_string(),
         dispatch_id: "dispatch-1".to_string(),
@@ -135,6 +177,7 @@ fn command_worker_usage_persists_and_revalidates() {
         duration_millis: Some(42),
         provenance: UsageProvenance::ProviderReported,
         complete: true,
+        accounting: None,
     };
     store.save_command_worker_usage(&observation).expect("usage saves");
     store.save_command_worker_usage(&observation).expect("identical usage is idempotent");
@@ -161,8 +204,8 @@ fn command_worker_usage_persists_and_revalidates() {
     assert!(store.save_command_worker_usage(&invalid).is_err());
 }
 
-fn produced_attempt_result(attempt_id: &str) -> CandidateAttemptResult {
-    CandidateAttemptResult {
+fn produced_attempt_result(attempt_id: &str) -> AttemptResult {
+    AttemptResult {
         schema: lattice::candidate_worker::CANDIDATE_ATTEMPT_RESULT_SCHEMA.to_string(),
         disposition: CandidateDisposition::Produced,
         receipt: Some(CandidateReceipt {
@@ -183,6 +226,8 @@ fn produced_attempt_result(attempt_id: &str) -> CandidateAttemptResult {
         stderr_blake3: "e".repeat(64),
         blocker: None,
         compatibility: None,
+        process_failure: None,
+        observed_artifacts: std::collections::BTreeMap::new(),
     }
 }
 

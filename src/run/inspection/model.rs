@@ -139,7 +139,7 @@ pub struct SafeBudgetEvidence {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SafeOrchestrationEvidence {
     pub event_chain: EvidenceState,
-    pub status: crate::orchestration::OrchestrationStatus,
+    pub status: crate::orchestration::Status,
     pub dispatch: DispatchEvidenceState,
     pub recovery: RecoveryEvidenceState,
     pub cancellation_requested: bool,
@@ -162,8 +162,8 @@ pub struct Report {
 }
 
 pub struct OrchestrationInput<'a> {
-    pub instance: &'a crate::orchestration::OrchestrationInstance,
-    pub events: &'a [crate::orchestration::OrchestrationEvent],
+    pub instance: &'a crate::orchestration::Instance,
+    pub events: &'a [crate::orchestration::Event],
 }
 
 pub struct Input<'a> {

@@ -7,13 +7,6 @@
 
 use std::collections::HashMap;
 use std::fmt;
-use std::path::Path;
-use std::path::PathBuf;
-
-use serde::Deserialize;
-use serde::Serialize;
-
-use crate::agent_node::AgentRuntimeConfig;
 
 pub mod identity;
 
@@ -22,13 +15,13 @@ const SERIAL_MAX_PARALLELISM: u32 = 1;
 const DEFAULT_SHELL: &str = "sh";
 
 /// Application-level configuration loaded from Nickel.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AppConfig {
     /// Directory for redb database and other state.
-    pub data_dir: PathBuf,
+    pub data_dir: std::path::PathBuf,
     /// Absolute path to an operator-supplied effect authority profile. Omission denies effects.
     #[serde(default = "no_effect_authority")]
-    pub effect_authority: Option<PathBuf>,
+    pub effect_authority: Option<std::path::PathBuf>,
     /// Default shell command timeout in seconds.
     pub default_timeout_secs: u64,
     /// Shell to use for commands (default: "sh").
@@ -41,7 +34,7 @@ pub struct AppConfig {
     pub resource_lanes: std::collections::BTreeMap<String, u32>,
     /// Production command and OpenAI-compatible agent runtime configuration.
     #[serde(default)]
-    pub agent_runtime: AgentRuntimeConfig,
+    pub agent_runtime: crate::agent_node::RuntimeOptions,
     /// Shared stdin, capture, command-agent deadline, polling, and teardown bounds.
     #[serde(default)]
     pub process_limits: crate::process::core::LimitConfig,
@@ -55,7 +48,8 @@ pub struct AppConfig {
 
 impl Default for AppConfig {
     fn default() -> Self {
-        let data_dir = default_data_dir().unwrap_or_else(|| PathBuf::from(identity::CANONICAL_DATA_DIR_NAME));
+        let data_dir =
+            default_data_dir().unwrap_or_else(|| std::path::PathBuf::from(identity::CANONICAL_DATA_DIR_NAME));
         Self {
             data_dir,
             effect_authority: None,
@@ -63,7 +57,7 @@ impl Default for AppConfig {
             shell: DEFAULT_SHELL.into(),
             max_parallelism: SERIAL_MAX_PARALLELISM,
             resource_lanes: std::collections::BTreeMap::new(),
-            agent_runtime: AgentRuntimeConfig::default(),
+            agent_runtime: crate::agent_node::RuntimeOptions::default(),
             process_limits: crate::process::core::LimitConfig::default(),
             credential_providers: Vec::new(),
             credential_hosts: Vec::new(),
@@ -71,7 +65,7 @@ impl Default for AppConfig {
     }
 }
 
-const fn no_effect_authority() -> Option<PathBuf> {
+const fn no_effect_authority() -> Option<std::path::PathBuf> {
     None
 }
 
@@ -89,7 +83,7 @@ impl AppConfig {
     }
 
     /// Derive the explicit process runtime consumed by every executor entry point.
-    pub fn effective_agent_runtime(&self) -> AgentRuntimeConfig {
+    pub fn effective_agent_runtime(&self) -> crate::agent_node::RuntimeOptions {
         let mut runtime = self.agent_runtime.clone();
         runtime.local_process = crate::process::core::RuntimeConfig {
             shell_program: self.shell.clone(),
@@ -197,7 +191,7 @@ fn empty_resource_lanes() -> std::collections::BTreeMap<String, u32> {
 }
 
 /// Imperative shell: collect environment and filesystem facts for the default data directory.
-fn default_data_dir() -> Option<PathBuf> {
+fn default_data_dir() -> Option<std::path::PathBuf> {
     let home_dir = home::home_dir();
     let has_legacy_default = home_dir.as_ref().is_some_and(|home| home.join(identity::LEGACY_DATA_DIR_NAME).exists());
     identity::select_data_dir(identity::DataDirFacts {
@@ -209,12 +203,12 @@ fn default_data_dir() -> Option<PathBuf> {
     .map(expand_home)
 }
 
-fn read_data_dir_env(name: &str) -> Option<PathBuf> {
-    std::env::var(name).ok().map(PathBuf::from)
+fn read_data_dir_env(name: &str) -> Option<std::path::PathBuf> {
+    std::env::var(name).ok().map(std::path::PathBuf::from)
 }
 
 /// Imperative shell: collect filesystem facts for the configured store directory.
-pub fn store_path(data_dir: &Path) -> PathBuf {
+pub fn store_path(data_dir: &std::path::Path) -> std::path::PathBuf {
     let canonical_path = data_dir.join(identity::CANONICAL_STORE_FILE_NAME);
     let legacy_path = data_dir.join(identity::LEGACY_STORE_FILE_NAME);
     identity::select_store_path(identity::StorePathFacts {
@@ -226,7 +220,7 @@ pub fn store_path(data_dir: &Path) -> PathBuf {
 }
 
 /// A node template defined in Nickel.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct NodeTemplate {
     pub name: String,
     pub description: String,
@@ -239,7 +233,7 @@ pub struct NodeTemplate {
     pub output_ports: Vec<PortTemplate>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TemplateParameter {
     pub name: String,
     #[serde(rename = "type")]
@@ -256,7 +250,7 @@ pub struct TemplateParameter {
     pub max: Option<f64>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum TemplateParameterType {
     String,
@@ -268,7 +262,7 @@ const fn parameter_is_optional() -> bool {
     false
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
 pub enum TemplateParameterDefault {
     String(String),
@@ -298,7 +292,7 @@ pub enum TemplateRenderError {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TemplateDiagnostic {
-    pub path: PathBuf,
+    pub path: std::path::PathBuf,
     pub message: String,
 }
 
@@ -308,7 +302,7 @@ pub struct NodeTemplateLoadResult {
     pub diagnostics: Vec<TemplateDiagnostic>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PortTemplate {
     pub label: String,
     pub type_tag: String,
@@ -495,7 +489,7 @@ fn validate_number_constraints(parameter: &TemplateParameter, value: f64) -> Res
 
 /// Load an existing selected config without silently discarding invalid settings.
 /// A missing default config preserves the existing unconfigured behavior.
-pub fn load_app_config(path: &Path) -> crate::error::Result<AppConfig> {
+pub fn load_app_config(path: &std::path::Path) -> crate::error::Result<AppConfig> {
     let config_error = |message: &str| crate::error::Error::Config {
         message: message.to_owned(),
     };
@@ -510,7 +504,7 @@ pub fn load_app_config(path: &Path) -> crate::error::Result<AppConfig> {
     Ok(config)
 }
 
-fn expand_home(path: PathBuf) -> PathBuf {
+fn expand_home(path: std::path::PathBuf) -> std::path::PathBuf {
     let Some(text) = path.to_str() else {
         return path;
     };
@@ -524,12 +518,12 @@ fn expand_home(path: PathBuf) -> PathBuf {
 }
 
 /// Load node templates from a directory of .ncl files.
-pub fn load_node_templates(dir: &Path) -> Vec<NodeTemplate> {
+pub fn load_node_templates(dir: &std::path::Path) -> Vec<NodeTemplate> {
     load_node_templates_with_diagnostics(dir).templates
 }
 
 /// Load node templates and collect diagnostics for invalid template files.
-pub fn load_node_templates_with_diagnostics(dir: &Path) -> NodeTemplateLoadResult {
+pub fn load_node_templates_with_diagnostics(dir: &std::path::Path) -> NodeTemplateLoadResult {
     let mut templates = Vec::new();
     let mut diagnostics = Vec::new();
 
@@ -586,7 +580,7 @@ pub fn load_node_templates_with_diagnostics(dir: &Path) -> NodeTemplateLoadResul
 }
 
 /// Evaluate a Nickel file and return the result as serde_json::Value.
-pub(crate) fn load_nickel_as_json(path: &Path) -> Result<serde_json::Value, String> {
+pub(crate) fn load_nickel_as_json(path: &std::path::Path) -> Result<serde_json::Value, String> {
     crate::nickel::evaluate_file(path).map_err(|error| error.to_string())
 }
 

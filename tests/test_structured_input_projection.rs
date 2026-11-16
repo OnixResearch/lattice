@@ -3,16 +3,16 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
-use lattice::agent_node::AgentAdapter;
-use lattice::agent_node::AgentOutput;
-use lattice::agent_node::AgentOutputMode;
-use lattice::agent_node::AgentRequest;
-use lattice::agent_node::AgentRuntimeConfig;
-use lattice::agent_node::AgentTarget;
+use lattice::agent_node::Adapter;
 use lattice::agent_node::ExecutionContext;
-use lattice::agent_node::ProductionAgentAdapter;
+use lattice::agent_node::Output;
+use lattice::agent_node::OutputMode;
+use lattice::agent_node::ProductionAdapter;
+use lattice::agent_node::Request;
+use lattice::agent_node::RuntimeOptions;
 use lattice::agent_node::StructuredInputProjectionPolicy;
-use lattice::agent_node::plan_agent_command;
+use lattice::agent_node::Target;
+use lattice::agent_node::plan_command;
 use lattice::agent_prompt::ProjectionPilotInput;
 use lattice::agent_prompt::StructuredInputProjection;
 use lattice::agent_prompt::evaluate_pilot;
@@ -50,7 +50,7 @@ impl Transport for RecordingTransport {
         &self,
         _plan: &ChatPlan,
         _bearer_token: Option<&str>,
-    ) -> Result<HttpResponse, lattice::agent_node::AgentError> {
+    ) -> Result<HttpResponse, lattice::agent_node::Error> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         Ok(HttpResponse {
             status: HTTP_OK,
@@ -59,11 +59,11 @@ impl Transport for RecordingTransport {
     }
 }
 
-fn agent_request(target: AgentTarget, input: serde_json::Value) -> AgentRequest {
-    AgentRequest {
+fn agent_request(target: Target, input: serde_json::Value) -> Request {
+    Request {
         target,
         prompt: "Return the selected owner.".to_string(),
-        output_mode: AgentOutputMode::Text,
+        output_mode: OutputMode::Text,
         model_hint: None,
         tool_policy: "No tools.".to_string(),
         context_refs: vec!["context:fixture".to_string()],
@@ -103,25 +103,25 @@ fn user_prompt(plan: &ChatPlan) -> String {
 // r[verify lattice.agent_runtime.structured_input_projection]
 #[test]
 fn runtime_policy_accepts_closed_profiles_and_rejects_unknown_entries() {
-    let selected: AgentRuntimeConfig = serde_json::from_value(serde_json::json!({
+    let selected: RuntimeOptions = serde_json::from_value(serde_json::json!({
         "runtimes": {},
         "openai_compatible": {},
         "structured_input_projection": {"pi": "toon_v3"}
     }))
     .expect("closed projection policy decodes");
-    let unknown_profile = serde_json::from_value::<AgentRuntimeConfig>(serde_json::json!({
+    let unknown_profile = serde_json::from_value::<RuntimeOptions>(serde_json::json!({
         "structured_input_projection": {"pi": "toon_v4"}
     }));
-    let unknown_target = serde_json::from_value::<AgentRuntimeConfig>(serde_json::json!({
+    let unknown_target = serde_json::from_value::<RuntimeOptions>(serde_json::json!({
         "structured_input_projection": {"other": "toon_v3"}
     }));
-    let wrong_type = serde_json::from_value::<AgentRuntimeConfig>(serde_json::json!({
+    let wrong_type = serde_json::from_value::<RuntimeOptions>(serde_json::json!({
         "structured_input_projection": {"pi": true}
     }));
 
-    assert_eq!(selected.structured_input_projection.for_target(AgentTarget::Pi), StructuredInputProjection::ToonV3);
+    assert_eq!(selected.structured_input_projection.for_target(Target::Pi), StructuredInputProjection::ToonV3);
     assert_eq!(
-        selected.structured_input_projection.for_target(AgentTarget::Clankers),
+        selected.structured_input_projection.for_target(Target::Clankers),
         StructuredInputProjection::JsonPretty
     );
     assert!(unknown_profile.is_err());
@@ -134,10 +134,10 @@ fn runtime_policy_accepts_closed_profiles_and_rejects_unknown_entries() {
 #[test]
 fn selected_profile_has_identical_command_openai_and_animus_prompt() {
     let input = serde_json::json!({"users": [{"id": 1, "name": "Ada"}]});
-    let request = agent_request(AgentTarget::Pi, input.clone());
-    let mut command_config = AgentRuntimeConfig::default();
+    let request = agent_request(Target::Pi, input.clone());
+    let mut command_config = RuntimeOptions::default();
     command_config.structured_input_projection.pi = Some(StructuredInputProjection::ToonV3);
-    let command_plan = plan_agent_command(&command_config, &request).expect("command prompt projects");
+    let command_plan = plan_command(&command_config, &request).expect("command prompt projects");
     let command_prompt = command_plan.args.last().expect("command plan has prompt");
 
     let runtime = runtime();
@@ -148,7 +148,7 @@ fn selected_profile_has_identical_command_openai_and_animus_prompt() {
         global_output_max_bytes: GLOBAL_OUTPUT_LIMIT_BYTES,
     })
     .expect("OpenAI prompt projects");
-    let animus_request = agent_request(AgentTarget::Animus, input);
+    let animus_request = agent_request(Target::Animus, input);
     let animus_plan = plan_execution_with_projection(&animus_request, StructuredInputProjection::ToonV3)
         .expect("Animus prompt projects");
 
@@ -161,8 +161,8 @@ fn selected_profile_has_identical_command_openai_and_animus_prompt() {
 // r[verify lattice.agent_runtime.structured_input_projection.scenario.default]
 #[test]
 fn omitted_policy_preserves_exact_pretty_json_prompt() {
-    let request = agent_request(AgentTarget::Pi, serde_json::json!({"enabled": true}));
-    let plan = plan_agent_command(&AgentRuntimeConfig::default(), &request).expect("default command prompt renders");
+    let request = agent_request(Target::Pi, serde_json::json!({"enabled": true}));
+    let plan = plan_command(&RuntimeOptions::default(), &request).expect("default command prompt renders");
     let prompt = plan.args.last().expect("command plan has prompt");
 
     assert!(prompt.contains("JSON input 1:\n{\n  \"enabled\": true\n}"));
@@ -174,8 +174,8 @@ fn omitted_policy_preserves_exact_pretty_json_prompt() {
 // r[verify lattice.agent_runtime.projection_boundaries.scenario.output]
 #[test]
 fn toon_input_keeps_provider_envelope_and_requested_output_as_json() {
-    let mut request = agent_request(AgentTarget::Pi, serde_json::json!({"users": [{"id": 1, "name": "Ada"}]}));
-    request.output_mode = AgentOutputMode::Json;
+    let mut request = agent_request(Target::Pi, serde_json::json!({"users": [{"id": 1, "name": "Ada"}]}));
+    request.output_mode = OutputMode::Json;
     let runtime = runtime();
     let plan = plan_chat_with_projection(ProjectedChat {
         runtime: &runtime,
@@ -195,7 +195,7 @@ fn toon_input_keeps_provider_envelope_and_requested_output_as_json() {
 
     assert!(user_prompt(&plan).contains("TOON v3 input 1"));
     assert!(envelope["messages"].is_array());
-    assert_eq!(decoded.output, AgentOutput::Json(serde_json::json!({"owner": "Ada"})));
+    assert_eq!(decoded.output, Output::Json(serde_json::json!({"owner": "Ada"})));
     assert!(durable_request.get("structured_input_projection").is_none());
 }
 
@@ -203,10 +203,10 @@ fn toon_input_keeps_provider_envelope_and_requested_output_as_json() {
 #[test]
 fn invalid_toon_projection_stops_every_route_before_effects() {
     let invalid_input = serde_json::json!({});
-    let request = agent_request(AgentTarget::Pi, invalid_input.clone());
-    let mut command_config = AgentRuntimeConfig::default();
+    let request = agent_request(Target::Pi, invalid_input.clone());
+    let mut command_config = RuntimeOptions::default();
     command_config.structured_input_projection.pi = Some(StructuredInputProjection::ToonV3);
-    assert!(plan_agent_command(&command_config, &request).is_err());
+    assert!(plan_command(&command_config, &request).is_err());
     assert!(
         plan_chat_with_projection(ProjectedChat {
             runtime: &runtime(),
@@ -216,12 +216,12 @@ fn invalid_toon_projection_stops_every_route_before_effects() {
         })
         .is_err()
     );
-    let animus_request = agent_request(AgentTarget::Animus, invalid_input);
+    let animus_request = agent_request(Target::Animus, invalid_input);
     assert!(plan_execution_with_projection(&animus_request, StructuredInputProjection::ToonV3).is_err());
 
     let transport = Arc::new(RecordingTransport::default());
-    let adapter = ProductionAgentAdapter::new_with_openai_transport(
-        AgentRuntimeConfig {
+    let adapter = ProductionAdapter::new_with_openai_transport(
+        RuntimeOptions {
             runtimes: BTreeMap::new(),
             openai_compatible: BTreeMap::from([("pi".to_string(), runtime())]),
             structured_input_projection: StructuredInputProjectionPolicy {
@@ -242,8 +242,8 @@ fn invalid_toon_projection_stops_every_route_before_effects() {
 #[test]
 fn successful_route_records_only_safe_projection_facts() {
     let transport = Arc::new(RecordingTransport::default());
-    let adapter = ProductionAgentAdapter::new_with_openai_transport(
-        AgentRuntimeConfig {
+    let adapter = ProductionAdapter::new_with_openai_transport(
+        RuntimeOptions {
             runtimes: BTreeMap::new(),
             openai_compatible: BTreeMap::from([("pi".to_string(), runtime())]),
             structured_input_projection: StructuredInputProjectionPolicy {
@@ -258,7 +258,7 @@ fn successful_route_records_only_safe_projection_facts() {
     );
     let response = adapter
         .execute(
-            &agent_request(AgentTarget::Pi, serde_json::json!({"private": "not retained"})),
+            &agent_request(Target::Pi, serde_json::json!({"private": "not retained"})),
             &ExecutionContext::default(),
         )
         .expect("controlled route returns a response");

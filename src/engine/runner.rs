@@ -116,8 +116,6 @@ pub enum PersistedReplayError {
 }
 
 use crate::agent_node;
-use crate::engine::value::Value;
-use crate::engine::value::ValueData;
 use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::NodeRunnerSettings;
 use crate::engine::workflow::Workflow;
@@ -261,14 +259,14 @@ pub struct RuntimeOutputShape {
 pub struct RuntimeInvocation {
     pub node_id: RunnerNodeId,
     pub binding: RuntimeBinding,
-    pub inputs: BTreeMap<RunnerPortId, Value>,
+    pub inputs: BTreeMap<RunnerPortId, crate::engine::value::Value>,
     pub output_ports: Vec<RunnerPort>,
 }
 
 #[derive(Debug, Clone)]
 pub struct RuntimeOutputValue {
     pub port_id: RunnerPortId,
-    pub value: Value,
+    pub value: crate::engine::value::Value,
 }
 
 #[derive(Debug, Clone)]
@@ -473,9 +471,7 @@ pub(crate) fn runtime_binding_for_config(config: &NodeConfig) -> RuntimeBinding 
         NodeConfig::Http { .. } => runtime_binding(RUNTIME_KIND_HTTP, RUNTIME_KEY_DEFAULT),
         NodeConfig::File { operation, .. } => runtime_binding(RUNTIME_KIND_FILE, file_runtime_key(*operation)),
         NodeConfig::ImageInput { .. } => runtime_binding(RUNTIME_KIND_IMAGE_INPUT, RUNTIME_KEY_DEFAULT),
-        NodeConfig::Agent(settings) => {
-            runtime_binding(RUNTIME_KIND_AGENT, agent_node::agent_target_label(settings.target))
-        }
+        NodeConfig::Agent(settings) => runtime_binding(RUNTIME_KIND_AGENT, agent_node::target_label(settings.target)),
         NodeConfig::Operation(plan) => runtime_binding(&plan.runtime.kind, &plan.runtime.key),
         NodeConfig::Condition(_) => runtime_binding(RUNTIME_KIND_CONDITION, RUNTIME_KEY_DEFAULT),
         NodeConfig::Merge(_) => runtime_binding(RUNTIME_KIND_MERGE, RUNTIME_KEY_DEFAULT),
@@ -880,9 +876,9 @@ pub fn builtin_runtime_registry() -> RuntimeRegistry {
         runtime_binding(RUNTIME_KIND_SUBWORKFLOW, RUNTIME_KEY_DEFAULT),
         runtime_binding(RUNTIME_KIND_APPROVAL, RUNTIME_KEY_DEFAULT),
         runtime_binding(RUNTIME_KIND_PROCESS, crate::operation::runtime::CAIRN_RUNTIME_KEY),
-        runtime_binding(RUNTIME_KIND_AGENT, agent_node::agent_target_label(agent_node::AgentTarget::Pi)),
-        runtime_binding(RUNTIME_KIND_AGENT, agent_node::agent_target_label(agent_node::AgentTarget::Clankers)),
-        runtime_binding(RUNTIME_KIND_AGENT, agent_node::agent_target_label(agent_node::AgentTarget::Animus)),
+        runtime_binding(RUNTIME_KIND_AGENT, agent_node::target_label(agent_node::Target::Pi)),
+        runtime_binding(RUNTIME_KIND_AGENT, agent_node::target_label(agent_node::Target::Clankers)),
+        runtime_binding(RUNTIME_KIND_AGENT, agent_node::target_label(agent_node::Target::Animus)),
     ])
 }
 
@@ -1040,7 +1036,10 @@ fn contains_sensitive_fragment(summary: &str, sensitive_fragments: &[String]) ->
 
 // r[impl n8nclone.workflow_execution.artifact_references.model]
 // r[impl n8nclone.workflow_execution.artifact_references.trellis_identity]
-pub fn artifact_reference_for_value(value: &Value, backend_ref: impl Into<String>) -> ArtifactReference {
+pub fn artifact_reference_for_value(
+    value: &crate::engine::value::Value,
+    backend_ref: impl Into<String>,
+) -> ArtifactReference {
     ArtifactReference {
         content_hash: value.hash.to_hex(),
         type_tag: value.type_tag().as_str().to_string(),
@@ -1052,21 +1051,23 @@ pub fn artifact_reference_for_value(value: &Value, backend_ref: impl Into<String
     }
 }
 
-fn value_media_type(value: &Value) -> Option<String> {
+fn value_media_type(value: &crate::engine::value::Value) -> Option<String> {
     match &value.data {
-        ValueData::Image(image) => Some(image.media_type.clone()),
+        crate::engine::value::ValueData::Image(image) => Some(image.media_type.clone()),
         _ => None,
     }
 }
 
-fn value_byte_length(value: &Value) -> usize {
+fn value_byte_length(value: &crate::engine::value::Value) -> usize {
     match &value.data {
-        ValueData::String(value) => value.len(),
-        ValueData::Bytes(value) => value.len(),
-        ValueData::Json(value) => serde_json::to_vec(value).map(|bytes| bytes.len()).unwrap_or_default(),
-        ValueData::Image(image) => image.bytes.len(),
-        ValueData::ExitCode(_) => std::mem::size_of::<i32>(),
-        ValueData::Error { message, stderr } => message.len() + stderr.len(),
+        crate::engine::value::ValueData::String(value) => value.len(),
+        crate::engine::value::ValueData::Bytes(value) => value.len(),
+        crate::engine::value::ValueData::Json(value) => {
+            serde_json::to_vec(value).map(|bytes| bytes.len()).unwrap_or_default()
+        }
+        crate::engine::value::ValueData::Image(image) => image.bytes.len(),
+        crate::engine::value::ValueData::ExitCode(_) => std::mem::size_of::<i32>(),
+        crate::engine::value::ValueData::Error { message, stderr } => message.len() + stderr.len(),
     }
 }
 

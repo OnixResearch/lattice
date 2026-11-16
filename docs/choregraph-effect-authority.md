@@ -139,7 +139,7 @@ Adding the Agent contract changes the shared policy identity. Re-inspect every
 affected workflow and review a replacement operator profile; profiles bound to
 the previous policy are rejected, not silently upgraded.
 
-Custom `AgentAdapter` implementations must supply `execution_identity` without
+Custom `agent_node::Adapter` implementations must supply `execution_identity` without
 resolving credentials or performing effects. The explicit compatibility/embedder
 path remains trusted host execution, not a product authorization fallback.
 

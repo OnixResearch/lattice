@@ -8,10 +8,10 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::Command;
 
-use lattice::agent_node::AgentCommandRuntimeConfig;
-use lattice::agent_node::AgentOutputMode;
-use lattice::agent_node::AgentRuntimeConfig;
-use lattice::agent_node::AgentTarget;
+use lattice::agent_node::CommandOptions;
+use lattice::agent_node::OutputMode;
+use lattice::agent_node::RuntimeOptions;
+use lattice::agent_node::Target;
 use lattice::config::DEFAULT_NODE_TEMPLATE_FILES;
 use lattice::config::NodeTemplate;
 use lattice::config::load_node_templates_with_diagnostics;
@@ -290,17 +290,17 @@ fn write_agent_script_with_body(temp_dir: &tempfile::TempDir, body: &str) -> Str
     path.display().to_string()
 }
 
-fn pi_agent_runtime(command: String) -> AgentRuntimeConfig {
+fn pi_agent_runtime(command: String) -> RuntimeOptions {
     let mut runtimes = BTreeMap::new();
-    runtimes.insert(PI_RUNTIME_KEY.to_string(), AgentCommandRuntimeConfig {
+    runtimes.insert(PI_RUNTIME_KEY.to_string(), CommandOptions {
         command,
         args: vec!["-p".to_string(), PROMPT_ARG_TEMPLATE.to_string()],
     });
-    AgentRuntimeConfig {
+    RuntimeOptions {
         runtimes,
         openai_compatible: BTreeMap::new(),
         structured_input_projection: Default::default(),
-        max_output_bytes: AgentRuntimeConfig::default().max_output_bytes,
+        max_output_bytes: RuntimeOptions::default().max_output_bytes,
         local_process: Default::default(),
     }
 }
@@ -531,7 +531,7 @@ async fn headless_run_uses_configured_production_agent_runtime() {
     let (store, temp_dir) = temp_store();
     let command = write_agent_script(&temp_dir);
     let mut workflow = Workflow::new(AGENT_WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
-    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Pi, "summarize this", AgentOutputMode::Text);
+    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, Target::Pi, "summarize this", OutputMode::Text);
     let text_port = output_port_id(&workflow, node_id, AGENT_TEXT_OUTPUT_PORT_LABEL);
     let input_hash = node_execution_cache_key(
         node_id,
@@ -572,8 +572,7 @@ async fn headless_run_maps_agent_image_handoff_to_image_output_port() {
     let envelope = serde_json::json!({"path": HEADLESS_AGENT_IMAGE_FILE_NAME, "media_type": "image/png"});
     let command = write_agent_script_with_body(&temp_dir, &format!("#!/bin/sh\nprintf '{envelope}'\n"));
     let mut workflow = Workflow::new(AGENT_WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
-    let node_id =
-        workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Pi, HEADLESS_AGENT_IMAGE_PROMPT, AgentOutputMode::Image);
+    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, Target::Pi, HEADLESS_AGENT_IMAGE_PROMPT, OutputMode::Image);
     if let Some(NodeConfig::Agent(settings)) = workflow.configs.get_mut(&node_id.0) {
         settings.cwd = Some(temp_dir.path().display().to_string());
     }

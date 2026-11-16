@@ -25,4 +25,4 @@ pub mod input;
 pub mod panels;
 pub mod rows;
 
-pub use app::App;
+pub use app::State;

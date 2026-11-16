@@ -98,7 +98,9 @@ impl ProtocolAdapter for HttpAdapter<'_> {
             Ok(response) if (SUCCESS_STATUS_START..=SUCCESS_STATUS_END).contains(&response.status) => {
                 AdapterDispatch::Started
             }
-            Ok(_) => AdapterDispatch::ObservedFailure,
+            // A status is transport evidence, not an exact application rejection.
+            // The receiver (or an intermediary) may have failed after applying work.
+            Ok(_) => AdapterDispatch::UnknownAfterStart,
             Err(
                 crate::http::HttpError::InvalidRequest(_)
                 | crate::http::HttpError::LimitExceeded(

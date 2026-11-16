@@ -6,7 +6,7 @@ pub enum Error {
     Store(crate::store::StoreError),
     ApplicationConflict,
     ActivationBlocked(super::model::ActivationBlock),
-    Orchestration(crate::orchestration::OrchestrationShellError),
+    Orchestration(crate::orchestration::Error),
 }
 
 impl std::fmt::Display for Error {
@@ -29,8 +29,8 @@ impl From<crate::store::StoreError> for Error {
     }
 }
 
-impl From<crate::orchestration::OrchestrationShellError> for Error {
-    fn from(value: crate::orchestration::OrchestrationShellError) -> Self {
+impl From<crate::orchestration::Error> for Error {
+    fn from(value: crate::orchestration::Error) -> Self {
         Self::Orchestration(value)
     }
 }

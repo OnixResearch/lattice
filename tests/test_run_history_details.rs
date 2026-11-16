@@ -22,7 +22,7 @@ use lattice::store::RunNodeDetailStatus;
 use lattice::store::RunOutputDetail;
 use lattice::store::RunOwner;
 use lattice::store::RunRecord;
-use lattice::tui::App;
+use lattice::tui::State;
 use lattice::tui::app::run_detail_record_from_results as tui_run_detail_record_from_results;
 use lattice::tui::panels;
 use pretty_assertions::assert_eq;
@@ -72,7 +72,7 @@ fn run_record(run_id: RunId, workflow_name: &str) -> RunRecord {
     }
 }
 
-fn rendered_frame_text(app: &mut App) -> String {
+fn rendered_frame_text(app: &mut State) -> String {
     let area = Rect::new(0, 0, FRAME_WIDTH, FRAME_HEIGHT);
     let mut buffer = Buffer::empty(area);
     panels::render(app, area, &mut buffer);
@@ -171,7 +171,7 @@ fn run_detail_record_replaces_sensitive_values_before_persistence() {
 #[test]
 fn app_inspects_run_history_details() {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");
-    let mut app = App::new(test_config(&temp_dir));
+    let mut app = State::new(test_config(&temp_dir));
     let run_id = RunId(RUN_ID_VALUE);
     {
         let store = app.store.as_ref().expect("app store available");
@@ -191,7 +191,7 @@ fn app_inspects_run_history_details() {
 #[test]
 fn app_reports_missing_run_history_details() {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");
-    let mut app = App::new(test_config(&temp_dir));
+    let mut app = State::new(test_config(&temp_dir));
     let run_id = RunId(RUN_ID_VALUE);
     {
         let store = app.store.as_ref().expect("app store available");
@@ -210,7 +210,7 @@ fn app_reports_missing_run_history_details() {
 #[tokio::test]
 async fn app_reruns_history_workflow_without_replacing_current_workflow() {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");
-    let mut app = App::new(test_config(&temp_dir));
+    let mut app = State::new(test_config(&temp_dir));
     let mut saved_workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     saved_workflow.add_shell_node(NODE_LABEL, NODE_COMMAND);
     {
@@ -236,7 +236,7 @@ async fn app_reruns_history_workflow_without_replacing_current_workflow() {
 #[test]
 fn app_opens_historical_replay_and_renders_timeline_and_node_outputs() {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");
-    let mut app = App::new(test_config(&temp_dir));
+    let mut app = State::new(test_config(&temp_dir));
     let run_id = RunId(RUN_ID_VALUE);
     let mut workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.add_shell_node(NODE_LABEL, NODE_COMMAND);
@@ -266,7 +266,7 @@ fn app_opens_historical_replay_and_renders_timeline_and_node_outputs() {
 #[test]
 fn app_renders_empty_node_output_and_unavailable_rerun_as_recoverable() {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");
-    let mut app = App::new(test_config(&temp_dir));
+    let mut app = State::new(test_config(&temp_dir));
     let run_id = RunId(RUN_ID_VALUE);
     let empty_detail = RunDetailRecord {
         run_id,

@@ -78,6 +78,22 @@ A fast branch can release its child while an unrelated slow branch is still runn
 
 A resolved resource alias conflicts only with the same alias. An unresolved effect can run, but it cannot overlap another effect. Pure work can overlap an unresolved effect.
 
+`Condition` and `Merge` compute over admitted in-memory values and remain pure.
+`File(Read)` and `ImageInput` observe live, mutable host state; like mutations,
+they default to unresolved conflict participants. A read-only authority grant
+does not establish commutativity. Their filesystem and image resource lanes,
+capability roots, and authorization requirements remain unchanged.
+
+An explicitly admitted resource-alias fact can refine conflict scheduling. The
+default classification does not infer independence from read-only access, a path
+string, or an absence of declared writes. A future immutable, content-bound
+snapshot profile would need its own admitted evidence; resolved expressions,
+aliases, overlapping roots, and host identity rules prevent a path-only shortcut.
+
+This ordering is scoped to effects within the admitted workflow. It does not
+prevent unrelated external processes from changing files and does not turn a
+live read into an immutable snapshot.
+
 The planner records these blockers:
 
 - total capacity;
@@ -123,6 +139,9 @@ They cover:
 - total and lane bounds;
 - resolved conflicts;
 - unresolved conflicts;
+- live file/image reads against mutations, in both candidate and active-reservation orderings;
+- barrier-controlled subprocess mutations with real capability-rooted file/image adapters;
+- pure `Condition`/`Merge` overlap and cancellation of pending live reads;
 - missing preparation;
 - invalid policies;
 - durable completion-order persistence.

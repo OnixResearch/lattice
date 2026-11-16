@@ -19,7 +19,7 @@ use lattice::engine::Workflow;
 use lattice::engine::workflow::NodeConfig;
 use lattice::store::RunNodeDetailStatus;
 use lattice::store::Store;
-use lattice::tui::App;
+use lattice::tui::State;
 use lattice::tui::app::RunOutputLine;
 use lattice::tui::app::palette_action;
 use lattice::tui::input::handle_event;
@@ -100,7 +100,7 @@ fn test_config(temp_dir: &TempDir) -> AppConfig {
     }
 }
 
-fn rendered_frame_text(app: &mut App) -> String {
+fn rendered_frame_text(app: &mut State) -> String {
     let area = Rect::new(0, 0, FRAME_WIDTH, FRAME_HEIGHT);
     let mut buffer = Buffer::empty(area);
     panels::render(app, area, &mut buffer);
@@ -613,33 +613,6 @@ fn operator_e2e_tui_process_inspects_failure_and_explicitly_reruns_fresh_identit
     }
 }
 
-// r[verify n8nclone.tui_ux.keyboard_first]
-#[cfg(unix)]
-#[test]
-fn operator_e2e_tui_toggles_between_graph_and_rows_views() {
-    let temp_dir = tempfile::tempdir().expect("temporary rows-view PTY directory");
-    let config_path = write_cli_config(&temp_dir);
-    save_operator_tui_workflow(&temp_dir);
-    let mut session = TuiPtySession::start(&config_path, temp_dir.path());
-
-    session.wait(TUI_WORKSPACE_SURFACES, "the initial rows-view workspace");
-    let cursor = session.cursor();
-    session.input(TUI_OPEN_WORKFLOW_INPUT, "open populated workflow");
-    session.wait_fresh(cursor, &["Open Workflow", TUI_WORKFLOW_NAME], "the populated workflow browser");
-    let cursor = session.cursor();
-    session.input(TUI_CONFIRM_INPUT, "select populated workflow");
-    session.wait_fresh(cursor, &[TUI_NODE_LABEL], "the populated workflow");
-    let cursor = session.cursor();
-    session.input(b"v", "toggle the rows view");
-    session.wait_fresh(cursor, &["NODE", "KIND", "STATUS", "TIME", "TOKENS", "COST", "ATT"], "the rows view");
-    session.input(b"v", "toggle back to the graph view");
-    session.wait(&[TUI_NODE_LABEL, "C-W: fields"], "the graph view");
-    session.input(TUI_QUIT_INPUT, "quit after rows-view toggle");
-    let (status, transcript) = session.finish();
-
-    assert!(status.success(), "TUI exit status: {status}; transcript: {transcript}");
-}
-
 // r[verify lattice.tui_ux.process_failure_recovery.scenario.diagnostics]
 #[cfg(unix)]
 #[test]
@@ -808,7 +781,7 @@ fn operator_e2e_tui_process_rejects_non_terminal_stdio_without_hanging() {
 #[test]
 fn workspace_render_exposes_all_panels_and_keyboard_authoring_actions() {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");
-    let mut app = App::new(test_config(&temp_dir));
+    let mut app = State::new(test_config(&temp_dir));
 
     let rendered = rendered_frame_text(&mut app);
 
@@ -825,32 +798,13 @@ fn workspace_render_exposes_all_panels_and_keyboard_authoring_actions() {
     assert!(palette.contains("Add Node (all built-in kinds)"), "authoring action missing: {palette}");
 }
 
-// r[verify n8nclone.tui_ux.workspace]
-// r[verify n8nclone.tui_ux.keyboard_first]
-#[test]
-fn rows_view_renders_topological_metadata_columns() {
-    let temp_dir = tempfile::tempdir().expect("temporary app directory");
-    let mut app = App::new(test_config(&temp_dir));
-    app.add_shell_node("First", "true");
-    app.add_shell_node("Second", "true");
-    app.toggle_canvas_view();
-
-    let rendered = rendered_frame_text(&mut app);
-
-    for surface in [
-        "NODE", "KIND", "STATUS", "TIME", "TOKENS", "COST", "ATT", "First", "Second",
-    ] {
-        assert!(rendered.contains(surface), "missing {surface}: {rendered}");
-    }
-}
-
 // r[verify n8nclone.tui_ux.background_runs.long_running]
 // r[verify n8nclone.tui_ux.background_runs.responsive]
 // r[verify n8nclone.tui_ux.replay_debugger.active_run.stream]
 #[tokio::test(flavor = "multi_thread")]
 async fn active_run_keeps_rendering_and_input_live_while_replay_events_stream() {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");
-    let mut app = App::new(test_config(&temp_dir))
+    let mut app = State::new(test_config(&temp_dir))
         .with_authority_provider(Arc::new(common::authority::TestRunContextProvider::new()));
     app.add_shell_node("Long", LONG_RUNNING_COMMAND);
 
@@ -880,7 +834,7 @@ async fn active_run_keeps_rendering_and_input_live_while_replay_events_stream() 
 #[test]
 fn canvas_renders_bounded_image_metadata_fallback_without_raw_bytes() {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");
-    let mut app = App::new(test_config(&temp_dir));
+    let mut app = State::new(test_config(&temp_dir));
     app.add_image_input_node("Preview", IMAGE_PATH);
     let node_id = app.graph_state.focused.expect("image node focused");
     let port_id = app.workflow.graph.node(node_id).expect("image node").output_ports[0].id;

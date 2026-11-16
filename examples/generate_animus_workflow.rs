@@ -3,8 +3,8 @@
 use std::fs;
 use std::path::Path;
 
-use lattice::agent_node::AgentOutputMode;
-use lattice::agent_node::AgentTarget;
+use lattice::agent_node::OutputMode;
+use lattice::agent_node::Target;
 use lattice::engine::workflow::NodeConfig;
 use lattice::engine::workflow::Workflow;
 use lattice::workflow_format::workflow_to_nickel;
@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn workflow_definition() -> Result<Workflow, Box<dyn std::error::Error>> {
     let mut workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
     workflow.meta.description = WORKFLOW_DESCRIPTION.to_string();
-    let node_id = workflow.add_agent_node(NODE_LABEL, AgentTarget::Animus, NODE_PROMPT, AgentOutputMode::Text);
+    let node_id = workflow.add_agent_node(NODE_LABEL, Target::Animus, NODE_PROMPT, OutputMode::Text);
     let Some(NodeConfig::Agent(mut settings)) = workflow.node_config(node_id).cloned() else {
         return Err("generated Animus node is missing typed settings".into());
     };

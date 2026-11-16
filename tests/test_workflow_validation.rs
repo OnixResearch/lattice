@@ -10,7 +10,7 @@ use lattice::engine::workflow::Workflow;
 use lattice::headless::HeadlessRunError;
 use lattice::headless::run_saved_workflow;
 use lattice::store::Store;
-use lattice::tui::App;
+use lattice::tui::State;
 use lattice::workflow_validation::DiagnosticSeverity;
 use lattice::workflow_validation::WorkflowDiagnosticCode;
 use lattice::workflow_validation::has_fatal_diagnostics;
@@ -172,7 +172,7 @@ fn missing_runtime_binding_is_fatal_validation_diagnostic() {
 #[test]
 fn tui_run_gate_opens_diagnostics_on_fatal_validation() {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");
-    let mut app = App::new(test_config(&temp_dir));
+    let mut app = State::new(test_config(&temp_dir));
     app.add_shell_node(BROKEN_NODE_LABEL, EMPTY_COMMAND);
 
     assert!(!app.start_workflow_run());
@@ -185,7 +185,7 @@ fn tui_run_gate_opens_diagnostics_on_fatal_validation() {
 #[test]
 fn diagnostics_panel_opens_with_ready_state_for_valid_workflow() {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");
-    let mut app = App::new(test_config(&temp_dir));
+    let mut app = State::new(test_config(&temp_dir));
     app.add_shell_node("valid", VALID_COMMAND);
 
     app.open_diagnostics();

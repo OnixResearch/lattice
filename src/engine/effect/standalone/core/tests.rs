@@ -18,7 +18,7 @@ fn profile() -> Profile {
             resource: "lattice://process/0".to_owned(),
             ability: "process/execute".to_owned(),
         }],
-        roots: BTreeMap::from([("workspace".to_owned(), PathBuf::from("/workspace"))]),
+        roots: BTreeMap::from([("workspace".to_owned(), std::path::PathBuf::from("/workspace"))]),
     }
 }
 
@@ -128,13 +128,13 @@ fn malformed_profiles_cannot_be_admitted() {
         |p| p.grants[0].resource = "lattice://process/*".to_owned(),
         |p| p.grants[0].ability = "process/*".to_owned(),
         |p| {
-            p.roots.insert("relative".to_owned(), PathBuf::from("relative/path"));
+            p.roots.insert("relative".to_owned(), std::path::PathBuf::from("relative/path"));
         },
         |p| {
-            p.roots.insert(String::new(), PathBuf::from("/absolute"));
+            p.roots.insert(String::new(), std::path::PathBuf::from("/absolute"));
         },
         |p| {
-            p.roots.insert("x".repeat(MAX_ROOT_ID_BYTES + 1), PathBuf::from("/absolute"));
+            p.roots.insert("x".repeat(MAX_ROOT_ID_BYTES + 1), std::path::PathBuf::from("/absolute"));
         },
     ];
     assert!(admit(profile(), NOW).is_ok());
@@ -161,11 +161,12 @@ fn collection_limits_admit_boundary_and_reject_overflow() {
             ..bounded.grants[0].clone()
         })
         .collect();
-    bounded.roots =
-        (0..MAX_PROFILE_ROOTS).map(|index| (format!("root-{index}"), PathBuf::from("/workspace"))).collect();
+    bounded.roots = (0..MAX_PROFILE_ROOTS)
+        .map(|index| (format!("root-{index}"), std::path::PathBuf::from("/workspace")))
+        .collect();
     assert!(admit(bounded.clone(), NOW).is_ok());
     let mut too_many_roots = bounded.clone();
-    too_many_roots.roots.insert("extra".to_owned(), PathBuf::from("/workspace"));
+    too_many_roots.roots.insert("extra".to_owned(), std::path::PathBuf::from("/workspace"));
     assert_eq!(admit(too_many_roots, NOW).unwrap_err(), ProfileError::InvalidProfile);
     bounded.grants.push(Grant {
         node_id: MAX_PROFILE_GRANTS as u64,
@@ -187,7 +188,7 @@ fn semantic_edits_revoke_pinned_identity_but_source_formatting_does_not() {
         |p| p.expires_at_unix_ms += 1,
         |p| p.grants[0].operation = "lattice/operation".to_owned(),
         |p| {
-            p.roots.insert("workspace".to_owned(), PathBuf::from("/changed-import-root"));
+            p.roots.insert("workspace".to_owned(), std::path::PathBuf::from("/changed-import-root"));
         },
     ];
     for mutate in mutations {

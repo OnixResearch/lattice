@@ -8,7 +8,7 @@ use lattice::node_kind_provider::property_lines_for_config;
 use lattice::node_kind_provider::provider_for_config;
 use lattice::node_kind_provider::provider_for_portable_kind;
 use lattice::node_kind_provider::validate_config_for_kind;
-use lattice::tui::App;
+use lattice::tui::State;
 use lattice::tui::app::PropertyEditField;
 
 const NODE_LABEL: &str = "node";
@@ -101,7 +101,7 @@ fn provider_registry_resolves_supported_and_rejects_unknown_kinds() {
 #[test]
 fn unsupported_property_edit_does_not_mutate_workflow() {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");
-    let mut app = App::new(test_config(&temp_dir));
+    let mut app = State::new(test_config(&temp_dir));
     app.add_shell_node(SHELL_NODE_LABEL, SHELL_COMMAND);
     app.clear_workflow_dirty();
 

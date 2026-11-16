@@ -2,10 +2,6 @@
 //! No SDK, provider input, filesystem or process access is required for validation.
 
 use std::collections::HashSet;
-use std::path::PathBuf;
-
-use serde::Deserialize;
-use serde::Serialize;
 pub const REVIEWED_COHORT: &str = "0.17.0";
 const MAX_METADATA_BYTES: usize = 128;
 const BLAKE3_HEX_BYTES: usize = 64;
@@ -18,14 +14,14 @@ const MAX_POLL_INTERVAL_MS: u64 = 1_000;
 const MAX_TEARDOWN_TIMEOUT_MS: u64 = 10_000;
 const MAX_DECLARATIONS: usize = 128;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ProviderScheme {
     Environment,
     SystemdCredential,
     Sops,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DeclarationMapping {
     pub key: String,
@@ -34,7 +30,7 @@ pub struct DeclarationMapping {
     pub scheme: ProviderScheme,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RequestBounds {
     pub input_max_bytes: usize,
@@ -46,7 +42,7 @@ pub struct RequestBounds {
     pub teardown_timeout_ms: u64,
 }
 // r[impl lattice.credentials.animus_secret_providers.config]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SecretSpecProviderConfig {
     pub id: String,
@@ -153,29 +149,29 @@ fn safe_identity(value: &str) -> bool {
     value.len() == BLAKE3_HEX_BYTES && value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 /// Trusted operator deployment settings, separate from public provider metadata.
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SecretSpecHostConfig {
     pub provider_id: String,
-    pub policy_path: PathBuf,
-    pub manifest_path: PathBuf,
-    pub worker_executable: PathBuf,
-    pub working_directory: PathBuf,
+    pub policy_path: std::path::PathBuf,
+    pub manifest_path: std::path::PathBuf,
+    pub worker_executable: std::path::PathBuf,
+    pub working_directory: std::path::PathBuf,
     pub input: HostInputConfig,
 }
 
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum HostInputConfig {
     Environment {
         variable: String,
     },
     SystemdCredential {
-        directory: PathBuf,
+        directory: std::path::PathBuf,
     },
     Sops {
-        guard_directory: PathBuf,
-        executable: PathBuf,
+        guard_directory: std::path::PathBuf,
+        executable: std::path::PathBuf,
         credential_variables: Vec<SopsCredentialVariable>,
     },
 }
@@ -192,14 +188,14 @@ impl std::fmt::Debug for HostInputConfig {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SopsCredentialVariable {
     pub credential: SopsCredentialKind,
     pub variable: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum SopsCredentialKind {
     AgeKey,

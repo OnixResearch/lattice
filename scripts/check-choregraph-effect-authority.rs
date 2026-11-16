@@ -20,7 +20,7 @@ fn main() {
         let text = std::fs::read_to_string(root.join(module)).expect("required authority module");
         assert!(!text.contains(FORBIDDEN_AUTHORITY_SOURCE), "{module} must not acquire ambient root authority");
     }
-    let store = std::fs::read_to_string(root.join("src/store/mod.rs")).expect("store source");
+    let store = std::fs::read_to_string(root.join("src/store/implementation/model.rs")).expect("store source");
     let run_owner = store
         .split("pub enum RunOwner")
         .nth(1)

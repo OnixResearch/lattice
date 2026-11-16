@@ -10,7 +10,7 @@ use crate::control_flow;
 use crate::engine::workflow::NodeConfig;
 use crate::file_node;
 use crate::http;
-use crate::image_node;
+// removed image_node import
 
 const KIND_SHELL: &str = "shell";
 const KIND_HTTP: &str = "http";
@@ -225,7 +225,7 @@ pub fn property_lines_for_config(config: &NodeConfig) -> Vec<NodePropertyLine> {
         NodeConfig::Agent(settings) => {
             let mut lines = vec![
                 property_line("Type", DISPLAY_AGENT),
-                property_line("Target", agent_node::agent_target_label(settings.target)),
+                property_line("Target", agent_node::target_label(settings.target)),
                 property_line("Output", settings.output_mode.as_str()),
                 property_line("Prompt", &settings.prompt),
             ];
@@ -354,10 +354,10 @@ pub fn validate_config_for_kind(node_label: &str, config: &NodeConfig) -> Vec<No
             let has_expression = crate::expressions::contains_expression(path)
                 || allowed_roots.iter().any(|root| crate::expressions::contains_expression(root));
             if !has_expression {
-                if let Err(error) = image_node::validate_image_path_allowed(path, allowed_roots) {
+                if let Err(error) = crate::image_node::validate_image_path_allowed(path, allowed_roots) {
                     issues.push(issue(NodeKindValidationCode::UnsafeImagePath, error.to_string()));
                 }
-                if let Err(error) = image_node::validate_declared_format(path) {
+                if let Err(error) = crate::image_node::validate_declared_format(path) {
                     issues.push(issue(NodeKindValidationCode::UnsupportedImageFormat, error.to_string()));
                 }
             }

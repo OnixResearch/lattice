@@ -7,31 +7,34 @@
 //! paths, system read-only bases, a private network unless admitted, and no host
 //! credentials. It does not provide publication authority.
 
-use std::collections::BTreeMap;
-use std::path::Path;
 use std::sync::atomic::AtomicBool;
 
 use thiserror::Error;
 
-use crate::agent_node::ProcessError;
-use crate::agent_node::ProcessOutput;
-use crate::agent_node::ProcessRequest;
 use crate::candidate::CandidateDisposition;
 use crate::candidate::CandidateReceipt;
 use crate::candidate::CandidateReceiptError;
-use crate::candidate::produced_receipt_from_snapshots;
-use crate::candidate::validate_candidate_path;
-use crate::candidate_capture::CandidateCaptureError;
 use crate::candidate_capture::WorkspaceBoundary;
-use crate::candidate_capture::capture_workspace;
 use crate::process::core::RuntimeConfig;
-use crate::process::shell::run_bounded_clear_environment_with_cancellation;
-use crate::pure_inet_profile::blake3_identity;
 use crate::store::Store;
 use crate::store::StoreError;
 
+pub mod omp;
+
+mod compatibility;
+mod completion;
+mod execution;
+mod result;
+mod sandbox;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ProcessFailure {
+    pub phase: crate::agent_node::ProcessFailurePhase,
+    pub termination: crate::agent_node::ProcessTermination,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CandidateWorkerRequest {
+pub struct Request {
     pub work_id: String,
     pub attempt_id: String,
     pub fence: String,
@@ -47,10 +50,10 @@ pub struct CandidateWorkerRequest {
 }
 
 #[derive(Debug)]
-pub enum CandidateWorkerOutcome {
+pub enum Outcome {
     Produced {
         receipt: Box<CandidateReceipt>,
-        changed_files: BTreeMap<String, Vec<u8>>,
+        changed_files: std::collections::BTreeMap<String, Vec<u8>>,
         stdout: Vec<u8>,
         stderr: Vec<u8>,
     },
@@ -62,7 +65,23 @@ pub enum CandidateWorkerOutcome {
         stdout: Vec<u8>,
         stderr: Vec<u8>,
     },
-    Cancelled,
+    /// A typed no-change observation; generic publication remains failed.
+    Unchanged {
+        observation: Box<crate::candidate::UnchangedObservation>,
+        stdout: Vec<u8>,
+        stderr: Vec<u8>,
+    },
+    Cancelled {
+        stdout: Vec<u8>,
+        stderr: Vec<u8>,
+    },
+    /// No usable candidate receipt: files are evidence only, never retry authority.
+    Interrupted {
+        failure: ProcessFailure,
+        observed_files: Option<std::collections::BTreeMap<String, Vec<u8>>>,
+        stdout: Vec<u8>,
+        stderr: Vec<u8>,
+    },
     Unknown {
         blocker: String,
         stdout: Vec<u8>,
@@ -71,383 +90,51 @@ pub enum CandidateWorkerOutcome {
 }
 
 /// Run one worker and derive a candidate receipt from the actual workspace.
-pub fn run_candidate_worker(
-    request: &CandidateWorkerRequest,
-    config: &RuntimeConfig,
-    cancellation: &AtomicBool,
-) -> Result<CandidateWorkerOutcome, CandidateWorkerError> {
-    if request.timeout_secs == 0 || request.output_limit_bytes == 0 {
-        return Ok(CandidateWorkerOutcome::Blocked {
-            blocker: "worker deadline and output limit must be positive".to_string(),
-        });
-    }
-    if request.boundary.credentials {
-        return Ok(CandidateWorkerOutcome::Blocked {
-            blocker: "candidate worker does not admit credential-bearing workspaces".to_string(),
-        });
-    }
-    let root = request.boundary.root.as_path();
-    if !root.is_dir() {
-        return Ok(CandidateWorkerOutcome::Blocked {
-            blocker: "admitted workspace root is unavailable".to_string(),
-        });
-    }
-    let cwd = root.to_str().ok_or(CandidateWorkerError::NonUtf8Root)?.to_string();
-    let base = capture_workspace(root)?;
-    let (program, args) = if request.require_isolation {
-        match sandbox_command(request) {
-            Ok(command) => command,
-            Err(blocker) => return Ok(CandidateWorkerOutcome::Blocked { blocker }),
-        }
-    } else {
-        (request.program.clone(), request.args.clone())
-    };
-    let process = ProcessRequest {
-        program,
-        args,
-        cwd: Some(cwd),
-        env: BTreeMap::new(),
-        stdin: Vec::new(),
-        timeout_secs: request.timeout_secs,
-        output_limit_bytes: request.output_limit_bytes,
-    };
-    let output = match run_bounded_clear_environment_with_cancellation(&process, config, Some(cancellation)) {
-        Ok(output) => output,
-        Err(ProcessError::Cancelled) => return Ok(CandidateWorkerOutcome::Cancelled),
-        Err(ProcessError::Timeout) => {
-            return Ok(CandidateWorkerOutcome::Failed {
-                blocker: "worker exceeded its admitted deadline".to_string(),
-                stdout: Vec::new(),
-                stderr: Vec::new(),
-            });
-        }
-        Err(ProcessError::OutputLimitExceeded { .. }) => {
-            return Ok(CandidateWorkerOutcome::Failed {
-                blocker: "worker exceeded its admitted output limit".to_string(),
-                stdout: Vec::new(),
-                stderr: Vec::new(),
-            });
-        }
-        Err(ProcessError::InvalidRequest(_) | ProcessError::Spawn(_)) => {
-            return Ok(CandidateWorkerOutcome::Blocked {
-                blocker: "worker invocation was not admitted".to_string(),
-            });
-        }
-    };
-    finish_from_process_output(request, root, base, output)
-}
-
-/// Run one worker and durably publish a produced receipt.
-pub fn run_and_publish_candidate_worker(
-    request: &CandidateWorkerRequest,
-    config: &RuntimeConfig,
-    cancellation: &AtomicBool,
-    store: &Store,
-) -> Result<CandidateWorkerOutcome, CandidateWorkerError> {
-    let outcome = run_candidate_worker(request, config, cancellation)?;
-    let result = crate::candidate_worker::CandidateAttemptResult::from_outcome(&outcome).with_compatibility(request);
-    if let Err(error) = store.save_candidate_attempt_result(&request.attempt_id, &result) {
-        return Ok(CandidateWorkerOutcome::Unknown {
-            blocker: format!("candidate result publication failed: {error}"),
-            stdout: Vec::new(),
-            stderr: Vec::new(),
-        });
-    }
-    let (receipt, changed_files, stdout, stderr) = match outcome {
-        CandidateWorkerOutcome::Produced {
-            receipt,
-            changed_files,
-            stdout,
-            stderr,
-        } => (receipt, changed_files, stdout, stderr),
-        other => return Ok(other),
-    };
-    if let Err(error) = store.save_candidate_receipt(&receipt) {
-        return Ok(CandidateWorkerOutcome::Unknown {
-            blocker: format!("candidate receipt publication failed: {error}"),
-            stdout,
-            stderr,
-        });
-    }
-    for (path, bytes) in &changed_files {
-        if let Err(error) = store.save_candidate_artifact(&receipt.attempt_id, path, bytes) {
-            return Ok(CandidateWorkerOutcome::Unknown {
-                blocker: format!("candidate artifact publication failed: {error}"),
-                stdout,
-                stderr,
-            });
-        }
-    }
-    Ok(CandidateWorkerOutcome::Produced {
-        receipt,
-        changed_files,
-        stdout,
-        stderr,
+pub fn run(request: &Request, config: &RuntimeConfig, cancellation: &AtomicBool) -> Result<Outcome, Error> {
+    execution::run(request, config, cancellation, None, |process, config, cancellation| {
+        crate::process::shell::run_bounded_clear_environment_observed_with_cancellation(
+            process,
+            config,
+            Some(cancellation),
+        )
     })
 }
 
+/// Run one worker and durably publish a produced receipt.
+pub fn run_and_publish(
+    request: &Request,
+    config: &RuntimeConfig,
+    cancellation: &AtomicBool,
+    store: &Store,
+) -> Result<Outcome, Error> {
+    let compatibility = compatibility::observe(request);
+    let outcome = run(request, config, cancellation)?;
+    Ok(publish_outcome(request, store, outcome, compatibility))
+}
+
+pub(crate) fn publish_outcome(
+    request: &Request,
+    store: &Store,
+    outcome: Outcome,
+    compatibility: Option<Compatibility>,
+) -> Outcome {
+    result::publication::save(request, store, outcome, compatibility)
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CandidateRecovery {
-    Published(Box<CandidateAttemptResult>),
+pub enum Recovery {
+    Published(Box<AttemptResult>),
     Incomplete { blocker: String },
     Missing,
 }
 
 /// Reconcile the durable result and receipt without redispatching work.
-pub fn reconcile_candidate_attempt(store: &Store, attempt_id: &str) -> Result<CandidateRecovery, CandidateWorkerError> {
-    let result = store.load_candidate_attempt_result(attempt_id)?;
-    let receipt = store.load_candidate_receipt(attempt_id)?;
-    let usage = store.load_command_worker_usage(attempt_id)?;
-    match (result, receipt) {
-        (None, None) if usage.is_some() => Ok(CandidateRecovery::Incomplete {
-            blocker: "usage observation exists without an attempt result".to_string(),
-        }),
-        (None, None) => Ok(CandidateRecovery::Missing),
-        (None, Some(_)) => Ok(CandidateRecovery::Incomplete {
-            blocker: "candidate receipt exists without an attempt result".to_string(),
-        }),
-        (Some(result), None) if result.disposition == CandidateDisposition::Produced => {
-            Ok(CandidateRecovery::Incomplete {
-                blocker: "produced attempt result exists without a receipt".to_string(),
-            })
-        }
-        (Some(result), Some(receipt)) if result.disposition == CandidateDisposition::Produced => {
-            if result.receipt.as_ref() != Some(&receipt) {
-                return Ok(CandidateRecovery::Incomplete {
-                    blocker: "attempt result and stored receipt disagree".to_string(),
-                });
-            }
-            for path in &result.published_artifacts {
-                if store.load_candidate_artifact(attempt_id, path)?.is_none() {
-                    return Ok(CandidateRecovery::Incomplete {
-                        blocker: format!("published artifact is missing for {path}"),
-                    });
-                }
-            }
-            Ok(CandidateRecovery::Published(Box::new(result)))
-        }
-        (Some(result), _) => Ok(CandidateRecovery::Published(Box::new(result))),
-    }
-}
-
-fn sandbox_command(request: &CandidateWorkerRequest) -> Result<(String, Vec<String>), String> {
-    let Some(sandbox) = request.sandbox_program.as_ref() else {
-        return Err("no reviewed workspace isolation provider is configured".to_string());
-    };
-    let sandbox =
-        std::fs::canonicalize(sandbox).map_err(|_| "configured sandbox provider is unavailable".to_string())?;
-    if !sandbox.is_file() {
-        return Err("configured sandbox provider is not a file".to_string());
-    }
-    let root =
-        std::fs::canonicalize(&request.boundary.root).map_err(|_| "workspace root is unavailable".to_string())?;
-    let program = sandbox_worker_program(&request.program, &root, &request.boundary)?;
-    let mut args = vec![
-        "--unshare-user".to_string(),
-        "--unshare-pid".to_string(),
-        "--unshare-ipc".to_string(),
-        "--unshare-uts".to_string(),
-        "--unshare-cgroup".to_string(),
-        "--die-with-parent".to_string(),
-        "--cap-drop".to_string(),
-        "ALL".to_string(),
-        "--clearenv".to_string(),
-        "--setenv".to_string(),
-        "PATH".to_string(),
-        "/usr/bin:/bin".to_string(),
-        "--setenv".to_string(),
-        "HOME".to_string(),
-        "/workspace".to_string(),
-    ];
-    if !request.boundary.network {
-        args.push("--unshare-net".to_string());
-    }
-    for base in ["/nix/store", "/usr", "/bin", "/lib", "/lib64"] {
-        if std::path::Path::new(base).exists() {
-            args.extend(["--ro-bind".to_string(), base.to_string(), base.to_string()]);
-        }
-    }
-    if std::path::Path::new("/run/current-system/sw/bin").exists() {
-        args.extend([
-            "--ro-bind".to_string(),
-            "/run/current-system/sw/bin".to_string(),
-            "/usr/bin".to_string(),
-        ]);
-    }
-    args.extend([
-        "--proc".to_string(),
-        "/proc".to_string(),
-        "--dev".to_string(),
-        "/dev".to_string(),
-        "--dir".to_string(),
-        "/workspace".to_string(),
-        "--chdir".to_string(),
-        "/workspace".to_string(),
-    ]);
-    for read in &request.boundary.read_paths {
-        if request
-            .boundary
-            .write_paths
-            .iter()
-            .any(|write| write == read || read.starts_with(&format!("{write}/")))
-        {
-            continue;
-        }
-        let source = root.join(read);
-        if !source.exists() {
-            continue;
-        }
-        args.push("--ro-bind".to_string());
-        args.push(path_text(&source)?);
-        args.push(format!("/workspace/{read}"));
-    }
-    for write in &request.boundary.write_paths {
-        let source = root.join(write);
-        if !source.exists() {
-            return Err("isolated workspace write paths must already exist".to_string());
-        }
-        args.push("--bind".to_string());
-        args.push(path_text(&source)?);
-        args.push(format!("/workspace/{write}"));
-    }
-    args.push("--".to_string());
-    args.push(program);
-    args.extend(request.args.iter().cloned());
-    Ok((path_text(&sandbox)?, args))
-}
-
-fn sandbox_worker_program(program: &str, root: &Path, boundary: &WorkspaceBoundary) -> Result<String, String> {
-    let requested = std::path::Path::new(program);
-    let path = if requested.is_absolute() {
-        requested.to_path_buf()
-    } else if requested.components().count() > 1 {
-        root.join(requested)
-    } else {
-        which::which(program).map_err(|_| "worker program is unavailable".to_string())?
-    };
-    let canonical = std::fs::canonicalize(path).map_err(|_| "worker program is unavailable".to_string())?;
-    if !canonical.is_file() {
-        return Err("worker program is unavailable".to_string());
-    }
-    if let Ok(relative) = canonical.strip_prefix(root) {
-        let relative = relative.to_str().ok_or_else(|| "worker program path is not UTF-8".to_string())?;
-        if !boundary
-            .read_paths
-            .iter()
-            .chain(boundary.write_paths.iter())
-            .any(|admitted| relative == admitted || relative.starts_with(&format!("{admitted}/")))
-        {
-            return Err("worker program is outside the admitted workspace paths".to_string());
-        }
-        return Ok(format!("/workspace/{relative}"));
-    }
-    if ["/nix/store", "/usr", "/bin", "/lib", "/lib64"].iter().any(|base| canonical.starts_with(base)) {
-        return path_text(&canonical);
-    }
-    Err("worker program is outside the sandbox".to_string())
-}
-
-fn path_text(path: &Path) -> Result<String, String> {
-    path.to_str().map(str::to_string).ok_or_else(|| "workspace path is not UTF-8".to_string())
-}
-
-fn finish_from_process_output(
-    request: &CandidateWorkerRequest,
-    root: &Path,
-    base: BTreeMap<String, Vec<u8>>,
-    output: ProcessOutput,
-) -> Result<CandidateWorkerOutcome, CandidateWorkerError> {
-    if output.status_code != Some(0) {
-        return Ok(CandidateWorkerOutcome::Failed {
-            blocker: format!("worker exited with status {:?}", output.status_code),
-            stdout: output.stdout,
-            stderr: output.stderr,
-        });
-    }
-    let candidate = match capture_workspace(root) {
-        Ok(candidate) => candidate,
-        Err(error) => {
-            return Ok(CandidateWorkerOutcome::Unknown {
-                blocker: format!("candidate capture failed: {error}"),
-                stdout: output.stdout,
-                stderr: output.stderr,
-            });
-        }
-    };
-    let receipt = match produced_receipt_from_snapshots(
-        request.work_id.clone(),
-        request.attempt_id.clone(),
-        request.fence.clone(),
-        request.workspace_id.clone(),
-        &base,
-        &candidate,
-    ) {
-        Ok(receipt) => receipt,
-        Err(CandidateReceiptError::NoCandidateChanges) => {
-            return Ok(CandidateWorkerOutcome::Failed {
-                blocker: "worker exited zero without a candidate change".to_string(),
-                stdout: output.stdout,
-                stderr: output.stderr,
-            });
-        }
-        Err(error) => {
-            return Ok(CandidateWorkerOutcome::Unknown {
-                blocker: format!("candidate receipt failed: {error}"),
-                stdout: output.stdout,
-                stderr: output.stderr,
-            });
-        }
-    };
-    if !receipt.changed_paths.iter().all(|path| within_write_paths(path, &request.boundary.write_paths)) {
-        return Ok(CandidateWorkerOutcome::Failed {
-            blocker: "worker changed a path outside its admitted write boundary".to_string(),
-            stdout: output.stdout,
-            stderr: output.stderr,
-        });
-    }
-    let changed_files = receipt
-        .changed_paths
-        .iter()
-        .filter_map(|path| candidate.get(path).map(|bytes| (path.clone(), bytes.clone())))
-        .collect::<BTreeMap<_, _>>();
-    Ok(CandidateWorkerOutcome::Produced {
-        receipt: Box::new(receipt),
-        changed_files,
-        stdout: output.stdout,
-        stderr: output.stderr,
-    })
-}
-
-fn worker_compatibility(request: &CandidateWorkerRequest) -> Option<CandidateWorkerCompatibility> {
-    let program = std::path::Path::new(&request.program);
-    let program = if program.is_absolute() {
-        program.to_path_buf()
-    } else {
-        which::which(&request.program).ok()?
-    };
-    let program = std::fs::canonicalize(program).ok()?;
-    let worker_program_identity = blake3_identity(&std::fs::read(program).ok()?);
-    let workspace_provider_identity = if request.require_isolation {
-        let sandbox = request.sandbox_program.as_ref()?;
-        blake3_identity(&std::fs::read(std::fs::canonicalize(sandbox).ok()?).ok()?)
-    } else {
-        blake3_identity(b"unsandboxed")
-    };
-    Some(CandidateWorkerCompatibility {
-        schema: CANDIDATE_WORKER_COMPATIBILITY_SCHEMA.to_string(),
-        worker_program_identity,
-        environment_identity: blake3_identity(CANDIDATE_WORKER_ENVIRONMENT.as_bytes()),
-        workspace_provider_identity,
-        result_schema: CANDIDATE_ATTEMPT_RESULT_SCHEMA.to_string(),
-    })
-}
-
-fn within_write_paths(path: &str, write_paths: &[String]) -> bool {
-    write_paths.iter().any(|write| path == write || path.starts_with(&format!("{write}/")))
+pub fn reconcile_attempt(store: &Store, attempt_id: &str) -> Result<Recovery, Error> {
+    result::reconciliation::load(store, attempt_id)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct CandidateAttemptResult {
+pub struct AttemptResult {
     pub schema: String,
     pub disposition: CandidateDisposition,
     pub receipt: Option<CandidateReceipt>,
@@ -455,14 +142,22 @@ pub struct CandidateAttemptResult {
     pub stdout_blake3: String,
     pub stderr_blake3: String,
     pub blocker: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub compatibility: Option<CandidateWorkerCompatibility>,
+    #[serde(default = "result::absent_compatibility", skip_serializing_if = "Option::is_none")]
+    pub compatibility: Option<Compatibility>,
+    #[serde(default = "result::absent_process_failure", skip_serializing_if = "Option::is_none")]
+    pub process_failure: Option<ProcessFailure>,
+    /// Best-effort file identities, not a candidate or proof of quiescence.
+    #[serde(
+        default = "result::empty_observed_artifacts",
+        skip_serializing_if = "std::collections::BTreeMap::is_empty"
+    )]
+    pub observed_artifacts: std::collections::BTreeMap<String, String>,
 }
 
 pub const CANDIDATE_ATTEMPT_RESULT_SCHEMA: &str = "lattice.candidate-attempt-result.v1";
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct CandidateWorkerCompatibility {
+pub struct Compatibility {
     pub schema: String,
     pub worker_program_identity: String,
     pub environment_identity: String,
@@ -473,148 +168,10 @@ pub struct CandidateWorkerCompatibility {
 pub const CANDIDATE_WORKER_COMPATIBILITY_SCHEMA: &str = "lattice.candidate-worker-compatibility.v1";
 pub const CANDIDATE_WORKER_ENVIRONMENT: &str = "lattice.candidate-environment.clear.v1";
 
-impl CandidateAttemptResult {
-    /// Project a worker outcome without retaining raw output bytes.
-    pub fn from_outcome(outcome: &CandidateWorkerOutcome) -> Self {
-        let (disposition, receipt, published_artifacts, stdout, stderr, blocker) = match outcome {
-            CandidateWorkerOutcome::Produced {
-                receipt,
-                changed_files,
-                stdout,
-                stderr,
-            } => (
-                CandidateDisposition::Produced,
-                Some(receipt.as_ref().clone()),
-                changed_files.keys().cloned().collect(),
-                stdout,
-                stderr,
-                None,
-            ),
-            CandidateWorkerOutcome::Blocked { blocker } => {
-                (CandidateDisposition::Blocked, None, Vec::new(), &Vec::new(), &Vec::new(), Some(blocker.clone()))
-            }
-            CandidateWorkerOutcome::Failed {
-                blocker,
-                stdout,
-                stderr,
-            } => (CandidateDisposition::Failed, None, Vec::new(), stdout, stderr, Some(blocker.clone())),
-            CandidateWorkerOutcome::Cancelled => {
-                (CandidateDisposition::Cancelled, None, Vec::new(), &Vec::new(), &Vec::new(), None)
-            }
-            CandidateWorkerOutcome::Unknown {
-                blocker,
-                stdout,
-                stderr,
-            } => (CandidateDisposition::Unknown, None, Vec::new(), stdout, stderr, Some(blocker.clone())),
-        };
-        Self {
-            schema: CANDIDATE_ATTEMPT_RESULT_SCHEMA.to_string(),
-            disposition,
-            receipt,
-            published_artifacts,
-            stdout_blake3: blake3_identity(stdout),
-            stderr_blake3: blake3_identity(stderr),
-            blocker,
-            compatibility: None,
-        }
-    }
-
-    /// Attach the exact worker/workspace/environment identities used for this result.
-    #[must_use]
-    pub fn with_compatibility(mut self, request: &CandidateWorkerRequest) -> Self {
-        self.compatibility = worker_compatibility(request);
-        self
-    }
-
-    pub fn validate(&self) -> Result<(), CandidateWorkerError> {
-        if self.schema != CANDIDATE_ATTEMPT_RESULT_SCHEMA {
-            return Err(CandidateWorkerError::Result("unsupported candidate result schema".to_string()));
-        }
-        if !is_blake3(&self.stdout_blake3) || !is_blake3(&self.stderr_blake3) {
-            return Err(CandidateWorkerError::Result("candidate output identity is malformed".to_string()));
-        }
-        let malformed_compatibility = self.compatibility.as_ref().is_some_and(|compatibility| {
-            compatibility.schema != CANDIDATE_WORKER_COMPATIBILITY_SCHEMA
-                || compatibility.result_schema != CANDIDATE_ATTEMPT_RESULT_SCHEMA
-                || !is_blake3(&compatibility.worker_program_identity)
-                || !is_blake3(&compatibility.environment_identity)
-                || !is_blake3(&compatibility.workspace_provider_identity)
-        });
-        if malformed_compatibility {
-            return Err(CandidateWorkerError::Result(
-                "candidate worker compatibility identity is malformed".to_string(),
-            ));
-        }
-        for path in &self.published_artifacts {
-            validate_candidate_path(path).map_err(|error| CandidateWorkerError::Result(error.to_string()))?;
-        }
-        if self.published_artifacts.windows(2).any(|window| window[0] >= window[1]) {
-            return Err(CandidateWorkerError::Result("published artifact paths must be sorted and unique".to_string()));
-        }
-        match self.disposition {
-            CandidateDisposition::Produced => {
-                let receipt = self
-                    .receipt
-                    .as_ref()
-                    .ok_or_else(|| CandidateWorkerError::Result("produced result is missing a receipt".to_string()))?;
-                receipt.validate()?;
-                if self.published_artifacts.iter().any(|path| !receipt.changed_paths.contains(path)) {
-                    return Err(CandidateWorkerError::Result(
-                        "published artifact path is not present in the receipt".to_string(),
-                    ));
-                }
-                if self.blocker.is_some() {
-                    return Err(CandidateWorkerError::Result("produced result carries a blocker".to_string()));
-                }
-            }
-            CandidateDisposition::Blocked | CandidateDisposition::Failed | CandidateDisposition::Unknown => {
-                if self.receipt.is_some() {
-                    return Err(CandidateWorkerError::Result("non-produced result carries a receipt".to_string()));
-                }
-                if !self.published_artifacts.is_empty() {
-                    return Err(CandidateWorkerError::Result(
-                        "non-produced result carries published artifacts".to_string(),
-                    ));
-                }
-                if self.blocker.is_none() {
-                    return Err(CandidateWorkerError::Result("non-produced result is missing a blocker".to_string()));
-                }
-            }
-            CandidateDisposition::Cancelled => {
-                if self.receipt.is_some() {
-                    return Err(CandidateWorkerError::Result("cancelled result carries a receipt".to_string()));
-                }
-                if !self.published_artifacts.is_empty() {
-                    return Err(CandidateWorkerError::Result(
-                        "cancelled result carries published artifacts".to_string(),
-                    ));
-                }
-            }
-        }
-        Ok(())
-    }
-
-    pub fn to_json(&self) -> Result<String, CandidateWorkerError> {
-        self.validate()?;
-        serde_json::to_string(self).map_err(|error| CandidateWorkerError::Result(error.to_string()))
-    }
-
-    pub fn from_json(text: &str) -> Result<Self, CandidateWorkerError> {
-        let result: Self =
-            serde_json::from_str(text).map_err(|error| CandidateWorkerError::Result(error.to_string()))?;
-        result.validate()?;
-        Ok(result)
-    }
-}
-
-fn is_blake3(value: &str) -> bool {
-    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-}
-
 #[derive(Debug, Error)]
-pub enum CandidateWorkerError {
+pub enum Error {
     #[error("workspace capture failed: {0}")]
-    Capture(#[from] CandidateCaptureError),
+    Capture(#[from] crate::candidate_capture::Error),
     #[error("candidate receipt derivation failed: {0}")]
     Receipt(#[from] CandidateReceiptError),
     #[error("workspace root is not valid UTF-8")]
@@ -626,697 +183,4 @@ pub enum CandidateWorkerError {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::candidate::CandidateDisposition;
-    use crate::candidate_capture::admit_workspace_boundary;
-
-    fn boundary(root: &Path) -> WorkspaceBoundary {
-        admit_workspace_boundary(root, &["src".to_string()], &["src".to_string()], false, false)
-            .expect("boundary admits")
-    }
-
-    fn host_tool(name: &str) -> String {
-        which::which(name).expect("host test tool").to_string_lossy().into_owned()
-    }
-
-    fn request(root: &Path, command: &str) -> CandidateWorkerRequest {
-        CandidateWorkerRequest {
-            work_id: "work-1".to_string(),
-            attempt_id: "attempt-1".to_string(),
-            fence: "7".to_string(),
-            workspace_id: "workspace-1".to_string(),
-            program: "sh".to_string(),
-            args: vec!["-c".to_string(), command.to_string()],
-            boundary: boundary(root),
-            require_isolation: false,
-            sandbox_program: None,
-            timeout_secs: 5,
-            output_limit_bytes: 4_096,
-        }
-    }
-
-    #[test]
-    fn worker_produces_host_derived_candidate_receipt() {
-        let directory = tempfile::tempdir().expect("temporary workspace");
-        let root = directory.path();
-        std::fs::create_dir_all(root.join("src")).expect("source directory");
-        std::fs::write(root.join("src/main.rs"), b"old").expect("base source");
-
-        let outcome = run_candidate_worker(
-            &request(root, "printf new > src/main.rs"),
-            &RuntimeConfig::default(),
-            &AtomicBool::new(false),
-        )
-        .expect("worker runs");
-
-        let CandidateWorkerOutcome::Produced { receipt, .. } = outcome else {
-            panic!("expected produced candidate, got {outcome:?}");
-        };
-        assert_eq!(receipt.disposition, CandidateDisposition::Produced);
-        assert_eq!(receipt.changed_paths, vec!["src/main.rs"]);
-        assert!(receipt.is_usable_candidate());
-    }
-
-    #[test]
-    fn exit_zero_without_change_is_not_a_candidate() {
-        let directory = tempfile::tempdir().expect("temporary workspace");
-        let root = directory.path();
-        std::fs::create_dir_all(root.join("src")).expect("source directory");
-        std::fs::write(root.join("src/main.rs"), b"same").expect("source");
-
-        let outcome = run_candidate_worker(&request(root, "true"), &RuntimeConfig::default(), &AtomicBool::new(false))
-            .expect("worker runs");
-
-        assert!(matches!(outcome, CandidateWorkerOutcome::Failed { .. }));
-    }
-
-    #[test]
-    fn omp_worker_produces_a_sandboxed_candidate() {
-        let (Ok(sandbox), Ok(omp), Ok(base_url), Ok(model)) = (
-            std::env::var("LATTICE_BWRAP"),
-            std::env::var("LATTICE_OMP"),
-            std::env::var("LATTICE_OMP_BASE_URL"),
-            std::env::var("LATTICE_OMP_MODEL"),
-        ) else {
-            return;
-        };
-        let directory = tempfile::tempdir().expect("temporary workspace");
-        let root = directory.path();
-        std::fs::create_dir_all(root.join(".omp/agent")).expect("OMP config directory");
-        std::fs::create_dir_all(root.join("src")).expect("source directory");
-        std::fs::write(root.join("src/main.rs"), b"pub fn answer() -> i32 { 41 }\n").expect("base source");
-        std::fs::write(
-            root.join(".omp/agent/models.yml"),
-            serde_json::json!({
-                "providers": {
-                    "qualification": {
-                        "api": "openai-completions",
-                        "apiKey": "local",
-                        "baseUrl": base_url,
-                        "models": [{
-                            "id": model,
-                            "name": "Lattice qualification",
-                            "api": "openai-completions"
-                        }]
-                    }
-                }
-            })
-            .to_string(),
-        )
-        .expect("OMP model profile");
-        let boundary = admit_workspace_boundary(
-            root,
-            &[".omp".to_string(), "src".to_string()],
-            &[".omp".to_string(), "src".to_string()],
-            true,
-            false,
-        )
-        .expect("workspace boundary");
-        let isolated = CandidateWorkerRequest {
-            work_id: "work-omp".to_string(),
-            attempt_id: "attempt-omp".to_string(),
-            fence: "9".to_string(),
-            workspace_id: "workspace-omp".to_string(),
-            program: omp,
-            args: vec![
-                "--cwd".to_string(),
-                "/workspace".to_string(),
-                "--model".to_string(),
-                model,
-                "--no-session".to_string(),
-                "-p".to_string(),
-                "--approval-mode".to_string(),
-                "yolo".to_string(),
-                "--max-time".to_string(),
-                "90s".to_string(),
-                "--max-cost".to_string(),
-                "0.10".to_string(),
-                "Use the edit tool to replace 41 with 42 in src/main.rs. Do not run commands. Reply done.".to_string(),
-            ],
-            boundary,
-            require_isolation: true,
-            sandbox_program: Some(sandbox),
-            timeout_secs: 120,
-            output_limit_bytes: 1024 * 1024,
-        };
-
-        let outcome =
-            run_candidate_worker(&isolated, &RuntimeConfig::default(), &AtomicBool::new(false)).expect("worker runs");
-
-        let result = CandidateAttemptResult::from_outcome(&outcome).with_compatibility(&isolated);
-        result.validate().expect("compatibility validates");
-        assert!(result.compatibility.is_some());
-        let CandidateWorkerOutcome::Produced { receipt, .. } = outcome else {
-            panic!("expected OMP candidate, got {outcome:?}");
-        };
-        assert_eq!(receipt.changed_paths, vec!["src/main.rs"]);
-        assert_eq!(std::fs::read(root.join("src/main.rs")).expect("candidate"), b"pub fn answer() -> i32 { 42 }\n");
-    }
-
-    #[test]
-    fn bubblewrap_isolation_confines_workspace_and_hides_host_paths() {
-        let Ok(sandbox) = std::env::var("LATTICE_BWRAP") else {
-            return;
-        };
-        let directory = tempfile::tempdir().expect("temporary workspace");
-        let root = directory.path();
-        std::fs::create_dir_all(root.join("src")).expect("source directory");
-        std::fs::write(root.join("src/main.rs"), b"old").expect("base source");
-        let mut isolated = request(root, "if [ -e /etc/passwd ]; then exit 7; fi; printf new > src/main.rs");
-        isolated.require_isolation = true;
-        isolated.sandbox_program = Some(sandbox);
-
-        let outcome =
-            run_candidate_worker(&isolated, &RuntimeConfig::default(), &AtomicBool::new(false)).expect("worker runs");
-
-        let result = CandidateAttemptResult::from_outcome(&outcome).with_compatibility(&isolated);
-        result.validate().expect("compatibility validates");
-        assert!(result.compatibility.is_some());
-        let CandidateWorkerOutcome::Produced { receipt, .. } = outcome else {
-            panic!("expected isolated candidate, got {outcome:?}");
-        };
-        assert_eq!(receipt.changed_paths, vec!["src/main.rs"]);
-        assert_eq!(std::fs::read(root.join("src/main.rs")).expect("candidate"), b"new");
-    }
-
-    #[test]
-    fn bubblewrap_isolation_propagates_cancellation() {
-        use std::sync::atomic::Ordering;
-
-        let Ok(sandbox) = std::env::var("LATTICE_BWRAP") else {
-            return;
-        };
-        let directory = tempfile::tempdir().expect("temporary workspace");
-        let root = directory.path();
-        std::fs::create_dir_all(root.join("src")).expect("source directory");
-        std::fs::write(root.join("src/main.rs"), b"old").expect("base source");
-        let mut isolated = request(root, "sleep 1; printf leaked > src/leak");
-        isolated.require_isolation = true;
-        isolated.sandbox_program = Some(sandbox);
-        let signal = std::sync::Arc::new(AtomicBool::new(false));
-        let canceller = {
-            let signal = std::sync::Arc::clone(&signal);
-            std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_millis(100));
-                signal.store(true, Ordering::Release);
-            })
-        };
-
-        let outcome = run_candidate_worker(&isolated, &RuntimeConfig::default(), signal.as_ref()).expect("worker runs");
-        canceller.join().expect("canceller joins");
-
-        assert!(matches!(outcome, CandidateWorkerOutcome::Cancelled), "{outcome:?}");
-        std::thread::sleep(std::time::Duration::from_millis(1_200));
-        assert!(!root.join("src/leak").exists());
-    }
-
-    #[test]
-    fn bubblewrap_isolation_rejects_writes_outside_the_workspace() {
-        let Ok(sandbox) = std::env::var("LATTICE_BWRAP") else {
-            return;
-        };
-        let directory = tempfile::tempdir().expect("temporary workspace");
-        let root = directory.path();
-        std::fs::create_dir_all(root.join("src")).expect("source directory");
-        std::fs::write(root.join("src/main.rs"), b"old").expect("base source");
-        let mut isolated = request(root, "printf nope > /tmp/lattice-leak && printf new > src/main.rs");
-        isolated.require_isolation = true;
-        isolated.sandbox_program = Some(sandbox);
-
-        let outcome =
-            run_candidate_worker(&isolated, &RuntimeConfig::default(), &AtomicBool::new(false)).expect("worker runs");
-
-        assert!(matches!(outcome, CandidateWorkerOutcome::Failed { .. }), "{outcome:?}");
-        assert_eq!(std::fs::read(root.join("src/main.rs")).expect("source remains"), b"old");
-    }
-
-    #[test]
-    fn changes_outside_the_admitted_write_boundary_are_rejected() {
-        let directory = tempfile::tempdir().expect("temporary workspace");
-        let root = directory.path();
-        std::fs::create_dir_all(root.join("src")).expect("source directory");
-        std::fs::write(root.join("src/main.rs"), b"same").expect("source");
-
-        let outcome = run_candidate_worker(
-            &request(root, "printf changed > README.md"),
-            &RuntimeConfig::default(),
-            &AtomicBool::new(false),
-        )
-        .expect("worker runs");
-
-        assert!(matches!(
-            outcome,
-            CandidateWorkerOutcome::Failed { ref blocker, .. }
-                if blocker == "worker changed a path outside its admitted write boundary"
-        ));
-    }
-
-    #[test]
-    fn non_zero_exit_is_a_failure() {
-        let directory = tempfile::tempdir().expect("temporary workspace");
-        let root = directory.path();
-        std::fs::create_dir_all(root.join("src")).expect("source directory");
-        std::fs::write(root.join("src/main.rs"), b"same").expect("source");
-
-        let outcome =
-            run_candidate_worker(&request(root, "exit 3"), &RuntimeConfig::default(), &AtomicBool::new(false))
-                .expect("worker runs");
-
-        assert!(matches!(outcome, CandidateWorkerOutcome::Failed { .. }));
-    }
-
-    #[test]
-    fn output_overflow_and_timeout_are_failures() {
-        let directory = tempfile::tempdir().expect("temporary workspace");
-        let root = directory.path();
-        std::fs::create_dir_all(root.join("src")).expect("source directory");
-        std::fs::write(root.join("src/main.rs"), b"same").expect("source");
-
-        let mut overflow = request(root, "printf 1234567890");
-        overflow.output_limit_bytes = 8;
-        let outcome =
-            run_candidate_worker(&overflow, &RuntimeConfig::default(), &AtomicBool::new(false)).expect("worker runs");
-        assert!(matches!(outcome, CandidateWorkerOutcome::Failed { .. }));
-
-        let mut timed = request(root, "sleep 2");
-        timed.timeout_secs = 1;
-        let outcome =
-            run_candidate_worker(&timed, &RuntimeConfig::default(), &AtomicBool::new(false)).expect("worker runs");
-        assert!(matches!(outcome, CandidateWorkerOutcome::Failed { .. }));
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn interrupted_candidate_capture_is_unknown() {
-        use std::os::unix::fs::PermissionsExt;
-
-        let directory = tempfile::tempdir().expect("temporary workspace");
-        let root = directory.path();
-        std::fs::create_dir_all(root.join("src")).expect("source directory");
-        std::fs::write(root.join("src/main.rs"), b"same").expect("source");
-
-        let outcome = run_candidate_worker(
-            &request(root, &format!("{} 000 src/main.rs", host_tool("chmod"))),
-            &RuntimeConfig::default(),
-            &AtomicBool::new(false),
-        )
-        .expect("worker runs");
-
-        assert!(matches!(outcome, CandidateWorkerOutcome::Unknown { .. }), "{outcome:?}");
-        std::fs::set_permissions(root.join("src/main.rs"), std::fs::Permissions::from_mode(0o644))
-            .expect("restore source");
-    }
-
-    #[test]
-    fn produced_candidate_is_published_to_store() {
-        let directory = tempfile::tempdir().expect("temporary workspace");
-        let root = directory.path().join("workspace");
-        std::fs::create_dir_all(root.join("src")).expect("source directory");
-        std::fs::write(root.join("src/main.rs"), b"old").expect("base source");
-        let store = Store::new(directory.path().join("store.redb")).expect("store opens");
-
-        let outcome = run_and_publish_candidate_worker(
-            &request(&root, "printf new > src/main.rs"),
-            &RuntimeConfig::default(),
-            &AtomicBool::new(false),
-            &store,
-        )
-        .expect("worker runs");
-
-        assert!(matches!(outcome, CandidateWorkerOutcome::Produced { .. }), "{outcome:?}");
-        let receipt = store.load_candidate_receipt("attempt-1").expect("receipt loads").expect("receipt exists");
-        assert_eq!(receipt.changed_paths, vec!["src/main.rs"]);
-        assert_eq!(
-            store.load_candidate_artifact("attempt-1", "src/main.rs").expect("artifact loads"),
-            Some(b"new".to_vec())
-        );
-        assert_eq!(store.list_candidate_artifacts("attempt-1").expect("artifacts list").len(), 1);
-        let result = store.load_candidate_attempt_result("attempt-1").expect("result loads").expect("result exists");
-        assert_eq!(result.disposition, CandidateDisposition::Produced);
-        assert!(matches!(reconcile_candidate_attempt(&store, "attempt-1"), Ok(CandidateRecovery::Published(_))));
-    }
-
-    #[test]
-    fn failed_worker_outcome_is_persisted_without_a_candidate() {
-        let directory = tempfile::tempdir().expect("temporary workspace");
-        let root = directory.path().join("workspace");
-        std::fs::create_dir_all(root.join("src")).expect("source directory");
-        std::fs::write(root.join("src/main.rs"), b"same").expect("base source");
-        let store = Store::new(directory.path().join("store.redb")).expect("store opens");
-
-        let outcome = run_and_publish_candidate_worker(
-            &request(&root, "exit 3"),
-            &RuntimeConfig::default(),
-            &AtomicBool::new(false),
-            &store,
-        )
-        .expect("worker runs");
-
-        assert!(matches!(outcome, CandidateWorkerOutcome::Failed { .. }), "{outcome:?}");
-        let result = store.load_candidate_attempt_result("attempt-1").expect("result loads").expect("result exists");
-        assert_eq!(result.disposition, CandidateDisposition::Failed);
-        assert!(result.blocker.is_some());
-        assert!(result.receipt.is_none());
-        assert!(result.published_artifacts.is_empty());
-        assert!(store.load_candidate_receipt("attempt-1").expect("receipt lookup").is_none());
-    }
-
-    #[test]
-    fn blocked_worker_outcome_is_persisted_without_a_candidate() {
-        let directory = tempfile::tempdir().expect("temporary workspace");
-        let root = directory.path().join("workspace");
-        std::fs::create_dir_all(root.join("src")).expect("source directory");
-        std::fs::write(root.join("src/main.rs"), b"same").expect("base source");
-        let store = Store::new(directory.path().join("store.redb")).expect("store opens");
-        let mut request = request(&root, "printf new > src/main.rs");
-        request.boundary = admit_workspace_boundary(&root, &["src".to_string()], &["src".to_string()], false, true)
-            .expect("credential boundary admits structurally");
-
-        let outcome =
-            run_and_publish_candidate_worker(&request, &RuntimeConfig::default(), &AtomicBool::new(false), &store)
-                .expect("worker runs");
-
-        assert!(matches!(outcome, CandidateWorkerOutcome::Blocked { .. }), "{outcome:?}");
-        let result = store.load_candidate_attempt_result("attempt-1").expect("result loads").expect("result exists");
-        assert_eq!(result.disposition, CandidateDisposition::Blocked);
-        assert!(result.blocker.is_some());
-        assert!(result.receipt.is_none());
-        assert!(store.load_candidate_receipt("attempt-1").expect("receipt lookup").is_none());
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn unknown_worker_outcome_is_persisted_without_a_candidate() {
-        use std::os::unix::fs::PermissionsExt;
-
-        let directory = tempfile::tempdir().expect("temporary workspace");
-        let root = directory.path().join("workspace");
-        std::fs::create_dir_all(root.join("src")).expect("source directory");
-        std::fs::write(root.join("src/main.rs"), b"same").expect("base source");
-        let store = Store::new(directory.path().join("store.redb")).expect("store opens");
-
-        let outcome = run_and_publish_candidate_worker(
-            &request(&root, &format!("{} 000 src/main.rs", host_tool("chmod"))),
-            &RuntimeConfig::default(),
-            &AtomicBool::new(false),
-            &store,
-        )
-        .expect("worker runs");
-
-        assert!(matches!(outcome, CandidateWorkerOutcome::Unknown { .. }), "{outcome:?}");
-        let result = store.load_candidate_attempt_result("attempt-1").expect("result loads").expect("result exists");
-        assert_eq!(result.disposition, CandidateDisposition::Unknown);
-        assert!(result.blocker.is_some());
-        assert!(result.receipt.is_none());
-        assert!(store.load_candidate_receipt("attempt-1").expect("receipt lookup").is_none());
-        std::fs::set_permissions(root.join("src/main.rs"), std::fs::Permissions::from_mode(0o644))
-            .expect("restore source");
-    }
-
-    #[test]
-    fn cancelled_worker_outcome_is_persisted_without_a_candidate() {
-        use std::sync::Arc;
-        use std::sync::atomic::Ordering;
-        use std::time::Duration;
-
-        let directory = tempfile::tempdir().expect("temporary workspace");
-        let root = directory.path().join("workspace");
-        std::fs::create_dir_all(root.join("src")).expect("source directory");
-        std::fs::write(root.join("src/main.rs"), b"same").expect("base source");
-        let store = Store::new(directory.path().join("store.redb")).expect("store opens");
-        let cancellation = Arc::new(AtomicBool::new(false));
-        let signal = Arc::clone(&cancellation);
-        let canceller = std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_millis(100));
-            signal.store(true, Ordering::Release);
-        });
-
-        let outcome = run_and_publish_candidate_worker(
-            &request(&root, &format!("{} 1; printf leaked > src/leak", host_tool("sleep"))),
-            &RuntimeConfig::default(),
-            cancellation.as_ref(),
-            &store,
-        )
-        .expect("worker runs");
-        canceller.join().expect("canceller joins");
-
-        assert!(matches!(outcome, CandidateWorkerOutcome::Cancelled), "{outcome:?}");
-        let result = store.load_candidate_attempt_result("attempt-1").expect("result loads").expect("result exists");
-        assert_eq!(result.disposition, CandidateDisposition::Cancelled);
-        assert!(result.receipt.is_none());
-        assert!(store.load_candidate_receipt("attempt-1").expect("receipt lookup").is_none());
-        assert!(!root.join("src/leak").exists());
-    }
-
-    #[test]
-    fn reconciliation_reports_missing_and_incomplete_publication() {
-        let directory = tempfile::tempdir().expect("temporary workspace");
-        let store = Store::new(directory.path().join("reconcile.redb")).expect("store opens");
-        assert!(matches!(reconcile_candidate_attempt(&store, "attempt-missing"), Ok(CandidateRecovery::Missing)));
-
-        let usage = crate::orchestration::CommandWorkerUsageObservation {
-            schema: crate::orchestration::USAGE_OBSERVATION_SCHEMA.to_string(),
-            scope: crate::orchestration::UsageScope::Run,
-            workflow_revision: "revision-1".to_string(),
-            instance_id: "instance-1".to_string(),
-            dispatch_id: "dispatch-1".to_string(),
-            run_id: 7,
-            node_id: 0,
-            invocation_id: "invocation-1".to_string(),
-            worker_profile: "profile-1".to_string(),
-            attempt_id: "attempt-usage-only".to_string(),
-            agent_invocations: Some(1),
-            model_requests: None,
-            subagent_calls: None,
-            tokens: None,
-            cost_microunits: None,
-            duration_millis: Some(1),
-            provenance: crate::orchestration::UsageProvenance::HostMeasured,
-            complete: true,
-        };
-        store.save_command_worker_usage(&usage).expect("usage saves");
-        assert!(matches!(
-            reconcile_candidate_attempt(&store, "attempt-usage-only"),
-            Ok(CandidateRecovery::Incomplete { .. })
-        ));
-
-        let receipt = CandidateReceipt {
-            schema: crate::candidate::CANDIDATE_RECEIPT_SCHEMA.to_string(),
-            work_id: "work-1".to_string(),
-            attempt_id: "attempt-incomplete".to_string(),
-            fence: "7".to_string(),
-            workspace_id: "workspace-1".to_string(),
-            base_identity: "a".repeat(64),
-            candidate_identity: Some("b".repeat(64)),
-            diff_identity: Some("c".repeat(64)),
-            changed_paths: vec!["src/main.rs".to_string()],
-            disposition: CandidateDisposition::Produced,
-            blockers: Vec::new(),
-        };
-        let result = CandidateAttemptResult {
-            schema: CANDIDATE_ATTEMPT_RESULT_SCHEMA.to_string(),
-            disposition: CandidateDisposition::Produced,
-            receipt: Some(receipt),
-            published_artifacts: Vec::new(),
-            stdout_blake3: blake3_identity(b""),
-            stderr_blake3: blake3_identity(b""),
-            blocker: None,
-            compatibility: None,
-        };
-        store.save_candidate_attempt_result("attempt-incomplete", &result).expect("result saves");
-        assert!(matches!(
-            reconcile_candidate_attempt(&store, "attempt-incomplete"),
-            Ok(CandidateRecovery::Incomplete { .. })
-        ));
-    }
-
-    #[test]
-    fn attempt_result_hashes_outputs_and_round_trips() {
-        let receipt = CandidateReceipt {
-            schema: crate::candidate::CANDIDATE_RECEIPT_SCHEMA.to_string(),
-            work_id: "work-1".to_string(),
-            attempt_id: "attempt-1".to_string(),
-            fence: "7".to_string(),
-            workspace_id: "workspace-1".to_string(),
-            base_identity: "a".repeat(64),
-            candidate_identity: Some("b".repeat(64)),
-            diff_identity: Some("c".repeat(64)),
-            changed_paths: vec!["src/main.rs".to_string()],
-            disposition: CandidateDisposition::Produced,
-            blockers: Vec::new(),
-        };
-        let outcome = CandidateWorkerOutcome::Produced {
-            receipt: Box::new(receipt.clone()),
-            changed_files: BTreeMap::new(),
-            stdout: b"stdout".to_vec(),
-            stderr: b"stderr".to_vec(),
-        };
-        let result = CandidateAttemptResult::from_outcome(&outcome);
-        assert_eq!(result.stdout_blake3, blake3_identity(b"stdout"));
-        assert_eq!(result.stderr_blake3, blake3_identity(b"stderr"));
-        let json = result.to_json().expect("result serializes");
-        let parsed = CandidateAttemptResult::from_json(&json).expect("result parses");
-        assert_eq!(parsed, result);
-
-        let mut invalid = CandidateAttemptResult::from_outcome(&CandidateWorkerOutcome::Blocked {
-            blocker: "blocked".to_string(),
-        });
-        invalid.receipt = Some(receipt);
-        assert!(invalid.validate().is_err());
-    }
-
-    #[test]
-    fn cancelled_and_unknown_results_are_valid_non_success() {
-        let cancelled = CandidateAttemptResult::from_outcome(&CandidateWorkerOutcome::Cancelled);
-        assert_eq!(cancelled.disposition, CandidateDisposition::Cancelled);
-        assert!(cancelled.receipt.is_none());
-        assert!(cancelled.published_artifacts.is_empty());
-        assert!(cancelled.validate().is_ok());
-
-        let unknown = CandidateAttemptResult::from_outcome(&CandidateWorkerOutcome::Unknown {
-            blocker: "capture interrupted".to_string(),
-            stdout: b"partial".to_vec(),
-            stderr: Vec::new(),
-        });
-        assert_eq!(unknown.disposition, CandidateDisposition::Unknown);
-        assert!(unknown.blocker.is_some());
-        assert!(unknown.validate().is_ok());
-    }
-
-    #[test]
-    fn attempt_result_rejects_invalid_artifact_paths() {
-        let receipt = CandidateReceipt {
-            schema: crate::candidate::CANDIDATE_RECEIPT_SCHEMA.to_string(),
-            work_id: "work-1".to_string(),
-            attempt_id: "attempt-1".to_string(),
-            fence: "7".to_string(),
-            workspace_id: "workspace-1".to_string(),
-            base_identity: "a".repeat(64),
-            candidate_identity: Some("b".repeat(64)),
-            diff_identity: Some("c".repeat(64)),
-            changed_paths: vec!["src/main.rs".to_string()],
-            disposition: CandidateDisposition::Produced,
-            blockers: Vec::new(),
-        };
-        let mut result = CandidateAttemptResult::from_outcome(&CandidateWorkerOutcome::Produced {
-            receipt: Box::new(receipt),
-            changed_files: BTreeMap::from([("src/main.rs".to_string(), b"main".to_vec())]),
-            stdout: Vec::new(),
-            stderr: Vec::new(),
-        });
-
-        result.published_artifacts = vec!["src/other.rs".to_string()];
-        assert!(result.validate().is_err());
-
-        result.published_artifacts = vec!["src/main.rs".to_string(), "src/main.rs".to_string()];
-        assert!(result.validate().is_err());
-
-        let mut blocked = CandidateAttemptResult::from_outcome(&CandidateWorkerOutcome::Blocked {
-            blocker: "blocked".to_string(),
-        });
-        blocked.published_artifacts = vec!["src/main.rs".to_string()];
-        assert!(blocked.validate().is_err());
-    }
-
-    #[test]
-    fn invalid_limits_are_blocked_before_execution() {
-        let directory = tempfile::tempdir().expect("temporary workspace");
-        let root = directory.path();
-        std::fs::create_dir_all(root.join("src")).expect("source directory");
-        std::fs::write(root.join("src/main.rs"), b"old").expect("source");
-
-        let mut no_deadline = request(root, "printf new > src/main.rs");
-        no_deadline.timeout_secs = 0;
-        let outcome = run_candidate_worker(&no_deadline, &RuntimeConfig::default(), &AtomicBool::new(false))
-            .expect("worker runs");
-        assert!(matches!(outcome, CandidateWorkerOutcome::Blocked { .. }));
-
-        let mut no_output = request(root, "printf new > src/main.rs");
-        no_output.output_limit_bytes = 0;
-        let outcome =
-            run_candidate_worker(&no_output, &RuntimeConfig::default(), &AtomicBool::new(false)).expect("worker runs");
-        assert!(matches!(outcome, CandidateWorkerOutcome::Blocked { .. }));
-        assert_eq!(std::fs::read(root.join("src/main.rs")).expect("source remains"), b"old");
-    }
-
-    #[test]
-    fn credential_bearing_workspace_is_blocked_before_execution() {
-        let directory = tempfile::tempdir().expect("temporary workspace");
-        let root = directory.path();
-        std::fs::create_dir_all(root.join("src")).expect("source directory");
-        std::fs::write(root.join("src/main.rs"), b"old").expect("source");
-
-        let mut request = request(root, "printf new > src/main.rs");
-        request.boundary = admit_workspace_boundary(root, &["src".to_string()], &["src".to_string()], false, true)
-            .expect("credential boundary admits structurally");
-        let outcome =
-            run_candidate_worker(&request, &RuntimeConfig::default(), &AtomicBool::new(false)).expect("worker runs");
-
-        assert!(matches!(outcome, CandidateWorkerOutcome::Blocked { .. }), "{outcome:?}");
-        assert_eq!(std::fs::read(root.join("src/main.rs")).expect("source remains"), b"old");
-    }
-
-    #[test]
-    fn required_isolation_without_provider_is_blocked() {
-        let directory = tempfile::tempdir().expect("temporary workspace");
-        let root = directory.path();
-        std::fs::create_dir_all(root.join("src")).expect("source directory");
-        std::fs::write(root.join("src/main.rs"), b"old").expect("source");
-
-        let mut request = request(root, "printf new > src/main.rs");
-        request.require_isolation = true;
-        let outcome =
-            run_candidate_worker(&request, &RuntimeConfig::default(), &AtomicBool::new(false)).expect("worker runs");
-
-        assert!(matches!(outcome, CandidateWorkerOutcome::Blocked { .. }), "{outcome:?}");
-        assert_eq!(std::fs::read(root.join("src/main.rs")).expect("source remains"), b"old");
-    }
-
-    #[test]
-    fn worker_environment_is_clear() {
-        let directory = tempfile::tempdir().expect("temporary workspace");
-        let root = directory.path();
-        std::fs::create_dir_all(root.join("src")).expect("source directory");
-        std::fs::write(root.join("src/main.rs"), b"same").expect("source");
-
-        let outcome = run_candidate_worker(
-            &request(root, "printf %s \"$HOME\" > src/home"),
-            &RuntimeConfig::default(),
-            &AtomicBool::new(false),
-        )
-        .expect("worker runs");
-
-        assert!(matches!(outcome, CandidateWorkerOutcome::Produced { .. }), "{outcome:?}");
-        assert_eq!(std::fs::read(root.join("src/home")).expect("environment probe"), b"");
-    }
-
-    #[test]
-    fn in_flight_cancellation_stops_the_worker_before_late_write() {
-        use std::sync::Arc;
-        use std::sync::atomic::Ordering;
-        use std::time::Duration;
-
-        let directory = tempfile::tempdir().expect("temporary workspace");
-        let root = directory.path();
-        std::fs::create_dir_all(root.join("src")).expect("source directory");
-        std::fs::write(root.join("src/main.rs"), b"same").expect("source");
-
-        let cancellation = Arc::new(AtomicBool::new(false));
-        let signal = Arc::clone(&cancellation);
-        let canceller = std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_millis(100));
-            signal.store(true, Ordering::Release);
-        });
-        let outcome = run_candidate_worker(
-            &request(root, &format!("{} 1; printf leaked > src/leak", host_tool("sleep"))),
-            &RuntimeConfig::default(),
-            cancellation.as_ref(),
-        )
-        .expect("worker runs");
-        canceller.join().expect("canceller joins");
-
-        assert!(matches!(outcome, CandidateWorkerOutcome::Cancelled), "{outcome:?}");
-        assert!(!root.join("src/leak").exists());
-    }
-}
+mod tests;

@@ -1,0 +1,7 @@
+  # DAG NODE
+  0 ●─┐ node-0
+  1 ● │ node-1
+  2 │ ● node-2
+  3 ● │ node-3
+  4 ├─● node-4
+  5 ●   node-5

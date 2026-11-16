@@ -1,7 +1,6 @@
 //! Image input operation planning and image I/O interface.
 
 use std::collections::HashMap;
-use std::io::ErrorKind;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
@@ -9,7 +8,6 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::engine::value::ImageMetadata;
-use crate::engine::value::ImageValue;
 use crate::file_node;
 
 const PNG_SIGNATURE: &[u8] = b"\x89PNG\r\n\x1a\n";
@@ -66,14 +64,14 @@ impl std::fmt::Display for ImageError {
 impl std::error::Error for ImageError {}
 
 pub trait ImageIo: Send + Sync {
-    fn load(&self, plan: &ImageInputPlan) -> Result<ImageValue, ImageError>;
+    fn load(&self, plan: &ImageInputPlan) -> Result<crate::engine::value::ImageValue, ImageError>;
 }
 
 #[derive(Debug, Default)]
 pub struct NoopImageIo;
 
 impl ImageIo for NoopImageIo {
-    fn load(&self, _plan: &ImageInputPlan) -> Result<ImageValue, ImageError> {
+    fn load(&self, _plan: &ImageInputPlan) -> Result<crate::engine::value::ImageValue, ImageError> {
         Err(ImageError::Io(IMAGE_IO_NOT_CONFIGURED.to_string()))
     }
 }
@@ -82,7 +80,7 @@ impl ImageIo for NoopImageIo {
 pub struct LocalImageIo;
 
 impl ImageIo for LocalImageIo {
-    fn load(&self, plan: &ImageInputPlan) -> Result<ImageValue, ImageError> {
+    fn load(&self, plan: &ImageInputPlan) -> Result<crate::engine::value::ImageValue, ImageError> {
         load_local_image(plan)
     }
 }
@@ -107,7 +105,7 @@ impl MemoryImageIo {
 }
 
 impl ImageIo for MemoryImageIo {
-    fn load(&self, plan: &ImageInputPlan) -> Result<ImageValue, ImageError> {
+    fn load(&self, plan: &ImageInputPlan) -> Result<crate::engine::value::ImageValue, ImageError> {
         validate_image_path_allowed(&plan.path, &plan.allowed_roots)?;
         if self.denied_paths.lock().contains(&plan.path) {
             return Err(ImageError::PermissionDenied(plan.path.clone()));
@@ -164,10 +162,14 @@ pub fn validate_image_size(path: &str, bytes: usize, max_bytes: usize) -> Result
 }
 
 // r[impl n8nclone.workflow_execution.image_input_nodes.production_io.local]
-pub fn image_value_from_loaded_bytes(path: &str, bytes: Vec<u8>, max_bytes: usize) -> Result<ImageValue, ImageError> {
+pub fn image_value_from_loaded_bytes(
+    path: &str,
+    bytes: Vec<u8>,
+    max_bytes: usize,
+) -> Result<crate::engine::value::ImageValue, ImageError> {
     validate_image_size(path, bytes.len(), max_bytes)?;
     let media_type = sniff_image_media_type(&bytes).ok_or_else(|| ImageError::UnsupportedFormat(path.to_string()))?;
-    Ok(ImageValue::new(bytes, media_type.to_string(), ImageMetadata {
+    Ok(crate::engine::value::ImageValue::new(bytes, media_type.to_string(), ImageMetadata {
         width: None,
         height: None,
         source_label: Some(path.to_string()),
@@ -176,7 +178,7 @@ pub fn image_value_from_loaded_bytes(path: &str, bytes: Vec<u8>, max_bytes: usiz
 
 // r[impl n8nclone.workflow_execution.image_input_nodes.production_io.local]
 // r[impl n8nclone.workflow_execution.image_input_nodes.capability_read]
-pub fn load_local_image(plan: &ImageInputPlan) -> Result<ImageValue, ImageError> {
+pub fn load_local_image(plan: &ImageInputPlan) -> Result<crate::engine::value::ImageValue, ImageError> {
     let rooted_path = crate::capability::select_rooted_path(&plan.path, &plan.allowed_roots)
         .ok_or_else(|| ImageError::UnsafePath(plan.path.clone()))?;
     let file =
@@ -197,8 +199,8 @@ pub fn load_local_image(plan: &ImageInputPlan) -> Result<ImageValue, ImageError>
 
 fn image_error_from_io(path: &str, error: std::io::Error) -> ImageError {
     match error.kind() {
-        ErrorKind::NotFound => ImageError::MissingImage(path.to_string()),
-        ErrorKind::PermissionDenied => ImageError::PermissionDenied(path.to_string()),
+        std::io::ErrorKind::NotFound => ImageError::MissingImage(path.to_string()),
+        std::io::ErrorKind::PermissionDenied => ImageError::PermissionDenied(path.to_string()),
         _ => ImageError::Io(format!("{path}: {error}")),
     }
 }

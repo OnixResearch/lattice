@@ -270,6 +270,16 @@ Octet gate rejects new finding IDs outside the reviewed baseline. The Nix
 command disables host signing keys only for that check invocation; it does not
 change normal package or release signing policy.
 
+`scripts/octet-baseline-migrate.rs` defaults to identity-only migration. Its
+explicit `--prune-resolved` mode also removes resolved findings, but cannot grow
+the baseline identity count or any complete raw semantic occurrence budget.
+Every reference warning ID must already be accepted; colliding descriptions
+are checked before deduplication. Both modes require complete successful
+reference/current reports with matching tool/compiler/profile/configuration
+metadata, and the reference must reproduce the original canonical facts.
+Preview first, then use `--execute` to write. Neither mode remaps source owners
+or accepts new warning debt.
+
 Build the release package with `nix build .#lattice` and verify
 `./result/bin/lattice --version`. The optional compose workspace is checked
 separately with `cargo test --manifest-path compose/Cargo.toml --locked`; it

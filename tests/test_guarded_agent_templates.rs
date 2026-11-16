@@ -432,9 +432,9 @@ fn guarded_authority_rejects_second_agents_fallbacks_commands_retries_and_budget
     let mut second_agent = bundle.workflow.clone();
     second_agent.add_agent_node(
         "prohibited second agent",
-        lattice::agent_node::AgentTarget::Pi,
+        lattice::agent_node::Target::Pi,
         "do more work",
-        lattice::agent_node::AgentOutputMode::Text,
+        lattice::agent_node::OutputMode::Text,
     );
     assert_eq!(
         lattice::guarded::authority::validate_bundle(
@@ -456,7 +456,7 @@ fn guarded_authority_rejects_second_agents_fallbacks_commands_retries_and_budget
     else {
         panic!("agent config kind");
     };
-    settings.target = lattice::agent_node::AgentTarget::Clankers;
+    settings.target = lattice::agent_node::Target::Clankers;
     settings.model_hint = Some("fallback-model".to_owned());
     assert_eq!(
         lattice::guarded::authority::validate_bundle(

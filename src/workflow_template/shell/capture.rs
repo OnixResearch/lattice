@@ -228,7 +228,7 @@ fn parse_graph(
 fn parse_orchestration(
     manifest: &super::model::BundleManifest,
     captured: &std::collections::BTreeMap<String, Vec<u8>>,
-) -> Option<crate::orchestration::OrchestrationDefinition> {
+) -> Option<crate::orchestration::Definition> {
     let binding = manifest.orchestration.as_ref()?;
     let bytes = captured.get(&binding.path)?;
     let source = std::str::from_utf8(bytes).ok()?;

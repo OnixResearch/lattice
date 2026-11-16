@@ -30,6 +30,12 @@ pub fn settle_attempt(session: &SessionRecord, attempt: &Identity) -> Result<Ses
             .iter()
             .any(|observation| observation.message == message.identity && observation.accepted)
     });
+    // Atomic cursor advancement cannot roll back an accepted recipient. A mixed
+    // fanout must not become Failed (which would unlock a blind repeat of the
+    // recipients that already accepted). Recovery still requires duplicate risk.
+    if !is_accepted && current.observations.iter().any(|observation| observation.accepted) {
+        return Err(Issue::ObservationMismatch.into());
+    }
     let state_label = if is_accepted { "committed" } else { "failed" };
     let outcome = identity::reference(identity::OUTCOME_DOMAIN, &[attempt.as_str(), state_label])?;
     if is_accepted {
@@ -47,7 +53,7 @@ pub fn settle_attempt(session: &SessionRecord, attempt: &Identity) -> Result<Ses
 
 pub fn fail_before_dispatch(session: &SessionRecord, attempt: &Identity, issue: Issue) -> Result<SessionRecord, Error> {
     let current = attempt_record(session, attempt)?;
-    if !matches!(current.state, AttemptState::Prepared | AttemptState::Authorized | AttemptState::DispatchedUnknown) {
+    if !matches!(current.state, AttemptState::Prepared | AttemptState::Authorized) {
         return Err(Issue::ReorderedMessage.into());
     }
     let outcome =

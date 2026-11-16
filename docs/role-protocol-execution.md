@@ -46,12 +46,17 @@ A dispatch uses this order:
 2. Persist the `Prepared` attempt and all canonical envelopes.
 3. Evaluate the current Choregraph effect-authority boundary for each envelope.
 4. Persist the successful authority-attempt references.
-5. Persist `DispatchedUnknown` before the adapter starts.
-6. Start the selected bounded adapter.
-7. Admit an exact receiver observation.
-8. Commit linked sender and receiver cursors.
+5. Preflight every recipient's adapter and exact profile before any adapter effect.
+6. Persist `DispatchedUnknown` before the adapter starts.
+7. Start the already-selected bounded adapters, in canonical message order.
+8. Admit an exact receiver observation for every message.
+9. Commit linked sender and receiver cursors only when every recipient accepted.
 
-A crash after step 5 leaves an unknown outcome. Lattice does not resend automatically. A terminal adapter rejection can fail the attempt only when no earlier message in that action started.
+A crash after step 6 leaves an unknown outcome. Lattice does not resend automatically. A terminal adapter rejection can fail the attempt only when that call guarantees no receiver work started and no earlier message in the action started. Deterministic selection errors fail before step 6. `fail_before_dispatch` refuses an already-unknown attempt.
+
+HTTP 2xx means only that transport returned a success status (`Started`), not receiver acceptance, protocol commit, or external-effect completion. All other HTTP statuses, including 500 and 502, remain `UnknownAfterStart`: a receiver or intermediary may return an error after work occurred. A generic adapter `ObservedFailure` likewise cannot establish rejection. This HTTP profile does not admit rejection receipts from response bodies; exact rejection uses the separate observation surface.
+
+Each recipient needs its own exact observation. One accepted recipient cannot resolve another recipient's unknown outcome. Mixed accepted/rejected fanout cannot atomically commit and cannot become a terminal failure that permits a blind repetition of the accepted recipient. It remains blocked pending explicit duplicate-risk recovery. All-rejected exact observations may settle as failed.
 
 ## Envelopes and choices
 
@@ -70,6 +75,28 @@ This local commit does not prove remote byte uniqueness or remote durable storag
 The typed operator surface supports create, inspect, recover, retry, abandon, and replay requests. Retry requires explicit duplicate-risk acknowledgement. Abandon requires explicit unknown-outcome acknowledgement. A retry receives a new action and attempt identity.
 
 Replay reads the persisted plan and events. It recomputes pure state only. It does not load fresh authority or call an adapter.
+
+Agent-facing summaries and transcripts are not session records. A truthful correction must append to the original attempt history; a rewritten handoff saying `done` or a stale summary saying `failed` changes neither authority, attempt disposition, nor operation identity. Reconstruct a handoff from the persisted plan/events, not from prose. Missing or currently unavailable observations are not evidence that a receiver did nothing.
+
+`Runtime::observe` is an embedding trust boundary: the authorized product observer must authenticate the evidence reference against its current exact receiver contract before calling it. Core admission then checks the canonical session, attempt, message, roles, instances, artifacts, step, label, payload, and adapter context. The bare evidence identity is not a signature or an external-effect verifier. Transport delivery, receiver acceptance, local protocol commit, and external-effect completion remain distinct; acceptance alone need not mean completion under another product's receiver profile.
+
+## Deterministic uncertainty qualification
+
+The regression target `tests/test_role_protocol_uncertainty.rs` defines a local receiver contract with an independently persisted JSON operation/effect ledger, separate from the redb session store. It records canonical message identities, a stable logical-operation key, receiver generations, delivery/effect counts, completion/rejection and compensation counts. The logical key binds the session, protocol cursor, source, recipient and payload context while excluding fresh attempt, message and authority-request identities; separate fanout recipients remain separate operations. This fixture profile produces an acceptance observation only for its exact current completed operation, a rejection only for an exact recorded no-effect rejection, and no observation while in progress. No-start rejection records have zero deliveries and effects, including the later C recipient; they pass through the same current-record observer as completion records. Stale generations, substituted records, wrong/cross-session/attempt/message/role/adapter contexts and duplicate observations are negative inputs.
+
+The matrix varies not-applied/applied-once/in-progress receiver state independently of 202/500/502/lost-ACK transport responses. It uses unchanged history, additive truthful corrections, deliberately false rewritten `done` handoffs, and stale `failed` handoffs, both directly and after a real child-process exit/database reopen. A deterministic handoff reader consumes every selected transcript line and derives its proposed completion/retry intent. Safe reconstruction derives permitted disposition and completion claims from authoritative replay plus the independent ledger and admitted per-message observations, never from the proposed intent. Replay and handoff reconstruction never dispatch. Three-role projected choice fixtures cover missing/mismatched later profiles, partial fanout, exact per-message reconciliation, and acknowledged recovery. An independent checker aggregates effects and deliveries by logical operation across fresh attempt/message identities and rejects false completion, duplicated effects/deliveries and unjustified compensation. Broken controls consume the false summaries: `done` produces a false completion claim, and `failed` causes actual persisted duplicate receiver work, both as a same-message resend and as a fresh canonical `retry_unknown` attempt. The latter control invents duplicate-risk acknowledgment from the summary, not from an operator; it is not safe automatic recovery.
+
+These are deterministic regression definitions, not a recorded passing run or a qualification of the immutable published runtime revision. No model behavior, remote crash durability, transport authentication, or distributed exactly-once guarantee is inferred. Run the focused target under the pinned development shell to obtain current execution evidence.
+
+## Declared preference factors: producer prerequisite
+
+[Lattice #16](https://github.com/OnixResearch/lattice/issues/16) depends on an admitted annotation cohort from [Choregraph #4](https://github.com/OnixResearch/choregraph/issues/4); the related Noble filing is https://github.com/OnixResearch/noble-lang/issues/67#issuecomment-6796434640.
+
+The pinned Choregraph revision `0b2000edaf86d5a7a8601246afbc0d526f4a2a07` exposes only the closed `choregraph.role-choreography.v1` source and projection surface: its `Choice` has a decider, branches and span, and `ValueDeclaration` describes owned payloads, not preference factors. The inspected public GitHub HEAD `0dd723f1a53bdc7d0529dde8f2813f7d3c2d7922` has the same surface, and #4 remains open. Neither supplies a new annotation schema/profile, preference/world fields, a complete annotated local set, or a receipt binding those factors to the projection cohort. Source evidence: [pinned model](https://github.com/OnixResearch/choregraph/blob/0b2000edaf86d5a7a8601246afbc0d526f4a2a07/crates/choregraph-choreography/src/model.rs) and [upstream model](https://github.com/OnixResearch/choregraph/blob/0dd723f1a53bdc7d0529dde8f2813f7d3c2d7922/crates/choregraph-choreography/src/model.rs).
+
+Consequently no default-off factors profile can be truthfully admitted or compared to the exact-label baseline yet. No factor data is recorded or reported as ignored: none arrived with an admitted cohort. The implementation preserves unannotated admission, exact-label cursors, ownership and unavailable CLI authority unchanged. Implementing a local annotation/projection/solver or claiming an enabled-profile comparison would invent the missing producer contract. Once Choregraph publishes the exact schema, profile selector, identity-linked factor/world metadata, annotated complete local set and projection receipt, Lattice can review that cohort. Factors must remain metadata only: they cannot grant authority, choose a label, or turn a label set into a Boolean. **Game mapping not formalized**; Pact's unpublished solver and author claims are not admission evidence.
+
+A live `git ls-remote` against the Radicle seed did not return and was cancelled. The upstream inspection above is explicitly the public GitHub revision, not a claim about an undiscovered Radicle head. Neither a newer producer revision nor an annotation cohort was substituted for the exact pinned dependency.
 
 ## Safe evidence
 

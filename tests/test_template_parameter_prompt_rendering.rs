@@ -2,7 +2,7 @@ use lattice::config::AppConfig;
 use lattice::config::NodeTemplate;
 use lattice::config::TemplateParameter;
 use lattice::config::TemplateParameterType;
-use lattice::tui::App;
+use lattice::tui::State;
 use lattice::tui::app::AddNodeStep;
 use lattice::tui::panels;
 use ratatui::buffer::Buffer;
@@ -48,8 +48,8 @@ fn parameter_template(required: bool) -> NodeTemplate {
     }
 }
 
-fn app_at_parameter_prompt(temp_dir: &TempDir, required: bool) -> App {
-    let mut app = App::new(test_config(temp_dir));
+fn app_at_parameter_prompt(temp_dir: &TempDir, required: bool) -> State {
+    let mut app = State::new(test_config(temp_dir));
     app.set_node_templates(vec![parameter_template(required)]);
     app.open_add_node_flow();
     app.start_template_node_flow();
@@ -58,7 +58,7 @@ fn app_at_parameter_prompt(temp_dir: &TempDir, required: bool) -> App {
     app
 }
 
-fn rendered_frame_text(app: &mut App) -> String {
+fn rendered_frame_text(app: &mut State) -> String {
     let area = Rect::new(0, 0, FRAME_WIDTH, FRAME_HEIGHT);
     let mut buffer = Buffer::empty(area);
     panels::render(app, area, &mut buffer);

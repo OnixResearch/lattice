@@ -296,6 +296,24 @@ impl PureInvocationEnvelope {
         Ok(())
     }
 
+    /// Check an observed response against this exact invocation, not merely its shape.
+    ///
+    /// This is a host-side check, not a producer protocol or publication decision.
+    /// A fresh recomputation has a new invocation and must use its own envelope.
+    pub fn validate_result_binding(
+        &self,
+        observed: &PureComputationBinding,
+        effective_limits: PureLimits,
+    ) -> Result<(), PureProfileError> {
+        self.validate()?;
+        observed.validate()?;
+        effective_limits.validate()?;
+        if self.binding != *observed || self.limits != effective_limits {
+            return Err(PureProfileError::CrossedResultBinding);
+        }
+        Ok(())
+    }
+
     /// Evaluate only after the envelope is admitted.
     pub fn evaluate_canonical(&self) -> Result<String, PureProfileError> {
         self.validate()?;
@@ -379,6 +397,8 @@ pub enum PureProfileError {
     InvalidLimits,
     #[error("pure interaction-net program exceeds the admitted operation limit")]
     ProgramExceedsAdmittedLimit,
+    #[error("pure interaction-net result belongs to another invocation or effective limit set")]
+    CrossedResultBinding,
 }
 
 #[cfg(test)]
@@ -590,5 +610,67 @@ mod tests {
             verify_output_identity("A".repeat(64).as_str(), output_bytes),
             Err(PureProfileError::InvalidBindingIdentity)
         );
+    }
+
+    #[test]
+    fn every_crossed_result_binding_is_rejected() {
+        let admitted = envelope();
+        assert_eq!(admitted.validate_result_binding(&admitted.binding, admitted.limits), Ok(()));
+        let mutations: [fn(&mut PureComputationBinding); 15] = [
+            |b| b.workflow_revision.push('2'),
+            |b| b.instance_id.push('2'),
+            |b| b.dispatch_id.push('2'),
+            |b| b.run_id.push('2'),
+            |b| b.attempt_id.push('2'),
+            |b| b.program_identity = "b".repeat(64),
+            |b| b.input_identity = "b".repeat(64),
+            |b| b.producer_revision.push('2'),
+            |b| b.rule_revision.push('2'),
+            |b| b.runtime_identity = "b".repeat(64),
+            |b| b.executable_identity = "b".repeat(64),
+            |b| b.profile_identity = "b".repeat(64),
+            |b| b.extrinsic_profile_identity = "b".repeat(64),
+            |b| b.output_contract_identity = "b".repeat(64),
+            |b| b.attempt_id = "fresh-attempt".to_owned(),
+        ];
+        for mutate in mutations {
+            let mut crossed = admitted.binding.clone();
+            mutate(&mut crossed);
+            assert_eq!(
+                admitted.validate_result_binding(&crossed, admitted.limits),
+                Err(PureProfileError::CrossedResultBinding)
+            );
+        }
+        let mutations: [fn(&mut PureLimits); 4] = [
+            |limits| limits.max_program_operations -= 1,
+            |limits| limits.max_input_bytes -= 1,
+            |limits| limits.max_output_bytes -= 1,
+            |limits| limits.deadline_millis -= 1,
+        ];
+        for mutate in mutations {
+            let mut crossed = admitted.limits;
+            mutate(&mut crossed);
+            assert_eq!(
+                admitted.validate_result_binding(&admitted.binding, crossed),
+                Err(PureProfileError::CrossedResultBinding)
+            );
+        }
+    }
+
+    #[test]
+    fn arithmetic_reference_covers_each_signed_overflow_boundary() {
+        for (operation, first, second, expected) in [
+            (PureOperation::Add, i64::MAX, 1, i64::MIN),
+            (PureOperation::Add, i64::MIN, -1, i64::MAX),
+            (PureOperation::Sub, i64::MIN, 1, i64::MAX),
+            (PureOperation::Sub, i64::MAX, -1, i64::MIN),
+            (PureOperation::Mul, i64::MIN, -1, i64::MIN),
+            (PureOperation::Mul, i64::MAX, 2, -2),
+            (PureOperation::Sub, 1, 9_007_199_254_740_993, -9_007_199_254_740_992),
+        ] {
+            let program = PureProgram::new(vec![PureOperation::Input(0), PureOperation::Input(1), operation])
+                .expect("reference program admits");
+            assert_eq!(program.evaluate(inputs(first, second)), Ok(expected));
+        }
     }
 }

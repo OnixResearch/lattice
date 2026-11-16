@@ -10,15 +10,15 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
 
-use lattice::agent_node::AgentAdapter;
-use lattice::agent_node::AgentError;
-use lattice::agent_node::AgentOutput;
-use lattice::agent_node::AgentOutputMode;
-use lattice::agent_node::AgentRequest;
-use lattice::agent_node::AgentRuntimeConfig;
-use lattice::agent_node::AgentTarget;
+use lattice::agent_node::Adapter;
+use lattice::agent_node::Error;
 use lattice::agent_node::ExecutionContext as AgentExecutionContext;
-use lattice::agent_node::ProductionAgentAdapter;
+use lattice::agent_node::Output;
+use lattice::agent_node::OutputMode;
+use lattice::agent_node::ProductionAdapter;
+use lattice::agent_node::Request;
+use lattice::agent_node::RuntimeOptions;
+use lattice::agent_node::Target;
 use lattice::config::load_app_config;
 use lattice::engine::value::ImageMetadata;
 use lattice::engine::value::ImageValue;
@@ -87,12 +87,12 @@ struct ObservedCall {
 
 #[derive(Clone)]
 struct StaticTransport {
-    result: Result<OpenAiHttpResponse, AgentError>,
+    result: Result<OpenAiHttpResponse, Error>,
     calls: Arc<Mutex<Vec<ObservedCall>>>,
 }
 
 impl StaticTransport {
-    fn new(result: Result<OpenAiHttpResponse, AgentError>) -> Self {
+    fn new(result: Result<OpenAiHttpResponse, Error>) -> Self {
         Self {
             result,
             calls: Arc::new(Mutex::new(Vec::new())),
@@ -105,7 +105,7 @@ impl StaticTransport {
 }
 
 impl OpenAiTransport for StaticTransport {
-    fn execute(&self, plan: &OpenAiChatPlan, bearer_token: Option<&str>) -> Result<OpenAiHttpResponse, AgentError> {
+    fn execute(&self, plan: &OpenAiChatPlan, bearer_token: Option<&str>) -> Result<OpenAiHttpResponse, Error> {
         self.calls.lock().expect("transport calls lock succeeds").push(ObservedCall {
             plan: plan.clone(),
             bearer_token: bearer_token.map(str::to_string),
@@ -129,9 +129,9 @@ fn runtime() -> OpenAiRuntimeConfig {
     }
 }
 
-fn request(output_mode: AgentOutputMode) -> AgentRequest {
-    AgentRequest {
-        target: AgentTarget::Pi,
+fn request(output_mode: OutputMode) -> Request {
+    Request {
+        target: Target::Pi,
         prompt: PROMPT.to_string(),
         output_mode,
         model_hint: None,
@@ -145,8 +145,8 @@ fn request(output_mode: AgentOutputMode) -> AgentRequest {
     }
 }
 
-fn runtime_registry(runtime: OpenAiRuntimeConfig) -> AgentRuntimeConfig {
-    AgentRuntimeConfig {
+fn runtime_registry(runtime: OpenAiRuntimeConfig) -> RuntimeOptions {
+    RuntimeOptions {
         runtimes: BTreeMap::new(),
         openai_compatible: BTreeMap::from([(PI_RUNTIME_KEY.to_string(), runtime)]),
         structured_input_projection: Default::default(),
@@ -179,8 +179,8 @@ fn response_with_finish_reason(content: Option<&str>, finish_reason: &str) -> Op
     }
 }
 
-fn adapter_with_transport(runtime: OpenAiRuntimeConfig, transport: StaticTransport) -> ProductionAgentAdapter {
-    ProductionAgentAdapter::new_with_openai_transport(runtime_registry(runtime), Arc::new(transport))
+fn adapter_with_transport(runtime: OpenAiRuntimeConfig, transport: StaticTransport) -> ProductionAdapter {
+    ProductionAdapter::new_with_openai_transport(runtime_registry(runtime), Arc::new(transport))
 }
 
 fn delayed_response_server() -> (String, thread::JoinHandle<()>) {

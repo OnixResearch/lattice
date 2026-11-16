@@ -8,18 +8,18 @@ fn production_adapter_decodes_text_and_json_outputs() {
     let text_transport = StaticTransport::new(Ok(response(Some(TEXT_CONTENT))));
     let text_adapter = adapter_with_transport(runtime(), text_transport.clone());
     let text = text_adapter
-        .execute(&request(AgentOutputMode::Text), &AgentExecutionContext::default())
+        .execute(&request(OutputMode::Text), &AgentExecutionContext::default())
         .expect("text response succeeds");
     let json_transport = StaticTransport::new(Ok(response(Some(JSON_CONTENT))));
     let json_adapter = adapter_with_transport(runtime(), json_transport.clone());
     let json = json_adapter
-        .execute(&request(AgentOutputMode::Json), &AgentExecutionContext::default())
+        .execute(&request(OutputMode::Json), &AgentExecutionContext::default())
         .expect("JSON response succeeds");
 
-    assert_eq!(text.output, AgentOutput::Text(TEXT_CONTENT.to_string()));
+    assert_eq!(text.output, Output::Text(TEXT_CONTENT.to_string()));
     assert_eq!(text.metadata["provider"], "openai_compatible");
     assert_eq!(text.metadata["reasoning_suppressed"], false);
-    assert_eq!(json.output, AgentOutput::Json(serde_json::json!({"ok": true})));
+    assert_eq!(json.output, Output::Json(serde_json::json!({"ok": true})));
     assert_eq!(text_transport.calls().len(), 1);
     assert_eq!(json_transport.calls().len(), 1);
 }
@@ -30,7 +30,7 @@ fn production_adapter_decodes_text_and_json_outputs() {
 #[test]
 fn decoder_suppresses_one_leading_reasoning_block_before_output_typing() {
     let text_plan =
-        plan_openai_chat(&runtime(), &request(AgentOutputMode::Text), MAX_RESPONSE_BYTES).expect("valid text plan");
+        plan_openai_chat(&runtime(), &request(OutputMode::Text), MAX_RESPONSE_BYTES).expect("valid text plan");
     let text = decode_openai_chat_response(
         &text_plan,
         &response(Some(INLINE_REASONING_TEXT_CONTENT)),
@@ -38,7 +38,7 @@ fn decoder_suppresses_one_leading_reasoning_block_before_output_typing() {
     )
     .expect("closed reasoning block must yield final text");
     let json_plan =
-        plan_openai_chat(&runtime(), &request(AgentOutputMode::Json), MAX_RESPONSE_BYTES).expect("valid JSON plan");
+        plan_openai_chat(&runtime(), &request(OutputMode::Json), MAX_RESPONSE_BYTES).expect("valid JSON plan");
     let json = decode_openai_chat_response(
         &json_plan,
         &response(Some(INLINE_REASONING_JSON_CONTENT)),
@@ -46,9 +46,9 @@ fn decoder_suppresses_one_leading_reasoning_block_before_output_typing() {
     )
     .expect("closed reasoning block must yield final JSON");
 
-    assert_eq!(text.output, AgentOutput::Text(TEXT_CONTENT.to_string()));
+    assert_eq!(text.output, Output::Text(TEXT_CONTENT.to_string()));
     assert_eq!(text.metadata["reasoning_suppressed"], true);
-    assert_eq!(json.output, AgentOutput::Json(serde_json::json!({"ok": true})));
+    assert_eq!(json.output, Output::Json(serde_json::json!({"ok": true})));
     assert_eq!(json.metadata["reasoning_suppressed"], true);
     assert!(!format!("{:?}", text.output).contains(INLINE_REASONING_PRIVATE));
 }
@@ -57,7 +57,7 @@ fn decoder_suppresses_one_leading_reasoning_block_before_output_typing() {
 // r[verify lattice.agent_runtime.inline_reasoning_boundary.scenario.malformed]
 #[test]
 fn decoder_rejects_ambiguous_reasoning_without_echoing_private_content() {
-    let plan = plan_openai_chat(&runtime(), &request(AgentOutputMode::Text), MAX_RESPONSE_BYTES).expect("valid plan");
+    let plan = plan_openai_chat(&runtime(), &request(OutputMode::Text), MAX_RESPONSE_BYTES).expect("valid plan");
 
     for malformed_content in MALFORMED_INLINE_REASONING_CONTENT {
         let error =
@@ -74,9 +74,9 @@ fn decoder_rejects_ambiguous_reasoning_without_echoing_private_content() {
 #[test]
 fn decoder_reports_token_exhaustion_without_admitting_partial_content() {
     let cases = [
-        (AgentOutputMode::Text, TOKEN_LIMIT_CONTENT),
-        (AgentOutputMode::Text, TEXT_CONTENT),
-        (AgentOutputMode::Json, JSON_CONTENT),
+        (OutputMode::Text, TOKEN_LIMIT_CONTENT),
+        (OutputMode::Text, TEXT_CONTENT),
+        (OutputMode::Json, JSON_CONTENT),
     ];
 
     for (output_mode, content) in cases {
@@ -112,7 +112,7 @@ async fn executor_passes_resolved_node_credential_to_native_adapter() {
         "native-openai-credential",
         lattice::engine::workflow::WorkflowTimestamp::epoch(),
     );
-    let node_id = workflow.add_agent_node("native-openai", AgentTarget::Pi, PROMPT, AgentOutputMode::Text);
+    let node_id = workflow.add_agent_node("native-openai", Target::Pi, PROMPT, OutputMode::Text);
     workflow.set_node_credentials(node_id, lattice::credentials::NodeCredentialRefs {
         env: HashMap::from([(
             API_KEY_BINDING.to_string(),
@@ -146,12 +146,10 @@ fn bearer_credential_is_required_and_redacted() {
     }));
     let adapter = adapter_with_transport(credential_runtime, transport.clone());
     let missing = adapter
-        .execute(&request(AgentOutputMode::Text), &AgentExecutionContext::default())
+        .execute(&request(OutputMode::Text), &AgentExecutionContext::default())
         .expect_err("missing credential rejected");
     let context = AgentExecutionContext::new(HashMap::from([(API_KEY_BINDING.to_string(), API_KEY_VALUE.to_string())]));
-    let redacted = adapter
-        .execute(&request(AgentOutputMode::Text), &context)
-        .expect_err("non-success response rejected");
+    let redacted = adapter.execute(&request(OutputMode::Text), &context).expect_err("non-success response rejected");
     let calls = transport.calls();
 
     assert!(missing.to_string().contains(API_KEY_BINDING));
@@ -164,7 +162,7 @@ fn bearer_credential_is_required_and_redacted() {
 // r[verify n8nclone.workflow_execution.agent_nodes.openai_compatible.scenario.failure]
 #[test]
 fn decoder_rejects_malformed_missing_empty_and_wrong_typed_content() {
-    let plan = plan_openai_chat(&runtime(), &request(AgentOutputMode::Text), MAX_RESPONSE_BYTES).expect("valid plan");
+    let plan = plan_openai_chat(&runtime(), &request(OutputMode::Text), MAX_RESPONSE_BYTES).expect("valid plan");
     let malformed = OpenAiHttpResponse {
         status: HTTP_STATUS_OK,
         body: b"not-json".to_vec(),
@@ -187,7 +185,7 @@ fn decoder_rejects_malformed_missing_empty_and_wrong_typed_content() {
     assert!(reasoning_error.to_string().contains("content is empty or missing"));
 
     let json_plan =
-        plan_openai_chat(&runtime(), &request(AgentOutputMode::Json), MAX_RESPONSE_BYTES).expect("valid JSON plan");
+        plan_openai_chat(&runtime(), &request(OutputMode::Json), MAX_RESPONSE_BYTES).expect("valid JSON plan");
     let invalid_json_content = response(Some("not requested JSON"));
     let json_error = decode_openai_chat_response(&json_plan, &invalid_json_content, &AgentExecutionContext::default())
         .expect_err("invalid requested JSON rejected");
@@ -197,10 +195,10 @@ fn decoder_rejects_malformed_missing_empty_and_wrong_typed_content() {
 // r[verify n8nclone.workflow_execution.agent_nodes.openai_compatible.scenario.failure]
 #[test]
 fn adapter_rejects_transport_failure_and_oversized_response() {
-    let timeout_transport = StaticTransport::new(Err(AgentError::Adapter("fixture timeout".to_string())));
+    let timeout_transport = StaticTransport::new(Err(Error::Adapter("fixture timeout".to_string())));
     let timeout_adapter = adapter_with_transport(runtime(), timeout_transport.clone());
     let timeout = timeout_adapter
-        .execute(&request(AgentOutputMode::Text), &AgentExecutionContext::default())
+        .execute(&request(OutputMode::Text), &AgentExecutionContext::default())
         .expect_err("transport failure returned");
     let mut small_runtime = runtime();
     small_runtime.max_response_bytes = SMALL_RESPONSE_MAX_BYTES;
@@ -210,7 +208,7 @@ fn adapter_rejects_transport_failure_and_oversized_response() {
     }));
     let oversized_adapter = adapter_with_transport(small_runtime, oversized_transport);
     let oversized = oversized_adapter
-        .execute(&request(AgentOutputMode::Text), &AgentExecutionContext::default())
+        .execute(&request(OutputMode::Text), &AgentExecutionContext::default())
         .expect_err("oversized response rejected");
 
     assert!(timeout.to_string().contains("fixture timeout"));
@@ -226,17 +224,15 @@ async fn production_transport_calls_local_compatible_endpoint() {
     let mut local_runtime = runtime();
     local_runtime.endpoint = endpoint;
     local_runtime.enable_thinking = None;
-    let adapter = ProductionAgentAdapter::new_with_openai_transport(
-        runtime_registry(local_runtime),
-        Arc::new(ReqwestOpenAiTransport),
-    );
+    let adapter =
+        ProductionAdapter::new_with_openai_transport(runtime_registry(local_runtime), Arc::new(ReqwestOpenAiTransport));
 
     let result = adapter
-        .execute(&request(AgentOutputMode::Text), &AgentExecutionContext::default())
+        .execute(&request(OutputMode::Text), &AgentExecutionContext::default())
         .expect("local compatible endpoint succeeds");
     server.join().expect("local compatible server joins");
 
-    assert_eq!(result.output, AgentOutput::Text(TEXT_CONTENT.to_string()));
+    assert_eq!(result.output, Output::Text(TEXT_CONTENT.to_string()));
 }
 
 // r[verify n8nclone.workflow_execution.agent_nodes.openai_compatible.scenario.failure]
@@ -247,8 +243,8 @@ fn production_transport_enforces_request_timeout() {
     local_runtime.endpoint = endpoint;
     local_runtime.timeout_secs = TIMEOUT_TEST_SECS;
     local_runtime.enable_thinking = None;
-    let plan = plan_openai_chat(&local_runtime, &request(AgentOutputMode::Text), MAX_RESPONSE_BYTES)
-        .expect("local timeout plan");
+    let plan =
+        plan_openai_chat(&local_runtime, &request(OutputMode::Text), MAX_RESPONSE_BYTES).expect("local timeout plan");
 
     let error = ReqwestOpenAiTransport.execute(&plan, None).expect_err("delayed endpoint times out");
     server.join().expect("timeout server joins");
@@ -263,7 +259,7 @@ fn production_transport_does_not_follow_redirects() {
     let mut local_runtime = runtime();
     local_runtime.endpoint = endpoint;
     local_runtime.enable_thinking = None;
-    let plan = plan_openai_chat(&local_runtime, &request(AgentOutputMode::Text), MAX_RESPONSE_BYTES)
+    let plan = plan_openai_chat(&local_runtime, &request(OutputMode::Text), MAX_RESPONSE_BYTES)
         .expect("local HTTP plan without credentials");
 
     let response = ReqwestOpenAiTransport.execute(&plan, None).expect("redirect response captured");

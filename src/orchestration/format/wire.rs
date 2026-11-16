@@ -13,7 +13,7 @@ pub(super) struct RevisionRecord {
 #[serde(deny_unknown_fields)]
 struct TriggerRecord {
     trigger_id: String,
-    kind: super::super::core::OrchestrationTriggerKind,
+    kind: super::super::core::TriggerKind,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -65,8 +65,8 @@ impl TryFrom<RevisionRecord> for super::super::core::WorkflowRevisionRef {
     }
 }
 
-impl From<&super::super::core::OrchestrationDefinition> for DefinitionRecord {
-    fn from(definition: &super::super::core::OrchestrationDefinition) -> Self {
+impl From<&super::super::core::Definition> for DefinitionRecord {
+    fn from(definition: &super::super::core::Definition) -> Self {
         Self {
             schema_version: definition.schema_version,
             id: definition.id.to_string(),
@@ -89,7 +89,7 @@ impl From<&super::super::core::OrchestrationDefinition> for DefinitionRecord {
     }
 }
 
-impl TryFrom<DefinitionRecord> for super::super::core::OrchestrationDefinition {
+impl TryFrom<DefinitionRecord> for super::super::core::Definition {
     type Error = super::OrchestrationFormatError;
 
     fn try_from(definition: DefinitionRecord) -> Result<Self, Self::Error> {
@@ -97,7 +97,7 @@ impl TryFrom<DefinitionRecord> for super::super::core::OrchestrationDefinition {
             .triggers
             .into_iter()
             .map(|binding| {
-                Ok(super::super::core::OrchestrationTriggerBinding {
+                Ok(super::super::core::TriggerBinding {
                     trigger_id: super::super::identity::TriggerId::try_from_text(binding.trigger_id)
                         .map_err(identity_admission_error)?,
                     kind: binding.kind,

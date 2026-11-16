@@ -340,7 +340,7 @@ async fn process_kill_after_atomic_suspension_commit_recovers_exact_state() {
             name: binding(RESUME_VALUE_NAME),
             value: Value::from_string(RESUME_TEXT.to_string()),
         }]),
-        lattice::agent_node::AgentRuntimeConfig::default(),
+        lattice::agent_node::RuntimeOptions::default(),
         &lattice::engine::effect::execution::UnavailableRunContextSource,
     )
     .await
@@ -381,7 +381,7 @@ async fn resume_rejects_plaintext_secret_and_executes_each_gate_once() {
         lattice::workflow::gate::shell::resume_with_authority_provider(
             &store,
             &secret_command,
-            lattice::agent_node::AgentRuntimeConfig::default(),
+            lattice::agent_node::RuntimeOptions::default(),
             &lattice::engine::effect::execution::UnavailableRunContextSource,
         )
         .await
@@ -396,7 +396,7 @@ async fn resume_rejects_plaintext_secret_and_executes_each_gate_once() {
     let first_resume = lattice::workflow::gate::shell::resume_with_authority_provider(
         &store,
         &valid_command,
-        lattice::agent_node::AgentRuntimeConfig::default(),
+        lattice::agent_node::RuntimeOptions::default(),
         &lattice::engine::effect::execution::UnavailableRunContextSource,
     )
     .await
@@ -425,7 +425,7 @@ async fn resume_rejects_plaintext_secret_and_executes_each_gate_once() {
     let second_resume = lattice::workflow::gate::shell::resume_with_authority_provider(
         &store,
         &resume_command(&approved_second, "resume-second", Vec::new()),
-        lattice::agent_node::AgentRuntimeConfig::default(),
+        lattice::agent_node::RuntimeOptions::default(),
         &lattice::engine::effect::execution::UnavailableRunContextSource,
     )
     .await
@@ -453,7 +453,7 @@ async fn tui_exposes_safe_inspection_and_separate_decide_and_resume_actions() {
         .expect("request exists");
     drop(store);
 
-    let mut app = lattice::tui::App::new(lattice::config::AppConfig {
+    let mut app = lattice::tui::State::new(lattice::config::AppConfig {
         data_dir,
         ..lattice::config::AppConfig::default()
     });
@@ -504,7 +504,7 @@ async fn tui_exposes_safe_inspection_and_separate_decide_and_resume_actions() {
     let repeated = lattice::workflow::gate::shell::resume_with_authority_provider(
         app.store.as_ref().expect("TUI store"),
         &resume,
-        lattice::agent_node::AgentRuntimeConfig::default(),
+        lattice::agent_node::RuntimeOptions::default(),
         &lattice::engine::effect::execution::UnavailableRunContextSource,
     )
     .await
@@ -518,7 +518,7 @@ async fn tui_exposes_safe_inspection_and_separate_decide_and_resume_actions() {
         lattice::workflow::gate::shell::resume_with_authority_provider(
             app.store.as_ref().expect("TUI store"),
             &conflicting,
-            lattice::agent_node::AgentRuntimeConfig::default(),
+            lattice::agent_node::RuntimeOptions::default(),
             &lattice::engine::effect::execution::UnavailableRunContextSource,
         )
         .await
@@ -680,7 +680,7 @@ async fn restart_after_resume_claim_fails_closed_without_replaying_work() {
     let retry = lattice::workflow::gate::shell::resume_with_authority_provider(
         &store,
         &command,
-        lattice::agent_node::AgentRuntimeConfig::default(),
+        lattice::agent_node::RuntimeOptions::default(),
         &lattice::engine::effect::execution::UnavailableRunContextSource,
     )
     .await;
@@ -976,7 +976,7 @@ async fn resume_persists_only_declared_opaque_credential_references() {
         lattice::workflow::gate::shell::resume_with_authority_provider(
             &store,
             &invalid,
-            lattice::agent_node::AgentRuntimeConfig::default(),
+            lattice::agent_node::RuntimeOptions::default(),
             &lattice::engine::effect::execution::UnavailableRunContextSource,
         )
         .await
@@ -991,7 +991,7 @@ async fn resume_persists_only_declared_opaque_credential_references() {
     lattice::workflow::gate::shell::resume_with_authority_provider(
         &store,
         &valid,
-        lattice::agent_node::AgentRuntimeConfig::default(),
+        lattice::agent_node::RuntimeOptions::default(),
         &lattice::engine::effect::execution::UnavailableRunContextSource,
     )
     .await
@@ -1053,7 +1053,7 @@ async fn rejection_is_terminal_and_self_approval_fails_closed() {
                 name: binding(RESUME_VALUE_NAME),
                 value: Value::from_string(RESUME_TEXT.to_string()),
             }],),
-            lattice::agent_node::AgentRuntimeConfig::default(),
+            lattice::agent_node::RuntimeOptions::default(),
             &lattice::engine::effect::execution::UnavailableRunContextSource,
         )
         .await
@@ -1091,7 +1091,7 @@ async fn expired_resume_becomes_terminal_without_running_the_gate() {
         lattice::workflow::gate::shell::resume_with_authority_provider(
             &store,
             &command,
-            lattice::agent_node::AgentRuntimeConfig::default(),
+            lattice::agent_node::RuntimeOptions::default(),
             &lattice::engine::effect::execution::UnavailableRunContextSource,
         )
         .await

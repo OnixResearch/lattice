@@ -6,15 +6,15 @@ use std::path::Path;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use lattice::agent_node::AgentAdapter;
-use lattice::agent_node::AgentError;
-use lattice::agent_node::AgentOutput;
-use lattice::agent_node::AgentOutputMode;
-use lattice::agent_node::AgentRequest;
-use lattice::agent_node::AgentRuntimeConfig;
-use lattice::agent_node::AgentTarget;
+use lattice::agent_node::Adapter;
+use lattice::agent_node::Error;
 use lattice::agent_node::ExecutionContext;
-use lattice::agent_node::ProductionAgentAdapter;
+use lattice::agent_node::Output;
+use lattice::agent_node::OutputMode;
+use lattice::agent_node::ProductionAdapter;
+use lattice::agent_node::Request;
+use lattice::agent_node::RuntimeOptions;
+use lattice::agent_node::Target;
 use lattice::animus_agent::BUILTIN_PROGRAM;
 use lattice::animus_agent::BUILTIN_PROGRAM_IDENTITY;
 use lattice::animus_agent::DecisionBudget;
@@ -73,12 +73,12 @@ struct ObservedCall {
 
 #[derive(Clone)]
 struct StaticTransport {
-    result: Result<HttpResponse, AgentError>,
+    result: Result<HttpResponse, Error>,
     calls: Arc<Mutex<Vec<ObservedCall>>>,
 }
 
 impl StaticTransport {
-    fn new(result: Result<HttpResponse, AgentError>) -> Self {
+    fn new(result: Result<HttpResponse, Error>) -> Self {
         Self {
             result,
             calls: Arc::new(Mutex::new(Vec::new())),
@@ -91,7 +91,7 @@ impl StaticTransport {
 }
 
 impl Transport for StaticTransport {
-    fn execute(&self, plan: &ChatPlan, bearer_token: Option<&str>) -> Result<HttpResponse, AgentError> {
+    fn execute(&self, plan: &ChatPlan, bearer_token: Option<&str>) -> Result<HttpResponse, Error> {
         self.calls.lock().expect("transport calls lock succeeds").push(ObservedCall {
             plan: plan.clone(),
             bearer_token: bearer_token.map(str::to_string),
@@ -115,9 +115,9 @@ fn runtime() -> OpenAiRuntimeConfig {
     }
 }
 
-fn request(output_mode: AgentOutputMode) -> AgentRequest {
-    AgentRequest {
-        target: AgentTarget::Animus,
+fn request(output_mode: OutputMode) -> Request {
+    Request {
+        target: Target::Animus,
         prompt: PROMPT.to_string(),
         output_mode,
         model_hint: None,
@@ -131,8 +131,8 @@ fn request(output_mode: AgentOutputMode) -> AgentRequest {
     }
 }
 
-fn runtime_registry(key: &str, runtime: OpenAiRuntimeConfig) -> AgentRuntimeConfig {
-    AgentRuntimeConfig {
+fn runtime_registry(key: &str, runtime: OpenAiRuntimeConfig) -> RuntimeOptions {
+    RuntimeOptions {
         runtimes: BTreeMap::new(),
         openai_compatible: BTreeMap::from([(key.to_string(), runtime)]),
         structured_input_projection: Default::default(),
@@ -159,18 +159,15 @@ fn response(content: &str) -> HttpResponse {
     }
 }
 
-fn adapter(runtime: OpenAiRuntimeConfig, transport: StaticTransport) -> ProductionAgentAdapter {
-    ProductionAgentAdapter::new_with_openai_transport(
-        runtime_registry(ANIMUS_RUNTIME_KEY, runtime),
-        Arc::new(transport),
-    )
+fn adapter(runtime: OpenAiRuntimeConfig, transport: StaticTransport) -> ProductionAdapter {
+    ProductionAdapter::new_with_openai_transport(runtime_registry(ANIMUS_RUNTIME_KEY, runtime), Arc::new(transport))
 }
 
 // r[verify lattice.agent_runtime.animus_fabric]
 // r[verify lattice.agent_runtime.animus_output]
 #[test]
 fn pure_plan_binds_the_program_identity_and_typed_output() {
-    let plan = plan_execution(&request(AgentOutputMode::Text)).expect("valid Animus plan");
+    let plan = plan_execution(&request(OutputMode::Text)).expect("valid Animus plan");
 
     assert_eq!(program_identity(BUILTIN_PROGRAM), BUILTIN_PROGRAM_IDENTITY);
     assert_eq!(plan.program_identity, BUILTIN_PROGRAM_IDENTITY);
@@ -178,8 +175,8 @@ fn pure_plan_binds_the_program_identity_and_typed_output() {
     assert!(plan.summary.contains(PROMPT));
     assert!(plan.summary.contains(TEXT_INPUT));
     assert_eq!(
-        decode_final_response(AgentOutputMode::Json, JSON_RESPONSE).expect("JSON response admitted"),
-        AgentOutput::Json(serde_json::json!({"ok": true}))
+        decode_final_response(OutputMode::Json, JSON_RESPONSE).expect("JSON response admitted"),
+        Output::Json(serde_json::json!({"ok": true}))
     );
 }
 
@@ -195,7 +192,7 @@ fn pure_admission_rejects_identity_turn_input_and_output_failures() {
     })
     .expect_err("program drift rejected");
     let admission_error = validate_execution_admission(
-        &request(AgentOutputMode::Text),
+        &request(OutputMode::Text),
         ProgramIdentityCheck {
             program: changed_program,
             expected_identity: BUILTIN_PROGRAM_IDENTITY,
@@ -208,18 +205,18 @@ fn pure_admission_rejects_identity_turn_input_and_output_failures() {
         turn_limit: TURN_LIMIT,
     })
     .expect_err("exhausted turn rejected");
-    let mut image_request = request(AgentOutputMode::Text);
+    let mut image_request = request(OutputMode::Text);
     image_request.image_inputs.push(lattice::engine::value::ImageValue::new(
         vec![0_u8],
         "image/png".to_string(),
         lattice::engine::value::ImageMetadata::default(),
     ));
     let image_error = plan_execution(&image_request).expect_err("image input rejected");
-    let artifact_error = plan_execution(&request(AgentOutputMode::Artifact)).expect_err("artifact output rejected");
-    let mut session_request = request(AgentOutputMode::Text);
+    let artifact_error = plan_execution(&request(OutputMode::Artifact)).expect_err("artifact output rejected");
+    let mut session_request = request(OutputMode::Text);
     session_request.session = Some("mutable-session".to_string());
     let session_error = plan_execution(&session_request).expect_err("session rejected");
-    let json_error = decode_final_response(AgentOutputMode::Json, "not-json").expect_err("bad JSON rejected");
+    let json_error = decode_final_response(OutputMode::Json, "not-json").expect_err("bad JSON rejected");
 
     assert!(identity_error.to_string().contains("identity mismatch"));
     assert!(admission_error.to_string().contains("identity mismatch"));
@@ -240,16 +237,16 @@ fn production_animus_route_runs_one_model_call_for_text_and_json() {
     let text_transport = StaticTransport::new(Ok(response(TEXT_RESPONSE)));
     let text_adapter = adapter(runtime(), text_transport.clone());
     let text_result = text_adapter
-        .execute(&request(AgentOutputMode::Text), &ExecutionContext::default())
+        .execute(&request(OutputMode::Text), &ExecutionContext::default())
         .expect("text loop succeeds");
     let json_transport = StaticTransport::new(Ok(response(JSON_RESPONSE)));
     let json_adapter = adapter(runtime(), json_transport.clone());
     let json_result = json_adapter
-        .execute(&request(AgentOutputMode::Json), &ExecutionContext::default())
+        .execute(&request(OutputMode::Json), &ExecutionContext::default())
         .expect("JSON loop succeeds");
 
-    assert_eq!(text_result.output, AgentOutput::Text(TEXT_RESPONSE.to_string()));
-    assert_eq!(json_result.output, AgentOutput::Json(serde_json::json!({"ok": true})));
+    assert_eq!(text_result.output, Output::Text(TEXT_RESPONSE.to_string()));
+    assert_eq!(json_result.output, Output::Json(serde_json::json!({"ok": true})));
     assert_eq!(text_transport.calls().len(), EXPECTED_TRANSPORT_CALL_COUNT);
     assert_eq!(json_transport.calls().len(), EXPECTED_TRANSPORT_CALL_COUNT);
     assert_eq!(text_result.metadata["adapter"], ANIMUS_RUNTIME_KEY);
@@ -271,7 +268,7 @@ fn credential_is_used_only_at_lattice_transport_and_is_absent_from_evidence() {
     let adapter = adapter(credential_runtime, transport.clone());
     let context = ExecutionContext::new(HashMap::from([(API_KEY_BINDING.to_string(), API_KEY_VALUE.to_string())]));
 
-    let result = adapter.execute(&request(AgentOutputMode::Text), &context).expect("credential-bound loop succeeds");
+    let result = adapter.execute(&request(OutputMode::Text), &context).expect("credential-bound loop succeeds");
     let calls = transport.calls();
 
     assert_eq!(calls.len(), EXPECTED_TRANSPORT_CALL_COUNT);
@@ -288,8 +285,8 @@ fn credential_is_used_only_at_lattice_transport_and_is_absent_from_evidence() {
 #[test]
 fn missing_or_failed_animus_provider_does_not_fallback() {
     let missing_transport = StaticTransport::new(Ok(response(TEXT_RESPONSE)));
-    let missing_adapter = ProductionAgentAdapter::new_with_openai_transport(
-        AgentRuntimeConfig {
+    let missing_adapter = ProductionAdapter::new_with_openai_transport(
+        RuntimeOptions {
             runtimes: BTreeMap::new(),
             openai_compatible: BTreeMap::new(),
             structured_input_projection: Default::default(),
@@ -298,18 +295,18 @@ fn missing_or_failed_animus_provider_does_not_fallback() {
         },
         Arc::new(missing_transport.clone()),
     );
-    let missing_request = request(AgentOutputMode::Text);
+    let missing_request = request(OutputMode::Text);
     let original_request = missing_request.clone();
     let missing_error = missing_adapter
         .execute(&missing_request, &ExecutionContext::default())
         .expect_err("missing route rejected");
     let failed_transport =
-        StaticTransport::new(Err(AgentError::Adapter(format!("fixture provider failed with {API_KEY_VALUE}"))));
+        StaticTransport::new(Err(Error::Adapter(format!("fixture provider failed with {API_KEY_VALUE}"))));
     let failed_adapter = adapter(runtime(), failed_transport.clone());
     let failed_context =
         ExecutionContext::new(HashMap::from([(API_KEY_BINDING.to_string(), API_KEY_VALUE.to_string())]));
     let failed_error = failed_adapter
-        .execute(&request(AgentOutputMode::Text), &failed_context)
+        .execute(&request(OutputMode::Text), &failed_context)
         .expect_err("provider failure returned");
     let failed_diagnostic = failed_error.to_string();
 
@@ -328,10 +325,10 @@ fn authority_bearing_response_remains_ordinary_agent_output() {
     let adapter = adapter(runtime(), transport.clone());
 
     let result = adapter
-        .execute(&request(AgentOutputMode::Text), &ExecutionContext::default())
+        .execute(&request(OutputMode::Text), &ExecutionContext::default())
         .expect("authority-shaped content remains ordinary output");
 
-    assert_eq!(result.output, AgentOutput::Text(AUTHORITY_RESPONSE.to_string()));
+    assert_eq!(result.output, Output::Text(AUTHORITY_RESPONSE.to_string()));
     assert_eq!(transport.calls().len(), EXPECTED_TRANSPORT_CALL_COUNT);
     for forbidden_key in [
         "graph",
@@ -352,7 +349,7 @@ fn unsupported_animus_inputs_fail_before_provider_dispatch() {
     let transport = StaticTransport::new(Ok(response(TEXT_RESPONSE)));
     let adapter = adapter(runtime(), transport.clone());
     let artifact_error = adapter
-        .execute(&request(AgentOutputMode::Artifact), &ExecutionContext::default())
+        .execute(&request(OutputMode::Artifact), &ExecutionContext::default())
         .expect_err("artifact output rejected before dispatch");
 
     assert!(artifact_error.to_string().contains("only text and JSON"));
@@ -372,13 +369,13 @@ async fn typed_examples_load_validate_and_execute_through_the_runner() {
         panic!("expected Animus agent config");
     };
     let transport = StaticTransport::new(Ok(response(TEXT_RESPONSE)));
-    let adapter = ProductionAgentAdapter::new_with_openai_transport(config.agent_runtime, Arc::new(transport.clone()));
+    let adapter = ProductionAdapter::new_with_openai_transport(config.agent_runtime, Arc::new(transport.clone()));
     let executor = Executor::new_with_agent_adapter(Box::new(adapter));
 
     let result = executor.execute_node(&workflow, node.id, &HashMap::new()).await;
 
     assert_eq!(diagnostics.len(), NO_DIAGNOSTICS);
-    assert_eq!(settings.target, AgentTarget::Animus);
+    assert_eq!(settings.target, Target::Animus);
     assert!(matches!(result.status, NodeStatus::Completed { .. }), "unexpected status: {:?}", result.status);
     assert_eq!(transport.calls().len(), EXPECTED_TRANSPORT_CALL_COUNT);
 }
@@ -388,16 +385,16 @@ async fn typed_examples_load_validate_and_execute_through_the_runner() {
 #[test]
 fn existing_direct_openai_route_does_not_invoke_animus() {
     let transport = StaticTransport::new(Ok(response(TEXT_RESPONSE)));
-    let adapter = ProductionAgentAdapter::new_with_openai_transport(
+    let adapter = ProductionAdapter::new_with_openai_transport(
         runtime_registry(PI_RUNTIME_KEY, runtime()),
         Arc::new(transport.clone()),
     );
-    let mut pi_request = request(AgentOutputMode::Text);
-    pi_request.target = AgentTarget::Pi;
+    let mut pi_request = request(OutputMode::Text);
+    pi_request.target = Target::Pi;
 
     let result = adapter.execute(&pi_request, &ExecutionContext::default()).expect("existing direct route succeeds");
 
-    assert_eq!(result.output, AgentOutput::Text(TEXT_RESPONSE.to_string()));
+    assert_eq!(result.output, Output::Text(TEXT_RESPONSE.to_string()));
     assert_eq!(result.metadata["adapter"], PI_RUNTIME_KEY);
     assert!(result.metadata.get("program_identity").is_none());
     assert_eq!(transport.calls().len(), EXPECTED_TRANSPORT_CALL_COUNT);

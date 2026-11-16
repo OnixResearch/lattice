@@ -5,6 +5,7 @@ use lattice::engine::RunId;
 use lattice::engine::Workflow;
 use lattice::orchestration::ABANDONED_ACKNOWLEDGED_SUMMARY;
 use lattice::orchestration::ABANDONED_PENDING_SUMMARY;
+use lattice::orchestration::Action;
 use lattice::orchestration::ApprovalDecision;
 use lattice::orchestration::AuthorityPolicy;
 use lattice::orchestration::BudgetCharge;
@@ -15,29 +16,28 @@ use lattice::orchestration::BudgetLimits;
 use lattice::orchestration::BudgetPolicy;
 use lattice::orchestration::BudgetUsageBasis;
 use lattice::orchestration::CompletionPolicy;
+use lattice::orchestration::Definition;
 use lattice::orchestration::DefinitionId;
+use lattice::orchestration::DiagnosticCode;
 use lattice::orchestration::DispatchId;
 use lattice::orchestration::DispatchIntent;
 use lattice::orchestration::DispatchStatus;
+use lattice::orchestration::EventKind;
+use lattice::orchestration::Fact;
 use lattice::orchestration::FactId;
 use lattice::orchestration::LedgerHeadId;
-use lattice::orchestration::OrchestrationAction;
-use lattice::orchestration::OrchestrationDefinition;
-use lattice::orchestration::OrchestrationDiagnosticCode;
-use lattice::orchestration::OrchestrationEventKind;
-use lattice::orchestration::OrchestrationFact;
-use lattice::orchestration::OrchestrationStatus;
-use lattice::orchestration::OrchestrationTriggerAdmission;
-use lattice::orchestration::OrchestrationTriggerBinding;
-use lattice::orchestration::OrchestrationTriggerContext;
-use lattice::orchestration::OrchestrationTriggerKind;
 use lattice::orchestration::RedactionPolicy;
 use lattice::orchestration::ReservationId;
 use lattice::orchestration::RetryPolicy;
 use lattice::orchestration::RevisionProposal;
 use lattice::orchestration::StateDigest;
+use lattice::orchestration::Status;
+use lattice::orchestration::TriggerAdmission;
+use lattice::orchestration::TriggerBinding;
+use lattice::orchestration::TriggerContext;
 use lattice::orchestration::TriggerId;
 use lattice::orchestration::TriggerIdempotencyKey;
+use lattice::orchestration::TriggerKind;
 use lattice::orchestration::TriggerStartRequest;
 use lattice::orchestration::admit_trigger_start;
 use lattice::orchestration::authority_policy_hash;
@@ -117,10 +117,10 @@ fn workflow(name: &str) -> Workflow {
     Workflow::new(name, lattice::engine::workflow::WorkflowTimestamp::epoch())
 }
 
-fn definition(completion: CompletionPolicy) -> OrchestrationDefinition {
+fn definition(completion: CompletionPolicy) -> Definition {
     let workflow = workflow(WORKFLOW_NAME);
     let revision = workflow_revision(&workflow).expect("fixture workflow must serialize");
-    OrchestrationDefinition {
+    Definition {
         schema_version: current_schema_version(),
         id: definition_id(),
         objective: OBJECTIVE.to_string(),
@@ -149,9 +149,9 @@ fn definition(completion: CompletionPolicy) -> OrchestrationDefinition {
         authority: AuthorityPolicy {
             approvers: BTreeSet::from([ACTOR.to_string()]),
         },
-        triggers: vec![OrchestrationTriggerBinding {
+        triggers: vec![TriggerBinding {
             trigger_id: trigger_id(),
-            kind: OrchestrationTriggerKind::Webhook,
+            kind: TriggerKind::Webhook,
         }],
         redaction: RedactionPolicy {
             retain_safe_summaries: true,
@@ -179,11 +179,11 @@ fn charge_plan() -> BudgetChargePlan {
     }
 }
 
-fn base_instance(completion: CompletionPolicy) -> lattice::orchestration::OrchestrationInstance {
+fn base_instance(completion: CompletionPolicy) -> lattice::orchestration::Instance {
     new_instance(definition(completion), FIRST_INSTANCE_SEQUENCE, None).expect("fixture instance must hash")
 }
 
-fn retry_capable_instance() -> lattice::orchestration::OrchestrationInstance {
+fn retry_capable_instance() -> lattice::orchestration::Instance {
     let mut definition = definition(CompletionPolicy::RunSucceeded);
     definition.budgets.limits = BudgetLimits {
         rounds: TOTAL_ATTEMPTS,
@@ -195,9 +195,9 @@ fn retry_capable_instance() -> lattice::orchestration::OrchestrationInstance {
     new_instance(definition, FIRST_INSTANCE_SEQUENCE, None).expect("retry fixture instance must hash")
 }
 
-fn retry_action(instance: &lattice::orchestration::OrchestrationInstance, actor: &str) -> OrchestrationAction {
+fn retry_action(instance: &lattice::orchestration::Instance, actor: &str) -> Action {
     let run_id = RunId(RETRY_RUN_ID);
-    OrchestrationAction::RetryRound {
+    Action::RetryRound {
         actor: actor.to_string(),
         intent: DispatchIntent {
             id: dispatch_identity(instance, run_id).expect("retry dispatch must hash"),
@@ -209,14 +209,12 @@ fn retry_action(instance: &lattice::orchestration::OrchestrationInstance, actor:
     }
 }
 
-fn fact(instance: &lattice::orchestration::OrchestrationInstance, action: OrchestrationAction) -> OrchestrationFact {
+fn fact(instance: &lattice::orchestration::Instance, action: Action) -> Fact {
     let id = fact_identity(&instance.id, instance.version, &action).expect("fixture fact must hash");
-    OrchestrationFact { id, action }
+    Fact { id, action }
 }
 
-fn start_transition(
-    instance: &lattice::orchestration::OrchestrationInstance,
-) -> lattice::orchestration::OrchestrationTransition {
+fn start_transition(instance: &lattice::orchestration::Instance) -> lattice::orchestration::Transition {
     let run_id = RunId(FIRST_RUN_ID);
     let intent = DispatchIntent {
         id: dispatch_identity(instance, run_id).expect("dispatch must hash"),
@@ -224,7 +222,7 @@ fn start_transition(
         workflow_revision: instance.workflow_revision.clone(),
         status: DispatchStatus::Pending,
     };
-    let action = OrchestrationAction::StartRound {
+    let action = Action::StartRound {
         intent,
         planned_charge: charge_plan(),
     };
@@ -232,11 +230,11 @@ fn start_transition(
 }
 
 fn finish_transition(
-    instance: &lattice::orchestration::OrchestrationInstance,
+    instance: &lattice::orchestration::Instance,
     succeeded: bool,
-) -> lattice::orchestration::OrchestrationTransition {
+) -> lattice::orchestration::Transition {
     let dispatch = instance.pending_dispatch.as_ref().expect("started instance has dispatch");
-    let action = OrchestrationAction::RunFinished {
+    let action = Action::RunFinished {
         dispatch_id: dispatch.id.clone(),
         run_id: dispatch.run_id,
         succeeded,
@@ -270,11 +268,7 @@ fn workflow_revision_drift_is_rejected() {
 
     let diagnostics = validate_definition(&definition, Some(&drifted));
 
-    assert!(
-        diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic.code == OrchestrationDiagnosticCode::WorkflowRevisionMismatch)
-    );
+    assert!(diagnostics.iter().any(|diagnostic| diagnostic.code == DiagnosticCode::WorkflowRevisionMismatch));
 }
 
 // r[verify lattice.agent_orchestration.core]
@@ -286,15 +280,15 @@ fn successful_terminal_round_completes_and_cannot_reopen() {
     let started = start_transition(&base).instance;
     let completed = finish_transition(&started, true).instance;
 
-    assert_eq!(completed.status, OrchestrationStatus::Completed);
+    assert_eq!(completed.status, Status::Completed);
     assert_eq!(completed.round, FIRST_INSTANCE_SEQUENCE);
     assert_eq!(completed.budgets.consumed, charge());
 
-    let pause = fact(&completed, OrchestrationAction::PauseRequested {
+    let pause = fact(&completed, Action::PauseRequested {
         actor: ACTOR.to_string(),
     });
     let error = transition(&completed, pause).expect_err("terminal state must reject mutation");
-    assert_eq!(error.code, OrchestrationDiagnosticCode::TerminalStateMutation);
+    assert_eq!(error.code, DiagnosticCode::TerminalStateMutation);
 }
 
 #[test]
@@ -308,7 +302,7 @@ fn measured_usage_is_distinct_from_the_reserved_plan() {
         ..reserved
     };
     assert_ne!(reserved, measured);
-    let action = OrchestrationAction::RunFinishedMeasured {
+    let action = Action::RunFinishedMeasured {
         dispatch_id: dispatch.id.clone(),
         run_id: dispatch.run_id,
         succeeded: true,
@@ -334,7 +328,7 @@ fn measured_token_usage_basis_remains_distinct_from_full_measurement() {
         tokens: reserved.tokens.saturating_sub(1),
         ..reserved
     };
-    let action = OrchestrationAction::RunFinishedMeasured {
+    let action = Action::RunFinishedMeasured {
         dispatch_id: dispatch.id.clone(),
         run_id: dispatch.run_id,
         succeeded: true,
@@ -359,7 +353,7 @@ fn measured_duration_basis_remains_distinct() {
         duration_millis: reserved.duration_millis.saturating_add(1),
         ..reserved
     };
-    let action = OrchestrationAction::RunFinishedMeasured {
+    let action = Action::RunFinishedMeasured {
         dispatch_id: dispatch.id.clone(),
         run_id: dispatch.run_id,
         succeeded: true,
@@ -385,7 +379,7 @@ fn measured_token_and_duration_basis_remains_distinct() {
         duration_millis: reserved.duration_millis.saturating_add(1),
         ..reserved
     };
-    let action = OrchestrationAction::RunFinishedMeasured {
+    let action = Action::RunFinishedMeasured {
         dispatch_id: dispatch.id.clone(),
         run_id: dispatch.run_id,
         succeeded: true,
@@ -417,7 +411,7 @@ fn observed_failure_retry_starts_fresh_budgeted_round_and_replays() {
     let retry = transition(&failed.instance, fact(&failed.instance, retry_action(&failed.instance, ACTOR)))
         .expect("retry round must start");
     let retry_dispatch = retry.instance.pending_dispatch.as_ref().expect("retry dispatch must persist");
-    assert_eq!(retry.instance.status, OrchestrationStatus::Running);
+    assert_eq!(retry.instance.status, Status::Running);
     assert_eq!(retry.instance.round, TOTAL_ATTEMPTS);
     assert_eq!(retry.instance.retry.admitted, RETRY_LIMIT);
     assert_eq!(retry_dispatch.run_id, RunId(RETRY_RUN_ID));
@@ -433,7 +427,7 @@ fn observed_failure_retry_starts_fresh_budgeted_round_and_replays() {
         monetary_microunits: MONEY_CHARGE.saturating_mul(TOTAL_ATTEMPTS),
         duration_millis: DURATION_CHARGE.saturating_mul(TOTAL_ATTEMPTS),
     };
-    assert_eq!(completed.instance.status, OrchestrationStatus::Completed);
+    assert_eq!(completed.instance.status, Status::Completed);
     assert_eq!(completed.instance.budgets.consumed, expected_consumed);
     assert!(completed.instance.budgets.reservations.is_empty());
 
@@ -455,23 +449,23 @@ fn retry_preflight_rejects_pending_unauthorized_disabled_missing_and_unfunded_st
     let base = retry_capable_instance();
     let started = start_transition(&base).instance;
     let pending = preflight_retry(&started, ACTOR, charge_plan()).expect_err("pending dispatch cannot retry");
-    assert_eq!(pending.code, OrchestrationDiagnosticCode::InvalidLifecycleTransition);
+    assert_eq!(pending.code, DiagnosticCode::InvalidLifecycleTransition);
 
     let failed = finish_transition(&started, false).instance;
     let unauthorized = preflight_retry(&failed, OTHER_ACTOR, charge_plan()).expect_err("actor must be authorized");
-    assert_eq!(unauthorized.code, OrchestrationDiagnosticCode::UnauthorizedActor);
+    assert_eq!(unauthorized.code, DiagnosticCode::UnauthorizedActor);
 
     let mut disabled_definition = definition(CompletionPolicy::RunSucceeded);
     disabled_definition.retry = None;
     let disabled_base = new_instance(disabled_definition, FIRST_INSTANCE_SEQUENCE, None).expect("disabled instance");
     let disabled_failed = finish_transition(&start_transition(&disabled_base).instance, false).instance;
     let disabled = preflight_retry(&disabled_failed, ACTOR, charge_plan()).expect_err("disabled retry must fail");
-    assert_eq!(disabled.code, OrchestrationDiagnosticCode::RetryDisabled);
+    assert_eq!(disabled.code, DiagnosticCode::RetryDisabled);
 
     let unobserved_started = start_transition(&retry_capable_instance()).instance;
     let unobserved_dispatch =
         unobserved_started.pending_dispatch.as_ref().expect("unobserved dispatch must be pending");
-    let shell_failure_action = OrchestrationAction::RunFinished {
+    let shell_failure_action = Action::RunFinished {
         dispatch_id: unobserved_dispatch.id.clone(),
         run_id: unobserved_dispatch.run_id,
         succeeded: false,
@@ -484,14 +478,48 @@ fn retry_preflight_rejects_pending_unauthorized_disabled_missing_and_unfunded_st
         .instance;
     let no_evidence =
         preflight_retry(&shell_failed, ACTOR, charge_plan()).expect_err("shell failure evidence is insufficient");
-    assert_eq!(shell_failed.status, OrchestrationStatus::Failed);
+    assert_eq!(shell_failed.status, Status::Failed);
     assert!(shell_failed.retry.retryable_failure.is_none());
-    assert_eq!(no_evidence.code, OrchestrationDiagnosticCode::RetryEvidenceMissing);
+    assert_eq!(no_evidence.code, DiagnosticCode::RetryEvidenceMissing);
 
     let unfunded_base = base_instance(CompletionPolicy::RunSucceeded);
     let unfunded_failed = finish_transition(&start_transition(&unfunded_base).instance, false).instance;
     let unfunded = preflight_retry(&unfunded_failed, ACTOR, charge_plan()).expect_err("fresh budget is required");
-    assert_eq!(unfunded.code, OrchestrationDiagnosticCode::BudgetExceeded);
+    assert_eq!(unfunded.code, DiagnosticCode::BudgetExceeded);
+}
+
+#[test]
+fn failed_round_exhaustion_requires_real_retry_or_budget_exhaustion() {
+    let funded = retry_capable_instance();
+    let failed = finish_transition(&start_transition(&funded).instance, false).instance;
+    let exhaust = || Action::BudgetExhausted {
+        safe_reason: "bounded retry exhausted".to_string(),
+    };
+    assert!(
+        transition(&failed, fact(&failed, exhaust())).is_err(),
+        "remaining capacity cannot be claimed exhausted"
+    );
+    let retried = transition(&failed, fact(&failed, retry_action(&failed, ACTOR))).expect("funded retry").instance;
+    let limit_failed = finish_transition(&retried, false).instance;
+    let consumed = limit_failed.budgets.consumed;
+    let exhausted = transition(&limit_failed, fact(&limit_failed, exhaust())).expect("retry cap is proven").instance;
+    assert_eq!(exhausted.status, Status::Exhausted);
+    assert_eq!(exhausted.budgets.consumed, consumed);
+    let unfunded =
+        finish_transition(&start_transition(&base_instance(CompletionPolicy::RunSucceeded)).instance, false).instance;
+    assert_eq!(
+        transition(&unfunded, fact(&unfunded, exhaust()))
+            .expect("budget exhaustion is proven")
+            .instance
+            .status,
+        Status::Exhausted
+    );
+    let mut unknown = limit_failed;
+    unknown.retry.retryable_failure = None;
+    assert!(
+        transition(&unknown, fact(&unknown, exhaust())).is_err(),
+        "lost observation cannot authorize exhaustion"
+    );
 }
 
 // r[verify lattice.agent_orchestration.retry_round.scenario.refusal]
@@ -508,7 +536,7 @@ fn retry_limit_rejects_a_second_failed_retry() {
 
     assert_eq!(failed_again.retry.admitted, RETRY_LIMIT);
     assert!(failed_again.retry.retryable_failure.is_some());
-    assert_eq!(exhausted.code, OrchestrationDiagnosticCode::RetryLimitExceeded);
+    assert_eq!(exhausted.code, DiagnosticCode::RetryLimitExceeded);
 }
 
 // r[verify lattice.agent_orchestration.observed_failure_retry.scenario.policy]
@@ -520,13 +548,13 @@ fn retry_policy_rejects_zero_and_disabled_defaults_remain_canonical() {
         max_observed_failure_retries: 0,
     });
     let diagnostics = validate_definition(&invalid, Some(&invalid.workflow));
-    assert!(diagnostics.iter().any(|diagnostic| diagnostic.code == OrchestrationDiagnosticCode::RetryDisabled));
+    assert!(diagnostics.iter().any(|diagnostic| diagnostic.code == DiagnosticCode::RetryDisabled));
 
     let mut disabled = definition(CompletionPolicy::RunSucceeded);
     disabled.retry = None;
     let serialized = serde_json::to_string(&disabled).expect("disabled definition must serialize");
     assert!(!serialized.contains("retry"));
-    let decoded: OrchestrationDefinition = serde_json::from_str(&serialized).expect("disabled definition must decode");
+    let decoded: Definition = serde_json::from_str(&serialized).expect("disabled definition must decode");
     assert_eq!(decoded, disabled);
 
     let base = new_instance(disabled, FIRST_INSTANCE_SEQUENCE, None).expect("disabled instance must hash");
@@ -553,13 +581,13 @@ fn proposal_requires_current_authority_and_successor_validation() {
     let base = base_instance(CompletionPolicy::AwaitProposal);
     let started = start_transition(&base).instance;
     let waiting = finish_transition(&started, true).instance;
-    assert_eq!(waiting.status, OrchestrationStatus::WaitingForApproval);
+    assert_eq!(waiting.status, Status::WaitingForApproval);
 
     let successor = workflow_revision(&workflow(SUCCESSOR_WORKFLOW_NAME)).expect("successor must hash");
     let proposal = make_proposal(&waiting, successor, "revise the report workflow").expect("proposal must hash");
     let submit = transition(
         &waiting,
-        fact(&waiting, OrchestrationAction::SubmitProposal {
+        fact(&waiting, Action::SubmitProposal {
             proposal: proposal.clone(),
         }),
     )
@@ -569,35 +597,35 @@ fn proposal_requires_current_authority_and_successor_validation() {
     let unauthorized = make_approval(&submit, &proposal, OTHER_ACTOR, true).expect("approval identity must hash");
     let unauthorized_error = transition(
         &submit,
-        fact(&submit, OrchestrationAction::DecideProposal {
+        fact(&submit, Action::DecideProposal {
             approval: unauthorized,
             successor_validated: true,
         }),
     )
     .expect_err("unauthorized actor must fail");
-    assert_eq!(unauthorized_error.code, OrchestrationDiagnosticCode::UnauthorizedActor);
+    assert_eq!(unauthorized_error.code, DiagnosticCode::UnauthorizedActor);
 
     let approval = make_approval(&submit, &proposal, ACTOR, true).expect("approval must hash");
     let invalid_successor_error = transition(
         &submit,
-        fact(&submit, OrchestrationAction::DecideProposal {
+        fact(&submit, Action::DecideProposal {
             approval: approval.clone(),
             successor_validated: false,
         }),
     )
     .expect_err("approval must not bypass validation");
-    assert_eq!(invalid_successor_error.code, OrchestrationDiagnosticCode::SuccessorValidationFailed);
+    assert_eq!(invalid_successor_error.code, DiagnosticCode::SuccessorValidationFailed);
 
     let approved = transition(
         &submit,
-        fact(&submit, OrchestrationAction::DecideProposal {
+        fact(&submit, Action::DecideProposal {
             approval,
             successor_validated: true,
         }),
     )
     .expect("validated approval must advance")
     .instance;
-    assert_eq!(approved.status, OrchestrationStatus::Ready);
+    assert_eq!(approved.status, Status::Ready);
     assert_eq!(approved.workflow_revision, proposal.successor);
 }
 
@@ -609,7 +637,7 @@ fn proposal_requires_current_authority_and_successor_validation() {
 #[test]
 fn stale_approval_is_rejected() {
     let mut instance = base_instance(CompletionPolicy::AwaitProposal);
-    instance.status = OrchestrationStatus::WaitingForApproval;
+    instance.status = Status::WaitingForApproval;
     let successor = workflow_revision(&workflow(SUCCESSOR_WORKFLOW_NAME)).expect("successor must hash");
     let proposal = make_proposal(&instance, successor, "safe proposal").expect("proposal must hash");
     instance.pending_proposal = Some(proposal.clone());
@@ -619,14 +647,14 @@ fn stale_approval_is_rejected() {
 
     let error = transition(
         &instance,
-        fact(&instance, OrchestrationAction::DecideProposal {
+        fact(&instance, Action::DecideProposal {
             approval: stale,
             successor_validated: true,
         }),
     )
     .expect_err("stale approval must fail");
 
-    assert_eq!(error.code, OrchestrationDiagnosticCode::StaleApproval);
+    assert_eq!(error.code, DiagnosticCode::StaleApproval);
 }
 
 // r[verify lattice.agent_orchestration.budgets]
@@ -643,7 +671,7 @@ fn budget_reservation_rejects_missing_bounds_and_oversubscription() {
     missing.tokens = None;
     let missing_error =
         reserve_budget(&mut missing_bound_ledger, reservation_id("missing"), missing).expect_err("bound is required");
-    assert_eq!(missing_error.code, OrchestrationDiagnosticCode::MissingBudgetBound);
+    assert_eq!(missing_error.code, DiagnosticCode::MissingBudgetBound);
 
     let mut ledger = BudgetLedger {
         policy,
@@ -652,7 +680,7 @@ fn budget_reservation_rejects_missing_bounds_and_oversubscription() {
     reserve_budget(&mut ledger, reservation_id("first"), charge_plan()).expect("first reservation fits");
     let oversubscribed = reserve_budget(&mut ledger, reservation_id("second"), charge_plan())
         .expect_err("second reservation exceeds limit");
-    assert_eq!(oversubscribed.code, OrchestrationDiagnosticCode::BudgetExceeded);
+    assert_eq!(oversubscribed.code, DiagnosticCode::BudgetExceeded);
     assert_eq!(ledger.reservations.len(), FIRST_INSTANCE_SEQUENCE as usize);
 }
 
@@ -661,7 +689,7 @@ fn budget_reservation_rejects_missing_bounds_and_oversubscription() {
 #[test]
 fn duplicate_fact_is_idempotent() {
     let base = base_instance(CompletionPolicy::RunSucceeded);
-    let action = OrchestrationAction::StartRound {
+    let action = Action::StartRound {
         intent: DispatchIntent {
             id: dispatch_identity(&base, RunId(FIRST_RUN_ID)).expect("dispatch must hash"),
             run_id: RunId(FIRST_RUN_ID),
@@ -670,7 +698,7 @@ fn duplicate_fact_is_idempotent() {
         },
         planned_charge: charge_plan(),
     };
-    let start = OrchestrationFact {
+    let start = Fact {
         id: fact_id(FACT_ID_START),
         action,
     };
@@ -708,7 +736,7 @@ fn replay_reconstructs_state_and_rejects_tampering() {
         StateDigest::try_from_hex(test_digest("tampered-state")).expect("tampered digest must be valid");
     let rejected = replay_events(&base, &tampered, head.as_ref());
     assert!(!rejected.valid);
-    assert_eq!(rejected.diagnostics[0].code, OrchestrationDiagnosticCode::ReplayMismatch);
+    assert_eq!(rejected.diagnostics[0].code, DiagnosticCode::ReplayMismatch);
 }
 
 // r[verify lattice.agent_orchestration.events]
@@ -723,7 +751,7 @@ fn replay_rejects_wrong_local_head_without_claiming_external_anchor() {
     let report = replay_events(&base, &events, Some(&wrong_head));
 
     assert!(!report.valid);
-    assert_eq!(report.diagnostics[0].code, OrchestrationDiagnosticCode::ReplayHeadMismatch);
+    assert_eq!(report.diagnostics[0].code, DiagnosticCode::ReplayHeadMismatch);
 }
 
 // r[verify lattice.agent_orchestration.triggers]
@@ -732,7 +760,7 @@ fn replay_rejects_wrong_local_head_without_claiming_external_anchor() {
 fn trigger_admission_is_scoped_and_duplicate_safe() {
     let definition = definition(CompletionPolicy::RunSucceeded);
     let revision = definition_revision(&definition).expect("definition must hash");
-    let empty = OrchestrationTriggerContext {
+    let empty = TriggerContext {
         accepted: BTreeMap::new(),
     };
     let trigger_id = trigger_id();
@@ -741,29 +769,29 @@ fn trigger_admission_is_scoped_and_duplicate_safe() {
         definition: &definition,
         definition_revision: &revision,
         trigger_id: &trigger_id,
-        trigger_kind: OrchestrationTriggerKind::Webhook,
+        trigger_kind: TriggerKind::Webhook,
         idempotency_key: &idempotency_key,
         next_sequence: FIRST_INSTANCE_SEQUENCE,
         context: &empty,
     })
     .expect("bound trigger must admit");
-    let OrchestrationTriggerAdmission::Accepted(plan) = admitted else {
+    let TriggerAdmission::Accepted(plan) = admitted else {
         panic!("first trigger must be accepted");
     };
-    let duplicate_context = OrchestrationTriggerContext {
+    let duplicate_context = TriggerContext {
         accepted: BTreeMap::from([(plan.scoped_key.clone(), plan.instance_id.clone())]),
     };
     let duplicate = admit_trigger_start(TriggerStartRequest {
         definition: &definition,
         definition_revision: &revision,
         trigger_id: &trigger_id,
-        trigger_kind: OrchestrationTriggerKind::Webhook,
+        trigger_kind: TriggerKind::Webhook,
         idempotency_key: &idempotency_key,
         next_sequence: FIRST_INSTANCE_SEQUENCE,
         context: &duplicate_context,
     })
     .expect("duplicate trigger returns prior result");
-    assert_eq!(duplicate, OrchestrationTriggerAdmission::Duplicate {
+    assert_eq!(duplicate, TriggerAdmission::Duplicate {
         instance_id: plan.instance_id
     });
 
@@ -772,13 +800,13 @@ fn trigger_admission_is_scoped_and_duplicate_safe() {
         definition: &definition,
         definition_revision: &revision,
         trigger_id: &missing_trigger,
-        trigger_kind: OrchestrationTriggerKind::Webhook,
+        trigger_kind: TriggerKind::Webhook,
         idempotency_key: &idempotency_key,
         next_sequence: FIRST_INSTANCE_SEQUENCE,
         context: &empty,
     })
     .expect_err("unbound trigger must fail");
-    assert_eq!(error.code, OrchestrationDiagnosticCode::TriggerNotBound);
+    assert_eq!(error.code, DiagnosticCode::TriggerNotBound);
 }
 
 // r[verify lattice.agent_orchestration.controls]
@@ -789,34 +817,34 @@ fn pause_and_cancel_preserve_observed_runner_boundary() {
     let base = base_instance(CompletionPolicy::AwaitProposal);
     let paused = transition(
         &base,
-        fact(&base, OrchestrationAction::PauseRequested {
+        fact(&base, Action::PauseRequested {
             actor: ACTOR.to_string(),
         }),
     )
     .expect("authorized pause must apply")
     .instance;
-    assert_eq!(paused.status, OrchestrationStatus::Paused);
+    assert_eq!(paused.status, Status::Paused);
 
     let resumed = transition(
         &paused,
-        fact(&paused, OrchestrationAction::ResumeRequested {
+        fact(&paused, Action::ResumeRequested {
             actor: ACTOR.to_string(),
         }),
     )
     .expect("authorized resume must apply")
     .instance;
-    assert_eq!(resumed.status, OrchestrationStatus::Ready);
+    assert_eq!(resumed.status, Status::Ready);
 
     let running = start_transition(&resumed).instance;
     let cancel_requested = transition(
         &running,
-        fact(&running, OrchestrationAction::CancelRequested {
+        fact(&running, Action::CancelRequested {
             actor: ACTOR.to_string(),
         }),
     )
     .expect("cancel request must be recorded")
     .instance;
-    assert_eq!(cancel_requested.status, OrchestrationStatus::Running);
+    assert_eq!(cancel_requested.status, Status::Running);
     assert!(cancel_requested.cancellation_requested);
 }
 
@@ -828,18 +856,18 @@ fn acknowledged_abandonment_consumes_reservation_and_replays_without_remote_clai
     let base = base_instance(CompletionPolicy::RunSucceeded);
     let started = start_transition(&base);
     let dispatch = started.instance.pending_dispatch.as_ref().expect("dispatch must be pending");
-    let acknowledged_action = OrchestrationAction::DispatchAcknowledged {
+    let acknowledged_action = Action::DispatchAcknowledged {
         dispatch_id: dispatch.id.clone(),
     };
     let acknowledged = transition(&started.instance, fact(&started.instance, acknowledged_action))
         .expect("dispatch acknowledgement must apply");
-    let cancel_action = OrchestrationAction::CancelRequested {
+    let cancel_action = Action::CancelRequested {
         actor: ACTOR.to_string(),
     };
     let cancelled = transition(&acknowledged.instance, fact(&acknowledged.instance, cancel_action))
         .expect("cancellation request must apply");
     let active = cancelled.instance.pending_dispatch.as_ref().expect("dispatch remains pending");
-    let abandon_action = OrchestrationAction::AbandonPendingDispatch {
+    let abandon_action = Action::AbandonPendingDispatch {
         actor: ACTOR.to_string(),
         dispatch_id: active.id.clone(),
         run_id: active.run_id,
@@ -847,14 +875,14 @@ fn acknowledged_abandonment_consumes_reservation_and_replays_without_remote_clai
     let abandon_fact = fact(&cancelled.instance, abandon_action.clone());
     let abandoned = transition(&cancelled.instance, abandon_fact.clone()).expect("abandonment must apply");
 
-    assert_eq!(abandoned.instance.status, OrchestrationStatus::Failed);
+    assert_eq!(abandoned.instance.status, Status::Failed);
     assert_eq!(abandoned.instance.budgets.consumed, charge());
     assert!(abandoned.instance.budgets.reservations.is_empty());
     assert!(abandoned.instance.active_run_id.is_none());
     assert!(abandoned.instance.pending_dispatch.is_none());
     assert!(!abandoned.instance.cancellation_requested);
     assert_eq!(abandoned.instance.terminal_summary.as_deref(), Some(ABANDONED_ACKNOWLEDGED_SUMMARY));
-    assert_eq!(abandoned.event.as_ref().expect("event must exist").kind, OrchestrationEventKind::DispatchAbandoned);
+    assert_eq!(abandoned.event.as_ref().expect("event must exist").kind, EventKind::DispatchAbandoned);
 
     let events = vec![
         started.event.expect("start event exists"),
@@ -871,7 +899,7 @@ fn acknowledged_abandonment_consumes_reservation_and_replays_without_remote_clai
     assert!(duplicate.event.is_none());
     let terminal_error = transition(&abandoned.instance, fact(&abandoned.instance, abandon_action))
         .expect_err("new abandonment fact cannot mutate terminal state");
-    assert_eq!(terminal_error.code, OrchestrationDiagnosticCode::TerminalStateMutation);
+    assert_eq!(terminal_error.code, DiagnosticCode::TerminalStateMutation);
 }
 
 // r[verify lattice.agent_orchestration.unobserved_abandon]
@@ -880,14 +908,14 @@ fn acknowledged_abandonment_consumes_reservation_and_replays_without_remote_clai
 fn planned_abandonment_releases_reservation_without_consumption() {
     let base = base_instance(CompletionPolicy::RunSucceeded);
     let started = start_transition(&base);
-    let cancel_action = OrchestrationAction::CancelRequested {
+    let cancel_action = Action::CancelRequested {
         actor: ACTOR.to_string(),
     };
     let cancelled = transition(&started.instance, fact(&started.instance, cancel_action))
         .expect("cancellation request must apply")
         .instance;
     let dispatch = cancelled.pending_dispatch.as_ref().expect("dispatch remains pending");
-    let abandon_action = OrchestrationAction::AbandonPendingDispatch {
+    let abandon_action = Action::AbandonPendingDispatch {
         actor: ACTOR.to_string(),
         dispatch_id: dispatch.id.clone(),
         run_id: dispatch.run_id,
@@ -897,7 +925,7 @@ fn planned_abandonment_releases_reservation_without_consumption() {
         .expect("planned abandonment must apply")
         .instance;
 
-    assert_eq!(abandoned.status, OrchestrationStatus::Failed);
+    assert_eq!(abandoned.status, Status::Failed);
     assert_eq!(abandoned.budgets.consumed, BudgetCharge::default());
     assert!(abandoned.budgets.reservations.is_empty());
     assert_eq!(abandoned.terminal_summary.as_deref(), Some(ABANDONED_PENDING_SUMMARY));
@@ -913,39 +941,39 @@ fn abandonment_rejects_missing_cancellation_authority_and_identity_drift() {
     let base = base_instance(CompletionPolicy::RunSucceeded);
     let running = start_transition(&base).instance;
     let dispatch = running.pending_dispatch.as_ref().expect("dispatch must be pending");
-    let action = OrchestrationAction::AbandonPendingDispatch {
+    let action = Action::AbandonPendingDispatch {
         actor: ACTOR.to_string(),
         dispatch_id: dispatch.id.clone(),
         run_id: dispatch.run_id,
     };
     let missing_cancellation =
         transition(&running, fact(&running, action)).expect_err("abandonment requires cancellation");
-    assert_eq!(missing_cancellation.code, OrchestrationDiagnosticCode::CancellationRequired);
+    assert_eq!(missing_cancellation.code, DiagnosticCode::CancellationRequired);
 
-    let cancel_action = OrchestrationAction::CancelRequested {
+    let cancel_action = Action::CancelRequested {
         actor: ACTOR.to_string(),
     };
     let cancelled = transition(&running, fact(&running, cancel_action))
         .expect("cancellation request must apply")
         .instance;
     let dispatch = cancelled.pending_dispatch.as_ref().expect("dispatch remains pending");
-    let unauthorized_action = OrchestrationAction::AbandonPendingDispatch {
+    let unauthorized_action = Action::AbandonPendingDispatch {
         actor: OTHER_ACTOR.to_string(),
         dispatch_id: dispatch.id.clone(),
         run_id: dispatch.run_id,
     };
     let unauthorized =
         transition(&cancelled, fact(&cancelled, unauthorized_action)).expect_err("unauthorized abandonment must fail");
-    assert_eq!(unauthorized.code, OrchestrationDiagnosticCode::UnauthorizedActor);
+    assert_eq!(unauthorized.code, DiagnosticCode::UnauthorizedActor);
 
-    let mismatched_action = OrchestrationAction::AbandonPendingDispatch {
+    let mismatched_action = Action::AbandonPendingDispatch {
         actor: ACTOR.to_string(),
         dispatch_id: dispatch_id(DISPATCH_ID),
         run_id: dispatch.run_id,
     };
     let mismatched =
         transition(&cancelled, fact(&cancelled, mismatched_action)).expect_err("mismatched abandonment must fail");
-    assert_eq!(mismatched.code, OrchestrationDiagnosticCode::DispatchMismatch);
+    assert_eq!(mismatched.code, DiagnosticCode::DispatchMismatch);
     assert_eq!(cancelled.budgets.consumed, BudgetCharge::default());
     assert_eq!(cancelled.budgets.reservations.len(), FIRST_INSTANCE_SEQUENCE as usize);
 }
@@ -954,7 +982,7 @@ fn abandonment_rejects_missing_cancellation_authority_and_identity_drift() {
 #[test]
 fn approval_identity_binds_authority_policy() {
     let mut instance = base_instance(CompletionPolicy::AwaitProposal);
-    instance.status = OrchestrationStatus::WaitingForApproval;
+    instance.status = Status::WaitingForApproval;
     let successor = workflow_revision(&workflow(SUCCESSOR_WORKFLOW_NAME)).expect("successor must hash");
     let proposal = make_proposal(&instance, successor, "safe proposal").expect("proposal must hash");
     let approval = make_approval(&instance, &proposal, ACTOR, true).expect("approval must hash");
@@ -975,7 +1003,7 @@ fn authority_shaped_round_output_remains_inert_without_an_approval_fact() {
     let workflow_before = base.workflow_revision.clone();
     let started = start_transition(&base).instance;
     let dispatch = started.pending_dispatch.as_ref().expect("dispatch must be pending");
-    let action = OrchestrationAction::RunFinished {
+    let action = Action::RunFinished {
         dispatch_id: dispatch.id.clone(),
         run_id: dispatch.run_id,
         succeeded: true,
@@ -986,7 +1014,7 @@ fn authority_shaped_round_output_remains_inert_without_an_approval_fact() {
 
     let waiting = transition(&started, fact(&started, action)).expect("terminal output must be recorded").instance;
 
-    assert_eq!(waiting.status, OrchestrationStatus::WaitingForApproval);
+    assert_eq!(waiting.status, Status::WaitingForApproval);
     assert!(waiting.pending_proposal.is_none());
     assert_eq!(waiting.definition, definition_before);
     assert_eq!(waiting.workflow_revision, workflow_before);
@@ -1005,7 +1033,7 @@ fn observed_budget_overage_exhausts_new_work_without_reversing_usage() {
         tokens: OVERAGE_TOKEN_CHARGE,
         ..charge()
     };
-    let action = OrchestrationAction::RunFinished {
+    let action = Action::RunFinished {
         dispatch_id: dispatch.id.clone(),
         run_id: dispatch.run_id,
         succeeded: true,
@@ -1016,18 +1044,18 @@ fn observed_budget_overage_exhausts_new_work_without_reversing_usage() {
 
     let exhausted = transition(&started, fact(&started, action)).expect("overage must be recorded").instance;
 
-    assert_eq!(exhausted.status, OrchestrationStatus::Exhausted);
+    assert_eq!(exhausted.status, Status::Exhausted);
     assert!(exhausted.budgets.breached);
     assert_eq!(exhausted.budgets.consumed, observed);
     assert!(exhausted.budgets.reservations.is_empty());
     let restart = transition(
         &exhausted,
-        fact(&exhausted, OrchestrationAction::ResumeRequested {
+        fact(&exhausted, Action::ResumeRequested {
             actor: ACTOR.to_string(),
         }),
     )
     .expect_err("breached terminal state must not dispatch");
-    assert_eq!(restart.code, OrchestrationDiagnosticCode::TerminalStateMutation);
+    assert_eq!(restart.code, DiagnosticCode::TerminalStateMutation);
 }
 
 // r[verify lattice.agent_orchestration.cli.scenario.status]
@@ -1041,7 +1069,7 @@ fn status_text_is_actionable_safe_and_explicitly_local_and_at_least_once() {
 
     let rendered = render_status_text(&started);
 
-    assert!(rendered.contains(&format!("{:?}", OrchestrationStatus::Running)));
+    assert!(rendered.contains(&format!("{:?}", Status::Running)));
     assert!(rendered.contains(started.workflow_revision.content_hash.as_str()));
     assert!(rendered.contains(&format!("round {FIRST_INSTANCE_SEQUENCE}")));
     assert!(rendered.contains("remaining "));
@@ -1065,17 +1093,17 @@ fn feedback_cannot_continue_a_running_round_or_bypass_successor_validation() {
     let proposal = make_proposal(&running, successor, "feedback to an earlier role").expect("proposal must hash");
     let immediate = transition(
         &running,
-        fact(&running, OrchestrationAction::SubmitProposal {
+        fact(&running, Action::SubmitProposal {
             proposal: proposal.clone(),
         }),
     )
     .expect_err("a non-terminal round cannot continue through feedback");
-    assert_eq!(immediate.code, OrchestrationDiagnosticCode::InvalidLifecycleTransition);
+    assert_eq!(immediate.code, DiagnosticCode::InvalidLifecycleTransition);
 
     let waiting = finish_transition(&running, true).instance;
     let submitted = transition(
         &waiting,
-        fact(&waiting, OrchestrationAction::SubmitProposal {
+        fact(&waiting, Action::SubmitProposal {
             proposal: make_proposal(&waiting, proposal.successor.clone(), "cyclic successor")
                 .expect("proposal must hash"),
         }),
@@ -1086,13 +1114,13 @@ fn feedback_cannot_continue_a_running_round_or_bypass_successor_validation() {
     let approval = make_approval(&submitted, &pending, ACTOR, true).expect("approval must hash");
     let rejected = transition(
         &submitted,
-        fact(&submitted, OrchestrationAction::DecideProposal {
+        fact(&submitted, Action::DecideProposal {
             approval,
             successor_validated: false,
         }),
     )
     .expect_err("cyclic successor validation must fail");
-    assert_eq!(rejected.code, OrchestrationDiagnosticCode::SuccessorValidationFailed);
+    assert_eq!(rejected.code, DiagnosticCode::SuccessorValidationFailed);
     assert_eq!(submitted.workflow_revision, waiting.workflow_revision);
 }
 
@@ -1100,4 +1128,56 @@ fn feedback_cannot_continue_a_running_round_or_bypass_successor_validation() {
 #[test]
 fn explicitly_supplied_fact_ids_remain_distinct() {
     assert_ne!(FACT_ID_START, FACT_ID_FINISH);
+}
+
+// r[verify lattice.agent_orchestration.usage.scenario.cancellation]
+#[test]
+fn observed_completion_settles_actual_cancellation_and_completion_winner_once() {
+    let base = retry_capable_instance();
+    let running = start_transition(&base).instance;
+    let cancel = Action::CancelRequested {
+        actor: ACTOR.to_string(),
+    };
+    let requested = transition(&running, fact(&running, cancel)).expect("request persists").instance;
+    let dispatch = requested.pending_dispatch.as_ref().expect("pending");
+    let action = |succeeded, cancelled, retryable_observed_failure| Action::RunFinishedObserved {
+        dispatch_id: dispatch.id.clone(),
+        run_id: dispatch.run_id,
+        succeeded,
+        cancelled,
+        retryable_observed_failure,
+        observed_usage: charge(),
+        usage_basis: BudgetUsageBasis::ConservativeObservation,
+        safe_summary: "owned completion observation".to_string(),
+    };
+    assert!(transition(&requested, fact(&requested, action(true, true, false))).is_err());
+    assert!(transition(&requested, fact(&requested, action(false, true, true))).is_err());
+    assert!(!requested.budgets.reservations.is_empty());
+    let cancellation = action(false, true, false);
+    let cancellation_fact = fact(&requested, cancellation.clone());
+    let cancelled = transition(&requested, cancellation_fact.clone()).expect("settles cancellation").instance;
+    assert_eq!(cancelled.status, Status::Cancelled);
+    assert!(cancelled.pending_dispatch.is_none() && cancelled.budgets.reservations.is_empty());
+    assert_eq!(cancelled.budgets.consumed, charge());
+    assert!(transition(&cancelled, cancellation_fact).expect("exact duplicate is idempotent").duplicate);
+    assert!(
+        transition(&cancelled, fact(&cancelled, cancellation)).is_err(),
+        "new settlement fact cannot charge twice"
+    );
+    let completed = transition(&requested, fact(&requested, action(true, false, false)))
+        .expect("completion wins late request")
+        .instance;
+    assert_eq!(completed.status, Status::Completed);
+    assert_eq!(completed.budgets.consumed, charge());
+    let failed = transition(&requested, fact(&requested, action(false, false, true)))
+        .expect("actual failure remains failure")
+        .instance;
+    assert_eq!(failed.status, Status::Failed);
+    assert!(failed.retry.retryable_failure.is_none(), "requested cancellation cannot become retry evidence");
+    assert!(preflight_retry(&failed, ACTOR, charge_plan()).is_err());
+    let mut crossed = action(false, false, true);
+    if let Action::RunFinishedObserved { run_id, .. } = &mut crossed {
+        *run_id = RunId(RETRY_RUN_ID);
+    }
+    assert!(transition(&requested, fact(&requested, crossed)).is_err());
 }

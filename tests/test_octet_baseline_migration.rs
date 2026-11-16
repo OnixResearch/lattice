@@ -72,6 +72,11 @@ impl Fixture {
         Self { directory, args }
     }
 
+    fn pruning(mut self) -> Self {
+        self.args.push("--prune-resolved".to_string());
+        self
+    }
+
     fn run(&self, execute: bool) -> Result<(), String> {
         let mut args = self.args.clone();
         if execute {
@@ -166,6 +171,72 @@ fn semantic_occurrence_growth_and_loss_refuse_without_touching_baseline() {
     let two = finding("b3:new-two", "ambiguous_params", "2 `&str` parameters are easy to swap by accident");
     Fixture::new(vec![old.clone()], vec![one.clone(), two.clone()]).assert_refused();
     Fixture::new(vec![old, two], vec![one]).assert_refused();
+}
+
+// r[verify lattice.repository_validation.octet_baseline_migration]
+#[test]
+fn resolved_findings_can_be_pruned_without_admitting_new_warning_facts() {
+    let retained = finding("b3:old-retained", "demo", "retained warning");
+    let resolved = finding("b3:old-resolved", "demo", "resolved warning");
+    let mut current = retained.clone();
+    current["stable_id"] = json!("b3:current");
+    current["semantic_id"] = json!("b3:current");
+    current["line"] = json!(42);
+    let fixture = Fixture::new(vec![retained, resolved], vec![current.clone()]).pruning();
+    fixture.run(false).expect("pruning dry run");
+    assert!(!fixture.output_path().exists());
+    fixture.run(true).expect("prune resolved finding");
+    assert_eq!(fixture.output()["findings"], json!([current]));
+}
+
+// r[verify lattice.repository_validation.octet_baseline_migration.scenario.multiplicity]
+#[test]
+fn pruning_cannot_exchange_resolved_debt_for_new_or_duplicated_raw_debt() {
+    let retained = finding("b3:retained", "demo", "retained warning");
+    let resolved = finding("b3:resolved", "demo", "resolved warning");
+    let old = [retained.clone(), resolved];
+    Fixture::with_reference(&old, &old, &[retained.clone(), retained.clone()])
+        .pruning()
+        .assert_refused();
+    let new = finding("b3:new", "demo", "new warning");
+    Fixture::with_reference(&old, &old, &[retained, new]).pruning().assert_refused();
+}
+
+// r[verify lattice.repository_validation.octet_baseline_migration]
+#[test]
+fn pruning_retains_only_facts_covered_by_an_admitted_colliding_identity() {
+    let first = finding("b3:accepted", "demo", "first admitted warning");
+    let second = finding("b3:accepted", "demo", "second admitted warning");
+    let reference = [first.clone(), second.clone()];
+    let fixture = Fixture::with_reference(&reference[..1], &reference, &[second.clone(), first]).pruning();
+    fixture.run(true).expect("both raw warnings belonged to the admitted identity");
+    assert_eq!(fixture.output()["findings"], json!([second]));
+}
+
+// r[verify lattice.repository_validation.octet_baseline_migration.scenario.multiplicity]
+#[test]
+fn pruning_cannot_expand_baseline_identities_even_when_raw_warning_facts_match() {
+    let first = finding("b3:accepted", "demo", "first admitted warning");
+    let second = finding("b3:accepted", "demo", "second admitted warning");
+    let reference = [first.clone(), second.clone()];
+    let mut separate_identity = second;
+    separate_identity["stable_id"] = json!("b3:separate");
+    separate_identity["semantic_id"] = json!("b3:separate");
+    Fixture::with_reference(std::slice::from_ref(&first), &reference, &[first.clone(), separate_identity])
+        .pruning()
+        .assert_refused();
+}
+
+// r[verify lattice.repository_validation.octet_baseline_migration.scenario.fail_closed]
+#[test]
+fn pruning_refuses_reference_identities_not_covered_by_the_old_baseline() {
+    let old = finding("b3:accepted", "demo", "unchanged warning");
+    let mut foreign = old.clone();
+    foreign["stable_id"] = json!("b3:unaccepted");
+    foreign["semantic_id"] = json!("b3:unaccepted");
+    Fixture::with_reference(std::slice::from_ref(&old), std::slice::from_ref(&foreign), std::slice::from_ref(&old))
+        .pruning()
+        .assert_refused();
 }
 
 // r[verify lattice.repository_validation.octet_baseline_migration.scenario.fail_closed]

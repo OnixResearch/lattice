@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use lattice::engine::RunId;
 use lattice::engine::Workflow;
+use lattice::orchestration::Action;
 use lattice::orchestration::AuthorityPolicy;
 use lattice::orchestration::BudgetCharge;
 use lattice::orchestration::BudgetChargePlan;
@@ -15,16 +16,15 @@ use lattice::orchestration::BudgetDimensions;
 use lattice::orchestration::BudgetLimits;
 use lattice::orchestration::BudgetPolicy;
 use lattice::orchestration::CompletionPolicy;
+use lattice::orchestration::Definition;
 use lattice::orchestration::DefinitionId;
 use lattice::orchestration::DispatchIntent;
 use lattice::orchestration::DispatchStatus;
-use lattice::orchestration::OrchestrationAction;
-use lattice::orchestration::OrchestrationDefinition;
-use lattice::orchestration::OrchestrationFact;
-use lattice::orchestration::OrchestrationInstance;
-use lattice::orchestration::OrchestrationStatus;
+use lattice::orchestration::Fact;
+use lattice::orchestration::Instance;
 use lattice::orchestration::RedactionPolicy;
 use lattice::orchestration::RetryPolicy;
+use lattice::orchestration::Status;
 use lattice::orchestration::current_schema_version;
 use lattice::orchestration::definition_to_nickel;
 use lattice::orchestration::dispatch_identity;
@@ -132,7 +132,7 @@ fn fixture_with_workflow(
     .expect("config must write");
     let store = Store::new(data_dir.join(STORE_FILE_NAME)).expect("store must open");
     store.save_workflow(&workflow).expect("workflow must persist");
-    let definition = OrchestrationDefinition {
+    let definition = Definition {
         schema_version: current_schema_version(),
         id: definition_id(),
         objective: OBJECTIVE.to_string(),
@@ -213,8 +213,8 @@ fn recovery_contender_outcome(result: &RecoveryContenderResult) -> RecoveryConte
     RecoveryContenderOutcome::Unexpected
 }
 
-fn persist_observed_failure(store: &Store, workflow: &Workflow) -> OrchestrationInstance {
-    let definition = OrchestrationDefinition {
+fn persist_observed_failure(store: &Store, workflow: &Workflow) -> Instance {
+    let definition = Definition {
         schema_version: current_schema_version(),
         id: definition_id(),
         objective: OBJECTIVE.to_string(),
@@ -253,7 +253,7 @@ fn persist_observed_failure(store: &Store, workflow: &Workflow) -> Orchestration
         workflow_revision: base.workflow_revision.clone(),
         status: DispatchStatus::Pending,
     };
-    let start_action = OrchestrationAction::StartRound {
+    let start_action = Action::StartRound {
         intent: intent.clone(),
         planned_charge: BudgetChargePlan {
             rounds: Some(ROUND_CHARGE),
@@ -263,15 +263,15 @@ fn persist_observed_failure(store: &Store, workflow: &Workflow) -> Orchestration
             duration_millis: Some(0),
         },
     };
-    let started = transition(&base, OrchestrationFact {
+    let started = transition(&base, Fact {
         id: fact_identity(&base.id, base.version, &start_action).expect("start fact must hash"),
         action: start_action,
     })
     .expect("start must apply");
-    let acknowledge_action = OrchestrationAction::DispatchAcknowledged {
+    let acknowledge_action = Action::DispatchAcknowledged {
         dispatch_id: intent.id.clone(),
     };
-    let acknowledged = transition(&started.instance, OrchestrationFact {
+    let acknowledged = transition(&started.instance, Fact {
         id: fact_identity(&started.instance.id, started.instance.version, &acknowledge_action)
             .expect("acknowledgement fact must hash"),
         action: acknowledge_action,
@@ -292,7 +292,7 @@ fn persist_observed_failure(store: &Store, workflow: &Workflow) -> Orchestration
             failures: 1,
         })
         .expect("observed failed run must persist");
-    let finish_action = OrchestrationAction::RunFinished {
+    let finish_action = Action::RunFinished {
         dispatch_id: intent.id,
         run_id,
         succeeded: false,
@@ -303,7 +303,7 @@ fn persist_observed_failure(store: &Store, workflow: &Workflow) -> Orchestration
         },
         safe_summary: "observed terminal failure".to_string(),
     };
-    let finished = transition(&acknowledged.instance, OrchestrationFact {
+    let finished = transition(&acknowledged.instance, Fact {
         id: fact_identity(&acknowledged.instance.id, acknowledged.instance.version, &finish_action)
             .expect("finish fact must hash"),
         action: finish_action,
@@ -318,8 +318,8 @@ fn persist_observed_failure(store: &Store, workflow: &Workflow) -> Orchestration
     finished.instance
 }
 
-fn persist_acknowledged_pending(store: &Store, workflow: &Workflow) -> OrchestrationInstance {
-    let definition = OrchestrationDefinition {
+fn persist_acknowledged_pending(store: &Store, workflow: &Workflow) -> Instance {
+    let definition = Definition {
         schema_version: current_schema_version(),
         id: definition_id(),
         objective: OBJECTIVE.to_string(),
@@ -358,7 +358,7 @@ fn persist_acknowledged_pending(store: &Store, workflow: &Workflow) -> Orchestra
         workflow_revision: base.workflow_revision.clone(),
         status: DispatchStatus::Pending,
     };
-    let start_action = OrchestrationAction::StartRound {
+    let start_action = Action::StartRound {
         intent,
         planned_charge: BudgetChargePlan {
             rounds: Some(ROUND_CHARGE),
@@ -368,14 +368,14 @@ fn persist_acknowledged_pending(store: &Store, workflow: &Workflow) -> Orchestra
             duration_millis: Some(0),
         },
     };
-    let started = transition(&base, OrchestrationFact {
+    let started = transition(&base, Fact {
         id: fact_identity(&base.id, base.version, &start_action).expect("start fact must hash"),
         action: start_action,
     })
     .expect("start must apply");
     let dispatch_id = started.instance.pending_dispatch.as_ref().expect("dispatch must be pending").id.clone();
-    let acknowledge_action = OrchestrationAction::DispatchAcknowledged { dispatch_id };
-    let acknowledged = transition(&started.instance, OrchestrationFact {
+    let acknowledge_action = Action::DispatchAcknowledged { dispatch_id };
+    let acknowledged = transition(&started.instance, Fact {
         id: fact_identity(&started.instance.id, started.instance.version, &acknowledge_action)
             .expect("acknowledgement fact must hash"),
         action: acknowledge_action,
@@ -391,7 +391,7 @@ fn persist_acknowledged_pending(store: &Store, workflow: &Workflow) -> Orchestra
     acknowledged.instance
 }
 
-fn persist_pending_run_record(store: &Store, instance: &OrchestrationInstance, owner: RunOwner) {
+fn persist_pending_run_record(store: &Store, instance: &Instance, owner: RunOwner) {
     let intent = instance.pending_dispatch.as_ref().expect("pending dispatch must exist");
     store
         .save_run(&RunRecord {
@@ -432,8 +432,8 @@ fn cli_validates_starts_and_reports_json_status() {
         .output()
         .expect("start command must execute");
     assert!(start.status.success(), "stderr: {}", String::from_utf8_lossy(&start.stderr));
-    let instance: OrchestrationInstance = serde_json::from_slice(&start.stdout).expect("instance JSON must parse");
-    assert_eq!(instance.status, OrchestrationStatus::Failed);
+    let instance: Instance = serde_json::from_slice(&start.stdout).expect("instance JSON must parse");
+    assert_eq!(instance.status, Status::Failed);
     assert!(instance.terminal_summary.as_deref().is_some_and(|summary| summary.contains("Failed")));
 
     let status = command(&config_path)
@@ -444,7 +444,7 @@ fn cli_validates_starts_and_reports_json_status() {
         .output()
         .expect("status command must execute");
     assert!(status.status.success(), "stderr: {}", String::from_utf8_lossy(&status.stderr));
-    let loaded: OrchestrationInstance = serde_json::from_slice(&status.stdout).expect("status JSON must parse");
+    let loaded: Instance = serde_json::from_slice(&status.stdout).expect("status JSON must parse");
     assert_eq!(loaded, instance);
 }
 
@@ -470,8 +470,8 @@ fn cli_retries_an_exact_observed_failure_and_preserves_replay() {
         .output()
         .expect("retry command must execute");
     assert!(retry.status.success(), "stderr: {}", String::from_utf8_lossy(&retry.stderr));
-    let completed: OrchestrationInstance = serde_json::from_slice(&retry.stdout).expect("retry JSON must parse");
-    assert_eq!(completed.status, OrchestrationStatus::Failed);
+    let completed: Instance = serde_json::from_slice(&retry.stdout).expect("retry JSON must parse");
+    assert_eq!(completed.status, Status::Failed);
     assert_eq!(completed.round, ROUND_LIMIT);
     assert_eq!(completed.retry.admitted, RETRY_LIMIT);
     assert!(completed.terminal_summary.as_deref().is_some_and(|summary| summary.contains("Failed")));
@@ -505,8 +505,8 @@ fn cli_pause_resume_and_replay_share_persisted_state_machine() {
         .arg("json")
         .output()
         .expect("start command must execute");
-    let waiting: OrchestrationInstance = serde_json::from_slice(&start.stdout).expect("instance JSON must parse");
-    assert_eq!(waiting.status, OrchestrationStatus::WaitingForApproval);
+    let waiting: Instance = serde_json::from_slice(&start.stdout).expect("instance JSON must parse");
+    assert_eq!(waiting.status, Status::WaitingForApproval);
 
     let pause = command(&config_path)
         .arg("pause")
@@ -518,8 +518,8 @@ fn cli_pause_resume_and_replay_share_persisted_state_machine() {
         .output()
         .expect("pause command must execute");
     assert!(pause.status.success(), "stderr: {}", String::from_utf8_lossy(&pause.stderr));
-    let paused: OrchestrationInstance = serde_json::from_slice(&pause.stdout).expect("pause JSON must parse");
-    assert_eq!(paused.status, OrchestrationStatus::Paused);
+    let paused: Instance = serde_json::from_slice(&pause.stdout).expect("pause JSON must parse");
+    assert_eq!(paused.status, Status::Paused);
 
     let resume = command(&config_path)
         .arg("resume")
@@ -531,8 +531,8 @@ fn cli_pause_resume_and_replay_share_persisted_state_machine() {
         .output()
         .expect("resume command must execute");
     assert!(resume.status.success(), "stderr: {}", String::from_utf8_lossy(&resume.stderr));
-    let resumed: OrchestrationInstance = serde_json::from_slice(&resume.stdout).expect("resume JSON must parse");
-    assert_eq!(resumed.status, OrchestrationStatus::WaitingForApproval);
+    let resumed: Instance = serde_json::from_slice(&resume.stdout).expect("resume JSON must parse");
+    assert_eq!(resumed.status, Status::WaitingForApproval);
 
     let replay = command(&config_path)
         .arg("replay")
@@ -590,9 +590,9 @@ fn cli_recovers_cancels_and_abandons_an_unobserved_dispatch_without_retry() {
         .output()
         .expect("cancel command must execute");
     assert!(cancel.status.success(), "stderr: {}", String::from_utf8_lossy(&cancel.stderr));
-    let cancelled: OrchestrationInstance = serde_json::from_slice(&cancel.stdout).expect("cancel JSON must parse");
+    let cancelled: Instance = serde_json::from_slice(&cancel.stdout).expect("cancel JSON must parse");
     assert!(cancelled.cancellation_requested);
-    assert_eq!(cancelled.status, OrchestrationStatus::Running);
+    assert_eq!(cancelled.status, Status::Running);
 
     let abandon = command(&config_path)
         .arg("abandon")
@@ -604,8 +604,8 @@ fn cli_recovers_cancels_and_abandons_an_unobserved_dispatch_without_retry() {
         .output()
         .expect("abandon command must execute");
     assert!(abandon.status.success(), "stderr: {}", String::from_utf8_lossy(&abandon.stderr));
-    let abandoned: OrchestrationInstance = serde_json::from_slice(&abandon.stdout).expect("instance JSON must parse");
-    assert_eq!(abandoned.status, OrchestrationStatus::Failed);
+    let abandoned: Instance = serde_json::from_slice(&abandon.stdout).expect("instance JSON must parse");
+    assert_eq!(abandoned.status, Status::Failed);
     assert!(abandoned.pending_dispatch.is_none());
     assert!(abandoned.budgets.reservations.is_empty());
     let rendered = String::from_utf8_lossy(&abandon.stdout);
@@ -686,11 +686,7 @@ fn operator_e2e_orchestration_recovery_concurrent_processes_commit_one_terminal_
         .expect("concurrent recovery workflow lookup succeeds")
         .expect("concurrent recovery workflow exists");
     let pending = persist_acknowledged_pending(&store, &workflow);
-    let intent = pending.pending_dispatch.as_ref().expect("concurrent recovery dispatch remains pending");
-    persist_pending_run_record(&store, &pending, RunOwner::Orchestration {
-        instance_id: pending.id.clone(),
-        dispatch_id: intent.id.clone(),
-    });
+    common::observe_pending_usage(&store, &pending);
     drop(store);
 
     let release_path = directory.path().join("recovery-contenders-release");
@@ -765,7 +761,7 @@ fn operator_e2e_orchestration_recovery_concurrent_processes_commit_one_terminal_
         .expect("concurrent recovery instance remains");
     let events = settled.load_orchestration_events(&pending.id).expect("concurrent recovery events load");
     let runs = settled.list_runs(OPERATOR_E2E_RUN_HISTORY_LIMIT).expect("concurrent recovery runs list");
-    assert_eq!(instance.status, OrchestrationStatus::Completed);
+    assert_eq!(instance.status, Status::Completed);
     assert!(instance.pending_dispatch.is_none());
     assert_eq!(events.len(), RECOVERY_SETTLED_EVENT_COUNT);
     assert_eq!(runs.len(), EXPECTED_OBSERVED_RUN_COUNT);
@@ -817,9 +813,8 @@ fn operator_e2e_orchestration_denies_forced_death_effect_without_current_authori
 
     assert!(denied.status.success(), "stderr: {}", String::from_utf8_lossy(&denied.stderr));
     assert!(!marker_path.exists(), "authority denial must occur before the shell effect");
-    let failed: OrchestrationInstance =
-        serde_json::from_slice(&denied.stdout).expect("denied orchestration JSON parses");
-    assert_eq!(failed.status, OrchestrationStatus::Failed);
+    let failed: Instance = serde_json::from_slice(&denied.stdout).expect("denied orchestration JSON parses");
+    assert_eq!(failed.status, Status::Failed);
     assert!(failed.pending_dispatch.is_none());
     assert!(failed.terminal_summary.as_deref().is_some_and(|summary| summary.contains("Failed")));
 
@@ -845,11 +840,7 @@ fn operator_e2e_orchestration_recovery_reconciles_exact_observed_run_without_red
         .expect("workflow lookup must succeed")
         .expect("workflow must exist");
     let pending = persist_acknowledged_pending(&store, &workflow);
-    let intent = pending.pending_dispatch.as_ref().expect("pending dispatch must exist");
-    persist_pending_run_record(&store, &pending, RunOwner::Orchestration {
-        instance_id: pending.id.clone(),
-        dispatch_id: intent.id.clone(),
-    });
+    common::observe_pending_usage(&store, &pending);
     drop(store);
 
     let recovery = command(&config_path)
@@ -870,7 +861,7 @@ fn operator_e2e_orchestration_recovery_reconciles_exact_observed_run_without_red
         .expect("reconciled instance must exist");
     let runs = reopened.list_runs(OPERATOR_E2E_RUN_HISTORY_LIMIT).expect("reconciled run history must list");
 
-    assert_eq!(reconciled.status, OrchestrationStatus::Completed);
+    assert_eq!(reconciled.status, Status::Completed);
     assert!(reconciled.pending_dispatch.is_none());
     assert_eq!(runs.len(), EXPECTED_OBSERVED_RUN_COUNT);
     assert_eq!(runs[0].run_id, RunId(PENDING_RUN_ID));

@@ -5,7 +5,7 @@ const HTTPS_SCHEME: &str = "https";
 /// One admitted projection-aware chat request.
 pub struct ProjectedChat<'a> {
     pub runtime: &'a super::RuntimeConfig,
-    pub request: &'a crate::agent_node::AgentRequest,
+    pub request: &'a crate::agent_node::Request,
     pub projection: crate::agent_prompt::StructuredInputProjection,
     pub global_output_max_bytes: u64,
 }
@@ -13,15 +13,15 @@ pub struct ProjectedChat<'a> {
 struct ChatInput<'a> {
     model: &'a str,
     prompt: &'a str,
-    output_mode: crate::agent_node::AgentOutputMode,
+    output_mode: crate::agent_node::OutputMode,
 }
 
 // r[impl n8nclone.workflow_execution.agent_nodes.openai_compatible.scenario.plan]
 pub fn plan_chat(
     runtime: &super::RuntimeConfig,
-    request: &crate::agent_node::AgentRequest,
+    request: &crate::agent_node::Request,
     global_output_max_bytes: u64,
-) -> Result<super::ChatPlan, crate::agent_node::AgentError> {
+) -> Result<super::ChatPlan, crate::agent_node::Error> {
     plan_chat_with_projection(ProjectedChat {
         runtime,
         request,
@@ -31,7 +31,7 @@ pub fn plan_chat(
 }
 
 // r[impl lattice.agent_runtime.projection_boundaries.scenario.wire]
-pub fn plan_chat_with_projection(input: ProjectedChat<'_>) -> Result<super::ChatPlan, crate::agent_node::AgentError> {
+pub fn plan_chat_with_projection(input: ProjectedChat<'_>) -> Result<super::ChatPlan, crate::agent_node::Error> {
     let ProjectedChat {
         runtime,
         request,
@@ -52,7 +52,7 @@ pub fn plan_chat_with_projection(input: ProjectedChat<'_>) -> Result<super::Chat
     if api_key_env.is_some() && endpoint.scheme() != HTTPS_SCHEME {
         return Err(super::core::preflight("OpenAI-compatible bearer credentials require an HTTPS endpoint"));
     }
-    let prompt = crate::agent_node::render_prompt_with_projection(request, projection)?;
+    let prompt = crate::agent_node::render_with_projection(request, projection)?;
     let body = encode_chat_request(runtime, ChatInput {
         model,
         prompt: &prompt,
@@ -70,7 +70,7 @@ pub fn plan_chat_with_projection(input: ProjectedChat<'_>) -> Result<super::Chat
     debug_assert!(!model.is_empty());
     debug_assert!(request_bytes <= runtime.max_request_bytes);
     Ok(super::ChatPlan {
-        adapter_label: crate::agent_node::agent_target_label(request.target),
+        adapter_label: crate::agent_node::target_label(request.target),
         endpoint: endpoint.to_string(),
         model: model.to_string(),
         api_key_env,
@@ -84,11 +84,11 @@ pub fn plan_chat_with_projection(input: ProjectedChat<'_>) -> Result<super::Chat
 // r[impl n8nclone.workflow_execution.agent_nodes.openai_compatible.scenario.credentials]
 pub fn execute(
     runtime: &super::RuntimeConfig,
-    request: &crate::agent_node::AgentRequest,
+    request: &crate::agent_node::Request,
     context: &crate::agent_node::ExecutionContext,
     global_output_max_bytes: u64,
     transport: &dyn Transport,
-) -> Result<crate::agent_node::AgentResponse, crate::agent_node::AgentError> {
+) -> Result<crate::agent_node::Response, crate::agent_node::Error> {
     execute_with_projection(
         ProjectedChat {
             runtime,
@@ -106,22 +106,20 @@ pub fn execute_with_projection(
     input: ProjectedChat<'_>,
     context: &crate::agent_node::ExecutionContext,
     transport: &dyn Transport,
-) -> Result<crate::agent_node::AgentResponse, crate::agent_node::AgentError> {
+) -> Result<crate::agent_node::Response, crate::agent_node::Error> {
     let plan = plan_chat_with_projection(input)?;
     let bearer_token = match plan.api_key_env.as_deref() {
         Some(binding) => Some(context.secret(binding).ok_or_else(|| {
-            crate::agent_node::AgentError::Credential(format!(
-                "missing OpenAI-compatible credential binding: {binding}"
-            ))
+            crate::agent_node::Error::Credential(format!("missing OpenAI-compatible credential binding: {binding}"))
         })?),
         None => None,
     };
     let response = transport.execute(&plan, bearer_token)?;
     let response_bytes = u64::try_from(response.body.len()).map_err(|_| {
-        crate::agent_node::AgentError::Adapter("OpenAI-compatible response length is unsupported".to_string())
+        crate::agent_node::Error::Adapter("OpenAI-compatible response length is unsupported".to_string())
     })?;
     if response_bytes > plan.max_response_bytes {
-        return Err(crate::agent_node::AgentError::Adapter(format!(
+        return Err(crate::agent_node::Error::Adapter(format!(
             "OpenAI-compatible response exceeded {} bytes",
             plan.max_response_bytes
         )));
@@ -140,7 +138,7 @@ const JSON_OUTPUT_SYSTEM_PROMPT: &str =
 fn encode_chat_request(
     runtime: &super::RuntimeConfig,
     input: ChatInput<'_>,
-) -> Result<Vec<u8>, crate::agent_node::AgentError> {
+) -> Result<Vec<u8>, crate::agent_node::Error> {
     let mut messages = Vec::new();
     if let Some(system_prompt) = combined_system_prompt(runtime, input.output_mode) {
         messages.push(serde_json::json!({"role": "system", "content": system_prompt}));
@@ -154,7 +152,7 @@ fn encode_chat_request(
         "max_tokens": runtime.max_tokens,
         "messages": messages,
     });
-    if input.output_mode == crate::agent_node::AgentOutputMode::Json {
+    if input.output_mode == crate::agent_node::OutputMode::Json {
         body["response_format"] = serde_json::json!({"type": "json_object"});
     }
     if let Some(enable_thinking) = runtime.enable_thinking {
@@ -163,11 +161,11 @@ fn encode_chat_request(
     debug_assert!(body["messages"].as_array().is_some_and(|messages| !messages.is_empty()));
     debug_assert_eq!(body["stream"], serde_json::Value::Bool(false));
     serde_json::to_vec(&body)
-        .map_err(|error| crate::agent_node::AgentError::Adapter(format!("encode OpenAI-compatible request: {error}")))
+        .map_err(|error| crate::agent_node::Error::Adapter(format!("encode OpenAI-compatible request: {error}")))
 }
 
-fn user_prompt(prompt: &str, output_mode: crate::agent_node::AgentOutputMode) -> String {
-    if output_mode == crate::agent_node::AgentOutputMode::Json {
+fn user_prompt(prompt: &str, output_mode: crate::agent_node::OutputMode) -> String {
+    if output_mode == crate::agent_node::OutputMode::Json {
         format!("{prompt}\n\n{JSON_OUTPUT_SYSTEM_PROMPT}")
     } else {
         prompt.to_string()
@@ -176,10 +174,10 @@ fn user_prompt(prompt: &str, output_mode: crate::agent_node::AgentOutputMode) ->
 
 fn combined_system_prompt(
     runtime: &super::RuntimeConfig,
-    output_mode: crate::agent_node::AgentOutputMode,
+    output_mode: crate::agent_node::OutputMode,
 ) -> Option<String> {
     let configured = super::core::non_empty_trimmed(&runtime.system_prompt);
-    match (configured, output_mode == crate::agent_node::AgentOutputMode::Json) {
+    match (configured, output_mode == crate::agent_node::OutputMode::Json) {
         (Some(configured), true) => Some(format!("{configured}\n\n{JSON_OUTPUT_SYSTEM_PROMPT}")),
         (Some(configured), false) => Some(configured.to_string()),
         (None, true) => Some(JSON_OUTPUT_SYSTEM_PROMPT.to_string()),

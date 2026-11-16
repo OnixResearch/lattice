@@ -122,7 +122,7 @@ pub struct BundleValidationInput {
     pub manifest: BundleManifest,
     pub files: Vec<BundleFile>,
     pub workflow: Option<crate::engine::Workflow>,
-    pub orchestration: Option<crate::orchestration::OrchestrationDefinition>,
+    pub orchestration: Option<crate::orchestration::Definition>,
 }
 
 #[derive(Debug, Clone)]
@@ -133,7 +133,7 @@ pub struct ValidatedBundle {
     pub workflow_revision: crate::orchestration::WorkflowRevisionRef,
     pub workflow: crate::engine::Workflow,
     pub orchestration_revision: Option<crate::orchestration::DefinitionRevision>,
-    pub orchestration: Option<crate::orchestration::OrchestrationDefinition>,
+    pub orchestration: Option<crate::orchestration::Definition>,
     pub file_identities: Vec<(String, ContentIdentity)>,
 }
 

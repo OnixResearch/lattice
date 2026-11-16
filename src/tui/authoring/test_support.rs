@@ -6,12 +6,12 @@ use crossterm::event::KeyEvent;
 use crossterm::event::KeyModifiers;
 
 use crate::engine::Workflow;
-use crate::tui::App;
+use crate::tui::State;
 use crate::tui::input;
 
 pub(crate) fn edit(workflow: &mut Workflow, node_id: Option<u64>, id: &str, value: &str) -> Result<(), String> {
     let root = tempfile::tempdir().map_err(|error| error.to_string())?;
-    let mut app = App::new(crate::config::AppConfig {
+    let mut app = State::new(crate::config::AppConfig {
         data_dir: root.path().join("state"),
         ..Default::default()
     });
@@ -49,7 +49,7 @@ pub(crate) fn edit(workflow: &mut Workflow, node_id: Option<u64>, id: &str, valu
     Ok(())
 }
 
-pub(crate) fn send(app: &mut App, modifiers: KeyModifiers, code: KeyCode) {
+pub(crate) fn send(app: &mut State, modifiers: KeyModifiers, code: KeyCode) {
     let action = input::handle_event(app, &Event::Key(KeyEvent::new(code, modifiers)));
     assert!(action.is_none(), "modal input must not escape to an effectful application action: {action:?}");
 }

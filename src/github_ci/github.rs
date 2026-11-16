@@ -8,7 +8,6 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 use serde::Serialize;
-use zeroize::Zeroize;
 use zeroize::Zeroizing;
 
 use super::core::CheckProjection;
@@ -149,20 +148,20 @@ struct TransientRequest(HttpRequestPlan);
 impl Drop for TransientRequest {
     fn drop(&mut self) {
         for value in self.0.headers.values_mut() {
-            value.zeroize();
+            zeroize::Zeroize::zeroize(value);
         }
         if let Some(body) = &mut self.0.body {
-            body.zeroize();
+            zeroize::Zeroize::zeroize(body);
         }
-        self.0.url.zeroize();
+        zeroize::Zeroize::zeroize(&mut self.0.url);
     }
 }
 struct TransientResponse(HttpResponse);
 impl Drop for TransientResponse {
     fn drop(&mut self) {
-        self.0.body.zeroize();
+        zeroize::Zeroize::zeroize(&mut self.0.body);
         for value in self.0.headers.values_mut() {
-            value.zeroize();
+            zeroize::Zeroize::zeroize(value);
         }
     }
 }

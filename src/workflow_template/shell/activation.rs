@@ -64,8 +64,8 @@ pub async fn start_orchestration_draft(
     bundle: &super::model::ValidatedBundle,
     facts: &super::model::ActivationFacts,
     actor: &str,
-    runtime: crate::agent_node::AgentRuntimeConfig,
-) -> Result<crate::orchestration::OrchestrationInstance, Error> {
+    runtime: crate::agent_node::RuntimeOptions,
+) -> Result<crate::orchestration::Instance, Error> {
     let definition = admit_activation(store, bundle, facts, actor)?;
     crate::orchestration::start(store, definition, actor, runtime).await.map_err(Error::Orchestration)
 }
@@ -76,7 +76,7 @@ pub async fn start_orchestration_draft_with_execution(
     facts: &super::model::ActivationFacts,
     actor: &str,
     execution: crate::orchestration::ProductExecution<'_>,
-) -> Result<crate::orchestration::OrchestrationInstance, Error> {
+) -> Result<crate::orchestration::Instance, Error> {
     let definition = admit_activation(store, bundle, facts, actor)?;
     crate::orchestration::start_with_execution(store, definition, actor, execution)
         .await
@@ -88,7 +88,7 @@ fn admit_activation(
     bundle: &super::model::ValidatedBundle,
     facts: &super::model::ActivationFacts,
     actor: &str,
-) -> Result<crate::orchestration::OrchestrationDefinition, Error> {
+) -> Result<crate::orchestration::Definition, Error> {
     let plan = super::core::plan_activation(bundle, facts);
     let super::model::ActivationPlan::StartOrchestration { .. } = plan else {
         let block = match plan {

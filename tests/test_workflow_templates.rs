@@ -9,8 +9,8 @@ use lattice::orchestration::BudgetDimensions;
 use lattice::orchestration::BudgetLimits;
 use lattice::orchestration::BudgetPolicy;
 use lattice::orchestration::CompletionPolicy;
+use lattice::orchestration::Definition;
 use lattice::orchestration::DefinitionId;
-use lattice::orchestration::OrchestrationDefinition;
 use lattice::orchestration::RedactionPolicy;
 use lattice::workflow_template::ActivationBlock;
 use lattice::workflow_template::ActivationFacts;
@@ -113,7 +113,7 @@ fn pure_validation_input() -> BundleValidationInput {
 fn orchestration_bundle(
     mut bundle: lattice::workflow_template::ValidatedBundle,
 ) -> lattice::workflow_template::ValidatedBundle {
-    let definition = OrchestrationDefinition {
+    let definition = Definition {
         schema_version: lattice::orchestration::current_schema_version(),
         id: DefinitionId::try_from_text(DEFINITION_ID).expect("definition identity fixture is valid"),
         objective: "Review the exact template workflow".to_string(),
@@ -121,11 +121,12 @@ fn orchestration_bundle(
         completion: CompletionPolicy::RunSucceeded,
         retry: None,
         budgets: BudgetPolicy {
+            // This activates a shell preview, not an accounted worker or model.
             enforced: BudgetDimensions {
                 rounds: true,
-                agent_invocations: true,
-                tokens: true,
-                monetary_microunits: true,
+                agent_invocations: false,
+                tokens: false,
+                monetary_microunits: false,
                 duration_millis: true,
             },
             limits: BudgetLimits {
@@ -513,7 +514,7 @@ async fn exact_activation_records_identities_before_one_admitted_dispatch() {
         &facts,
         ACTOR,
         lattice::orchestration::ProductExecution {
-            agent_runtime: lattice::agent_node::AgentRuntimeConfig::default(),
+            agent_runtime: lattice::agent_node::RuntimeOptions::default(),
             authority_provider: &authority,
         },
     )
@@ -549,7 +550,7 @@ async fn blocked_activation_creates_no_instance_run_or_activation_receipt() {
         &bundle,
         &facts,
         ACTOR,
-        lattice::agent_node::AgentRuntimeConfig::default(),
+        lattice::agent_node::RuntimeOptions::default(),
     )
     .await
     .expect_err("missing runtime admission blocks activation");
@@ -596,7 +597,7 @@ fn tui_preview_is_unsaved_and_cancel_restores_prior_state() {
         ..lattice::config::AppConfig::default()
     };
     std::fs::create_dir_all(&config.data_dir).expect("TUI state directory creates");
-    let mut app = lattice::tui::App::new(config);
+    let mut app = lattice::tui::State::new(config);
     let prior_name = app.workflow.meta.name.clone();
     let store = app.store.clone().expect("preview test store opens");
     let workflow_count = store.list_workflows().expect("preview workflow count reads").len();
@@ -645,7 +646,7 @@ fn tui_browser_renders_safe_metadata_without_bundle_commands() {
         ..lattice::config::AppConfig::default()
     };
     std::fs::create_dir_all(&config.data_dir).expect("render TUI state directory creates");
-    let mut app = lattice::tui::App::new(config);
+    let mut app = lattice::tui::State::new(config);
     app.set_workflow_templates(vec![bundle]);
     app.open_workflow_template_browser();
     let area = ratatui::layout::Rect::new(0, 0, TUI_FRAME_WIDTH, TUI_FRAME_HEIGHT);
@@ -669,7 +670,7 @@ fn tui_refuses_dirty_replacement_and_accepts_only_an_explicit_preview() {
         ..lattice::config::AppConfig::default()
     };
     std::fs::create_dir_all(&dirty_config.data_dir).expect("dirty TUI state directory creates");
-    let mut dirty = lattice::tui::App::new(dirty_config);
+    let mut dirty = lattice::tui::State::new(dirty_config);
     dirty.set_workflow_templates(vec![dirty_bundle]);
     dirty.mark_workflow_dirty();
     let dirty_name = dirty.workflow.meta.name.clone();
@@ -685,7 +686,7 @@ fn tui_refuses_dirty_replacement_and_accepts_only_an_explicit_preview() {
         ..lattice::config::AppConfig::default()
     };
     std::fs::create_dir_all(&accepted_config.data_dir).expect("accepted TUI state directory creates");
-    let mut accepted = lattice::tui::App::new(accepted_config);
+    let mut accepted = lattice::tui::State::new(accepted_config);
     accepted.set_workflow_templates(vec![accepted_bundle]);
     accepted.open_workflow_template_browser();
     accepted.confirm_workflow_template_browser();
@@ -714,7 +715,7 @@ fn tui_refuses_dirty_replacement_and_accepts_only_an_explicit_preview() {
         ..lattice::config::AppConfig::default()
     };
     std::fs::create_dir_all(&drift_config.data_dir).expect("drift TUI state directory creates");
-    let mut drift = lattice::tui::App::new(drift_config);
+    let mut drift = lattice::tui::State::new(drift_config);
     drift.set_workflow_templates(vec![drift_bundle]);
     drift.open_workflow_template_browser();
     drift.confirm_workflow_template_browser();

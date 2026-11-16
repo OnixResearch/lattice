@@ -11,6 +11,7 @@ pub enum Status {
     Failed,
     TimedOut,
     Truncated,
+    Unknown,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -82,6 +83,7 @@ pub fn run(
                 (Status::TimedOut, 0)
             }
             Err(crate::agent_node::ProcessError::OutputLimitExceeded { .. }) => (Status::Truncated, 0),
+            Err(crate::agent_node::ProcessError::Execution { .. }) => (Status::Unknown, 0),
             Err(crate::agent_node::ProcessError::InvalidRequest(_) | crate::agent_node::ProcessError::Spawn(_)) => {
                 (Status::Failed, 0)
             }

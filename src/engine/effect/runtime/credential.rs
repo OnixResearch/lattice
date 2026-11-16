@@ -6,8 +6,6 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 
-use zeroize::Zeroize;
-
 use crate::credentials::CredentialDestination;
 use crate::credentials::CredentialProvider;
 use crate::credentials::CredentialSubject;
@@ -28,7 +26,7 @@ struct TransientProcessRequest(crate::agent_node::ProcessRequest);
 impl Drop for TransientProcessRequest {
     fn drop(&mut self) {
         for value in self.0.env.values_mut() {
-            value.zeroize();
+            zeroize::Zeroize::zeroize(value);
         }
     }
 }
@@ -38,7 +36,7 @@ struct TransientNetworkRequest(crate::http::HttpRequestPlan);
 impl Drop for TransientNetworkRequest {
     fn drop(&mut self) {
         for value in self.0.headers.values_mut() {
-            value.zeroize();
+            zeroize::Zeroize::zeroize(value);
         }
     }
 }
@@ -102,7 +100,7 @@ impl ProcessRecipe {
         let mut resolved = self.bindings.resolve(subject, cancellation).map_err(|_| Error::AdapterRejected)?;
         for (name, value) in resolved.env.drain() {
             if let Some(mut replaced) = request.0.env.insert(name, value) {
-                replaced.zeroize();
+                zeroize::Zeroize::zeroize(&mut replaced);
             }
         }
         let mut output = crate::process::shell::run_bounded(&request.0, process, cancellation).map_err(|error| {
@@ -114,8 +112,8 @@ impl ProcessRecipe {
                 crate::credentials::redact_text(&String::from_utf8_lossy(&output.stdout), &resolved.secret_values);
             let stderr =
                 crate::credentials::redact_text(&String::from_utf8_lossy(&output.stderr), &resolved.secret_values);
-            output.stdout.zeroize();
-            output.stderr.zeroize();
+            zeroize::Zeroize::zeroize(&mut output.stdout);
+            zeroize::Zeroize::zeroize(&mut output.stderr);
             output.stdout = stdout.into_bytes();
             output.stderr = stderr.into_bytes();
         }
@@ -195,7 +193,7 @@ impl NetworkRecipe {
         for (name, value) in resolved.env.drain() {
             request.0.headers.retain(|existing, value| {
                 if existing.eq_ignore_ascii_case(&name) {
-                    value.zeroize();
+                    zeroize::Zeroize::zeroize(value);
                     false
                 } else {
                     true
@@ -207,11 +205,11 @@ impl NetworkRecipe {
             http.execute_with_cancellation(&request.0, cancellation).map_err(|_| Error::AdapterRejected)?;
         if !resolved.secret_values.is_empty() {
             let body = crate::credentials::redact_text(&response.body, &resolved.secret_values);
-            response.body.zeroize();
+            zeroize::Zeroize::zeroize(&mut response.body);
             response.body = body;
             for value in response.headers.values_mut() {
                 let redacted = crate::credentials::redact_text(value, &resolved.secret_values);
-                value.zeroize();
+                zeroize::Zeroize::zeroize(value);
                 *value = redacted;
             }
         }

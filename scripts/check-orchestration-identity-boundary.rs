@@ -33,17 +33,20 @@ const TYPE_ALIASES: &[&str] = &[
     "TriggerScopedKey",
 ];
 const CORE_FIELDS: &[(&str, &str)] = &[
-    ("pub struct WorkflowRevisionRef", "pub content_hash: super::identity::WorkflowRevision"),
-    ("pub struct OrchestrationDefinition", "pub id: super::identity::DefinitionId"),
-    ("pub struct OrchestrationTriggerBinding", "pub trigger_id: super::identity::TriggerId"),
-    ("pub struct DispatchIntent", "pub id: super::identity::DispatchId"),
-    ("pub struct RevisionProposal", "pub id: super::identity::ProposalId"),
-    ("pub struct ApprovalDecision", "pub id: super::identity::ApprovalId"),
-    ("pub struct OrchestrationInstance", "pub id: super::identity::InstanceId"),
-    ("pub struct OrchestrationFact", "pub id: super::identity::FactId"),
-    ("pub struct OrchestrationEvent", "pub event_hash: super::identity::EventId"),
-    ("pub struct OrchestrationEvent", "pub prior_hash: Option<super::identity::PreviousEventId>"),
-    ("pub struct OrchestrationInstance", "pub event_head: Option<super::identity::LedgerHeadId>"),
+    (
+        "pub struct WorkflowRevisionRef",
+        "pub content_hash: crate::orchestration::identity::WorkflowRevision",
+    ),
+    ("pub struct Definition", "pub id: crate::orchestration::identity::DefinitionId"),
+    ("pub struct TriggerBinding", "pub trigger_id: crate::orchestration::identity::TriggerId"),
+    ("pub struct DispatchIntent", "pub id: crate::orchestration::identity::DispatchId"),
+    ("pub struct RevisionProposal", "pub id: crate::orchestration::identity::ProposalId"),
+    ("pub struct ApprovalDecision", "pub id: crate::orchestration::identity::ApprovalId"),
+    ("pub struct Instance", "pub id: crate::orchestration::identity::InstanceId"),
+    ("pub struct Fact", "pub id: crate::orchestration::identity::FactId"),
+    ("pub struct Event", "pub event_hash: crate::orchestration::identity::EventId"),
+    ("pub struct Event", "pub prior_hash: Option<crate::orchestration::identity::PreviousEventId>"),
+    ("pub struct Instance", "pub event_head: Option<crate::orchestration::identity::LedgerHeadId>"),
 ];
 const WIRE_MARKERS: &[&str] = &[
     "struct DefinitionRecord",
@@ -77,13 +80,15 @@ fn main() {
 
 fn check_repository(root: &Path) -> Result<(), String> {
     let identity = read(root, "src/orchestration/identity.rs")?;
-    let core = read(root, "src/orchestration/core.rs")?;
+    let admission = read(root, "src/orchestration/core/model/admission.rs")?;
+    let state = read(root, "src/orchestration/core/model/state.rs")?;
+    let history = read(root, "src/orchestration/core/ledger/history.rs")?;
     let format = read(root, "src/orchestration/format.rs")?;
     let wire = read(root, "src/orchestration/format/wire.rs")?;
-    let store = read(root, "src/store/mod.rs")?;
+    let store = read(root, "src/store/implementation/coordination/ingress.rs")?;
     let docs = read(root, "docs/orchestration-identities.md")?;
     check_identity_source(&identity)?;
-    check_core_source(&core)?;
+    check_core_source(&[&admission, &state, &history])?;
     require_markers("orchestration wire record", &wire, WIRE_MARKERS)?;
     require_markers("orchestration wire adapter", &format, FORMAT_MARKERS)?;
     require_markers("redb identity adapter", &store, STORE_MARKERS)?;
@@ -114,8 +119,9 @@ fn check_identity_source(source: &str) -> Result<(), String> {
     ])
 }
 
-fn check_core_source(source: &str) -> Result<(), String> {
+fn check_core_source(sources: &[&str]) -> Result<(), String> {
     for (owner, field) in CORE_FIELDS {
+        let source = sources.iter().find(|source| source.contains(owner)).ok_or_else(|| format!("missing {owner}"))?;
         let block = struct_block(source, owner)?;
         if !block.contains(field) {
             return Err(format!("{owner} is missing nominal field `{field}`"));
@@ -153,25 +159,25 @@ fn self_test() {
     assert!(error.contains("InstanceId"));
 
     let valid_core = r#"
-pub struct WorkflowRevisionRef { pub content_hash: super::identity::WorkflowRevision, }
-pub struct OrchestrationDefinition { pub id: super::identity::DefinitionId, }
-pub struct OrchestrationTriggerBinding { pub trigger_id: super::identity::TriggerId, }
-pub struct DispatchIntent { pub id: super::identity::DispatchId, }
-pub struct RevisionProposal { pub id: super::identity::ProposalId, }
-pub struct ApprovalDecision { pub id: super::identity::ApprovalId, }
-pub struct OrchestrationInstance {
-    pub id: super::identity::InstanceId,
-    pub event_head: Option<super::identity::LedgerHeadId>,
+pub struct WorkflowRevisionRef { pub content_hash: crate::orchestration::identity::WorkflowRevision, }
+pub struct Definition { pub id: crate::orchestration::identity::DefinitionId, }
+pub struct TriggerBinding { pub trigger_id: crate::orchestration::identity::TriggerId, }
+pub struct DispatchIntent { pub id: crate::orchestration::identity::DispatchId, }
+pub struct RevisionProposal { pub id: crate::orchestration::identity::ProposalId, }
+pub struct ApprovalDecision { pub id: crate::orchestration::identity::ApprovalId, }
+pub struct Instance {
+    pub id: crate::orchestration::identity::InstanceId,
+    pub event_head: Option<crate::orchestration::identity::LedgerHeadId>,
 }
-pub struct OrchestrationFact { pub id: super::identity::FactId, }
-pub struct OrchestrationEvent {
-    pub event_hash: super::identity::EventId,
-    pub prior_hash: Option<super::identity::PreviousEventId>,
+pub struct Fact { pub id: crate::orchestration::identity::FactId, }
+pub struct Event {
+    pub event_hash: crate::orchestration::identity::EventId,
+    pub prior_hash: Option<crate::orchestration::identity::PreviousEventId>,
 }
 "#;
-    assert!(check_core_source(valid_core).is_ok());
-    let invalid_core = valid_core.replace("pub id: super::identity::DispatchId", "pub id: String");
-    let error = check_core_source(&invalid_core).expect_err("raw dispatch identity must fail");
+    assert!(check_core_source(&[valid_core]).is_ok());
+    let invalid_core = valid_core.replace("pub id: crate::orchestration::identity::DispatchId", "pub id: String");
+    let error = check_core_source(&[&invalid_core]).expect_err("raw dispatch identity must fail");
     assert!(error.contains("DispatchIntent"));
     println!("orchestration identity boundary self-test: PASS");
 }

@@ -7,19 +7,12 @@
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 
-use serde::Deserialize;
-use serde::Serialize;
 use tracing::debug;
 use tracing::error;
 use tracing::info;
 
 use crate::agent_node;
-use crate::agent_node::AgentAdapter;
-use crate::agent_node::AgentNodeSettings;
-use crate::agent_node::AgentOutput;
-use crate::agent_node::AgentRequest;
-use crate::agent_node::AgentRuntimeConfig;
-use crate::agent_node::ProductionAgentAdapter;
+use crate::agent_node::Adapter;
 use crate::control_flow;
 use crate::credentials;
 use crate::credentials::CredentialProvider;
@@ -28,7 +21,6 @@ use crate::credentials::NodeCredentialRefs;
 use crate::engine::child::SubworkflowRunnerShell;
 use crate::engine::runner;
 use crate::engine::value::ContentHash;
-use crate::engine::value::Value;
 use crate::engine::workflow::Node;
 use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::PortId;
@@ -43,7 +35,6 @@ use crate::http;
 use crate::http::HttpClient;
 use crate::http::HttpRequestPlan;
 use crate::http::NativeHttpClient;
-use crate::image_node;
 use crate::image_node::ImageIo;
 use crate::image_node::LocalImageIo;
 
@@ -89,6 +80,8 @@ const AUTHORIZED_WORKFLOW_CONTEXT_REQUIRED: &str =
     "product effect execution requires a current Choregraph authority context";
 const CHOREGRAPH_EXECUTION_FAILURE: &str = "Choregraph product execution failed";
 const APPROVAL_REQUIRES_DURABLE_SHELL: &str = "approval nodes require the durable workflow approval shell";
+
+pub mod progress;
 
 type LocalProcessConfig = crate::process::core::RuntimeConfig;
 const HTTP_BODY_INPUT_LABEL: &str = "body";
@@ -217,7 +210,7 @@ struct AgentOutputPortIds {
 pub fn node_execution_cache_key(
     node_id: crate::engine::workflow::NodeId,
     config: &NodeConfig,
-    inputs: &HashMap<PortId, Value>,
+    inputs: &HashMap<PortId, crate::engine::value::Value>,
 ) -> ContentHash {
     node_execution_cache_key_with_credentials(node_id, config, None, inputs)
 }
@@ -227,7 +220,7 @@ pub fn node_execution_cache_key_with_credentials(
     node_id: crate::engine::workflow::NodeId,
     config: &NodeConfig,
     credentials: Option<&NodeCredentialRefs>,
-    inputs: &HashMap<PortId, Value>,
+    inputs: &HashMap<PortId, crate::engine::value::Value>,
 ) -> ContentHash {
     node_execution_cache_key_with_expression_values(node_id, config, credentials, inputs, &BTreeMap::new())
 }
@@ -236,8 +229,8 @@ pub(super) fn node_execution_cache_key_with_expression_values(
     node_id: crate::engine::workflow::NodeId,
     config: &NodeConfig,
     credentials: Option<&NodeCredentialRefs>,
-    inputs: &HashMap<PortId, Value>,
-    expression_values: &BTreeMap<(u64, expressions::ExpressionPortId), Value>,
+    inputs: &HashMap<PortId, crate::engine::value::Value>,
+    expression_values: &BTreeMap<(u64, expressions::ExpressionPortId), crate::engine::value::Value>,
 ) -> ContentHash {
     let mut hasher = blake3::Hasher::new();
     hasher.update(HASH_TAG_NODE_EXECUTION);
@@ -249,7 +242,7 @@ pub(super) fn node_execution_cache_key_with_expression_values(
     ContentHash(*hasher.finalize().as_bytes())
 }
 
-pub(super) fn input_values_hash(inputs: &HashMap<PortId, Value>) -> ContentHash {
+pub(super) fn input_values_hash(inputs: &HashMap<PortId, crate::engine::value::Value>) -> ContentHash {
     let mut hasher = blake3::Hasher::new();
     update_inputs_hash(&mut hasher, inputs);
     ContentHash(*hasher.finalize().as_bytes())
@@ -349,8 +342,8 @@ fn update_node_config_hash(hasher: &mut blake3::Hasher, config: &NodeConfig) {
     }
 }
 
-fn update_agent_settings_hash(hasher: &mut blake3::Hasher, settings: &AgentNodeSettings) {
-    update_str(hasher, HASH_TAG_AGENT_TARGET, agent_node::agent_target_label(settings.target));
+fn update_agent_settings_hash(hasher: &mut blake3::Hasher, settings: &crate::agent_node::Settings) {
+    update_str(hasher, HASH_TAG_AGENT_TARGET, agent_node::target_label(settings.target));
     update_str(hasher, HASH_TAG_AGENT_PROMPT, &settings.prompt);
     update_optional_str(hasher, HASH_TAG_AGENT_PROMPT_FILE, settings.prompt_file.as_deref());
     update_str(hasher, HASH_TAG_AGENT_OUTPUT_MODE, settings.output_mode.as_str());
@@ -361,7 +354,7 @@ fn update_agent_settings_hash(hasher: &mut blake3::Hasher, settings: &AgentNodeS
     update_optional_str(hasher, HASH_TAG_AGENT_SESSION, settings.session.as_deref());
 }
 
-fn update_inputs_hash(hasher: &mut blake3::Hasher, inputs: &HashMap<PortId, Value>) {
+fn update_inputs_hash(hasher: &mut blake3::Hasher, inputs: &HashMap<PortId, crate::engine::value::Value>) {
     let mut input_pairs = inputs.iter().collect::<Vec<_>>();
     input_pairs.sort_by_key(|(port_id, _)| port_id.0);
 
@@ -377,7 +370,7 @@ fn update_inputs_hash(hasher: &mut blake3::Hasher, inputs: &HashMap<PortId, Valu
 
 fn update_expression_values_hash(
     hasher: &mut blake3::Hasher,
-    values: &BTreeMap<(u64, expressions::ExpressionPortId), Value>,
+    values: &BTreeMap<(u64, expressions::ExpressionPortId), crate::engine::value::Value>,
 ) {
     if values.is_empty() {
         return;
@@ -477,7 +470,7 @@ fn resolve_config_list(input: &[String], context: &ExpressionContext) -> Result<
     Ok(resolved)
 }
 
-fn collect_input_sensitive_fragments(inputs: &HashMap<PortId, Value>) -> Vec<String> {
+fn collect_input_sensitive_fragments(inputs: &HashMap<PortId, crate::engine::value::Value>) -> Vec<String> {
     inputs.values().flat_map(|value| value.sensitive_fragments.clone()).collect()
 }
 
@@ -485,8 +478,8 @@ fn collect_input_sensitive_fragments(inputs: &HashMap<PortId, Value>) -> Vec<Str
 pub(super) fn expression_values_for_consumer(
     plan: &runner::RunnerWorkflow,
     consumer_node: crate::engine::workflow::NodeId,
-    port_values: &HashMap<PortId, Value>,
-) -> Result<BTreeMap<(u64, expressions::ExpressionPortId), Value>, String> {
+    port_values: &HashMap<PortId, crate::engine::value::Value>,
+) -> Result<BTreeMap<(u64, expressions::ExpressionPortId), crate::engine::value::Value>, String> {
     plan.expression_dependencies
         .iter()
         .filter(|dependency| dependency.consumer_node == consumer_node.0)
@@ -504,7 +497,7 @@ pub(super) fn expression_values_for_consumer(
 }
 
 pub(super) fn expression_context_from_admitted_values(
-    values: &BTreeMap<(u64, expressions::ExpressionPortId), Value>,
+    values: &BTreeMap<(u64, expressions::ExpressionPortId), crate::engine::value::Value>,
 ) -> ExpressionContext {
     ExpressionContext::new(values.iter().map(|(key, value)| (*key, value.clone())).collect())
 }
@@ -555,7 +548,10 @@ fn update_len(hasher: &mut blake3::Hasher, value: usize) {
     hasher.update(&encoded_len.to_le_bytes());
 }
 
-fn shell_stdin_value<'a>(node: &Node, inputs: &'a HashMap<PortId, Value>) -> Option<&'a Value> {
+fn shell_stdin_value<'a>(
+    node: &Node,
+    inputs: &'a HashMap<PortId, crate::engine::value::Value>,
+) -> Option<&'a crate::engine::value::Value> {
     let labeled_stdin = node
         .input_ports
         .iter()
@@ -568,7 +564,10 @@ fn shell_stdin_value<'a>(node: &Node, inputs: &'a HashMap<PortId, Value>) -> Opt
     node.input_ports.iter().find_map(|port| inputs.get(&port.id))
 }
 
-fn http_body_value<'a>(node: &Node, inputs: &'a HashMap<PortId, Value>) -> Option<&'a Value> {
+fn http_body_value<'a>(
+    node: &Node,
+    inputs: &'a HashMap<PortId, crate::engine::value::Value>,
+) -> Option<&'a crate::engine::value::Value> {
     let labeled_body = node
         .input_ports
         .iter()
@@ -588,9 +587,11 @@ fn http_request_plan(
     headers: &HashMap<String, String>,
     body: &Option<String>,
     timeout_secs: u64,
-    inputs: &HashMap<PortId, Value>,
+    inputs: &HashMap<PortId, crate::engine::value::Value>,
 ) -> HttpRequestPlan {
-    let resolved_body = body.clone().or_else(|| http_body_value(node, inputs).map(Value::as_display_string));
+    let resolved_body = body
+        .clone()
+        .or_else(|| http_body_value(node, inputs).map(crate::engine::value::Value::as_display_string));
     HttpRequestPlan {
         method: http::normalized_method(method),
         url: url.to_string(),
@@ -600,7 +601,10 @@ fn http_request_plan(
     }
 }
 
-fn file_content_value<'a>(node: &Node, inputs: &'a HashMap<PortId, Value>) -> Option<&'a Value> {
+fn file_content_value<'a>(
+    node: &Node,
+    inputs: &'a HashMap<PortId, crate::engine::value::Value>,
+) -> Option<&'a crate::engine::value::Value> {
     let labeled_content = node
         .input_ports
         .iter()
@@ -620,9 +624,11 @@ fn file_operation_plan(
     content: &Option<String>,
     overwrite: bool,
     allowed_roots: &[String],
-    inputs: &HashMap<PortId, Value>,
+    inputs: &HashMap<PortId, crate::engine::value::Value>,
 ) -> FileOperationPlan {
-    let resolved_content = content.clone().or_else(|| file_content_value(node, inputs).map(Value::as_display_string));
+    let resolved_content = content
+        .clone()
+        .or_else(|| file_content_value(node, inputs).map(crate::engine::value::Value::as_display_string));
     FileOperationPlan {
         kind: operation,
         path: path.to_string(),
@@ -744,7 +750,7 @@ pub(super) fn choregraph_execution_error(error: crate::engine::effect::execution
     format!("{CHOREGRAPH_EXECUTION_FAILURE}: {error}")
 }
 
-fn ordered_input_values(inputs: &HashMap<PortId, Value>) -> Vec<Value> {
+fn ordered_input_values(inputs: &HashMap<PortId, crate::engine::value::Value>) -> Vec<crate::engine::value::Value> {
     let mut input_pairs = inputs.iter().collect::<Vec<_>>();
     input_pairs.sort_by_key(|(port_id, _)| port_id.0);
     input_pairs.into_iter().map(|(_, value)| value.clone()).collect()
@@ -752,18 +758,18 @@ fn ordered_input_values(inputs: &HashMap<PortId, Value>) -> Vec<Value> {
 
 // r[impl n8nclone.workflow_execution.agent_nodes.execute]
 fn agent_request_from_settings(
-    settings: &AgentNodeSettings,
+    settings: &crate::agent_node::Settings,
     prompt: String,
     model_hint: Option<String>,
     tool_policy: String,
     context_refs: Vec<String>,
     cwd: Option<String>,
     session: Option<String>,
-    inputs: &HashMap<PortId, Value>,
-) -> AgentRequest {
+    inputs: &HashMap<PortId, crate::engine::value::Value>,
+) -> agent_node::Request {
     let ordered_values = ordered_input_values(inputs);
     let (text_inputs, image_inputs, json_inputs) = agent_node::request_inputs_from_values(&ordered_values);
-    AgentRequest {
+    agent_node::Request {
         target: settings.target,
         prompt,
         output_mode: settings.output_mode,
@@ -798,11 +804,14 @@ fn shell_output_port_ids(node: &Node) -> Result<ShellOutputPortIds, String> {
     Ok(ShellOutputPortIds { stdout, stderr, exit })
 }
 
-fn shell_outputs_by_real_port(ports: ShellOutputPortIds, outputs: ShellOutputValues) -> HashMap<PortId, Value> {
+fn shell_outputs_by_real_port(
+    ports: ShellOutputPortIds,
+    outputs: ShellOutputValues,
+) -> HashMap<PortId, crate::engine::value::Value> {
     let mut mapped = HashMap::new();
-    mapped.insert(ports.stdout, Value::from_string(outputs.stdout));
-    mapped.insert(ports.stderr, Value::from_string(outputs.stderr));
-    mapped.insert(ports.exit, Value::from_exit_code(outputs.exit_code));
+    mapped.insert(ports.stdout, crate::engine::value::Value::from_string(outputs.stdout));
+    mapped.insert(ports.stderr, crate::engine::value::Value::from_string(outputs.stderr));
+    mapped.insert(ports.exit, crate::engine::value::Value::from_exit_code(outputs.exit_code));
     mapped
 }
 
@@ -825,11 +834,14 @@ fn http_output_port_ids(node: &Node) -> Result<HttpOutputPortIds, String> {
     Ok(HttpOutputPortIds { status, headers, body })
 }
 
-fn http_outputs_by_real_port(ports: HttpOutputPortIds, response: http::HttpResponse) -> HashMap<PortId, Value> {
+fn http_outputs_by_real_port(
+    ports: HttpOutputPortIds,
+    response: http::HttpResponse,
+) -> HashMap<PortId, crate::engine::value::Value> {
     let mut mapped = HashMap::new();
-    mapped.insert(ports.status, Value::from_string(response.status.to_string()));
-    mapped.insert(ports.headers, Value::from_json(serde_json::json!(response.headers)));
-    mapped.insert(ports.body, Value::from_string(response.body));
+    mapped.insert(ports.status, crate::engine::value::Value::from_string(response.status.to_string()));
+    mapped.insert(ports.headers, crate::engine::value::Value::from_json(serde_json::json!(response.headers)));
+    mapped.insert(ports.body, crate::engine::value::Value::from_string(response.body));
     mapped
 }
 
@@ -860,21 +872,19 @@ fn file_outputs_by_real_port(
     ports: FileOutputPortIds,
     path: &str,
     result: FileOperationResult,
-) -> HashMap<PortId, Value> {
-    let mut mapped = HashMap::new();
-    match result {
-        FileOperationResult::Read { content, bytes } => {
-            mapped.insert(ports.content, Value::from_string(content));
-            mapped.insert(ports.metadata, Value::from_json(serde_json::json!({ "path": path, "bytes": bytes })));
-            mapped.insert(ports.bytes_written, Value::from_string(String::new()));
-        }
-        FileOperationResult::Written { bytes } => {
-            mapped.insert(ports.content, Value::from_string(String::new()));
-            mapped.insert(ports.metadata, Value::from_json(serde_json::json!({ "path": path, "bytes": bytes })));
-            mapped.insert(ports.bytes_written, Value::from_string(bytes.to_string()));
-        }
-    }
-    mapped
+) -> HashMap<PortId, crate::engine::value::Value> {
+    let (content, bytes_written, bytes) = match result {
+        FileOperationResult::Read { content, bytes } => (content, String::new(), bytes),
+        FileOperationResult::Written { bytes } => (String::new(), bytes.to_string(), bytes),
+    };
+    HashMap::from([
+        (ports.content, crate::engine::value::Value::from_string(content)),
+        (
+            ports.metadata,
+            crate::engine::value::Value::from_json(serde_json::json!({ "path": path, "bytes": bytes })),
+        ),
+        (ports.bytes_written, crate::engine::value::Value::from_string(bytes_written)),
+    ])
 }
 
 fn image_output_port_ids(node: &Node) -> Result<ImageOutputPortIds, String> {
@@ -894,7 +904,7 @@ fn image_output_port_ids(node: &Node) -> Result<ImageOutputPortIds, String> {
 fn image_outputs_by_real_port(
     ports: ImageOutputPortIds,
     image: crate::engine::value::ImageValue,
-) -> HashMap<PortId, Value> {
+) -> HashMap<PortId, crate::engine::value::Value> {
     let mut mapped = HashMap::new();
     let metadata = serde_json::json!({
         "media_type": image.media_type.clone(),
@@ -903,8 +913,8 @@ fn image_outputs_by_real_port(
         "height": image.metadata.height,
         "source_label": image.metadata.source_label.clone(),
     });
-    mapped.insert(ports.image, Value::from_image(image));
-    mapped.insert(ports.metadata, Value::from_json(metadata));
+    mapped.insert(ports.image, crate::engine::value::Value::from_image(image));
+    mapped.insert(ports.metadata, crate::engine::value::Value::from_json(metadata));
     mapped
 }
 
@@ -945,28 +955,28 @@ fn agent_output_port_ids(node: &Node) -> Result<AgentOutputPortIds, String> {
 
 fn agent_outputs_by_real_port(
     ports: AgentOutputPortIds,
-    response: agent_node::AgentResponse,
-) -> HashMap<PortId, Value> {
+    response: agent_node::Response,
+) -> HashMap<PortId, crate::engine::value::Value> {
     let mut mapped = HashMap::new();
     match response.output {
-        AgentOutput::Text(text) => {
-            mapped.insert(ports.text, Value::from_string(text));
+        agent_node::Output::Text(text) => {
+            mapped.insert(ports.text, crate::engine::value::Value::from_string(text));
         }
-        AgentOutput::Json(json) => {
-            mapped.insert(ports.json, Value::from_json(json));
+        agent_node::Output::Json(json) => {
+            mapped.insert(ports.json, crate::engine::value::Value::from_json(json));
         }
-        AgentOutput::Image(image) => {
-            mapped.insert(ports.image, Value::from_image(image));
+        agent_node::Output::Image(image) => {
+            mapped.insert(ports.image, crate::engine::value::Value::from_image(image));
         }
-        AgentOutput::Artifact(bytes) => {
-            mapped.insert(ports.artifact, Value::from_bytes(bytes));
+        agent_node::Output::Artifact(bytes) => {
+            mapped.insert(ports.artifact, crate::engine::value::Value::from_bytes(bytes));
         }
     }
-    mapped.insert(ports.metadata, Value::from_json(response.metadata));
+    mapped.insert(ports.metadata, crate::engine::value::Value::from_json(response.metadata));
     mapped
 }
 
-fn first_input_value(inputs: &HashMap<PortId, Value>) -> Option<&Value> {
+fn first_input_value(inputs: &HashMap<PortId, crate::engine::value::Value>) -> Option<&crate::engine::value::Value> {
     inputs.iter().min_by_key(|(port_id, _)| port_id.0).map(|(_, value)| value)
 }
 
@@ -974,15 +984,15 @@ fn first_input_value(inputs: &HashMap<PortId, Value>) -> Option<&Value> {
 fn condition_outputs_by_real_port(
     node: &Node,
     matched_labels: &[String],
-    value: Option<&Value>,
-) -> HashMap<PortId, Value> {
+    value: Option<&crate::engine::value::Value>,
+) -> HashMap<PortId, crate::engine::value::Value> {
     let matched = matched_labels.iter().collect::<std::collections::BTreeSet<_>>();
     node.output_ports
         .iter()
         .filter(|port| matched.contains(&port.label))
         .map(|port| {
             let output = value.cloned().unwrap_or_else(|| {
-                Value::from_json(serde_json::json!({
+                crate::engine::value::Value::from_json(serde_json::json!({
                     "branch": port.label,
                     "matched": true,
                 }))
@@ -992,7 +1002,10 @@ fn condition_outputs_by_real_port(
         .collect()
 }
 
-fn merge_inputs_by_label(node: &Node, inputs: &HashMap<PortId, Value>) -> Vec<control_flow::MergeInputValue> {
+fn merge_inputs_by_label(
+    node: &Node,
+    inputs: &HashMap<PortId, crate::engine::value::Value>,
+) -> Vec<control_flow::MergeInputValue> {
     node.input_ports
         .iter()
         .enumerate()
@@ -1011,7 +1024,7 @@ fn merge_outputs_by_real_port(
     node: &Node,
     policy: control_flow::MergePolicy,
     selected: Vec<control_flow::MergeInputValue>,
-) -> HashMap<PortId, Value> {
+) -> HashMap<PortId, crate::engine::value::Value> {
     let Some(output_port) = node.output_ports.first() else {
         return HashMap::new();
     };
@@ -1019,7 +1032,10 @@ fn merge_outputs_by_real_port(
     HashMap::from([(output_port.id, output_value)])
 }
 
-fn merge_output_value(policy: control_flow::MergePolicy, selected: Vec<control_flow::MergeInputValue>) -> Value {
+fn merge_output_value(
+    policy: control_flow::MergePolicy,
+    selected: Vec<control_flow::MergeInputValue>,
+) -> crate::engine::value::Value {
     if policy != control_flow::MergePolicy::Collect && selected.len() == 1 {
         return selected.into_iter().next().expect("selected merge value exists").value;
     }
@@ -1035,10 +1051,10 @@ fn merge_output_value(policy: control_flow::MergePolicy, selected: Vec<control_f
             })
         })
         .collect::<Vec<_>>();
-    Value::from_json(serde_json::json!(values)).with_sensitive_fragments(sensitive_fragments)
+    crate::engine::value::Value::from_json(serde_json::json!(values)).with_sensitive_fragments(sensitive_fragments)
 }
 
-fn value_to_json(value: &Value) -> serde_json::Value {
+fn value_to_json(value: &crate::engine::value::Value) -> serde_json::Value {
     match &value.data {
         crate::engine::ValueData::String(value) => serde_json::json!(value),
         crate::engine::ValueData::Bytes(value) => serde_json::json!(value),
@@ -1060,7 +1076,7 @@ pub(super) fn completed_step_result(
     node_id: crate::engine::workflow::NodeId,
     input_hash: ContentHash,
     node: &Node,
-    outputs: HashMap<PortId, Value>,
+    outputs: HashMap<PortId, crate::engine::value::Value>,
     cached: bool,
 ) -> StepResult {
     match admit_completed_outputs(node, &outputs) {
@@ -1077,7 +1093,7 @@ pub(super) fn completed_step_result(
     }
 }
 
-fn admit_completed_outputs(node: &Node, outputs: &HashMap<PortId, Value>) -> Result<(), String> {
+fn admit_completed_outputs(node: &Node, outputs: &HashMap<PortId, crate::engine::value::Value>) -> Result<(), String> {
     let runner_node = runner_node_from_graph_node(node);
     let output_shapes = outputs
         .iter()
@@ -1124,7 +1140,7 @@ fn format_runner_output_diagnostics(diagnostics: Vec<runner::RunnerDiagnostic>) 
 }
 
 /// Unique identifier for an execution run.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct RunId(pub u64);
 
 impl std::fmt::Display for RunId {
@@ -1143,12 +1159,12 @@ pub enum ExecutionMode {
 }
 
 /// Per-node execution status.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum NodeStatus {
     Pending,
     Running,
     Completed {
-        outputs: HashMap<PortId, Value>,
+        outputs: HashMap<PortId, crate::engine::value::Value>,
         cached: bool,
     },
     Failed {
@@ -1157,19 +1173,20 @@ pub enum NodeStatus {
     Skipped,
 }
 
-/// Result of executing a single step (one node).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Observations of dispatch and the final admitted result of one node.
+#[derive(Debug, Clone)]
 pub enum NodeProgress {
     Started {
         node_id: crate::engine::workflow::NodeId,
     },
     Finished {
         node_id: crate::engine::workflow::NodeId,
-        duration_millis: u64,
+        duration_millis: Option<u64>,
+        result: StepResult,
     },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct StepResult {
     pub node_id: crate::engine::workflow::NodeId,
     pub status: NodeStatus,
@@ -1179,7 +1196,7 @@ pub struct StepResult {
 #[derive(Debug, Clone)]
 pub struct ApprovalSuspensionPoint {
     pub node_id: crate::engine::workflow::NodeId,
-    pub inputs: HashMap<PortId, Value>,
+    pub inputs: HashMap<PortId, crate::engine::value::Value>,
 }
 
 #[derive(Debug, Clone)]
@@ -1191,11 +1208,11 @@ pub struct ApprovalRunOutcome {
 
 pub struct ApprovalResumeInput<'a> {
     pub workflow: &'a Workflow,
-    pub cache: &'a HashMap<ContentHash, HashMap<PortId, Value>>,
+    pub cache: &'a HashMap<ContentHash, HashMap<PortId, crate::engine::value::Value>>,
     pub context: &'a crate::engine::effect::execution::RunContext,
     pub checkpoint: &'a [StepResult],
     pub resumed_gate: crate::engine::workflow::NodeId,
-    pub resumed_gate_outputs: &'a HashMap<PortId, Value>,
+    pub resumed_gate_outputs: &'a HashMap<PortId, crate::engine::value::Value>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1203,7 +1220,7 @@ struct ExecutionControl<'a> {
     checkpoint: &'a [StepResult],
     stop_at_approval: bool,
     resumed_gate: Option<crate::engine::workflow::NodeId>,
-    resumed_gate_outputs: Option<&'a HashMap<PortId, Value>>,
+    resumed_gate_outputs: Option<&'a HashMap<PortId, crate::engine::value::Value>>,
 }
 
 impl ExecutionControl<'_> {
@@ -1222,7 +1239,7 @@ struct RuntimeParts {
     http_client: Box<dyn HttpClient>,
     file_system: Box<dyn FileSystem>,
     image_io: Box<dyn ImageIo>,
-    agent_adapter: Box<dyn AgentAdapter>,
+    agent_adapter: Box<dyn Adapter>,
     local_process: LocalProcessConfig,
 }
 
@@ -1238,7 +1255,7 @@ pub(super) enum EffectExecution<'a> {
 pub(super) struct NodeExecution<'a> {
     pub(super) workflow: &'a Workflow,
     pub(super) node_id: crate::engine::workflow::NodeId,
-    pub(super) inputs: &'a HashMap<PortId, Value>,
+    pub(super) inputs: &'a HashMap<PortId, crate::engine::value::Value>,
     pub(super) expression_context: &'a ExpressionContext,
     pub(super) input_hash: Option<ContentHash>,
     pub(super) parent_run_id: Option<RunId>,
@@ -1252,7 +1269,7 @@ pub struct Executor {
     http_client: Box<dyn HttpClient>,
     file_system: Box<dyn FileSystem>,
     image_io: Box<dyn ImageIo>,
-    agent_adapter: Box<dyn AgentAdapter>,
+    agent_adapter: Box<dyn Adapter>,
     local_process: LocalProcessConfig,
     require_successful_shells: bool,
     subworkflow_runner_shell: Box<dyn SubworkflowRunnerShell>,
@@ -1261,7 +1278,7 @@ pub struct Executor {
     pub(super) frontier_policy: lattice_core::scheduling::CapacityPolicy,
     frontier_conflicts: BTreeMap<u64, lattice_core::scheduling::ConflictState>,
     observed_completion_order: Vec<crate::engine::workflow::NodeId>,
-    progress_sender: Option<tokio::sync::mpsc::UnboundedSender<NodeProgress>>,
+    progress_sender: Option<progress::Sender>,
 }
 
 // r[impl n8nclone.workflow_execution.image_input_nodes.production_io.default_executor]
@@ -1276,8 +1293,8 @@ fn default_file_system() -> Box<dyn FileSystem> {
 }
 
 // r[impl n8nclone.workflow_execution.agent_nodes.production_adapters.default_executor]
-fn default_agent_adapter() -> Box<dyn AgentAdapter> {
-    Box::<ProductionAgentAdapter>::default()
+fn default_agent_adapter() -> Box<dyn Adapter> {
+    Box::<agent_node::ProductionAdapter>::default()
 }
 
 fn default_subworkflow_runner_shell() -> Box<dyn SubworkflowRunnerShell> {
@@ -1328,7 +1345,7 @@ impl Executor {
     }
 
     // r[impl n8nclone.workflow_execution.agent_nodes.production_adapters.config]
-    pub fn new_with_agent_runtime_config(agent_runtime: AgentRuntimeConfig) -> Self {
+    pub fn new_with_agent_runtime_config(agent_runtime: crate::agent_node::RuntimeOptions) -> Self {
         let credential_env_keys: Vec<String> = agent_runtime
             .openai_compatible
             .values()
@@ -1344,7 +1361,7 @@ impl Executor {
             http_client: Box::<NativeHttpClient>::default(),
             file_system: default_file_system(),
             image_io: default_image_io(),
-            agent_adapter: Box::new(ProductionAgentAdapter::new(agent_runtime)),
+            agent_adapter: Box::new(agent_node::ProductionAdapter::new(agent_runtime)),
             local_process,
         })
     }
@@ -1382,7 +1399,7 @@ impl Executor {
         })
     }
 
-    pub fn new_with_agent_adapter(agent_adapter: Box<dyn AgentAdapter>) -> Self {
+    pub fn new_with_agent_adapter(agent_adapter: Box<dyn Adapter>) -> Self {
         Self::with_components(RuntimeParts {
             credential_provider: Box::<EmptyCredentialProvider>::default(),
             http_client: Box::<NativeHttpClient>::default(),
@@ -1412,12 +1429,12 @@ impl Executor {
         self
     }
 
-    pub fn with_progress_sender(mut self, sender: tokio::sync::mpsc::UnboundedSender<NodeProgress>) -> Self {
+    pub fn with_progress_sender(mut self, sender: progress::Sender) -> Self {
         self.progress_sender = Some(sender);
         self
     }
 
-    pub(crate) fn progress_sender(&self) -> Option<tokio::sync::mpsc::UnboundedSender<NodeProgress>> {
+    pub(crate) fn progress_sender(&self) -> Option<progress::Sender> {
         self.progress_sender.clone()
     }
 
@@ -1493,7 +1510,7 @@ impl Executor {
         http_client: Box<dyn HttpClient>,
         file_system: Box<dyn FileSystem>,
         image_io: Box<dyn ImageIo>,
-        agent_adapter: Box<dyn AgentAdapter>,
+        agent_adapter: Box<dyn Adapter>,
     ) -> Self {
         Self::with_components(RuntimeParts {
             credential_provider,
@@ -1512,7 +1529,7 @@ impl Executor {
         &self,
         workflow: &Workflow,
         node_id: crate::engine::workflow::NodeId,
-        inputs: &HashMap<PortId, Value>,
+        inputs: &HashMap<PortId, crate::engine::value::Value>,
     ) -> StepResult {
         self.execute_node_with_expression_context(NodeExecution {
             workflow,
@@ -1533,7 +1550,7 @@ impl Executor {
         &self,
         workflow: &Workflow,
         node_id: crate::engine::workflow::NodeId,
-        inputs: &HashMap<PortId, Value>,
+        inputs: &HashMap<PortId, crate::engine::value::Value>,
         binding: &crate::engine::effect::authority::IntentBinding,
         dispatch: &crate::engine::effect::dispatch::Shell,
     ) -> StepResult {
@@ -2114,7 +2131,7 @@ impl Executor {
                         };
                     }
                 };
-                let plan = image_node::image_input_plan(&resolved_path.value, &resolved_roots, *max_bytes);
+                let plan = crate::image_node::image_input_plan(&resolved_path.value, &resolved_roots, *max_bytes);
                 match self.image_io.load(&plan) {
                     Ok(image) => completed_step_result(
                         node_id,
@@ -2280,7 +2297,7 @@ impl Executor {
                         }),
                 };
                 match response {
-                    Ok(response) => match agent_node::validate_agent_response_mode(&response, settings.output_mode) {
+                    Ok(response) => match agent_node::validate_response_mode(&response, settings.output_mode) {
                         Ok(()) => completed_step_result(
                             node_id,
                             input_hash,
@@ -2374,7 +2391,7 @@ impl Executor {
                 match (observation.class, observation.output) {
                     (crate::operation::runtime::ObservationClass::Completed, Some(output)) => {
                         let mut outputs = HashMap::new();
-                        outputs.insert(output_port, Value::from_json(output));
+                        outputs.insert(output_port, crate::engine::value::Value::from_json(output));
                         completed_step_result(node_id, input_hash, node, outputs, false)
                     }
                     _ => StepResult {
@@ -2503,7 +2520,7 @@ impl Executor {
     pub async fn run(
         &mut self,
         workflow: &Workflow,
-        cache: &HashMap<ContentHash, HashMap<PortId, Value>>,
+        cache: &HashMap<ContentHash, HashMap<PortId, crate::engine::value::Value>>,
     ) -> (RunId, Vec<StepResult>) {
         self.run_with_bound_inputs(workflow, cache, &HashMap::new(), None).await
     }
@@ -2514,7 +2531,7 @@ impl Executor {
     pub async fn run_authorized(
         &mut self,
         workflow: &Workflow,
-        cache: &HashMap<ContentHash, HashMap<PortId, Value>>,
+        cache: &HashMap<ContentHash, HashMap<PortId, crate::engine::value::Value>>,
         context: &crate::engine::effect::execution::RunContext,
     ) -> (RunId, Vec<StepResult>) {
         self.run_with_bound_inputs(workflow, cache, &HashMap::new(), Some(context)).await
@@ -2523,7 +2540,7 @@ impl Executor {
     pub async fn run_authorized_until_approval(
         &mut self,
         workflow: &Workflow,
-        cache: &HashMap<ContentHash, HashMap<PortId, Value>>,
+        cache: &HashMap<ContentHash, HashMap<PortId, crate::engine::value::Value>>,
         context: &crate::engine::effect::execution::RunContext,
     ) -> ApprovalRunOutcome {
         self.run_with_bound_inputs_control(workflow, cache, &HashMap::new(), Some(context), ExecutionControl {
@@ -2554,8 +2571,8 @@ impl Executor {
     pub async fn run_with_named_inputs(
         &mut self,
         workflow: &Workflow,
-        cache: &HashMap<ContentHash, HashMap<PortId, Value>>,
-        named_inputs: &BTreeMap<String, Value>,
+        cache: &HashMap<ContentHash, HashMap<PortId, crate::engine::value::Value>>,
+        named_inputs: &BTreeMap<String, crate::engine::value::Value>,
     ) -> Result<(RunId, Vec<StepResult>), crate::engine::child::SubworkflowExecutionError> {
         let bound_inputs = crate::engine::child::bind_named_inputs(workflow, named_inputs)?;
         Ok(self.run_with_bound_inputs(workflow, cache, &bound_inputs, None).await)
@@ -2564,8 +2581,8 @@ impl Executor {
     pub async fn run_authorized_with_named_inputs(
         &mut self,
         workflow: &Workflow,
-        cache: &HashMap<ContentHash, HashMap<PortId, Value>>,
-        named_inputs: &BTreeMap<String, Value>,
+        cache: &HashMap<ContentHash, HashMap<PortId, crate::engine::value::Value>>,
+        named_inputs: &BTreeMap<String, crate::engine::value::Value>,
         context: &crate::engine::effect::execution::RunContext,
     ) -> Result<(RunId, Vec<StepResult>), crate::engine::child::SubworkflowExecutionError> {
         let bound_inputs = crate::engine::child::bind_named_inputs(workflow, named_inputs)?;
@@ -2575,8 +2592,8 @@ impl Executor {
     async fn run_with_bound_inputs(
         &mut self,
         workflow: &Workflow,
-        cache: &HashMap<ContentHash, HashMap<PortId, Value>>,
-        bound_inputs: &HashMap<PortId, Value>,
+        cache: &HashMap<ContentHash, HashMap<PortId, crate::engine::value::Value>>,
+        bound_inputs: &HashMap<PortId, crate::engine::value::Value>,
         product_context: Option<&crate::engine::effect::execution::RunContext>,
     ) -> (RunId, Vec<StepResult>) {
         let outcome = self
@@ -2588,8 +2605,8 @@ impl Executor {
     async fn run_with_bound_inputs_control(
         &mut self,
         workflow: &Workflow,
-        cache: &HashMap<ContentHash, HashMap<PortId, Value>>,
-        bound_inputs: &HashMap<PortId, Value>,
+        cache: &HashMap<ContentHash, HashMap<PortId, crate::engine::value::Value>>,
+        bound_inputs: &HashMap<PortId, crate::engine::value::Value>,
         product_context: Option<&crate::engine::effect::execution::RunContext>,
         control: ExecutionControl<'_>,
     ) -> ApprovalRunOutcome {
@@ -2662,7 +2679,7 @@ impl Executor {
 
         let maximum_step_count = topo.len();
         let mut results = Vec::with_capacity(maximum_step_count);
-        let mut port_values: HashMap<PortId, Value> = HashMap::new();
+        let mut port_values: HashMap<PortId, crate::engine::value::Value> = HashMap::new();
         assert!(
             control.checkpoint.len() <= maximum_step_count,
             "approval checkpoint cannot contain more nodes than the admitted workflow"
@@ -2864,8 +2881,10 @@ impl Executor {
                 None => EffectExecution::Compatibility,
             };
             let progress = self.progress_sender();
-            if let Some(sender) = progress.as_ref() {
-                let _ = sender.send(NodeProgress::Started { node_id });
+            if let Some(sender) = progress.as_ref()
+                && let Err(fault) = sender.send(NodeProgress::Started { node_id })
+            {
+                error!(?node_id, ?fault, "executor start observation incomplete");
             }
             let started = std::time::Instant::now();
             let step = self
@@ -2879,12 +2898,6 @@ impl Executor {
                     effect,
                 })
                 .await;
-            if let Some(sender) = progress.as_ref() {
-                let _ = sender.send(NodeProgress::Finished {
-                    node_id: step.node_id,
-                    duration_millis: u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX),
-                });
-            }
             let step = match product_session.as_ref() {
                 Some(session) => match session.lock().finish(node_id, &step.status) {
                     Ok(()) => step,
@@ -2892,6 +2905,15 @@ impl Executor {
                 },
                 None => step,
             };
+            if let Some(sender) = progress.as_ref()
+                && let Err(fault) = sender.send(NodeProgress::Finished {
+                    node_id: step.node_id,
+                    duration_millis: u64::try_from(started.elapsed().as_millis()).ok(),
+                    result: step.clone(),
+                })
+            {
+                error!(node = ?step.node_id, ?fault, "executor finish observation incomplete");
+            }
 
             // Store outputs for downstream nodes.
             if let NodeStatus::Completed { ref outputs, .. } = step.status {
@@ -2969,7 +2991,7 @@ struct ShellExecutionInput<'a> {
     environment: &'a HashMap<String, String>,
     timeout_secs: u64,
     should_pipe_stdin: bool,
-    stdin_value: Option<&'a Value>,
+    stdin_value: Option<&'a crate::engine::value::Value>,
 }
 
 /// Execute a shell command through the shared blocking bounded-process shell.
@@ -2979,7 +3001,11 @@ fn shell_process_request(
     config: &LocalProcessConfig,
 ) -> crate::agent_node::ProcessRequest {
     let stdin = if input.should_pipe_stdin {
-        input.stdin_value.map(Value::as_display_string).unwrap_or_default().into_bytes()
+        input
+            .stdin_value
+            .map(crate::engine::value::Value::as_display_string)
+            .unwrap_or_default()
+            .into_bytes()
     } else {
         Vec::new()
     };
@@ -3010,11 +3036,14 @@ async fn execute_shell(
     config: &LocalProcessConfig,
     cancellation: std::sync::Arc<std::sync::atomic::AtomicBool>,
 ) -> Result<crate::agent_node::ProcessOutput, crate::agent_node::ProcessError> {
-    let request = crate::agent_node::ExecutionProcessRequest(shell_process_request(&input, config));
+    let request = crate::agent_node::runtime::host::ExecutionProcessRequest(shell_process_request(&input, config));
     let runner = crate::agent_node::ProductionProcessRunner::new(config.clone());
     let output = tokio::task::spawn_blocking(move || runner.run_with_cancellation(&request.0, &cancellation))
         .await
-        .map_err(|_| crate::agent_node::ProcessError::Spawn(PROCESS_TASK_FAILURE_DIAGNOSTIC.to_owned()))??;
+        .map_err(|_| crate::agent_node::ProcessError::Execution {
+            phase: crate::agent_node::ProcessFailurePhase::Execution,
+            termination: crate::agent_node::ProcessTermination::Unknown,
+        })??;
 
     Ok(output)
 }
@@ -3023,8 +3052,8 @@ async fn execute_shell(
 pub(super) fn gather_inputs(
     workflow: &Workflow,
     node_id: crate::engine::workflow::NodeId,
-    port_values: &HashMap<PortId, Value>,
-) -> HashMap<PortId, Value> {
+    port_values: &HashMap<PortId, crate::engine::value::Value>,
+) -> HashMap<PortId, crate::engine::value::Value> {
     let Some(node) = workflow.graph.node(node_id) else {
         return HashMap::new();
     };
@@ -3044,7 +3073,7 @@ pub(super) fn gather_inputs(
     inputs
 }
 
-fn approval_gate_outputs_valid(node: &Node, outputs: &HashMap<PortId, Value>) -> bool {
+fn approval_gate_outputs_valid(node: &Node, outputs: &HashMap<PortId, crate::engine::value::Value>) -> bool {
     if outputs.len() != node.output_ports.len() {
         return false;
     }

@@ -11,26 +11,26 @@ use std::sync::atomic::Ordering;
 use std::time::Duration;
 use std::time::Instant;
 
-use lattice::agent_node::AgentAdapter;
-use lattice::agent_node::AgentCommandOutput;
-use lattice::agent_node::AgentCommandPlan;
-use lattice::agent_node::AgentCommandRuntimeConfig;
-use lattice::agent_node::AgentError;
-use lattice::agent_node::AgentOutput;
-use lattice::agent_node::AgentOutputMode;
-use lattice::agent_node::AgentRequest;
-use lattice::agent_node::AgentResponse;
-use lattice::agent_node::AgentRuntimeConfig;
-use lattice::agent_node::AgentTarget;
+use lattice::agent_node::Adapter;
+use lattice::agent_node::CommandOptions;
+use lattice::agent_node::CommandOutput;
+use lattice::agent_node::CommandPlan;
+use lattice::agent_node::Error;
 use lattice::agent_node::ExecutionContext as AgentExecutionContext;
 use lattice::agent_node::FakeProcessRunner;
+use lattice::agent_node::Output;
+use lattice::agent_node::OutputMode;
 use lattice::agent_node::ProcessError;
 use lattice::agent_node::ProcessOutput;
-use lattice::agent_node::ProductionAgentAdapter;
-use lattice::agent_node::decode_agent_command_output;
-use lattice::agent_node::plan_agent_command;
-use lattice::agent_node::render_agent_command_prompt;
-use lattice::agent_node::run_agent_command_with_runner;
+use lattice::agent_node::ProductionAdapter;
+use lattice::agent_node::Request;
+use lattice::agent_node::Response;
+use lattice::agent_node::RuntimeOptions;
+use lattice::agent_node::Target;
+use lattice::agent_node::decode_command;
+use lattice::agent_node::plan_command;
+use lattice::agent_node::render_command;
+use lattice::agent_node::run_command_with_runner;
 use lattice::credentials::NodeCredentialRefs;
 use lattice::credentials::SecretRef;
 use lattice::engine::executor::Executor;
@@ -96,28 +96,28 @@ const SMALL_OUTPUT_LIMIT_BYTES: usize = 4;
 
 #[derive(Clone)]
 struct StaticAgentAdapter {
-    response: AgentResponse,
-    requests: Arc<Mutex<Vec<AgentRequest>>>,
+    response: Response,
+    requests: Arc<Mutex<Vec<Request>>>,
 }
 
 impl StaticAgentAdapter {
-    fn new(response: AgentResponse) -> Self {
+    fn new(response: Response) -> Self {
         Self {
             response,
             requests: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
-    fn requests(&self) -> Vec<AgentRequest> {
+    fn requests(&self) -> Vec<Request> {
         self.requests.lock().clone()
     }
 }
 
-impl AgentAdapter for StaticAgentAdapter {
-    fn execution_identity(&self, _request: &AgentRequest) -> Result<String, AgentError> {
+impl Adapter for StaticAgentAdapter {
+    fn execution_identity(&self, _request: &Request) -> Result<String, Error> {
         Ok("test/static-agent/v1".to_owned())
     }
-    fn execute(&self, request: &AgentRequest, _context: &AgentExecutionContext) -> Result<AgentResponse, AgentError> {
+    fn execute(&self, request: &Request, _context: &AgentExecutionContext) -> Result<Response, Error> {
         self.requests.lock().push(request.clone());
         Ok(self.response.clone())
     }
@@ -125,12 +125,12 @@ impl AgentAdapter for StaticAgentAdapter {
 
 #[derive(Clone)]
 struct ErrorAgentAdapter {
-    error: AgentError,
+    error: Error,
     calls: Arc<Mutex<usize>>,
 }
 
 impl ErrorAgentAdapter {
-    fn new(error: AgentError) -> Self {
+    fn new(error: Error) -> Self {
         Self {
             error,
             calls: Arc::new(Mutex::new(0)),
@@ -142,11 +142,11 @@ impl ErrorAgentAdapter {
     }
 }
 
-impl AgentAdapter for ErrorAgentAdapter {
-    fn execution_identity(&self, _request: &AgentRequest) -> Result<String, AgentError> {
+impl Adapter for ErrorAgentAdapter {
+    fn execution_identity(&self, _request: &Request) -> Result<String, Error> {
         Ok("test/error-agent/v1".to_owned())
     }
-    fn execute(&self, _request: &AgentRequest, _context: &AgentExecutionContext) -> Result<AgentResponse, AgentError> {
+    fn execute(&self, _request: &Request, _context: &AgentExecutionContext) -> Result<Response, Error> {
         *self.calls.lock() += 1;
         Err(self.error.clone())
     }
@@ -156,8 +156,8 @@ fn image_value(bytes: &[u8]) -> Value {
     Value::from_image(ImageValue::new(bytes.to_vec(), IMAGE_MEDIA_TYPE.to_string(), ImageMetadata::default()))
 }
 
-fn agent_request(target: AgentTarget, output_mode: AgentOutputMode) -> AgentRequest {
-    AgentRequest {
+fn agent_request(target: Target, output_mode: OutputMode) -> Request {
+    Request {
         target,
         prompt: PROMPT_TEXT.to_string(),
         output_mode,
@@ -172,7 +172,7 @@ fn agent_request(target: AgentTarget, output_mode: AgentOutputMode) -> AgentRequ
     }
 }
 
-fn runtime_config(pi_runtime_command: Option<String>, clankers_runtime_command: Option<String>) -> AgentRuntimeConfig {
+fn runtime_config(pi_runtime_command: Option<String>, clankers_runtime_command: Option<String>) -> RuntimeOptions {
     let mut runtimes = BTreeMap::new();
     if let Some(command) = pi_runtime_command {
         runtimes.insert(PI_RUNTIME_KEY.to_string(), runtime_entry(command, &[PROMPT_FLAG, PROMPT_ARG_TEMPLATE]));
@@ -180,17 +180,17 @@ fn runtime_config(pi_runtime_command: Option<String>, clankers_runtime_command: 
     if let Some(command) = clankers_runtime_command {
         runtimes.insert(CLANKERS_RUNTIME_KEY.to_string(), runtime_entry(command, &[PROMPT_FLAG, PROMPT_ARG_TEMPLATE]));
     }
-    AgentRuntimeConfig {
+    RuntimeOptions {
         runtimes,
         openai_compatible: BTreeMap::new(),
         structured_input_projection: Default::default(),
-        max_output_bytes: AgentRuntimeConfig::default().max_output_bytes,
+        max_output_bytes: RuntimeOptions::default().max_output_bytes,
         local_process: Default::default(),
     }
 }
 
-fn runtime_entry(command: impl Into<String>, args: &[&str]) -> AgentCommandRuntimeConfig {
-    AgentCommandRuntimeConfig {
+fn runtime_entry(command: impl Into<String>, args: &[&str]) -> CommandOptions {
+    CommandOptions {
         command: command.into(),
         args: args.iter().map(|arg| (*arg).to_string()).collect(),
     }
@@ -200,7 +200,7 @@ fn runtime_entry(command: impl Into<String>, args: &[&str]) -> AgentCommandRunti
 fn runtime_config_for_script(
     pi_runtime_script: Option<String>,
     clankers_runtime_script: Option<String>,
-) -> AgentRuntimeConfig {
+) -> RuntimeOptions {
     let mut runtimes = BTreeMap::new();
     if let Some(script) = pi_runtime_script {
         runtimes.insert(PI_RUNTIME_KEY.to_string(), script_runtime_entry(script));
@@ -208,37 +208,37 @@ fn runtime_config_for_script(
     if let Some(script) = clankers_runtime_script {
         runtimes.insert(CLANKERS_RUNTIME_KEY.to_string(), script_runtime_entry(script));
     }
-    AgentRuntimeConfig {
+    RuntimeOptions {
         runtimes,
         openai_compatible: BTreeMap::new(),
         structured_input_projection: Default::default(),
-        max_output_bytes: AgentRuntimeConfig::default().max_output_bytes,
+        max_output_bytes: RuntimeOptions::default().max_output_bytes,
         local_process: Default::default(),
     }
 }
 
 #[cfg(unix)]
-fn script_runtime_entry(script: String) -> AgentCommandRuntimeConfig {
-    AgentCommandRuntimeConfig {
+fn script_runtime_entry(script: String) -> CommandOptions {
+    CommandOptions {
         command: SHELL_COMMAND.to_string(),
         args: vec![script, PROMPT_FLAG.to_string(), PROMPT_ARG_TEMPLATE.to_string()],
     }
 }
 
-fn command_plan(target: AgentTarget, output_mode: AgentOutputMode) -> AgentCommandPlan {
-    AgentCommandPlan {
+fn command_plan(target: Target, output_mode: OutputMode) -> CommandPlan {
+    CommandPlan {
         target,
         adapter_label: match target {
-            AgentTarget::Pi => "pi",
-            AgentTarget::Clankers => "clankers",
-            AgentTarget::Animus => "animus",
+            Target::Pi => "pi",
+            Target::Clankers => "clankers",
+            Target::Animus => "animus",
         },
         program: "agent".to_string(),
         args: Vec::new(),
         cwd: None,
         output_mode,
-        timeout_secs: AgentRuntimeConfig::default().local_process.limits.command_agent_timeout_secs,
-        max_output_bytes: AgentRuntimeConfig::default().max_output_bytes,
+        timeout_secs: RuntimeOptions::default().local_process.limits.command_agent_timeout_secs,
+        max_output_bytes: RuntimeOptions::default().max_output_bytes,
     }
 }
 
@@ -266,7 +266,7 @@ fn handoff_envelope(path: &str, media_type: Option<&str>) -> String {
 // r[verify n8nclone.workflow_execution.agent_nodes.command_runtimes.config]
 #[test]
 fn default_agent_runtime_config_contains_command_presets() {
-    let config = AgentRuntimeConfig::default();
+    let config = RuntimeOptions::default();
 
     let pi = config.runtimes.get(PI_RUNTIME_KEY).expect("pi runtime preset");
     let clankers = config.runtimes.get(CLANKERS_RUNTIME_KEY).expect("clankers runtime preset");
@@ -283,7 +283,7 @@ fn default_agent_runtime_config_contains_command_presets() {
 // r[verify n8nclone.workflow_execution.agent_nodes.command_runtimes.planning]
 #[test]
 fn production_command_plan_uses_runtime_args_and_prompt_inputs() {
-    let mut request = agent_request(AgentTarget::Pi, AgentOutputMode::Text);
+    let mut request = agent_request(Target::Pi, OutputMode::Text);
     request.model_hint = Some(MODEL_HINT.to_string());
     request.session = Some(SESSION_ID.to_string());
     request.tool_policy = TOOL_POLICY.to_string();
@@ -305,8 +305,8 @@ fn production_command_plan_uses_runtime_args_and_prompt_inputs() {
         ]),
     );
 
-    let plan = plan_agent_command(&config, &request).expect("command plan builds");
-    let prompt = render_agent_command_prompt(&request).expect("default prompt renders");
+    let plan = plan_command(&config, &request).expect("command plan builds");
+    let prompt = render_command(&request).expect("default prompt renders");
 
     assert_eq!(plan.program, "pi-test");
     assert!(plan.args.iter().any(|arg| arg == "--model"));
@@ -325,16 +325,16 @@ fn production_command_plan_uses_runtime_args_and_prompt_inputs() {
 // r[verify n8nclone.workflow_execution.trait_boundaries.process_runner]
 #[test]
 fn agent_command_uses_process_runner_output() {
-    let request = agent_request(AgentTarget::Pi, AgentOutputMode::Text);
+    let request = agent_request(Target::Pi, OutputMode::Text);
     let config = runtime_config(Some("pi-test".to_string()), None);
-    let plan = plan_agent_command(&config, &request).expect("command plan builds");
+    let plan = plan_command(&config, &request).expect("command plan builds");
     let runner = FakeProcessRunner::new(Ok(ProcessOutput {
         status_code: Some(PROCESS_STATUS_SUCCESS),
         stdout: RUNTIME_TEXT_OUTPUT.as_bytes().to_vec(),
         stderr: Vec::new(),
     }));
 
-    let output = run_agent_command_with_runner(&plan, &runner).expect("fake process runner succeeds");
+    let output = run_command_with_runner(&plan, &runner).expect("fake process runner succeeds");
 
     assert_eq!(output.status_code, Some(PROCESS_STATUS_SUCCESS));
     assert_eq!(output.stdout, RUNTIME_TEXT_OUTPUT);
@@ -343,12 +343,12 @@ fn agent_command_uses_process_runner_output() {
 // r[verify n8nclone.workflow_execution.trait_boundaries.process_runner]
 #[test]
 fn agent_command_reports_process_runner_failure() {
-    let request = agent_request(AgentTarget::Pi, AgentOutputMode::Text);
+    let request = agent_request(Target::Pi, OutputMode::Text);
     let config = runtime_config(Some("pi-test".to_string()), None);
-    let plan = plan_agent_command(&config, &request).expect("command plan builds");
+    let plan = plan_command(&config, &request).expect("command plan builds");
     let runner = FakeProcessRunner::new(Err(ProcessError::Timeout));
 
-    let error = run_agent_command_with_runner(&plan, &runner).expect_err("fake timeout fails command");
+    let error = run_command_with_runner(&plan, &runner).expect_err("fake timeout fails command");
 
     assert!(error.to_string().contains("process timed out"), "error: {error}");
 }
@@ -361,12 +361,12 @@ fn agent_command_reports_process_runner_failure() {
 fn production_pi_text_adapter_executes_command() {
     let temp_dir = tempfile::tempdir().expect("temporary fake agent directory");
     let command = write_agent_script(&temp_dir, &format!("#!/bin/sh\nprintf '{RUNTIME_TEXT_OUTPUT}'\n"));
-    let adapter = ProductionAgentAdapter::new(runtime_config_for_script(Some(command), None));
-    let request = agent_request(AgentTarget::Pi, AgentOutputMode::Text);
+    let adapter = ProductionAdapter::new(runtime_config_for_script(Some(command), None));
+    let request = agent_request(Target::Pi, OutputMode::Text);
 
     let response = adapter.execute(&request, &AgentExecutionContext::default()).expect("production pi adapter runs");
 
-    assert_eq!(response.output, AgentOutput::Text(RUNTIME_TEXT_OUTPUT.to_string()));
+    assert_eq!(response.output, Output::Text(RUNTIME_TEXT_OUTPUT.to_string()));
     assert_eq!(response.metadata["adapter"], "pi");
 }
 
@@ -378,8 +378,8 @@ fn production_command_adapter_honors_pre_execution_cancellation() {
     let temp_dir = tempfile::tempdir().expect("temporary fake agent directory");
     let marker = temp_dir.path().join("pre-cancel-marker");
     let command = write_agent_script(&temp_dir, &format!("#!/bin/sh\nprintf started > '{}'\n", marker.display()));
-    let adapter = ProductionAgentAdapter::new(runtime_config_for_script(Some(command), None));
-    let request = agent_request(AgentTarget::Pi, AgentOutputMode::Text);
+    let adapter = ProductionAdapter::new(runtime_config_for_script(Some(command), None));
+    let request = agent_request(Target::Pi, OutputMode::Text);
     let cancellation = AtomicBool::new(true);
 
     let error = adapter
@@ -396,8 +396,8 @@ fn production_command_adapter_honors_pre_execution_cancellation() {
 fn production_command_adapter_cancels_a_running_process_promptly() {
     let temp_dir = tempfile::tempdir().expect("temporary fake agent directory");
     let command = write_agent_script(&temp_dir, "#!/bin/sh\nsleep 30\n");
-    let adapter = ProductionAgentAdapter::new(runtime_config_for_script(Some(command), None));
-    let request = agent_request(AgentTarget::Pi, AgentOutputMode::Text);
+    let adapter = ProductionAdapter::new(runtime_config_for_script(Some(command), None));
+    let request = agent_request(Target::Pi, OutputMode::Text);
     let cancellation = Arc::new(AtomicBool::new(false));
     let signal = Arc::clone(&cancellation);
     let setter = std::thread::spawn(move || {
@@ -425,8 +425,8 @@ fn production_command_cancellation_terminates_descendants() {
         &temp_dir,
         &format!("#!/bin/sh\n( sleep 2; printf after > '{}' ) &\nwait\n", marker.display()),
     );
-    let adapter = ProductionAgentAdapter::new(runtime_config_for_script(Some(command), None));
-    let request = agent_request(AgentTarget::Pi, AgentOutputMode::Text);
+    let adapter = ProductionAdapter::new(runtime_config_for_script(Some(command), None));
+    let request = agent_request(Target::Pi, OutputMode::Text);
     let cancellation = Arc::new(AtomicBool::new(false));
     let signal = Arc::clone(&cancellation);
     let setter = std::thread::spawn(move || {
@@ -451,14 +451,14 @@ fn production_command_cancellation_terminates_descendants() {
 fn production_clankers_json_adapter_executes_command() {
     let temp_dir = tempfile::tempdir().expect("temporary fake agent directory");
     let command = write_agent_script(&temp_dir, &format!("#!/bin/sh\nprintf '{RUNTIME_JSON_OUTPUT}'\n"));
-    let adapter = ProductionAgentAdapter::new(runtime_config_for_script(None, Some(command)));
-    let request = agent_request(AgentTarget::Clankers, AgentOutputMode::Json);
+    let adapter = ProductionAdapter::new(runtime_config_for_script(None, Some(command)));
+    let request = agent_request(Target::Clankers, OutputMode::Json);
 
     let response = adapter
         .execute(&request, &AgentExecutionContext::default())
         .expect("production clankers adapter runs");
 
-    assert_eq!(response.output, AgentOutput::Json(serde_json::json!({"ok": true})));
+    assert_eq!(response.output, Output::Json(serde_json::json!({"ok": true})));
     assert_eq!(response.metadata["adapter"], "clankers");
 }
 
@@ -468,9 +468,9 @@ fn production_clankers_json_adapter_executes_command() {
 #[test]
 fn production_adapter_missing_runtime_rejects_before_spawn() {
     let config = runtime_config(None, None);
-    let request = agent_request(AgentTarget::Pi, AgentOutputMode::Text);
+    let request = agent_request(Target::Pi, OutputMode::Text);
 
-    let error = plan_agent_command(&config, &request).expect_err("missing runtime rejected");
+    let error = plan_command(&config, &request).expect_err("missing runtime rejected");
 
     assert!(error.to_string().contains("missing pi agent runtime configuration"), "error: {error}");
 }
@@ -480,9 +480,9 @@ fn production_adapter_missing_runtime_rejects_before_spawn() {
 #[test]
 fn production_adapter_empty_command_rejects_before_spawn() {
     let config = runtime_config(Some("   ".to_string()), None);
-    let request = agent_request(AgentTarget::Pi, AgentOutputMode::Text);
+    let request = agent_request(Target::Pi, OutputMode::Text);
 
-    let error = plan_agent_command(&config, &request).expect_err("empty command rejected");
+    let error = plan_command(&config, &request).expect_err("empty command rejected");
 
     assert!(error.to_string().contains("missing pi agent runtime command"), "error: {error}");
 }
@@ -497,14 +497,14 @@ fn production_image_handoff_loads_typed_image() {
     fs::write(temp_dir.path().join(HANDOFF_IMAGE_FILE_NAME), IMAGE_BYTES_A).expect("image handoff written");
     let envelope = handoff_envelope(HANDOFF_IMAGE_FILE_NAME, Some(IMAGE_MEDIA_TYPE));
     let command = write_agent_script(&temp_dir, &format!("#!/bin/sh\nprintf '{envelope}'\n"));
-    let adapter = ProductionAgentAdapter::new(runtime_config_for_script(Some(command), None));
-    let mut request = agent_request(AgentTarget::Pi, AgentOutputMode::Image);
+    let adapter = ProductionAdapter::new(runtime_config_for_script(Some(command), None));
+    let mut request = agent_request(Target::Pi, OutputMode::Image);
     request.cwd = Some(temp_dir.path().display().to_string());
 
     let response = adapter.execute(&request, &AgentExecutionContext::default()).expect("production image handoff runs");
 
     match response.output {
-        AgentOutput::Image(image) => {
+        Output::Image(image) => {
             assert_eq!(image.media_type, IMAGE_MEDIA_TYPE);
             assert_eq!(image.bytes, IMAGE_BYTES_A);
         }
@@ -522,15 +522,15 @@ fn production_artifact_handoff_loads_bytes() {
         .expect("artifact handoff written");
     let envelope = handoff_envelope(HANDOFF_ARTIFACT_FILE_NAME, None);
     let command = write_agent_script(&temp_dir, &format!("#!/bin/sh\nprintf '{envelope}'\n"));
-    let adapter = ProductionAgentAdapter::new(runtime_config_for_script(None, Some(command)));
-    let mut request = agent_request(AgentTarget::Clankers, AgentOutputMode::Artifact);
+    let adapter = ProductionAdapter::new(runtime_config_for_script(None, Some(command)));
+    let mut request = agent_request(Target::Clankers, OutputMode::Artifact);
     request.cwd = Some(temp_dir.path().display().to_string());
 
     let response = adapter
         .execute(&request, &AgentExecutionContext::default())
         .expect("production artifact handoff runs");
 
-    assert_eq!(response.output, AgentOutput::Artifact(HANDOFF_ARTIFACT_BYTES.to_vec()));
+    assert_eq!(response.output, Output::Artifact(HANDOFF_ARTIFACT_BYTES.to_vec()));
     assert_eq!(response.metadata["file_handoff"]["bytes"], HANDOFF_ARTIFACT_BYTES.len());
 }
 
@@ -538,17 +538,17 @@ fn production_artifact_handoff_loads_bytes() {
 #[test]
 fn image_handoff_rejects_missing_file() {
     let temp_dir = tempfile::tempdir().expect("temporary missing handoff directory");
-    let plan = AgentCommandPlan {
+    let plan = CommandPlan {
         cwd: Some(temp_dir.path().display().to_string()),
-        ..command_plan(AgentTarget::Pi, AgentOutputMode::Image)
+        ..command_plan(Target::Pi, OutputMode::Image)
     };
-    let output = AgentCommandOutput {
+    let output = CommandOutput {
         status_code: Some(0),
         stdout: handoff_envelope(HANDOFF_MISSING_FILE_NAME, Some(IMAGE_MEDIA_TYPE)),
         stderr: String::new(),
     };
 
-    let error = decode_agent_command_output(&plan, &output).expect_err("missing handoff rejected");
+    let error = decode_command(&plan, &output).expect_err("missing handoff rejected");
 
     assert!(error.to_string().contains("output file is missing"), "error: {error}");
 }
@@ -559,17 +559,17 @@ fn image_handoff_rejects_unsupported_image_bytes() {
     let temp_dir = tempfile::tempdir().expect("temporary bad image handoff directory");
     fs::write(temp_dir.path().join(HANDOFF_UNSUPPORTED_IMAGE_FILE_NAME), HANDOFF_BAD_IMAGE_BYTES)
         .expect("bad image handoff written");
-    let plan = AgentCommandPlan {
+    let plan = CommandPlan {
         cwd: Some(temp_dir.path().display().to_string()),
-        ..command_plan(AgentTarget::Pi, AgentOutputMode::Image)
+        ..command_plan(Target::Pi, OutputMode::Image)
     };
-    let output = AgentCommandOutput {
+    let output = CommandOutput {
         status_code: Some(0),
         stdout: handoff_envelope(HANDOFF_UNSUPPORTED_IMAGE_FILE_NAME, Some(IMAGE_MEDIA_TYPE)),
         stderr: String::new(),
     };
 
-    let error = decode_agent_command_output(&plan, &output).expect_err("unsupported image rejected");
+    let error = decode_command(&plan, &output).expect_err("unsupported image rejected");
 
     assert!(error.to_string().contains("unsupported image format"), "error: {error}");
 }
@@ -579,17 +579,17 @@ fn image_handoff_rejects_unsupported_image_bytes() {
 fn image_handoff_rejects_media_type_mismatch() {
     let temp_dir = tempfile::tempdir().expect("temporary media mismatch handoff directory");
     fs::write(temp_dir.path().join(HANDOFF_IMAGE_FILE_NAME), IMAGE_BYTES_A).expect("image handoff written");
-    let plan = AgentCommandPlan {
+    let plan = CommandPlan {
         cwd: Some(temp_dir.path().display().to_string()),
-        ..command_plan(AgentTarget::Pi, AgentOutputMode::Image)
+        ..command_plan(Target::Pi, OutputMode::Image)
     };
-    let output = AgentCommandOutput {
+    let output = CommandOutput {
         status_code: Some(0),
         stdout: handoff_envelope(HANDOFF_IMAGE_FILE_NAME, Some("image/jpeg")),
         stderr: String::new(),
     };
 
-    let error = decode_agent_command_output(&plan, &output).expect_err("media mismatch rejected");
+    let error = decode_command(&plan, &output).expect_err("media mismatch rejected");
 
     assert!(error.to_string().contains("media type mismatch"), "error: {error}");
 }
@@ -600,18 +600,18 @@ fn artifact_handoff_rejects_oversized_file() {
     let temp_dir = tempfile::tempdir().expect("temporary oversized handoff directory");
     fs::write(temp_dir.path().join(HANDOFF_ARTIFACT_FILE_NAME), HANDOFF_ARTIFACT_BYTES)
         .expect("artifact handoff written");
-    let plan = AgentCommandPlan {
+    let plan = CommandPlan {
         cwd: Some(temp_dir.path().display().to_string()),
         max_output_bytes: SMALL_OUTPUT_LIMIT_BYTES,
-        ..command_plan(AgentTarget::Clankers, AgentOutputMode::Artifact)
+        ..command_plan(Target::Clankers, OutputMode::Artifact)
     };
-    let output = AgentCommandOutput {
+    let output = CommandOutput {
         status_code: Some(0),
         stdout: handoff_envelope(HANDOFF_ARTIFACT_FILE_NAME, None),
         stderr: String::new(),
     };
 
-    let error = decode_agent_command_output(&plan, &output).expect_err("oversized artifact rejected");
+    let error = decode_command(&plan, &output).expect_err("oversized artifact rejected");
 
     assert!(error.to_string().contains("too large"), "error: {error}");
 }
@@ -625,17 +625,17 @@ fn handoff_rejects_output_path_outside_working_directory() {
     let outside_dir = tempfile::tempdir().expect("temporary outside directory");
     let outside_path = outside_dir.path().join(HANDOFF_OUTSIDE_FILE_NAME);
     fs::write(&outside_path, IMAGE_BYTES_A).expect("outside handoff written");
-    let plan = AgentCommandPlan {
+    let plan = CommandPlan {
         cwd: Some(cwd_dir.path().display().to_string()),
-        ..command_plan(AgentTarget::Pi, AgentOutputMode::Image)
+        ..command_plan(Target::Pi, OutputMode::Image)
     };
-    let output = AgentCommandOutput {
+    let output = CommandOutput {
         status_code: Some(0),
         stdout: handoff_envelope(&outside_path.display().to_string(), Some(IMAGE_MEDIA_TYPE)),
         stderr: String::new(),
     };
 
-    let error = decode_agent_command_output(&plan, &output).expect_err("outside path rejected");
+    let error = decode_command(&plan, &output).expect_err("outside path rejected");
 
     assert!(error.to_string().contains("outside working directory"), "error: {error}");
 }
@@ -650,17 +650,17 @@ fn handoff_rejects_symlink_escape() {
     fs::write(&outside_path, IMAGE_BYTES_A).expect("outside handoff written");
     std::os::unix::fs::symlink(&outside_path, cwd_dir.path().join(HANDOFF_SYMLINK_FILE_NAME))
         .expect("escaping handoff symlink created");
-    let plan = AgentCommandPlan {
+    let plan = CommandPlan {
         cwd: Some(cwd_dir.path().display().to_string()),
-        ..command_plan(AgentTarget::Pi, AgentOutputMode::Image)
+        ..command_plan(Target::Pi, OutputMode::Image)
     };
-    let output = AgentCommandOutput {
+    let output = CommandOutput {
         status_code: Some(PROCESS_STATUS_SUCCESS),
         stdout: handoff_envelope(HANDOFF_SYMLINK_FILE_NAME, Some(IMAGE_MEDIA_TYPE)),
         stderr: String::new(),
     };
 
-    let error = decode_agent_command_output(&plan, &output).expect_err("escaping handoff rejected");
+    let error = decode_command(&plan, &output).expect_err("escaping handoff rejected");
 
     assert!(error.to_string().contains("permission denied"), "error: {error}");
 }
@@ -668,14 +668,14 @@ fn handoff_rejects_symlink_escape() {
 // r[verify n8nclone.workflow_execution.agent_nodes.output_file_handoff.safety]
 #[test]
 fn handoff_rejects_invalid_envelope_json() {
-    let plan = command_plan(AgentTarget::Pi, AgentOutputMode::Image);
-    let output = AgentCommandOutput {
+    let plan = command_plan(Target::Pi, OutputMode::Image);
+    let output = CommandOutput {
         status_code: Some(0),
         stdout: INVALID_JSON_OUTPUT.to_string(),
         stderr: String::new(),
     };
 
-    let error = decode_agent_command_output(&plan, &output).expect_err("invalid envelope rejected");
+    let error = decode_command(&plan, &output).expect_err("invalid envelope rejected");
 
     assert!(error.to_string().contains("handoff envelope is invalid JSON"), "error: {error}");
 }
@@ -684,14 +684,14 @@ fn handoff_rejects_invalid_envelope_json() {
 // r[verify n8nclone.workflow_execution.agent_nodes.production_adapters.errors]
 #[test]
 fn decode_agent_command_output_rejects_invalid_json() {
-    let plan = command_plan(AgentTarget::Pi, AgentOutputMode::Json);
-    let output = AgentCommandOutput {
+    let plan = command_plan(Target::Pi, OutputMode::Json);
+    let output = CommandOutput {
         status_code: Some(0),
         stdout: INVALID_JSON_OUTPUT.to_string(),
         stderr: String::new(),
     };
 
-    let error = decode_agent_command_output(&plan, &output).expect_err("invalid JSON rejected");
+    let error = decode_command(&plan, &output).expect_err("invalid JSON rejected");
 
     assert!(error.to_string().contains("invalid JSON"), "error: {error}");
 }
@@ -699,14 +699,14 @@ fn decode_agent_command_output_rejects_invalid_json() {
 // r[verify n8nclone.workflow_execution.agent_nodes.production_adapters.errors]
 #[test]
 fn decode_agent_command_output_reports_nonzero_stderr() {
-    let plan = command_plan(AgentTarget::Clankers, AgentOutputMode::Text);
-    let output = AgentCommandOutput {
+    let plan = command_plan(Target::Clankers, OutputMode::Text);
+    let output = CommandOutput {
         status_code: Some(NONZERO_EXIT_CODE),
         stdout: String::new(),
         stderr: NONZERO_STDERR.to_string(),
     };
 
-    let error = decode_agent_command_output(&plan, &output).expect_err("nonzero exit rejected");
+    let error = decode_command(&plan, &output).expect_err("nonzero exit rejected");
 
     assert!(error.to_string().contains(&format!("status {NONZERO_EXIT_CODE}")), "error: {error}");
     assert!(error.to_string().contains(NONZERO_STDERR), "error: {error}");
@@ -717,7 +717,7 @@ fn decode_agent_command_output_reports_nonzero_stderr() {
 #[test]
 fn add_agent_node_records_config_and_ports() {
     let mut workflow = Workflow::new("agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
-    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Pi, PROMPT_TEXT, AgentOutputMode::Image);
+    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, Target::Pi, PROMPT_TEXT, OutputMode::Image);
     let node = workflow.graph.node(node_id).expect("agent node exists");
 
     assert_eq!(node.input_ports.len(), JSON_INPUT_INDEX + 1);
@@ -726,9 +726,9 @@ fn add_agent_node_records_config_and_ports() {
     assert_eq!(node.output_ports[IMAGE_OUTPUT_INDEX].type_tag, TypeTag::Image.as_str());
     match workflow.node_config(node_id).expect("agent config exists") {
         NodeConfig::Agent(settings) => {
-            assert_eq!(settings.target, AgentTarget::Pi);
+            assert_eq!(settings.target, Target::Pi);
             assert_eq!(settings.prompt, PROMPT_TEXT);
-            assert_eq!(settings.output_mode, AgentOutputMode::Image);
+            assert_eq!(settings.output_mode, OutputMode::Image);
         }
         other => panic!("expected agent config, got {other:?}"),
     }
@@ -739,13 +739,13 @@ fn add_agent_node_records_config_and_ports() {
 // r[verify n8nclone.workflow_execution.agent_nodes.execute]
 #[tokio::test]
 async fn pi_agent_node_executes_text_request_through_adapter() {
-    let adapter = StaticAgentAdapter::new(AgentResponse {
-        output: AgentOutput::Text(TEXT_OUTPUT.to_string()),
+    let adapter = StaticAgentAdapter::new(Response {
+        output: Output::Text(TEXT_OUTPUT.to_string()),
         metadata: serde_json::json!({"adapter": "pi"}),
     });
     let observed_adapter = adapter.clone();
     let mut workflow = Workflow::new("agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
-    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Pi, PROMPT_TEXT, AgentOutputMode::Text);
+    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, Target::Pi, PROMPT_TEXT, OutputMode::Text);
     let node = workflow.graph.node(node_id).expect("agent node exists");
     let prompt_input = node.input_ports[PROMPT_INPUT_INDEX].id;
     let inputs = [(prompt_input, Value::from_string("extra prompt".to_string()))].into();
@@ -764,7 +764,7 @@ async fn pi_agent_node_executes_text_request_through_adapter() {
     }
     let requests = observed_adapter.requests();
     assert_eq!(requests.len(), 1);
-    assert_eq!(requests[0].target, AgentTarget::Pi);
+    assert_eq!(requests[0].target, Target::Pi);
     assert_eq!(requests[0].prompt, PROMPT_TEXT);
     assert_eq!(requests[0].text_inputs, vec!["extra prompt".to_string()]);
 }
@@ -778,13 +778,13 @@ async fn pi_agent_node_executes_text_request_through_adapter() {
 async fn clankers_agent_node_executes_image_request_through_adapter() {
     let generated_image =
         ImageValue::new(IMAGE_BYTES_B.to_vec(), IMAGE_MEDIA_TYPE.to_string(), ImageMetadata::default());
-    let adapter = StaticAgentAdapter::new(AgentResponse {
-        output: AgentOutput::Image(generated_image),
+    let adapter = StaticAgentAdapter::new(Response {
+        output: Output::Image(generated_image),
         metadata: serde_json::json!({"adapter": "clankers"}),
     });
     let observed_adapter = adapter.clone();
     let mut workflow = Workflow::new("agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
-    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Clankers, PROMPT_TEXT, AgentOutputMode::Image);
+    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, Target::Clankers, PROMPT_TEXT, OutputMode::Image);
     let node = workflow.graph.node(node_id).expect("agent node exists");
     let image_input = node.input_ports[IMAGE_INPUT_INDEX].id;
     let inputs = [(image_input, image_value(IMAGE_BYTES_A))].into();
@@ -802,7 +802,7 @@ async fn clankers_agent_node_executes_image_request_through_adapter() {
     }
     let requests = observed_adapter.requests();
     assert_eq!(requests.len(), 1);
-    assert_eq!(requests[0].target, AgentTarget::Clankers);
+    assert_eq!(requests[0].target, Target::Clankers);
     assert_eq!(requests[0].image_inputs.len(), 1);
 }
 
@@ -810,12 +810,12 @@ async fn clankers_agent_node_executes_image_request_through_adapter() {
 // r[verify n8nclone.workflow_execution.agent_nodes.execute]
 #[tokio::test]
 async fn output_mode_mismatch_marks_node_failed() {
-    let adapter = StaticAgentAdapter::new(AgentResponse {
-        output: AgentOutput::Text(TEXT_OUTPUT.to_string()),
+    let adapter = StaticAgentAdapter::new(Response {
+        output: Output::Text(TEXT_OUTPUT.to_string()),
         metadata: serde_json::json!({}),
     });
     let mut workflow = Workflow::new("agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
-    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Pi, PROMPT_TEXT, AgentOutputMode::Image);
+    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, Target::Pi, PROMPT_TEXT, OutputMode::Image);
     let executor = Executor::new_with_agent_adapter(Box::new(adapter));
 
     let result = executor.execute_node(&workflow, node_id, &HashMap::new()).await;
@@ -833,7 +833,7 @@ async fn output_mode_mismatch_marks_node_failed() {
 #[test]
 fn agent_cache_key_changes_for_prompt_target_and_image_edits() {
     let mut workflow = Workflow::new("agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
-    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Pi, PROMPT_TEXT, AgentOutputMode::Image);
+    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, Target::Pi, PROMPT_TEXT, OutputMode::Image);
     let node = workflow.graph.node(node_id).expect("agent node exists");
     let image_input = node.input_ports[IMAGE_INPUT_INDEX].id;
     let inputs_a = [(image_input, image_value(IMAGE_BYTES_A))].into();
@@ -841,8 +841,8 @@ fn agent_cache_key_changes_for_prompt_target_and_image_edits() {
     let original_config = workflow.node_config(node_id).expect("agent config");
     let original_key = node_execution_cache_key(node_id, original_config, &inputs_a);
 
-    let prompt_config = NodeConfig::agent(AgentTarget::Pi, PROMPT_TEXT_EDITED, AgentOutputMode::Image);
-    let target_config = NodeConfig::agent(AgentTarget::Clankers, PROMPT_TEXT, AgentOutputMode::Image);
+    let prompt_config = NodeConfig::agent(Target::Pi, PROMPT_TEXT_EDITED, OutputMode::Image);
+    let target_config = NodeConfig::agent(Target::Clankers, PROMPT_TEXT, OutputMode::Image);
 
     assert_ne!(original_key, node_execution_cache_key(node_id, &prompt_config, &inputs_a));
     assert_ne!(original_key, node_execution_cache_key(node_id, &target_config, &inputs_a));
@@ -854,7 +854,7 @@ fn agent_cache_key_changes_for_prompt_target_and_image_edits() {
 #[test]
 fn empty_agent_prompt_is_validation_diagnostic() {
     let mut workflow = Workflow::new("agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
-    workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Pi, "", AgentOutputMode::Text);
+    workflow.add_agent_node(AGENT_NODE_LABEL, Target::Pi, "", OutputMode::Text);
 
     let diagnostics = validate_workflow(&workflow);
 
@@ -865,9 +865,9 @@ fn empty_agent_prompt_is_validation_diagnostic() {
 // r[verify n8nclone.workflow_execution.agent_nodes.errors]
 #[tokio::test]
 async fn preflight_rejection_marks_node_failed() {
-    let adapter = ErrorAgentAdapter::new(AgentError::PreflightRejected("missing model".to_string()));
+    let adapter = ErrorAgentAdapter::new(Error::PreflightRejected("missing model".to_string()));
     let mut workflow = Workflow::new("agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
-    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Pi, PROMPT_TEXT, AgentOutputMode::Text);
+    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, Target::Pi, PROMPT_TEXT, OutputMode::Text);
     let executor = Executor::new_with_agent_adapter(Box::new(adapter));
 
     let result = executor.execute_node(&workflow, node_id, &HashMap::new()).await;
@@ -882,9 +882,9 @@ async fn preflight_rejection_marks_node_failed() {
 // r[verify n8nclone.workflow_execution.agent_nodes.errors]
 #[tokio::test]
 async fn session_failure_marks_node_failed() {
-    let adapter = ErrorAgentAdapter::new(AgentError::Session("session unavailable".to_string()));
+    let adapter = ErrorAgentAdapter::new(Error::Session("session unavailable".to_string()));
     let mut workflow = Workflow::new("agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
-    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Clankers, PROMPT_TEXT, AgentOutputMode::Text);
+    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, Target::Clankers, PROMPT_TEXT, OutputMode::Text);
     let executor = Executor::new_with_agent_adapter(Box::new(adapter));
 
     let result = executor.execute_node(&workflow, node_id, &HashMap::new()).await;
@@ -899,9 +899,9 @@ async fn session_failure_marks_node_failed() {
 // r[verify n8nclone.workflow_execution.agent_nodes.errors]
 #[tokio::test]
 async fn adapter_failure_marks_node_failed() {
-    let adapter = ErrorAgentAdapter::new(AgentError::Adapter("adapter exploded".to_string()));
+    let adapter = ErrorAgentAdapter::new(Error::Adapter("adapter exploded".to_string()));
     let mut workflow = Workflow::new("agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
-    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Pi, PROMPT_TEXT, AgentOutputMode::Text);
+    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, Target::Pi, PROMPT_TEXT, OutputMode::Text);
     let executor = Executor::new_with_agent_adapter(Box::new(adapter));
 
     let result = executor.execute_node(&workflow, node_id, &HashMap::new()).await;
@@ -916,10 +916,10 @@ async fn adapter_failure_marks_node_failed() {
 // r[verify n8nclone.workflow_execution.agent_nodes.errors]
 #[tokio::test]
 async fn credential_failure_skips_agent_adapter_call() {
-    let adapter = ErrorAgentAdapter::new(AgentError::Adapter("should not be called".to_string()));
+    let adapter = ErrorAgentAdapter::new(Error::Adapter("should not be called".to_string()));
     let observed_adapter = adapter.clone();
     let mut workflow = Workflow::new("agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
-    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, AgentTarget::Pi, PROMPT_TEXT, AgentOutputMode::Text);
+    let node_id = workflow.add_agent_node(AGENT_NODE_LABEL, Target::Pi, PROMPT_TEXT, OutputMode::Text);
     workflow.set_node_credentials(node_id, NodeCredentialRefs {
         env: [(SECRET_ENV_NAME.to_string(), SecretRef::new(SECRET_PROVIDER, SECRET_KEY, None))].into(),
     });

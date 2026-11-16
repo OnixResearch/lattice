@@ -7,13 +7,13 @@ use lattice::orchestration::BudgetDimensions;
 use lattice::orchestration::BudgetLimits;
 use lattice::orchestration::BudgetPolicy;
 use lattice::orchestration::CompletionPolicy;
+use lattice::orchestration::Definition;
 use lattice::orchestration::DefinitionId;
-use lattice::orchestration::OrchestrationDefinition;
-use lattice::orchestration::OrchestrationTriggerBinding;
-use lattice::orchestration::OrchestrationTriggerKind;
 use lattice::orchestration::RedactionPolicy;
 use lattice::orchestration::RetryPolicy;
+use lattice::orchestration::TriggerBinding;
 use lattice::orchestration::TriggerId;
+use lattice::orchestration::TriggerKind;
 use lattice::orchestration::current_schema_version;
 use lattice::orchestration::definition_to_nickel;
 use lattice::orchestration::load_definition_nickel_file;
@@ -36,9 +36,9 @@ const FIRST_SEQUENCE: u64 = 1;
 const ROUND_LIMIT: u64 = 3;
 const RETRY_LIMIT: u64 = 1;
 
-fn definition() -> OrchestrationDefinition {
+fn definition() -> Definition {
     let workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
-    OrchestrationDefinition {
+    Definition {
         schema_version: current_schema_version(),
         id: DefinitionId::try_from_text(DEFINITION_ID).expect("definition identity fixture must be valid"),
         objective: OBJECTIVE.to_string(),
@@ -64,9 +64,9 @@ fn definition() -> OrchestrationDefinition {
         authority: AuthorityPolicy {
             approvers: BTreeSet::from([ACTOR.to_string()]),
         },
-        triggers: vec![OrchestrationTriggerBinding {
+        triggers: vec![TriggerBinding {
             trigger_id: TriggerId::try_from_text(TRIGGER_ID).expect("trigger identity fixture must be valid"),
-            kind: OrchestrationTriggerKind::Schedule,
+            kind: TriggerKind::Schedule,
         }],
         redaction: RedactionPolicy {
             retain_safe_summaries: true,

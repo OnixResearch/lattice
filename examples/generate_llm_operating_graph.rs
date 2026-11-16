@@ -3,8 +3,8 @@
 use std::fs;
 use std::io;
 
-use lattice::agent_node::AgentOutputMode;
-use lattice::agent_node::AgentTarget;
+use lattice::agent_node::OutputMode;
+use lattice::agent_node::Target;
 use lattice::engine::workflow::NodeConfig;
 use lattice::engine::workflow::NodeId;
 use lattice::engine::workflow::PortId;
@@ -47,13 +47,10 @@ fn build_fixture() -> Result<Workflow, Box<dyn std::error::Error>> {
     let read_brief = workflow.add_file_node("Read shared brief", FileOperationKind::Read, BRIEF_PATH);
     configure_file_effect(&mut workflow, read_brief, false)?;
 
-    let researcher =
-        add_role(&mut workflow, "Researcher", AgentTarget::Pi, AgentOutputMode::Text, RESEARCHER_PROMPT_PATH)?;
-    let builder =
-        add_role(&mut workflow, "Builder", AgentTarget::Clankers, AgentOutputMode::Json, BUILDER_PROMPT_PATH)?;
-    let reviewer = add_role(&mut workflow, "Reviewer", AgentTarget::Pi, AgentOutputMode::Text, REVIEWER_PROMPT_PATH)?;
-    let publisher =
-        add_role(&mut workflow, "Publisher", AgentTarget::Pi, AgentOutputMode::Text, PUBLISHER_PROMPT_PATH)?;
+    let researcher = add_role(&mut workflow, "Researcher", Target::Pi, OutputMode::Text, RESEARCHER_PROMPT_PATH)?;
+    let builder = add_role(&mut workflow, "Builder", Target::Clankers, OutputMode::Json, BUILDER_PROMPT_PATH)?;
+    let reviewer = add_role(&mut workflow, "Reviewer", Target::Pi, OutputMode::Text, REVIEWER_PROMPT_PATH)?;
+    let publisher = add_role(&mut workflow, "Publisher", Target::Pi, OutputMode::Text, PUBLISHER_PROMPT_PATH)?;
 
     let write_report = workflow.add_file_node("Write report artifact", FileOperationKind::Write, REPORT_PATH);
     configure_file_effect(&mut workflow, write_report, true)?;
@@ -71,8 +68,8 @@ fn build_fixture() -> Result<Workflow, Box<dyn std::error::Error>> {
 fn add_role(
     workflow: &mut Workflow,
     label: &str,
-    target: AgentTarget,
-    output_mode: AgentOutputMode,
+    target: Target,
+    output_mode: OutputMode,
     prompt_file: &str,
 ) -> Result<NodeId, Box<dyn std::error::Error>> {
     let node_id = workflow.add_agent_node(label, target, PROMPT_PLACEHOLDER, output_mode);

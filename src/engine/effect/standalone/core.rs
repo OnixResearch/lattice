@@ -3,7 +3,6 @@
 //! This module accepts evaluated values and an observed time, never ambient authority.
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
 
 pub const PROFILE_SCHEMA: &str = "lattice.standalone-effect-authority.v1";
 pub const MAX_PROFILE_GRANTS: usize = 64;
@@ -30,7 +29,7 @@ pub struct Profile {
     pub policy_ref: String,
     pub expires_at_unix_ms: u64,
     pub grants: Vec<Grant>,
-    pub roots: BTreeMap<String, PathBuf>,
+    pub roots: BTreeMap<String, std::path::PathBuf>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

@@ -10,17 +10,17 @@ use std::sync::atomic::Ordering;
 use std::thread;
 use std::time::Duration;
 
-use lattice::agent_node::AgentCommandPlan;
-use lattice::agent_node::AgentOutput;
-use lattice::agent_node::AgentOutputMode;
-use lattice::agent_node::AgentRuntimeConfig;
-use lattice::agent_node::AgentTarget;
+use lattice::agent_node::CommandPlan;
+use lattice::agent_node::Output;
+use lattice::agent_node::OutputMode;
 use lattice::agent_node::ProcessError;
 use lattice::agent_node::ProcessRequest;
 use lattice::agent_node::ProcessRunner;
 use lattice::agent_node::ProductionProcessRunner;
-use lattice::agent_node::decode_agent_command_output;
-use lattice::agent_node::run_agent_command_with_runner;
+use lattice::agent_node::RuntimeOptions;
+use lattice::agent_node::Target;
+use lattice::agent_node::decode_command;
+use lattice::agent_node::run_command_with_runner;
 use lattice::credentials::CommandCredentialProvider;
 use lattice::credentials::CommandCredentialProviderConfig;
 use lattice::credentials::CredentialProvider;
@@ -175,8 +175,8 @@ fn bounded_process_rejects_each_truncated_stream_without_returning_prefixes() {
         .expect_err("stdout truncation must fail closed");
     // r[verify lattice.repository_validation.radicle_bounded_exec_behavior.scenario.preserved]
     assert!(matches!(stdout_error, ProcessError::OutputLimitExceeded {
-        limit: TINY_LIMIT_BYTES,
-        actual: OVERFLOW_OUTPUT_BYTES,
+        limit_bytes: TINY_LIMIT_BYTES,
+        actual_bytes: OVERFLOW_OUTPUT_BYTES,
     }));
 
     let mut stderr_limits = limits();
@@ -185,8 +185,8 @@ fn bounded_process_rejects_each_truncated_stream_without_returning_prefixes() {
         .run(&shell_request(repeated_output_script(">&2", OVERFLOW_OUTPUT_BYTES)))
         .expect_err("stderr truncation must fail closed");
     assert!(matches!(stderr_error, ProcessError::OutputLimitExceeded {
-        limit: SMALL_LIMIT_BYTES,
-        actual: OVERFLOW_OUTPUT_BYTES,
+        limit_bytes: SMALL_LIMIT_BYTES,
+        actual_bytes: OVERFLOW_OUTPUT_BYTES,
     }));
 }
 
@@ -287,28 +287,28 @@ fn process_failures_use_fixed_bounded_diagnostics_without_secret_material() {
 // r[verify lattice.agent_runtime.bounded_command_process.scenario.success]
 #[test]
 fn bounded_agent_output_reaches_typed_decoding() {
-    let plan = AgentCommandPlan {
-        target: AgentTarget::Pi,
+    let plan = CommandPlan {
+        target: Target::Pi,
         adapter_label: COMMAND_AGENT_LABEL,
         program: SHELL.to_owned(),
         args: vec![SHELL_COMMAND_FLAG.to_owned(), format!("printf {BOUNDED_AGENT_TEXT}")],
         cwd: Some("/".to_owned()),
-        output_mode: AgentOutputMode::Text,
+        output_mode: OutputMode::Text,
         timeout_secs: TEST_TIMEOUT_SECS,
         max_output_bytes: TEST_LIMIT_BYTES,
     };
-    let output = run_agent_command_with_runner(&plan, &runner_with_limits(limits()))
-        .expect("bounded agent command must complete");
-    let response = decode_agent_command_output(&plan, &output).expect("complete bounded agent output must decode");
-    assert_eq!(response.output, AgentOutput::Text(BOUNDED_AGENT_TEXT.to_owned()));
+    let output =
+        run_command_with_runner(&plan, &runner_with_limits(limits())).expect("bounded agent command must complete");
+    let response = decode_command(&plan, &output).expect("complete bounded agent output must decode");
+    assert_eq!(response.output, Output::Text(BOUNDED_AGENT_TEXT.to_owned()));
 }
 
 // r[verify lattice.agent_runtime.bounded_command_process]
 // r[verify lattice.agent_runtime.bounded_command_process.scenario.failure]
 #[test]
 fn command_agent_timeout_fails_before_output_decoding() {
-    let plan = AgentCommandPlan {
-        target: AgentTarget::Pi,
+    let plan = CommandPlan {
+        target: Target::Pi,
         adapter_label: COMMAND_AGENT_LABEL,
         program: SHELL.to_owned(),
         args: vec![
@@ -316,12 +316,12 @@ fn command_agent_timeout_fails_before_output_decoding() {
             format!("sleep {LONG_TIMEOUT_SECS}; printf late"),
         ],
         cwd: Some("/".to_owned()),
-        output_mode: AgentOutputMode::Text,
+        output_mode: OutputMode::Text,
         timeout_secs: TIMEOUT_TEST_SECS,
         max_output_bytes: TEST_LIMIT_BYTES,
     };
 
-    let error = run_agent_command_with_runner(&plan, &runner_with_limits(limits()))
+    let error = run_command_with_runner(&plan, &runner_with_limits(limits()))
         .expect_err("timed-out agent command must fail before decoding");
     assert!(error.to_string().contains("process timed out"));
 }
@@ -334,8 +334,8 @@ fn truncated_agent_output_is_rejected_before_agent_output_decoding() {
         stdout_max_bytes: SMALL_LIMIT_BYTES,
         ..limits()
     });
-    let plan = AgentCommandPlan {
-        target: AgentTarget::Pi,
+    let plan = CommandPlan {
+        target: Target::Pi,
         adapter_label: COMMAND_AGENT_LABEL,
         program: SHELL.to_owned(),
         args: vec![
@@ -343,13 +343,13 @@ fn truncated_agent_output_is_rejected_before_agent_output_decoding() {
             format!("printf '{{\"accepted\":true}}'; {}", repeated_output_script("", OVERFLOW_OUTPUT_BYTES)),
         ],
         cwd: Some("/".to_owned()),
-        output_mode: AgentOutputMode::Json,
+        output_mode: OutputMode::Json,
         timeout_secs: TEST_TIMEOUT_SECS,
         max_output_bytes: TEST_LIMIT_BYTES,
     };
 
     let error =
-        run_agent_command_with_runner(&plan, &runner).expect_err("truncated agent output must not reach JSON decoding");
+        run_command_with_runner(&plan, &runner).expect_err("truncated agent output must not reach JSON decoding");
     assert!(error.to_string().contains("process output exceeded limit"));
 }
 
@@ -424,7 +424,7 @@ fn truncated_credential_output_is_rejected_before_secret_parsing() {
 // r[verify lattice.agent_runtime.bounded_command_process]
 #[test]
 fn command_agent_plans_always_receive_a_positive_configured_deadline() {
-    let config = AgentRuntimeConfig::default();
+    let config = RuntimeOptions::default();
     assert!(config.local_process.limits.command_agent_timeout_secs > 0);
 }
 

@@ -33,9 +33,9 @@ let Workflow = { meta | Meta, nodes | Array Node, edges | Array Edge, configs | 
 {
   meta = {
     name = "bounded-build-loop",
-    description = "Plan, generate, and compile a minimal Rust program through two bounded agent roles and a real build check.",
-    created = "2026-11-11T00:00:00+00:00",
-    modified = "2026-11-11T00:00:00+00:00",
+    description = "Fixed planner/generator/evaluator round; runtime repetition belongs to the bounded host.",
+    created = "1970-01-01T00:00:00+00:00",
+    modified = "1970-01-01T00:00:00+00:00",
   },
   nodes = [
     {
@@ -76,7 +76,7 @@ let Workflow = { meta | Meta, nodes | Array Node, edges | Array Edge, configs | 
     },
     {
       id = 2,
-      label = "Build and run generated program",
+      label = "Evaluator: real Rust build and test",
       x = 0,
       y = 0,
       input_ports = [
@@ -123,13 +123,13 @@ let Workflow = { meta | Meta, nodes | Array Node, edges | Array Edge, configs | 
       image_allowed_roots = [],
       image_max_bytes = 0,
       agent_target = "pi",
-      agent_prompt = "# Planner\nReturn a short implementation plan for a Rust program that prints one line.",
+      agent_prompt = "# Planner\nWrite only the fixed local task specification; no tools or authority changes.",
       agent_prompt_file = [],
       agent_output_mode = "text",
       agent_model_hint = [],
-      agent_tool_policy = "",
+      agent_tool_policy = "none",
       agent_context_refs = [],
-      agent_cwd = [],
+      agent_cwd = ["examples/bounded-build-loop", ],
       agent_session = [],
       condition_branches = [
       ],
@@ -176,13 +176,13 @@ let Workflow = { meta | Meta, nodes | Array Node, edges | Array Edge, configs | 
       image_allowed_roots = [],
       image_max_bytes = 0,
       agent_target = "clankers",
-      agent_prompt = "# Generator\nReturn only Rust source for the planned program.",
+      agent_prompt = "# Generator\nRead the exact specification and prior verdict; produce Rust source only.",
       agent_prompt_file = [],
       agent_output_mode = "text",
       agent_model_hint = [],
-      agent_tool_policy = "",
+      agent_tool_policy = "none",
       agent_context_refs = [],
-      agent_cwd = [],
+      agent_cwd = ["examples/bounded-build-loop", ],
       agent_session = [],
       condition_branches = [
       ],
@@ -209,8 +209,8 @@ let Workflow = { meta | Meta, nodes | Array Node, edges | Array Edge, configs | 
       cache_policy = "",
       retry_policy = "",
       artifact_policy = "",
-      command = "sh -c 'out=/tmp/lattice-bounded-build-loop-$$; rustc --edition 2024 -o \"$out\" - && \"$out\"; status=$?; rm -f \"$out\"; exit $status'",
-      cwd = [],
+      command = "sh evaluator.sh",
+      cwd = ["examples/bounded-build-loop", ],
       env = [
       ],
       secret_env = [

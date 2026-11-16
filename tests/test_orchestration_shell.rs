@@ -4,12 +4,13 @@ use std::collections::BTreeSet;
 use std::path::Path;
 use std::process::Command;
 
-use lattice::agent_node::AgentRuntimeConfig;
+use lattice::agent_node::RuntimeOptions;
 use lattice::engine::NodeConfig;
 use lattice::engine::RunId;
 use lattice::engine::Workflow;
 use lattice::file_node::FileOperationKind;
 use lattice::orchestration::AbandonPendingRequest;
+use lattice::orchestration::Action;
 use lattice::orchestration::AuthorityPolicy;
 use lattice::orchestration::BudgetCharge;
 use lattice::orchestration::BudgetChargePlan;
@@ -17,18 +18,14 @@ use lattice::orchestration::BudgetDimensions;
 use lattice::orchestration::BudgetLimits;
 use lattice::orchestration::BudgetPolicy;
 use lattice::orchestration::CompletionPolicy;
+use lattice::orchestration::Definition;
 use lattice::orchestration::DefinitionId;
 use lattice::orchestration::DispatchIntent;
 use lattice::orchestration::DispatchStatus;
-use lattice::orchestration::OrchestrationAction;
-use lattice::orchestration::OrchestrationDefinition;
-use lattice::orchestration::OrchestrationEvent;
-use lattice::orchestration::OrchestrationEventKind;
-use lattice::orchestration::OrchestrationFact;
-use lattice::orchestration::OrchestrationInstance;
-use lattice::orchestration::OrchestrationStatus;
-use lattice::orchestration::OrchestrationTriggerBinding;
-use lattice::orchestration::OrchestrationTriggerKind;
+use lattice::orchestration::Event;
+use lattice::orchestration::EventKind;
+use lattice::orchestration::Fact;
+use lattice::orchestration::Instance;
 use lattice::orchestration::ProductApproval;
 use lattice::orchestration::ProductExecution;
 use lattice::orchestration::ProductTriggerStart;
@@ -36,8 +33,11 @@ use lattice::orchestration::RecoveryOutcome;
 use lattice::orchestration::RedactionPolicy;
 use lattice::orchestration::RetryPolicy;
 use lattice::orchestration::RetryRequest;
+use lattice::orchestration::Status;
+use lattice::orchestration::TriggerBinding;
 use lattice::orchestration::TriggerId;
 use lattice::orchestration::TriggerIdempotencyKey;
+use lattice::orchestration::TriggerKind;
 use lattice::orchestration::abandon_pending;
 use lattice::orchestration::approve_with_execution;
 use lattice::orchestration::current_schema_version;
@@ -127,7 +127,7 @@ fn parse_restart_result(value: &str) -> Result<RestartResult, &'static str> {
 
 fn test_execution(provider: &common::authority::TestRunContextProvider) -> ProductExecution<'_> {
     ProductExecution {
-        agent_runtime: AgentRuntimeConfig::default(),
+        agent_runtime: RuntimeOptions::default(),
         authority_provider: provider,
     }
 }
@@ -156,8 +156,8 @@ fn fail_once_workflow(name: &str, marker: &Path) -> Workflow {
     workflow
 }
 
-fn definition(workflow: &Workflow, completion: CompletionPolicy) -> OrchestrationDefinition {
-    OrchestrationDefinition {
+fn definition(workflow: &Workflow, completion: CompletionPolicy) -> Definition {
+    Definition {
         schema_version: current_schema_version(),
         id: DefinitionId::try_from_text(DEFINITION_ID).expect("definition identity fixture must be valid"),
         objective: OBJECTIVE.to_string(),
@@ -183,9 +183,9 @@ fn definition(workflow: &Workflow, completion: CompletionPolicy) -> Orchestratio
         authority: AuthorityPolicy {
             approvers: BTreeSet::from([ACTOR.to_string()]),
         },
-        triggers: vec![OrchestrationTriggerBinding {
+        triggers: vec![TriggerBinding {
             trigger_id: TriggerId::try_from_text(TRIGGER_ID).expect("trigger identity fixture must be valid"),
-            kind: OrchestrationTriggerKind::Webhook,
+            kind: TriggerKind::Webhook,
         }],
         redaction: RedactionPolicy {
             retain_safe_summaries: true,
@@ -199,7 +199,7 @@ fn store() -> (tempfile::TempDir, Store) {
     (directory, store)
 }
 
-fn cancelled_acknowledged_instance(workflow: &Workflow) -> (OrchestrationInstance, Vec<OrchestrationEvent>) {
+fn cancelled_acknowledged_instance(workflow: &Workflow) -> (Instance, Vec<Event>) {
     let base = new_instance(definition(workflow, CompletionPolicy::RunSucceeded), FIRST_SEQUENCE, None)
         .expect("instance must hash");
     let run_id = RunId(RECOVERY_RUN_ID);
@@ -209,7 +209,7 @@ fn cancelled_acknowledged_instance(workflow: &Workflow) -> (OrchestrationInstanc
         workflow_revision: base.workflow_revision.clone(),
         status: DispatchStatus::Pending,
     };
-    let start_action = OrchestrationAction::StartRound {
+    let start_action = Action::StartRound {
         intent,
         planned_charge: BudgetChargePlan {
             rounds: Some(FIRST_SEQUENCE),
@@ -219,23 +219,23 @@ fn cancelled_acknowledged_instance(workflow: &Workflow) -> (OrchestrationInstanc
             duration_millis: Some(0),
         },
     };
-    let started = transition(&base, OrchestrationFact {
+    let started = transition(&base, Fact {
         id: fact_identity(&base.id, base.version, &start_action).expect("start fact must hash"),
         action: start_action,
     })
     .expect("start must apply");
     let dispatch_id = started.instance.pending_dispatch.as_ref().expect("dispatch must be pending").id.clone();
-    let acknowledge_action = OrchestrationAction::DispatchAcknowledged { dispatch_id };
-    let acknowledged = transition(&started.instance, OrchestrationFact {
+    let acknowledge_action = Action::DispatchAcknowledged { dispatch_id };
+    let acknowledged = transition(&started.instance, Fact {
         id: fact_identity(&started.instance.id, started.instance.version, &acknowledge_action)
             .expect("acknowledgement fact must hash"),
         action: acknowledge_action,
     })
     .expect("acknowledgement must apply");
-    let cancel_action = OrchestrationAction::CancelRequested {
+    let cancel_action = Action::CancelRequested {
         actor: ACTOR.to_string(),
     };
-    let cancelled = transition(&acknowledged.instance, OrchestrationFact {
+    let cancelled = transition(&acknowledged.instance, Fact {
         id: fact_identity(&acknowledged.instance.id, acknowledged.instance.version, &cancel_action)
             .expect("cancellation fact must hash"),
         action: cancel_action,
@@ -269,7 +269,7 @@ async fn start_executes_one_seaglass_admitted_round_and_persists_replay() {
     .await
     .expect("orchestration must run");
 
-    assert_eq!(instance.status, OrchestrationStatus::Completed);
+    assert_eq!(instance.status, Status::Completed);
     assert_eq!(instance.round, FIRST_SEQUENCE);
     assert!(instance.active_run_id.is_none());
     let runs = store.list_runs(ROUND_LIMIT as usize).expect("runs must list");
@@ -328,7 +328,7 @@ async fn approved_successor_runs_as_a_new_immutable_round() {
     )
     .await
     .expect("first round must run");
-    assert_eq!(waiting.status, OrchestrationStatus::WaitingForApproval);
+    assert_eq!(waiting.status, Status::WaitingForApproval);
 
     let proposal = make_proposal(
         &waiting,
@@ -345,7 +345,7 @@ async fn approved_successor_runs_as_a_new_immutable_round() {
     .await
     .expect("approved successor must run");
 
-    assert_eq!(advanced.status, OrchestrationStatus::WaitingForApproval);
+    assert_eq!(advanced.status, Status::WaitingForApproval);
     assert_eq!(advanced.round, ROUND_LIMIT);
     assert_eq!(advanced.workflow_revision.workflow_name, SECOND_WORKFLOW_NAME);
     assert_eq!(store.list_runs(ROUND_LIMIT as usize).expect("runs must list").len(), ROUND_LIMIT as usize);
@@ -366,7 +366,7 @@ async fn duplicate_trigger_returns_the_original_instance_without_another_run() {
     let first = start_from_trigger_with_execution(&store, ProductTriggerStart {
         definition_id: DEFINITION_ID.to_owned(),
         trigger_id: TRIGGER_ID.to_owned(),
-        trigger_kind: OrchestrationTriggerKind::Webhook,
+        trigger_kind: TriggerKind::Webhook,
         idempotency_key: IDEMPOTENCY_KEY.to_owned(),
         execution: test_execution(&provider),
     })
@@ -375,7 +375,7 @@ async fn duplicate_trigger_returns_the_original_instance_without_another_run() {
     let duplicate = start_from_trigger_with_execution(&store, ProductTriggerStart {
         definition_id: DEFINITION_ID.to_owned(),
         trigger_id: TRIGGER_ID.to_owned(),
-        trigger_kind: OrchestrationTriggerKind::Webhook,
+        trigger_kind: TriggerKind::Webhook,
         idempotency_key: IDEMPOTENCY_KEY.to_owned(),
         execution: test_execution(&provider),
     })
@@ -439,7 +439,7 @@ fn restart_duplicate_trigger_reuses_original_admission_across_processes() {
         Some(expected_scoped_key.as_str())
     );
     assert_eq!(instance.id.as_str(), first_result.instance_id);
-    assert_eq!(instance.status, OrchestrationStatus::Completed);
+    assert_eq!(instance.status, Status::Completed);
     assert_eq!(instance.budgets.consumed, BudgetCharge {
         rounds: FIRST_SEQUENCE,
         ..BudgetCharge::default()
@@ -512,7 +512,7 @@ fn run_restart_child(phase: RestartPhase, store_path: &Path, first_result_path: 
         .block_on(start_from_trigger_with_execution(&store, ProductTriggerStart {
             definition_id: DEFINITION_ID.to_owned(),
             trigger_id: TRIGGER_ID.to_owned(),
-            trigger_kind: OrchestrationTriggerKind::Webhook,
+            trigger_kind: TriggerKind::Webhook,
             idempotency_key: IDEMPOTENCY_KEY.to_owned(),
             execution: test_execution(&provider),
         }))
@@ -582,7 +582,7 @@ async fn exact_observed_failure_retries_with_fresh_identity_budget_and_replay() 
     let first_failure = failed.retry.retryable_failure.clone().unwrap_or_else(|| {
         panic!("exact failed run must become retryable: record={first_record:?}, instance={failed:?}")
     });
-    assert_eq!(failed.status, OrchestrationStatus::Failed);
+    assert_eq!(failed.status, Status::Failed);
     assert_eq!(first_failure.run_id, RunId(FIRST_ALLOCATED_RUN_ID));
     assert_eq!(failed.budgets.consumed.rounds, FIRST_SEQUENCE);
     assert!(failed.budgets.reservations.is_empty());
@@ -593,7 +593,7 @@ async fn exact_observed_failure_retries_with_fresh_identity_budget_and_replay() 
             instance_id: failed.id.as_str(),
             actor: UNAUTHORIZED_ACTOR,
         },
-        AgentRuntimeConfig::default(),
+        RuntimeOptions::default(),
     )
     .await
     .expect_err("unauthorized retry must fail before dispatch");
@@ -613,7 +613,7 @@ async fn exact_observed_failure_retries_with_fresh_identity_budget_and_replay() 
     .await
     .expect("authorized observed failure retry must run");
 
-    assert_eq!(completed.status, OrchestrationStatus::Completed);
+    assert_eq!(completed.status, Status::Completed);
     assert_eq!(completed.round, ROUND_LIMIT);
     assert_eq!(completed.retry.admitted, RETRY_LIMIT);
     assert!(completed.retry.retryable_failure.is_none());
@@ -642,7 +642,7 @@ async fn exact_observed_failure_retries_with_fresh_identity_budget_and_replay() 
     assert_ne!(retry_dispatch, &first_failure.dispatch_id);
     let events = store.load_orchestration_events(&completed.id).expect("retry events must load");
     assert_eq!(
-        events.iter().filter(|event| event.kind == OrchestrationEventKind::RetryRoundStarted).count(),
+        events.iter().filter(|event| event.kind == EventKind::RetryRoundStarted).count(),
         RETRY_LIMIT as usize
     );
     let report = replay(&store, completed.id.as_str()).expect("retry replay must validate");
@@ -666,7 +666,7 @@ async fn pending_unobserved_and_abandoned_dispatches_never_retry() {
             instance_id: pending.id.as_str(),
             actor: ACTOR,
         },
-        AgentRuntimeConfig::default(),
+        RuntimeOptions::default(),
     )
     .await
     .expect_err("pending-unobserved dispatch cannot retry");
@@ -685,7 +685,7 @@ async fn pending_unobserved_and_abandoned_dispatches_never_retry() {
             instance_id: abandoned.id.as_str(),
             actor: ACTOR,
         },
-        AgentRuntimeConfig::default(),
+        RuntimeOptions::default(),
     )
     .await
     .expect_err("abandoned dispatch cannot become retry authority");
@@ -719,7 +719,7 @@ async fn pending_unobserved_and_abandoned_dispatches_never_retry() {
             instance_id: foreign_pending.id.as_str(),
             actor: ACTOR,
         },
-        AgentRuntimeConfig::default(),
+        RuntimeOptions::default(),
     )
     .await
     .expect_err("foreign owner cannot provide retry evidence");
@@ -747,7 +747,7 @@ fn recovery_reconciles_persisted_run_without_redispatch() {
         workflow_revision: base.workflow_revision.clone(),
         status: DispatchStatus::Pending,
     };
-    let action = OrchestrationAction::StartRound {
+    let action = Action::StartRound {
         intent,
         planned_charge: BudgetChargePlan {
             rounds: Some(FIRST_SEQUENCE),
@@ -757,7 +757,7 @@ fn recovery_reconciles_persisted_run_without_redispatch() {
             duration_millis: Some(0),
         },
     };
-    let started = transition(&base, OrchestrationFact {
+    let started = transition(&base, Fact {
         id: fact_identity(&base.id, base.version, &action).expect("fact must hash"),
         action,
     })
@@ -768,33 +768,13 @@ fn recovery_reconciles_persisted_run_without_redispatch() {
             std::slice::from_ref(started.event.as_ref().expect("event must exist")),
         )
         .expect("started instance must persist");
-    store
-        .save_run(&RunRecord {
-            run_id,
-            owner: RunOwner::Orchestration {
-                instance_id: started.instance.id.clone(),
-                dispatch_id: started
-                    .instance
-                    .pending_dispatch
-                    .as_ref()
-                    .expect("dispatch must remain pending")
-                    .id
-                    .clone(),
-            },
-            workflow_name: FIRST_WORKFLOW_NAME.to_string(),
-            started_epoch_ms: 0,
-            finished_epoch_ms: Some(FIRST_SEQUENCE as i64),
-            node_count: FIRST_SEQUENCE as usize,
-            cache_hits: 0,
-            failures: 0,
-        })
-        .expect("observed run must persist");
+    common::observe_pending_usage(&store, &started.instance);
 
     let outcome = recover_pending(&store, started.instance.id.as_str()).expect("recovery must run");
     let RecoveryOutcome::Reconciled(reconciled) = outcome else {
         panic!("existing run must reconcile");
     };
-    assert_eq!(reconciled.status, OrchestrationStatus::Completed);
+    assert_eq!(reconciled.status, Status::Completed);
     assert!(reconciled.pending_dispatch.is_none());
 }
 
@@ -824,7 +804,7 @@ fn unobserved_cancelled_dispatch_requires_authority_then_abandons_without_retry(
         actor: ACTOR,
     })
     .expect("authorized abandonment must apply");
-    assert_eq!(abandoned.status, OrchestrationStatus::Failed);
+    assert_eq!(abandoned.status, Status::Failed);
     assert!(abandoned.pending_dispatch.is_none());
     assert!(abandoned.active_run_id.is_none());
     assert!(abandoned.budgets.reservations.is_empty());
@@ -851,21 +831,7 @@ fn observed_pending_run_rejects_abandonment_and_uses_recovery() {
     store.save_workflow(&workflow).expect("workflow must persist");
     let (instance, events) = cancelled_acknowledged_instance(&workflow);
     store.create_orchestration(&instance, &events).expect("pending instance must persist");
-    store
-        .save_run(&RunRecord {
-            run_id: RunId(RECOVERY_RUN_ID),
-            owner: RunOwner::Orchestration {
-                instance_id: instance.id.clone(),
-                dispatch_id: instance.pending_dispatch.as_ref().expect("dispatch must remain pending").id.clone(),
-            },
-            workflow_name: FIRST_WORKFLOW_NAME.to_string(),
-            started_epoch_ms: 0,
-            finished_epoch_ms: Some(FIRST_SEQUENCE as i64),
-            node_count: FIRST_SEQUENCE as usize,
-            cache_hits: 0,
-            failures: 0,
-        })
-        .expect("observed run must persist");
+    common::observe_pending_usage(&store, &instance);
 
     let rejected = abandon_pending(&store, AbandonPendingRequest {
         instance_id: instance.id.as_str(),
@@ -879,7 +845,7 @@ fn observed_pending_run_rejects_abandonment_and_uses_recovery() {
     let RecoveryOutcome::Reconciled(reconciled) = outcome else {
         panic!("observed run must reconcile");
     };
-    assert_eq!(reconciled.status, OrchestrationStatus::Cancelled);
+    assert_eq!(reconciled.status, Status::Completed, "actual success wins the earlier cancellation request");
     assert!(reconciled.pending_dispatch.is_none());
 }
 
@@ -940,9 +906,9 @@ async fn unbound_trigger_fails_without_instance_or_run() {
         &store,
         DEFINITION_ID,
         "missing-trigger",
-        OrchestrationTriggerKind::Schedule,
+        TriggerKind::Schedule,
         IDEMPOTENCY_KEY,
-        AgentRuntimeConfig::default(),
+        RuntimeOptions::default(),
     )
     .await
     .expect_err("unbound trigger must fail");

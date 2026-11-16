@@ -1,11 +1,9 @@
 //! Typed Nickel authoring and deterministic rendering for orchestration data.
 
 use std::fmt;
-use std::path::Path;
 
 use serde::Serialize;
 
-use super::core::OrchestrationDefinition;
 use super::core::RevisionProposal;
 use crate::config;
 
@@ -37,7 +35,9 @@ impl fmt::Display for OrchestrationFormatError {
 impl std::error::Error for OrchestrationFormatError {}
 
 // r[impl lattice.agent_orchestration.format]
-pub fn load_definition_nickel_file(path: &Path) -> Result<OrchestrationDefinition, OrchestrationFormatError> {
+pub fn load_definition_nickel_file(
+    path: &std::path::Path,
+) -> Result<super::core::Definition, OrchestrationFormatError> {
     let json = config::load_nickel_as_json(path)
         .map_err(|_| OrchestrationFormatError::Nickel("definition evaluation failed".to_string()))?;
     definition_from_nickel_value(json)
@@ -46,7 +46,7 @@ pub fn load_definition_nickel_file(path: &Path) -> Result<OrchestrationDefinitio
 /// Decode an already evaluated orchestration definition without filesystem access.
 pub fn definition_from_nickel_value(
     value: serde_json::Value,
-) -> Result<OrchestrationDefinition, OrchestrationFormatError> {
+) -> Result<super::core::Definition, OrchestrationFormatError> {
     let wire: wire::DefinitionRecord =
         serde_json::from_value(value).map_err(|error| OrchestrationFormatError::Json(error.to_string()))?;
     wire.try_into()
@@ -54,7 +54,7 @@ pub fn definition_from_nickel_value(
 
 // r[impl lattice.agent_orchestration.format]
 // r[impl lattice.agent_orchestration.observed_failure_retry]
-pub fn definition_to_nickel(definition: &OrchestrationDefinition) -> Result<String, OrchestrationFormatError> {
+pub fn definition_to_nickel(definition: &super::core::Definition) -> Result<String, OrchestrationFormatError> {
     render_with_contract(
         DEFINITION_HEADER,
         DEFINITION_CONTRACT,
@@ -63,7 +63,7 @@ pub fn definition_to_nickel(definition: &OrchestrationDefinition) -> Result<Stri
     )
 }
 
-pub fn load_proposal_nickel_file(path: &Path) -> Result<RevisionProposal, OrchestrationFormatError> {
+pub fn load_proposal_nickel_file(path: &std::path::Path) -> Result<RevisionProposal, OrchestrationFormatError> {
     let json = config::load_nickel_as_json(path)
         .map_err(|_| OrchestrationFormatError::Nickel("proposal evaluation failed".to_string()))?;
     let wire: wire::ProposalRecord =

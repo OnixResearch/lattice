@@ -9,13 +9,11 @@ use serde::Serialize;
 use crate::credentials;
 use crate::credentials::CredentialProvider;
 use crate::credentials::SecretRef;
-use crate::engine::RunId;
 use crate::engine::Value;
 use crate::scheduler;
 use crate::scheduler::MissedRunPolicy;
 use crate::scheduler::OverlapPolicy;
 use crate::scheduler::RecurrenceRule;
-use crate::scheduler::ScheduleDefinition;
 
 const TYPE_TAG_STRING: &str = "string";
 const TYPE_TAG_BYTES: &str = "bytes";
@@ -146,7 +144,7 @@ pub struct WebhookClaim {
     pub identity: String,
     pub trigger_id: String,
     pub workflow_name: String,
-    pub run_id: RunId,
+    pub run_id: crate::engine::RunId,
     pub accepted_epoch_ms: i64,
     pub payload_summary: String,
 }
@@ -162,15 +160,15 @@ pub enum WebhookClaimPlanError {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WebhookClaimResolution {
-    Inserted { run_id: RunId },
-    Duplicate { existing_run_id: RunId },
+    Inserted { run_id: crate::engine::RunId },
+    Duplicate { existing_run_id: crate::engine::RunId },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WebhookAdmissionDecision {
     ExecuteUnclaimed,
-    ExecuteClaimed { run_id: RunId },
-    RejectDuplicate { existing_run_id: RunId },
+    ExecuteClaimed { run_id: crate::engine::RunId },
+    RejectDuplicate { existing_run_id: crate::engine::RunId },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -210,7 +208,7 @@ pub enum TriggerDiagnosticCode {
 pub struct TriggerRunRecord {
     pub trigger_id: String,
     pub workflow_name: String,
-    pub run_id: Option<RunId>,
+    pub run_id: Option<crate::engine::RunId>,
     pub idempotency_key: Option<String>,
     #[serde(default = "missing_claim_identity")]
     pub claim_identity: Option<String>,
@@ -514,7 +512,7 @@ pub fn decide_webhook_admission(
 
 impl WebhookClaimRequest {
     #[must_use]
-    pub fn claim(&self, run_id: RunId) -> WebhookClaim {
+    pub fn claim(&self, run_id: crate::engine::RunId) -> WebhookClaim {
         WebhookClaim {
             identity: self.identity.clone(),
             trigger_id: self.trigger_id.clone(),
@@ -526,7 +524,7 @@ impl WebhookClaimRequest {
     }
 
     #[must_use]
-    pub fn started_record(&self, run_id: RunId) -> TriggerRunRecord {
+    pub fn started_record(&self, run_id: crate::engine::RunId) -> TriggerRunRecord {
         TriggerRunRecord {
             trigger_id: self.trigger_id.clone(),
             workflow_name: self.workflow_name.clone(),
@@ -540,7 +538,7 @@ impl WebhookClaimRequest {
     }
 
     #[must_use]
-    pub fn failed_record(&self, run_id: RunId) -> TriggerRunRecord {
+    pub fn failed_record(&self, run_id: crate::engine::RunId) -> TriggerRunRecord {
         TriggerRunRecord {
             trigger_id: self.trigger_id.clone(),
             workflow_name: self.workflow_name.clone(),
@@ -677,7 +675,7 @@ fn diagnostic(trigger: &TriggerDefinition, code: TriggerDiagnosticCode, message:
 }
 
 // r[impl n8nclone.scheduling.triggers.scheduler_compat]
-pub fn schedule_trigger_from_schedule(schedule: &ScheduleDefinition) -> TriggerDefinition {
+pub fn schedule_trigger_from_schedule(schedule: &crate::scheduler::ScheduleDefinition) -> TriggerDefinition {
     TriggerDefinition {
         id: schedule.id.clone(),
         workflow_name: schedule.workflow_name.clone(),
@@ -693,7 +691,7 @@ pub fn schedule_trigger_from_schedule(schedule: &ScheduleDefinition) -> TriggerD
     }
 }
 
-pub fn schedule_from_schedule_trigger(trigger: &TriggerDefinition) -> Option<ScheduleDefinition> {
+pub fn schedule_from_schedule_trigger(trigger: &TriggerDefinition) -> Option<crate::scheduler::ScheduleDefinition> {
     let TriggerKind::Schedule {
         recurrence,
         missed_run_policy,
@@ -702,7 +700,7 @@ pub fn schedule_from_schedule_trigger(trigger: &TriggerDefinition) -> Option<Sch
     else {
         return None;
     };
-    Some(ScheduleDefinition {
+    Some(crate::scheduler::ScheduleDefinition {
         id: trigger.id.clone(),
         workflow_name: trigger.workflow_name.clone(),
         recurrence,
@@ -726,7 +724,7 @@ pub fn schedule_due_plan_from_trigger(
 }
 
 // r[impl n8nclone.scheduling.triggers.history]
-pub fn trigger_run_record_started(plan: &TriggerRunPlan, run_id: RunId) -> TriggerRunRecord {
+pub fn trigger_run_record_started(plan: &TriggerRunPlan, run_id: crate::engine::RunId) -> TriggerRunRecord {
     TriggerRunRecord {
         trigger_id: plan.trigger_id.clone(),
         workflow_name: plan.workflow_name.clone(),

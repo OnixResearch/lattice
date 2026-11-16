@@ -76,7 +76,7 @@ struct WorkflowInventory<'a> {
 pub fn validate_bundle(
     bundle_id: &str,
     workflow: &crate::engine::Workflow,
-    orchestration: Option<&crate::orchestration::OrchestrationDefinition>,
+    orchestration: Option<&crate::orchestration::Definition>,
 ) -> Result<(), Error> {
     let shape = bundle_shape(bundle_id)?;
     validate_workflow(workflow, &shape)?;
@@ -182,9 +182,9 @@ fn validate_shell(
     Ok(())
 }
 
-fn validate_agent(settings: &crate::agent_node::AgentNodeSettings, prompt_file: &str) -> Result<(), Error> {
-    let has_fixed_shape = settings.target == crate::agent_node::AgentTarget::Pi
-        && settings.output_mode == crate::agent_node::AgentOutputMode::Text
+fn validate_agent(settings: &crate::agent_node::Settings, prompt_file: &str) -> Result<(), Error> {
+    let has_fixed_shape = settings.target == crate::agent_node::Target::Pi
+        && settings.output_mode == crate::agent_node::OutputMode::Text
         && !settings.prompt.trim().is_empty()
         && settings.prompt_file.as_deref() == Some(prompt_file);
     let has_fixed_authority = settings.model_hint.is_none()
@@ -236,7 +236,7 @@ fn validate_inventory(
     Ok(())
 }
 
-fn validate_orchestration(definition: &crate::orchestration::OrchestrationDefinition) -> Result<(), Error> {
+fn validate_orchestration(definition: &crate::orchestration::Definition) -> Result<(), Error> {
     if definition.completion != crate::orchestration::CompletionPolicy::AwaitProposal {
         return Err(Error::InvalidAuthority);
     }

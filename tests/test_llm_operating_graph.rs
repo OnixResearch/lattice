@@ -5,13 +5,13 @@ use std::path::Path;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use lattice::agent_node::AgentAdapter;
-use lattice::agent_node::AgentError;
-use lattice::agent_node::AgentOutput;
-use lattice::agent_node::AgentOutputMode;
-use lattice::agent_node::AgentRequest;
-use lattice::agent_node::AgentResponse;
+use lattice::agent_node::Adapter;
+use lattice::agent_node::Error;
 use lattice::agent_node::ExecutionContext as AgentExecutionContext;
+use lattice::agent_node::Output;
+use lattice::agent_node::OutputMode;
+use lattice::agent_node::Request;
+use lattice::agent_node::Response;
 use lattice::credentials::EmptyCredentialProvider;
 use lattice::engine::executor::Executor;
 use lattice::engine::executor::NodeStatus;
@@ -19,7 +19,7 @@ use lattice::file_node::MemoryFileSystem;
 use lattice::http::NoopHttpClient;
 use lattice::image_node::NoopImageIo;
 use lattice::orchestration::CompletionPolicy;
-use lattice::orchestration::OrchestrationTriggerKind;
+use lattice::orchestration::TriggerKind;
 use lattice::orchestration::load_definition_nickel_file;
 use lattice::orchestration::validate_definition;
 use lattice::orchestration::workflow_revision;
@@ -51,19 +51,19 @@ const PUBLISHER_REQUEST_INDEX: usize = 3;
 
 #[derive(Debug, Clone)]
 struct RecordingAgentAdapter {
-    requests: Arc<Mutex<Vec<AgentRequest>>>,
+    requests: Arc<Mutex<Vec<Request>>>,
     failing_role: Option<&'static str>,
 }
 
 impl RecordingAgentAdapter {
-    fn succeeds(requests: Arc<Mutex<Vec<AgentRequest>>>) -> Self {
+    fn succeeds(requests: Arc<Mutex<Vec<Request>>>) -> Self {
         Self {
             requests,
             failing_role: None,
         }
     }
 
-    fn fails_for(requests: Arc<Mutex<Vec<AgentRequest>>>, role: &'static str) -> Self {
+    fn fails_for(requests: Arc<Mutex<Vec<Request>>>, role: &'static str) -> Self {
         Self {
             requests,
             failing_role: Some(role),
@@ -71,37 +71,37 @@ impl RecordingAgentAdapter {
     }
 }
 
-impl AgentAdapter for RecordingAgentAdapter {
-    fn execution_identity(&self, _request: &AgentRequest) -> Result<String, AgentError> {
+impl Adapter for RecordingAgentAdapter {
+    fn execution_identity(&self, _request: &Request) -> Result<String, Error> {
         Ok("test/recording-agent/v1".to_owned())
     }
-    fn execute(&self, request: &AgentRequest, _context: &AgentExecutionContext) -> Result<AgentResponse, AgentError> {
+    fn execute(&self, request: &Request, _context: &AgentExecutionContext) -> Result<Response, Error> {
         self.requests.lock().expect("request log lock succeeds").push(request.clone());
         let role = request_role(request);
         if self.failing_role == Some(role.as_str()) {
-            return Err(AgentError::PreflightRejected(format!("{role} is unavailable")));
+            return Err(Error::PreflightRejected(format!("{role} is unavailable")));
         }
 
         let output = match request.output_mode {
-            AgentOutputMode::Text => AgentOutput::Text(text_output_for_role(&role)?),
-            AgentOutputMode::Json => AgentOutput::Json(builder_output()),
-            AgentOutputMode::Image | AgentOutputMode::Artifact => {
-                return Err(AgentError::Adapter(format!("unexpected fixture output mode for {role}")));
+            OutputMode::Text => Output::Text(text_output_for_role(&role)?),
+            OutputMode::Json => Output::Json(builder_output()),
+            OutputMode::Image | OutputMode::Artifact => {
+                return Err(Error::Adapter(format!("unexpected fixture output mode for {role}")));
             }
         };
-        Ok(AgentResponse {
+        Ok(Response {
             output,
             metadata: json!({ "role": role }),
         })
     }
 }
 
-fn text_output_for_role(role: &str) -> Result<String, AgentError> {
+fn text_output_for_role(role: &str) -> Result<String, Error> {
     match role {
         RESEARCHER_ROLE => Ok(RESEARCH_RESULT.to_string()),
         REVIEWER_ROLE => Ok(REVIEW_RESULT.to_string()),
         PUBLISHER_ROLE => Ok(PUBLISHED_REPORT.to_string()),
-        _ => Err(AgentError::Adapter(format!("unexpected text role: {role}"))),
+        _ => Err(Error::Adapter(format!("unexpected text role: {role}"))),
     }
 }
 
@@ -114,7 +114,7 @@ fn builder_output() -> serde_json::Value {
     })
 }
 
-fn request_role(request: &AgentRequest) -> String {
+fn request_role(request: &Request) -> String {
     request.prompt.lines().next().unwrap_or_default().trim_start_matches('#').trim().to_string()
 }
 
@@ -132,7 +132,7 @@ fn fixture_executor(file_system: MemoryFileSystem, adapter: RecordingAgentAdapte
     )
 }
 
-fn request_log(requests: &Arc<Mutex<Vec<AgentRequest>>>) -> Vec<AgentRequest> {
+fn request_log(requests: &Arc<Mutex<Vec<Request>>>) -> Vec<Request> {
     requests.lock().expect("request log lock succeeds").clone()
 }
 
@@ -182,8 +182,8 @@ fn durable_llm_orchestration_binds_the_checked_in_agent_graph() {
 
     assert!(validate_definition(&definition, Some(&actual_revision)).is_empty());
     assert_eq!(definition.completion, CompletionPolicy::AwaitProposal);
-    assert!(definition.triggers.iter().any(|binding| binding.kind == OrchestrationTriggerKind::Schedule));
-    assert!(definition.triggers.iter().any(|binding| binding.kind == OrchestrationTriggerKind::Webhook));
+    assert!(definition.triggers.iter().any(|binding| binding.kind == TriggerKind::Schedule));
+    assert!(definition.triggers.iter().any(|binding| binding.kind == TriggerKind::Webhook));
 }
 
 // r[verify lattice.agent_orchestration.rounds]

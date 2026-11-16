@@ -10,7 +10,7 @@ struct BoundedLoopFabric<Fabric> {
 }
 
 impl<Fabric> BoundedLoopFabric<Fabric> {
-    fn new(inner: Fabric, turn_limit: u32) -> Result<Self, crate::agent_node::AgentError> {
+    fn new(inner: Fabric, turn_limit: u32) -> Result<Self, crate::agent_node::Error> {
         super::validate_turn_limit(turn_limit)?;
         Ok(Self {
             inner,
@@ -22,7 +22,7 @@ impl<Fabric> BoundedLoopFabric<Fabric> {
 
 #[derive(Debug)]
 enum BoundedLoopError<Inner> {
-    Admission(crate::agent_node::AgentError),
+    Admission(crate::agent_node::Error),
     Inner(Inner),
 }
 
@@ -52,9 +52,7 @@ where Fabric: animus_runtime::LoopFabric
         })
         .map_err(BoundedLoopError::Admission)?;
         self.decision_count = self.decision_count.checked_add(ONE_DECISION).ok_or_else(|| {
-            BoundedLoopError::Admission(crate::agent_node::AgentError::Adapter(
-                "Animus decision count overflow".to_string(),
-            ))
+            BoundedLoopError::Admission(crate::agent_node::Error::Adapter("Animus decision count overflow".to_string()))
         })?;
         self.inner.decide(turn).map_err(BoundedLoopError::Inner)
     }
@@ -62,7 +60,7 @@ where Fabric: animus_runtime::LoopFabric
 
 struct LatticeModelAdapter<'a> {
     runtime: &'a crate::openai::RuntimeConfig,
-    request: &'a crate::agent_node::AgentRequest,
+    request: &'a crate::agent_node::Request,
     context: &'a crate::agent_node::ExecutionContext,
     global_output_max_bytes: u64,
     transport: &'a dyn Transport,
@@ -72,7 +70,7 @@ struct LatticeModelAdapter<'a> {
 impl<'a> LatticeModelAdapter<'a> {
     const fn new(
         runtime: &'a crate::openai::RuntimeConfig,
-        request: &'a crate::agent_node::AgentRequest,
+        request: &'a crate::agent_node::Request,
         context: &'a crate::agent_node::ExecutionContext,
         global_output_max_bytes: u64,
         transport: &'a dyn Transport,
@@ -96,9 +94,9 @@ impl<'a> LatticeModelAdapter<'a> {
             .unwrap_or("unresolved")
     }
 
-    fn provider_request(&self, prompt: &str) -> crate::agent_node::AgentRequest {
-        crate::agent_node::AgentRequest {
-            target: crate::agent_node::AgentTarget::Animus,
+    fn provider_request(&self, prompt: &str) -> crate::agent_node::Request {
+        crate::agent_node::Request {
+            target: crate::agent_node::Target::Animus,
             prompt: prompt.to_string(),
             output_mode: self.request.output_mode,
             model_hint: self.request.model_hint.clone(),
@@ -116,13 +114,13 @@ impl<'a> LatticeModelAdapter<'a> {
 impl animus_adapters::ComponentAdapter<animus_adapters::ModelRequest, animus_adapters::ModelResponse>
     for LatticeModelAdapter<'_>
 {
-    type Error = crate::agent_node::AgentError;
+    type Error = crate::agent_node::Error;
 
     fn call(&mut self, request: &animus_adapters::ModelRequest) -> Result<animus_adapters::ModelResponse, Self::Error> {
         self.model_call_count = self
             .model_call_count
             .checked_add(ONE_MODEL_CALL)
-            .ok_or_else(|| crate::agent_node::AgentError::Adapter("Animus model call count overflow".to_string()))?;
+            .ok_or_else(|| crate::agent_node::Error::Adapter("Animus model call count overflow".to_string()))?;
         let provider_request = self.provider_request(request.prompt());
         let provider_response = crate::openai::execute(
             self.runtime,
@@ -132,9 +130,8 @@ impl animus_adapters::ComponentAdapter<animus_adapters::ModelRequest, animus_ada
             self.transport,
         )?;
         let message = provider_response_message(provider_response.output)?;
-        animus_adapters::ModelResponse::new(&message).map_err(|error| {
-            crate::agent_node::AgentError::Adapter(format!("Animus rejected the model response: {error}"))
-        })
+        animus_adapters::ModelResponse::new(&message)
+            .map_err(|error| crate::agent_node::Error::Adapter(format!("Animus rejected the model response: {error}")))
     }
 }
 
@@ -165,11 +162,11 @@ impl animus_adapters::ComponentAdapter<animus_adapters::ToolRequest, animus_adap
 // r[impl lattice.agent_runtime.animus_output]
 pub fn execute(
     runtime: &crate::openai::RuntimeConfig,
-    request: &crate::agent_node::AgentRequest,
+    request: &crate::agent_node::Request,
     context: &crate::agent_node::ExecutionContext,
     global_output_max_bytes: u64,
     transport: &dyn Transport,
-) -> Result<crate::agent_node::AgentResponse, crate::agent_node::AgentError> {
+) -> Result<crate::agent_node::Response, crate::agent_node::Error> {
     execute_with_projection(
         crate::openai::ProjectedChat {
             runtime,
@@ -186,7 +183,7 @@ pub fn execute_with_projection(
     input: crate::openai::ProjectedChat<'_>,
     context: &crate::agent_node::ExecutionContext,
     transport: &dyn Transport,
-) -> Result<crate::agent_node::AgentResponse, crate::agent_node::AgentError> {
+) -> Result<crate::agent_node::Response, crate::agent_node::Error> {
     let crate::openai::ProjectedChat {
         runtime,
         request,
@@ -198,10 +195,10 @@ pub fn execute_with_projection(
     debug_assert_eq!(plan.program_identity, super::BUILTIN_PROGRAM_IDENTITY);
     debug_assert!(plan.turn_limit > 0);
     let runtime_input = animus_runtime::RuntimeInput::new(&plan.summary).map_err(|error| {
-        crate::agent_node::AgentError::PreflightRejected(format!("invalid Animus runtime input: {error}"))
+        crate::agent_node::Error::PreflightRejected(format!("invalid Animus runtime input: {error}"))
     })?;
     let steel_fabric = animus_steel::SteelLoopFabric::new(plan.program).map_err(|error| {
-        crate::agent_node::AgentError::PreflightRejected(format!("invalid Animus Steel program: {error}"))
+        crate::agent_node::Error::PreflightRejected(format!("invalid Animus Steel program: {error}"))
     })?;
     let mut bounded_fabric = BoundedLoopFabric::new(steel_fabric, plan.turn_limit)?;
     let mut model_adapter = LatticeModelAdapter::new(runtime, request, context, global_output_max_bytes, transport);
@@ -219,48 +216,46 @@ pub fn execute_with_projection(
 fn map_report(
     runtime_result: &animus_runtime::RunReport,
     model_adapter: &LatticeModelAdapter<'_>,
-    output_mode: crate::agent_node::AgentOutputMode,
+    output_mode: crate::agent_node::OutputMode,
     context: &crate::agent_node::ExecutionContext,
-) -> Result<crate::agent_node::AgentResponse, crate::agent_node::AgentError> {
+) -> Result<crate::agent_node::Response, crate::agent_node::Error> {
     match runtime_result.status() {
-        animus_runtime::RuntimeStatus::FinalResponse { response } => Ok(crate::agent_node::AgentResponse {
+        animus_runtime::RuntimeStatus::FinalResponse { response } => Ok(crate::agent_node::Response {
             output: super::decode_final_response(output_mode, response.message())?,
             metadata: super::safe_metadata(super::SafeMetadataInput {
-                event_count: u64::try_from(runtime_result.events().len()).map_err(|_| {
-                    crate::agent_node::AgentError::Adapter("Animus event count is unsupported".to_string())
-                })?,
+                event_count: u64::try_from(runtime_result.events().len())
+                    .map_err(|_| crate::agent_node::Error::Adapter("Animus event count is unsupported".to_string()))?,
                 model_call_count: model_adapter.model_call_count,
                 model_label: model_adapter.model_label(),
             }),
         }),
-        animus_runtime::RuntimeStatus::CompletionCandidate { .. } => Err(crate::agent_node::AgentError::Adapter(
+        animus_runtime::RuntimeStatus::CompletionCandidate { .. } => Err(crate::agent_node::Error::Adapter(
             "Animus runtime requested unsupported host-owned completion evaluation".to_string(),
         )),
-        animus_runtime::RuntimeStatus::Stopped => Err(crate::agent_node::AgentError::Adapter(
-            "Animus runtime stopped without a final response".to_string(),
-        )),
-        animus_runtime::RuntimeStatus::MaxTurnsExceeded { max_turns } => Err(crate::agent_node::AgentError::Adapter(
-            format!("Animus runtime exceeded its {max_turns}-turn limit"),
-        )),
-        animus_runtime::RuntimeStatus::Failed { failure } => Err(crate::agent_node::AgentError::Adapter(
+        animus_runtime::RuntimeStatus::Stopped => {
+            Err(crate::agent_node::Error::Adapter("Animus runtime stopped without a final response".to_string()))
+        }
+        animus_runtime::RuntimeStatus::MaxTurnsExceeded { max_turns } => {
+            Err(crate::agent_node::Error::Adapter(format!("Animus runtime exceeded its {max_turns}-turn limit")))
+        }
+        animus_runtime::RuntimeStatus::Failed { failure } => Err(crate::agent_node::Error::Adapter(
             context.redact(&format!("Animus runtime failed: {}", failure.message())),
         )),
     }
 }
 
-fn provider_response_message(output: crate::agent_node::AgentOutput) -> Result<String, crate::agent_node::AgentError> {
+fn provider_response_message(output: crate::agent_node::Output) -> Result<String, crate::agent_node::Error> {
     match output {
-        crate::agent_node::AgentOutput::Text(message) => Ok(message),
-        crate::agent_node::AgentOutput::Json(value) => serde_json::to_string(&value).map_err(|error| {
-            crate::agent_node::AgentError::Adapter(format!("encode Animus model JSON response: {error}"))
+        crate::agent_node::Output::Text(message) => Ok(message),
+        crate::agent_node::Output::Json(value) => serde_json::to_string(&value)
+            .map_err(|error| crate::agent_node::Error::Adapter(format!("encode Animus model JSON response: {error}"))),
+        crate::agent_node::Output::Image(_) => Err(crate::agent_node::Error::OutputTypeMismatch {
+            expected: crate::agent_node::OutputMode::Text,
+            actual: crate::agent_node::OutputMode::Image,
         }),
-        crate::agent_node::AgentOutput::Image(_) => Err(crate::agent_node::AgentError::OutputTypeMismatch {
-            expected: crate::agent_node::AgentOutputMode::Text,
-            actual: crate::agent_node::AgentOutputMode::Image,
-        }),
-        crate::agent_node::AgentOutput::Artifact(_) => Err(crate::agent_node::AgentError::OutputTypeMismatch {
-            expected: crate::agent_node::AgentOutputMode::Text,
-            actual: crate::agent_node::AgentOutputMode::Artifact,
+        crate::agent_node::Output::Artifact(_) => Err(crate::agent_node::Error::OutputTypeMismatch {
+            expected: crate::agent_node::OutputMode::Text,
+            actual: crate::agent_node::OutputMode::Artifact,
         }),
     }
 }

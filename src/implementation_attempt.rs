@@ -1,11 +1,13 @@
 //! Versioned coordinator envelope for one admitted implementation attempt.
 //!
-//! This module owns only bounded admission and canonical identity for the
-//! immutable inputs that a future implementation-attempt workflow must bind
-//! before effects. It does not select work, execute a worker, approve a
-//! candidate, or publish anything.
+//! The envelope core owns bounded admission and canonical identity for immutable
+//! attempt inputs. The `cli` shell executes one explicitly admitted worker and
+//! retains its observations. Neither layer owns global claims, candidate
+//! acceptance, or publication authority.
 
 use thiserror::Error;
+
+pub mod cli;
 
 pub const IMPLEMENTATION_ATTEMPT_ENVELOPE_SCHEMA: &str = "lattice.implementation-attempt-envelope.v1";
 pub const MAX_IDENTIFIER_BYTES: usize = 256;
@@ -19,6 +21,7 @@ pub const MAX_REPOSITORY_BYTES: usize = 512;
 pub enum SourceKind {
     GitHubIssue,
     CairnTask,
+    CairnArtifact,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -108,6 +111,7 @@ impl ImplementationAttemptEnvelope {
         bytes.push(match self.source_kind {
             SourceKind::GitHubIssue => 1,
             SourceKind::CairnTask => 2,
+            SourceKind::CairnArtifact => 3,
         });
         for value in [
             &self.source_id,
@@ -242,5 +246,13 @@ mod tests {
         invalid = envelope();
         invalid.repository = "../kiln".to_string();
         assert_eq!(admit_implementation_attempt(&invalid), Err(ImplementationAttemptError::InvalidRepository));
+    }
+
+    #[test]
+    fn artifact_source_kind_has_distinct_wire_name_and_identity_tag() {
+        let mut artifact = envelope();
+        artifact.source_kind = SourceKind::CairnArtifact;
+        assert_eq!(serde_json::to_string(&artifact.source_kind).expect("source kind serializes"), "\"cairn_artifact\"");
+        assert_ne!(artifact.identity(), envelope().identity());
     }
 }

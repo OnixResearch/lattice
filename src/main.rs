@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::io::IsTerminal as _;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
@@ -22,7 +23,7 @@ use lattice::scheduler::ScheduleSkipReason;
 use lattice::store::Store;
 use lattice::triggers::TriggerDefinition;
 use lattice::triggers::TriggerRunRecord;
-use lattice::tui::App;
+use lattice::tui::State;
 use lattice::webhooks;
 use lattice::workflow_format;
 use lattice::workflow_validation;
@@ -104,6 +105,8 @@ enum CliCommand {
     Workflow(lattice::workflow::gate::cli::ResumeGroupArgs),
     /// Run fixed guarded-round discovery, probe, and progress adapters
     Guarded(lattice::guarded::CommandArgs),
+    /// Execute or reconcile one exact coordinator-admitted coding attempt
+    ImplementationAttempt(lattice::implementation_attempt::cli::CommandArgs),
     /// Inspect identity-bound agent evaluations and durable trial state
     Evaluation(lattice::agent_evaluation::cli::CommandArgs),
     /// Inspect, plan, run, and promote typed operation contracts
@@ -452,8 +455,20 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
         return Ok(ExitCode::SUCCESS);
     }
 
+    if args.command.is_none() && !(std::io::stdin().is_terminal() && std::io::stdout().is_terminal()) {
+        return Err(lattice::error::Error::Config {
+            message: "interactive TUI requires terminal stdin and stdout; use a headless subcommand".to_string(),
+        });
+    }
+
     if let Some(CliCommand::Doctor(doctor_args)) = &args.command {
         return Ok(run_doctor_command(&config_path, doctor_args));
+    }
+    if let Some(CliCommand::ImplementationAttempt(attempt_args)) = &args.command {
+        return lattice::implementation_attempt::cli::run_command(attempt_args)
+            .await
+            .map(|()| ExitCode::SUCCESS)
+            .map_err(|message| lattice::error::Error::Config { message });
     }
     if let Some(CliCommand::Guarded(guarded_args)) = &args.command {
         return lattice::guarded::run_command(guarded_args).map_err(|error| lattice::error::Error::Config {
@@ -533,6 +548,9 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
             unreachable!("operation pack command returns before generic data-directory side effects")
         }
         Some(CliCommand::Guarded(_)) => unreachable!("guarded command returns before app config side effects"),
+        Some(CliCommand::ImplementationAttempt(_)) => {
+            unreachable!("implementation attempt returns before app config side effects")
+        }
         None => {
             let config_root = config_path.parent().unwrap_or_else(|| std::path::Path::new("."));
             let templates_dir = config_root.join("templates");
@@ -544,7 +562,7 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
                         message: error.to_string(),
                     }
                 })?;
-            let mut app = App::new(app_config);
+            let mut app = State::new(app_config);
             app.set_node_templates(template_load.templates);
             app.set_workflow_templates(workflow_template_catalog.bundles);
             for diagnostic in template_load.diagnostics {
@@ -1010,10 +1028,7 @@ fn render_orchestration_validation(
     write_stdout_and_flush(&rendered)
 }
 
-fn render_orchestration_instance(
-    instance: &orchestration::OrchestrationInstance,
-    output: OrchestrationOutputFormat,
-) -> ExitCode {
+fn render_orchestration_instance(instance: &orchestration::Instance, output: OrchestrationOutputFormat) -> ExitCode {
     match output {
         OrchestrationOutputFormat::Text => {
             render_orchestration_output(&format!("{}\n", orchestration::render_status_text(instance)))

@@ -2,10 +2,18 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::fmt;
 
-use serde::Deserialize;
-use serde::Serialize;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize
+)]
 pub struct NodeId(pub u64);
 
 impl fmt::Display for NodeId {
@@ -24,7 +32,18 @@ impl WorkflowNodeIdentity for NodeId {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize
+)]
 pub struct PortId(pub u64);
 
 impl fmt::Display for PortId {
@@ -43,13 +62,13 @@ impl WorkflowPortIdentity for PortId {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum PortDirection {
     Input,
     Output,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Port {
     pub id: PortId,
     pub label: String,
@@ -72,7 +91,7 @@ impl PortSpec {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Node {
     pub id: NodeId,
     pub label: String,
@@ -82,7 +101,7 @@ pub struct Node {
     pub output_ports: Vec<Port>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Edge {
     pub source: PortId,
     pub target: PortId,
@@ -132,7 +151,7 @@ impl std::error::Error for GraphError {}
     numeric_units,
     reason = "serialized port identity counters are unitless and retain their compatible field names"
 )]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct WorkflowGraph {
     pub(super) nodes: BTreeMap<NodeId, Node>,
     pub(super) edges: Vec<Edge>,

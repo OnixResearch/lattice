@@ -3,11 +3,11 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use lattice::agent_node::AgentAdapter;
-use lattice::agent_node::AgentError;
-use lattice::agent_node::AgentOutput;
-use lattice::agent_node::AgentResponse;
+use lattice::agent_node::Adapter;
+use lattice::agent_node::Error;
 use lattice::agent_node::ExecutionContext as AgentExecutionContext;
+use lattice::agent_node::Output;
+use lattice::agent_node::Response;
 use lattice::credentials::EmptyCredentialProvider;
 use lattice::engine::executor::Executor;
 use lattice::engine::executor::NodeStatus;
@@ -39,18 +39,18 @@ const EXPECTED_COMPLETED_NODE_COUNT: usize = 4;
 #[derive(Debug)]
 struct ExampleAgentAdapter;
 
-impl AgentAdapter for ExampleAgentAdapter {
-    fn execution_identity(&self, _request: &lattice::agent_node::AgentRequest) -> Result<String, AgentError> {
+impl Adapter for ExampleAgentAdapter {
+    fn execution_identity(&self, _request: &lattice::agent_node::Request) -> Result<String, Error> {
         Ok("test/image-agent/v1".to_owned())
     }
     fn execute(
         &self,
-        request: &lattice::agent_node::AgentRequest,
+        request: &lattice::agent_node::Request,
         _context: &AgentExecutionContext,
-    ) -> Result<AgentResponse, AgentError> {
+    ) -> Result<Response, Error> {
         assert_eq!(request.image_inputs.len(), EXPECTED_IMAGE_INPUT_COUNT);
-        Ok(AgentResponse {
-            output: AgentOutput::Image(ImageValue::new(
+        Ok(Response {
+            output: Output::Image(ImageValue::new(
                 GENERATED_FIXTURE.to_vec(),
                 "image/png".to_string(),
                 ImageMetadata::default(),

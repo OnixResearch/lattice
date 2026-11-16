@@ -20,13 +20,23 @@ pub trait Clock {
 pub struct SystemClock;
 
 impl Clock for SystemClock {
-    #[allow(
-        unknown_lints,
-        ambient_clock,
-        reason = "SystemClock is the sole shell clock adapter; domain operations depend on the injected Clock port"
-    )]
     fn observe_epoch_millis(&self) -> i64 {
-        chrono::Utc::now().timestamp_millis()
+        self.observe_utc_datetime().timestamp_millis()
+    }
+}
+
+#[allow(
+    unknown_lints,
+    ambient_clock,
+    reason = "SystemClock is the sole shell clock adapter; domain operations depend on the injected Clock port"
+)]
+impl SystemClock {
+    pub fn observe_utc_datetime(&self) -> chrono::DateTime<chrono::Utc> {
+        chrono::Utc::now()
+    }
+
+    pub fn observe_monotonic_instant(&self) -> std::time::Instant {
+        std::time::Instant::now()
     }
 }
 

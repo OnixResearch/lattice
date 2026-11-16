@@ -97,14 +97,14 @@ impl ReadOnlyStore {
     fn load_instance(
         &self,
         instance_id: &crate::orchestration::InstanceId,
-    ) -> Result<Option<crate::orchestration::OrchestrationInstance>, crate::store::StoreError> {
+    ) -> Result<Option<crate::orchestration::Instance>, crate::store::StoreError> {
         self.load_by_str(ORCHESTRATION_INSTANCES, instance_id.as_str())
     }
 
     fn load_events(
         &self,
         instance_id: &crate::orchestration::InstanceId,
-    ) -> Result<Vec<crate::orchestration::OrchestrationEvent>, crate::store::StoreError> {
+    ) -> Result<Vec<crate::orchestration::Event>, crate::store::StoreError> {
         Ok(self.load_by_str(ORCHESTRATION_EVENTS, instance_id.as_str())?.unwrap_or_default())
     }
 
@@ -196,7 +196,7 @@ pub fn inspect_path(
 fn load_owner_instance(
     store: &ReadOnlyStore,
     owner: &crate::store::RunOwner,
-) -> Result<Option<crate::orchestration::OrchestrationInstance>, crate::store::StoreError> {
+) -> Result<Option<crate::orchestration::Instance>, crate::store::StoreError> {
     match owner {
         crate::store::RunOwner::Unscoped
         | crate::store::RunOwner::ScheduleOccurrence { .. }

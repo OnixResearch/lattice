@@ -48,8 +48,8 @@ impl DispatchFacts {
 }
 
 pub(super) fn orchestration_event_chain(
-    instance: &crate::orchestration::OrchestrationInstance,
-    events: &[crate::orchestration::OrchestrationEvent],
+    instance: &crate::orchestration::Instance,
+    events: &[crate::orchestration::Event],
 ) -> super::model::EvidenceState {
     let Ok(initial) = crate::orchestration::new_instance(
         instance.definition.clone(),
@@ -70,22 +70,36 @@ pub(super) fn orchestration_event_chain(
 pub(super) fn collect_dispatch_facts(
     run_id: crate::engine::RunId,
     dispatch_id: &crate::orchestration::DispatchId,
-    events: &[crate::orchestration::OrchestrationEvent],
+    events: &[crate::orchestration::Event],
 ) -> DispatchFacts {
     let target = DispatchTarget { run_id, dispatch_id };
     let mut facts = DispatchFacts::new();
     for event in events {
         match &event.fact.action {
-            crate::orchestration::OrchestrationAction::StartRound { intent, planned_charge }
-            | crate::orchestration::OrchestrationAction::RetryRound {
+            crate::orchestration::Action::StartRound { intent, planned_charge }
+            | crate::orchestration::Action::RetryRound {
                 intent, planned_charge, ..
             } => collect_start_fact(&mut facts, target, intent, *planned_charge),
-            crate::orchestration::OrchestrationAction::DispatchAcknowledged {
+            crate::orchestration::Action::DispatchAcknowledged {
                 dispatch_id: acknowledged,
             } if acknowledged == target.dispatch_id => {
                 facts.acknowledgement_count = facts.acknowledgement_count.saturating_add(1);
             }
-            crate::orchestration::OrchestrationAction::RunFinished {
+            crate::orchestration::Action::RunFinished {
+                dispatch_id: finished_dispatch,
+                run_id: finished_run,
+                succeeded,
+                observed_usage,
+                ..
+            }
+            | crate::orchestration::Action::RunFinishedMeasured {
+                dispatch_id: finished_dispatch,
+                run_id: finished_run,
+                succeeded,
+                measured_usage: observed_usage,
+                ..
+            }
+            | crate::orchestration::Action::RunFinishedObserved {
                 dispatch_id: finished_dispatch,
                 run_id: finished_run,
                 succeeded,
@@ -95,7 +109,7 @@ pub(super) fn collect_dispatch_facts(
                 succeeded: *succeeded,
                 observed_usage: *observed_usage,
             }),
-            crate::orchestration::OrchestrationAction::AbandonPendingDispatch {
+            crate::orchestration::Action::AbandonPendingDispatch {
                 dispatch_id: abandoned_dispatch,
                 run_id: abandoned_run,
                 ..
@@ -174,7 +188,7 @@ pub(super) fn dispatch_diagnostics(facts: &DispatchFacts) -> Vec<super::model::D
 }
 
 pub(super) fn summarize_orchestration(
-    instance: &crate::orchestration::OrchestrationInstance,
+    instance: &crate::orchestration::Instance,
     event_chain: super::model::EvidenceState,
     facts: &DispatchFacts,
 ) -> super::model::SafeOrchestrationEvidence {
@@ -228,7 +242,7 @@ fn recovery_state(dispatch: super::model::DispatchEvidenceState) -> super::model
 }
 
 fn summarize_budget(
-    instance: &crate::orchestration::OrchestrationInstance,
+    instance: &crate::orchestration::Instance,
     facts: &DispatchFacts,
     dispatch: super::model::DispatchEvidenceState,
 ) -> super::model::SafeBudgetEvidence {

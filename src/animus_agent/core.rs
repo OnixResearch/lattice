@@ -16,7 +16,7 @@ const TOOLS_DISABLED_LABEL: &str = "disabled";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExecutionPlan {
     pub summary: String,
-    pub output_mode: crate::agent_node::AgentOutputMode,
+    pub output_mode: crate::agent_node::OutputMode,
     pub program: &'static str,
     pub program_identity: &'static str,
     pub turn_limit: u32,
@@ -50,16 +50,14 @@ pub fn program_identity(program: &str) -> String {
 // r[impl lattice.agent_runtime.animus_leaf]
 // r[impl lattice.agent_runtime.animus_fabric]
 // r[impl lattice.agent_runtime.animus_output]
-pub fn plan_execution(
-    request: &crate::agent_node::AgentRequest,
-) -> Result<ExecutionPlan, crate::agent_node::AgentError> {
+pub fn plan_execution(request: &crate::agent_node::Request) -> Result<ExecutionPlan, crate::agent_node::Error> {
     plan_execution_with_projection(request, crate::agent_prompt::StructuredInputProjection::JsonPretty)
 }
 
 pub fn plan_execution_with_projection(
-    request: &crate::agent_node::AgentRequest,
+    request: &crate::agent_node::Request,
     projection: crate::agent_prompt::StructuredInputProjection,
-) -> Result<ExecutionPlan, crate::agent_node::AgentError> {
+) -> Result<ExecutionPlan, crate::agent_node::Error> {
     validate_execution_admission(
         request,
         ProgramIdentityCheck {
@@ -71,11 +69,11 @@ pub fn plan_execution_with_projection(
 
     let mut summary_request = request.clone();
     summary_request.model_hint = None;
-    let summary = crate::agent_node::render_prompt_with_projection(&summary_request, projection)?;
+    let summary = crate::agent_node::render_with_projection(&summary_request, projection)?;
     if summary.trim().is_empty() {
-        return Err(crate::agent_node::AgentError::MissingPrompt);
+        return Err(crate::agent_node::Error::MissingPrompt);
     }
-    debug_assert_eq!(request.target, crate::agent_node::AgentTarget::Animus);
+    debug_assert_eq!(request.target, crate::agent_node::Target::Animus);
     debug_assert_eq!(program_identity(BUILTIN_PROGRAM), BUILTIN_PROGRAM_IDENTITY);
     debug_assert!(!summary.trim().is_empty());
 
@@ -89,16 +87,16 @@ pub fn plan_execution_with_projection(
 }
 
 pub fn validate_execution_admission(
-    request: &crate::agent_node::AgentRequest,
+    request: &crate::agent_node::Request,
     identity: ProgramIdentityCheck<'_>,
     turn_limit: u32,
-) -> Result<(), crate::agent_node::AgentError> {
+) -> Result<(), crate::agent_node::Error> {
     validate_request(request)?;
     validate_program_identity(identity)?;
     validate_turn_limit(turn_limit)
 }
 
-pub fn validate_program_identity(check: ProgramIdentityCheck<'_>) -> Result<(), crate::agent_node::AgentError> {
+pub fn validate_program_identity(check: ProgramIdentityCheck<'_>) -> Result<(), crate::agent_node::Error> {
     if check.program.trim().is_empty() {
         return Err(preflight("Animus Steel program is empty"));
     }
@@ -112,17 +110,17 @@ pub fn validate_program_identity(check: ProgramIdentityCheck<'_>) -> Result<(), 
     Ok(())
 }
 
-pub fn validate_turn_limit(turn_limit: u32) -> Result<(), crate::agent_node::AgentError> {
+pub fn validate_turn_limit(turn_limit: u32) -> Result<(), crate::agent_node::Error> {
     if turn_limit == 0 || turn_limit > ANIMUS_RUNTIME_MAX_TURNS {
         return Err(preflight(format!("Animus turn limit must be between 1 and {ANIMUS_RUNTIME_MAX_TURNS}")));
     }
     Ok(())
 }
 
-pub fn validate_decision_count(budget: DecisionBudget) -> Result<(), crate::agent_node::AgentError> {
+pub fn validate_decision_count(budget: DecisionBudget) -> Result<(), crate::agent_node::Error> {
     validate_turn_limit(budget.turn_limit)?;
     if budget.decision_count >= budget.turn_limit {
-        return Err(crate::agent_node::AgentError::Adapter(format!(
+        return Err(crate::agent_node::Error::Adapter(format!(
             "Animus Steel loop exhausted its {}-turn limit",
             budget.turn_limit
         )));
@@ -132,22 +130,20 @@ pub fn validate_decision_count(budget: DecisionBudget) -> Result<(), crate::agen
 
 // r[impl lattice.agent_runtime.animus_output]
 pub fn decode_final_response(
-    output_mode: crate::agent_node::AgentOutputMode,
+    output_mode: crate::agent_node::OutputMode,
     message: &str,
-) -> Result<crate::agent_node::AgentOutput, crate::agent_node::AgentError> {
+) -> Result<crate::agent_node::Output, crate::agent_node::Error> {
     let Some(message) = non_empty_trimmed(message) else {
-        return Err(crate::agent_node::AgentError::Adapter("Animus final response is empty".to_string()));
+        return Err(crate::agent_node::Error::Adapter("Animus final response is empty".to_string()));
     };
     match output_mode {
-        crate::agent_node::AgentOutputMode::Text => Ok(crate::agent_node::AgentOutput::Text(message.to_string())),
-        crate::agent_node::AgentOutputMode::Json => {
-            serde_json::from_str(message).map(crate::agent_node::AgentOutput::Json).map_err(|error| {
-                crate::agent_node::AgentError::Adapter(format!(
-                    "Animus final response is not valid requested JSON: {error}"
-                ))
+        crate::agent_node::OutputMode::Text => Ok(crate::agent_node::Output::Text(message.to_string())),
+        crate::agent_node::OutputMode::Json => {
+            serde_json::from_str(message).map(crate::agent_node::Output::Json).map_err(|error| {
+                crate::agent_node::Error::Adapter(format!("Animus final response is not valid requested JSON: {error}"))
             })
         }
-        crate::agent_node::AgentOutputMode::Image | crate::agent_node::AgentOutputMode::Artifact => {
+        crate::agent_node::OutputMode::Image | crate::agent_node::OutputMode::Artifact => {
             Err(preflight("Animus runtime supports only text and JSON outputs"))
         }
     }
@@ -170,12 +166,12 @@ pub fn safe_metadata(input: SafeMetadataInput<'_>) -> serde_json::Value {
     })
 }
 
-fn validate_request(request: &crate::agent_node::AgentRequest) -> Result<(), crate::agent_node::AgentError> {
-    if request.target != crate::agent_node::AgentTarget::Animus {
+fn validate_request(request: &crate::agent_node::Request) -> Result<(), crate::agent_node::Error> {
+    if request.target != crate::agent_node::Target::Animus {
         return Err(preflight("Animus execution requires the animus agent target"));
     }
     if request.prompt.trim().is_empty() {
-        return Err(crate::agent_node::AgentError::MissingPrompt);
+        return Err(crate::agent_node::Error::MissingPrompt);
     }
     if !request.image_inputs.is_empty() {
         return Err(preflight("Animus runtime does not support image inputs"));
@@ -184,12 +180,12 @@ fn validate_request(request: &crate::agent_node::AgentRequest) -> Result<(), cra
         return Err(preflight("Animus runtime does not support sessions"));
     }
     match request.output_mode {
-        crate::agent_node::AgentOutputMode::Text | crate::agent_node::AgentOutputMode::Json => {}
-        crate::agent_node::AgentOutputMode::Image | crate::agent_node::AgentOutputMode::Artifact => {
+        crate::agent_node::OutputMode::Text | crate::agent_node::OutputMode::Json => {}
+        crate::agent_node::OutputMode::Image | crate::agent_node::OutputMode::Artifact => {
             return Err(preflight("Animus runtime supports only text and JSON outputs"));
         }
     }
-    debug_assert_eq!(request.target, crate::agent_node::AgentTarget::Animus);
+    debug_assert_eq!(request.target, crate::agent_node::Target::Animus);
     debug_assert!(!request.prompt.trim().is_empty());
     debug_assert!(request.image_inputs.is_empty());
     debug_assert!(request.session.as_deref().and_then(non_empty_trimmed).is_none());
@@ -201,6 +197,6 @@ fn non_empty_trimmed(value: &str) -> Option<&str> {
     if trimmed.is_empty() { None } else { Some(trimmed) }
 }
 
-fn preflight(message: impl Into<String>) -> crate::agent_node::AgentError {
-    crate::agent_node::AgentError::PreflightRejected(message.into())
+fn preflight(message: impl Into<String>) -> crate::agent_node::Error {
+    crate::agent_node::Error::PreflightRejected(message.into())
 }

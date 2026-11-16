@@ -20,7 +20,6 @@ use crate::engine::workflow::Workflow;
 use crate::scheduler::MissedRunPolicy;
 use crate::scheduler::OverlapPolicy;
 use crate::scheduler::RecurrenceRule;
-use crate::scheduler::ScheduleDefinition;
 use crate::triggers::IdempotencyPolicy;
 use crate::triggers::TriggerDefinition;
 use crate::triggers::TriggerInputBinding;
@@ -937,7 +936,7 @@ fn validate(workflow: &Workflow) -> Result<(), String> {
                 next_run_epoch_ms
                     .checked_add(interval_ms)
                     .ok_or("next schedule occurrence overflows epoch milliseconds")?;
-                let schedule = ScheduleDefinition {
+                let schedule = crate::scheduler::ScheduleDefinition {
                     id: trigger.id.clone(),
                     workflow_name: trigger.workflow_name.clone(),
                     recurrence: *recurrence,

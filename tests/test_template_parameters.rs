@@ -17,7 +17,7 @@ use lattice::config::load_node_templates_with_diagnostics;
 use lattice::config::render_template_command;
 use lattice::config::validate_template_parameters;
 use lattice::engine::workflow::NodeConfig;
-use lattice::tui::App;
+use lattice::tui::State;
 use lattice::tui::app::AddNodeStep;
 use pretty_assertions::assert_eq;
 
@@ -132,7 +132,7 @@ fn template_by_name<'a>(templates: &'a [NodeTemplate], name: &str) -> &'a NodeTe
     templates.iter().find(|template| template.name == name).expect("default template should load")
 }
 
-fn app_with_default_template_catalog() -> (tempfile::TempDir, App) {
+fn app_with_default_template_catalog() -> (tempfile::TempDir, State) {
     let temp_dir = tempfile::tempdir().expect("temporary TUI catalog directory");
     let templates_dir = temp_dir.path().join(TEMPLATES_DIR_NAME);
     std::fs::create_dir(&templates_dir).expect("TUI template directory created");
@@ -144,12 +144,12 @@ fn app_with_default_template_catalog() -> (tempfile::TempDir, App) {
         data_dir: temp_dir.path().join("data"),
         ..AppConfig::default()
     };
-    let mut app = App::new(config);
+    let mut app = State::new(config);
     app.set_node_templates(result.templates);
     (temp_dir, app)
 }
 
-fn template_index(app: &App, name: &str) -> usize {
+fn template_index(app: &State, name: &str) -> usize {
     app.node_templates
         .iter()
         .position(|template| template.name == name)

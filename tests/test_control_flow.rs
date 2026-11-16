@@ -23,7 +23,7 @@ use lattice::engine::value::Value;
 use lattice::engine::workflow::NodeConfig;
 use lattice::engine::workflow::Workflow;
 use lattice::node_kind_provider::property_lines_for_config;
-use lattice::tui::App;
+use lattice::tui::State;
 use lattice::tui::app::PropertyEditField;
 use lattice::workflow_format::WorkflowFormatError;
 use lattice::workflow_format::portable_to_workflow;
@@ -75,9 +75,9 @@ fn merge_config(policy: MergePolicy) -> MergeNodeConfig {
     }
 }
 
-fn test_app() -> App {
+fn test_app() -> State {
     let temp_dir = tempfile::tempdir().expect("temporary app directory");
-    App::new(lattice::config::AppConfig {
+    State::new(lattice::config::AppConfig {
         data_dir: temp_dir.path().join("data"),
         ..lattice::config::AppConfig::default()
     })

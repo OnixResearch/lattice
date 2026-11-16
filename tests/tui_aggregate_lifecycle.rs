@@ -2,8 +2,8 @@
 
 use std::collections::BTreeMap;
 
-use lattice::agent_node::AgentOutputMode;
-use lattice::agent_node::AgentTarget;
+use lattice::agent_node::OutputMode;
+use lattice::agent_node::Target;
 use lattice::control_flow::ConditionBranch;
 use lattice::control_flow::ConditionNodeConfig;
 use lattice::control_flow::ConditionPredicate;
@@ -190,7 +190,7 @@ fn config_variants() -> Vec<NodeConfig> {
         NodeConfig::http("POST", "https://example.com/aggregate"),
         NodeConfig::file(FileOperationKind::Read, "/tmp/aggregate.txt"),
         NodeConfig::image_input("/tmp/aggregate.png"),
-        NodeConfig::agent(AgentTarget::Pi, "Review the aggregate", AgentOutputMode::Text),
+        NodeConfig::agent(Target::Pi, "Review the aggregate", OutputMode::Text),
         NodeConfig::operation(operation_plan()),
         NodeConfig::condition(ConditionNodeConfig {
             branches: vec![condition_branch("output")],

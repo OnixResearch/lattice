@@ -2,8 +2,8 @@
 
 mod common;
 
-use lattice::agent_node::AgentOutputMode;
-use lattice::agent_node::AgentTarget;
+use lattice::agent_node::OutputMode;
+use lattice::agent_node::Target;
 use lattice::engine::workflow::GraphError;
 use lattice::engine::workflow::NodeConfig;
 use lattice::engine::workflow::PortSpec;
@@ -162,12 +162,12 @@ fn image_input_config_defaults() {
 
 #[test]
 fn agent_config_defaults() {
-    let cfg = NodeConfig::agent(AgentTarget::Pi, AGENT_PROMPT, AgentOutputMode::Text);
+    let cfg = NodeConfig::agent(Target::Pi, AGENT_PROMPT, OutputMode::Text);
     match cfg {
         NodeConfig::Agent(settings) => {
-            assert_eq!(settings.target, AgentTarget::Pi);
+            assert_eq!(settings.target, Target::Pi);
             assert_eq!(settings.prompt, AGENT_PROMPT);
-            assert_eq!(settings.output_mode, AgentOutputMode::Text);
+            assert_eq!(settings.output_mode, OutputMode::Text);
             assert!(settings.model_hint.is_none());
             assert!(settings.context_refs.is_empty());
         }

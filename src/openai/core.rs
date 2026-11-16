@@ -14,31 +14,31 @@ pub fn decode_response(
     plan: &super::ChatPlan,
     response: &super::HttpResponse,
     context: &crate::agent_node::ExecutionContext,
-) -> Result<crate::agent_node::AgentResponse, crate::agent_node::AgentError> {
+) -> Result<crate::agent_node::Response, crate::agent_node::Error> {
     if !(HTTP_SUCCESS_STATUS_MIN..HTTP_SUCCESS_STATUS_MAX_EXCLUSIVE).contains(&response.status) {
         let body = bounded_diagnostic(&String::from_utf8_lossy(&response.body));
-        return Err(crate::agent_node::AgentError::Adapter(
+        return Err(crate::agent_node::Error::Adapter(
             context.redact(&format!("OpenAI-compatible endpoint returned HTTP {}: {body}", response.status)),
         ));
     }
-    let body = std::str::from_utf8(&response.body).map_err(|_| {
-        crate::agent_node::AgentError::Adapter("OpenAI-compatible response is not valid UTF-8".to_string())
-    })?;
+    let body = std::str::from_utf8(&response.body)
+        .map_err(|_| crate::agent_node::Error::Adapter("OpenAI-compatible response is not valid UTF-8".to_string()))?;
     let envelope: super::ResponseEnvelope = serde_json::from_str(body).map_err(|error| {
-        crate::agent_node::AgentError::Adapter(format!("malformed OpenAI-compatible response JSON: {error}"))
+        crate::agent_node::Error::Adapter(format!("malformed OpenAI-compatible response JSON: {error}"))
     })?;
-    let choice = envelope.choices.first().ok_or_else(|| {
-        crate::agent_node::AgentError::Adapter("OpenAI-compatible response has no choices".to_string())
-    })?;
+    let choice = envelope
+        .choices
+        .first()
+        .ok_or_else(|| crate::agent_node::Error::Adapter("OpenAI-compatible response has no choices".to_string()))?;
     super::reasoning::admit_finish_reason(choice.finish_reason.as_deref())?;
     let content = choice.message.content.as_deref().and_then(non_empty_trimmed).ok_or_else(|| {
-        crate::agent_node::AgentError::Adapter("OpenAI-compatible response content is empty or missing".to_string())
+        crate::agent_node::Error::Adapter("OpenAI-compatible response content is empty or missing".to_string())
     })?;
     let final_content = super::reasoning::admit_final_content(content)?;
     debug_assert!((HTTP_SUCCESS_STATUS_MIN..HTTP_SUCCESS_STATUS_MAX_EXCLUSIVE).contains(&response.status));
     debug_assert!(!final_content.text.is_empty());
     let output = decode_content(plan.output_mode, final_content.text)?;
-    Ok(crate::agent_node::AgentResponse {
+    Ok(crate::agent_node::Response {
         output,
         metadata: serde_json::json!({
             "adapter": plan.adapter_label,
@@ -53,27 +53,25 @@ pub fn decode_response(
 }
 
 fn decode_content(
-    output_mode: crate::agent_node::AgentOutputMode,
+    output_mode: crate::agent_node::OutputMode,
     content: &str,
-) -> Result<crate::agent_node::AgentOutput, crate::agent_node::AgentError> {
+) -> Result<crate::agent_node::Output, crate::agent_node::Error> {
     match output_mode {
-        crate::agent_node::AgentOutputMode::Text => Ok(crate::agent_node::AgentOutput::Text(content.to_string())),
-        crate::agent_node::AgentOutputMode::Json => {
-            serde_json::from_str(content).map(crate::agent_node::AgentOutput::Json).map_err(|error| {
-                crate::agent_node::AgentError::Adapter(format!(
+        crate::agent_node::OutputMode::Text => Ok(crate::agent_node::Output::Text(content.to_string())),
+        crate::agent_node::OutputMode::Json => {
+            serde_json::from_str(content).map(crate::agent_node::Output::Json).map_err(|error| {
+                crate::agent_node::Error::Adapter(format!(
                     "OpenAI-compatible content is not valid requested JSON: {error}"
                 ))
             })
         }
-        crate::agent_node::AgentOutputMode::Image | crate::agent_node::AgentOutputMode::Artifact => {
+        crate::agent_node::OutputMode::Image | crate::agent_node::OutputMode::Artifact => {
             Err(preflight("OpenAI-compatible runtime supports only text and JSON outputs"))
         }
     }
 }
 
-pub(super) fn validate_supported_request(
-    request: &crate::agent_node::AgentRequest,
-) -> Result<(), crate::agent_node::AgentError> {
+pub(super) fn validate_supported_request(request: &crate::agent_node::Request) -> Result<(), crate::agent_node::Error> {
     if !request.image_inputs.is_empty() {
         return Err(preflight("OpenAI-compatible runtime does not support image inputs"));
     }
@@ -81,14 +79,14 @@ pub(super) fn validate_supported_request(
         return Err(preflight("OpenAI-compatible runtime does not support sessions"));
     }
     match request.output_mode {
-        crate::agent_node::AgentOutputMode::Text | crate::agent_node::AgentOutputMode::Json => Ok(()),
-        crate::agent_node::AgentOutputMode::Image | crate::agent_node::AgentOutputMode::Artifact => {
+        crate::agent_node::OutputMode::Text | crate::agent_node::OutputMode::Json => Ok(()),
+        crate::agent_node::OutputMode::Image | crate::agent_node::OutputMode::Artifact => {
             Err(preflight("OpenAI-compatible runtime supports only text and JSON outputs"))
         }
     }
 }
 
-pub(super) fn validate_endpoint(runtime: &super::RuntimeConfig) -> Result<url::Url, crate::agent_node::AgentError> {
+pub(super) fn validate_endpoint(runtime: &super::RuntimeConfig) -> Result<url::Url, crate::agent_node::Error> {
     let endpoint =
         non_empty_trimmed(&runtime.endpoint).ok_or_else(|| preflight("OpenAI-compatible endpoint is empty"))?;
     let parsed =
@@ -111,7 +109,7 @@ pub(super) fn validate_endpoint(runtime: &super::RuntimeConfig) -> Result<url::U
 pub(super) fn validate_numeric_bounds(
     runtime: &super::RuntimeConfig,
     global_output_max_bytes: u64,
-) -> Result<(), crate::agent_node::AgentError> {
+) -> Result<(), crate::agent_node::Error> {
     if runtime.timeout_secs == 0 || runtime.timeout_secs > MAX_TIMEOUT_SECS {
         return Err(preflight(format!("OpenAI-compatible timeout must be between 1 and {MAX_TIMEOUT_SECS} seconds")));
     }
@@ -143,7 +141,7 @@ pub(super) fn validate_numeric_bounds(
 pub(super) fn optional_non_empty(
     value: &Option<String>,
     label: &str,
-) -> Result<Option<String>, crate::agent_node::AgentError> {
+) -> Result<Option<String>, crate::agent_node::Error> {
     match value {
         Some(value) => non_empty_trimmed(value)
             .map(str::to_string)
@@ -158,8 +156,8 @@ pub(super) fn non_empty_trimmed(value: &str) -> Option<&str> {
     if trimmed.is_empty() { None } else { Some(trimmed) }
 }
 
-pub(super) fn preflight(message: impl Into<String>) -> crate::agent_node::AgentError {
-    crate::agent_node::AgentError::PreflightRejected(message.into())
+pub(super) fn preflight(message: impl Into<String>) -> crate::agent_node::Error {
+    crate::agent_node::Error::PreflightRejected(message.into())
 }
 
 fn bounded_diagnostic(value: &str) -> String {

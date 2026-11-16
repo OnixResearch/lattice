@@ -10,11 +10,11 @@ use lattice::orchestration::BudgetDimensions;
 use lattice::orchestration::BudgetLimits;
 use lattice::orchestration::BudgetPolicy;
 use lattice::orchestration::CompletionPolicy;
-use lattice::orchestration::OrchestrationDefinition;
-use lattice::orchestration::OrchestrationTriggerBinding;
-use lattice::orchestration::OrchestrationTriggerKind;
+use lattice::orchestration::Definition;
 use lattice::orchestration::RedactionPolicy;
 use lattice::orchestration::RetryPolicy;
+use lattice::orchestration::TriggerBinding;
+use lattice::orchestration::TriggerKind;
 use lattice::orchestration::current_schema_version;
 use lattice::orchestration::definition_to_nickel;
 use lattice::orchestration::workflow_revision;
@@ -39,7 +39,7 @@ const MAX_OBSERVED_FAILURE_RETRIES: u64 = 1;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let workflow = load_workflow_nickel_file(Path::new(WORKFLOW_PATH))?;
-    let definition = OrchestrationDefinition {
+    let definition = Definition {
         schema_version: current_schema_version(),
         id: lattice::orchestration::DefinitionId::try_from_text(DEFINITION_ID)
             .expect("example definition identity must be valid"),
@@ -76,15 +76,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             approvers: BTreeSet::from([OPERATOR_AUTHORITY.to_string()]),
         },
         triggers: vec![
-            OrchestrationTriggerBinding {
+            TriggerBinding {
                 trigger_id: lattice::orchestration::TriggerId::try_from_text(SCHEDULE_TRIGGER_ID)
                     .expect("example schedule trigger identity must be valid"),
-                kind: OrchestrationTriggerKind::Schedule,
+                kind: TriggerKind::Schedule,
             },
-            OrchestrationTriggerBinding {
+            TriggerBinding {
                 trigger_id: lattice::orchestration::TriggerId::try_from_text(WEBHOOK_TRIGGER_ID)
                     .expect("example webhook trigger identity must be valid"),
-                kind: OrchestrationTriggerKind::Webhook,
+                kind: TriggerKind::Webhook,
             },
         ],
         redaction: RedactionPolicy {

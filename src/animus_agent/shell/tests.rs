@@ -84,12 +84,12 @@ impl crate::openai::Transport for NeverTransport {
         &self,
         _plan: &crate::openai::ChatPlan,
         _bearer_token: Option<&str>,
-    ) -> Result<crate::openai::HttpResponse, crate::agent_node::AgentError> {
-        Err(crate::agent_node::AgentError::Adapter("mapping test must not invoke transport".to_string()))
+    ) -> Result<crate::openai::HttpResponse, crate::agent_node::Error> {
+        Err(crate::agent_node::Error::Adapter("mapping test must not invoke transport".to_string()))
     }
 }
 
-fn mapping_error(report: &animus_runtime::RunReport) -> crate::agent_node::AgentError {
+fn mapping_error(report: &animus_runtime::RunReport) -> crate::agent_node::Error {
     let runtime = crate::openai::RuntimeConfig {
         endpoint: ENDPOINT.to_string(),
         model: MODEL.to_string(),
@@ -102,10 +102,10 @@ fn mapping_error(report: &animus_runtime::RunReport) -> crate::agent_node::Agent
         enable_thinking: None,
         system_prompt: String::new(),
     };
-    let request = crate::agent_node::AgentRequest {
-        target: crate::agent_node::AgentTarget::Animus,
+    let request = crate::agent_node::Request {
+        target: crate::agent_node::Target::Animus,
         prompt: SUMMARY.to_string(),
-        output_mode: crate::agent_node::AgentOutputMode::Text,
+        output_mode: crate::agent_node::OutputMode::Text,
         model_hint: None,
         tool_policy: String::new(),
         context_refs: Vec::new(),
@@ -118,7 +118,7 @@ fn mapping_error(report: &animus_runtime::RunReport) -> crate::agent_node::Agent
     let context = crate::agent_node::ExecutionContext::default();
     let transport = NeverTransport;
     let adapter = LatticeModelAdapter::new(&runtime, &request, &context, MAX_BYTES, &transport);
-    map_report(report, &adapter, crate::agent_node::AgentOutputMode::Text, &context)
+    map_report(report, &adapter, crate::agent_node::OutputMode::Text, &context)
         .expect_err("non-final runtime report must fail the node")
 }
 

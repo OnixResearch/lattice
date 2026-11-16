@@ -218,7 +218,7 @@ fn handler_profile_rejects_advertised_pause_or_resume() {
 fn serving_rejects_a_profile_that_advertises_pause() {
     let (_directory, store, _workflow, _contract, _request, mut profile) = fixture(TEST_COMMAND);
     profile.controls.pause = true;
-    let result = super::ApplicationHandler::new(store, profile, crate::agent_node::AgentRuntimeConfig::default());
+    let result = super::ApplicationHandler::new(store, profile, crate::agent_node::RuntimeOptions::default());
     assert!(matches!(result, Err(super::ApplicationError::Profile)));
 }
 
@@ -258,7 +258,7 @@ fn source_context_instantiates_exact_shell_environment_and_revision() {
         Err(super::RouteError::SourceCollision)
     );
 
-    let handler = super::ApplicationHandler::new(store, profile, crate::agent_node::AgentRuntimeConfig::default())
+    let handler = super::ApplicationHandler::new(store, profile, crate::agent_node::RuntimeOptions::default())
         .expect("handler starts");
     let mut service = WorkflowExchangeService::new(handler);
     let dispatch = new_request(ExchangeCommand::Dispatch {
@@ -293,7 +293,7 @@ fn source_context_instantiates_exact_shell_environment_and_revision() {
 #[test]
 fn dispatch_executes_once_recovers_acceptance_and_reads_bounded_log() {
     let (_directory, store, _workflow, contract, request, profile) = fixture(TEST_COMMAND);
-    let handler = super::ApplicationHandler::new(store, profile, crate::agent_node::AgentRuntimeConfig::default())
+    let handler = super::ApplicationHandler::new(store, profile, crate::agent_node::RuntimeOptions::default())
         .expect("handler starts");
     let mut service = WorkflowExchangeService::new(handler);
     let dispatch = new_request(ExchangeCommand::Dispatch {
@@ -366,7 +366,10 @@ fn exchange_shell_exit_controls_durable_results_and_dependent_effects() {
         let (directory, store, mut workflow, contract, mut request, mut profile) = fixture(command);
         let source = crate::engine::workflow::NodeId(profile.routes[0].nodes[0].workflow_node_id);
         let marker = directory.path().join("dependent-effect");
-        let dependent = workflow.add_shell_node("dependent", format!("printf dependent > '{}'", marker.display()));
+        // This case checks exit-status propagation after complete stdin delivery;
+        // the bounded runner separately rejects an early-closed input pipe.
+        let dependent = workflow
+            .add_shell_node("dependent", format!("cat >/dev/null && printf dependent > '{}'", marker.display()));
         let stdout =
             workflow.graph.node(source).expect("source exists").output_ports.first().expect("stdout exists").id;
         let stdin = workflow
@@ -401,7 +404,7 @@ fn exchange_shell_exit_controls_durable_results_and_dependent_effects() {
             workflow_node_id: dependent.0,
         });
         let handler =
-            super::ApplicationHandler::new(store.clone(), profile, crate::agent_node::AgentRuntimeConfig::default())
+            super::ApplicationHandler::new(store.clone(), profile, crate::agent_node::RuntimeOptions::default())
                 .expect("handler starts");
         let mut service = WorkflowExchangeService::new(handler);
         let dispatch = new_request(ExchangeCommand::Dispatch {
@@ -500,9 +503,8 @@ fn active_cancel_stops_started_child_and_prevents_dependent_effect() {
         operation_identity: identity('8'),
         workflow_node_id: dependent.0,
     });
-    let handler =
-        super::ApplicationHandler::new(store.clone(), profile, crate::agent_node::AgentRuntimeConfig::default())
-            .expect("handler starts");
+    let handler = super::ApplicationHandler::new(store.clone(), profile, crate::agent_node::RuntimeOptions::default())
+        .expect("handler starts");
     let mut service = WorkflowExchangeService::new(handler);
     let dispatch = new_request(ExchangeCommand::Dispatch {
         profile: contract.clone(),
@@ -588,7 +590,7 @@ fn reused_idempotency_key_with_changed_request_is_rejected() {
 fn stale_cancel_and_unsupported_pause_fail_closed() {
     let (_directory, store, _workflow, contract, request, mut profile) = fixture("sleep 2");
     profile.maximum_active_executions = 1;
-    let handler = super::ApplicationHandler::new(store, profile, crate::agent_node::AgentRuntimeConfig::default())
+    let handler = super::ApplicationHandler::new(store, profile, crate::agent_node::RuntimeOptions::default())
         .expect("handler starts");
     let mut service = WorkflowExchangeService::new(handler);
     let dispatch = new_request(ExchangeCommand::Dispatch {
@@ -695,7 +697,7 @@ fn accepted_execution_without_live_worker_becomes_unknown_without_redispatch() {
     let super::AdmissionResolution::Inserted(record) = admitted else {
         panic!("fixture must insert one execution");
     };
-    let handler = super::ApplicationHandler::new(store, profile, crate::agent_node::AgentRuntimeConfig::default())
+    let handler = super::ApplicationHandler::new(store, profile, crate::agent_node::RuntimeOptions::default())
         .expect("replacement handler starts");
     let mut service = WorkflowExchangeService::new(handler);
     let observe = new_request(ExchangeCommand::Observe {
@@ -715,7 +717,7 @@ fn accepted_execution_without_live_worker_becomes_unknown_without_redispatch() {
 fn unavailable_route_authority_denies_effects_without_fallback() {
     let (_directory, store, _workflow, contract, request, mut profile) = fixture(TEST_COMMAND);
     profile.routes[0].effect_authority = super::EffectAuthorityMode::Unavailable;
-    let handler = super::ApplicationHandler::new(store, profile, crate::agent_node::AgentRuntimeConfig::default())
+    let handler = super::ApplicationHandler::new(store, profile, crate::agent_node::RuntimeOptions::default())
         .expect("handler starts");
     let mut service = WorkflowExchangeService::new(handler);
     let dispatch = new_request(ExchangeCommand::Dispatch {
@@ -760,8 +762,7 @@ fn unix_service_composes_the_application_handler_and_bounded_transport() {
     profile.maximum_active_executions = 1;
     profile.transport.peers.allowed_user_ids = vec![nix::unistd::getuid().as_raw()];
     let client_profile = profile.transport.clone();
-    let server =
-        std::thread::spawn(move || super::serve(store, profile, crate::agent_node::AgentRuntimeConfig::default()));
+    let server = std::thread::spawn(move || super::serve(store, profile, crate::agent_node::RuntimeOptions::default()));
     for _attempt in 0..SOCKET_READY_ATTEMPTS {
         if socket_path.exists() {
             break;

@@ -203,16 +203,11 @@ fn file_and_image_fields_validate_paths_rows_enums_and_platform_bounds() {
 #[test]
 fn agent_source_is_opaque_and_all_fields_preserve_typed_values_without_io() {
     let mut w = workflow();
-    let node = w.add_agent_node(
-        "agent",
-        crate::agent_node::AgentTarget::Pi,
-        "prompt",
-        crate::agent_node::AgentOutputMode::Text,
-    );
+    let node = w.add_agent_node("agent", crate::agent_node::Target::Pi, "prompt", crate::agent_node::OutputMode::Text);
     for target in ["pi", "clankers", "animus"] {
         edit(&mut w, node, "config.agent.target", target);
         assert!(
-            matches!(&w.configs[&node.0], NodeConfig::Agent(settings) if crate::agent_node::agent_target_label(settings.target) == target)
+            matches!(&w.configs[&node.0], NodeConfig::Agent(settings) if crate::agent_node::target_label(settings.target) == target)
         );
     }
     for mode in ["text", "json", "image", "artifact"] {

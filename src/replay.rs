@@ -13,7 +13,6 @@ use serde::Serialize;
 
 use crate::engine::Value;
 use crate::engine::ValueData;
-use crate::engine::Workflow;
 use crate::engine::executor::NodeStatus;
 use crate::engine::executor::RunId;
 use crate::engine::executor::StepResult;
@@ -141,7 +140,7 @@ pub struct ReplayBundle {
     pub run_id: RunId,
     pub workflow_name: String,
     pub workflow_hash: Option<String>,
-    pub workflow_snapshot: Option<Workflow>,
+    pub workflow_snapshot: Option<crate::engine::workflow::Workflow>,
     pub redaction_policy: String,
     pub events: Vec<ReplayEventRecord>,
 }
@@ -399,7 +398,11 @@ pub fn move_replay_cursor(cursor: ReplayCursor, delta: i32) -> ReplayCursor {
 }
 
 // r[impl n8nclone.tui_ux.replay_debugger.active_run]
-pub fn active_events(run_id: RunId, workflow: &Workflow, timestamp_epoch_ms: i64) -> Vec<ReplayEventRecord> {
+pub fn active_events(
+    run_id: RunId,
+    workflow: &crate::engine::workflow::Workflow,
+    timestamp_epoch_ms: i64,
+) -> Vec<ReplayEventRecord> {
     let run_boundary_event_count = 1;
     let mut events = Vec::with_capacity(workflow.graph.node_count().saturating_add(run_boundary_event_count));
     events.push(replay_event_record(
@@ -435,7 +438,11 @@ pub fn active_events(run_id: RunId, workflow: &Workflow, timestamp_epoch_ms: i64
 
 // r[impl n8nclone.workflow_execution.replay.event_store]
 // r[impl n8nclone.tui_ux.replay_debugger.active_run]
-pub fn cancelled_replay_events(run_id: RunId, workflow: &Workflow, timestamp_epoch_ms: i64) -> Vec<ReplayEventRecord> {
+pub fn cancelled_replay_events(
+    run_id: RunId,
+    workflow: &crate::engine::workflow::Workflow,
+    timestamp_epoch_ms: i64,
+) -> Vec<ReplayEventRecord> {
     let run_boundary_event_count = 2;
     let mut events = Vec::with_capacity(workflow.graph.node_count().saturating_add(run_boundary_event_count));
     events.push(replay_event_record(
@@ -482,7 +489,7 @@ pub fn cancelled_replay_events(run_id: RunId, workflow: &Workflow, timestamp_epo
 // r[impl n8nclone.workflow_execution.replay.event_store]
 pub fn replay_events_from_results(
     run_id: RunId,
-    workflow: &Workflow,
+    workflow: &crate::engine::workflow::Workflow,
     results: &[StepResult],
     started_epoch_ms: i64,
     finished_epoch_ms: Option<i64>,
@@ -527,7 +534,7 @@ fn replay_event_capacity(results: &[StepResult]) -> usize {
 fn append_step_events(
     events: &mut Vec<ReplayEventRecord>,
     run_id: RunId,
-    workflow: &Workflow,
+    workflow: &crate::engine::workflow::Workflow,
     step: &StepResult,
     timestamp_epoch_ms: Option<i64>,
 ) {
@@ -724,7 +731,7 @@ pub fn artifact_view(reference: ReplayArtifactReference, payload_available: bool
 pub fn export_replay_bundle(
     run_id: RunId,
     workflow_name: impl Into<String>,
-    workflow_snapshot: Option<Workflow>,
+    workflow_snapshot: Option<crate::engine::workflow::Workflow>,
     events: Vec<ReplayEventRecord>,
 ) -> ReplayBundle {
     let workflow_hash = workflow_snapshot.as_ref().map(workflow_snapshot_hash);
@@ -782,11 +789,11 @@ pub fn validate_replay_bundle(bundle: &ReplayBundle) -> Vec<ReplayDiagnostic> {
     diagnostics
 }
 
-fn workflow_node_ids(workflow: &Workflow) -> BTreeSet<u64> {
+fn workflow_node_ids(workflow: &crate::engine::workflow::Workflow) -> BTreeSet<u64> {
     workflow.graph.nodes().map(|node| node.id.0).collect()
 }
 
-fn workflow_snapshot_hash(workflow: &Workflow) -> String {
+fn workflow_snapshot_hash(workflow: &crate::engine::workflow::Workflow) -> String {
     match serde_json::to_vec(workflow) {
         Ok(bytes) => blake3::hash(&bytes).to_hex().to_string(),
         Err(error) => blake3::hash(format!("workflow-hash-error:{error}").as_bytes()).to_hex().to_string(),

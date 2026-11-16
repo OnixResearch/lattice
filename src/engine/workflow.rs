@@ -8,9 +8,6 @@ use std::collections::HashMap;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::agent_node::AgentNodeSettings;
-use crate::agent_node::AgentOutputMode;
-use crate::agent_node::AgentTarget;
 use crate::control_flow::ConditionNodeConfig;
 use crate::control_flow::MergeNodeConfig;
 use crate::control_flow::SubworkflowNodeConfig;
@@ -109,7 +106,7 @@ pub enum NodeConfig {
         allowed_roots: Vec<String>,
         max_bytes: usize,
     },
-    Agent(AgentNodeSettings),
+    Agent(crate::agent_node::Settings),
     Operation(Box<crate::operation::InvocationPlan>),
     Condition(ConditionNodeConfig),
     Merge(MergeNodeConfig),
@@ -156,8 +153,12 @@ impl NodeConfig {
         }
     }
 
-    pub fn agent(target: AgentTarget, prompt: impl Into<String>, output_mode: AgentOutputMode) -> Self {
-        Self::Agent(AgentNodeSettings::new(target, prompt, output_mode))
+    pub fn agent(
+        target: crate::agent_node::Target,
+        prompt: impl Into<String>,
+        output_mode: crate::agent_node::OutputMode,
+    ) -> Self {
+        Self::Agent(crate::agent_node::Settings::new(target, prompt, output_mode))
     }
 
     pub fn operation(plan: crate::operation::InvocationPlan) -> Self {
@@ -326,9 +327,9 @@ impl Workflow {
     pub fn add_agent_node(
         &mut self,
         label: impl Into<String>,
-        target: AgentTarget,
+        target: crate::agent_node::Target,
         prompt: impl Into<String>,
-        output_mode: AgentOutputMode,
+        output_mode: crate::agent_node::OutputMode,
     ) -> NodeId {
         self.add_configured_node(label, NodeConfig::agent(target, prompt, output_mode))
     }
@@ -742,7 +743,12 @@ mod tests {
             workflow.add_http_node("http", "GET", "https://example.com"),
             workflow.add_file_node("file", FileOperationKind::Read, "./input.txt"),
             workflow.add_image_input_node("image", "./input.png"),
-            workflow.add_agent_node("agent", AgentTarget::Pi, "prompt", AgentOutputMode::Text),
+            workflow.add_agent_node(
+                "agent",
+                crate::agent_node::Target::Pi,
+                "prompt",
+                crate::agent_node::OutputMode::Text,
+            ),
             workflow.add_condition_node("condition", ConditionNodeConfig {
                 branches: vec![branch("match")],
             }),

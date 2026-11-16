@@ -3,13 +3,11 @@
 //! Catalog loading and executable identity observation are explicit actions.
 //! Planning uses the existing admission path, never an executor or secret resolver.
 use std::collections::BTreeMap;
-use std::path::Path;
 
 use serde_json::Value;
 
 use super::Field;
 use super::field;
-use crate::engine::Workflow;
 use crate::operation::model::ValidatedCatalog;
 use crate::operation::model::ValidatedInstance;
 use crate::operation::model::ValueType;
@@ -113,7 +111,7 @@ impl Builder {
 
     pub fn apply(
         &mut self,
-        workflow: &mut Workflow,
+        workflow: &mut crate::engine::workflow::Workflow,
         node_id: Option<u64>,
         id: &str,
         text: &str,
@@ -139,10 +137,11 @@ impl Builder {
                 if text != "load" {
                     return Err("Enter load to validate the catalog and instances".into());
                 }
-                let catalog = crate::operation::format::load_catalog(Path::new(&self.catalog_path))
+                let catalog = crate::operation::format::load_catalog(std::path::Path::new(&self.catalog_path))
                     .map_err(|error| error.to_string())?;
-                let instances = crate::operation::format::load_instances(Path::new(&self.instances_path), &catalog)
-                    .map_err(|error| error.to_string())?;
+                let instances =
+                    crate::operation::format::load_instances(std::path::Path::new(&self.instances_path), &catalog)
+                        .map_err(|error| error.to_string())?;
                 self.catalog = Some(catalog);
                 self.instances = instances;
                 self.instance_id.clear();
@@ -176,12 +175,12 @@ impl Builder {
                 let arguments_json = serde_json::to_string(&self.arguments).map_err(|error| error.to_string())?;
                 let admitted = crate::operation::cli::admit_for_pack_with_runtime(
                     crate::operation::cli::PlanInput {
-                        catalog_path: Path::new(&self.catalog_path),
-                        instances_path: Path::new(&self.instances_path),
+                        catalog_path: std::path::Path::new(&self.catalog_path),
+                        instances_path: std::path::Path::new(&self.instances_path),
                         instance_id: &self.instance_id,
                         method: &self.method,
                         arguments_json: &arguments_json,
-                        executable_path: Path::new(&self.executable_path),
+                        executable_path: std::path::Path::new(&self.executable_path),
                     },
                     runtime,
                 )

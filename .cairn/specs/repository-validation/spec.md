@@ -899,6 +899,8 @@ r[lattice.repository_validation.workflow_format_promotion.scenario.fail_closed]
 ### Requirement: Bounded Octet baseline migration
 r[lattice.repository_validation.octet_baseline_migration] Lattice MUST migrate accepted Octet identities only when the bounded semantic finding policy accepts the complete transition.
 
+Identity-only migration requires equal complete raw and canonical semantic multisets. The explicit `--prune-resolved` mode MAY remove resolved findings, but MUST NOT increase the baseline identity count or any complete raw semantic group's multiplicity. Every reference warning identity MUST belong to the old baseline; all descriptions covered by an admitted colliding identity form its occurrence budget. The reference MUST reproduce the original canonical facts under the same successful tool, compiler, profile and configuration cohort. Stable-ID collisions, removals elsewhere, and source-file relocation MUST NOT admit new warning facts.
+
 #### Scenario: Reviewed wording retains semantic identity
 r[lattice.repository_validation.octet_baseline_migration.scenario.wording]
 - GIVEN an `ambiguous_params` or `numeric_units` message changes only through a reviewed Octet wording transition

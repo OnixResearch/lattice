@@ -123,14 +123,14 @@ fn every_supported_expression_field_is_in_the_checked_inventory() {
 
     let agent = workflow.add_agent_node(
         "agent",
-        lattice::agent_node::AgentTarget::Pi,
+        lattice::agent_node::Target::Pi,
         "prompt",
-        lattice::agent_node::AgentOutputMode::Text,
+        lattice::agent_node::OutputMode::Text,
     );
-    let mut settings = lattice::agent_node::AgentNodeSettings::new(
-        lattice::agent_node::AgentTarget::Pi,
+    let mut settings = lattice::agent_node::Settings::new(
+        lattice::agent_node::Target::Pi,
         expression.clone(),
-        lattice::agent_node::AgentOutputMode::Text,
+        lattice::agent_node::OutputMode::Text,
     );
     settings.model_hint = Some(expression.clone());
     settings.tool_policy = expression.clone();
@@ -359,10 +359,10 @@ fn malformed_and_unsupported_expression_forms_fail_closed() {
     let malformed_diagnostics = validate_workflow(&malformed);
 
     let (mut unsupported, _producer, consumer, _producer_stdout) = independent_expression_workflow();
-    let mut settings = lattice::agent_node::AgentNodeSettings::new(
-        lattice::agent_node::AgentTarget::Pi,
+    let mut settings = lattice::agent_node::Settings::new(
+        lattice::agent_node::Target::Pi,
         "prompt",
-        lattice::agent_node::AgentOutputMode::Text,
+        lattice::agent_node::OutputMode::Text,
     );
     settings.prompt_file = Some("{{node:1:port:2}}".to_string());
     unsupported.set_node_config(consumer, NodeConfig::Agent(settings));

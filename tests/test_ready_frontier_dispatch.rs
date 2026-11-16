@@ -1,5 +1,8 @@
 mod common;
 
+#[path = "fixtures/ready-frontier-live-reads.rs"]
+mod live_reads;
+
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 

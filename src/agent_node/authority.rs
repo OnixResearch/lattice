@@ -4,13 +4,7 @@ use std::cell::RefCell;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 
-use zeroize::Zeroize;
-
-use super::AgentAdapter;
-use super::AgentError;
-use super::AgentOutput;
-use super::AgentRequest;
-use super::AgentResponse;
+use super::Adapter;
 use super::ExecutionContext;
 use crate::credentials::CredentialDestination;
 use crate::credentials::CredentialProvider;
@@ -23,8 +17,8 @@ use crate::engine::effect::dispatch::AuthorizedAttempt;
 use crate::engine::effect::dispatch::Error;
 
 pub(crate) struct Recipe<'a> {
-    request: RefCell<Option<AgentRequest>>,
-    adapter: &'a dyn AgentAdapter,
+    request: RefCell<Option<super::Request>>,
+    adapter: &'a dyn Adapter,
     backend: String,
     bindings: Bindings,
     cancellation: &'a AtomicBool,
@@ -33,8 +27,8 @@ pub(crate) struct Recipe<'a> {
 
 impl<'a> Recipe<'a> {
     pub(crate) fn new(
-        request: AgentRequest,
-        adapter: &'a dyn AgentAdapter,
+        request: super::Request,
+        adapter: &'a dyn Adapter,
         references: Option<&NodeCredentialRefs>,
         provider: Arc<dyn CredentialProvider>,
         cancellation: &'a AtomicBool,
@@ -60,7 +54,7 @@ impl<'a> Recipe<'a> {
         &self.payload
     }
 
-    fn consume(&self, subject: &CredentialSubject) -> Result<AgentResponse, Error> {
+    fn consume(&self, subject: &CredentialSubject) -> Result<super::Response, Error> {
         let request = self.request.borrow_mut().take().ok_or(Error::AdapterRejected)?;
         if self.adapter.execution_identity(&request).map_err(|_| Error::AdapterRejected)? != self.backend {
             return Err(Error::AdapterRejected);
@@ -73,7 +67,7 @@ impl<'a> Recipe<'a> {
 }
 
 impl AuthorizedAdapterRequest for Recipe<'_> {
-    type Output = AgentResponse;
+    type Output = super::Response;
 
     fn execute(
         &self,
@@ -95,25 +89,25 @@ impl AuthorizedAdapterRequest for Recipe<'_> {
 }
 
 pub(crate) fn execute_redacted(
-    adapter: &dyn AgentAdapter,
-    request: &AgentRequest,
+    adapter: &dyn Adapter,
+    request: &super::Request,
     context: &ExecutionContext,
     cancellation: Option<&std::sync::atomic::AtomicBool>,
-) -> Result<AgentResponse, AgentError> {
+) -> Result<super::Response, super::Error> {
     let mut response =
         adapter.execute_with_cancellation(request, context, cancellation).map_err(|error| match error {
-            AgentError::UnsupportedTarget(text) => AgentError::UnsupportedTarget(context.redact(&text)),
-            AgentError::PreflightRejected(text) => AgentError::PreflightRejected(context.redact(&text)),
-            AgentError::Credential(text) => AgentError::Credential(context.redact(&text)),
-            AgentError::Session(text) => AgentError::Session(context.redact(&text)),
-            AgentError::Adapter(text) => AgentError::Adapter(context.redact(&text)),
+            super::Error::UnsupportedTarget(text) => super::Error::UnsupportedTarget(context.redact(&text)),
+            super::Error::PreflightRejected(text) => super::Error::PreflightRejected(context.redact(&text)),
+            super::Error::Credential(text) => super::Error::Credential(context.redact(&text)),
+            super::Error::Session(text) => super::Error::Session(context.redact(&text)),
+            super::Error::Adapter(text) => super::Error::Adapter(context.redact(&text)),
             other => other,
         })?;
     match &mut response.output {
-        AgentOutput::Text(text) => redact_string(text, context),
-        AgentOutput::Json(json) => redact_json(json, context),
-        AgentOutput::Artifact(bytes) => redact_bytes(bytes, context),
-        AgentOutput::Image(image) => {
+        super::Output::Text(text) => redact_string(text, context),
+        super::Output::Json(json) => redact_json(json, context),
+        super::Output::Artifact(bytes) => redact_bytes(bytes, context),
+        super::Output::Image(image) => {
             redact_bytes(&mut image.bytes, context);
             redact_string(&mut image.media_type, context);
             if let Some(label) = image.metadata.source_label.as_mut() {
@@ -127,7 +121,7 @@ pub(crate) fn execute_redacted(
 
 fn redact_string(text: &mut String, context: &ExecutionContext) {
     let redacted = context.redact(text);
-    text.zeroize();
+    zeroize::Zeroize::zeroize(text);
     *text = redacted;
 }
 
@@ -161,7 +155,7 @@ fn redact_bytes(bytes: &mut Vec<u8>, context: &ExecutionContext) {
         let mut offset = 0;
         while offset + needle.len() <= bytes.len() {
             if &bytes[offset..offset + needle.len()] == needle {
-                bytes[offset..offset + needle.len()].zeroize();
+                zeroize::Zeroize::zeroize(&mut bytes[offset..offset + needle.len()]);
                 bytes.splice(offset..offset + needle.len(), crate::credentials::REDACTION_MARKER.bytes());
                 offset += crate::credentials::REDACTION_MARKER.len();
             } else {

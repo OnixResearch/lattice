@@ -20,14 +20,16 @@ This is a proposed, opt-in profile. No worker execution or production qualificat
 - Preserve authorization, durable dispatch, cancellation, unknown outcomes, and explicit fresh recomputation from immutable inputs. r[lattice.pure_inet_profile.recovery]
 - Keep Mneme projection admission and Kiln/Lattice campaign ownership outside the worker. r[lattice.pure_inet_profile.ownership]
 - Qualify the real selected executable with independent result checks and failure fixtures before enabling the profile. r[lattice.pure_inet_profile.verification]
+- Specify an optional semantic-interaction result observation and conditional fresh-recomputation integrity check, requiring the exact theorem/hypothesis and native counter bridge before a count can be checked. Without that bridge counters remain observed only. r[lattice.pure_inet_profile.semantic_count] r[lattice.pure_inet_profile.recompute_integrity] r[lattice.pure_inet_profile.semantic_limit]
 
 ## Impact
 
 - **Profile and fixtures:** add one optional content-addressed pack, a closed worker contract, and exact producer/runtime compatibility evidence.
 - **Thin adapter:** normalize the worker's versioned protocol into existing typed invocation/output and artifact boundaries. Reuse the current process runner; do not add a runtime kind or `NodeConfig` variant.
 - **Consumers:** Mneme supplies an immutable authorized snapshot and validates the resulting projection. The existing campaign owner retains claims, budgets across attempts, acceptance, and publication.
-- **Dependencies:** [Noble #37](https://github.com/OnixResearch/noble-lang/issues/37) owns the future exact net-byte, rule, and readback contract. Qualify that producer's serialized pure-program and bounded-evaluation protocol before advertising a runnable profile. No producer worker CLI is assumed to exist, and this change specifies no invented CLI flags.
+- **Dependencies:** [Noble #37](https://github.com/OnixResearch/noble-lang/issues/37) owns exact net/rule/readback and bounded-evaluation contracts. The current source now has a real `--net` CLI; qualify its exact executable and actual enforced bounds before advertising a Lattice runnable profile. This change invents no CLI flags.
 - **Mneme consumer:** coordinate with [Mneme #5](https://github.com/OnixResearch/mneme/issues/5) and its `add-optional-inet-compute` change; its input/output semantics and independent reference workload remain the common consumer contract.
+- **Current producer selection:** Noble `84ece371a8f68ac37dca745a135fee5e73e1ed53` selects `ngraph-net-i64/3` on inets `98bbb01070664e4462a35efa5d62de6f27143572`; a Rust reducer, `--net` CLI and instantiated model theorems now exist. Historical missing-runtime observations are superseded. Mandatory producer memory/output-construction ceilings and admitted native implementation-to-counter/executable bindings remain unavailable; see [precise source-backed blockers](evidence/producer-readiness.json). [Noble #124](https://github.com/OnixResearch/noble-lang/issues/124)'s model declarations alone do not qualify the native worker.
 
 ## Existing Work and Scope Boundaries
 

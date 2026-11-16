@@ -8,8 +8,8 @@ use super::test_support::send;
 use crate::engine::workflow::NodeConfig;
 use crate::engine::workflow::NodeId;
 use crate::engine::workflow::WorkflowTimestamp;
-use crate::tui::App;
-use crate::tui::app::AppAction;
+use crate::tui::State;
+use crate::tui::app::Action;
 use crate::tui::graph;
 use crate::tui::input;
 use crate::tui::panels;
@@ -17,13 +17,13 @@ use crate::workflow_format::load_workflow_nickel_file;
 use crate::workflow_format::workflow_to_nickel;
 use crate::workflow_format::workflow_to_portable;
 
-fn app(root: &tempfile::TempDir) -> App {
-    App::new(crate::config::AppConfig {
+fn app(root: &tempfile::TempDir) -> State {
+    State::new(crate::config::AppConfig {
         data_dir: root.path().join("state"),
         ..Default::default()
     })
 }
-fn text(app: &mut App, value: &str) {
+fn text(app: &mut State, value: &str) {
     for character in value.chars() {
         if character == '\n' {
             send(app, KeyModifiers::CONTROL, KeyCode::Char('j'));
@@ -32,7 +32,7 @@ fn text(app: &mut App, value: &str) {
         }
     }
 }
-fn select(app: &mut App, node: Option<u64>) {
+fn select(app: &mut State, node: Option<u64>) {
     app.authoring = None;
     app.graph_state.selected.clear();
     if let Some(node) = node {
@@ -40,7 +40,7 @@ fn select(app: &mut App, node: Option<u64>) {
     }
     app.open_authoring("all");
 }
-fn draft(app: &mut App, id: &str, value: &str) {
+fn draft(app: &mut State, id: &str, value: &str) {
     let state = app.authoring.as_mut().expect("typed browser");
     state.selected = state
         .fields
@@ -51,14 +51,14 @@ fn draft(app: &mut App, id: &str, value: &str) {
     send(app, KeyModifiers::CONTROL, KeyCode::Char('u'));
     text(app, value);
 }
-fn edit(app: &mut App, id: &str, value: &str) {
+fn edit(app: &mut State, id: &str, value: &str) {
     draft(app, id, value);
     send(app, KeyModifiers::NONE, KeyCode::Enter);
     let state = app.authoring.as_ref().expect("recoverable browser");
     assert!(state.error.is_none(), "{id}={value}: {:?}", state.error);
     assert!(state.draft.is_none(), "{id} did not commit");
 }
-fn create(app: &mut App, kind: char, label: &str, value: &str) -> u64 {
+fn create(app: &mut State, kind: char, label: &str, value: &str) -> u64 {
     app.authoring = None;
     app.open_add_node_flow();
     send(app, KeyModifiers::NONE, KeyCode::Char(kind));
@@ -510,6 +510,6 @@ fn every_guided_kind_rejects_invalid_or_cancelled_drafts_without_dirtying_prior_
     }
     assert_eq!(
         input::handle_event(&mut app, &Event::Key(KeyEvent::new(KeyCode::Char('w'), KeyModifiers::CONTROL))),
-        Some(AppAction::OpenAuthoring("all"))
+        Some(Action::OpenAuthoring("all"))
     );
 }

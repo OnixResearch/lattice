@@ -1,14 +1,6 @@
 //! Credential references, provider interfaces, and redaction helpers.
 
-use std::collections::BTreeMap;
 use std::collections::HashMap;
-
-use serde::Deserialize;
-use serde::Serialize;
-
-use crate::agent_node::ProcessOutput;
-use crate::agent_node::ProcessRequest;
-use crate::agent_node::ProcessRunner;
 
 pub mod config;
 pub(crate) mod execution;
@@ -24,7 +16,7 @@ pub enum CredentialSubject {
     TriggerInvocation { workflow_id: String, trigger_id: String },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub enum CredentialDestination {
     ShellEnvironment,
     HttpHeader,
@@ -52,7 +44,7 @@ const SUCCESS_STATUS_CODE: i32 = 0;
 const VAULT_STREAM_HASH_TAG: &[u8] = b"n8nclone-local-vault-stream-v1";
 const VAULT_INTEGRITY_HASH_TAG: &[u8] = b"n8nclone-local-vault-integrity-v1";
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct SecretRef {
     pub provider: String,
     pub key: String,
@@ -78,7 +70,7 @@ impl SecretRef {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct NodeCredentialRefs {
     pub env: HashMap<String, SecretRef>,
 }
@@ -207,7 +199,7 @@ impl CredentialProvider for MapCredentialProvider {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CredentialProviderCapabilities {
     pub supports_fields: bool,
     pub supports_listing: bool,
@@ -226,7 +218,7 @@ impl CredentialProviderCapabilities {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CredentialProviderMetadata {
     pub id: String,
     pub display_name: String,
@@ -386,7 +378,7 @@ impl CredentialProvider for EnvironmentCredentialProvider {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct LocalVaultEntry {
     pub key: String,
     pub nonce_hex: String,
@@ -394,7 +386,7 @@ pub struct LocalVaultEntry {
     pub plaintext_hash: String,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct LocalCredentialVault {
     pub entries: HashMap<String, LocalVaultEntry>,
 }
@@ -516,7 +508,7 @@ pub struct CommandCredentialProviderConfig {
     pub program: String,
     pub args: Vec<String>,
     pub cwd: Option<String>,
-    pub env: BTreeMap<String, String>,
+    pub env: std::collections::BTreeMap<String, String>,
     pub timeout_secs: u64,
     pub output_limit_bytes: usize,
 }
@@ -527,7 +519,7 @@ impl CommandCredentialProviderConfig {
             program: program.into(),
             args: Vec::new(),
             cwd: None,
-            env: BTreeMap::new(),
+            env: std::collections::BTreeMap::new(),
             timeout_secs: DEFAULT_PROVIDER_TIMEOUT_SECS,
             output_limit_bytes: DEFAULT_PROVIDER_OUTPUT_LIMIT_BYTES,
         }
@@ -546,14 +538,14 @@ impl<R> CommandCredentialProvider<R> {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct CommandSecretResponse {
     value: String,
 }
 
 // r[impl n8nclone.credentials.providers.command]
 impl<R> CredentialProvider for CommandCredentialProvider<R>
-where R: ProcessRunner + Send + Sync
+where R: crate::agent_node::ProcessRunner + Send + Sync
 {
     fn resolve(&self, secret_ref: &SecretRef) -> Result<SecretValue, CredentialError> {
         validate_secret_ref(secret_ref)?;
@@ -571,8 +563,11 @@ where R: ProcessRunner + Send + Sync
     }
 }
 
-fn command_provider_request(config: &CommandCredentialProviderConfig, secret_ref: &SecretRef) -> ProcessRequest {
-    ProcessRequest {
+fn command_provider_request(
+    config: &CommandCredentialProviderConfig,
+    secret_ref: &SecretRef,
+) -> crate::agent_node::ProcessRequest {
+    crate::agent_node::ProcessRequest {
         program: config.program.clone(),
         args: config.args.clone(),
         cwd: config.cwd.clone(),
@@ -585,7 +580,7 @@ fn command_provider_request(config: &CommandCredentialProviderConfig, secret_ref
 
 fn command_provider_secret_from_output(
     secret_ref: &SecretRef,
-    output: ProcessOutput,
+    output: crate::agent_node::ProcessOutput,
     output_limit_bytes: usize,
 ) -> Result<String, CredentialError> {
     if output.status_code != Some(SUCCESS_STATUS_CODE) {
@@ -630,7 +625,7 @@ fn parse_command_secret_stdout(secret_ref: &SecretRef, stdout: &str) -> Result<S
     Ok(stdout.to_string())
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct CredentialProbeResult {
     pub identity: String,
     pub reachable: bool,

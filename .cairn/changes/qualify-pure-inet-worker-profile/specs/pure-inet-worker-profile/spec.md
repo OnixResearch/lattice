@@ -145,3 +145,48 @@ r[lattice.pure_inet_profile.verification.scenario.structural]
 - GIVEN only schema checks, profile parsing, mocked worker responses, or an upstream performance claim
 - WHEN readiness is evaluated
 - THEN the profile remains unqualified and no runtime, confluence, speedup, or production-readiness claim is made.
+
+### Requirement: Optional semantic interaction count
+r[lattice.pure_inet_profile.semantic_count] The host evaluation envelope MAY carry an optional versioned `semantic_interactions` observation alongside the output. Version 1 MUST contain an exact nonnegative decimal-string `value` (`0` or digits without leading zeroes), a semantic `unit` and observation-boundary identity, producer-counter provenance, and an assurance classification of `observed` or `checked`. A checked observation MUST additionally bind the exact upstream proof commit and theorem declarations, instantiated system/rules/representation, discharged invariant and diamond hypotheses, admitted initial net and complete normal-form/readback observation, producer/lowering/runtime/executable identities, and retained implementation-to-counter correspondence evidence. Host admission MUST match those bindings to independently admitted qualification evidence; a worker naming a theorem, two matching counters, or structural validation alone MUST NOT promote a count to checked. Missing theorem or correspondence evidence MUST leave a valid counter observed only; malformed or crossed checked claims MUST fail admission. This is a host envelope requirement, not a newly invented producer wire schema.
+
+#### Scenario: Count has no qualified theorem bridge
+r[lattice.pure_inet_profile.semantic_count.scenario.observed]
+- GIVEN a complete response with a counter but no named theorem or admitted implementation-to-counter correspondence
+- WHEN the host records its bounded observation
+- THEN the counter remains observed only, never a checked result, while ordinary output admission retains its independent obligations.
+
+#### Scenario: Count units disagree
+r[lattice.pure_inet_profile.semantic_count.scenario.units]
+- GIVEN a theorem counting principal-pair interactions and a producer counting arithmetic graph nodes, administrative microsteps, retries, or host work
+- WHEN checked-count admission compares the units and observation boundary
+- THEN it refuses the checked claim unless an explicit admitted correspondence establishes the reported semantic unit.
+
+### Requirement: Complete recomputation integrity
+r[lattice.pure_inet_profile.recompute_integrity] Only complete, admitted results for the same immutable computation MAY be compared as recomputations. Comparison MUST bind exact program/input/schema/net/rule/producer/lowering/runtime/executable/profile/output-contract and semantic-count evidence identities, while retaining each fresh invocation/attempt and lineage separately. With qualified checked counts on both complete results, a different output MUST produce `OutputIntegrityFailure` and a different semantic count MUST produce `InteractionCountIntegrityFailure`; neither MAY be classified as `Unknown`, resource exhaustion, or acceptable physical variance. A missing required checked count or changed proof/unit binding MUST fail admission rather than silently downgrade comparison. Matching output and checked count is consistency evidence only, not independent qualification, publication authority, or proof of source correctness. Observed physical counters and unqualified semantic counters MUST retain their provenance and MAY differ without establishing this count-integrity failure. Partial, interrupted, cancelled, exhausted and unknown attempts MUST retain their existing outcomes and MUST NOT supply a complete comparison baseline.
+
+#### Scenario: Exact complete recomputation matches
+r[lattice.pure_inet_profile.recompute_integrity.scenario.match]
+- GIVEN two explicitly authorized fresh complete invocations reconstructed from identical admitted immutable inputs with the same qualified count bridge
+- WHEN both output and semantic count agree
+- THEN the host records consistency with both attempt identities, current authority decisions, lineage and remaining budget, without claiming the earlier attempt never ran.
+
+#### Scenario: Output or checked count differs
+r[lattice.pure_inet_profile.recompute_integrity.scenario.mismatch]
+- GIVEN two complete admitted results with the same immutable computation and qualified count bindings
+- WHEN output differs or, with matching output, the checked semantic count differs
+- THEN output mismatch is `OutputIntegrityFailure` or count mismatch is `InteractionCountIntegrityFailure`, and the mismatched result is not usable derived data.
+
+### Requirement: Exact semantic limit consequence
+r[lattice.pure_inet_profile.semantic_limit] A previously admitted complete checked count MAY justify an exact rewrite-limit comparison only when the new invocation uses the same immutable computation and the limiter charges the identical semantic unit at the same boundary and stopping convention (including success at exactly the limit). An alleged semantic-rewrite exhaustion at or above that complete count MUST be retained as `InteractionCountIntegrityFailure`, not silently retried or relabelled ordinary exhaustion. Validation, construction, allocation/arena, queue, wall-time, stream, readback and publication bounds remain independent and MAY still stop the invocation. A declared ceiling, observed-only counter or partial count MUST NOT establish this consequence or become measured consumption.
+
+#### Scenario: Another bound stops recomputation
+r[lattice.pure_inet_profile.semantic_limit.scenario.independent]
+- GIVEN a qualified complete count no greater than a matching semantic rewrite ceiling but an insufficient allocation or deadline bound
+- WHEN the new invocation exhausts that independent bound
+- THEN the host retains the actual exhaustion or timeout, does not infer count disagreement, and admits no complete result.
+
+#### Scenario: Exact semantic rewrite limit is contradicted
+r[lattice.pure_inet_profile.semantic_limit.scenario.contradiction]
+- GIVEN an admitted complete checked count K and an identically charged semantic limit at least K for the same immutable computation
+- WHEN the producer instead reports exhaustion of that semantic limit
+- THEN the host records the named integrity failure and retains the conflicting evidence without claiming that other resource bounds are removed.

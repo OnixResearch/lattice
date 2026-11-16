@@ -14,7 +14,6 @@ pub(crate) mod test_support;
 mod tests;
 pub mod workflow;
 
-use crate::engine::Workflow;
 use crate::workflow_format::PortableWorkflow;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -55,7 +54,7 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(workflow: &Workflow, node_id: Option<u64>, family: &'static str) -> Self {
+    pub fn new(workflow: &crate::engine::workflow::Workflow, node_id: Option<u64>, family: &'static str) -> Self {
         let mut state = Self {
             node_id,
             family,
@@ -69,7 +68,7 @@ impl State {
         state
     }
 
-    pub fn refresh(&mut self, workflow: &Workflow) {
+    pub fn refresh(&mut self, workflow: &crate::engine::workflow::Workflow) {
         self.fields = fields(workflow, self.node_id, self.family);
         if self.family == "all" || self.family == "operation" {
             let replace = self.node_id.is_some_and(|id| {
@@ -80,7 +79,7 @@ impl State {
         self.selected = self.selected.min(self.fields.len().saturating_sub(1));
     }
 
-    pub fn begin(&mut self, workflow: &Workflow) {
+    pub fn begin(&mut self, workflow: &crate::engine::workflow::Workflow) {
         if let Some(field) = self.fields.get(self.selected).cloned() {
             self.draft = Some(Draft {
                 text: field.value.clone(),
@@ -92,7 +91,7 @@ impl State {
     }
 }
 
-pub fn fields(workflow: &Workflow, node_id: Option<u64>, family: &str) -> Vec<Field> {
+pub fn fields(workflow: &crate::engine::workflow::Workflow, node_id: Option<u64>, family: &str) -> Vec<Field> {
     let mut fields = workflow::fields(workflow, node_id);
     if let Some(node_id) = node_id {
         fields.extend(node::fields(workflow, node_id));
@@ -110,7 +109,12 @@ pub fn fields(workflow: &Workflow, node_id: Option<u64>, family: &str) -> Vec<Fi
     fields
 }
 
-pub fn apply(workflow: &mut Workflow, node_id: Option<u64>, id: &str, value: &str) -> Result<(), String> {
+pub fn apply(
+    workflow: &mut crate::engine::workflow::Workflow,
+    node_id: Option<u64>,
+    id: &str,
+    value: &str,
+) -> Result<(), String> {
     if id == "config.approval.add" {
         let parts = value.split('|').map(str::trim).collect::<Vec<_>>();
         if parts.len() != 3 {

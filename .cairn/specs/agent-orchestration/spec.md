@@ -105,6 +105,44 @@ r[lattice.agent_orchestration.budgets.scenario.concurrent]
 - WHEN the durable shell commits the reservation decisions
 - THEN at most the policy-admitted reservation MUST commit and no runner invocation may start for a rejected reservation
 
+### Requirement: Honest durable usage settlement
+r[lattice.agent_orchestration.usage] The orchestration shell MUST retain a host-owned receipt distinguishing reservation, conservative charged budget, host run interval, provider reports and unknown coverage before settlement. Provider reports and model-written assertions MUST NOT be relabeled as measured billing or physical allocation.
+
+#### Scenario: Restart after observation persistence
+r[lattice.agent_orchestration.usage.scenario.recovery]
+- GIVEN the exact run receipt and its conservative charge were persisted before the settlement event
+- WHEN the host restarts or recovery is repeated
+- THEN recovery MUST reuse that exact workflow/instance/dispatch/run/reservation-bound receipt once, preserve previously consumed budget, and MUST NOT rederive a cheaper charge from missing or changed telemetry
+- AND later exact owned outcome evidence MAY monotonically refine absent cancellation telemetry without changing any frozen usage, reservation or charge; stale partial writes MUST NOT erase known evidence, and contradictory known outcomes MUST be rejected
+
+#### Scenario: Missing or conflicting telemetry
+r[lattice.agent_orchestration.usage.scenario.uncertainty]
+- GIVEN telemetry is missing, malformed, truncated, unsupported, interrupted or incomplete
+- WHEN a terminal owned run is settled
+- THEN unknown usage MUST retain the admitted conservative fallback rather than zero; valid known reports MUST remain distinct, and conflicting or crossed durable receipts MUST block settlement without refunding the reservation
+- AND production Agent metadata split into ordered history rows MUST be reassembled as one exact port-bound JSON document within a byte bound, without truncation; valid totals with only one non-contradictory component MUST remain reports, while invalid fields or conflicting full sums MUST NOT establish token usage
+
+#### Scenario: Cancellation outcome and settlement remain correlated
+r[lattice.agent_orchestration.usage.scenario.cancellation]
+- GIVEN a current completion has exact owned run and cancellation observations
+- WHEN its budget reservation is settled
+- THEN observed cancellation MUST close ownership only after the charge is durable, successful non-cancelled completion MUST win a late cancellation request, and failed/requested work MUST NOT become retry evidence
+- AND absent cancellation telemetry MUST retain pending ownership and conservative budget without inventing a negative observation or replacement
+- AND recovery that observes the terminal run record before the producer returns its typed outcome MUST remain pending until that later exact owned evidence is durable, then settle once without changing its frozen charge
+
+#### Scenario: Unqualified shell routes cannot evade worker accounting
+r[lattice.agent_orchestration.usage.scenario.shell]
+- GIVEN worker invocation, token or monetary accounting is enforced and no accounted shell-worker profile is admitted
+- WHEN a workflow contains any Shell node, including an opaque wrapper
+- THEN admission MUST reject that route before runner effects rather than infer model usage from a command name or zero Agent nodes
+
+#### Scenario: Worker and service qualification is unavailable
+r[lattice.agent_orchestration.usage.scenario.bindings]
+- GIVEN no admitted exact worker/service/request or currency/pricing identity is supplied by its existing owner
+- WHEN usage is persisted or exposed
+- THEN Lattice MUST retain explicit unknown coverage and MUST NOT invent GPU leases, served-weight identities, authoritative billing, shared-allocation apportionment or completed worker qualification
+
+
 ### Requirement: Durable idempotent dispatch admission
 r[lattice.agent_orchestration.durability] Lattice MUST persist each accepted orchestration event, budget reservation, and dispatch intent atomically and MUST reconcile stable BLAKE3 dispatch identities with run history after interruption.
 

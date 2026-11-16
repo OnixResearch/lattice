@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 
 use lattice::engine::RunId;
 use lattice::engine::Workflow;
+use lattice::orchestration::Action;
 use lattice::orchestration::AuthorityPolicy;
 use lattice::orchestration::BudgetCharge;
 use lattice::orchestration::BudgetChargePlan;
@@ -9,13 +10,12 @@ use lattice::orchestration::BudgetDimensions;
 use lattice::orchestration::BudgetLimits;
 use lattice::orchestration::BudgetPolicy;
 use lattice::orchestration::CompletionPolicy;
+use lattice::orchestration::Definition;
 use lattice::orchestration::DefinitionId;
 use lattice::orchestration::DispatchIntent;
 use lattice::orchestration::DispatchStatus;
+use lattice::orchestration::Fact;
 use lattice::orchestration::InstanceId;
-use lattice::orchestration::OrchestrationAction;
-use lattice::orchestration::OrchestrationDefinition;
-use lattice::orchestration::OrchestrationFact;
 use lattice::orchestration::RedactionPolicy;
 use lattice::orchestration::RetryPolicy;
 use lattice::orchestration::TriggerScopedKey;
@@ -58,9 +58,9 @@ fn instance_id(label: &str) -> InstanceId {
     InstanceId::try_from_hex(digest(label)).expect("instance identity fixture must be valid")
 }
 
-fn definition() -> OrchestrationDefinition {
+fn definition() -> Definition {
     let workflow = Workflow::new(WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
-    OrchestrationDefinition {
+    Definition {
         schema_version: current_schema_version(),
         id: definition_id(),
         objective: OBJECTIVE.to_string(),
@@ -95,7 +95,7 @@ fn store() -> (tempfile::TempDir, Store) {
     (directory, store)
 }
 
-fn start(base: &lattice::orchestration::OrchestrationInstance) -> lattice::orchestration::OrchestrationTransition {
+fn start(base: &lattice::orchestration::Instance) -> lattice::orchestration::Transition {
     let run_id = RunId(RUN_ID);
     let intent = DispatchIntent {
         id: dispatch_identity(base, run_id).expect("dispatch must hash"),
@@ -103,14 +103,14 @@ fn start(base: &lattice::orchestration::OrchestrationInstance) -> lattice::orche
         workflow_revision: base.workflow_revision.clone(),
         status: DispatchStatus::Pending,
     };
-    let action = OrchestrationAction::StartRound {
+    let action = Action::StartRound {
         intent,
         planned_charge: BudgetChargePlan {
             rounds: Some(FIRST_SEQUENCE),
             ..BudgetChargePlan::default()
         },
     };
-    let fact = OrchestrationFact {
+    let fact = Fact {
         id: fact_identity(&base.id, base.version, &action).expect("fact must hash"),
         action,
     };
@@ -158,10 +158,10 @@ fn stale_concurrent_transition_cannot_overwrite_newer_state() {
         .create_orchestration(&started.instance, std::slice::from_ref(&start_event))
         .expect("started instance must persist");
 
-    let acknowledge_action = OrchestrationAction::DispatchAcknowledged {
+    let acknowledge_action = Action::DispatchAcknowledged {
         dispatch_id: started.instance.pending_dispatch.as_ref().expect("dispatch exists").id.clone(),
     };
-    let acknowledge = transition(&started.instance, OrchestrationFact {
+    let acknowledge = transition(&started.instance, Fact {
         id: fact_identity(&started.instance.id, started.instance.version, &acknowledge_action).expect("fact must hash"),
         action: acknowledge_action,
     })
@@ -174,10 +174,10 @@ fn stale_concurrent_transition_cannot_overwrite_newer_state() {
         )
         .expect("first writer must commit");
 
-    let cancel_action = OrchestrationAction::CancelRequested {
+    let cancel_action = Action::CancelRequested {
         actor: ACTOR.to_string(),
     };
-    let stale = transition(&started.instance, OrchestrationFact {
+    let stale = transition(&started.instance, Fact {
         id: fact_identity(&started.instance.id, started.instance.version, &cancel_action).expect("fact must hash"),
         action: cancel_action,
     })
@@ -204,7 +204,7 @@ fn concurrent_retry_transitions_admit_exactly_one_dispatch() {
     let base = new_instance(retry_definition, FIRST_SEQUENCE, None).expect("instance must hash");
     let started = start(&base);
     let dispatch = started.instance.pending_dispatch.as_ref().expect("dispatch exists");
-    let failed_action = OrchestrationAction::RunFinished {
+    let failed_action = Action::RunFinished {
         dispatch_id: dispatch.id.clone(),
         run_id: dispatch.run_id,
         succeeded: false,
@@ -215,7 +215,7 @@ fn concurrent_retry_transitions_admit_exactly_one_dispatch() {
         },
         safe_summary: "observed terminal failure".to_string(),
     };
-    let failed = transition(&started.instance, OrchestrationFact {
+    let failed = transition(&started.instance, Fact {
         id: fact_identity(&started.instance.id, started.instance.version, &failed_action)
             .expect("failure fact must hash"),
         action: failed_action,
@@ -235,7 +235,7 @@ fn concurrent_retry_transitions_admit_exactly_one_dispatch() {
             workflow_revision: failed.instance.workflow_revision.clone(),
             status: DispatchStatus::Pending,
         };
-        let action = OrchestrationAction::RetryRound {
+        let action = Action::RetryRound {
             actor: ACTOR.to_string(),
             intent,
             planned_charge: BudgetChargePlan {
@@ -243,7 +243,7 @@ fn concurrent_retry_transitions_admit_exactly_one_dispatch() {
                 ..BudgetChargePlan::default()
             },
         };
-        transition(&failed.instance, OrchestrationFact {
+        transition(&failed.instance, Fact {
             id: fact_identity(&failed.instance.id, failed.instance.version, &action).expect("retry fact must hash"),
             action,
         })

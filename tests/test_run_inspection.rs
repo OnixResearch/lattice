@@ -6,6 +6,7 @@ use lattice::engine::Workflow;
 use lattice::engine::runner::RunnerEventKind;
 use lattice::engine::workflow::NodeId;
 use lattice::engine::workflow::PortId;
+use lattice::orchestration::Action;
 use lattice::orchestration::AuthorityPolicy;
 use lattice::orchestration::BudgetCharge;
 use lattice::orchestration::BudgetChargePlan;
@@ -13,16 +14,15 @@ use lattice::orchestration::BudgetDimensions;
 use lattice::orchestration::BudgetLimits;
 use lattice::orchestration::BudgetPolicy;
 use lattice::orchestration::CompletionPolicy;
+use lattice::orchestration::Definition;
 use lattice::orchestration::DefinitionId;
 use lattice::orchestration::DispatchId;
 use lattice::orchestration::DispatchIntent;
 use lattice::orchestration::DispatchStatus;
+use lattice::orchestration::Event;
+use lattice::orchestration::Fact;
+use lattice::orchestration::Instance;
 use lattice::orchestration::InstanceId;
-use lattice::orchestration::OrchestrationAction;
-use lattice::orchestration::OrchestrationDefinition;
-use lattice::orchestration::OrchestrationEvent;
-use lattice::orchestration::OrchestrationFact;
-use lattice::orchestration::OrchestrationInstance;
 use lattice::orchestration::RedactionPolicy;
 use lattice::orchestration::RetryPolicy;
 use lattice::orchestration::current_schema_version;
@@ -156,9 +156,9 @@ fn assert_private_content_absent(rendered: &str) {
     assert!(!rendered.contains("<think>"));
 }
 
-fn started_orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationEvent>, DispatchId) {
+fn started_orchestration_fixture() -> (Instance, Vec<Event>, DispatchId) {
     let workflow = Workflow::new(PRIVATE_PROMPT, lattice::engine::workflow::WorkflowTimestamp::epoch());
-    let definition = OrchestrationDefinition {
+    let definition = Definition {
         schema_version: current_schema_version(),
         id: definition_id(),
         objective: PRIVATE_PROMPT.to_string(),
@@ -196,7 +196,7 @@ fn started_orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationE
         workflow_revision: initial.workflow_revision.clone(),
         status: DispatchStatus::Pending,
     };
-    let start = apply(&initial, OrchestrationAction::StartRound {
+    let start = apply(&initial, Action::StartRound {
         intent,
         planned_charge: BudgetChargePlan {
             rounds: Some(ROUND_CHARGE),
@@ -209,13 +209,13 @@ fn started_orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationE
     (start.0, vec![start.1], dispatch_id)
 }
 
-fn orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationEvent>, DispatchId) {
+fn orchestration_fixture() -> (Instance, Vec<Event>, DispatchId) {
     let (started, mut events, dispatch_id) = started_orchestration_fixture();
-    let acknowledged = apply(&started, OrchestrationAction::DispatchAcknowledged {
+    let acknowledged = apply(&started, Action::DispatchAcknowledged {
         dispatch_id: dispatch_id.clone(),
     });
     events.push(acknowledged.1);
-    let finished = apply(&acknowledged.0, OrchestrationAction::RunFinished {
+    let finished = apply(&acknowledged.0, Action::RunFinished {
         dispatch_id: dispatch_id.clone(),
         run_id: RunId(RUN_ID_VALUE),
         succeeded: true,
@@ -230,9 +230,9 @@ fn orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationEvent>, D
     (finished.0, events, dispatch_id)
 }
 
-fn retried_orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationEvent>, DispatchId) {
+fn retried_orchestration_fixture() -> (Instance, Vec<Event>, DispatchId) {
     let workflow = Workflow::new(PRIVATE_PROMPT, lattice::engine::workflow::WorkflowTimestamp::epoch());
-    let definition = OrchestrationDefinition {
+    let definition = Definition {
         schema_version: current_schema_version(),
         id: definition_id(),
         objective: PRIVATE_PROMPT.to_string(),
@@ -266,7 +266,7 @@ fn retried_orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationE
     let initial = new_instance(definition, INSTANCE_SEQUENCE, None).expect("instance");
     let first_run_id = RunId(RUN_ID_VALUE);
     let first_dispatch_id = dispatch_identity(&initial, first_run_id).expect("first dispatch identity");
-    let started = apply(&initial, OrchestrationAction::StartRound {
+    let started = apply(&initial, Action::StartRound {
         intent: DispatchIntent {
             id: first_dispatch_id.clone(),
             run_id: first_run_id,
@@ -278,10 +278,10 @@ fn retried_orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationE
             ..BudgetChargePlan::default()
         },
     });
-    let acknowledged = apply(&started.0, OrchestrationAction::DispatchAcknowledged {
+    let acknowledged = apply(&started.0, Action::DispatchAcknowledged {
         dispatch_id: first_dispatch_id.clone(),
     });
-    let failed = apply(&acknowledged.0, OrchestrationAction::RunFinished {
+    let failed = apply(&acknowledged.0, Action::RunFinished {
         dispatch_id: first_dispatch_id,
         run_id: first_run_id,
         succeeded: false,
@@ -294,7 +294,7 @@ fn retried_orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationE
     });
     let retry_run_id = RunId(OTHER_RUN_ID_VALUE);
     let retry_dispatch_id = dispatch_identity(&failed.0, retry_run_id).expect("retry dispatch identity");
-    let retry_started = apply(&failed.0, OrchestrationAction::RetryRound {
+    let retry_started = apply(&failed.0, Action::RetryRound {
         actor: SAFE_ACTOR.to_string(),
         intent: DispatchIntent {
             id: retry_dispatch_id.clone(),
@@ -307,10 +307,10 @@ fn retried_orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationE
             ..BudgetChargePlan::default()
         },
     });
-    let retry_acknowledged = apply(&retry_started.0, OrchestrationAction::DispatchAcknowledged {
+    let retry_acknowledged = apply(&retry_started.0, Action::DispatchAcknowledged {
         dispatch_id: retry_dispatch_id.clone(),
     });
-    let completed = apply(&retry_acknowledged.0, OrchestrationAction::RunFinished {
+    let completed = apply(&retry_acknowledged.0, Action::RunFinished {
         dispatch_id: retry_dispatch_id.clone(),
         run_id: retry_run_id,
         succeeded: true,
@@ -332,17 +332,17 @@ fn retried_orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationE
     (completed.0, events, retry_dispatch_id)
 }
 
-fn abandoned_orchestration_fixture() -> (OrchestrationInstance, Vec<OrchestrationEvent>, DispatchId) {
+fn abandoned_orchestration_fixture() -> (Instance, Vec<Event>, DispatchId) {
     let (started, mut events, dispatch_id) = started_orchestration_fixture();
-    let acknowledged = apply(&started, OrchestrationAction::DispatchAcknowledged {
+    let acknowledged = apply(&started, Action::DispatchAcknowledged {
         dispatch_id: dispatch_id.clone(),
     });
     events.push(acknowledged.1);
-    let cancelled = apply(&acknowledged.0, OrchestrationAction::CancelRequested {
+    let cancelled = apply(&acknowledged.0, Action::CancelRequested {
         actor: SAFE_ACTOR.to_string(),
     });
     events.push(cancelled.1);
-    let abandoned = apply(&cancelled.0, OrchestrationAction::AbandonPendingDispatch {
+    let abandoned = apply(&cancelled.0, Action::AbandonPendingDispatch {
         actor: SAFE_ACTOR.to_string(),
         dispatch_id: dispatch_id.clone(),
         run_id: RunId(RUN_ID_VALUE),
@@ -351,8 +351,8 @@ fn abandoned_orchestration_fixture() -> (OrchestrationInstance, Vec<Orchestratio
     (abandoned.0, events, dispatch_id)
 }
 
-fn apply(instance: &OrchestrationInstance, action: OrchestrationAction) -> (OrchestrationInstance, OrchestrationEvent) {
-    let fact = OrchestrationFact {
+fn apply(instance: &Instance, action: Action) -> (Instance, Event) {
+    let fact = Fact {
         id: fact_identity(&instance.id, instance.version, &action).expect("fact identity"),
         action,
     };

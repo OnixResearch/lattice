@@ -171,6 +171,7 @@ pub(super) fn record_completion(
     results_by_node: &mut BTreeMap<u64, StepResult>,
     observed_completion_order: &mut Vec<NodeId>,
     product_session: Option<&SharedSession>,
+    progress: Option<(&crate::engine::executor::progress::Sender, Option<u64>)>,
 ) {
     if let Some(session) = product_session
         && let Err(error) = session.lock().finish(step.node_id, &step.status)
@@ -186,6 +187,15 @@ pub(super) fn record_completion(
         for (port_id, value) in outputs {
             port_values.insert(*port_id, value.clone());
         }
+    }
+    if let Some((sender, duration_millis)) = progress
+        && let Err(fault) = sender.send(crate::engine::executor::NodeProgress::Finished {
+            node_id: step.node_id,
+            duration_millis,
+            result: step.clone(),
+        })
+    {
+        tracing::error!(node = ?step.node_id, ?fault, "executor finish observation incomplete");
     }
     runner_states.insert(step.node_id.0, crate::engine::executor::runner_step_state(&step.status));
     observed_completion_order.push(step.node_id);
@@ -252,6 +262,7 @@ pub(super) fn fail_unfinished(
             results_by_node,
             observed_completion_order,
             product_session,
+            None,
         );
         if workflow.graph.node(*node_id).is_none() {
             debug_assert!(results_by_node.contains_key(&node_id.0));

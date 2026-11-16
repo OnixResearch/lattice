@@ -527,7 +527,7 @@ async fn shell_claims_before_execution_and_settles_exact_owned_run() {
 
     assert_eq!(store.load_schedule(SCHEDULE_ID).unwrap().unwrap().next_run_epoch_ms, NEXT_RUN_EPOCH_MS);
     assert!(store.load_run(occurrence.active_run_id).expect("pre-effect run loads").is_none());
-    let summary = execute_occurrence(&store, &occurrence, lattice::agent_node::AgentRuntimeConfig::default())
+    let summary = execute_occurrence(&store, &occurrence, lattice::agent_node::RuntimeOptions::default())
         .await
         .expect("owned occurrence executes");
     let settled = store
@@ -564,7 +564,7 @@ async fn shell_rejects_changed_workflow_revision_before_effects() {
     changed.add_shell_node("changed", CHANGED_WORKFLOW_COMMAND);
     store.save_workflow(&changed).expect("changed workflow saves");
 
-    let error = execute_occurrence(&store, &occurrence, lattice::agent_node::AgentRuntimeConfig::default())
+    let error = execute_occurrence(&store, &occurrence, lattice::agent_node::RuntimeOptions::default())
         .await
         .expect_err("changed workflow revision rejects before execution");
 
@@ -616,13 +616,13 @@ async fn shell_retry_is_explicit_fresh_and_terminal() {
     };
 
     assert!(
-        retry_occurrence(&store, &initial.identity, false, lattice::agent_node::AgentRuntimeConfig::default(),)
+        retry_occurrence(&store, &initial.identity, false, lattice::agent_node::RuntimeOptions::default(),)
             .await
             .expect_err("unacknowledged shell retry rejects")
             .to_string()
             .contains("acknowledgement")
     );
-    let retried = retry_occurrence(&store, &initial.identity, true, lattice::agent_node::AgentRuntimeConfig::default())
+    let retried = retry_occurrence(&store, &initial.identity, true, lattice::agent_node::RuntimeOptions::default())
         .await
         .expect("acknowledged shell retry executes");
 
@@ -676,7 +676,7 @@ async fn reopened_pending_reservation_blocks_allowed_effect_until_acknowledged_r
     let completed = lattice::scheduler::shell::execute_occurrence_with_authority_provider(
         &store,
         &first,
-        lattice::agent_node::AgentRuntimeConfig::default(),
+        lattice::agent_node::RuntimeOptions::default(),
         &authority,
     )
     .await
@@ -702,7 +702,7 @@ async fn reopened_pending_reservation_blocks_allowed_effect_until_acknowledged_r
         lattice::scheduler::shell::execute_occurrence_with_authority_provider(
             &store,
             &pending,
-            lattice::agent_node::AgentRuntimeConfig::default(),
+            lattice::agent_node::RuntimeOptions::default(),
             &authority,
         )
         .await,
@@ -722,7 +722,7 @@ async fn reopened_pending_reservation_blocks_allowed_effect_until_acknowledged_r
     let completed = lattice::scheduler::shell::execute_occurrence_with_authority_provider(
         &store,
         &retry,
-        lattice::agent_node::AgentRuntimeConfig::default(),
+        lattice::agent_node::RuntimeOptions::default(),
         &authority,
     )
     .await

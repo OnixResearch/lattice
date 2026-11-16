@@ -12,15 +12,15 @@ pub(super) struct FinalContent<'a> {
 }
 
 // r[impl lattice.agent_runtime.inline_reasoning_boundary]
-pub(super) fn admit_finish_reason(finish_reason: Option<&str>) -> Result<(), crate::agent_node::AgentError> {
+pub(super) fn admit_finish_reason(finish_reason: Option<&str>) -> Result<(), crate::agent_node::Error> {
     if finish_reason == Some(TOKEN_LIMIT_FINISH_REASON) {
-        return Err(crate::agent_node::AgentError::Adapter(TOKEN_LIMIT_DIAGNOSTIC.to_string()));
+        return Err(crate::agent_node::Error::Adapter(TOKEN_LIMIT_DIAGNOSTIC.to_string()));
     }
     Ok(())
 }
 
 // r[impl lattice.agent_runtime.inline_reasoning_boundary]
-pub(super) fn admit_final_content(content: &str) -> Result<FinalContent<'_>, crate::agent_node::AgentError> {
+pub(super) fn admit_final_content(content: &str) -> Result<FinalContent<'_>, crate::agent_node::Error> {
     let has_open = content.contains(INLINE_REASONING_OPEN);
     let has_close = content.contains(INLINE_REASONING_CLOSE);
     if !has_open && !has_close {
@@ -58,6 +58,6 @@ pub(super) fn admit_final_content(content: &str) -> Result<FinalContent<'_>, cra
     })
 }
 
-fn boundary_error(message: &str) -> crate::agent_node::AgentError {
-    crate::agent_node::AgentError::PreflightRejected(message.to_string())
+fn boundary_error(message: &str) -> crate::agent_node::Error {
+    crate::agent_node::Error::PreflightRejected(message.to_string())
 }

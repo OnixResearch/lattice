@@ -127,7 +127,7 @@ pub fn fields(workflow: &Workflow, node_id: u64) -> Vec<Field> {
                 "target",
                 "Agent target",
                 "pi, clankers, animus",
-                crate::agent_node::agent_target_label(settings.target),
+                crate::agent_node::target_label(settings.target),
             );
             scalar(&mut out, &prefix, "prompt", "Prompt", "Non-empty inline prompt; no execution", &settings.prompt);
             scalar(
@@ -561,14 +561,11 @@ fn edit_config(config: &mut NodeConfig, key: &str, value: &str) -> Result<(), St
             )?,
         },
         NodeConfig::Agent(settings) => match key {
-            "target" => {
-                settings.target = crate::agent_node::parse_agent_target(value).map_err(|error| error.to_string())?
-            }
+            "target" => settings.target = crate::agent_node::parse_target(value).map_err(|error| error.to_string())?,
             "prompt" => settings.prompt = required(value)?,
             "prompt_file" => settings.prompt_file = optional_prompt_path(value)?,
             "output_mode" => {
-                settings.output_mode =
-                    crate::agent_node::parse_agent_output_mode(value).map_err(|error| error.to_string())?
+                settings.output_mode = crate::agent_node::parse_output_mode(value).map_err(|error| error.to_string())?
             }
             "model_hint" => settings.model_hint = optional_text(value),
             "tool_policy" => settings.tool_policy = value.into(),

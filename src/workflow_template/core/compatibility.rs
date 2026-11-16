@@ -55,12 +55,12 @@ fn validate_declared_compatibility(
 
 fn validate_orchestration(
     expected: bool,
-    orchestration: Option<crate::orchestration::OrchestrationDefinition>,
+    orchestration: Option<crate::orchestration::Definition>,
     workflow_revision: &crate::orchestration::WorkflowRevisionRef,
     bundle: &str,
 ) -> Result<
     (
-        Option<crate::orchestration::OrchestrationDefinition>,
+        Option<crate::orchestration::Definition>,
         Option<crate::orchestration::DefinitionRevision>,
     ),
     super::model::Diagnostic,

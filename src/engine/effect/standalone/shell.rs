@@ -1,20 +1,18 @@
 //! Host-owned profile evaluation, currentness, clock, roots, and durable attempts.
 
 use std::collections::BTreeMap;
-use std::path::Path;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 const RUN_IDENTITY_DOMAIN: &[u8] = b"lattice.standalone-effect-authority.run.v1";
 
 #[derive(Debug, Clone)]
 pub struct OperatorRunContextSource {
-    profile_path: PathBuf,
+    profile_path: std::path::PathBuf,
 }
 
 impl OperatorRunContextSource {
     #[must_use]
-    pub fn new(profile_path: PathBuf) -> Self {
+    pub fn new(profile_path: std::path::PathBuf) -> Self {
         Self { profile_path }
     }
 }
@@ -64,7 +62,7 @@ impl crate::engine::effect::execution::RunContextProvider for OperatorRunContext
 }
 
 struct CurrentOperatorFacts {
-    profile_path: PathBuf,
+    profile_path: std::path::PathBuf,
     profile_identity: String,
     run_reference: String,
 }
@@ -121,7 +119,9 @@ impl crate::engine::effect::dispatch::ScopeSnapshotProvider for UnscopedSnapshot
     }
 }
 
-fn load_profile(path: &Path) -> Result<(super::core::AdmittedProfile, u64), crate::engine::effect::dispatch::Error> {
+fn load_profile(
+    path: &std::path::Path,
+) -> Result<(super::core::AdmittedProfile, u64), crate::engine::effect::dispatch::Error> {
     if !path.is_absolute() {
         return Err(crate::engine::effect::dispatch::Error::AuthorityDenied);
     }

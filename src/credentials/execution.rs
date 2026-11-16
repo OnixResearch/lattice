@@ -1,12 +1,9 @@
 //! Execution-only, material-free credential slots and current-boundary facts.
 
-use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
-
-use serde::Serialize;
 
 use super::CredentialDestination;
 use super::CredentialError;
@@ -17,7 +14,7 @@ use super::NodeCredentialRefs;
 use super::ResolvedSecretEnv;
 use super::SecretRef;
 
-#[derive(Serialize)]
+#[derive(serde::Serialize)]
 struct Binding {
     reference: SecretRef,
     resolver_policy: Option<String>,
@@ -26,7 +23,7 @@ struct Binding {
 /// Sealed public mappings; concrete values are obtained only at consumption.
 /// The provider is a trusted shell port, not a source of effect authority.
 pub(crate) struct Bindings {
-    entries: BTreeMap<String, Binding>,
+    entries: std::collections::BTreeMap<String, Binding>,
     destination: CredentialDestination,
     provider: Arc<dyn CredentialProvider>,
 }
@@ -37,7 +34,7 @@ impl Bindings {
         destination: CredentialDestination,
         provider: Arc<dyn CredentialProvider>,
     ) -> Result<Self, CredentialError> {
-        let mut entries = BTreeMap::new();
+        let mut entries = std::collections::BTreeMap::new();
         if let Some(references) = references {
             for (name, reference) in &references.env {
                 let resolver_policy = provider.resolution_policy_identity(reference)?.map(str::to_owned);
@@ -62,7 +59,7 @@ impl Bindings {
         self.entries.keys().map(String::as_str)
     }
 
-    pub(crate) fn identity<T: Serialize>(
+    pub(crate) fn identity<T: serde::Serialize>(
         &self,
         domain: &[u8],
         public_request: &T,

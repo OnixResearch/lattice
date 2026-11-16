@@ -23,7 +23,7 @@ pub(super) struct WorkerInput {
     pub admitted: ExecutionRecord,
     pub authority_mode: EffectAuthorityMode,
     pub workflow: crate::engine::workflow::Workflow,
-    pub agent_runtime: crate::agent_node::AgentRuntimeConfig,
+    pub agent_runtime: crate::agent_node::RuntimeOptions,
     pub cancellation: Arc<AtomicBool>,
 }
 
@@ -200,7 +200,7 @@ mod tests {
                             workflow,
                             run_id: crate::engine::RunId(running.run_id),
                             owner: crate::store::RunOwner::Unscoped,
-                            agent_runtime: crate::agent_node::AgentRuntimeConfig::default(),
+                            agent_runtime: crate::agent_node::RuntimeOptions::default(),
                             cancellation: std::sync::Arc::clone(&cancellation),
                         },
                         &authority,

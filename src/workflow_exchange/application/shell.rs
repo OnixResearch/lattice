@@ -37,7 +37,7 @@ pub struct ApplicationHandler {
     store: crate::store::Store,
     profile: HandlerProfile,
     profile_identity: Identity,
-    agent_runtime: crate::agent_node::AgentRuntimeConfig,
+    agent_runtime: crate::agent_node::RuntimeOptions,
     workers: BTreeMap<String, Worker>,
 }
 
@@ -45,7 +45,7 @@ impl ApplicationHandler {
     pub fn new(
         store: crate::store::Store,
         profile: HandlerProfile,
-        agent_runtime: crate::agent_node::AgentRuntimeConfig,
+        agent_runtime: crate::agent_node::RuntimeOptions,
     ) -> Result<Self, ApplicationError> {
         super::validate_handler_profile(&profile).map_err(|_| ApplicationError::Profile)?;
         let profile_identity = super::handler_profile_identity(&profile).map_err(|_| ApplicationError::Profile)?;

@@ -1,6 +1,6 @@
 impl Store {
     /// Load one run record by identity.
-    pub fn load_run(&self, run_id: RunId) -> Result<Option<RunRecord>, StoreError> {
+    pub fn load_run(&self, run_id: crate::engine::RunId) -> Result<Option<RunRecord>, StoreError> {
         let txn = self.db.begin_read().map_err(|error| StoreError::Db(error.to_string()))?;
         let table = txn.open_table(RUNS).map_err(|error| StoreError::Table(error.to_string()))?;
         match table.get(run_id.0).map_err(|error| StoreError::Db(error.to_string()))? {
@@ -22,7 +22,7 @@ impl Store {
     }
 
     /// Load detailed per-node records for a run.
-    pub fn load_run_details(&self, run_id: RunId) -> Result<Option<RunDetailRecord>, StoreError> {
+    pub fn load_run_details(&self, run_id: crate::engine::RunId) -> Result<Option<RunDetailRecord>, StoreError> {
         let txn = self.db.begin_read().map_err(|e| StoreError::Db(e.to_string()))?;
         let table = txn.open_table(RUN_DETAILS).map_err(|e| StoreError::Table(e.to_string()))?;
         match table.get(run_id.0).map_err(|e| StoreError::Db(e.to_string()))? {
@@ -37,7 +37,11 @@ impl Store {
     }
 
     // r[impl n8nclone.workflow_execution.replay.event_store]
-    pub fn save_run_replay_events(&self, run_id: RunId, events: &[ReplayEventRecord]) -> Result<(), StoreError> {
+    pub fn save_run_replay_events(
+        &self,
+        run_id: crate::engine::RunId,
+        events: &[ReplayEventRecord],
+    ) -> Result<(), StoreError> {
         let data = serde_json::to_vec(events).map_err(|e| StoreError::Serialize(e.to_string()))?;
         let txn = self.db.begin_write().map_err(|e| StoreError::Db(e.to_string()))?;
         {
@@ -49,7 +53,10 @@ impl Store {
     }
 
     // r[impl n8nclone.workflow_execution.replay.event_store]
-    pub fn load_run_replay_events(&self, run_id: RunId) -> Result<Option<Vec<ReplayEventRecord>>, StoreError> {
+    pub fn load_run_replay_events(
+        &self,
+        run_id: crate::engine::RunId,
+    ) -> Result<Option<Vec<ReplayEventRecord>>, StoreError> {
         let txn = self.db.begin_read().map_err(|e| StoreError::Db(e.to_string()))?;
         let table = txn.open_table(RUN_REPLAY_EVENTS).map_err(|e| StoreError::Table(e.to_string()))?;
         match table.get(run_id.0).map_err(|e| StoreError::Db(e.to_string()))? {
@@ -81,7 +88,7 @@ impl Store {
 
     /// Atomically reserve and return one globally unique run id.
     // r[impl lattice.agent_orchestration.run_identity]
-    pub fn next_run_id(&self) -> Result<RunId, StoreError> {
+    pub fn next_run_id(&self) -> Result<crate::engine::RunId, StoreError> {
         let txn = self.db.begin_write().map_err(|error| StoreError::Db(error.to_string()))?;
         let run_id = reserve_run_id(&txn)?;
         txn.commit().map_err(|error| StoreError::Db(error.to_string()))?;

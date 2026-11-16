@@ -20,26 +20,26 @@ let OrchestrationDefinition = { schema_version | Number, id | String, objective 
       duration_millis = true,
       monetary_microunits = false,
       rounds = true,
-      tokens = true,
+      tokens = false,
     },
     limits = {
       agent_invocations = 4,
       duration_millis = 240000,
       monetary_microunits = 0,
       rounds = 2,
-      tokens = 8192,
+      tokens = 0,
     },
     per_round_upper_bound = {
       agent_invocations = 2,
       duration_millis = 120000,
       monetary_microunits = 0,
       rounds = 1,
-      tokens = 4096,
+      tokens = 0,
     },
   },
-  completion = "await_proposal",
+  completion = "run_succeeded",
   id = "bounded-build-loop",
-  objective = "Generate and compile a minimal Rust program, retrying at most once when the build check fails.",
+  objective = "Build and test the fixed greeting task; stop on pass or at two total rounds.",
   redaction = {
     retain_safe_summaries = true,
   },
@@ -47,14 +47,9 @@ let OrchestrationDefinition = { schema_version | Number, id | String, objective 
     max_observed_failure_retries = 1,
   },
   schema_version = 1,
-  triggers = [
-    {
-      kind = "schedule",
-      trigger_id = "bounded-build-loop-schedule",
-    },
-  ],
+  triggers = [],
   workflow = {
-    content_hash = "387eb11f5cc4154e8f47c8209329fedb45d65f46c0619412517e04a3e595ba43",
+    content_hash = "4b9487e20c4582743904382c1720e2825607f4169811d65cd917083ca709b607",
     workflow_name = "bounded-build-loop",
   },
 }) | OrchestrationDefinition

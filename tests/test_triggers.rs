@@ -38,7 +38,7 @@ use lattice::triggers::scoped_idempotency_key;
 use lattice::triggers::trigger_run_record_started;
 use lattice::triggers::validate_trigger_definition;
 use lattice::triggers::webhook_signature;
-use lattice::tui::App;
+use lattice::tui::State;
 use lattice::tui::app::trigger_status_lines_from_history;
 use lattice::workflow_format::load_workflow_nickel_file;
 use lattice::workflow_format::workflow_to_nickel;
@@ -383,7 +383,7 @@ fn tui_exposes_minimal_trigger_status_lines() {
     let temp_dir = tempfile::tempdir().expect("temporary trigger status directory");
     let data_dir = temp_dir.path().join("data");
     std::fs::create_dir_all(&data_dir).expect("create trigger status data directory");
-    let mut app = App::new(AppConfig {
+    let mut app = State::new(AppConfig {
         data_dir,
         ..AppConfig::default()
     });

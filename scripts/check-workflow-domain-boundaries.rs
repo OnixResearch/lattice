@@ -26,7 +26,7 @@ const CORE_SCOPES: &[&str] = &[
     "crates/lattice-core/src/expressions.rs",
     "src/replay.rs",
     "src/run/history.rs",
-    "src/store/mod.rs",
+    "src/store",
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -66,9 +66,7 @@ fn main() -> ExitCode {
 fn check_repository(root: &Path) -> Result<(), String> {
     let mut diagnostics = Vec::new();
     for relative_path in CORE_SCOPES {
-        let path = root.join(relative_path);
-        let source = read_source(&path)?;
-        diagnostics.extend(find_clock_reads(relative_path, &source));
+        fs::metadata(root.join(relative_path)).map_err(|error| format!("{relative_path}: {error}"))?;
     }
 
     let mut rust_files = Vec::new();
@@ -89,6 +87,11 @@ fn check_repository(root: &Path) -> Result<(), String> {
             continue;
         }
         let source = read_source(&path)?;
+        if CORE_SCOPES.iter().any(|scope| {
+            relative == *scope || relative.strip_prefix(scope).is_some_and(|suffix| suffix.starts_with('/'))
+        }) {
+            diagnostics.extend(find_clock_reads(&relative, &source));
+        }
         diagnostics.extend(find_token(&relative, &source, RAT_NODEGRAPH_TOKEN, "Subwayrat type leakage"));
     }
 

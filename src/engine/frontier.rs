@@ -160,11 +160,9 @@ fn lane(config: Option<&NodeConfig>) -> &'static str {
 // r[impl lattice.workflow_execution.ready_frontier.conflicts]
 fn conflict(config: Option<&NodeConfig>) -> ConflictState {
     match config {
-        Some(NodeConfig::Condition(_) | NodeConfig::Merge(_) | NodeConfig::ImageInput { .. }) => ConflictState::Pure,
-        Some(NodeConfig::File {
-            operation: crate::file_node::FileOperationKind::Read,
-            ..
-        }) => ConflictState::Pure,
+        Some(NodeConfig::Condition(_) | NodeConfig::Merge(_)) => ConflictState::Pure,
+        // Live host-state observations participate in effect ordering even when
+        // their authority is read-only. Paths alone are not independence facts.
         Some(NodeConfig::Operation(plan)) => operation_conflict(plan),
         Some(_) | None => ConflictState::Unresolved,
     }

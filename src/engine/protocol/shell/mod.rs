@@ -4,13 +4,13 @@
 //! r[impl lattice.role_protocol.uncertainty]
 #![allow(
     unknown_lints,
-    excessive_file_length,
     non_trait_imports,
     reason = "one imperative transaction shell and its local DTO vocabulary keep dispatch order reviewable"
 )]
 
 pub mod authority;
 pub mod operator;
+mod routing;
 pub mod transport;
 
 use std::collections::HashMap;
@@ -21,7 +21,6 @@ use super::model::Error;
 use super::model::Identity;
 use super::model::Issue;
 use super::model::MessageEnvelope;
-use super::model::PlacementKind;
 use super::model::SessionEvent;
 use super::model::SessionPlan;
 use super::model::SessionRecord;
@@ -42,7 +41,9 @@ pub enum StoreError {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AdapterDispatch {
     Started,
+    /// A guarantee that this call started no receiver work.
     RejectedBeforeStart,
+    /// Failure-shaped response without an admitted receiver observation; still unknown.
     ObservedFailure,
     UnknownAfterStart,
 }
@@ -82,27 +83,6 @@ impl Adapters {
         external: HashMap<String, Box<dyn ProtocolAdapter>>,
     ) -> Self {
         Self { native, external }
-    }
-
-    fn select(&self, session: &SessionRecord, envelope: &MessageEnvelope) -> Result<&dyn ProtocolAdapter, Issue> {
-        let placement = session
-            .plan
-            .roles
-            .iter()
-            .find(|role| role.role == envelope.destination_role)
-            .ok_or(Issue::MissingRole)?;
-        let adapter = match &placement.placement.kind {
-            PlacementKind::Native { runtime_route } => {
-                self.native.get(runtime_route.as_str()).map(Box::as_ref).ok_or(Issue::AdapterFailed)?
-            }
-            PlacementKind::External { contract, .. } => {
-                self.external.get(contract.as_str()).map(Box::as_ref).ok_or(Issue::AdapterFailed)?
-            }
-        };
-        if adapter.profile() != &expected_adapter_profile(&placement.placement) {
-            return Err(Issue::AdapterFailed);
-        }
-        Ok(adapter)
     }
 }
 
@@ -166,36 +146,46 @@ impl<'a> Runtime<'a> {
         let authorized = super::core::record_authorization(&prepared, &attempt.identity, authorization_references)?;
         let authorized_event = authorized.events.last().ok_or(Issue::PersistenceFailed)?;
         self.repository.commit(prepared.version, &authorized, authorized_event).map_err(map_store_error)?;
+        // Resolve every deterministic route/profile before the first possible effect.
+        // Retain these exact adapter references throughout fanout; never select again
+        // after a recipient might have acted.
+        let selected = match attempt
+            .messages
+            .iter()
+            .map(|envelope| self.adapters.select(&authorized, envelope))
+            .collect::<Result<Vec<_>, _>>()
+        {
+            Ok(selected) => selected,
+            Err(issue) => {
+                self.persist_failed_before_dispatch(&authorized, &attempt.identity, issue)?;
+                return Err(issue.into());
+            }
+        };
         let unknown = super::core::mark_dispatched_unknown(&authorized, &attempt.identity)?;
         let unknown_event = unknown.events.last().ok_or(Issue::PersistenceFailed)?;
         self.repository.commit(authorized.version, &unknown, unknown_event).map_err(map_store_error)?;
 
         let mut dispatched_messages = 0_usize;
-        for envelope in &attempt.messages {
+        for (envelope, adapter) in attempt.messages.iter().zip(selected) {
             let placement = unknown
                 .plan
                 .roles
                 .iter()
                 .find(|role| role.role == envelope.destination_role)
                 .ok_or(Issue::MissingRole)?;
-            let adapter = match self.adapters.select(&unknown, envelope) {
-                Ok(adapter) => adapter,
-                Err(issue) => {
-                    self.persist_terminal_failure(&unknown, &attempt.identity, issue)?;
-                    return Err(issue.into());
-                }
-            };
             match adapter.dispatch(envelope, &placement.placement.limits) {
                 AdapterDispatch::Started => {
                     dispatched_messages = dispatched_messages.saturating_add(1);
                 }
-                AdapterDispatch::RejectedBeforeStart | AdapterDispatch::ObservedFailure => {
+                AdapterDispatch::RejectedBeforeStart => {
                     if dispatched_messages == 0 {
-                        self.persist_terminal_failure(&unknown, &attempt.identity, Issue::AdapterFailed)?;
+                        self.persist_rejected_before_start(&unknown, &attempt.identity, Issue::AdapterFailed)?;
                     }
                     return Err(Issue::AdapterFailed.into());
                 }
-                AdapterDispatch::UnknownAfterStart => return Err(Issue::AdapterFailed.into()),
+                AdapterDispatch::ObservedFailure | AdapterDispatch::UnknownAfterStart => {
+                    return Err(Issue::AdapterFailed.into());
+                }
             }
         }
         Ok(DispatchResult {
@@ -216,8 +206,23 @@ impl<'a> Runtime<'a> {
         self.repository.commit(session.version, &failed, event).map_err(map_store_error)
     }
 
-    fn persist_terminal_failure(&self, session: &SessionRecord, attempt: &Identity, issue: Issue) -> Result<(), Error> {
-        let failed = super::core::fail_before_dispatch(session, attempt, issue)?;
+    fn persist_rejected_before_start(
+        &self,
+        session: &SessionRecord,
+        attempt: &Identity,
+        issue: Issue,
+    ) -> Result<(), Error> {
+        // Only the first adapter's explicit no-start guarantee reaches this path.
+        // This is not a failed-before-dispatch inference from an unknown attempt.
+        let outcome = super::identity::reference(super::identity::OUTCOME_DOMAIN, &[
+            attempt.as_str(),
+            "rejected-before-start",
+            issue.code(),
+        ])?;
+        let failed = super::core::apply_event(session, &SessionEvent::Failed {
+            attempt: attempt.clone(),
+            outcome,
+        })?;
         let event = failed.events.last().ok_or(Issue::PersistenceFailed)?;
         self.repository.commit(session.version, &failed, event).map_err(map_store_error)
     }
@@ -258,26 +263,6 @@ impl<'a> Runtime<'a> {
     pub fn replay(&self, identity: &Identity) -> Result<SessionRecord, Error> {
         let persisted = self.repository.load(identity).map_err(map_store_error)?.ok_or(Issue::MissingRole)?;
         super::core::replay(persisted.plan.clone(), &persisted.events)
-    }
-}
-
-fn expected_adapter_profile(placement: &super::model::RolePlacement) -> AdapterProfile {
-    match &placement.kind {
-        PlacementKind::Native { runtime_route } => AdapterProfile::Native {
-            cohort: placement.adapter_cohort.clone(),
-            runtime_route: runtime_route.clone(),
-        },
-        PlacementKind::External {
-            contract,
-            destination_policy,
-            credential_reference,
-            ..
-        } => AdapterProfile::External {
-            cohort: placement.adapter_cohort.clone(),
-            contract: contract.clone(),
-            destination_policy: destination_policy.clone(),
-            credential_reference: credential_reference.clone(),
-        },
     }
 }
 

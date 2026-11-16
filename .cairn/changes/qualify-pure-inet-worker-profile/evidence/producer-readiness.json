@@ -1,0 +1,116 @@
+{
+  "schema": "lattice.pure_inet_profile.producer_readiness.v1",
+  "recorded_at": "2026-11-14",
+  "kind": "source_inspection_and_blocker_record",
+  "qualification": "blocked",
+  "worker_executed": false,
+  "proof_replayed": false,
+  "checks_executed": [],
+  "issues_reviewed_with_comments": [
+    "https://github.com/OnixResearch/lattice/issues/14",
+    "https://github.com/OnixResearch/lattice/issues/22",
+    "https://github.com/OnixResearch/noble-lang/issues/37",
+    "https://github.com/OnixResearch/noble-lang/issues/124",
+    "https://github.com/OnixResearch/mneme/issues/5"
+  ],
+  "consumer_specification": "https://github.com/OnixResearch/mneme/blob/spec/optional-inet-compute/openspec/changes/add-optional-inet-compute/specs/inet-compute/spec.md",
+  "consumer_pr": "https://github.com/OnixResearch/mneme/pull/7",
+  "selected_producer_contract": {
+    "repository": "https://github.com/OnixResearch/noble-lang",
+    "reviewed_commit": "84ece371a8f68ac37dca745a135fee5e73e1ed53",
+    "contract": "ngraph-net-i64/3",
+    "source": "https://github.com/OnixResearch/noble-lang/blob/84ece371a8f68ac37dca745a135fee5e73e1ed53/docs/i64-net-contract-v3.md",
+    "observations": [
+      "Revision 3 is selected; revision 2 operand stacks are superseded and retained only for comparison.",
+      "The system uses principal-pair num/op2/op1/dup/era rules; arithmetic takes two semantic interactions, preserving first-minus-second subtraction.",
+      "The documented K = 2*ops + dups + eras is a semantic claim, not a measured native counter or proof of the documented lowering.",
+      "The Noble whitelist also includes equality and ordered multiple outputs. Lattice still admits only two I64 inputs, one I64 output and Input/Const/Add/Sub/Mul.",
+      "The current source now supplies a sequential Rust net reducer and actual noble ngraph eval GRAPH VECTORS --net [--fuel N] entry point. This supersedes the older 23e529 snapshot's missing-runtime observation.",
+      "net::Limits has max_agent_slots, max_wires and interaction_fuel only; retained_bytes is an estimate, not an enforced whole-request allocation/memory ceiling. The CLI uses default agent/wire limits and a tightened fuel, with no admitted byte-ceiling field."
+    ],
+    "executable": "noble (source target only; no measured executable artifact selected)",
+    "executable_digest": null,
+    "worker_schema": "noble-ngraph-report/v1 (CLI JSON-lines transport, not yet admitted as a Lattice worker protocol)",
+    "supported_enforced_evaluator_cohort": null,
+    "implementation_counter_correspondence": null
+  },
+  "runtime_source_observations": [
+    {
+      "source": "https://github.com/OnixResearch/noble-lang/blob/84ece371a8f68ac37dca745a135fee5e73e1ed53/crates/noble-ngraph/src/net.rs",
+      "observation": "Real lower/validate/reduce implementation, exact contract/lowering identities, fuel/agent/wire caps, agent-derived bounded worklist, cancellation callback and complete-only readback. Limits exposes no independent allocation/memory or output-construction byte ceiling; Report.retained_bytes estimates initial net storage, not total consumption."
+    },
+    {
+      "source": "https://github.com/OnixResearch/noble-lang/blob/84ece371a8f68ac37dca745a135fee5e73e1ed53/crates/noble-cli/src/ngraph.rs",
+      "observation": "Actual --net route lowers and reduces fresh nets. eval_net reports graph/backend/vector/outputs/interactions/peak_live_agents/final_wires/retained_bytes, but no theorem, native-counter correspondence, executable digest or enclosing Lattice attempt binding. Reports are buffered in a growing Vec before stdout; a host stdout cap is not a producer output-construction memory ceiling."
+    },
+    {
+      "source": "https://github.com/OnixResearch/noble-lang/blob/84ece371a8f68ac37dca745a135fee5e73e1ed53/proofs/foundation/NobleFoundation/NetI64.lean",
+      "observation": "The previously unavailable module is now landed. It defines system with proved rule_wf/rule_symm, i64_normal_form_unique, i64_equal_interaction_count and Certificate.accepted_exact_count. Source inspection only, no proof replay. i64_equal_interaction_count explicitly assumes a canonical complete reduction of the formula length as well as the alternative complete reduction; it is not an unconditional Rust theorem."
+    }
+  ],
+  "formal_reference": {
+    "repository": "https://github.com/OnixResearch/inets",
+    "commit": "98bbb01070664e4462a35efa5d62de6f27143572",
+    "source": "https://github.com/OnixResearch/inets/blob/98bbb01070664e4462a35efa5d62de6f27143572/InteractionNets.lean",
+    "producer_provenance_source": "https://github.com/OnixResearch/noble-lang/blob/main/proofs/inets/UPSTREAM.json",
+    "producer_declared_sha256": "c7a35dad49822583a9ee209b47d8ba5617d5abcb5a7f9f96df05e8502f362f54",
+    "producer_declared_bytes": 1926441,
+    "producer_declared_toolchain": "leanprover/lean4:v4.35.0",
+    "locally_remeasured": false,
+    "theorems_inspected": [
+      {
+        "name": "Rewriting.StrongConfluent.normal_unique",
+        "hypotheses": "Invariant preservation and one-step diamond; invariant initial state; two finite reductions from that same state; normality of both endpoints.",
+        "conclusion": "Equal endpoints and complete reduction lengths."
+      },
+      {
+        "name": "INet.normal_form_unique",
+        "hypotheses": "INet.System with rule_wf and rule_symm; well-formed initial net; two Step reductions with normal endpoints.",
+        "conclusion": "Equal normal forms and semantic principal-pair interaction counts."
+      },
+      {
+        "name": "INet.reduction_bounded",
+        "hypotheses": "Same system and well-formed initial net; supplied reduction to a normal form; another reduction prefix.",
+        "conclusion": "Prefix length no greater than supplied normalization length, and extension to that normal form."
+      },
+      {
+        "name": "NobleFoundation.NetI64.i64_equal_interaction_count",
+        "hypotheses": "translateChecked succeeds; canonical CStep reduction has program.interactionCount steps and a normal endpoint; alternative CStep reduction from that same source reaches a normal endpoint.",
+        "conclusion": "Alternative normal form equals canonical normal form and its step count equals program.interactionCount. Native runtime correspondence is not a hypothesis supplied by this declaration."
+      }
+    ],
+    "missing_bridge": "Admitted exact graph/net/readback evidence and native implementation-to-counter correspondence to a retained executable artifact. Noble's instantiated model theorems now exist; they do not by themselves discharge these native boundaries.",
+    "non_claims": [
+      "No unconditional normalization theorem for arbitrary nets.",
+      "No Rust/process correspondence, memory bound, cancellation, publication or source correctness follows from the generic theorem.",
+      "Two-stage semantic interactions do not share a unit with graph operations, administrative microsteps, retries or host work.",
+      "Physical time/storage observations remain distinct and may vary."
+    ]
+  },
+  "lattice_host_work": {
+    "module": "src/pure_inet_profile.rs",
+    "implemented": "Exact host result-binding/effective-limit equality check and unit-test definitions for crossed bindings and signed wrapping overflow boundaries.",
+    "verification": "Not run; parent owns integration verification.",
+    "scope": "Pure host validation/reference only, not producer serialization, net evaluation, proof admission, durable result publication or checked-count promotion.",
+    "remaining_host_bindings": "Qualified program/input schemas, resolved data references, lowering/platform/numeric semantics and effective producer work/arena/memory/queue/output-construction bounds remain to be consumed from the real producer contract."
+  },
+  "criterion_mapping": {
+    "14.1_actual_worker_reference": "BLOCKED: a real inet CLI now exists, but no executable artifact is selected/qualified through the Lattice production route; enforced end-to-end memory/output-construction bounds remain unavailable. Host reference tests cannot replace that fixture.",
+    "14.2_crossed_bindings": "PARTIAL: pure host equality checks cover all existing binding fields and effective limits; unit tests added but unrun. Producer schema/lowering/platform bindings and production admission/use are blocked.",
+    "14.3_closed_program_numeric_purity": "PARTIAL: local canonical integer/reference validation exists and Noble now implements real net validation; no actual narrowed two-input/one-output Lattice pack/admission fixture has consumed it. Broader Noble equality/multiple-output support must not widen Lattice.",
+    "14.4_limits_cancel_descendant": "BLOCKED: real fuel/agent/wire and bounded-worklist code exists, but no independent enforced whole-request allocation/memory/output-construction ceiling or qualified actual-process/descendant cancellation fixture. Retained storage estimates and host process limits do not fill this gap or establish sandboxing.",
+    "14.5_partial_truncated_publication": "BLOCKED: real producer complete/non-success reports exist, but no Lattice adapter/attempt binding or output-publication integration; no executed partial/truncation/crash evidence.",
+    "14.6_restart_lineage_budget": "BLOCKED: real admitted invocation/reconciliation integration unavailable. Spec requires no blind redispatch, new invocation, retained lineage/consumed charges/remaining budget/current authority and no address-state resume.",
+    "14.7_mneme_supersession": "BLOCKED: consumer PR is draft/dirty planning; no real authorized snapshot/result mapping or stale-result integration fixture. Mneme owns schema/access/erasure release checks.",
+    "14.8_qualification_costs": "BLOCKED: no real worker observations, comparator results or end-to-end costs; all unavailable measurements remain unavailable, no default promotion.",
+    "22.1_envelope_specification": "SPECIFIED: semantic_count, recompute_integrity and semantic_limit requirements bind version/unit/theorem/hypotheses/implementation identities and preserve observed-only counts.",
+    "22.2_recompute_match_fixture": "BLOCKED: no two real admitted complete invocations or qualified count bridge. Synthetic counters or running the Rust reference twice would not qualify the producer.",
+    "22.3_mismatch_integrity_fixtures": "SPECIFIED BUT BLOCKED: OutputIntegrityFailure and InteractionCountIntegrityFailure are distinct from Unknown/exhaustion; no qualified actual-worker recomputation fixture or runtime normalization is claimed.",
+    "22.4_no_theorem_observed_only": "SPECIFIED BUT BLOCKED: actual eval_net reports name no theorem or implementation correspondence, so its interactions remain observed-only. No checked-count promotion API or admitted process receipt fixture added."
+  },
+  "decision": "stop_before_dispatch_until_exact_producer_artifacts_and_bridges_exist",
+  "verification_for_parent": [
+    "cargo test --lib --locked pure_inet_profile",
+    "Pinned Cairn strict validation and native proposal/design/tasks gates after integration; specification validation is not runtime qualification."
+  ]
+}

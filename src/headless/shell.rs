@@ -5,7 +5,7 @@ pub struct OwnedRunRequest {
     pub workflow_name: String,
     pub run_id: crate::engine::executor::RunId,
     pub owner: crate::store::RunOwner,
-    pub agent_runtime: crate::agent_node::AgentRuntimeConfig,
+    pub agent_runtime: crate::agent_node::RuntimeOptions,
 }
 
 pub(super) struct ProductRunRequest<'a> {
@@ -44,7 +44,7 @@ pub async fn run_saved_workflow_with_app_config(
 }
 
 fn configured_executor(
-    agent_runtime: crate::agent_node::AgentRuntimeConfig,
+    agent_runtime: crate::agent_node::RuntimeOptions,
     frontier_policy: lattice_core::scheduling::CapacityPolicy,
 ) -> crate::engine::executor::Executor {
     let fallback_runtime = agent_runtime.clone();
@@ -211,7 +211,7 @@ pub struct SnapshotRunRequest {
     pub workflow: crate::engine::workflow::Workflow,
     pub run_id: crate::engine::executor::RunId,
     pub owner: crate::store::RunOwner,
-    pub agent_runtime: crate::agent_node::AgentRuntimeConfig,
+    pub agent_runtime: crate::agent_node::RuntimeOptions,
     pub cancellation: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 

@@ -6,8 +6,8 @@ use std::process::Command;
 
 use choregraph_nickel::FrontendIssueCode;
 use choregraph_nickel::LoweredSourceFormat;
-use lattice::agent_node::AgentOutputMode;
-use lattice::agent_node::AgentTarget;
+use lattice::agent_node::OutputMode;
+use lattice::agent_node::Target;
 use lattice::control_flow::ConditionBranch;
 use lattice::control_flow::ConditionNodeConfig;
 use lattice::control_flow::ConditionPredicate;
@@ -101,7 +101,7 @@ fn custom_runner_settings() -> NodeRunnerSettings {
 
 fn markdown_agent_workflow(prompt_file: &str) -> Workflow {
     let mut workflow = Workflow::new("markdown-agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
-    let node_id = workflow.add_agent_node(ROLE_PROMPT_LABEL, AgentTarget::Pi, ROLE_PROMPT_BODY, AgentOutputMode::Text);
+    let node_id = workflow.add_agent_node(ROLE_PROMPT_LABEL, Target::Pi, ROLE_PROMPT_BODY, OutputMode::Text);
     let Some(NodeConfig::Agent(mut settings)) = workflow.node_config(node_id).cloned() else {
         panic!("agent config exists");
     };
@@ -357,8 +357,7 @@ fn cli_export_missing_workflow_writes_no_file() {
 fn nickel_export_import_preserves_image_input_and_generic_agent_node() {
     let mut workflow = Workflow::new("image-agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
     let image_id = workflow.add_image_input_node("Selfie", IMAGE_PATH);
-    let agent_id =
-        workflow.add_agent_node("Fine art agent", AgentTarget::Clankers, AGENT_PROMPT, AgentOutputMode::Image);
+    let agent_id = workflow.add_agent_node("Fine art agent", Target::Clankers, AGENT_PROMPT, OutputMode::Image);
     let image_out = workflow.graph.node(image_id).expect("image node").output_ports[0].id;
     let agent_image_in = workflow.graph.node(agent_id).expect("agent node").input_ports[1].id;
     workflow.graph.add_edge(image_out, agent_image_in).expect("connect image to agent");
@@ -375,9 +374,9 @@ fn nickel_export_import_preserves_image_input_and_generic_agent_node() {
     }
     match imported.node_config(agent_node.id).expect("agent config imported") {
         NodeConfig::Agent(settings) => {
-            assert_eq!(settings.target, AgentTarget::Clankers);
+            assert_eq!(settings.target, Target::Clankers);
             assert_eq!(settings.prompt, AGENT_PROMPT);
-            assert_eq!(settings.output_mode, AgentOutputMode::Image);
+            assert_eq!(settings.output_mode, OutputMode::Image);
         }
         _ => panic!("expected agent config"),
     }
@@ -387,7 +386,7 @@ fn nickel_export_import_preserves_image_input_and_generic_agent_node() {
 fn nickel_export_import_preserves_agent_credential_references() {
     let mut workflow =
         Workflow::new("credentialed-agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
-    let agent_id = workflow.add_agent_node("Agent", AgentTarget::Pi, AGENT_PROMPT, AgentOutputMode::Text);
+    let agent_id = workflow.add_agent_node("Agent", Target::Pi, AGENT_PROMPT, OutputMode::Text);
     let mut credentials = NodeCredentialRefs::default();
     credentials
         .env
@@ -412,7 +411,7 @@ fn nickel_round_trip_preserves_credentials_for_every_builtin_node_kind() {
         ("HTTP", workflow.add_http_node("HTTP", "GET", "https://example.com")),
         ("File", workflow.add_file_node("File", FileOperationKind::Read, "./input.txt")),
         ("Image", workflow.add_image_input_node("Image", "./input.png")),
-        ("Agent", workflow.add_agent_node("Agent", AgentTarget::Pi, AGENT_PROMPT, AgentOutputMode::Text)),
+        ("Agent", workflow.add_agent_node("Agent", Target::Pi, AGENT_PROMPT, OutputMode::Text)),
         (
             "Condition",
             workflow.add_condition_node("Condition", ConditionNodeConfig {
@@ -458,7 +457,7 @@ fn aggregate_deletion_remains_valid_through_store_and_nickel_round_trips() {
     let temp_dir = tempfile::tempdir().expect("temporary deletion directory");
     let store = Store::new(temp_dir.path().join(STORE_FILE_NAME)).expect("store opens");
     let mut workflow = Workflow::new("deleted-node-round-trip", lattice::engine::workflow::WorkflowTimestamp::epoch());
-    let removed = workflow.add_agent_node("Removed", AgentTarget::Pi, AGENT_PROMPT, AgentOutputMode::Text);
+    let removed = workflow.add_agent_node("Removed", Target::Pi, AGENT_PROMPT, OutputMode::Text);
     let kept = workflow.add_shell_node("Kept", "true");
     let removed_output = workflow.graph.node(removed).expect("removed node").output_ports[0].id;
     let kept_input = workflow.graph.node(kept).expect("kept node").input_ports[0].id;
@@ -692,7 +691,7 @@ fn cli_import_rejects_unsupported_declared_image_format_without_mutating_store()
 #[test]
 fn portable_import_rejects_invalid_agent_target() {
     let mut workflow = Workflow::new("invalid-agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
-    workflow.add_agent_node("Agent", AgentTarget::Pi, AGENT_PROMPT, AgentOutputMode::Text);
+    workflow.add_agent_node("Agent", Target::Pi, AGENT_PROMPT, OutputMode::Text);
     let mut portable = workflow_to_portable(&workflow);
     let config = portable.configs.first_mut().expect("agent config");
     config.agent_target = "unsupported".to_string();
@@ -705,7 +704,7 @@ fn portable_import_rejects_invalid_agent_target() {
 #[test]
 fn portable_import_rejects_invalid_agent_output_mode() {
     let mut workflow = Workflow::new("invalid-agent-workflow", lattice::engine::workflow::WorkflowTimestamp::epoch());
-    workflow.add_agent_node("Agent", AgentTarget::Pi, AGENT_PROMPT, AgentOutputMode::Text);
+    workflow.add_agent_node("Agent", Target::Pi, AGENT_PROMPT, OutputMode::Text);
     let mut portable = workflow_to_portable(&workflow);
     let config = portable.configs.first_mut().expect("agent config");
     config.agent_output_mode = "unsupported".to_string();

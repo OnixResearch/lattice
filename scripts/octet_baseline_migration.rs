@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
@@ -6,6 +7,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 const EXECUTE_ARG: &str = "--execute";
+const PRUNE_RESOLVED_ARG: &str = "--prune-resolved";
 const BASELINE_SCHEMA_VERSION: u64 = 1;
 const DIAGNOSTIC_LIMIT: usize = 20;
 const SEMANTIC_FIELDS: &[&str] = &[
@@ -20,6 +22,17 @@ const SEMANTIC_FIELDS: &[&str] = &[
 const EXCESSIVE_FILE_LENGTH_LINT: &str = "excessive_file_length";
 const ASSERTION_DENSITY_LINT: &str = "assertion_density";
 const FUNCTION_LENGTH_LINT: &str = "function_length";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Mode {
+    IdentityOnly,
+    PruneResolved,
+}
+
+struct Options {
+    mode: Mode,
+    should_execute: bool,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Migration<'a> {
@@ -56,37 +69,78 @@ struct BaselineFinding {
 
 // r[impl lattice.repository_validation.octet_baseline_migration]
 pub fn run(args: &[String]) -> Result<(), String> {
-    if !(7..=8).contains(&args.len()) {
+    if !(7..=9).contains(&args.len()) {
         return Err(
-            "usage: octet-baseline-migrate OLD_BASELINE REFERENCE_RESULTS_JSONL REFERENCE_STATUS_JSON RESULTS_JSONL STATUS_JSON OUTPUT [--execute]".to_string()
+            "usage: octet-baseline-migrate OLD_BASELINE REFERENCE_RESULTS_JSONL REFERENCE_STATUS_JSON RESULTS_JSONL STATUS_JSON OUTPUT [--prune-resolved] [--execute]".to_string()
         );
     }
-    let execute = args.len() == 8;
-    if execute && args[7] != EXECUTE_ARG {
-        return Err(format!("unsupported argument: {}", args[7]));
-    }
+    let options = parse_options(&args[7..])?;
     let old = read_json(Path::new(&args[1]))?;
     let reference_findings = read_json_lines(Path::new(&args[2]))?;
     let reference_status = read_json(Path::new(&args[3]))?;
     let current_findings = read_json_lines(Path::new(&args[4]))?;
     let status = read_json(Path::new(&args[5]))?;
-    if grouped(&reference_findings)? != grouped(&current_findings)? {
-        return Err("complete raw warning multisets differ; refusing to rebaseline".to_string());
+    let reference_groups = grouped(&reference_findings)?;
+    if options.mode == Mode::PruneResolved {
+        validate_reference_admission(&old, &reference_findings)?;
+    }
+    if !accepts_groups(&reference_groups, &grouped(&current_findings)?, options.mode) {
+        return Err(
+            "complete raw warning multiplicities violate the selected migration policy; refusing to rebaseline"
+                .to_string(),
+        );
     }
     let reference = candidate_baseline(&old, reference_findings, &reference_status)?;
     let candidate = candidate_baseline(&old, current_findings, &status)?;
     if grouped(findings(&old)?)? != grouped(findings(&reference)?)? {
         return Err("reference observation does not preserve the accepted warning facts".to_string());
     }
-    let migration = migrate(&old, &candidate)?;
+    let migration = migrate(&old, &candidate, options.mode, &reference_groups)?;
     print_summary(&migration);
     if !migration.unmatched_old.is_empty() || !migration.unmatched_candidate.is_empty() {
         return Err(
             "semantic finding multisets differ outside the selected bounded policy; refusing to rebaseline".to_string()
         );
     }
-    if execute {
+    if options.should_execute {
         write_migrated_baseline(Path::new(&args[6]), &old, &status, migration.findings)?;
+    }
+    Ok(())
+}
+
+fn parse_options(args: &[String]) -> Result<Options, String> {
+    let mut options = Options {
+        mode: Mode::IdentityOnly,
+        should_execute: false,
+    };
+    for arg in args {
+        match arg.as_str() {
+            EXECUTE_ARG if !options.should_execute => options.should_execute = true,
+            PRUNE_RESOLVED_ARG if options.mode == Mode::IdentityOnly => options.mode = Mode::PruneResolved,
+            _ => return Err(format!("unsupported or repeated argument: {arg}")),
+        }
+    }
+    Ok(options)
+}
+
+fn accepts_groups(reference: &BTreeMap<String, usize>, current: &BTreeMap<String, usize>, mode: Mode) -> bool {
+    match mode {
+        Mode::IdentityOnly => reference == current,
+        Mode::PruneResolved => current.iter().all(|(key, count)| reference.get(key).is_some_and(|old| count <= old)),
+    }
+}
+
+fn validate_reference_admission(old: &Value, reference: &[Value]) -> Result<(), String> {
+    let accepted = findings(old)?
+        .iter()
+        .map(|finding| finding.get("stable_id").and_then(Value::as_str).ok_or("old finding is missing stable_id"))
+        .collect::<Result<BTreeSet<_>, _>>()?;
+    for finding in reference {
+        let identity =
+            finding.get("stable_id").and_then(Value::as_str).ok_or("reference finding is missing stable_id")?;
+        if !accepted.contains(identity) {
+            return Err("reference observation contains an identity not admitted by the old baseline".to_string());
+        }
     }
     Ok(())
 }
@@ -301,16 +355,28 @@ fn grouped(findings: &[Value]) -> Result<BTreeMap<String, usize>, String> {
     Ok(groups)
 }
 
-fn migrate<'a>(old: &Value, candidate: &'a Value) -> Result<Migration<'a>, String> {
+fn migrate<'a>(
+    old: &Value,
+    candidate: &'a Value,
+    mode: Mode,
+    reference_groups: &BTreeMap<String, usize>,
+) -> Result<Migration<'a>, String> {
     let old_findings = findings(old)?;
     let candidate_findings = findings(candidate)?;
-    let old_groups = grouped(old_findings)?;
+    if mode == Mode::PruneResolved && candidate_findings.len() > old_findings.len() {
+        return Err("pruning would expand the accepted baseline identity count".to_string());
+    }
+    let canonical_groups = grouped(old_findings)?;
+    let old_groups = match mode {
+        Mode::IdentityOnly => &canonical_groups,
+        Mode::PruneResolved => reference_groups,
+    };
     let candidate_groups = grouped(candidate_findings)?;
     let mut unmatched_old = Vec::new();
     let mut unmatched_candidate = Vec::new();
-    for (key, old_count) in &old_groups {
+    for (key, old_count) in old_groups {
         let candidate_count = candidate_groups.get(key).copied().unwrap_or(0);
-        if candidate_count != *old_count {
+        if candidate_count > *old_count || (mode == Mode::IdentityOnly && candidate_count != *old_count) {
             unmatched_old.push(format!("count mismatch old={old_count} candidate={candidate_count} key={key}"));
         }
     }
@@ -347,7 +413,6 @@ fn print_summary(migration: &Migration) {
         migration.unmatched_old.len(),
         migration.unmatched_candidate.len()
     );
-    println!("Complete raw warning multiplicities and canonical first-per-stable-ID baseline facts are preserved.");
     for diagnostic in migration.unmatched_old.iter().take(DIAGNOSTIC_LIMIT) {
         println!("OLD: {diagnostic}");
     }
