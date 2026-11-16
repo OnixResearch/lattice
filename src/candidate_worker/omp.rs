@@ -18,6 +18,7 @@ pub struct Profile {
     pub base_identity: String,
     pub model: String,
     pub prompt: String,
+    pub model_broker: super::broker::Profile,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -58,19 +59,48 @@ pub fn run(
     profile: &Profile,
     config: &crate::process::core::RuntimeConfig,
     cancellation: &std::sync::atomic::AtomicBool,
+    credentials: &dyn crate::credentials::CredentialProvider,
 ) -> Result<RunResult, super::Error> {
     if let Err(reason) = profile::admit(request, profile) {
         return Ok(blocked(profile, reason));
     }
+    debug_assert!(!request.boundary.network);
+    debug_assert!(request.require_isolation);
     let mut selected = request.clone();
     selected.args = profile::arguments(request, profile);
     let argv_blake3 = argument_identity(&selected.args)?;
-    let compatibility = match compatible(&selected, profile) {
-        Ok(value) => Some(value),
-        Err(reason) => return Ok(blocked(profile, reason)),
+    let result = super::broker::with_route(selected, &profile.model_broker, credentials, cancellation, |selected| {
+        let compatibility = match compatible(&selected, profile) {
+            Ok(value) => Some(value),
+            Err(reason) => return Ok(blocked(profile, reason)),
+        };
+        let outcome = dispatch(&selected, &profile.base_identity, config, cancellation)?;
+        Ok(finish_profile(&selected, profile, outcome, argv_blake3, compatibility))
+    });
+    match result {
+        Err(reason) => Ok(blocked(profile, &reason)),
+        Ok((result, is_stopped_cleanly)) => result.map(|result| {
+            if is_stopped_cleanly {
+                result
+            } else {
+                broker_failure(result)
+            }
+        }),
+    }
+}
+
+fn broker_failure(mut result: RunResult) -> RunResult {
+    result.outcome = match result.outcome {
+        super::Outcome::Produced { stdout, stderr, .. } | super::Outcome::Unchanged { stdout, stderr, .. } => {
+            super::Outcome::Unknown {
+                blocker: "model broker stopped unexpectedly after worker dispatch; retain workspace".into(),
+                stdout,
+                stderr,
+            }
+        }
+        other => other,
     };
-    let outcome = dispatch(&selected, &profile.base_identity, config, cancellation)?;
-    Ok(finish_profile(&selected, profile, outcome, argv_blake3, compatibility))
+    result
 }
 
 impl RunResult {

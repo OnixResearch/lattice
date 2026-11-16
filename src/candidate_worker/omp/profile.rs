@@ -6,6 +6,11 @@ pub(super) fn admit(request: &super::super::Request, profile: &super::Profile) -
         return Err("OMP requires an explicit workspace provider and profile-owned argv");
     }
     admit_input(profile)?;
+    super::super::broker::admission::validate(&profile.model_broker)
+        .map_err(|_| "OMP model broker profile is invalid")?;
+    if request.boundary.network || profile.model != format!("lattice/{}", profile.model_broker.model) {
+        return Err("OMP requires the exact broker model and a private network namespace");
+    }
     if !std::path::Path::new(&request.program).is_absolute() {
         return Err("OMP executable must be an absolute reviewed path");
     }

@@ -18,8 +18,10 @@ read paths are read-only; explicit existing write paths are writable. The privat
 workspace root and filesystem root are remounted read-only after bind setup.
 `/tmp` and `HOME=/tmp/omp-home` are private scratch space; `PATH=/usr/bin:/bin` and
 the selected read-only system bases are explicit runtime grants, not host-home
-access. Network is private when `boundary.network` is false. With true it is
-shared network access, **not endpoint-scoped egress enforcement**.
+access. Generic commands with `boundary.network=true` still share the host
+network and cannot advertise destination-scoped confinement. The selected OMP
+profile now refuses that mode and always uses a private network namespace plus
+the attempt-local model broker described below.
 
 Root `.git`/`.jj` metadata is neither a source artifact nor an admitted path.
 A linked worktree pointer is not followed or exposed to the worker. Repository
@@ -39,9 +41,12 @@ The profile follows its [CLI reference](https://github.com/can1357/oh-my-pi/blob
 and [session header](https://github.com/can1357/oh-my-pi/blob/e325ffc73ab86e03bdd20a91b77d8e2b3964c906/packages/coding-agent/src/session/session-entries.ts).
 
 `candidate_worker::omp::Profile` requires the reviewed executable's BLAKE3, this exact reference
-revision, an exact model, one non-command prompt, and the independently admitted
-base snapshot identity. The executable must be an absolute path. The wrapper
-owns argv; arbitrary caller argv, resume and interactive `/loop` are not admitted:
+revision, the independently admitted base snapshot identity, one non-command
+prompt, and a `model_broker` profile. OMP, bubblewrap, the relay and shell resolve
+to immutable Nix store artifacts; their byte identities are checked before
+dispatch. The model selector is exactly `lattice/MODEL`, where `MODEL` equals the
+broker's wire model. The wrapper owns argv; arbitrary caller argv, resume and
+interactive `/loop` are not admitted:
 
 ```text
 launch --cwd /workspace --model MODEL --no-session --no-title -p --mode json
@@ -66,6 +71,55 @@ compatibility identities. These are compatibility observations, not proof that
 the reviewed executable bytes were built from the declared source revision.
 Usage completeness is explicitly false: JSONL is not a complete model-request,
 subagent or billing ledger, and no measured usage is invented from final text.
+
+## Attempt-local model broker
+
+`candidate_worker::broker::Profile` selects one canonical HTTPS endpoint (literal
+loopback HTTP is also supported), one exact wire model, an optional `SecretRef`,
+reviewed relay/shell paths and BLAKE3 identities, the sandbox BLAKE3, an absolute
+expiry and a positive request ceiling no greater than 256. URL credentials,
+queries, fragments and non-chat-completion endpoints are refused.
+
+The host creates a private mode-0700 directory, mode-0600 Unix socket and
+read-only OMP model configuration. Only that socket and public local model
+configuration enter the sandbox. A pinned socat relay listens on private
+loopback port 41001; the worker receives no host network namespace, provider
+bearer, publisher credential or privileged host socket. Relay readiness is
+checked before starting the worker. PID-namespace and existing bounded-process
+teardown own the relay and worker descendants.
+
+The broker accepts only bounded `POST /v1/chat/completions` JSON for the selected
+model. It rejects other paths/models, CONNECT, ambiguous framing and oversized
+input before resolving credentials. Worker headers are never forwarded;
+authorization is constructed on the host through the existing credential
+provider. JSON is canonically re-encoded to eliminate duplicate-key ambiguity.
+Every admitted dispatch consumes the request ceiling, including an uncertain
+outcome. There are no broker retries, redirects or ambient HTTP proxies.
+Response bodies are bounded by the existing native HTTP limits; SSE is buffered
+until the bounded upstream response completes, not streamed incrementally.
+Literal credential echoes are refused rather than returned to the worker.
+
+Mount grants are fenced to the work/attempt/fence/workspace, program/argv,
+read/write roots, environment/network mode, sandbox and resource limits.
+Changed bindings cannot reuse a live grant. Expiry and cancellation are checked
+before credential resolution and again before dispatch. The broker stops and
+joins on normal return or unwinding; an unexpected post-dispatch broker failure
+cannot produce an accepted candidate. These local checks do not establish a
+current external Kiln grant, compute reservation or serving-generation lease.
+
+Standalone execution resolves only the exact explicitly selected `env` reference
+on the host. Embedders supply the existing `CredentialProvider` to `omp::run`;
+provider trust/currentness remain their responsibility. No secret is placed in
+the request, argv, worker environment, model configuration or compatibility
+receipt. Byte pins establish the selected artifacts, not their source/build
+provenance or general hostile-sandbox safety.
+
+Lattice owns this broker, request codec and compatibility projection. Kiln owns
+current external work authority and independent acceptance; Aspen and Animus own
+the still-unavailable compute and serving/request-admission contracts. The
+repeatable checks are the bounded socket security fixtures, explicitly selected
+kernel-provider scenarios and non-dispatching request-v2 CLI preparation smoke.
+
 
 ## Host-derived candidate and partial evidence
 
@@ -136,26 +190,54 @@ reproduce a kernel kill/reap error or qualify OMP.
 Live provider/OMP tests are explicitly ignored unless selected. They require
 reviewed binaries, enabled kernel namespaces and an authorized model endpoint:
 
+Executable byte pins use 64 lowercase hexadecimal BLAKE3 digits, as emitted by
+`b3sum`, without a `b3:` prefix. The selected worker validates this format before
+opening its broker or dispatching the process.
+
 ```sh
 cargo test --locked --lib process::shell::failure_tests
 cargo test --locked --lib candidate_worker
 cargo test --locked --test test_store candidate_attempt
 cargo test --locked --test test_local_process
-# With LATTICE_BWRAP set to the reviewed provider executable:
-cargo test --locked --lib candidate_worker::tests::bubblewrap_ -- --ignored
-# Also supply LATTICE_OMP, LATTICE_OMP_REVISION, LATTICE_OMP_BLAKE3,
-# LATTICE_OMP_BASE_URL and LATTICE_OMP_MODEL for the reviewed local endpoint:
-cargo test --locked --lib candidate_worker::tests::omp_worker_produces_a_sandboxed_candidate -- --ignored --exact
+# With LATTICE_BWRAP and LATTICE_SOCAT set to reviewed immutable executables:
+cargo test --locked --lib bubblewrap_ -- --ignored
+# OMP additionally needs reviewed source/build and byte pins:
+# LATTICE_OMP, LATTICE_OMP_REVISION, LATTICE_OMP_BLAKE3,
+# LATTICE_BWRAP_BLAKE3, LATTICE_SOCAT_BLAKE3, LATTICE_WORKER_SHELL,
+# LATTICE_WORKER_SHELL_BLAKE3, LATTICE_OMP_BASE_URL, LATTICE_OMP_MODEL,
+# and optionally LATTICE_OMP_CREDENTIAL_ENV naming the host-only env reference:
+cargo test --locked --lib candidate_worker::tests::isolation::omp_worker_produces_a_sandboxed_candidate -- --ignored --exact
+# The same executable/model pins, but no live endpoint or credential, cover
+# actual OMP failure/cancellation against bounded local fault servers:
+cargo test --locked --lib candidate_worker::tests::isolation::faults:: -- --ignored --nocapture
 ```
 
-These commands are verification instructions, not a report that they were run.
-No live OMP build/provider/model qualification is claimed by source fixtures.
-An admitted immutable OMP build with source provenance, measured provider policy
-on the deployment kernel, endpoint-scoped model/network/credential capability,
-and selected-route failure/cancellation evidence remain qualification
-prerequisites. There is no credential delivery provider, independent acceptance,
-publisher, merge authority, external exactly-once guarantee or production-readiness
-claim in this contract.
+The retained [source-qualification record](../.cairn/changes/preserve-candidate-worker-observations/evidence/source-qualification.json)
+records the reviewed OMP 18.18.7 build, its executable bytes, the real
+`underclass/gpt-6.1-sol` code candidate and the selected-route failure/cancellation
+fixtures. Provider credentials stayed in the host OMP auth gateway; the isolated
+worker received only its bounded exact-model broker route. The normal run used
+three logical broker calls; these are not complete provider-attempt or billing
+telemetry. Four separate actual namespace fixtures cover the provider boundary.
+These observations grant no independent acceptance, publication, merge,
+external exactly-once or production-readiness claim.
+
+### Durable continuation remains unsupported
+
+The pinned producer's
+[`restoreInterruptedTurn`](https://github.com/can1357/oh-my-pi/blob/e325ffc73ab86e03bdd20a91b77d8e2b3964c906/packages/coding-agent/src/session/agent-session.ts#L13390-L13419)
+marks unfinished tool calls outcome-unknown and invokes retry. Its
+[`retry` path](https://github.com/can1357/oh-my-pi/blob/e325ffc73ab86e03bdd20a91b77d8e2b3964c906/packages/coding-agent/src/session/turn-recovery.ts#L3445-L3506)
+can execute that tool batch again with a fresh retry budget. This is not
+no-effect restoration of host-accepted results.
+
+Issues #7/#12 still need a producer-owned bounded headless continuation contract:
+stable model/tool invocation identities, accepted result/artifact references and
+cursor commits, no-effect reconstruction, and a barrier for uncertain calls.
+The consumer must revalidate current attempt/fence, workspace, runtime and service
+authority. Session IDs, transcripts and RPC pagination cursors cannot substitute.
+The single-shot `--no-session` profile stays enforced; Unknown reconciliation
+retains evidence without redispatch, and Animus tools remain disabled.
 
 ## Coordinator-admitted implementation consumer
 
@@ -171,13 +253,14 @@ lattice implementation-attempt cancel --request request.json --state /var/lib/la
 lattice implementation-attempt export-candidate --request request.json --state /var/lib/lattice/implementation --output-parent /var/lib/lattice/candidates
 ```
 
-The strict `lattice.implementation-attempt-run.v1` fields and canonical profile
+The strict `lattice.implementation-attempt-run.v2` fields and canonical profile
 codec are in `src/implementation_attempt/cli.rs`. Preparation reads the actual
 workspace snapshot and emits snapshot/profile/envelope/request-byte identities;
 it reports `admitted:false` and grants no authority. The installed operator
 request binds current work/version/attempt/fence/source/spec/base and an expiry.
 Only the trusted Kiln dispatcher may admit it through current claim/resource
-grants. Model credentials and publisher authority remain unavailable.
+grants. Publisher authority remains unavailable; selected model credentials stay
+in the host broker.
 
 A private one-shot execution intent is fsynced before the worker starts. Re-entry
 with the exact request only reconciles retained results; changed requests and
@@ -186,9 +269,10 @@ normalization artifacts are separately fsynced before the candidate result.
 Recovery bounds their reads, rejects symbolic links, checks the raw digest against
 the owned stdout observation, and independently repeats normalization. Missing,
 substituted, or contradictory artifacts cannot become a published result.
-A network-enabled request names a backend-owned `/run/netns/NAME`; execution
-verifies the actual namespace identity. No namespace or egress policy is created
-by this command.
+Version 2 removes the old `network`/`network_namespace` fields rather than
+accepting shared-network compatibility requests. Broker expiry cannot exceed
+the enclosing attempt expiry; existing version-1 requests require explicit
+readmission as version 2. This shell creates no external authorization grant.
 
 Cancel writes only an exact persisted request; the running owner observes it and
 uses the existing process-group cancellation. Requested cancellation is not a
@@ -218,8 +302,9 @@ The summary always reports `accepted:false` and `integrated:false`; exporting
 never starts a worker or grants publication authority.
 
 
-The source additions are an explicitly unpublished local correction cohort over
-`c6da59566a896f432f8c3a8f419033364e376cf2`, not a fabricated published revision.
-The consumer must pin its exact source archive/executable identities. No live
-OMP/model/kernel, cancellation campaign, GitHub effect or deployment is claimed
-by these source and fixture changes.
+The scoped broker extends the previously published Lattice worker route at
+`06e551e5b08ce78a46d03af5b5870ef1de81ac00`. Consumers must pin the actual source
+archive/executable identities. Kiln #46 still owns independent verification and
+canonical CI acceptance; its current contract admits supplied observations but
+does not execute the verification profile. A live OMP/coordinator pilot and
+external current-grant/worker/compute/service qualification remain separate.

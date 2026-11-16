@@ -1,5 +1,6 @@
 pub(crate) mod host;
 mod invocation;
+mod profile;
 
 pub use host::ExecutionContext;
 pub use host::FakeProcessRunner;
@@ -14,6 +15,10 @@ pub use invocation::CommandOutput;
 pub use invocation::CommandPlan;
 pub use invocation::plan_command;
 pub use invocation::run_command_with_runner;
+pub use profile::CONFIGURED_RUNTIME_SCHEMA;
+pub use profile::CompatibilitySupport;
+pub use profile::ConfiguredBinding;
+pub use profile::ConfiguredProfile;
 
 pub trait Adapter: Send + Sync {
     /// Material-free identity of the selected backend and its execution configuration.
@@ -120,19 +125,7 @@ impl Default for ProductionAdapter {
 // r[impl lattice.agent_runtime.projection_boundaries.scenario.evidence]
 impl Adapter for ProductionAdapter {
     fn execution_identity(&self, request: &super::Request) -> Result<String, super::Error> {
-        let route = match route_for_target(&self.config, request.target)? {
-            Route::Command => "command",
-            Route::OpenAi(_) => "openai-compatible",
-            Route::Animus(_) => "animus",
-        };
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(b"lattice.agent.selected-runtime.v1");
-        serde_json::to_writer(
-            &mut hasher,
-            &(route, &self.config, &self.config.local_process.shell_program, &self.config.local_process.limits),
-        )
-        .map_err(|_| super::Error::PreflightRejected("agent runtime identity unavailable".to_owned()))?;
-        Ok(format!("blake3:{}", hasher.finalize().to_hex()))
+        Ok(configured_binding(&self.config, request.target)?.revision)
     }
     fn execute(
         &self,
@@ -148,6 +141,7 @@ impl Adapter for ProductionAdapter {
         cancellation: Option<&std::sync::atomic::AtomicBool>,
     ) -> Result<super::Response, super::Error> {
         let projection = self.config.structured_input_projection.for_target(request.target);
+        let binding = configured_binding(&self.config, request.target)?;
         let response = match route_for_target(&self.config, request.target)? {
             Route::Command => {
                 let plan = super::plan_command(&self.config, request)?;
@@ -178,7 +172,11 @@ impl Adapter for ProductionAdapter {
                 self.openai_transport.as_ref(),
             ),
         }?;
-        Ok(attach_projection_metadata(response, projection, request.json_inputs.len()))
+        let mut response = attach_projection_metadata(response, projection, request.json_inputs.len());
+        if let Some(metadata) = response.metadata.as_object_mut() {
+            metadata.insert("configured_runtime".to_string(), serde_json::json!(binding));
+        }
+        Ok(response)
     }
 }
 
@@ -206,4 +204,27 @@ fn attach_projection_metadata(
 fn global_output_max_bytes(config: &super::RuntimeOptions) -> Result<u64, super::Error> {
     u64::try_from(config.max_output_bytes)
         .map_err(|_| super::Error::PreflightRejected("global agent output bound is unsupported".to_string()))
+}
+
+fn configured_binding(
+    config: &super::RuntimeOptions,
+    target: super::Target,
+) -> Result<ConfiguredBinding, super::Error> {
+    let route = match route_for_target(config, target)? {
+        Route::Command => "command",
+        Route::OpenAi(_) => "openai-compatible",
+        Route::Animus(_) => "animus",
+    };
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"lattice.agent.selected-runtime.v1");
+    serde_json::to_writer(
+        &mut hasher,
+        &(route, config, &config.local_process.shell_program, &config.local_process.limits),
+    )
+    .map_err(|_| super::Error::PreflightRejected("agent runtime identity unavailable".to_owned()))?;
+    Ok(ConfiguredBinding {
+        schema: CONFIGURED_RUNTIME_SCHEMA.to_string(),
+        target,
+        revision: format!("blake3:{}", hasher.finalize().to_hex()),
+    })
 }

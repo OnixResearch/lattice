@@ -21,6 +21,7 @@ use crate::store::StoreError;
 
 pub mod omp;
 
+pub mod broker;
 mod compatibility;
 mod completion;
 mod execution;
@@ -45,6 +46,8 @@ pub struct Request {
     pub require_isolation: bool,
     /// Reviewed bubblewrap executable used when isolation is required.
     pub sandbox_program: Option<String>,
+    /// Attempt-local host broker grant; never shares the host network.
+    pub broker: Option<broker::Mount>,
     pub timeout_secs: u64,
     pub output_limit_bytes: usize,
 }

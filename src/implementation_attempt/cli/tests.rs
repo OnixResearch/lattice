@@ -83,11 +83,3 @@ fn concurrent_intent_writers_have_exactly_one_execution_owner() {
     assert_eq!(outcomes.iter().filter(|outcome| matches!(outcome, Ok(true))).count(), 1);
     assert_eq!(super::artifacts::read_bounded(&path, 5).expect("exact intent"), b"exact");
 }
-
-#[test]
-fn namespace_paths_preserve_exact_admission() {
-    assert!(super::validate_namespace_path(std::path::Path::new("/run/netns/provider-1_a.b")).is_ok());
-    assert!(super::validate_namespace_path(std::path::Path::new("/run/netns")).is_err());
-    assert!(super::validate_namespace_path(std::path::Path::new("/tmp/provider")).is_err());
-    assert!(super::validate_namespace_path(std::path::Path::new("/run/netns/provider name")).is_err());
-}

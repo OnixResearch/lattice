@@ -22,6 +22,9 @@ jobs:
       TZ: UTC
       RUST_BACKTRACE: "1"
       CARGO_INCREMENTAL: "0"
+      # Preserve the full rail without retaining multi-gigabyte debug symbols.
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
     steps:
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -50,12 +53,19 @@ jobs:
       - name: Observe release inputs
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: "true"
-        run: nix develop . -c sh -c 'CARGO_TARGET_DIR=/tmp/lattice-release-inputs cargo -q -Zscript scripts/release-readiness-inputs.rs "$LATTICE_CAIRN_BIN"'
+        run: |
+          nix develop . -c sh <<'SH'
+          CARGO_TARGET_DIR=/tmp/lattice-release-inputs cargo -q -Zscript scripts/release-readiness-inputs.rs "$LATTICE_CAIRN_BIN"
+          SH
 
       - name: Run Octet precommit gate
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: "true"
         run: nix develop . -c octet-precommit-check
+
+      - name: Release local build trees before isolated Nix checks
+        # Keep target/octet-precommit JSON evidence, not duplicate Cargo payloads.
+        run: rm -rf -- target/debug target/octet-cargo-target target/octet-core-cargo-target
 
       - name: Run Nix flake checks
         env:

@@ -26,6 +26,7 @@ fn partial_provider_reports_preserve_unknown_remainder_and_overrun() {
         node_id: 1,
         provider: "openai_compatible".to_string(),
         model: Some("reported-model".to_string()),
+        configured_runtime: None,
         tokens: Some(tokens),
         cost_microunits: Some(999),
     };

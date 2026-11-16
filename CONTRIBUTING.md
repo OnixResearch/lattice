@@ -37,6 +37,13 @@ development shell sets it to the pinned native binary. Running `cargo test`
 outside the development shell fails closed instead of using an unrelated Cairn
 from `PATH`.
 
+Hosted check and release jobs set dev/test debug information to zero and disable
+incremental compilation. They run the same harness and Octet gates, then remove
+only those jobs' generated local build trees before Nix performs its separate
+isolated builds. Octet JSON evidence remains in `target/octet-precommit`.
+This bounds duplicate artifact retention; a passing local run does not establish
+that a GitHub-hosted runner has completed the rail.
+
 For the optional compose workspace, run its own checks with authorized Tile
 source access:
 

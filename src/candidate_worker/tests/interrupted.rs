@@ -33,6 +33,7 @@ fn actual_child_candidate_survives_injected_capture_and_teardown_failures() {
             .expect("boundary"),
             require_isolation: false,
             sandbox_program: None,
+            broker: None,
             timeout_secs: 5,
             output_limit_bytes: 4096,
         };

@@ -58,6 +58,7 @@ fn observed_cancellation_retains_bounded_partial_output_and_workspace() {
         .expect("boundary"),
         require_isolation: false,
         sandbox_program: None,
+        broker: None,
         timeout_secs: 10,
         output_limit_bytes: 4096,
     };

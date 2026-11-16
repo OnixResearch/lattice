@@ -20,6 +20,7 @@ pub(super) fn request(root: &std::path::Path, command: &str) -> Request {
         boundary: boundary(root),
         require_isolation: false,
         sandbox_program: None,
+        broker: None,
         timeout_secs: 5,
         output_limit_bytes: 4_096,
     }

@@ -36,13 +36,26 @@ pub(super) fn command(request: &super::Request) -> Result<(String, Vec<String>),
     let sandbox = provider(request)?;
     let root =
         std::fs::canonicalize(&request.boundary.root).map_err(|_| "workspace root is unavailable".to_string())?;
+    debug_assert!(sandbox.is_absolute());
+    debug_assert!(root.is_absolute());
     let program = program_path(&request.program, &root, &request.boundary)?;
     let args = environment_arguments(request.boundary.network);
     let args = read_mounts(request, &root, args)?;
     let mut args = write_mounts(request, &root, args)?;
+    if let Some(broker) = &request.broker {
+        broker.admit(request)?;
+        if request.boundary.network || !request.require_isolation {
+            return Err("model broker requires a private network namespace".into());
+        }
+        args.extend(broker.arguments());
+    }
     args.extend(["--remount-ro", "/workspace", "--remount-ro", "/", "--"].map(str::to_string));
-    args.push(program);
-    args.extend(request.args.iter().cloned());
+    if let Some(broker) = &request.broker {
+        args.extend(broker.launch(program, &request.args));
+    } else {
+        args.push(program);
+        args.extend(request.args.iter().cloned());
+    }
     Ok((path_text(&sandbox)?, args))
 }
 

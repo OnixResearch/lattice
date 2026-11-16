@@ -1,21 +1,3 @@
-fn verify_namespace(request: &super::Request) -> Result<(), String> {
-    if let Some(namespace) = &request.network_namespace {
-        #[cfg(target_os = "linux")]
-        {
-            use std::os::unix::fs::MetadataExt;
-            let selected = std::fs::metadata(namespace).map_err(|_| "admitted model namespace is unavailable")?;
-            let current =
-                std::fs::metadata("/proc/self/ns/net").map_err(|_| "current network namespace is unavailable")?;
-            if selected.dev() != current.dev() || selected.ino() != current.ino() {
-                return Err("worker is not running inside the admitted provider network namespace".into());
-            }
-        }
-        #[cfg(not(target_os = "linux"))]
-        return Err("qualified worker network namespaces require Linux".into());
-    }
-    Ok(())
-}
-
 fn timeout_secs(request: &super::Request, now_ms: u64) -> Result<u64, String> {
     let remaining_ms =
         request.expires_at_ms.checked_sub(now_ms).ok_or("admission expired before a bounded worker step")?;
@@ -27,13 +9,12 @@ fn timeout_secs(request: &super::Request, now_ms: u64) -> Result<u64, String> {
 }
 
 fn worker_request(request: &super::Request) -> Result<crate::candidate_worker::Request, String> {
-    verify_namespace(request)?;
     request.validate(super::now_ms()?)?;
     let boundary = crate::candidate_capture::admit_workspace_boundary(
         &request.workspace_root,
         &request.read_paths,
         &request.write_paths,
-        request.network,
+        false,
         false,
     )
     .map_err(|error| error.to_string())?;
@@ -55,6 +36,7 @@ fn build_worker(
         boundary,
         require_isolation: true,
         sandbox_program: Some(request.sandbox_program.clone()),
+        broker: None,
         timeout_secs,
         output_limit_bytes: request.output_limit_bytes,
     }
@@ -107,11 +89,18 @@ impl WorkerStep {
     }
 
     fn observe(self, cancellation: &std::sync::atomic::AtomicBool) -> Result<(), String> {
+        let reference = self.profile.model_broker.credential.as_ref();
+        if reference.is_some_and(|value| value.provider != "env" || value.field.is_some()) {
+            return Err("standalone model broker requires an explicit env credential reference".into());
+        }
+        let keys: Vec<String> = reference.map(|value| value.key.clone()).into_iter().collect();
+        let credentials = crate::credentials::EnvironmentCredentialProvider::from_current_env(&keys);
         let result = crate::candidate_worker::omp::run(
             &self.worker,
             &self.profile,
             &crate::process::core::RuntimeConfig::default(),
             cancellation,
+            &credentials,
         )
         .map_err(|error| error.to_string())?;
         self.retain_events(&result)?;

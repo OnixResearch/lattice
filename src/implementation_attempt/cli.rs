@@ -7,7 +7,7 @@ mod recovery;
 #[cfg(test)]
 mod tests;
 
-pub const REQUEST_SCHEMA: &str = "lattice.implementation-attempt-run.v1";
+pub const REQUEST_SCHEMA: &str = "lattice.implementation-attempt-run.v2";
 const MAX_REQUEST_BYTES: usize = 2_097_152;
 const MAX_OUTPUT_BYTES: usize = 16_777_216;
 
@@ -66,9 +66,6 @@ pub struct Request {
     pub workspace_root: std::path::PathBuf,
     pub read_paths: Vec<String>,
     pub write_paths: Vec<String>,
-    pub network: bool,
-    /// Backend-owned qualified egress namespace; never created by this shell.
-    pub network_namespace: Option<std::path::PathBuf>,
     pub program: String,
     pub sandbox_program: String,
     pub omp: crate::candidate_worker::omp::Profile,
@@ -85,8 +82,6 @@ impl Request {
             &self.omp,
             &self.read_paths,
             &self.write_paths,
-            self.network,
-            &self.network_namespace,
             self.output_limit_bytes,
             self.allow_unchanged,
         ))
@@ -116,10 +111,12 @@ impl Request {
         }
         self.validate_paths().map_err(|_| invalid.to_string())?;
         if self.omp.revision != crate::candidate_worker::omp::OMP_REVISION
-            || self.network != self.network_namespace.is_some()
+            || self.omp.model_broker.expires_at_ms <= now_ms
+            || self.omp.model_broker.expires_at_ms > self.expires_at_ms
         {
             return Err(invalid.into());
         }
+        crate::candidate_worker::broker::admission::validate(&self.omp.model_broker)?;
         Ok(())
     }
 
@@ -130,22 +127,8 @@ impl Request {
         {
             return Err("worker paths must be absolute".into());
         }
-        if let Some(path) = &self.network_namespace {
-            validate_namespace_path(path)?;
-        }
         Ok(())
     }
-}
-
-fn validate_namespace_path(path: &std::path::Path) -> Result<(), String> {
-    if path.parent() != Some(std::path::Path::new("/run/netns")) {
-        return Err("network namespace is outside the admitted directory".into());
-    }
-    let name = path.file_name().and_then(|name| name.to_str()).ok_or("network namespace name is invalid")?;
-    if name.is_empty() || !name.bytes().all(|byte| byte.is_ascii_alphanumeric() || b"-_.".contains(&byte)) {
-        return Err("network namespace name is invalid".into());
-    }
-    Ok(())
 }
 
 fn now_ms() -> Result<u64, String> {

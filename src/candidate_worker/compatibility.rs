@@ -1,4 +1,4 @@
-fn executable_identity(path: &std::path::Path) -> Option<String> {
+pub(super) fn executable_identity(path: &std::path::Path) -> Option<String> {
     if !std::fs::metadata(path).ok()?.is_file() {
         return None;
     }
@@ -33,7 +33,8 @@ fn provider_identity(request: &super::Request) -> Option<String> {
     if request.require_isolation {
         let (sandbox, args) = super::sandbox::command(request).ok()?;
         let executable = executable_identity(std::path::Path::new(&sandbox))?;
-        Some(crate::pure_inet_profile::blake3_identity(&serde_json::to_vec(&(executable, args)).ok()?))
+        let broker = request.broker.as_ref().map(|mount| mount.profile_identity.as_str());
+        Some(crate::pure_inet_profile::blake3_identity(&serde_json::to_vec(&(executable, args, broker)).ok()?))
     } else {
         Some(crate::pure_inet_profile::blake3_identity(b"unsandboxed"))
     }

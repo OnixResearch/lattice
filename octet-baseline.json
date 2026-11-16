@@ -10,7 +10,7 @@
     "tool_version": "0.1.0",
     "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu"
   },
-  "baseline_hash": "b3:78c324ba13459e6dc4a21b6c69148becefcba35d3380713b8e7d636f65e305b2",
+  "baseline_hash": "b3:823ba9879f571d417e8603754680f0aabe4a7e3a2ffd9eac6f2102eaeda323e8",
   "findings": [
     {
       "stable_id": "b3:00132a81afe48abf",
@@ -855,19 +855,6 @@
       "line": 436,
       "column": 9,
       "message": "direct randomness source `rand::random(` makes core behavior non-deterministic",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:0f4eae122cd26245",
-      "semantic_id": "b3:0f4eae122cd26245",
-      "identity_status": "computed",
-      "lint": "module_file_count",
-      "group": "tigerstyle::structure",
-      "severity": "warning",
-      "file": "src/agent_node.rs",
-      "line": 1,
-      "column": 1,
-      "message": "module directory `src` contains 22 Rust source files (limit: 7)",
       "crate_name": "lattice"
     },
     {
@@ -9919,6 +9906,19 @@
       "crate_name": "lattice"
     },
     {
+      "stable_id": "b3:bef8d561dd8bb269",
+      "semantic_id": "b3:bef8d561dd8bb269",
+      "identity_status": "computed",
+      "lint": "module_file_count",
+      "group": "tigerstyle::structure",
+      "severity": "warning",
+      "file": "src/agent_node.rs",
+      "line": 1,
+      "column": 1,
+      "message": "module directory `src` contains 22 Rust source files (limit: 7)",
+      "crate_name": "lattice"
+    },
+    {
       "stable_id": "b3:befdca3c7a4f0b0d",
       "semantic_id": "b3:befdca3c7a4f0b0d",
       "identity_status": "computed",
@@ -11609,19 +11609,6 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:de45fc85051274e6",
-      "semantic_id": "b3:de45fc85051274e6",
-      "identity_status": "computed",
-      "lint": "underscore_in_module_filename",
-      "group": "tigerstyle::naming",
-      "severity": "warning",
-      "file": "src/agent_node.rs",
-      "line": 1,
-      "column": 1,
-      "message": "module filename `agent_node.rs` contains an underscore; prefer `agent/node.rs`",
-      "crate_name": "lattice"
-    },
-    {
       "stable_id": "b3:de4eaf8f266ebab5",
       "semantic_id": "b3:de4eaf8f266ebab5",
       "identity_status": "computed",
@@ -12129,6 +12116,19 @@
       "crate_name": "lattice"
     },
     {
+      "stable_id": "b3:e5096f97758b4a5d",
+      "semantic_id": "b3:e5096f97758b4a5d",
+      "identity_status": "computed",
+      "lint": "underscore_in_module_filename",
+      "group": "tigerstyle::naming",
+      "severity": "warning",
+      "file": "src/agent_node.rs",
+      "line": 1,
+      "column": 1,
+      "message": "module filename `agent_node.rs` contains an underscore; prefer `agent/node.rs`",
+      "crate_name": "lattice"
+    },
+    {
       "stable_id": "b3:e5d390d9e84f55ab",
       "semantic_id": "b3:e5d390d9e84f55ab",
       "identity_status": "computed",
@@ -12467,8 +12467,8 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:ecfb537f84e51f3f",
-      "semantic_id": "b3:ecfb537f84e51f3f",
+      "stable_id": "b3:ed1d56ec98ed31e9",
+      "semantic_id": "b3:ed1d56ec98ed31e9",
       "identity_status": "computed",
       "lint": "underscore_in_module_filename",
       "group": "tigerstyle::naming",

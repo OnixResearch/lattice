@@ -140,6 +140,9 @@ impl super::RunAccounting {
             if let Some(model) = &report.model {
                 validate_identifier(model)?;
             }
+            if report.configured_runtime.as_ref().is_some_and(|binding| !binding.validate()) {
+                return Err(super::ObservationError::InvalidHostReceipt);
+            }
         }
         Ok(())
     }

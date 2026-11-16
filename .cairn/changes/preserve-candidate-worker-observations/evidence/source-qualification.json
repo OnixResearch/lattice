@@ -1,6 +1,6 @@
 {
   "issue": "https://github.com/OnixResearch/lattice/issues/7",
-  "kind": "source-inspection-and-unexecuted-fixture-definition",
+  "kind": "source-local-provider-and-selected-omp-single-shot-qualification",
   "bounded_exec": {
     "selection": "Cargo.toml path dependency and git patch to vendor-cargo-deps/bounded-exec/crates/bounded-exec",
     "revision": "29dac88ecded94457572db3fdfaaaab95fa91525",
@@ -10,23 +10,81 @@
     "reference_revision": "e325ffc73ab86e03bdd20a91b77d8e2b3964c906",
     "inspected": ["docs/cli-reference.md", "packages/coding-agent/src/modes/print-mode.ts", "packages/coding-agent/src/session/session-entries.ts"],
     "source_url": "https://github.com/can1357/oh-my-pi/tree/e325ffc73ab86e03bdd20a91b77d8e2b3964c906",
-    "executable_source_provenance_qualified": false,
-    "live_selected_route_qualified": false
+    "executable_source_provenance_qualified": true,
+    "live_selected_route_qualified": true,
+    "qualified_scope": "bounded single-shot normal candidate production, injected HTTP-400 terminal failure and cancellation after an admitted local request; durable continuation is unsupported",
+    "normal_completion": {
+      "command": "cargo test --locked --lib candidate_worker::tests::isolation::omp_worker_produces_a_sandboxed_candidate -- --ignored --exact --nocapture",
+      "passed": 1,
+      "model": "underclass/gpt-6.1-sol",
+      "host_gateway": "OMP 18.18.6 auth-gateway stdio using existing operator authentication",
+      "model_fallback_disabled": true,
+      "logical_broker_request_cap": 8,
+      "logical_broker_requests_observed": 3,
+      "observed_response_statuses": [200, 200, 200],
+      "observed_response_bytes": [5773, 13993, 1138],
+      "broker_window_secs": 120,
+      "observed_broker_window_secs": 8.19,
+      "candidate_assertions": "Completed JSONL; host-derived receipt changes exactly src/main.rs; independently read file equals pub fn answer() -> i32 { 42 } followed by newline; compatibility validates",
+      "credential_boundary": "provider credentials remain in the host gateway; the host broker alone receives an ephemeral local-proxy bearer token; the worker receives its private exact-model Unix-socket route",
+      "runtime_pins": {
+        "sandbox": {"path": "/nix/store/37z73lp6f6kvgbl8rh38ifw3lfxqk66w-bubblewrap-0.11.0/bin/bwrap", "blake3": "01f3054278f369ebb34aa2f02e978ffbf3f488e01e772510548d10b37e5309a4"},
+        "relay": {"path": "/nix/store/k562gy1wa1rwyhlp6ma2cp37zlc0mspl-socat-1.8.1.3/bin/socat1", "blake3": "b8e3a6f91077c9cf3a65265e260b969edbdbb99ebcdbb190340df4fa99676f04"},
+        "shell": {"path": "/nix/store/v8sa6r6q037ihghxfbwzjj4p59v2x0pv-bash-5.3p9/bin/bash", "blake3": "e2129fd97d773dec8d2702df5f415030332c9e309ed8c9e50fdd9cbbc2b61bae"}
+      },
+      "non_claim": "logical broker calls are not complete provider transport-attempt, token or billing telemetry; no publication, merge or independent acceptance"
+    },
+    "failure_and_cancellation": {
+      "command": "cargo test --locked --lib candidate_worker::tests::isolation::faults:: -- --ignored --nocapture",
+      "passed": 2,
+      "observed_test_elapsed_secs": 0.83,
+      "external_model_calls": 0,
+      "failure": "real pinned OMP receives an injected local HTTP 400 and returns a normalized Failed terminal with bound raw events and no candidate receipt",
+      "cancellation": "a complete exact-model broker request triggers cancellation; the actual worker returns Cancelled and workspace bytes remain independently capturable; normalized Aborted is checked only when a complete terminal exists",
+      "non_claim": "controlled local fault fixtures, not observed production provider outages, durable continuation, workspace release or independent acceptance"
+    },
+    "durable_continuation": {
+      "supported": false,
+      "evidence_kind": "static inspection of the exact pinned producer and current Lattice consumer, not an executed restore experiment",
+      "producer_behavior": "restoreInterruptedTurn synthesizes outcome-unknown tool results and calls retry; retry can remove failed results and execute the same tool batch again with a fresh retry budget",
+      "source_evidence": [
+        "https://github.com/can1357/oh-my-pi/blob/e325ffc73ab86e03bdd20a91b77d8e2b3964c906/packages/coding-agent/src/session/agent-session.ts#L13390-L13419",
+        "https://github.com/can1357/oh-my-pi/blob/e325ffc73ab86e03bdd20a91b77d8e2b3964c906/packages/coding-agent/src/session/turn-recovery.ts#L3445-L3506"
+      ],
+      "missing_producer_contract": "versioned bounded headless restore with stable model/tool invocation identities, accepted result/artifact references and cursor commit semantics; reconstruct accepted calls without effects or credentials; uncertain-call barrier; compatible runtime/tool state and current host-authority bindings",
+      "consumer_boundary": "single-shot --no-session profile and profile-owned argv stay enforced; durable Unknown reconciles retained host evidence without redispatch; no session or transcript is promoted into continuation authority"
+    },
+    "build": {
+      "source_store_path": "/nix/store/fkpjmb6zwp6g6ylwi6k9ab3ljv51dm1i-source",
+      "command": "nix build --impure --expr '(builtins.getFlake \"/nix/store/fkpjmb6zwp6g6ylwi6k9ab3ljv51dm1i-source\").packages.x86_64-linux.omp' --no-link --print-out-paths --builders '' --option substituters https://cache.nixos.org --option extra-substituters '' --option accept-flake-config false --option secret-key-files ''",
+      "derivation": "/nix/store/vw62xh08s0xmiw0dywr7fyf8s757893j-omp-18.18.7.drv",
+      "output": "/nix/store/ii3yn9v4cj6dg87b9kkzycjzxplgf93d-omp-18.18.7",
+      "executable": "/nix/store/ii3yn9v4cj6dg87b9kkzycjzxplgf93d-omp-18.18.7/bin/omp",
+      "executable_blake3": "7ee769b6a4161b9d50410b31be252133fedb459e4441c6da4c92f3733a8d135f",
+      "claim": "exact reviewed source build and executable bytes, not live worker qualification"
+    }
   },
   "bubblewrap": {
     "reference": "https://github.com/containers/bubblewrap/blob/v0.11.0/bwrap.xml",
     "inspected": ["--unshare-user", "--disable-userns", "--tmpfs", "--remount-ro"],
-    "deployment_kernel_qualified": false,
-    "network_policy": "network=false private namespace; network=true shared network, not endpoint-scoped enforcement"
+    "deployment_kernel_qualified": true,
+    "qualified_tools": "/nix/store/fmr18iwdk05j0jbzfgm6qi0zwhhnbfqc-lattice-worker-isolation-tools",
+    "qualified_scope": "four actual namespace/workspace/host-capability/cancellation/broker scenarios on Linux 6.18.60 x86_64",
+    "network_policy": "OMP requires a private network namespace and exact-model Unix-socket host broker; generic trusted shared-network commands remain explicitly non-confined",
+    "non_claim": "not arbitrary hostile-sandbox or live OMP qualification"
   },
-  "observed_missing_configuration": ["LATTICE_CAIRN_BIN", "LATTICE_BWRAP", "LATTICE_OMP", "LATTICE_OMP_REVISION", "LATTICE_OMP_BLAKE3", "LATTICE_OMP_BASE_URL", "LATTICE_OMP_MODEL"],
-  "verification_executed": [],
-  "reason": "Worker assignment prohibits builds, tests, formatters and gates; parent verifies after integration.",
-  "remaining_qualification_prerequisites": [
-    "reviewed immutable OMP executable and source/build provenance",
-    "reviewed actual workspace provider on the deployment kernel",
-    "authorized model endpoint with endpoint-scoped network/credential capabilities",
-    "actual selected-route normal, failure and cancellation observations"
+  "observed_missing_configuration": [],
+  "verification_executed": [
+    {"command": "cargo test --locked --lib candidate_worker -- --nocapture", "passed": 29, "ignored": 5},
+    {"command": "cargo test --locked --lib bubblewrap_ -- --ignored --nocapture", "passed": 4, "ignored": 0},
+    {"command": "actual implementation-attempt prepare CLI smoke", "schema": "lattice.implementation-attempt-run.v2", "admitted": false, "host_snapshot_and_profile_bound": true, "legacy_shared_network_rejected": true, "worker_dispatched": false},
+    {"command": "native Cairn proposal/design/tasks gates for preserve-candidate-worker-observations and project-configured-agent-bindings", "passed": 6, "issues": []},
+    {"command": "nix flake check -L --builders '' --option substituters https://cache.nixos.org --option extra-substituters '' --option secret-key-files '' --option accept-flake-config false", "passed_checks": 32, "system": "x86_64-linux", "nextest_passed": 1445, "nextest_skipped": 10, "scope": "integrated production source before the separately exercised two new ignored selected-OMP fault fixtures"}
   ],
-  "non_claims": ["issue complete", "live OMP qualification", "arbitrary sandbox safety", "publisher or merge authority", "measured complete usage", "production readiness"]
+  "reason": "The reviewed e325ffc OMP source was built as immutable OMP 18.18.7 and its executable byte identity is retained. The selected worker produced a host-verified code candidate using operator-authorized host OMP authentication and underclass/gpt-6.1-sol. Actual selected-route HTTP-400 failure and post-request cancellation fixtures passed, as did local broker and namespace scenarios. Durable continuation and external coordinator acceptance remain separate unmet requirements.",
+  "remaining_qualification_prerequisites": [
+    "bounded durable continuation over accepted model/tool results and current authority",
+    "current external coordinator authority and independently executed Kiln acceptance"
+  ],
+  "non_claims": ["issue complete", "durable OMP continuation", "arbitrary sandbox safety", "publisher or merge authority", "measured complete usage", "production readiness"]
 }

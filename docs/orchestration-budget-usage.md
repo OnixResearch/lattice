@@ -18,6 +18,22 @@ has schema `lattice.host-run-accounting.v1` and retains:
 - explicit unknown token, cost, model-request and subagent coverage, plus the
   qualification diagnostic.
 
+Each provider report may also retain `configured_runtime`, with schema
+`lattice.configured-agent-runtime.v1`, the existing target and the exact host
+runtime configuration revision. The production adapter attaches it outside the
+model response. Its revision is exactly the existing `Adapter::execution_identity`
+used by admission; this addition does not change that identity or grant authority.
+The configuration digest conservatively covers the full runtime options, including
+other configured targets. Dynamic request inputs do not change it. It does not
+authenticate executable bytes, served model weights, worker ownership or placement.
+
+The existing receipt store freezes this optional binding with all other usage
+content. Exact duplicate writes remain idempotent, restart retains it, and changing
+it conflicts rather than rebinding previously settled usage. Historical reports
+without it remain readable with unknown configuration provenance. A malformed
+binding or a target crossed against the exact workflow Agent node cannot establish
+a report; its usage remains under the admitted conservative fallback, not zero.
+
 Duration is elapsed **owned workflow-run wall time**, in milliseconds. It is not
 worker CPU time, per-process duration, memory residency, or accelerator time.
 Negative, overflowing, missing, or interrupted intervals retain the duration
@@ -109,6 +125,49 @@ bindings. [Execution bindings #24](https://github.com/OnixResearch/lattice/issue
 must supply admitted identities and compatibility before they can be consumed
 here. No self-declared profile/service field establishes qualification, and no
 new producer schema is invented by this accounting boundary.
+
+### Current producer source boundary
+
+The current [Aspen #42](https://github.com/brittonr/aspen/issues/42) and
+[Animus #17](https://github.com/OnixResearch/animus/issues/17) contracts are still
+proposals, not implemented compute-reservation or serving-readiness APIs in the
+inspected producer sources:
+
+- Aspen local source `1e9c36edc437fdf4118120776d94f71570190511` retains
+  `molten-core::fabric_membership` CPU/memory/storage placement and assignment
+  contracts. It does not supply #42's device/backing-pool offers, authoritative
+  observe/reserve/inspect/release service, or qualified resource-release evidence.
+- Animus local source `1785984ec15bf8e799da13c895abe80e58788b2d` retains the Mesh
+  catalog/exact-model/dispatch contracts. Its dispatch booleans and catalog receipt
+  are not #17's serving-generation/readiness/request-slot observations or grants.
+- Lattice's unchanged reviewed Animus snapshot is
+  `51d2683776ab73d4fd36d3d9e6ced2beadf9793d`, recorded in
+  `vendor-cargo-deps/animus/source.ncl`. No sibling path dependency or pin migration
+  is introduced for absent APIs.
+
+`RuntimeOptions::configured_profiles()` and `configured_profile(Target)` project
+only existing Pi/Clankers/Animus routes. Missing, ambiguous and invalid routes
+reject through existing planning. Inventory is bounded to known targets and
+contains no command, argv, prompt, endpoint, credential or physical path. Output
+modes are declared adapter support, not a qualified executable or live capacity.
+Direct and Animus leaf routes expose their text/JSON-only and no-image/no-session
+limits. Generic command session and image protocol support remain unknown, rather
+than assuming arbitrary programs implement them. Compute reservations, named
+model-service binding and qualified worker telemetry are explicitly unsupported.
+The projection is not an owned-instance inventory: it creates no worker, idle or
+healthy observation, lease, GPU allocation or request grant.
+
+Completing producer-backed admission requires their actual versioned schemas and
+ports, exact profile/consumer/attempt/fence/generation bindings, freshness and
+expiry rechecks, definite-denial versus unknown-after-effect outcomes, and
+deduplication/reconciliation semantics. Completing usage attribution additionally
+requires producer-owned per-service/request/deployment observations, supported
+coverage and units/pricing identity; shared physical allocations must remain
+provider-owned and charged once. No-model and hosted-API routes must be explicit
+without synthesized inference or device usage. Owned worker lifecycle needs real
+incarnation/termination observations, not a terminal workflow record. These are
+unavailable prerequisites, not private Lattice substitutes. Live endpoint and
+cross-host qualification remain separately authorized work under Kiln #49.
 
 Until an accounted shell-worker profile is admitted, any Shell node is rejected
 before dispatch when invocation, token or monetary accounting is enforced. This

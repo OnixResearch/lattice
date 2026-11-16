@@ -14,14 +14,21 @@ interfaces.
 - A bounded local planner/generator/evaluator example that runs real Rust builds
   and tests, retains failed-round handoffs, and caps aggregate retries and resources.
 - An explicitly selected pinned-reference OMP JSONL candidate profile and typed
-  post-start process/capture/teardown observations. Live worker and deployment
-  qualification remain separate prerequisites.
+  post-start process/capture/teardown observations. The reviewed OMP 18.18.7 build
+  passed real gpt-6.1-sol candidate production and local terminal-failure/cancellation
+  qualification. Durable continuation remains unsupported by the pinned producer
+  contract; independent acceptance and deployment qualification remain separate.
 - Opt-in monotonic Octet baseline pruning, checked against complete admitted
   warning occurrences and the baseline identity-count bound so resolved
   findings cannot conceal additional debt.
 - Bounded export of exact retained implementation candidates, with owned output
   modes and replay integrity checks; export never dispatches a worker, accepts
   a candidate, or integrates changes.
+- An attempt-local model broker over a private Unix socket and network namespace,
+  exact endpoint/model admission, host-only credential resolution, bounded calls
+  and immutable runtime byte pins. Live OMP qualification remains explicit.
+- Material-free configured agent profiles and persisted configuration provenance;
+  these do not advertise worker ownership, compute reservations or service readiness.
 
 ### Changed
 
@@ -32,6 +39,8 @@ interfaces.
 - Corrected shell-preview activation fixtures to request only their actual
   round/duration accounting; production worker/model admission remains closed
   without a qualified worker profile.
+- Implementation-attempt requests use version 2 and remove shared-network/namespace
+  fields; scoped broker profiles require explicit readmission.
 
 - Orchestration retains reservation, conservative charges, host duration, partial
   provider observations, and unknown usage separately before settlement. Actual
@@ -53,6 +62,9 @@ interfaces.
 - Role-protocol fanout preflights all adapter selections. Ambiguous HTTP responses
   and partial delivery retain unknown outcomes until exact receiver evidence.
 - The standalone TUI rejects redirected stdin/stdout before terminal setup.
+- Hosted check/release jobs omit dev/test debug symbols and release generated
+  local Cargo build trees before isolated Nix checks, preserving the complete
+  test rail and Octet JSON evidence rather than exhausting runner disk space.
 - Live TUI progress uses a checked whole-run bounded executor port and a bounded,
   backpressured UI mailbox; incomplete observations remain explicit without
   retrying execution or fabricating timing metadata.

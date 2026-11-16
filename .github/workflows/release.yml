@@ -20,6 +20,8 @@ jobs:
       TZ: UTC
       RUST_BACKTRACE: "1"
       CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
       CARGO_NET_GIT_FETCH_WITH_CLI: "true"
 
     steps:
@@ -39,6 +41,10 @@ jobs:
 
       - name: Run Octet precommit gate
         run: nix develop . -c octet-precommit-check
+
+      - name: Release local build trees before isolated Nix checks
+        # Keep target/octet-precommit JSON evidence, not duplicate Cargo payloads.
+        run: rm -rf -- target/debug target/octet-cargo-target target/octet-core-cargo-target
 
       - name: Run Nix flake checks
         run: nix flake check -L --option secret-key-files ''

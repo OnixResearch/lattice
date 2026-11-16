@@ -139,10 +139,17 @@ pub struct ProviderReport {
     pub node_id: u64,
     pub provider: String,
     pub model: Option<String>,
+    /// Host-selected configuration only; not a worker/service/request identity.
+    #[serde(default = "absent_configured_binding", skip_serializing_if = "Option::is_none")]
+    pub configured_runtime: Option<crate::agent_node::ConfiguredBinding>,
     pub tokens: Option<u64>,
     /// Currency/pricing identity is absent from the current adapter protocol.
     /// Retained for diagnostics only; cannot lower a monetary reservation.
     pub cost_microunits: Option<u64>,
+}
+
+fn absent_configured_binding() -> Option<crate::agent_node::ConfiguredBinding> {
+    None
 }
 
 pub const RUN_USAGE_ACCOUNTING_SCHEMA: &str = "lattice.host-run-accounting.v1";

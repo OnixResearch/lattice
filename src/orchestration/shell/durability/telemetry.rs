@@ -1,3 +1,4 @@
+// r[impl lattice.agent_runtime.configured_bindings.scenario.usage]
 pub(in crate::orchestration::shell) fn provider_reports(
     store: &crate::store::Store,
     instance: &crate::orchestration::core::Instance,
@@ -66,13 +67,29 @@ fn provider_report(
         return None;
     }
     let model = provider_model(&value);
+    let configured_runtime = bound_runtime(workflow, node_id, &value)?;
     Some(crate::orchestration::usage::ProviderReport {
         node_id,
         provider: "openai_compatible".to_string(),
         model,
+        configured_runtime,
         tokens: usage_tokens(&value),
         cost_microunits: usage_cost(&value),
     })
+}
+
+fn bound_runtime(
+    workflow: &crate::engine::Workflow,
+    node_id: u64,
+    value: &serde_json::Value,
+) -> Option<Option<crate::agent_node::ConfiguredBinding>> {
+    let binding = configured_runtime(value)?;
+    if binding.as_ref().is_some_and(|binding| {
+        !matches!(workflow.configs.get(&node_id), Some(crate::engine::NodeConfig::Agent(config)) if config.target == binding.target)
+    }) {
+        return None;
+    }
+    Some(binding)
 }
 
 fn completed_detail(details: &[crate::store::RunNodeDetail], node_id: u64) -> Option<&crate::store::RunNodeDetail> {
@@ -105,6 +122,14 @@ fn provider_model(value: &serde_json::Value) -> Option<String> {
                 && !model.chars().any(char::is_control)
         })
         .map(str::to_owned)
+}
+
+fn configured_runtime(value: &serde_json::Value) -> Option<Option<crate::agent_node::ConfiguredBinding>> {
+    let Some(binding) = value.get("configured_runtime") else {
+        return Some(None);
+    };
+    let binding: crate::agent_node::ConfiguredBinding = serde_json::from_value(binding.clone()).ok()?;
+    binding.validate().then_some(Some(binding))
 }
 
 /// History stores pretty JSON as ordered, port-bound lines, not one output row.
@@ -188,6 +213,7 @@ mod tests {
             node_id,
             provider: "openai_compatible".to_string(),
             model: None,
+            configured_runtime: None,
             tokens: None,
             cost_microunits: None,
         }
@@ -205,5 +231,27 @@ mod tests {
         assert!(matches!(error, crate::orchestration::shell::Error::InvalidProposal(_)));
         assert_eq!(reports.len(), crate::orchestration::usage::MAX_PROVIDER_REPORTS);
         assert_ne!(reports.last().expect("retained report").node_id, u64::MAX);
+    }
+
+    #[test]
+    fn runtime_bindings_preserve_absence_and_reject_malformed_provenance() {
+        assert_eq!(configured_runtime(&serde_json::json!({})), Some(None));
+        let binding = crate::agent_node::ConfiguredBinding {
+            schema: crate::agent_node::CONFIGURED_RUNTIME_SCHEMA.to_string(),
+            target: crate::agent_node::Target::Pi,
+            revision: format!("blake3:{}", "a".repeat(64)),
+        };
+        assert_eq!(
+            configured_runtime(&serde_json::json!({"configured_runtime": binding})),
+            Some(Some(binding.clone()))
+        );
+        for value in [
+            serde_json::json!(null),
+            serde_json::json!({"schema": "unsupported", "target": "Pi", "revision": binding.revision}),
+            serde_json::json!({"schema": binding.schema, "target": "Pi", "revision": "blake3:bad"}),
+            serde_json::json!({"schema": binding.schema, "target": "Pi", "revision": binding.revision, "lease": "invented"}),
+        ] {
+            assert_eq!(configured_runtime(&serde_json::json!({"configured_runtime": value})), None);
+        }
     }
 }

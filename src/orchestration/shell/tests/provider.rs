@@ -23,9 +23,15 @@ fn production_multiline_metadata_reaches_charge_and_visible_overrun() {
         .find(|port| port.label == "metadata")
         .expect("metadata port")
         .id;
+    let binding = crate::agent_node::ConfiguredBinding {
+        schema: crate::agent_node::CONFIGURED_RUNTIME_SCHEMA.to_string(),
+        target: crate::agent_node::Target::Pi,
+        revision: format!("blake3:{}", "a".repeat(64)),
+    };
     let metadata = Value::from_json(serde_json::json!({
         "provider": "openai_compatible",
         "model": "reported-model",
+        "configured_runtime": binding,
         "usage": {"total_tokens": 250, "prompt_tokens": 150}
     }));
     let displayed = metadata.as_display_string();
@@ -54,6 +60,7 @@ fn production_multiline_metadata_reaches_charge_and_visible_overrun() {
     let reports = super::super::provider_reports(&store, &started, dispatch.run_id).expect("reports");
     assert_eq!(reports.len(), 1);
     assert_eq!(reports[0].tokens, Some(250));
+    assert_eq!(reports[0].configured_runtime, Some(binding));
     let action = super::super::finish_action(&store, &started, super::super::FinishRequest {
         dispatch_id: dispatch.id.clone(),
         run_id: dispatch.run_id,
@@ -103,6 +110,18 @@ fn production_multiline_metadata_reaches_charge_and_visible_overrun() {
     assert!(
         super::super::provider_reports(&store, &started, dispatch.run_id)
             .expect("ambiguous reports")
+            .is_empty()
+    );
+    let mut crossed_target = details;
+    for output in &mut crossed_target.nodes[0].outputs {
+        output.text = output.text.replace("\"target\": \"Pi\"", "\"target\": \"Animus\"");
+    }
+    store
+        .save_run_details(&crossed_target)
+        .expect("crossed runtime target persists as untrusted history");
+    assert!(
+        super::super::provider_reports(&store, &started, dispatch.run_id)
+            .expect("crossed target rejected")
             .is_empty()
     );
 }

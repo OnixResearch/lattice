@@ -11,31 +11,10 @@ fn omp_worker_produces_a_sandboxed_candidate() {
     let revision = std::env::var("LATTICE_OMP_REVISION").expect("reviewed executable source revision");
     let directory = tempfile::tempdir().expect("temporary workspace");
     let root = directory.path();
-    std::fs::create_dir_all(root.join(".omp/agent")).expect("OMP config directory");
     std::fs::create_dir_all(root.join("src")).expect("source directory");
     std::fs::write(root.join("src/main.rs"), b"pub fn answer() -> i32 { 41 }\n").expect("base source");
-    std::fs::write(
-        root.join(".omp/agent/models.yml"),
-        serde_json::json!({
-            "providers": {
-                "qualification": {
-                    "api": "openai-completions",
-                    "apiKey": "local",
-                    "baseUrl": base_url,
-                    "models": [{
-                        "id": model,
-                        "name": "Lattice qualification",
-                        "api": "openai-completions"
-                    }]
-                }
-            }
-        })
-        .to_string(),
-    )
-    .expect("OMP model profile");
-    let boundary =
-        admit_workspace_boundary(root, &[".omp".to_string(), "src".to_string()], &["src".to_string()], true, false)
-            .expect("workspace boundary");
+    let boundary = admit_workspace_boundary(root, &["src".to_string()], &["src".to_string()], false, false)
+        .expect("workspace boundary");
     let isolated = Request {
         work_id: "work-omp".to_string(),
         attempt_id: "attempt-omp".to_string(),
@@ -46,6 +25,7 @@ fn omp_worker_produces_a_sandboxed_candidate() {
         boundary,
         require_isolation: true,
         sandbox_program: Some(sandbox),
+        broker: None,
         timeout_secs: 120,
         output_limit_bytes: 1024 * 1024,
     };
@@ -57,17 +37,38 @@ fn omp_worker_produces_a_sandboxed_candidate() {
             &crate::candidate_capture::workspace(root).expect("base capture"),
         )
         .expect("base identity"),
-        model: format!("qualification/{model}"),
+        model: format!("lattice/{model}"),
         prompt: "Use the edit tool to replace 41 with 42 in src/main.rs. Do not run commands. Reply done.".to_string(),
+        model_broker: super::super::broker::Profile {
+            schema: super::super::broker::SCHEMA.into(),
+            endpoint: format!("{}/chat/completions", base_url.trim_end_matches('/')),
+            model,
+            credential: std::env::var("LATTICE_OMP_CREDENTIAL_ENV")
+                .ok()
+                .map(|key| crate::credentials::SecretRef::new("env", key, None)),
+            relay: pinned_runtime("LATTICE_SOCAT"),
+            shell: pinned_runtime("LATTICE_WORKER_SHELL"),
+            sandbox_blake3: std::env::var("LATTICE_BWRAP_BLAKE3").expect("reviewed sandbox bytes"),
+            expires_at_ms: super::super::broker::admission::now_ms().expect("clock") + 120_000,
+            max_requests: 8,
+        },
     };
     let observed = omp::run(
         &isolated,
         &profile,
         &crate::process::core::RuntimeConfig::default(),
         &std::sync::atomic::AtomicBool::new(false),
+        &crate::credentials::EnvironmentCredentialProvider::from_current_env(
+            &profile
+                .model_broker
+                .credential
+                .as_ref()
+                .map(|reference| reference.key.clone())
+                .into_iter()
+                .collect::<Vec<_>>(),
+        ),
     )
     .expect("selected OMP route");
-    assert!(!observed.raw_events().is_empty());
     assert_eq!(observed.observation.expect("complete JSONL").terminal, omp::Terminal::Completed);
     let outcome = observed.outcome;
 
@@ -79,6 +80,13 @@ fn omp_worker_produces_a_sandboxed_candidate() {
     };
     assert_eq!(receipt.changed_paths, vec!["src/main.rs"]);
     assert_eq!(std::fs::read(root.join("src/main.rs")).expect("candidate"), b"pub fn answer() -> i32 { 42 }\n");
+}
+
+fn pinned_runtime(key: &str) -> super::super::broker::Executable {
+    super::super::broker::Executable {
+        path: std::env::var(key).expect("reviewed runtime path").into(),
+        blake3: std::env::var(format!("{key}_BLAKE3")).expect("reviewed runtime bytes"),
+    }
 }
 
 #[test]
@@ -176,3 +184,6 @@ fn bubblewrap_isolation_rejects_writes_outside_the_workspace() {
     assert_eq!(std::fs::read(root.join("src/main.rs")).expect("source remains"), b"old");
     assert!(!root.join("not-admitted").exists());
 }
+
+#[cfg(unix)]
+mod faults;

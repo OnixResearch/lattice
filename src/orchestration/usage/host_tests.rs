@@ -1,3 +1,4 @@
+// r[verify lattice.agent_runtime.configured_bindings.scenario.usage]
 use super::tests::observation;
 use super::*;
 use crate::orchestration::core::BudgetCharge;
@@ -38,6 +39,7 @@ fn report() -> ProviderReport {
         node_id: 1,
         provider: "openai_compatible".to_string(),
         model: None,
+        configured_runtime: None,
         tokens: Some(100),
         cost_microunits: None,
     }
@@ -113,4 +115,46 @@ fn host_receipt_validation_preserves_every_unknown_binding_and_charge_boundary()
         mutate(&mut observation);
         assert_eq!(observation.validate(), Err(ObservationError::InvalidHostReceipt));
     }
+}
+
+#[test]
+fn configured_runtime_provenance_survives_restart_and_cannot_be_rebound() {
+    let directory = tempfile::tempdir().expect("usage store directory");
+    let path = directory.path().join("usage.redb");
+    let store = crate::store::Store::new(&path).expect("store opens");
+    let mut observation = host_observation();
+    let mut provider = report();
+    provider.configured_runtime = Some(crate::agent_node::ConfiguredBinding {
+        schema: crate::agent_node::CONFIGURED_RUNTIME_SCHEMA.to_string(),
+        target: crate::agent_node::Target::Pi,
+        revision: format!("blake3:{}", "a".repeat(64)),
+    });
+    observation.accounting.as_mut().expect("accounting").provider_reports.push(provider);
+    store.save_command_worker_usage(&observation).expect("binding persists");
+    store.save_command_worker_usage(&observation).expect("exact duplicate is idempotent");
+    drop(store);
+    let store = crate::store::Store::new(&path).expect("store reopens");
+    assert_eq!(
+        store
+            .load_command_worker_usage_for_run(crate::engine::RunId(observation.run_id))
+            .expect("binding loads"),
+        Some(observation.clone())
+    );
+    let mut changed = observation.clone();
+    changed.accounting.as_mut().expect("accounting").provider_reports[0]
+        .configured_runtime
+        .as_mut()
+        .expect("binding")
+        .revision = format!("blake3:{}", "b".repeat(64));
+    assert!(matches!(store.save_command_worker_usage(&changed), Err(crate::store::StoreError::Conflict(_))));
+    changed.accounting.as_mut().expect("accounting").provider_reports[0]
+        .configured_runtime
+        .as_mut()
+        .expect("binding")
+        .revision = "not-a-revision".to_string();
+    assert_eq!(changed.validate(), Err(ObservationError::InvalidHostReceipt));
+    assert_eq!(
+        store.load_command_worker_usage(&observation.attempt_id).expect("original receipt"),
+        Some(observation)
+    );
 }
