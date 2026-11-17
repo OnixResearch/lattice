@@ -223,15 +223,12 @@ impl shell::Batch for BatchFixture {
 }
 
 #[test]
-fn complete_accepted_artifacts_and_reordered_duplicates_are_identical() {
+fn complete_accepted_artifacts_are_committed_and_duplicates_reused() {
     let f = fixture();
     let accepted = model::accept(&f.request, &f.snapshot, &f.objects).unwrap();
     assert_eq!(accepted.tiles.len(), 4);
     assert!(accepted.measured_usage.is_none());
     assert_eq!(accepted.budget, f.request.budget);
-    let mut reordered = f.snapshot.clone();
-    reordered.tasks = f.snapshot.tasks.iter().rev().map(|(key, value)| (key.clone(), value.clone())).collect();
-    assert_eq!(model::accept(&f.request, &reordered, &f.objects).unwrap(), accepted);
     let mut batch = BatchFixture::new(&f);
     let first = shell::step(&f.request, &mut batch, shell::Action::Advance, shell::Fault::None).unwrap();
     assert_eq!(first.outcome, Outcome::Completed);
@@ -240,6 +237,52 @@ fn complete_accepted_artifacts_and_reordered_duplicates_are_identical() {
     assert_eq!(again.accepted_manifest, first.accepted_manifest);
     assert_eq!(again.recovery, "reused_committed_artifacts");
     assert_eq!(batch.submits, 1);
+}
+
+#[test]
+fn reordered_partial_acceptance_and_duplicates_preserve_committed_image() {
+    let mut expected_image = None;
+    for order in [["tile-000", "tile-001", "tile-002", "tile-003"], [
+        "tile-003", "tile-002", "tile-001", "tile-000",
+    ]] {
+        let f = fixture();
+        let mut batch = BatchFixture::new(&f);
+        batch.snapshot.phase = RunPhase::Pending;
+        for task in batch.snapshot.tasks.values_mut() {
+            *task = ProgressTask::Pending { ready_at: 0 };
+        }
+        let initial = shell::step(&f.request, &mut batch, shell::Action::Advance, shell::Fault::None).unwrap();
+        assert_eq!(initial.outcome, Outcome::Pending);
+        for (index, name) in order.into_iter().enumerate() {
+            *batch.snapshot.tasks.get_mut(name).unwrap() = f.snapshot.tasks[name].clone();
+            batch.snapshot.state_revision += 1;
+            batch.snapshot.watermark.revision = batch.snapshot.state_revision;
+            let progress = shell::step(&f.request, &mut batch, shell::Action::Observe, shell::Fault::None).unwrap();
+            assert_eq!(progress.outcome, Outcome::Pending, "tiles alone cannot complete assembly");
+            if index == 0 {
+                let duplicate =
+                    shell::step(&f.request, &mut batch, shell::Action::Observe, shell::Fault::None).unwrap();
+                assert_eq!(duplicate.outcome, Outcome::Pending, "duplicate acceptance cannot add coverage");
+            }
+        }
+        *batch.snapshot.tasks.get_mut("assemble").unwrap() = f.snapshot.tasks["assemble"].clone();
+        batch.snapshot.phase = RunPhase::Succeeded;
+        batch.snapshot.state_revision += 1;
+        batch.snapshot.watermark.revision = batch.snapshot.state_revision;
+        let completed = shell::step(&f.request, &mut batch, shell::Action::Observe, shell::Fault::None).unwrap();
+        assert_eq!(completed.outcome, Outcome::Completed);
+        shell::verify_committed(&f.request, &completed).unwrap();
+        assert_eq!(batch.submits, 1, "reordered observation never resubmits");
+        let image = std::fs::read(
+            Path::new(&f.request.journal_root).join(f.request.id().unwrap().to_string()).join("image.ppm"),
+        )
+        .unwrap();
+        if let Some(expected) = &expected_image {
+            assert_eq!(&image, expected, "completion order cannot change committed pixels");
+        } else {
+            expected_image = Some(image);
+        }
+    }
 }
 
 #[test]

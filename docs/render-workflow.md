@@ -173,6 +173,11 @@ bounded contract bytes and synthetic transport observations. They **do not**
 qualify the real component, network or Lattice process route. Producer tests and
 historical Aspen receipts are likewise not Lattice qualification. The process
 fixture writes passing observations only after its actual assertions succeed.
+The separate [reordered-progress regression](../.cairn/changes/bind-artifact-render-workflow/evidence/reordered-progress-regression.json)
+delivers partial acceptances in opposite orders, repeats a tile observation, and
+compares the actual request-bound committed PPM bytes. It exercises the native
+consumer journal/publication boundary, not the network or Wasm process route.
+
 The [earlier native observation](../.cairn/changes/bind-artifact-render-workflow/evidence/local-process-observation.json)
 retains its original source/executable cohort. The separate
 [published-runtime observation](../.cairn/changes/bind-artifact-render-workflow/evidence/published-runtime-observation.json)

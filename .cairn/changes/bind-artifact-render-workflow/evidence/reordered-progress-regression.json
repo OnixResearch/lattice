@@ -1,0 +1,52 @@
+{
+  "kind": "native-consumer-reordered-progress-regression",
+  "status": "passed",
+  "runtime_source_revision": "3580aad50597ffbdaaf7a94d6fa5ebc36e9b3d1b",
+  "test_source": "tests/test_render_workflow.rs",
+  "test_source_blake3": "16401024373d529c6ca6fb48851be591a75c9912f999ede464a377626d06faf2",
+  "cargo_target": "render_reordered_progress_probe",
+  "cargo_command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--test",
+    "render_reordered_progress_probe",
+    "reordered_partial_acceptance_and_duplicates_preserve_committed_image"
+  ],
+  "test": "reordered_partial_acceptance_and_duplicates_preserve_committed_image",
+  "scope": "Actual native consumer journal/publication with canonical producer artifacts and synthetic ProgressSnapshot transport; not a network/Wasm process qualification. Production source is isolated at the recorded revision; a temporary Cargo target compiles the separately hashed regression source.",
+  "orders": [
+    [
+      "tile-000",
+      "tile-001",
+      "tile-002",
+      "tile-003"
+    ],
+    [
+      "tile-003",
+      "tile-002",
+      "tile-001",
+      "tile-000"
+    ]
+  ],
+  "asserted_controls": [
+    "Pending tasks remain Pending until accepted assembly",
+    "Duplicate first-tile acceptance cannot add coverage or complete",
+    "Each order reaches Completed only after the exact accepted assembly",
+    "Current committed artifacts revalidate",
+    "Exactly one Submit per request despite reordered/duplicate observations",
+    "Request-bound committed image.ppm bytes are equal across orders"
+  ],
+  "result": {
+    "passed": 1,
+    "failed": 0,
+    "filtered_out": 13,
+    "test_seconds_observed": 0.93,
+    "command_wall_seconds_observed": 20.74
+  },
+  "non_claims": [
+    "No cross-backend or cross-architecture image equality",
+    "No new producer computation or distributed execution qualification",
+    "No remote usage, machine-loss durability or release authority"
+  ]
+}
