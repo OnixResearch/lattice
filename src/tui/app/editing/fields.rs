@@ -47,6 +47,7 @@ pub struct PropertyEditState {
     pub field: PropertyEditField,
     pub original: String,
     pub workflow_snapshot: crate::workflow_format::PortableWorkflow,
+    pub authoring_snapshot: Option<crate::authoring::ContentIdentity>,
     pub draft: String,
 }
 

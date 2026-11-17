@@ -1,25 +1,14 @@
 use redb::ReadableDatabase as _;
 use redb::ReadableTable as _;
 
+mod authoring;
 mod ingress;
 mod timing;
 
 impl crate::store::Store {
     /// Save a workflow.
     pub fn save_workflow(&self, workflow: &crate::engine::Workflow) -> Result<(), crate::store::StoreError> {
-        self.ensure_not_quarantined()?;
-        let data = serde_json::to_vec(workflow).map_err(|e| crate::store::StoreError::Serialize(e.to_string()))?;
-        let txn = self.db.begin_write().map_err(|e| crate::store::StoreError::Db(e.to_string()))?;
-        {
-            let mut table = txn
-                .open_table(crate::store::WORKFLOWS)
-                .map_err(|e| crate::store::StoreError::Table(e.to_string()))?;
-            table
-                .insert(workflow.meta.name.as_str(), data.as_slice())
-                .map_err(|e| crate::store::StoreError::Db(e.to_string()))?;
-        }
-        txn.commit().map_err(|e| crate::store::StoreError::Db(e.to_string()))?;
-        Ok(())
+        self.save_catalog_workflow(workflow)
     }
     /// Load a workflow by name.
     pub fn load_workflow(&self, name: &str) -> Result<Option<crate::engine::Workflow>, crate::store::StoreError> {
@@ -32,7 +21,7 @@ impl crate::store::Store {
                 let bytes: &[u8] = data.value();
                 let wf: crate::engine::Workflow =
                     serde_json::from_slice(bytes).map_err(|e| crate::store::StoreError::Deserialize(e.to_string()))?;
-                Ok(Some(wf))
+                authoring::with_revision(wf).map(Some)
             }
             None => Ok(None),
         }
@@ -50,8 +39,9 @@ impl crate::store::Store {
             .map_err(|e| crate::store::StoreError::Table(e.to_string()))?;
         match table.get(name).map_err(|e| crate::store::StoreError::Db(e.to_string()))? {
             Some(data) => serde_json::from_slice(data.value())
-                .map(Some)
-                .map_err(|e| crate::store::StoreError::Deserialize(e.to_string())),
+                .map_err(|e| crate::store::StoreError::Deserialize(e.to_string()))
+                .and_then(authoring::with_revision)
+                .map(Some),
             None => Ok(None),
         }
     }

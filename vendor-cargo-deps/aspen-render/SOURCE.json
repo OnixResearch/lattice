@@ -1,0 +1,40 @@
+{
+  "repository": "https://github.com/brittonr/aspen",
+  "revision": "afc8308bff9a8c50b2315cb4a17c9454252d7c45",
+  "archive_url": "https://codeload.github.com/brittonr/aspen/tar.gz/afc8308bff9a8c50b2315cb4a17c9454252d7c45",
+  "archive_blake3": "a6307998de7d69f737e1ce39465c63f6742aa4612979321597a304b89771363d",
+  "selection": [
+    "pilots/orchestration/core",
+    "pilots/orchestration/batch-core",
+    "pilots/orchestration/codec",
+    "pilots/orchestration/render"
+  ],
+  "wrapper": "source/Cargo.toml is Lattice-owned sparse workspace metadata",
+  "files": {
+    "LICENSE": "ca0292789c0a0ecba706f4b3f3493007a9951731c1d432c52c4aac1f1abba8ef",
+    "source/Cargo.toml": "d2ec7a05a74686fd9db900daf0ed2808c4f2ff2f6ffc5fed5484739b08aeddae",
+    "source/batch-core/Cargo.toml": "465836aa5c493a9e1767e1a0a0b60aedabafd5257b5cc8674db3b90e595390cf",
+    "source/batch-core/src/controller.rs": "f8d89f5b93860402e94815362e1f94c6c10465850ebab847875992faf8e25193",
+    "source/batch-core/src/lib.rs": "1e4eaf5833ad99bcb69ad514580773096734a6d366ae4f0c52a9537a03110ce5",
+    "source/batch-core/src/model.rs": "26947aa93ef38bf86fbdce7bef863c10256d100a99a81fe38a27a3c37c60c6b9",
+    "source/batch-core/src/policy.rs": "9918b76d085881413f783c5bbaa79586f0ea14227532fbdf8d9880ca8a4e96f3",
+    "source/batch-core/src/progress.rs": "43c60b4352aed312e30b19a57b10a8881f38f9ed242e58a3b45b847df22d55b7",
+    "source/batch-core/src/worker.rs": "6ac0f64cc0e6a424577019ec0a0d9eb3a0c628d7140082f07170ea2be845edbb",
+    "source/batch-core/tests/batch.rs": "dcce091a59a87104377b23a88f7841d9efd3c841c2f841483c838a81eef086ba",
+    "source/codec/Cargo.toml": "ce283516b6f7f0ab1f11f00d642e39dcb1fe9218f503488476f4dea818550e7e",
+    "source/codec/src/lib.rs": "1f9ea0a4d40b7f943f34b856854943112ceeeb0e155777edbd30db1215a3bdae",
+    "source/codec/tests/canonical.rs": "1cd5c559c07f26dadc3b3a4c631ea9c2a45fe9ec5d5d2551d2132fda88e7d33f",
+    "source/core/Cargo.toml": "84c359933631d5f8c59fb040f50d750ab470a329bc56c69b61183e4eebfcb8ff",
+    "source/core/src/lib.rs": "8572ca9cf2b599db85272d30ba16b72369ed6cc94d30c54ea0f705f2b2e49c00",
+    "source/core/tests/transitions.rs": "56d571ae7a2692f33f037d825cb711ca073a8a7a90ad00d8e13a7d1715d3a98e",
+    "source/render/Cargo.toml": "61716d4e1c29fc63b2d59d7d57cfdcaeeaa9c733263fa3232786b59b4d52a88f",
+    "source/render/README.md": "4318dec9e5903c5a02b6272f7d1fe6192320fa032262601cacdb5a33b8c0798f",
+    "source/render/shell.nix": "b29f468cf57ad655d1914749044f90d6a409d1cf43fe9daeffa3aa778e5f81bb",
+    "source/render/src/lib.rs": "c03700c8d525212fb2d1ec05b8912b469b379ab3272f377ae2e990661a94b1b5",
+    "source/render/src/main.rs": "6130ecc25b0f837234a57be6cbb263484e7b9a63832a63bb74fc994af4604e9d",
+    "source/render/src/model.rs": "9fa395435ccdb7335ab2b0ba379147cea6f31e8d017757c1f4bfd5e3f231a625",
+    "source/render/src/ray.rs": "cca8ec27f35518b5edd34d47303c72796f5f5da7a3b4f25da3b29dcb23aa1f9a",
+    "source/render/src/wire.rs": "632cf4709f1d4212c0e2aa1569cf817973bf59a6de6ae0124308c587165eb36b",
+    "source/render/tests/conformance.rs": "bd3d6c01b80dec1eff3d9b2d7d91ee2dccf34e9b9635baa73d62d1082d2bc1f7"
+  }
+}

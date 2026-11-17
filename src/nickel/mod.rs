@@ -2,6 +2,11 @@
 //!
 //! r[impl lattice.nickel_toolchain.boundary]
 
+// Observed evaluator cohort metadata, not a compiled executable identity.
+pub(crate) const SOURCE_REVISION: &str = nickel_eval::NICKEL_SOURCE_REVISION;
+pub(crate) const LIBRARY_VERSION: &str = nickel_eval::NICKEL_LANG_VERSION;
+pub(crate) const CORE_VERSION: &str = nickel_eval::NICKEL_LANG_CORE_VERSION;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SafeFailure {
     InvalidRequest,

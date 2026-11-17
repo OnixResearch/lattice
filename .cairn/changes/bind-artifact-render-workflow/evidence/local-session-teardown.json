@@ -1,0 +1,12 @@
+{
+  "kind": "actual-owned-session-teardown-observation",
+  "result": {
+    "scope": "real local nested process groups in one owned POSIX session",
+    "parent_exit_code": -9,
+    "nested_group_terminated": true
+  },
+  "non_claims": [
+    "not remote cancellation",
+    "not arbitrary process containment or sandboxing"
+  ]
+}

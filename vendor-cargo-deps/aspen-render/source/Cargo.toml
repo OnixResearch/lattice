@@ -1,0 +1,11 @@
+# Lattice-owned sparse import wrapper; producer files below remain byte-exact.
+[workspace]
+members = ["core", "batch-core", "codec", "render"]
+resolver = "2"
+[workspace.package]
+edition = "2021"
+license = "AGPL-3.0-or-later"
+rust-version = "1.94"
+[workspace.dependencies]
+serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
+serde_json = "1"

@@ -238,6 +238,20 @@ pub struct Workflow {
     pub runner: HashMap<u64, NodeRunnerSettings>,
     #[serde(default)]
     pub triggers: Vec<TriggerDefinition>,
+    /// Optional captured author revision; absent on legacy materialized workflows.
+    #[serde(default = "no_captured_authoring", skip_serializing_if = "Option::is_none")]
+    pub authoring: Option<crate::authoring::SourceAssociation>,
+    /// Durable catalog compare-and-swap token, not an execution identity.
+    #[serde(default = "no_catalog_revision", skip_serializing_if = "Option::is_none")]
+    pub catalog_revision: Option<crate::authoring::ContentIdentity>,
+}
+
+fn no_captured_authoring() -> Option<crate::authoring::SourceAssociation> {
+    None
+}
+
+fn no_catalog_revision() -> Option<crate::authoring::ContentIdentity> {
+    None
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -285,6 +299,8 @@ impl Workflow {
             credentials: HashMap::new(),
             runner: HashMap::new(),
             triggers: Vec::new(),
+            authoring: None,
+            catalog_revision: None,
         }
     }
 

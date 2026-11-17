@@ -9,7 +9,7 @@ pub fn application_facts(
                 crate::orchestration::workflow_revision(&workflow).map_err(|_| Error::ApplicationConflict)?;
             let identity = super::model::ContentIdentity::try_from_hex(revision.content_hash.as_str())
                 .map_err(|_| Error::ApplicationConflict)?;
-            if revision == bundle.workflow_revision {
+            if revision == bundle.workflow_revision && workflow.authoring == bundle.workflow.authoring {
                 super::model::ExistingContent::Exact(identity)
             } else {
                 super::model::ExistingContent::Conflicting(identity)
@@ -52,7 +52,10 @@ pub fn save_draft(
         super::model::ApplicationPlan::Conflict(_) => Err(Error::ApplicationConflict),
         super::model::ApplicationPlan::ExactAlreadyPresent { .. } => Ok(plan),
         super::model::ApplicationPlan::CreateDraft { .. } => {
-            store.save_workflow(&bundle.workflow)?;
+            // CreateDraft may only lack the orchestration; never rewrite an exact workflow.
+            if matches!(&facts.workflow, super::model::ExistingContent::Missing) {
+                store.save_workflow_cas(&bundle.workflow, None)?;
+            }
             Ok(plan)
         }
         super::model::ApplicationPlan::Preview { .. } => Ok(plan),

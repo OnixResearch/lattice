@@ -139,7 +139,17 @@ fn validate_definition(
         }
     } else {
         validate_target(instance, path, diagnostics);
-        validate_cairn_target(instance, path, diagnostics);
+        if crate::render::operation::is_runtime(&operation_type.definition.runtime) {
+            if !crate::render::operation::target_is_supported(&instance.target) {
+                diagnostics.push(super::diagnostic(
+                    super::model::DiagnosticCode::InvalidValue,
+                    format!("{path}.target"),
+                    "render target requires exact immutable binding identity and absolute admitted paths",
+                ));
+            }
+        } else {
+            validate_cairn_target(instance, path, diagnostics);
+        }
     }
     validate_tags(instance, path, diagnostics);
     validate_defaults(instance, operation_type, path, diagnostics);

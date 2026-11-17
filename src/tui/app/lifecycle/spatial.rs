@@ -252,7 +252,12 @@ impl State {
     /// Admit current Subwayrat edit state into the Lattice-owned workflow graph.
     pub(crate) fn sync_workflow_graph_from_state(&mut self) {
         match crate::tui::graph::from_subwayrat(&self.graph_state.graph) {
-            Ok(graph) => self.workflow.graph = graph,
+            Ok(graph) => {
+                self.workflow.graph = graph;
+                if let Err(error) = crate::authoring::reconcile_materialized(&mut self.workflow) {
+                    self.output.push_line(error);
+                }
+            }
             Err(_) => self.output.push_line("Canvas graph conversion was rejected; workflow state was preserved"),
         }
     }

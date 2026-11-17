@@ -113,12 +113,14 @@ cat > "$demo/config.ncl" <<EOF
 EOF
 
 cargo run --locked -- --config "$demo/config.ncl" import examples/workflows/daily-digest.ncl
-cargo run --locked -- --config "$demo/config.ncl" export daily-digest "$demo/daily-digest.ncl"
+cargo run --locked -- --config "$demo/config.ncl" export daily-digest "$demo/daily-digest.ncl" --expanded
 ```
 
-`import` validates the workflow and saves it in the selected store. `export`
-writes the saved workflow back to a typed Nickel file. Neither command runs the
-workflow.
+`import` validates the workflow and saves it in the selected store. `export
+--expanded` writes the materialized workflow as typed Nickel. Source-associated
+workflows otherwise require an explicit source archive destination; see
+[source-preserving authoring](docs/source-authoring.md). Neither command
+runs the workflow.
 
 The configuration uses an absolute `data_dir` so this demo's workflows and run
 state do not use your normal store. `--config` selects a configuration file; it
@@ -251,6 +253,9 @@ for import and maintenance procedures.
 | Reusable methods and outputs | [Operation contracts](docs/operation-contracts.md), [operation data](docs/operation-data.md), [operation packs](docs/operation-packs.md) |
 | Consumer integration | [Workflow exchange application](docs/workflow-exchange-application.md), [consumer contract](crates/lattice-workflow-contract/README.md) |
 | Projected local protocols | [Role-protocol execution](docs/role-protocol-execution.md) |
+| Captured source edits and export kinds | [Source authoring](docs/source-authoring.md) |
+| Inert typed dependency plans | [Workflow-intent compiler](docs/workflow-intent.md) |
+| Opt-in native batch rendering | [Artifact-bound render workflow](docs/render-workflow.md) |
 
 ## Development
 

@@ -31,6 +31,10 @@ maintained topic documents by the question they answer.
   template catalogs.
 - [Role-protocol execution](role-protocol-execution.md): projected local
   protocols and their bounds.
+- [Captured source authoring](source-authoring.md): separate drafts, exact source
+  archives, explicit admission and materialized forks; import/origin limits.
+- [Workflow-intent compilation](workflow-intent.md): bounded inert dependency
+  plans over host-normalized facts, not typed Cairn producer acceptance.
 
 ## Agents and orchestration
 
@@ -64,6 +68,8 @@ maintained topic documents by the question they answer.
   the pinned consumer boundary and licensing record.
 - [Compose surface pane binding](compose-surface-pane-binding.md): the optional
   Tile integration in the separate `compose/` workspace.
+- [Artifact-bound rendering](render-workflow.md): opt-in native batch admission,
+  accepted image integrity and explicit same-host qualification boundaries.
 
 ## Evidence and release
 

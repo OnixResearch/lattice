@@ -230,6 +230,11 @@ impl Session {
         Ok(())
     }
 
+    /// Existing admitted run provenance, not an authority grant.
+    pub(crate) fn run_identity(&self) -> &super::authority::RunIdentity {
+        &self.context.run
+    }
+
     #[must_use]
     pub fn dispatch(&self) -> &super::dispatch::Shell {
         self.dispatch.as_ref()

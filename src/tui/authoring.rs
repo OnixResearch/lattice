@@ -40,6 +40,7 @@ pub struct Draft {
     pub field: Field,
     pub text: String,
     pub original: PortableWorkflow,
+    pub authoring_snapshot: Option<crate::authoring::ContentIdentity>,
 }
 
 #[derive(Debug, Clone)]
@@ -85,6 +86,7 @@ impl State {
                 text: field.value.clone(),
                 field,
                 original: crate::workflow_format::workflow_to_portable(workflow),
+                authoring_snapshot: crate::authoring::identity("lattice.tui-authoring-snapshot.v1", workflow).ok(),
             });
             self.error = None;
         }
@@ -93,6 +95,7 @@ impl State {
 
 pub fn fields(workflow: &crate::engine::workflow::Workflow, node_id: Option<u64>, family: &str) -> Vec<Field> {
     let mut fields = workflow::fields(workflow, node_id);
+    fields.extend(crate::tui::app::editing::source::fields(workflow));
     if let Some(node_id) = node_id {
         fields.extend(node::fields(workflow, node_id));
     }

@@ -55,6 +55,13 @@ pub fn spec(id: &str) -> Spec {
             "NodeKindProvider::validate_config + aggregate admission",
             "Workflow.configs + reconciled graph ports",
         )
+    } else if id.starts_with("source.") {
+        (
+            Owner::Workflow,
+            "editing::source::apply_source_edit",
+            "authoring::shell::preview + Store::admit_source_draft CAS",
+            "durable SourceDraft; explicit admission replaces Workflow",
+        )
     } else if id.starts_with("workflow.") {
         (
             Owner::Workflow,

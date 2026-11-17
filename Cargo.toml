@@ -32,6 +32,7 @@ exclude = [
   "vendor-cargo-deps/host-control/crates/host-control-core",
   "vendor-cargo-deps/hardened-wasmtime-runtime",
   "vendor-cargo-deps/mantle",
+  "vendor-cargo-deps/aspen-render/source",
 ]
 resolver = "3"
 
@@ -69,6 +70,7 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt"] }
 clap = { version = "4.6", features = ["derive", "env"] }
 thiserror = "2.0.18"
+anyhow = "1.0.102"
 snafu = "0.9"
 bytes = "1.11"
 chrono = { version = "0.4.44", features = ["serde"] }
@@ -116,12 +118,18 @@ mantle-build-contract = { path = "vendor-cargo-deps/mantle/crates/mantle-build-c
 mantle-wasm-consumer-verifier = { path = "vendor-cargo-deps/mantle/crates/mantle-wasm-consumer-verifier" }
 valence-core = { git = "https://github.com/OnixResearch/valence.git", rev = "15e72b5a330b08139ac7c809ac31e7e87f825b22" }
 zeroize = "1"
+molten-render-pilot = { path = "vendor-cargo-deps/aspen-render/source/render" }
+molten-batch-core = { path = "vendor-cargo-deps/aspen-render/source/batch-core" }
+molten-orchestrator-codec = { path = "vendor-cargo-deps/aspen-render/source/codec" }
+nickel-lang-core = "=0.18.0"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
+[build-dependencies]
+blake3 = { workspace = true }
+
 [dev-dependencies]
-nickel-lang-core = "=0.18.0"
 pretty_assertions = "1.4"
 tempfile = "3.27"
 tokio-test = "0.4.5"

@@ -2817,6 +2817,7 @@ dependencies = [
  "animus-runtime",
  "animus-std-secretspec",
  "animus-steel",
+ "anyhow",
  "async-trait",
  "basalt",
  "base64 0.22.1",
@@ -2848,6 +2849,9 @@ dependencies = [
  "libc",
  "mantle-build-contract",
  "mantle-wasm-consumer-verifier",
+ "molten-batch-core",
+ "molten-orchestrator-codec",
+ "molten-render-pilot",
  "nickel-eval",
  "nickel-lang-core",
  "nix 0.31.3",
@@ -3320,6 +3324,39 @@ dependencies = [
  "log",
  "wasi",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "molten-batch-core"
+version = "0.2.0"
+dependencies = [
+ "molten-orchestrator-core",
+ "serde",
+]
+
+[[package]]
+name = "molten-orchestrator-codec"
+version = "0.2.0"
+dependencies = [
+ "blake3",
+ "molten-batch-core",
+ "preserves",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "molten-orchestrator-core"
+version = "0.1.0"
+
+[[package]]
+name = "molten-render-pilot"
+version = "0.1.0"
+dependencies = [
+ "molten-batch-core",
+ "molten-orchestrator-codec",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

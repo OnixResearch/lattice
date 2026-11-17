@@ -12,6 +12,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 pub mod component;
+mod request;
 
 pub const CAIRN_RUNTIME_KIND: &str = "process";
 pub const CAIRN_RUNTIME_KEY: &str = "cairn-read-only-v1";
@@ -57,8 +58,9 @@ pub struct AuthorizedProcessRequest {
 pub fn prepare_process_request(
     plan: &super::model::InvocationPlan,
     credentials: &dyn crate::credentials::CredentialProvider,
+    execution: Option<&crate::render::shell::HostExecution>,
 ) -> Result<AuthorizedProcessRequest, Observation> {
-    let process = process_request_plan(plan)?;
+    let mut process = process_request_plan(plan)?;
     let observed_executor_identity =
         super::identity::executor_file(std::path::Path::new(&plan.runtime.executable_path))
             .map_err(|_| unknown("operation executor identity is unavailable"))?;
@@ -66,7 +68,13 @@ pub fn prepare_process_request(
         return Err(deterministic("operation executor identity changed after planning"));
     }
     validate_repository_root_observation(process.cwd.as_deref())?;
-    let secret_values = resolve_credentials(plan, credentials)?;
+    if crate::render::operation::uses_runtime(plan) {
+        let execution =
+            execution.ok_or_else(|| deterministic("render requires an actual engine-owned execution context"))?;
+        crate::render::operation::bind_process_context(plan, execution, &mut process)
+            .map_err(|_| unknown("render execution is crossed or its host context could not be retained"))?;
+    }
+    let secret_values = request::resolve_credentials(plan, credentials)?;
     Ok(AuthorizedProcessRequest { process, secret_values })
 }
 
@@ -74,10 +82,14 @@ pub fn process_request_plan(
     plan: &super::model::InvocationPlan,
 ) -> Result<crate::agent_node::ProcessRequest, Observation> {
     super::planning::validate_plan_identity(plan).map_err(|_| deterministic("invocation plan identity is invalid"))?;
+    if crate::render::operation::uses_runtime(plan) {
+        return crate::render::operation::process_request(plan)
+            .map_err(|_| deterministic("render request differs from immutable planned binding"));
+    }
     if plan.runtime.kind != CAIRN_RUNTIME_KIND || plan.runtime.key != CAIRN_RUNTIME_KEY {
         return Err(deterministic("operation runtime binding is unsupported"));
     }
-    let repository_root = repository_root(plan)?;
+    let repository_root = request::repository_root(plan)?;
     let args = cairn_arguments(&plan.method, &repository_root)?;
     Ok(crate::agent_node::ProcessRequest {
         program: plan.runtime.executable_path.clone(),
@@ -88,28 +100,6 @@ pub fn process_request_plan(
         timeout_secs: plan.bounds.timeout_seconds,
         output_limit_bytes: plan.bounds.output_bytes,
     })
-}
-
-fn resolve_credentials(
-    plan: &super::model::InvocationPlan,
-    provider: &dyn crate::credentials::CredentialProvider,
-) -> Result<Vec<String>, Observation> {
-    let mut values = Vec::with_capacity(plan.credentials.len());
-    for reference in plan.credentials.values() {
-        let value = provider.resolve(reference).map_err(|_| deterministic("operation credential resolution failed"))?;
-        values.push(value.expose_for_execution().to_string());
-    }
-    Ok(values)
-}
-
-fn repository_root(plan: &super::model::InvocationPlan) -> Result<String, Observation> {
-    let Some(root) = plan.target.get(REPOSITORY_ROOT_TARGET).and_then(serde_json::Value::as_str) else {
-        return Err(deterministic("operation repository root target is missing"));
-    };
-    if !std::path::Path::new(root).is_absolute() {
-        return Err(deterministic("operation repository root must be absolute"));
-    }
-    Ok(root.to_string())
 }
 
 fn validate_repository_root_observation(root: Option<&str>) -> Result<(), Observation> {
@@ -144,6 +134,7 @@ pub fn classify_process_output(
     plan: &super::model::InvocationPlan,
     output: crate::agent_node::ProcessOutput,
     secret_values: &[String],
+    execution: Option<&crate::render::shell::HostExecution>,
 ) -> Result<Observation, Observation> {
     let output_bytes = output.stdout.len();
     let stderr_bytes = output.stderr.len();
@@ -173,6 +164,21 @@ pub fn classify_process_output(
             output_bytes,
             stderr_bytes,
         ));
+    }
+    if crate::render::operation::uses_runtime(plan) {
+        let class = crate::render::operation::classify(plan, &value, execution)
+            .map_err(|_| unknown("render acceptance or owning attempt could not be verified"))?;
+        if class != ObservationClass::Completed {
+            return Ok(Observation {
+                class,
+                output: None,
+                output_identity: None,
+                output_bytes,
+                stderr_bytes,
+                diagnostic: "render remains non-completed; local client termination is not remote stop".to_string(),
+                redacted: true,
+            });
+        }
     }
     let diagnostics = super::schema::validate_value(
         &plan.output_contract,

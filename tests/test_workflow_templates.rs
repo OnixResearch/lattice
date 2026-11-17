@@ -427,9 +427,14 @@ fn application_planning_is_deterministic_idempotent_and_conflict_safe() {
         ApplicationPlan::ExactAlreadyPresent { .. }
     ));
 
-    let mut conflicting = bundle.workflow.clone();
+    let mut conflicting = store
+        .load_workflow(&bundle.workflow.meta.name)
+        .expect("stored draft loads")
+        .expect("stored draft exists");
     conflicting.meta.description = "operator changed content".to_string();
-    store.save_workflow(&conflicting).expect("conflicting workflow fixture saves");
+    store
+        .save_workflow_cas(&conflicting, conflicting.catalog_revision.as_ref())
+        .expect("conflicting workflow fixture saves");
     let conflict = lattice::workflow_template::application_facts(&store, &bundle).expect("conflict facts load");
     assert!(matches!(
         lattice::workflow_template::plan_application(&bundle, &conflict),

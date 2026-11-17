@@ -45,6 +45,14 @@ fn validate_type_shape(
                 "component operation exceeds the import-free adapter profile",
             ));
         }
+    } else if crate::render::operation::is_runtime(&definition.runtime) {
+        if !crate::render::operation::type_is_supported(definition) {
+            diagnostics.push(super::diagnostic(
+                super::model::DiagnosticCode::RuntimeUnavailable,
+                format!("{path}.runtime"),
+                "render operation differs from the exact artifact-bound consumer profile",
+            ));
+        }
     } else {
         validate_cairn_profile(definition, path, diagnostics);
     }
@@ -136,9 +144,12 @@ fn validate_runtime(
             "runtime kind or key is not canonical",
         ));
     }
-    let is_cairn = runtime.kind == super::runtime::CAIRN_RUNTIME_KIND
-        && runtime.key == super::runtime::CAIRN_RUNTIME_KEY;
-    if !is_cairn && !super::runtime::component::runtime_is_component(runtime) {
+    let is_cairn =
+        runtime.kind == super::runtime::CAIRN_RUNTIME_KIND && runtime.key == super::runtime::CAIRN_RUNTIME_KEY;
+    if !is_cairn
+        && !super::runtime::component::runtime_is_component(runtime)
+        && !crate::render::operation::is_runtime(runtime)
+    {
         diagnostics.push(super::diagnostic(
             super::model::DiagnosticCode::RuntimeUnavailable,
             format!("{path}.runtime"),

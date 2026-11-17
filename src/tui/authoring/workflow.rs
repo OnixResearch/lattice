@@ -347,6 +347,10 @@ pub fn apply(workflow: &mut Workflow, node_id: Option<u64>, id: &str, value: &st
     let mut candidate = workflow.clone();
     apply_candidate(&mut candidate, node_id, id, value)?;
     validate(&candidate)?;
+    crate::authoring::reconcile_materialized(&mut candidate).map_err(str::to_string)?;
+    if candidate.meta.name != workflow.meta.name {
+        candidate.catalog_revision = None;
+    }
     *workflow = candidate;
     Ok(())
 }

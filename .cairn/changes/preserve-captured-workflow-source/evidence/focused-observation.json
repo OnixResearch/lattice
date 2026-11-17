@@ -1,0 +1,39 @@
+{
+  "kind": "bounded-focused-integration-observation",
+  "scope": "deterministic consumer regressions; not producer, VM, external model, deployment or release qualification",
+  "command": "cargo test --offline --locked --all-features --test tui_aggregate_lifecycle --test test_source_authoring --test test_workflow_templates --test test_workflow_format --test test_render_workflow --test test_workflow_intent",
+  "exit_code": 0,
+  "suites": [
+    {
+      "target": "test_render_workflow",
+      "passed": 13,
+      "failed": 0
+    },
+    {
+      "target": "test_source_authoring",
+      "passed": 21,
+      "failed": 0
+    },
+    {
+      "target": "test_workflow_format",
+      "passed": 25,
+      "failed": 0
+    },
+    {
+      "target": "test_workflow_intent",
+      "passed": 5,
+      "failed": 0
+    },
+    {
+      "target": "test_workflow_templates",
+      "passed": 17,
+      "failed": 0
+    },
+    {
+      "target": "tui_aggregate_lifecycle",
+      "passed": 8,
+      "failed": 0
+    }
+  ],
+  "source_of_observation": "actual completed focused integration invocation, retained as a measured-result projection; not a native acceptance receipt"
+}

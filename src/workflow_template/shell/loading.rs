@@ -92,12 +92,7 @@ fn load_one_bundle(
             bytes: bytes.clone(),
         })
         .collect::<Vec<_>>();
-    let assets = manifest
-        .assets
-        .iter()
-        .filter_map(|asset| captured.get(&asset.path).map(|bytes| (asset.path.clone(), bytes.clone())))
-        .collect::<std::collections::BTreeMap<_, _>>();
-    let workflow = parse_graph(&manifest, &captured, &assets);
+    let workflow = parse_graph(&manifest, &captured);
     let orchestration = parse_orchestration(&manifest, &captured);
     debug_assert!(captured.contains_key(MANIFEST_FILE_NAME));
     debug_assert!(files.len() <= super::model::MAX_BUNDLE_FILES);

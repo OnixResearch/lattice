@@ -21,6 +21,7 @@ impl State {
             field,
             original: draft.clone(),
             workflow_snapshot: crate::workflow_format::workflow_to_portable(&self.workflow),
+            authoring_snapshot: crate::authoring::identity("lattice.tui-authoring-snapshot.v1", &self.workflow).ok(),
             draft,
         });
         true

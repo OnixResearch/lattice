@@ -10,6 +10,11 @@ r[impl lattice.nickel_eval_adoption.boundary]
 
 Lattice retains configuration discovery, defaults, product decoding, warning policy, store-opening order, and rollback authority.
 
+Evaluation and observed cohort metadata both cross the `src/nickel` adapter.
+Source-authoring compiler records read that adapter's selected source, library,
+and core versions; they do not import the evaluator directly or identify compiled
+executable bytes.
+
 A source outage fails dependency acquisition. There is no GitHub, sibling-path, branch, or runtime fallback.
 
 r[impl lattice.nickel_eval_adoption.cutover]

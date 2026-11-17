@@ -6,4 +6,5 @@ mod admission;
 pub(super) mod fields;
 mod interaction;
 pub(in crate::tui) mod parsing;
+pub(in crate::tui) mod source;
 mod typed;

@@ -2314,20 +2314,69 @@ fn render_trigger(output: &mut String, trigger: &PortableTrigger) {
 }
 
 fn quoted(value: &str) -> String {
-    serde_json::to_string(value).expect("JSON string serialization cannot fail")
+    nickel_lang_core::eval::value::NickelValue::string_posless(value).to_string()
 }
 
 // r[impl n8nclone.workflow_format.nickel.import]
 // r[impl n8nclone.workflow_format.markdown_agent_prompts]
 // r[impl lattice.choregraph_adoption.lowering]
 pub fn load_workflow_nickel_file(path: &Path) -> Result<Workflow, WorkflowFormatError> {
+    // Keep ordinary file-context import semantics. Capturing this bounded snapshot
+    // is not a receipt for the evaluator's ambient import closure.
+    let captured = crate::authoring::shell::capture_file(path, crate::authoring::ProgramKind::Workflow).ok();
     let json = config::load_nickel_as_json(path).map_err(WorkflowFormatError::Nickel)?;
+    let evaluated_output = crate::authoring::identity("lattice.author-evaluation-json.v1", &json)
+        .map_err(|message| WorkflowFormatError::Nickel(message.into()))?;
     let portable = serde_json::from_value(json).map_err(|error| WorkflowFormatError::Json(error.to_string()))?;
     validate_portable_identity(&portable)?;
     let resolved_agent_prompts = load_markdown_agent_prompts(path, &portable)?;
-    let workflow = portable_to_runtime_with_agent_prompts(portable, &resolved_agent_prompts)?;
+    let captured = captured.and_then(|program| capture_prompt_assets(program, &portable, &resolved_agent_prompts));
+    let mut workflow = portable_to_runtime_with_agent_prompts(portable, &resolved_agent_prompts)?;
     choregraph::lower_portable(&workflow_to_portable(&workflow))?;
+    workflow.authoring = captured
+        .filter(|program| program.validate().is_ok())
+        .map(|program| retained_source_snapshot(program, &workflow, evaluated_output))
+        .transpose()?;
     Ok(workflow)
+}
+
+fn capture_prompt_assets(
+    mut program: crate::authoring::CapturedProgram,
+    portable: &PortableWorkflow,
+    prompts: &HashMap<u64, String>,
+) -> Option<crate::authoring::CapturedProgram> {
+    for config in &portable.configs {
+        let Some(path) = config.agent_prompt_file.first() else {
+            continue;
+        };
+        let Some(prompt) = prompts.get(&config.node_id) else {
+            continue;
+        };
+        if program.files.get(path).is_some_and(|bytes| bytes.as_slice() != prompt.as_bytes()) {
+            return None;
+        }
+        program.files.insert(path.clone(), prompt.as_bytes().to_vec());
+    }
+    Some(program)
+}
+
+fn retained_source_snapshot(
+    program: crate::authoring::CapturedProgram,
+    workflow: &Workflow,
+    evaluated_output: crate::authoring::ContentIdentity,
+) -> Result<crate::authoring::SourceAssociation, WorkflowFormatError> {
+    debug_assert!(workflow.authoring.is_none(), "source capture attaches only to a newly materialized import");
+    debug_assert!(workflow.catalog_revision.is_none(), "source capture cannot overwrite an admitted catalog revision");
+    Ok(crate::authoring::SourceAssociation {
+        source_revision: program.identity().map_err(|message| WorkflowFormatError::Nickel(message.into()))?,
+        program: std::sync::Arc::new(program),
+        compiler: crate::authoring::CompilerIdentity::current()
+            .map_err(|message| WorkflowFormatError::Nickel(message.into()))?,
+        evaluated_output,
+        expanded_artifact: crate::authoring::expanded_identity(workflow)
+            .map_err(|message| WorkflowFormatError::Nickel(message.into()))?,
+        state: crate::authoring::AssociationState::RetainedEntrySnapshot,
+    })
 }
 
 /// Decode an already evaluated workflow and resolve prompt files from captured bundle assets.

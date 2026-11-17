@@ -13,8 +13,10 @@ impl State {
         self.run_history = RunHistoryState::closed();
         self.approvals = ApprovalState::closed();
         self.diagnostics.open = false;
-        self.authoring =
-            Some(crate::tui::authoring::State::new(&self.workflow, self.selected_node_id().map(|id| id.0), family));
+        let mut authoring =
+            crate::tui::authoring::State::new(&self.workflow, self.selected_node_id().map(|id| id.0), family);
+        self.refresh_source_fields(&mut authoring);
+        self.authoring = Some(authoring);
     }
 
     /// Apply exactly one fully parsed field, retaining invalid/stale drafts for repair.
@@ -28,13 +30,19 @@ impl State {
             return false;
         };
         let current = crate::workflow_format::workflow_to_portable(&self.workflow);
-        if current != draft.original {
+        if current != draft.original
+            || crate::authoring::identity("lattice.tui-authoring-snapshot.v1", &self.workflow).ok()
+                != draft.authoring_snapshot
+        {
             state.error = Some("Workflow changed while editing; Esc cancels this stale draft".into());
             self.authoring = Some(state);
             return false;
         }
         let id = draft.field.id.clone();
-        let result = if id.starts_with("operation.") {
+        let is_source_edit = id.starts_with("source.");
+        let result = if is_source_edit {
+            self.apply_source_edit(draft)
+        } else if id.starts_with("operation.") {
             let runtime = crate::process::core::RuntimeConfig {
                 shell_program: self.config.shell.clone(),
                 limits: self.config.process_limits.clone(),
@@ -45,8 +53,13 @@ impl State {
         };
         match result {
             Ok(()) => {
+                if !is_source_edit && let Err(error) = crate::authoring::reconcile_materialized(&mut self.workflow) {
+                    state.error = Some(error.into());
+                    self.authoring = Some(state);
+                    return false;
+                }
                 let has_changed = current != crate::workflow_format::workflow_to_portable(&self.workflow);
-                if has_changed {
+                if has_changed && !is_source_edit {
                     let selection = self.graph_state.selected.clone();
                     self.sync_graph_state();
                     self.graph_state.selected =
@@ -58,6 +71,7 @@ impl State {
                 state.draft = None;
                 state.error = None;
                 state.refresh(&self.workflow);
+                self.refresh_source_fields(&mut state);
                 if let Some(index) = state.fields.iter().position(|field| field.id == id) {
                     state.selected = index;
                 }

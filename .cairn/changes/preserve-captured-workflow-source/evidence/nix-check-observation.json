@@ -1,0 +1,63 @@
+{
+  "kind": "measured-isolated-source-nix-observation",
+  "scope": "actual local commands; a measured-result projection, not typed producer acceptance or release authority",
+  "full_invocation": {
+    "source": "/home/brittonr/.cargo-target/lattice-nix-qualified-source-w8NFWN",
+    "command": "env TMPDIR=/home/brittonr/.cargo-target/lv-txGCQg nix flake check -L --keep-going --cores 4 --max-jobs 2 --builders '' --no-write-lock-file --option substituters https://cache.nixos.org --option extra-substituters '' --option secret-key-files '' --option accept-flake-config false",
+    "exit_code": 1,
+    "flake_checks": 41,
+    "failed_attributes": [
+      "checks.x86_64-linux.nickel-cohort-exact"
+    ],
+    "nextest": {
+      "passed": 1484,
+      "failed": 0,
+      "skipped": 12
+    },
+    "failure": "The strict single-facade import inventory found direct cohort-constant reads in src/authoring/mod.rs."
+  },
+  "targeted_correction": {
+    "changes": [
+      "Expose selected cohort metadata through the existing src/nickel adapter.",
+      "Read that adapter from CompilerIdentity::current; preserve all three selected values.",
+      "Leave the strict Nix import inventory and all producer pins unchanged."
+    ],
+    "source": "/home/brittonr/.cargo-target/lattice-nix-evaluator-boundary-_9dnrd8i",
+    "command": "env TMPDIR=/home/brittonr/.cargo-target/lv-txGCQg nix build .#checks.x86_64-linux.nickel-cohort-exact --no-link -L --no-write-lock-file --builders '' --option substituters https://cache.nixos.org --option extra-substituters '' --option secret-key-files '' --option accept-flake-config false",
+    "exit_code": 0,
+    "derivation": "/nix/store/41pg56zaibz1gq1dmrkbi166mfz2vr7w-lattice-nickel-cohort-exact.drv",
+    "wall_time_seconds": 8.44
+  },
+  "non_claims": [
+    "The failed aggregate invocation is not relabeled as a passing invocation.",
+    "The targeted correction does not rerun the other checks on a new source cohort.",
+    "Previously retained native render observations remain bound to their recorded executable/source cohort.",
+    "No external producer, whole-workflow correctness, hardware, deployment or release qualification is inferred."
+  ],
+  "post_correction_consumer_verification": {
+    "source_authoring": {
+      "command": "nix develop --offline --builders \"\" -c cargo test --offline --locked --all-features --test test_source_authoring",
+      "exit_code": 0,
+      "passed": 21,
+      "failed": 0
+    },
+    "formatting": {
+      "command": "nix develop --offline --builders \"\" -c cargo fmt --package lattice -- --check",
+      "exit_code": 0
+    },
+    "octet": {
+      "command": "nix develop --offline --builders \"\" -c octet-precommit-check",
+      "exit_code": 0,
+      "status": "accepted legacy warnings only",
+      "root_accepted_ids": 1055,
+      "core_accepted_ids": 25,
+      "new_ids": 0,
+      "stale_ids": 0
+    },
+    "native_structural_validation": {
+      "valid": true,
+      "changes": 22,
+      "receipt": ".cairn/changes/compile-workflow-intent/evidence/current-native-validation.json"
+    }
+  }
+}

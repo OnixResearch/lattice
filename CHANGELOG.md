@@ -29,6 +29,16 @@ interfaces.
   and immutable runtime byte pins. Live OMP qualification remains explicit.
 - Material-free configured agent profiles and persisted configuration provenance;
   these do not advertise worker ownership, compute reservations or service readiness.
+- Captured workflow-source drafts with durable revision CAS, explicit admission,
+  exact source archives and materialized-fork tracking. Complete module closure
+  and Choregraph construction origins remain unqualified.
+- A finite, deterministic `workflow-intent` compile/compare boundary over explicit
+  host-normalized facts. Plans are inert; typed Cairn/Kiln producer integration
+  and execution acceptance remain separate prerequisites.
+- An opt-in artifact-bound tiled-render consumer over Aspen's pinned native
+  batch/render contracts, with durable unknown-outcome recovery and exact
+  accepted-content verification. Remote aggregate-budget enforcement and usage
+  telemetry remain unavailable from the selected producer.
 
 ### Changed
 
@@ -65,6 +75,12 @@ interfaces.
 - Hosted check/release jobs omit dev/test debug symbols and release generated
   local Cargo build trees before isolated Nix checks, preserving the complete
   test rail and Octet JSON evidence rather than exhausting runner disk space.
+- Refreshed the explicitly operator-admitted dependency/manifest lint cohort
+  without growing complete per-owner warning budgets or weakening the maintained
+  identity-only migration guard.
+- Native render fault qualification terminates its owned local process sessions,
+  including the bounded runner's nested process groups, and verifies SIGKILL
+  rather than leaving a child observer holding the journal writer lock.
 - Live TUI progress uses a checked whole-run bounded executor port and a bounded,
   backpressured UI mailbox; incomplete observations remain explicit without
   retrying execution or fabricating timing metadata.

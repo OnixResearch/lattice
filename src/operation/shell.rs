@@ -54,6 +54,12 @@ impl LocalReadOnlyAuthorityProvider {
         plan: &super::model::InvocationPlan,
     ) -> Result<Self, super::Error> {
         super::planning::validate_plan_admission(plan, catalog, instance)?;
+        if crate::render::operation::uses_runtime(plan) {
+            return Err(super::Error::Invalid(
+                "render mutations require the configured graph effect authority, not the local read-only grant"
+                    .to_string(),
+            ));
+        }
         let process = super::runtime::process_request_plan(plan)
             .map_err(|observation| super::Error::Invalid(observation.diagnostic))?;
         Ok(Self {
@@ -205,7 +211,7 @@ fn execute_authorized(
     if session.mark_ready(node_id).is_err() {
         return super::runtime::unknown("operation authority readiness transition failed");
     }
-    let process_request = match super::runtime::prepare_process_request(request.plan, request.credentials) {
+    let process_request = match super::runtime::prepare_process_request(request.plan, request.credentials, None) {
         Ok(process_request) => process_request,
         Err(observation) => return observation,
     };
@@ -228,8 +234,10 @@ fn execute_authorized(
         None => crate::engine::effect::runtime::Adapters::new(dispatch, &http, request.process),
     };
     let observation = match dispatch.dispatch(&runtime, binding, &process_request) {
-        Ok(Ok(output)) => super::runtime::classify_process_output(request.plan, output, &process_request.secret_values)
-            .unwrap_or_else(std::convert::identity),
+        Ok(Ok(output)) => {
+            super::runtime::classify_process_output(request.plan, output, &process_request.secret_values, None)
+                .unwrap_or_else(std::convert::identity)
+        }
         Ok(Err(error)) => super::runtime::process_failure(error),
         Err(error) => {
             super::runtime::unknown(&format!("operation authorized process outcome is unavailable: {error:?}"))

@@ -115,6 +115,7 @@ pub mod agent_evaluation;
 // r[impl lattice.architecture.core_crate.compatibility]
 pub mod agent_node;
 pub mod animus_agent;
+pub mod authoring;
 pub mod candidate;
 pub mod candidate_capture;
 pub mod candidate_worker;
@@ -154,6 +155,7 @@ pub mod protocol_cli {
     pub use crate::engine::protocol::cli::*;
 }
 pub mod agent_prompt;
+pub mod render;
 pub mod replay;
 pub mod run;
 pub mod scheduler;

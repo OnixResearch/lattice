@@ -115,6 +115,12 @@ enum CliCommand {
     OperationData(lattice::operation_data::cli::CommandArgs),
     /// Inspect, lock, install, run, and diagnose content-addressed operation packs
     Pack(lattice::operation_pack::cli::CommandArgs),
+    /// Compile or compare inert Cairn workflow intent without execution authority
+    WorkflowIntent(lattice::workflow::intent::cli::Args),
+    /// Inspect and edit durable author-source revisions without running workloads
+    Authoring(lattice::authoring::cli::Args),
+    /// Advance an exactly bound artifact-backed Aspen render operation
+    Render(lattice::render::cli::Args),
 }
 
 #[derive(clap::Args, Debug)]
@@ -181,8 +187,12 @@ struct ExportWorkflowArgs {
     /// Saved workflow name to export
     workflow: String,
 
-    /// Nickel file to write
+    /// Author-source archive, or a Nickel file with --expanded
     output: PathBuf,
+
+    /// Export the expanded materialized workflow instead of retained author source
+    #[arg(long)]
+    expanded: bool,
 }
 
 #[derive(clap::Args, Debug)]
@@ -470,6 +480,11 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
             .map(|()| ExitCode::SUCCESS)
             .map_err(|message| lattice::error::Error::Config { message });
     }
+    if let Some(CliCommand::WorkflowIntent(intent_args)) = &args.command {
+        return lattice::workflow::intent::cli::run(intent_args)
+            .map(|()| ExitCode::SUCCESS)
+            .map_err(|message| lattice::error::Error::Config { message });
+    }
     if let Some(CliCommand::Guarded(guarded_args)) = &args.command {
         return lattice::guarded::run_command(guarded_args).map_err(|error| lattice::error::Error::Config {
             message: error.to_string(),
@@ -492,6 +507,18 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
     }
     if let Some(CliCommand::Pack(pack_args)) = &args.command {
         return Ok(lattice::operation_pack::cli::run(&app_config, pack_args));
+    }
+    if let Some(CliCommand::Render(render_args)) = &args.command {
+        return Ok(lattice::render::cli::run(&app_config, render_args));
+    }
+    if let Some(CliCommand::Authoring(authoring_args)) = &args.command {
+        if matches!(&authoring_args.command, lattice::authoring::cli::Command::Draft { .. }) {
+            std::fs::create_dir_all(&app_config.data_dir).map_err(|source| lattice::error::Error::Io { source })?;
+        }
+        let store = open_store(&app_config).map_err(|message| lattice::error::Error::Config { message })?;
+        return lattice::authoring::cli::run(&store, authoring_args)
+            .map(|()| ExitCode::SUCCESS)
+            .map_err(|message| lattice::error::Error::Config { message });
     }
 
     if let Err(e) = std::fs::create_dir_all(&app_config.data_dir) {
@@ -550,6 +577,9 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
         Some(CliCommand::Guarded(_)) => unreachable!("guarded command returns before app config side effects"),
         Some(CliCommand::ImplementationAttempt(_)) => {
             unreachable!("implementation attempt returns before app config side effects")
+        }
+        Some(CliCommand::WorkflowIntent(_) | CliCommand::Authoring(_) | CliCommand::Render(_)) => {
+            unreachable!("specialized command returns before generic data-directory side effects")
         }
         None => {
             let config_root = config_path.parent().unwrap_or_else(|| std::path::Path::new("."));
@@ -1805,6 +1835,17 @@ fn export_workflow_command(app_config: &config::AppConfig, args: &ExportWorkflow
             return ExitCode::FAILURE;
         }
     };
+    if let Err(message) = lattice::authoring::shell::validate_export_path(&workflow, args.expanded, &args.output) {
+        eprintln!("Export failed: {message}");
+        return ExitCode::FAILURE;
+    }
+    let content = match lattice::authoring::shell::default_export(&workflow, args.expanded) {
+        Ok(content) => content,
+        Err(message) => {
+            eprintln!("Export failed: {message}");
+            return ExitCode::FAILURE;
+        }
+    };
 
     if let Some(parent) = args.output.parent().filter(|parent| !parent.as_os_str().is_empty())
         && let Err(error) = std::fs::create_dir_all(parent)
@@ -1813,8 +1854,7 @@ fn export_workflow_command(app_config: &config::AppConfig, args: &ExportWorkflow
         return ExitCode::FAILURE;
     }
 
-    let nickel = workflow_format::workflow_to_nickel(&workflow);
-    match std::fs::write(&args.output, nickel) {
+    match std::fs::write(&args.output, content) {
         Ok(()) => {
             println!("Exported '{}' to {}", workflow.meta.name, args.output.display());
             ExitCode::SUCCESS
@@ -1856,6 +1896,9 @@ fn import_workflow_command(app_config: &config::AppConfig, args: &ImportWorkflow
     match save_workflow_with_import_triggers(&store, &workflow) {
         Ok(()) => {
             println!("Imported '{}'", workflow.meta.name);
+            if workflow.authoring.is_none() {
+                eprintln!("Author source retention unavailable; imported materialized workflow only");
+            }
             ExitCode::SUCCESS
         }
         Err(error) => {
@@ -1866,7 +1909,9 @@ fn import_workflow_command(app_config: &config::AppConfig, args: &ImportWorkflow
 }
 
 fn save_workflow_with_import_triggers(store: &Store, workflow: &lattice::engine::Workflow) -> Result<(), String> {
-    store.save_workflow(workflow).map_err(|error| error.to_string())?;
+    let previous = store.load_workflow(&workflow.meta.name).map_err(|error| error.to_string())?;
+    let expected = previous.as_ref().and_then(|workflow| workflow.catalog_revision.as_ref());
+    store.admit_imported_workflow(workflow, expected).map_err(|error| error.to_string())?;
     for trigger in &workflow.triggers {
         store.save_trigger(trigger).map_err(|error| error.to_string())?;
     }
@@ -1901,7 +1946,7 @@ fn import_n8n_workflow_command(app_config: &config::AppConfig, args: &ImportN8nW
             return ExitCode::FAILURE;
         }
     };
-    match store.save_workflow(&workflow) {
+    match save_workflow_with_import_triggers(&store, &workflow) {
         Ok(()) => {
             println!("Imported n8n workflow '{}'", workflow.meta.name);
             ExitCode::SUCCESS

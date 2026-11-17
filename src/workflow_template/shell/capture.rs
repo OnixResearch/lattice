@@ -217,12 +217,34 @@ fn parse_manifest(bytes: &[u8], safe_name: &str) -> Result<super::model::BundleM
 fn parse_graph(
     manifest: &super::model::BundleManifest,
     captured: &std::collections::BTreeMap<String, Vec<u8>>,
-    assets: &std::collections::BTreeMap<String, Vec<u8>>,
 ) -> Option<crate::engine::Workflow> {
-    let bytes = captured.get(&manifest.workflow.path)?;
-    let source = std::str::from_utf8(bytes).ok()?;
+    let program = graph_program(manifest, captured);
+    // Preserve existing bundle entry-text evaluation, but do not treat ambient
+    // imports as a source-editable captured module closure.
+    let source = std::str::from_utf8(program.files.get(&program.entry)?).ok()?;
     let value = crate::nickel::evaluate_source(source).ok()?;
-    crate::workflow_format::from_nickel_value(value, assets).ok()
+    crate::authoring::shell::admit_evaluated_snapshot(
+        &program,
+        value,
+        crate::authoring::AssociationState::RetainedEntrySnapshot,
+    )
+    .ok()
+}
+
+fn graph_program(
+    manifest: &super::model::BundleManifest,
+    captured: &std::collections::BTreeMap<String, Vec<u8>>,
+) -> crate::authoring::CapturedProgram {
+    crate::authoring::CapturedProgram {
+        entry: manifest.workflow.path.clone(),
+        files: captured
+            .iter()
+            .filter(|(path, _)| path.as_str() != "manifest.ncl")
+            .map(|(path, bytes)| (path.clone(), bytes.clone()))
+            .collect(),
+        kind: crate::authoring::ProgramKind::Workflow,
+        parameters: std::collections::BTreeMap::new(),
+    }
 }
 
 fn parse_orchestration(

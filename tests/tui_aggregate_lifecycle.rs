@@ -317,7 +317,8 @@ fn every_current_config_deletion_preserves_unrelated_aggregate_and_round_trips()
         let store = lattice::store::Store::new(directory.path().join("aggregate.redb")).expect("store");
         store.save_workflow(&workflow).expect("save deleted aggregate");
         let loaded = store.load_workflow(&workflow.meta.name).expect("load aggregate").expect("saved workflow");
-        assert_eq!(snapshot(&loaded), snapshot(&workflow), "{kind}: store persistence");
+        // The store assigns a catalog CAS token; portable aggregate meaning is unchanged.
+        assert_eq!(workflow_to_portable(&loaded), workflow_to_portable(&workflow), "{kind}: store persistence");
         let path = directory.path().join("aggregate.ncl");
         std::fs::write(&path, workflow_to_nickel(&loaded)).expect("write Nickel");
         let imported = load_workflow_nickel_file(&path).expect("import clean aggregate");
@@ -452,7 +453,7 @@ fn reconciled_condition_typed_ports_and_edges_survive_store_and_nickel_round_tri
     let store = lattice::store::Store::new(directory.path().join("condition.redb")).expect("store");
     store.save_workflow(&workflow).expect("save reconciled condition");
     let loaded = store.load_workflow(&workflow.meta.name).expect("load").expect("workflow");
-    assert_eq!(snapshot(&loaded), snapshot(&workflow));
+    assert_eq!(workflow_to_portable(&loaded), workflow_to_portable(&workflow));
     let path = directory.path().join("condition.ncl");
     std::fs::write(&path, workflow_to_nickel(&loaded)).expect("Nickel");
     let imported = load_workflow_nickel_file(&path).expect("import reconciled topology");

@@ -1,0 +1,93 @@
+{
+  "kind": "operator-authorized-manifest-cohort-admission",
+  "authority": "explicit user form response: admit_reviewed_manifest_cohort",
+  "scope": [
+    "octet-baseline.json",
+    "crates/lattice-core/octet-baseline.json"
+  ],
+  "reason": "The pinned Octet configuration identity hashes the entire Cargo.toml. Reviewed dependency/build/exclusion changes alter that identity without changing lint policy or effective scopes. This is explicit cohort admission, not a claimed successful identity-only migration.",
+  "unchanged": [
+    "dylint.toml",
+    "effective package scopes",
+    "effective Cargo check arguments",
+    "Octet binary selection",
+    "compiler selection",
+    "maintained migration guard"
+  ],
+  "reference_git_revision": "b46deb361ba35b751e68efcc40699d3576f9d35f",
+  "root_comparison": {
+    "reference_raw": 1357,
+    "current_raw": 1356,
+    "reference_ids": 1056,
+    "current_ids": 1055,
+    "increased_complete_raw_semantic_occurrences": []
+  },
+  "core_comparison": {
+    "reference_raw": 33,
+    "current_raw": 33,
+    "reference_ids": 25,
+    "current_ids": 25,
+    "identical_complete_raw_semantic_occurrences": true
+  },
+  "comparison_fields": [
+    "identity_status",
+    "lint",
+    "group",
+    "severity",
+    "file",
+    "message",
+    "crate_name"
+  ],
+  "normalization": "Only the maintained comparison conventions for observed source-line counts, quantity wording and consecutive-parameter wording; assertion quantities, configured limits, owners and raw multiplicities remain binding.",
+  "applied_native_observations": [
+    {
+      "scope": "root",
+      "baseline": "octet-baseline.json",
+      "preflight": {
+        "reference_raw": 1357,
+        "current_raw": 1356,
+        "current_ids": 1055,
+        "accepted_ids": 1056,
+        "reference_unadmitted": [],
+        "increases": [],
+        "reference_complete": true,
+        "current_complete": true,
+        "reference_native_success": true,
+        "current_native_success": true,
+        "reference_metadata_admitted": true,
+        "tool_compiler_profile_unchanged": true,
+        "old_canonical_facts_reproduced": true
+      },
+      "native_generation_exit_code": 0
+    },
+    {
+      "scope": "core",
+      "baseline": "crates/lattice-core/octet-baseline.json",
+      "preflight": {
+        "reference_raw": 33,
+        "current_raw": 33,
+        "current_ids": 25,
+        "accepted_ids": 25,
+        "reference_unadmitted": [],
+        "increases": [],
+        "reference_complete": true,
+        "current_complete": true,
+        "reference_native_success": true,
+        "current_native_success": true,
+        "reference_metadata_admitted": true,
+        "tool_compiler_profile_unchanged": true,
+        "old_canonical_facts_reproduced": true
+      },
+      "native_generation_exit_code": 0
+    }
+  ],
+  "admission_invariants": [
+    "no new warning debt admitted",
+    "no source-owner remapping",
+    "no weakened migrator"
+  ],
+  "non_claims": [
+    "not an identity-only migration",
+    "not behavioral correctness, lifecycle acceptance or release readiness"
+  ]
+}

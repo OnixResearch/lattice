@@ -69,13 +69,16 @@ impl State {
         }
     }
 
-    pub(in crate::tui::app) fn save_current_workflow(&self, store: &Store) -> Result<(), String> {
+    pub(in crate::tui::app) fn save_current_workflow(&mut self, store: &Store) -> Result<(), String> {
         let diagnostics = crate::workflow_validation::validate_workflow(&self.workflow);
         if crate::workflow_validation::has_fatal_diagnostics(&diagnostics) {
             return Err("workflow validation failed; inspect diagnostics before saving".into());
         }
         let Some(draft) = &self.workflow_template_draft else {
-            return store.save_workflow(&self.workflow).map_err(|error| error.to_string());
+            self.workflow = store
+                .save_workflow_cas(&self.workflow, self.workflow.catalog_revision.as_ref())
+                .map_err(|error| error.to_string())?;
+            return Ok(());
         };
         let current_revision = crate::orchestration::workflow_revision(&self.workflow)
             .map_err(|_| "workflow-template draft identity is invalid".to_string())?;
@@ -91,6 +94,11 @@ impl State {
                     && bundle.orchestration_revision == draft.orchestration
             })
             .ok_or_else(|| "workflow-template draft source is unavailable".to_string())?;
-        crate::workflow_template::save_draft(store, bundle).map(|_| ()).map_err(|error| error.to_string())
+        crate::workflow_template::save_draft(store, bundle).map_err(|error| error.to_string())?;
+        self.workflow = store
+            .load_workflow(&self.workflow.meta.name)
+            .map_err(|error| error.to_string())?
+            .ok_or_else(|| "saved workflow is unavailable".to_string())?;
+        Ok(())
     }
 }

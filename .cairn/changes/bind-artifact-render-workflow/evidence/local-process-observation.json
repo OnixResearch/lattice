@@ -1,0 +1,63 @@
+{
+  "status": "passed",
+  "scope": "same-host separate processes; not two-host or machine-loss",
+  "producer_revision": "afc8308bff9a8c50b2315cb4a17c9454252d7c45",
+  "identities": {
+    "producer_archive_blake3": "a6307998de7d69f737e1ce39465c63f6742aa4612979321597a304b89771363d",
+    "lattice_source_archive_blake3": "e37d1341fe1cb381ec268db1d71dcdace98d167dd8a963a33d1c2509e3e78a36",
+    "lattice_binary_blake3": "cc13e272a8cf1df35834aecf1d4211e84f0318a67a444a35ac2821f222640527",
+    "lattice_cargo_lock_blake3": "5168e68350af3ad8c3346fcb1d2f4f04d651823b09747ff9c12abd7190f74e57",
+    "lattice_flake_lock_blake3": "9e5b8a6a5727ba2276a94a896053037bd567330eb75cc7788439a380cbb60d59",
+    "producer_cargo_lock_blake3": "5b8c1d24b5b2424ab33c72a1bd8bfe819c525d7018969958a75642a1ec31ba36",
+    "producer_flake_lock_blake3": "974c6b0a8102c65d08cccb71ede949a5d066f041f5ffcfc710c09d31748ef158",
+    "producer_binary_blake3": "4f7d0a981438ceaadf484c68f3c75a11f77718709c7dac8c719d7a2ab9ba0067",
+    "producer_fixture_blake3": "10640a0f3bfbfdaf9f60233d66a79c828b465b92f5f43d738043b67602ace364",
+    "component_blake3": "6a654dc803971ff40adb574d7d4a938c2ba35582af6c8a2a9291e5073690279f",
+    "component_wit_blake3": "602daf3dd667a865e4cc326f77b43bd738965117a3d880cd35b3a3a5ee7412bb"
+  },
+  "controls": {
+    "real_admitted_graph_and_repeat": {
+      "status": "passed",
+      "boundary": null,
+      "comparison": "every accepted tile/final content ID and exact PPM bytes",
+      "stopped_outcome": null,
+      "stopped_phase": null
+    },
+    "lost-ack": {
+      "status": "passed",
+      "boundary": "real Submit completed; consumer deliberately discarded its ACK; next invocation was Observe, never Submit",
+      "comparison": null,
+      "stopped_outcome": null,
+      "stopped_phase": null
+    },
+    "controller": {
+      "status": "passed",
+      "boundary": "actual same-host process SIGKILL/restart; no machine-loss durability claim",
+      "comparison": null,
+      "stopped_outcome": null,
+      "stopped_phase": null
+    },
+    "worker": {
+      "status": "passed",
+      "boundary": "actual same-host process SIGKILL/restart; no machine-loss durability claim",
+      "comparison": null,
+      "stopped_outcome": null,
+      "stopped_phase": null
+    },
+    "cancel": {
+      "status": "passed",
+      "boundary": null,
+      "comparison": null,
+      "stopped_outcome": "stopped",
+      "stopped_phase": "Cancelled"
+    }
+  },
+  "kind": "bounded-local-process-observation",
+  "source_of_observation": "actual scripts/qualify-render.py output after owned-session teardown correction; bounded projection, not an acceptance receipt",
+  "retained_directory": "/home/brittonr/.cargo-target/lattice-render-qualification-session-fixed-b6258bb7320e",
+  "non_claims": [
+    "artifact-specific executable/source cohort, not unexecuted future artifacts",
+    "not two-host execution, machine-loss durability, cross-backend identity or remote metered usage",
+    "no lifecycle acceptance, issue closure, release or deployment authority"
+  ]
+}

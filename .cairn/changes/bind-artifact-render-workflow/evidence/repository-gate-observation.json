@@ -1,0 +1,28 @@
+{
+  "kind": "actual-full-repository-gate-observation",
+  "command": "nix develop --offline --builders \"\" -c cargo -q -Zscript scripts/check.rs",
+  "environment": {
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_BUILD_JOBS": "4",
+    "TMPDIR": "explicit private directory on a filesystem with free space"
+  },
+  "exit_code": 0,
+  "completed_rails": [
+    "operator E2E",
+    "repository boundary guards",
+    "Rust/script formatting",
+    "Nickel policy and generated-policy freshness",
+    "runtime/example/builtin typechecks",
+    "focused consumer compilation",
+    "agent evaluation",
+    "operation contracts",
+    "all-feature compilation",
+    "all-feature workspace tests",
+    "default-feature workspace tests",
+    "all-feature/all-target Clippy with warnings denied",
+    "maintained Cairn specification validation"
+  ],
+  "scope": "actual completed repository harness; not external producer contracts, deployment, release or complete issue acceptance"
+}

@@ -107,6 +107,9 @@ impl State {
             crate::operation::shell::SystemClock.observe_utc_datetime(),
         );
         self.workflow.touch(timestamp);
+        if let Err(error) = crate::authoring::reconcile_materialized(&mut self.workflow) {
+            self.output.push_line(error);
+        }
         self.dirty = true;
     }
 

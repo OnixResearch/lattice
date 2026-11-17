@@ -7,7 +7,10 @@ impl State {
         &mut self,
         edit: &PropertyEditState,
     ) -> Result<(), PropertyEditError> {
-        if crate::workflow_format::workflow_to_portable(&self.workflow) != edit.workflow_snapshot {
+        if crate::workflow_format::workflow_to_portable(&self.workflow) != edit.workflow_snapshot
+            || crate::authoring::identity("lattice.tui-authoring-snapshot.v1", &self.workflow).ok()
+                != edit.authoring_snapshot
+        {
             return Err(PropertyEditError::Typed("Workflow changed; cancel the stale draft and reopen".into()));
         }
         let mut candidate = self.workflow.clone();
@@ -59,6 +62,8 @@ impl State {
             crate::tui::authoring::apply(&mut candidate, Some(node_id), field_id, &edit.draft)
                 .map_err(PropertyEditError::Typed)?;
         }
+        crate::authoring::reconcile_materialized(&mut candidate)
+            .map_err(|error| PropertyEditError::Typed(error.into()))?;
         self.workflow = candidate;
         self.sync_graph_state();
         self.graph_state.selected.insert(edit.node_id);

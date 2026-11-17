@@ -1,0 +1,55 @@
+{
+  "schema": "lattice.workflow-intent-cli-observation.v1",
+  "scope": "synthetic host-normalized conformance; not typed Cairn producer or worker qualification",
+  "compiler": {
+    "compiler_revision": "lattice.workflow-intent-compiler.v1",
+    "identity": "b3:ef6f26096cdb270f76d20b5b2660d995c4d414bbbfcddf167fb7eeed47f623ae"
+  },
+  "plan_identity": "b3:a14cc0948983722bb71b0854b6a47fbee4151eb82a674999ae7290be810884f0",
+  "graph_identity": {
+    "algorithm": "blake3",
+    "domain": "machine",
+    "hex": "23da51d80aa6a86b3b68377492691c412599cbd229816719b4d10b8949e7758b"
+  },
+  "nodes": [
+    "A",
+    "B",
+    "C",
+    "D"
+  ],
+  "canonical_permutation_equal": true,
+  "proposal": {
+    "added_obligations": [],
+    "base_plan_identity": "b3:a14cc0948983722bb71b0854b6a47fbee4151eb82a674999ae7290be810884f0",
+    "changed_obligations": [
+      "C"
+    ],
+    "disposition": "owner_readmission_required",
+    "proposed_plan_identity": "b3:093d588e88e7eed721f1522c495e9d8fd4806009fb111d3de5e30b24a973bc92",
+    "removed_obligations": []
+  },
+  "denied": [
+    {
+      "case": "restricted",
+      "exit_code": 1,
+      "diagnostic": "configuration error: workflow intent rejected: IncompleteContext at coverage"
+    },
+    {
+      "case": "incomplete",
+      "exit_code": 1,
+      "diagnostic": "configuration error: workflow intent rejected: IncompleteContext at coverage"
+    },
+    {
+      "case": "unknown-class",
+      "exit_code": 1,
+      "diagnostic": "configuration error: workflow intent rejected: UnsupportedOperation at A"
+    },
+    {
+      "case": "stale-compiler",
+      "exit_code": 1,
+      "diagnostic": "configuration error: compiler artifact differs from frozen input"
+    }
+  ],
+  "configuration_created": false,
+  "retained_directory": "/home/brittonr/.cargo-target/lv-txGCQg/intent-current-y_452h3d"
+}

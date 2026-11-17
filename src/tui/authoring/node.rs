@@ -484,6 +484,7 @@ pub fn apply(workflow: &mut Workflow, node_id: u64, id: &str, value: &str) -> Re
     let mut candidate = workflow.clone();
     reconcile(&mut candidate, node_id, &config, key)?;
     candidate.configs.insert(node_id, config);
+    crate::authoring::reconcile_materialized(&mut candidate).map_err(str::to_string)?;
     *workflow = candidate;
     Ok(())
 }
@@ -1075,7 +1076,10 @@ pub fn replace_operation_plan(
         return Err("Operation node no longer exists".into());
     }
     crate::operation::planning::validate_plan_admission(&plan, catalog, instance).map_err(|error| error.to_string())?;
-    workflow.configs.insert(node_id, NodeConfig::operation(plan));
+    let mut candidate = workflow.clone();
+    candidate.configs.insert(node_id, NodeConfig::operation(plan));
+    crate::authoring::reconcile_materialized(&mut candidate).map_err(str::to_string)?;
+    *workflow = candidate;
     Ok(())
 }
 
@@ -1132,6 +1136,7 @@ pub fn create_approval(workflow: &mut Workflow, label: &str, gate_id: &str, acto
     let node_id = candidate
         .try_add_configured_node(label, NodeConfig::Approval(config))
         .map_err(|error| format!("{error:?}"))?;
+    crate::authoring::reconcile_materialized(&mut candidate).map_err(str::to_string)?;
     *workflow = candidate;
     Ok(node_id.0)
 }
@@ -1150,6 +1155,7 @@ pub fn create_operation(
     let node_id = candidate
         .try_add_configured_node(label, NodeConfig::operation(plan))
         .map_err(|error| format!("{error:?}"))?;
+    crate::authoring::reconcile_materialized(&mut candidate).map_err(str::to_string)?;
     *workflow = candidate;
     Ok(node_id.0)
 }

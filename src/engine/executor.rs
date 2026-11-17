@@ -2330,19 +2330,42 @@ impl Executor {
                         input_hash,
                     };
                 };
-                let request =
-                    match crate::operation::runtime::prepare_process_request(plan, self.credential_provider.as_ref()) {
-                        Ok(request) => request,
-                        Err(observation) => {
-                            return StepResult {
-                                node_id,
-                                status: NodeStatus::Failed {
-                                    error: observation.diagnostic,
-                                },
-                                input_hash,
-                            };
-                        }
+                let operation_context = if crate::render::operation::uses_runtime(plan) {
+                    let authority_run = match &effect {
+                        EffectExecution::Product(session) => Some(session.lock().run_identity().as_str().to_string()),
+                        EffectExecution::Exact { binding, .. } => Some(binding.run.as_str().to_string()),
+                        EffectExecution::Compatibility => None,
                     };
+                    parent_run_id.zip(authority_run).and_then(|(run_id, authority_run_identity)| {
+                        crate::orchestration::workflow_revision(workflow).ok().map(|revision| {
+                            crate::render::shell::HostExecution {
+                                run_id: run_id.0,
+                                authority_run_identity,
+                                node_id: node_id.0,
+                                workflow_revision: format!("blake3:{}", revision.content_hash),
+                                invocation_identity: plan.identity.clone(),
+                            }
+                        })
+                    })
+                } else {
+                    None
+                };
+                let request = match crate::operation::runtime::prepare_process_request(
+                    plan,
+                    self.credential_provider.as_ref(),
+                    operation_context.as_ref(),
+                ) {
+                    Ok(request) => request,
+                    Err(observation) => {
+                        return StepResult {
+                            node_id,
+                            status: NodeStatus::Failed {
+                                error: observation.diagnostic,
+                            },
+                            input_hash,
+                        };
+                    }
+                };
                 let payload = crate::engine::effect::runtime::process_plan_identity(&request.process);
                 let dispatched = match effect {
                     EffectExecution::Exact { binding, dispatch } => {
@@ -2379,10 +2402,13 @@ impl Executor {
                     EffectExecution::Compatibility => Err("operation execution requires product authority".to_string()),
                 };
                 let observation = match dispatched {
-                    Ok(Ok(output)) => {
-                        crate::operation::runtime::classify_process_output(plan, output, &request.secret_values)
-                            .unwrap_or_else(std::convert::identity)
-                    }
+                    Ok(Ok(output)) => crate::operation::runtime::classify_process_output(
+                        plan,
+                        output,
+                        &request.secret_values,
+                        operation_context.as_ref(),
+                    )
+                    .unwrap_or_else(std::convert::identity),
                     Ok(Err(error)) => crate::operation::runtime::process_failure(error),
                     Err(_) => {
                         crate::operation::runtime::unknown("operation authority or process outcome is unavailable")

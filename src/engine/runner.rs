@@ -876,6 +876,7 @@ pub fn builtin_runtime_registry() -> RuntimeRegistry {
         runtime_binding(RUNTIME_KIND_SUBWORKFLOW, RUNTIME_KEY_DEFAULT),
         runtime_binding(RUNTIME_KIND_APPROVAL, RUNTIME_KEY_DEFAULT),
         runtime_binding(RUNTIME_KIND_PROCESS, crate::operation::runtime::CAIRN_RUNTIME_KEY),
+        runtime_binding(RUNTIME_KIND_PROCESS, crate::render::operation::RUNTIME_KEY),
         runtime_binding(RUNTIME_KIND_AGENT, agent_node::target_label(agent_node::Target::Pi)),
         runtime_binding(RUNTIME_KIND_AGENT, agent_node::target_label(agent_node::Target::Clankers)),
         runtime_binding(RUNTIME_KIND_AGENT, agent_node::target_label(agent_node::Target::Animus)),
