@@ -81,6 +81,8 @@ interfaces.
 - Native render fault qualification terminates its owned local process sessions,
   including the bounded runner's nested process groups, and verifies SIGKILL
   rather than leaving a child observer holding the journal writer lock.
+- Render qualification selects the packaged runtime instead of an oversized debug
+  executable; the existing 256 MiB executor identity ceiling remains unchanged.
 - Live TUI progress uses a checked whole-run bounded executor port and a bounded,
   backpressured UI mailbox; incomplete observations remain explicit without
   retrying execution or fabricating timing metadata.

@@ -7,13 +7,17 @@ the hand-authored frozen scene from exact public Aspen revision
 import-free renderer component, and existing controller/worker CLI/iroh route.
 No scene assets or code from Hatchet, Graphics Lab or private sources are needed.
 
-Run from the Lattice root with a built absolute Lattice binary and an absent
-absolute private retention directory:
+Run from the Lattice root with the packaged runtime and an absent absolute
+private retention directory:
 
 ```sh
+nix build .#lattice
 nix-shell --pure examples/render-workflow/shell.nix --run \
-  'python3 scripts/qualify-render.py --retain /ABSOLUTE/NEW/RENDER-EVIDENCE --lattice /ABSOLUTE/lattice/target/debug/lattice'
+  'python3 scripts/qualify-render.py --retain /ABSOLUTE/NEW/RENDER-EVIDENCE --lattice "$(realpath result/bin/lattice)"'
 ```
+
+The executable must fit the existing 256 MiB identity limit. A large debug build
+may be rejected before submission; the packaged runtime is the supported choice.
 
 The driver retains inert admitted graphs/plans before execution, installs only
 exact local operator grants for those isolated test graphs, starts loopback
@@ -30,4 +34,6 @@ claim that killing an observer stops remote work.
 
 `qualification.json` is a measured result only after execution. Merely having
 this fixture or passing native contract tests is not qualified Lattice rendering.
-No completed qualification is claimed by these authored sources.
+The [published-runtime observation](../../.cairn/changes/bind-artifact-render-workflow/evidence/published-runtime-observation.json)
+records the exact exercised Nix runtime/source cohort and passed controls. It
+does not qualify a later artifact merely because these authored sources exist.

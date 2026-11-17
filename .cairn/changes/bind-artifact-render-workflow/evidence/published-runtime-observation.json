@@ -1,0 +1,76 @@
+{
+  "kind": "bounded-published-runtime-render-observation",
+  "published_revision": "3539ade3d6c6f5ea0c37a896761dfc5da1deb856",
+  "tested_tree": "1238c78b79e694abdad64d405822a8400ae4c778",
+  "status": "passed",
+  "scope": "same-host separate processes; not two-host or machine-loss",
+  "runtime": "/nix/store/2i7cmzp056r6ix4v0w9y6fxfssi513iv-lattice-0.1.0/bin/lattice",
+  "runtime_derivation": "/nix/store/b4r69wghpwc43m2ng35jbczywg0yxa0b-lattice-0.1.0.drv",
+  "retained_directory": "/home/brittonr/.cargo-target/lattice-render-nix3539-parent-74gac0u3/retained",
+  "command": "nix-shell --pure --keep TMPDIR --option builders \"\" examples/render-workflow/shell.nix --run \"python3 scripts/qualify-render.py --retain RETAINED --lattice /nix/store/2i7cmzp056r6ix4v0w9y6fxfssi513iv-lattice-0.1.0/bin/lattice\"",
+  "exit_code": 0,
+  "wall_time_seconds": 190.27,
+  "identities": {
+    "producer_archive_blake3": "a6307998de7d69f737e1ce39465c63f6742aa4612979321597a304b89771363d",
+    "lattice_source_archive_blake3": "8c2cebdf077071e4a32ad71f5251adcc05e20b58a3ee09de58e0965794262fe9",
+    "lattice_binary_blake3": "0363fe3fee7a02e808f446dee624d65b7230f6f46dfafb8fe0a9c73ffdddafe7",
+    "lattice_cargo_lock_blake3": "5168e68350af3ad8c3346fcb1d2f4f04d651823b09747ff9c12abd7190f74e57",
+    "lattice_flake_lock_blake3": "9e5b8a6a5727ba2276a94a896053037bd567330eb75cc7788439a380cbb60d59",
+    "producer_cargo_lock_blake3": "5b8c1d24b5b2424ab33c72a1bd8bfe819c525d7018969958a75642a1ec31ba36",
+    "producer_flake_lock_blake3": "974c6b0a8102c65d08cccb71ede949a5d066f041f5ffcfc710c09d31748ef158",
+    "producer_binary_blake3": "45499eec258ee753587c091ae61c47852205b85badca99c0921b3b7300a60fc4",
+    "producer_fixture_blake3": "10640a0f3bfbfdaf9f60233d66a79c828b465b92f5f43d738043b67602ace364",
+    "component_blake3": "616e597ee428370b4082d0922b42a180b0551ff518c5c2b8d538e4c59f68ae5c",
+    "component_wit_blake3": "602daf3dd667a865e4cc326f77b43bd738965117a3d880cd35b3a3a5ee7412bb"
+  },
+  "controls": {
+    "real_admitted_graph_and_repeat": {
+      "status": "passed",
+      "boundary": null,
+      "comparison": "every accepted tile/final content ID and exact PPM bytes",
+      "stopped_outcome": null,
+      "stopped_phase": null
+    },
+    "lost-ack": {
+      "status": "passed",
+      "boundary": "real Submit completed; consumer deliberately discarded its ACK; next invocation was Observe, never Submit",
+      "comparison": null,
+      "stopped_outcome": null,
+      "stopped_phase": null
+    },
+    "controller": {
+      "status": "passed",
+      "boundary": "actual same-host process SIGKILL/restart; no machine-loss durability claim",
+      "comparison": null,
+      "stopped_outcome": null,
+      "stopped_phase": null
+    },
+    "worker": {
+      "status": "passed",
+      "boundary": "actual same-host process SIGKILL/restart; no machine-loss durability claim",
+      "comparison": null,
+      "stopped_outcome": null,
+      "stopped_phase": null
+    },
+    "cancel": {
+      "status": "passed",
+      "boundary": null,
+      "comparison": null,
+      "stopped_outcome": "stopped",
+      "stopped_phase": "Cancelled"
+    }
+  },
+  "initial_rejected_profile": {
+    "status": "failed before Submit",
+    "runtime_bytes": 283023792,
+    "executor_ceiling_bytes": 268435456,
+    "retained_directory": "/home/brittonr/.cargo-target/lattice-render-3539-evidence-parent-kuq01w6j/retained",
+    "reason": "oversized debug executable; no limit or runtime guard was changed"
+  },
+  "usage": "reserved ceilings and measured local wall time retained separately; remote usage explicitly unavailable",
+  "non_claims": [
+    "same-host selected native/Wasm profile only",
+    "not cross-backend equivalence, two-host execution, machine-loss durability, detached remote absolute-deadline enforcement or metered remote usage",
+    "not lifecycle acceptance or release authority"
+  ]
+}

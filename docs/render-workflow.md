@@ -132,15 +132,18 @@ elapsed client time nor reserved fuel is substituted for measured remote usage.
 
 ## Retained qualification and explicit non-claims
 
-From the repository root, after the parent integrates and builds the selected
-Lattice binary:
+From the repository root, build the packaged runtime before qualification:
 
 ```sh
 nix develop -c cargo test --locked --test test_render_workflow
-nix develop -c cargo build --locked --bin lattice
+nix build .#lattice
 nix-shell --pure examples/render-workflow/shell.nix --run \
-  'python3 scripts/qualify-render.py --retain /ABSOLUTE/NEW/PRIVATE/RETAINED-DIR --lattice /ABSOLUTE/lattice/target/debug/lattice'
+  'python3 scripts/qualify-render.py --retain /ABSOLUTE/NEW/PRIVATE/RETAINED-DIR --lattice "$(realpath result/bin/lattice)"'
 ```
+
+The existing executor identity boundary admits at most 256 MiB per executable.
+Large debug binaries can exceed that ceiling and are rejected before submission;
+select the packaged runtime rather than weakening the bound.
 
 The last command is explicit opt-in to isolated loopback controller/worker
 processes and exact local operator grants for the generated test graphs. It
@@ -170,9 +173,13 @@ bounded contract bytes and synthetic transport observations. They **do not**
 qualify the real component, network or Lattice process route. Producer tests and
 historical Aspen receipts are likewise not Lattice qualification. The process
 fixture writes passing observations only after its actual assertions succeed.
-The [retained native observation](../.cairn/changes/bind-artifact-render-workflow/evidence/local-process-observation.json)
-names the exercised source and executable cohort. Later edits or rebuilt artifacts
-require their own execution; no passing record silently qualifies a newer binary.
+The [earlier native observation](../.cairn/changes/bind-artifact-render-workflow/evidence/local-process-observation.json)
+retains its original source/executable cohort. The separate
+[published-runtime observation](../.cairn/changes/bind-artifact-render-workflow/evidence/published-runtime-observation.json)
+records the packaged Nix runtime from published revision `3539ade3`, including
+completion/repetition, lost ACK, controller/worker interruption and observed
+terminal cancellation. Later edits or rebuilt artifacts require their own
+execution; neither record silently qualifies a newer binary.
 
 The qualified comparator here is exact accepted identity/PPM bytes on one actual
 backend/profile/host. There is no qualified cross-backend comparator and no claim
