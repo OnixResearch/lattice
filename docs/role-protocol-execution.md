@@ -1,6 +1,6 @@
 # Projected role-protocol execution
 
-Lattice executes one frozen Choregraph role-projection cohort. The cohort source is Choregraph revision `0b2000edaf86d5a7a8601246afbc0d526f4a2a07`.
+Lattice executes one frozen Choregraph role-projection cohort. The cohort source is Choregraph revision `c3577352ee1e39391f5204ee234d991c7dbeb151`.
 
 ## Intake
 
@@ -92,11 +92,11 @@ These are deterministic regression definitions, not a recorded passing run or a 
 
 [Lattice #16](https://github.com/OnixResearch/lattice/issues/16) depends on an admitted annotation cohort from [Choregraph #4](https://github.com/OnixResearch/choregraph/issues/4); the related Noble filing is https://github.com/OnixResearch/noble-lang/issues/67#issuecomment-6796434640.
 
-The pinned Choregraph revision `0b2000edaf86d5a7a8601246afbc0d526f4a2a07` exposes only the closed `choregraph.role-choreography.v1` source and projection surface: its `Choice` has a decider, branches and span, and `ValueDeclaration` describes owned payloads, not preference factors. The inspected public GitHub HEAD `0dd723f1a53bdc7d0529dde8f2813f7d3c2d7922` has the same surface, and #4 remains open. Neither supplies a new annotation schema/profile, preference/world fields, a complete annotated local set, or a receipt binding those factors to the projection cohort. Source evidence: [pinned model](https://github.com/OnixResearch/choregraph/blob/0b2000edaf86d5a7a8601246afbc0d526f4a2a07/crates/choregraph-choreography/src/model.rs) and [upstream model](https://github.com/OnixResearch/choregraph/blob/0dd723f1a53bdc7d0529dde8f2813f7d3c2d7922/crates/choregraph-choreography/src/model.rs).
+The pinned Choregraph revision `c3577352ee1e39391f5204ee234d991c7dbeb151` exposes only the closed `choregraph.role-choreography.v1` source and projection surface: its `model::tree::Node::Choice` has a decider, branches and span, and `model::participants::ValueDeclaration` describes owned payloads, not preference factors. Its namespace cutover keeps the original serialized record labels and adds no annotation profile, and #4 remains open. It supplies no new annotation schema/profile, preference/world fields, complete annotated local set, or receipt binding those factors to the projection cohort. Source evidence: [pinned tree](https://github.com/OnixResearch/choregraph/blob/c3577352ee1e39391f5204ee234d991c7dbeb151/crates/choregraph-choreography/src/model/tree.rs) and [pinned participants](https://github.com/OnixResearch/choregraph/blob/c3577352ee1e39391f5204ee234d991c7dbeb151/crates/choregraph-choreography/src/model/participants.rs).
 
 Consequently no default-off factors profile can be truthfully admitted or compared to the exact-label baseline yet. No factor data is recorded or reported as ignored: none arrived with an admitted cohort. The implementation preserves unannotated admission, exact-label cursors, ownership and unavailable CLI authority unchanged. Implementing a local annotation/projection/solver or claiming an enabled-profile comparison would invent the missing producer contract. Once Choregraph publishes the exact schema, profile selector, identity-linked factor/world metadata, annotated complete local set and projection receipt, Lattice can review that cohort. Factors must remain metadata only: they cannot grant authority, choose a label, or turn a label set into a Boolean. **Game mapping not formalized**; Pact's unpublished solver and author claims are not admission evidence.
 
-A live `git ls-remote` against the Radicle seed did not return and was cancelled. The upstream inspection above is explicitly the public GitHub revision, not a claim about an undiscovered Radicle head. Neither a newer producer revision nor an annotation cohort was substituted for the exact pinned dependency.
+A live `git ls-remote` against the Radicle seed returned `c3577352ee1e39391f5204ee234d991c7dbeb151` as `main`, matching the pin. No newer producer revision or annotation cohort was substituted for the exact pinned dependency.
 
 ## Safe evidence
 

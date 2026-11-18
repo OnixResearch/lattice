@@ -106,7 +106,10 @@ fn check_intent(directory: &std::path::Path, bytes: &[u8]) -> Result<(), String>
 
 pub(super) fn retained(inputs: &super::Admitted) -> Result<super::Retained, String> {
     let store = store(&inputs.directory)?;
-    let observation = super::super::recovery::recover(&store, &inputs.request, &inputs.directory)?;
+    let admitted = super::super::binding::load(&inputs.directory, &inputs.request)?
+        .ok_or("retained attempt has no persisted execution binding")?;
+    let observation =
+        super::super::recovery::recover(&store, &inputs.request, &inputs.directory, &admitted.binding_identity)?;
     let result = complete_result(&store, &inputs.request)?;
     Ok(super::Retained {
         store,

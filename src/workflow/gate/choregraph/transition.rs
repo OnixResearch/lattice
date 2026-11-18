@@ -62,7 +62,7 @@ pub fn apply_suspend(
     let machine = approval_machine(workflow)?;
     let mut state = replay(&machine, &request.graph_events)?;
     let gate = machine_node_id(&machine, request.node_id)?;
-    if state.state(&gate) != Some(choregraph_core::LocalState::Ready) {
+    if state.state(&gate) != Some(choregraph_core::model::semantics::LocalState::Ready) {
         let ready = crate::workflow::gate::model::ApprovalGraphEvent {
             node_id: request.node_id,
             action: crate::workflow::gate::model::ApprovalGraphAction::MarkReady,
@@ -79,14 +79,14 @@ pub fn apply_suspend(
         suspension_reference: Some(request.suspension_reference.clone()),
     };
     let state = apply_event(&machine, &state, &suspend)?;
-    if state.state(&gate) != Some(choregraph_core::LocalState::Suspended) {
+    if state.state(&gate) != Some(choregraph_core::model::semantics::LocalState::Suspended) {
         return Err(error(
             AdapterErrorCode::StateMismatch,
             "Choregraph did not produce the required suspended gate state",
         ));
     }
     request.graph_events.push(suspend);
-    debug_assert_eq!(state.state(&gate), Some(choregraph_core::LocalState::Suspended));
+    debug_assert_eq!(state.state(&gate), Some(choregraph_core::model::semantics::LocalState::Suspended));
     debug_assert!(
         request
             .graph_events
@@ -106,7 +106,7 @@ pub fn apply_resume_signal(
     let machine = approval_machine(workflow)?;
     let state = replay(&machine, &request.graph_events)?;
     let gate = machine_node_id(&machine, request.node_id)?;
-    if state.state(&gate) != Some(choregraph_core::LocalState::Suspended) {
+    if state.state(&gate) != Some(choregraph_core::model::semantics::LocalState::Suspended) {
         return Err(error(
             AdapterErrorCode::StateMismatch,
             "persisted approval graph does not reconstruct the suspended gate state",
@@ -119,14 +119,14 @@ pub fn apply_resume_signal(
         suspension_reference: Some(request.suspension_reference.clone()),
     };
     let resumed = apply_event(&machine, &state, &resume)?;
-    if resumed.state(&gate) != Some(choregraph_core::LocalState::Ready) {
+    if resumed.state(&gate) != Some(choregraph_core::model::semantics::LocalState::Ready) {
         return Err(error(
             AdapterErrorCode::StateMismatch,
             "Choregraph did not produce the required resumed gate state",
         ));
     }
     request.graph_events.push(resume);
-    debug_assert_eq!(resumed.state(&gate), Some(choregraph_core::LocalState::Ready));
+    debug_assert_eq!(resumed.state(&gate), Some(choregraph_core::model::semantics::LocalState::Ready));
     debug_assert!(
         request
             .graph_events
@@ -150,9 +150,15 @@ pub fn apply_execution_outcomes(
     for outcome in outcomes {
         let machine_node = machine_node_id(&machine, outcome.node_id)?;
         let target = match outcome.state {
-            crate::workflow::gate::model::PersistedNodeState::Completed => choregraph_core::LocalState::Completed,
-            crate::workflow::gate::model::PersistedNodeState::Failed => choregraph_core::LocalState::Failed,
-            crate::workflow::gate::model::PersistedNodeState::Cancelled => choregraph_core::LocalState::Cancelled,
+            crate::workflow::gate::model::PersistedNodeState::Completed => {
+                choregraph_core::model::semantics::LocalState::Completed
+            }
+            crate::workflow::gate::model::PersistedNodeState::Failed => {
+                choregraph_core::model::semantics::LocalState::Failed
+            }
+            crate::workflow::gate::model::PersistedNodeState::Cancelled => {
+                choregraph_core::model::semantics::LocalState::Cancelled
+            }
         };
         if state.state(&machine_node) == Some(target) {
             continue;
@@ -162,12 +168,12 @@ pub fn apply_execution_outcomes(
             state = apply_event(&machine, &state, &event)?;
             request.graph_events.push(event);
         } else {
-            if state.state(&machine_node) == Some(choregraph_core::LocalState::Pending) {
+            if state.state(&machine_node) == Some(choregraph_core::model::semantics::LocalState::Pending) {
                 let ready = event(outcome.node_id, crate::workflow::gate::model::ApprovalGraphAction::MarkReady);
                 state = apply_event(&machine, &state, &ready)?;
                 request.graph_events.push(ready);
             }
-            if state.state(&machine_node) == Some(choregraph_core::LocalState::Ready) {
+            if state.state(&machine_node) == Some(choregraph_core::model::semantics::LocalState::Ready) {
                 let start = event(outcome.node_id, crate::workflow::gate::model::ApprovalGraphAction::Start);
                 state = apply_event(&machine, &state, &start)?;
                 request.graph_events.push(start);

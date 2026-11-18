@@ -22,7 +22,7 @@ use lattice::engine::protocol::safe_diagnostic_text;
 use lattice::engine::protocol::settle_attempt;
 
 fn session_for(
-    source: choregraph_choreography::RoleChoreographySource,
+    source: choregraph_choreography::model::schema::RoleSource,
     external: bool,
 ) -> lattice::engine::protocol::SessionRecord {
     let cohort = common::protocol::cohort(source);

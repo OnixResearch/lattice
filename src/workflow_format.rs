@@ -76,8 +76,21 @@ pub struct PortableWorkflow {
     pub nodes: Vec<PortableNode>,
     pub edges: Vec<PortableEdge>,
     pub configs: Vec<PortableNodeConfig>,
+    #[serde(default = "empty_control_dependencies", skip_serializing_if = "Vec::is_empty")]
+    pub control_dependencies: Vec<PortableEdge>,
+    #[serde(default, skip_serializing_if = "crate::engine::workflow::is_false")]
+    pub construction_profile: bool,
+    #[serde(
+        default = "crate::engine::workflow::no_construction_runtime",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub construction_runtime: Option<crate::engine::workflow::ConstructionRuntimeBinding>,
     #[serde(default)]
     pub triggers: Vec<PortableTrigger>,
+}
+
+fn empty_control_dependencies() -> Vec<PortableEdge> {
+    Vec::new()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -288,7 +301,7 @@ pub enum WorkflowFormatError {
     Json(String),
     ChoregraphInputEncoding,
     ChoregraphLimitEncoding,
-    ChoregraphLowering(choregraph_nickel::FrontendIssueCode),
+    ChoregraphLowering(choregraph_nickel::diagnostic::FrontendIssueCode),
     ChoregraphLoweringContract,
     ChoregraphDependencyPortExhausted,
     InvalidExpressionDependency {
@@ -391,7 +404,11 @@ impl std::fmt::Display for WorkflowFormatError {
             Self::ChoregraphInputEncoding => write!(f, "Choregraph lowering input encoding failed"),
             Self::ChoregraphLimitEncoding => write!(f, "Choregraph lowering limit encoding failed"),
             Self::ChoregraphLowering(code) => {
-                write!(f, "Choregraph lowering rejected the workflow: {}", choregraph_nickel::summary(*code))
+                write!(
+                    f,
+                    "Choregraph lowering rejected the workflow: {}",
+                    choregraph_nickel::diagnostic::summary(*code)
+                )
             }
             Self::ChoregraphLoweringContract => write!(f, "Choregraph lowering returned no diagnostic"),
             Self::ChoregraphDependencyPortExhausted => {
@@ -520,6 +537,13 @@ pub fn workflow_to_portable(workflow: &Workflow) -> PortableWorkflow {
         },
         nodes,
         edges,
+        control_dependencies: workflow
+            .control_dependencies
+            .iter()
+            .map(|&(source, target)| PortableEdge { source, target })
+            .collect(),
+        construction_profile: workflow.construction_profile,
+        construction_runtime: workflow.construction_runtime.clone(),
         configs,
         triggers,
     }
@@ -1386,6 +1410,8 @@ fn portable_to_runtime_with_agent_prompts(
     let modified = parse_timestamp(&portable.meta.modified)?;
     let timestamp = crate::engine::workflow::WorkflowTimestamp::from_datetime(created);
     let mut workflow = Workflow::new(portable.meta.name.clone(), timestamp);
+    workflow.construction_profile = portable.construction_profile;
+    workflow.construction_runtime = portable.construction_runtime.clone();
     workflow.meta.description = portable.meta.description.clone();
     workflow.meta.created = created;
     workflow.meta.modified = modified;
@@ -1430,10 +1456,9 @@ fn portable_to_runtime_with_agent_prompts(
         workflow.set_node_runner_settings(new_node_id, runner_settings);
     }
 
-    for portable_node in &portable.nodes {
-        if !portable.configs.iter().any(|config| config.node_id == portable_node.id) {
-            return Err(WorkflowFormatError::MissingNodeConfig(portable_node.id));
-        }
+    let has_config = |node_id: u64| portable.configs.iter().any(|config| config.node_id == node_id);
+    if let Some(node) = portable.nodes.iter().find(|node| !has_config(node.id)) {
+        return Err(WorkflowFormatError::MissingNodeConfig(node.id));
     }
 
     for edge in &portable.edges {
@@ -1444,8 +1469,27 @@ fn portable_to_runtime_with_agent_prompts(
             .add_edge(source, target)
             .map_err(|error| WorkflowFormatError::InvalidGraph(error.to_string()))?;
     }
+    workflow.control_dependencies = portable_control_dependencies(&portable.control_dependencies, &node_id_map)?;
 
     Ok(workflow)
+}
+
+/// Control dependencies name portable nodes and admit only unique, non-self runtime orderings.
+fn portable_control_dependencies(
+    edges: &[PortableEdge],
+    node_id_map: &HashMap<u64, crate::engine::workflow::NodeId>,
+) -> Result<Vec<(u64, u64)>, WorkflowFormatError> {
+    let mut admitted = Vec::with_capacity(edges.len());
+    let mut seen = HashSet::with_capacity(edges.len());
+    for edge in edges {
+        let source = node_id_map.get(&edge.source).ok_or(WorkflowFormatError::UnknownConfigNode(edge.source))?.0;
+        let target = node_id_map.get(&edge.target).ok_or(WorkflowFormatError::UnknownConfigNode(edge.target))?.0;
+        if source == target || !seen.insert((source, target)) {
+            return Err(WorkflowFormatError::InvalidGraph("invalid control dependency".into()));
+        }
+        admitted.push((source, target));
+    }
+    Ok(admitted)
 }
 
 fn validate_portable_identity(portable: &PortableWorkflow) -> Result<(), WorkflowFormatError> {
@@ -1924,10 +1968,26 @@ pub fn portable_to_nickel(portable: &PortableWorkflow) -> String {
     output.push_str(NICKEL_FILE_HEADER);
     output.push_str("\n\n");
     output.push_str(nickel_contract_prelude());
+    let contract = if has_construction_controls(portable) {
+        output.push_str("let WorkflowWithControls = Workflow & { control_dependencies | Array Edge | default = [], construction_profile | Bool | default = false, construction_runtime | optional | Dyn } in\n");
+        "WorkflowWithControls"
+    } else {
+        "Workflow"
+    };
     output.push_str("(\n");
     render_portable_workflow(&mut output, portable);
-    output.push_str(") | Workflow\n");
+    output.push_str(") | ");
+    output.push_str(contract);
+    output.push('\n');
     output
+}
+
+/// Legacy workflows keep the committed export text; only control or v3 facts need the extended
+/// contract.
+fn has_construction_controls(portable: &PortableWorkflow) -> bool {
+    portable.construction_profile
+        || portable.construction_runtime.is_some()
+        || !portable.control_dependencies.is_empty()
 }
 
 fn nickel_contract_prelude() -> &'static str {
@@ -1952,6 +2012,24 @@ fn render_portable_workflow(output: &mut String, portable: &PortableWorkflow) {
         output.push_str(&format!("    {{ source = {}, target = {} }},\n", edge.source, edge.target));
     }
     output.push_str("  ],\n");
+    if !portable.control_dependencies.is_empty() {
+        output.push_str("  control_dependencies = [\n");
+        for edge in &portable.control_dependencies {
+            output.push_str(&format!("    {{ source = {}, target = {} }},\n", edge.source, edge.target));
+        }
+        output.push_str("  ],\n");
+    }
+    if portable.construction_profile {
+        output.push_str("  construction_profile = true,\n");
+    }
+    if let Some(binding) = &portable.construction_runtime {
+        output.push_str("  construction_runtime = {\n");
+        output.push_str(&format!("    runtime_artifact = {},\n", quoted(&binding.runtime_artifact)));
+        output.push_str(&format!("    shell_path = {},\n", quoted(&binding.shell_path)));
+        output.push_str(&format!("    shell_artifact = {},\n", quoted(&binding.shell_artifact)));
+        output.push_str(&format!("    shell_implementation = {},\n", quoted(&binding.shell_implementation)));
+        output.push_str("  },\n");
+    }
     output.push_str("  configs = [\n");
     for config in &portable.configs {
         render_config(output, config);
@@ -2314,7 +2392,7 @@ fn render_trigger(output: &mut String, trigger: &PortableTrigger) {
 }
 
 fn quoted(value: &str) -> String {
-    nickel_lang_core::eval::value::NickelValue::string_posless(value).to_string()
+    crate::nickel::string_literal(value)
 }
 
 // r[impl n8nclone.workflow_format.nickel.import]
@@ -2332,7 +2410,7 @@ pub fn load_workflow_nickel_file(path: &Path) -> Result<Workflow, WorkflowFormat
     let resolved_agent_prompts = load_markdown_agent_prompts(path, &portable)?;
     let captured = captured.and_then(|program| capture_prompt_assets(program, &portable, &resolved_agent_prompts));
     let mut workflow = portable_to_runtime_with_agent_prompts(portable, &resolved_agent_prompts)?;
-    choregraph::lower_portable(&workflow_to_portable(&workflow))?;
+    admit_imported(&mut workflow)?;
     workflow.authoring = captured
         .filter(|program| program.validate().is_ok())
         .map(|program| retained_source_snapshot(program, &workflow, evaluated_output))
@@ -2376,6 +2454,8 @@ fn retained_source_snapshot(
         expanded_artifact: crate::authoring::expanded_identity(workflow)
             .map_err(|message| WorkflowFormatError::Nickel(message.into()))?,
         state: crate::authoring::AssociationState::RetainedEntrySnapshot,
+        observation: None,
+        construction: None,
     })
 }
 
@@ -2388,9 +2468,30 @@ pub fn from_nickel_value(
         serde_json::from_value(value).map_err(|error| WorkflowFormatError::Json(error.to_string()))?;
     validate_portable_identity(&portable)?;
     let resolved_agent_prompts = captured_markdown_agent_prompts(&portable, assets)?;
-    let workflow = portable_to_runtime_with_agent_prompts(portable, &resolved_agent_prompts)?;
-    choregraph::lower_portable(&workflow_to_portable(&workflow))?;
+    let mut workflow = portable_to_runtime_with_agent_prompts(portable, &resolved_agent_prompts)?;
+    admit_imported(&mut workflow)?;
     Ok(workflow)
+}
+
+fn admit_imported(workflow: &mut Workflow) -> Result<(), WorkflowFormatError> {
+    if workflow.construction_profile {
+        // Flat interchange may omit executable claims; an explicit binding must still
+        // match the selected immutable runtime during materialized admission.
+        if workflow.construction_runtime.is_none() {
+            workflow.construction_runtime = Some(
+                crate::authoring::construction::selected_runtime()
+                    .map_err(|message| WorkflowFormatError::Nickel(message.into()))?,
+            );
+        }
+        crate::authoring::construction::admit_materialized(workflow)
+            .map_err(|message| WorkflowFormatError::Nickel(message.into()))?;
+    } else {
+        if !workflow.control_dependencies.is_empty() {
+            return Err(WorkflowFormatError::ChoregraphLoweringContract);
+        }
+        choregraph::lower_portable(&workflow_to_portable(workflow))?;
+    }
+    Ok(())
 }
 
 fn captured_markdown_agent_prompts(

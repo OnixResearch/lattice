@@ -1,6 +1,7 @@
 //! Run-scoped Choregraph authority composition for product workflow execution.
 
 mod provider;
+mod resume;
 
 pub use provider::RunContextProvider;
 pub use provider::StoreAttempts;
@@ -71,20 +72,37 @@ impl RunContext {
 }
 
 pub struct Session {
-    machine: choregraph_core::AdmittedMachine,
-    state: choregraph_core::MachineState,
+    machine: choregraph_core::model::automaton::AdmittedMachine,
+    state: choregraph_core::model::automaton::MachineState,
     context: super::choregraph::TransitionContext,
     dispatch: std::sync::Arc<super::dispatch::Shell>,
     ready_nodes: std::collections::BTreeSet<u64>,
     started_nodes: std::collections::BTreeSet<u64>,
+    construction_effects:
+        std::collections::BTreeMap<u64, choregraph_nickel::construction::model::projection::ExpandedEffect>,
 }
 
 impl Session {
     pub fn new(workflow: &crate::engine::workflow::Workflow, run: &RunContext) -> Result<Self, Error> {
-        let portable = crate::workflow_format::workflow_to_portable(workflow);
-        let lowered = crate::workflow_format::choregraph::lower_portable(&portable)
-            .map_err(|error| Error::Lowering(error.to_string()))?;
-        let machine_reference = canonical_machine_identity(&lowered.machine)?;
+        let (machine, construction_effects) = match crate::authoring::construction::admit_runtime(workflow)
+            .map_err(|error| Error::Lowering(error.into()))?
+        {
+            Some(admitted) => {
+                let effects =
+                    admitted.projection.effects.iter().map(|effect| (effect.node_id, effect.clone())).collect();
+                (admitted.machine, effects)
+            }
+            None => {
+                if !workflow.control_dependencies.is_empty() {
+                    return Err(Error::Lowering("control dependencies require v3 construction admission".into()));
+                }
+                let portable = crate::workflow_format::workflow_to_portable(workflow);
+                let lowered = crate::workflow_format::choregraph::lower_portable(&portable)
+                    .map_err(|error| Error::Lowering(error.to_string()))?;
+                (lowered.machine, std::collections::BTreeMap::new())
+            }
+        };
+        let machine_reference = canonical_machine_identity(&machine)?;
         let revision = crate::orchestration::workflow_revision(workflow).map_err(|_| Error::WorkflowRevision)?;
         let workflow_reference = format!("blake3:{}", revision.content_hash);
         let context = super::choregraph::TransitionContext {
@@ -94,59 +112,21 @@ impl Session {
             authority: run.authority.clone(),
             scope: run.scope.clone(),
         };
-        let state = lowered.machine.initial_state();
+        let state = machine.initial_state();
         Ok(Self {
-            machine: lowered.machine,
+            machine,
             state,
             context,
             dispatch: std::sync::Arc::clone(&run.dispatch),
             ready_nodes: std::collections::BTreeSet::new(),
             started_nodes: std::collections::BTreeSet::new(),
+            construction_effects,
         })
     }
 
-    pub fn new_with_checkpoint(
-        workflow: &crate::engine::workflow::Workflow,
-        run: &RunContext,
-        checkpoint: &[crate::engine::executor::StepResult],
-    ) -> Result<Self, Error> {
-        let mut session = Self::new(workflow, run)?;
-        let mut states = session
-            .machine
-            .node_ids()
-            .iter()
-            .cloned()
-            .map(|node_id| (node_id, choregraph_core::LocalState::Pending))
-            .collect::<std::collections::BTreeMap<_, _>>();
-        let mut observed = std::collections::BTreeSet::new();
-        for step in checkpoint {
-            if !observed.insert(step.node_id) {
-                return Err(Error::InvalidCheckpoint);
-            }
-            let expected = node_reference(step.node_id);
-            let machine_node = session
-                .machine
-                .node_ids()
-                .iter()
-                .find(|node_id| node_id.as_str() == expected)
-                .cloned()
-                .ok_or(Error::InvalidCheckpoint)?;
-            let state = match step.status {
-                crate::engine::executor::NodeStatus::Completed { .. } => choregraph_core::LocalState::Completed,
-                crate::engine::executor::NodeStatus::Failed { .. } => choregraph_core::LocalState::Failed,
-                crate::engine::executor::NodeStatus::Skipped => choregraph_core::LocalState::Cancelled,
-                crate::engine::executor::NodeStatus::Pending | crate::engine::executor::NodeStatus::Running => {
-                    return Err(Error::InvalidCheckpoint);
-                }
-            };
-            states.insert(machine_node, state);
-        }
-        session.state = choregraph_core::MachineState::new(states);
-        Ok(session)
-    }
-
     pub fn ready_frontier(&self) -> Result<Vec<crate::engine::workflow::NodeId>, Error> {
-        let ready = choregraph_core::ready_nodes(&self.machine, &self.state).map_err(|_| Error::TransitionDenied)?;
+        let ready =
+            choregraph_core::analytics::ready_nodes(&self.machine, &self.state).map_err(|_| Error::TransitionDenied)?;
         ready
             .into_iter()
             .map(|node_id| {
@@ -161,14 +141,20 @@ impl Session {
     }
 
     pub fn mark_ready(&mut self, node_id: crate::engine::workflow::NodeId) -> Result<(), Error> {
-        let event = choregraph_core::ConcreteEvent::new(node_reference(node_id), choregraph_core::Action::MarkReady);
+        let event = choregraph_core::concrete::event::ConcreteEvent::new(
+            node_reference(node_id),
+            choregraph_core::model::semantics::Action::MarkReady,
+        );
         self.apply_without_bindings(&event)?;
         self.ready_nodes.insert(node_id.0);
         Ok(())
     }
 
     pub fn start_pure(&mut self, node_id: crate::engine::workflow::NodeId) -> Result<(), Error> {
-        let event = choregraph_core::ConcreteEvent::new(node_reference(node_id), choregraph_core::Action::Start);
+        let event = choregraph_core::concrete::event::ConcreteEvent::new(
+            node_reference(node_id),
+            choregraph_core::model::semantics::Action::Start,
+        );
         self.apply_without_bindings(&event)?;
         self.ready_nodes.remove(&node_id.0);
         self.started_nodes.insert(node_id.0);
@@ -180,14 +166,24 @@ impl Session {
         node_id: crate::engine::workflow::NodeId,
         payload_reference: &str,
     ) -> Result<super::authority::IntentBinding, Error> {
-        let event = super::choregraph::requested_event(super::choregraph::EventRequest {
-            declaration_key: format!("{EFFECT_DECLARATION_PREFIX}{}", node_id.0),
-            node_id: node_reference(node_id),
-            source_node_id: node_id.0.to_string(),
-            action: choregraph_core::Action::Start,
-            request_ref: super::runtime::dispatch_request_identity(payload_reference),
-            payload_ref: payload_reference.to_owned(),
-        });
+        let request_ref = super::runtime::dispatch_request_identity(payload_reference);
+        let event = if self.construction_effects.is_empty() {
+            super::choregraph::requested_event(super::choregraph::EventRequest {
+                declaration_key: format!("{EFFECT_DECLARATION_PREFIX}{}", node_id.0),
+                node_id: node_reference(node_id),
+                source_node_id: node_id.0.to_string(),
+                action: choregraph_core::model::semantics::Action::Start,
+                request_ref,
+                payload_ref: payload_reference.to_owned(),
+            })
+        } else {
+            let effect = self.construction_effects.get(&node_id.0).ok_or(Error::UnexpectedBindings)?;
+            let references = super::choregraph::InvocationReferences {
+                request_ref,
+                payload_ref: payload_reference.to_owned(),
+            };
+            super::choregraph::requested_construction_event(effect, references).ok_or(Error::UnexpectedBindings)?
+        };
         let bindings = self.apply(&event)?;
         if bindings.len() != EXPECTED_EFFECT_BINDING_COUNT {
             return Err(Error::UnexpectedBindings);
@@ -210,20 +206,25 @@ impl Session {
             return Ok(());
         }
         let action = match status {
-            crate::engine::executor::NodeStatus::Completed { .. } => choregraph_core::Action::Complete,
-            crate::engine::executor::NodeStatus::Skipped => choregraph_core::Action::Cancel,
+            crate::engine::executor::NodeStatus::Completed { .. } => {
+                choregraph_core::model::semantics::Action::Complete
+            }
+            crate::engine::executor::NodeStatus::Skipped => choregraph_core::model::semantics::Action::Cancel,
             crate::engine::executor::NodeStatus::Failed { .. }
             | crate::engine::executor::NodeStatus::Pending
-            | crate::engine::executor::NodeStatus::Running => choregraph_core::Action::Fail,
+            | crate::engine::executor::NodeStatus::Running => choregraph_core::model::semantics::Action::Fail,
         };
-        let event = choregraph_core::ConcreteEvent::new(node_reference(node_id), action);
+        let event = choregraph_core::concrete::event::ConcreteEvent::new(node_reference(node_id), action);
         self.apply_without_bindings(&event)?;
         self.started_nodes.remove(&node_id.0);
         Ok(())
     }
 
     pub fn cancel(&mut self, node_id: crate::engine::workflow::NodeId) -> Result<(), Error> {
-        let event = choregraph_core::ConcreteEvent::new(node_reference(node_id), choregraph_core::Action::Cancel);
+        let event = choregraph_core::concrete::event::ConcreteEvent::new(
+            node_reference(node_id),
+            choregraph_core::model::semantics::Action::Cancel,
+        );
         self.apply_without_bindings(&event)?;
         self.ready_nodes.remove(&node_id.0);
         self.started_nodes.remove(&node_id.0);
@@ -245,7 +246,7 @@ impl Session {
         std::sync::Arc::clone(&self.dispatch)
     }
 
-    fn apply_without_bindings(&mut self, event: &choregraph_core::ConcreteEvent) -> Result<(), Error> {
+    fn apply_without_bindings(&mut self, event: &choregraph_core::concrete::event::ConcreteEvent) -> Result<(), Error> {
         let bindings = self.apply(event)?;
         if !bindings.is_empty() {
             return Err(Error::UnexpectedBindings);
@@ -253,7 +254,10 @@ impl Session {
         Ok(())
     }
 
-    fn apply(&mut self, event: &choregraph_core::ConcreteEvent) -> Result<Vec<super::authority::IntentBinding>, Error> {
+    fn apply(
+        &mut self,
+        event: &choregraph_core::concrete::event::ConcreteEvent,
+    ) -> Result<Vec<super::authority::IntentBinding>, Error> {
         match super::choregraph::transition(&self.machine, &self.state, event, &self.context) {
             super::choregraph::TransitionResult::Accepted { next, bindings } => {
                 self.state = next;
@@ -270,9 +274,10 @@ fn node_reference(node_id: crate::engine::workflow::NodeId) -> String {
 
 /// Canonical product machine identity shared by execution and read-only inspection.
 pub(crate) fn canonical_machine_identity(
-    machine: &choregraph_core::AdmittedMachine,
+    machine: &choregraph_core::model::automaton::AdmittedMachine,
 ) -> Result<super::authority::MachineIdentity, Error> {
-    let artifact = choregraph_kamacite::build_concrete_machine_artifact(machine).map_err(|_| Error::MachineIdentity)?;
+    let artifact = choregraph_kamacite::concrete::conversion::build_concrete_machine_artifact(machine)
+        .map_err(|_| Error::MachineIdentity)?;
     super::authority::MachineIdentity::new(format!("{}:{}", artifact.identity.algorithm, artifact.identity.hex))
         .map_err(Error::from)
 }

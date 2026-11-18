@@ -29,38 +29,38 @@ fn limit(value: usize) -> Result<u64, super::WorkflowFormatError> {
     u64::try_from(value).map_err(|_| super::WorkflowFormatError::ChoregraphLimitEncoding)
 }
 
-fn limits() -> Result<choregraph_nickel::EvaluatedLimits, super::WorkflowFormatError> {
-    Ok(choregraph_nickel::EvaluatedLimits {
-        max_nodes: limit(choregraph_core::DEFAULT_MAX_NODES)?,
-        max_edges: limit(choregraph_core::DEFAULT_MAX_EDGES)?,
-        max_operations: limit(choregraph_core::DEFAULT_MAX_OPERATIONS)?,
-        max_effect_declarations: limit(choregraph_core::DEFAULT_MAX_EFFECT_DECLARATIONS)?,
-        max_identifier_bytes: limit(choregraph_core::DEFAULT_MAX_IDENTIFIER_BYTES)?,
-        max_reference_bytes: limit(choregraph_core::DEFAULT_MAX_REFERENCE_BYTES)?,
-        max_event_bytes: limit(choregraph_core::DEFAULT_MAX_EVENT_BYTES)?,
-        max_intent_bytes: limit(choregraph_core::DEFAULT_MAX_INTENT_BYTES)?,
-        max_intents_per_transition: limit(choregraph_core::DEFAULT_MAX_INTENTS_PER_TRANSITION)?,
+fn limits() -> Result<choregraph_nickel::model::graph::EvaluatedLimits, super::WorkflowFormatError> {
+    Ok(choregraph_nickel::model::graph::EvaluatedLimits {
+        max_nodes: limit(choregraph_core::model::capacity::DEFAULT_MAX_NODES)?,
+        max_edges: limit(choregraph_core::model::capacity::DEFAULT_MAX_EDGES)?,
+        max_operations: limit(choregraph_core::model::capacity::DEFAULT_MAX_OPERATIONS)?,
+        max_effect_declarations: limit(choregraph_core::model::capacity::DEFAULT_MAX_EFFECT_DECLARATIONS)?,
+        max_identifier_bytes: limit(choregraph_core::model::capacity::DEFAULT_MAX_IDENTIFIER_BYTES)?,
+        max_reference_bytes: limit(choregraph_core::model::capacity::DEFAULT_MAX_REFERENCE_BYTES)?,
+        max_event_bytes: limit(choregraph_core::model::capacity::DEFAULT_MAX_EVENT_BYTES)?,
+        max_intent_bytes: limit(choregraph_core::model::capacity::DEFAULT_MAX_INTENT_BYTES)?,
+        max_intents_per_transition: limit(choregraph_core::model::capacity::DEFAULT_MAX_INTENTS_PER_TRANSITION)?,
     })
 }
 
-fn node(input: &super::PortableNode, synthetic_inputs: &[u64]) -> choregraph_nickel::LatticeNode {
+fn node(input: &super::PortableNode, synthetic_inputs: &[u64]) -> choregraph_nickel::model::projection::LatticeNode {
     let inputs = input.input_ports.iter().map(|port| port.id).chain(synthetic_inputs.iter().copied()).map(|id| {
-        choregraph_nickel::LatticePort {
+        choregraph_nickel::model::projection::LatticePort {
             id,
-            direction: choregraph_nickel::LatticePortDirection::Input,
+            direction: choregraph_nickel::model::projection::LatticePortDirection::Input,
         }
     });
-    let outputs = input.output_ports.iter().map(|port| choregraph_nickel::LatticePort {
+    let outputs = input.output_ports.iter().map(|port| choregraph_nickel::model::projection::LatticePort {
         id: port.id,
-        direction: choregraph_nickel::LatticePortDirection::Output,
+        direction: choregraph_nickel::model::projection::LatticePortDirection::Output,
     });
-    choregraph_nickel::LatticeNode {
+    choregraph_nickel::model::projection::LatticeNode {
         id: input.id,
         ports: inputs.chain(outputs).collect(),
     }
 }
 
-fn failure(error: choregraph_nickel::FrontendFailure) -> super::WorkflowFormatError {
+fn failure(error: choregraph_nickel::diagnostic::FrontendFailure) -> super::WorkflowFormatError {
     error
         .issues
         .first()
@@ -68,8 +68,8 @@ fn failure(error: choregraph_nickel::FrontendFailure) -> super::WorkflowFormatEr
         .unwrap_or(super::WorkflowFormatError::ChoregraphLoweringContract)
 }
 
-fn effect_binding(slot: &str, source: String) -> choregraph_nickel::EvaluatedReferenceBinding {
-    choregraph_nickel::EvaluatedReferenceBinding::Slot {
+fn effect_binding(slot: &str, source: String) -> choregraph_nickel::model::projection::EvaluatedReferenceBinding {
+    choregraph_nickel::model::projection::EvaluatedReferenceBinding::Slot {
         slot_id: slot.to_string(),
         source_ref: source,
     }
@@ -89,10 +89,12 @@ pub(crate) fn effect_contract(config: &super::PortableNodeConfig) -> Option<(&'s
     }
 }
 
-fn effect(config: &super::PortableNodeConfig) -> Option<choregraph_nickel::EvaluatedLatticeEffectV2> {
+fn effect(
+    config: &super::PortableNodeConfig,
+) -> Option<choregraph_nickel::model::projection::EvaluatedLatticeEffectV2> {
     let (resource_prefix, ability) = effect_contract(config)?;
     let source_prefix = format!("node/{}/input", config.node_id);
-    Some(choregraph_nickel::EvaluatedLatticeEffectV2 {
+    Some(choregraph_nickel::model::projection::EvaluatedLatticeEffectV2 {
         declaration_key: format!("{DECLARATION_PREFIX}-{}", config.node_id),
         node_id: config.node_id,
         from_state: "ready".to_string(),
@@ -121,8 +123,8 @@ fn synthetic_expression_edges(
     portable: &super::PortableWorkflow,
 ) -> Result<Vec<SyntheticExpressionEdge>, super::WorkflowFormatError> {
     let projection = crate::expression_dependencies::portable_projection(portable).map_err(expression_issue)?;
-    debug_assert!(projection.expression_dependencies.len() <= choregraph_core::DEFAULT_MAX_EDGES);
-    debug_assert!(projection.execution_dependencies.len() <= choregraph_core::DEFAULT_MAX_EDGES);
+    debug_assert!(projection.expression_dependencies.len() <= choregraph_core::model::capacity::DEFAULT_MAX_EDGES);
+    debug_assert!(projection.execution_dependencies.len() <= choregraph_core::model::capacity::DEFAULT_MAX_EDGES);
     let port_owners = portable
         .nodes
         .iter()
@@ -182,15 +184,15 @@ fn synthetic_expression_edges(
 // r[impl lattice.choregraph_effect_authority.binding]
 pub fn lower_portable(
     portable: &super::PortableWorkflow,
-) -> Result<choregraph_nickel::LoweringOutput, super::WorkflowFormatError> {
+) -> Result<choregraph_nickel::lower::LoweringOutput, super::WorkflowFormatError> {
     let synthetic_edges = synthetic_expression_edges(portable)?;
     let mut synthetic_inputs = BTreeMap::<u64, Vec<u64>>::new();
     for edge in &synthetic_edges {
         synthetic_inputs.entry(edge.consumer_node).or_default().push(edge.target.0);
     }
-    let evaluated = choregraph_nickel::EvaluatedSource::LatticeWorkflowV2 {
-        schema: choregraph_nickel::LATTICE_V2_EVALUATED_SCHEMA.to_string(),
-        lifecycle_profile: choregraph_core::LINEAR_LIFECYCLE_V1.to_string(),
+    let evaluated = choregraph_nickel::model::admission::EvaluatedSource::LatticeWorkflowV2 {
+        schema: choregraph_nickel::model::admission::LATTICE_V2_EVALUATED_SCHEMA.to_string(),
+        lifecycle_profile: choregraph_core::model::semantics::LINEAR_LIFECYCLE_V1.to_string(),
         events: LIFECYCLE_EVENTS.map(str::to_string).to_vec(),
         limits: limits()?,
         imports: Vec::new(),
@@ -202,11 +204,11 @@ pub fn lower_portable(
         edges: portable
             .edges
             .iter()
-            .map(|edge| choregraph_nickel::LatticePortEdge {
+            .map(|edge| choregraph_nickel::model::projection::LatticePortEdge {
                 source: edge.source,
                 target: edge.target,
             })
-            .chain(synthetic_edges.iter().map(|edge| choregraph_nickel::LatticePortEdge {
+            .chain(synthetic_edges.iter().map(|edge| choregraph_nickel::model::projection::LatticePortEdge {
                 source: edge.source.0,
                 target: edge.target.0,
             }))
@@ -214,7 +216,7 @@ pub fn lower_portable(
         configs: portable
             .configs
             .iter()
-            .map(|config| choregraph_nickel::LatticeNodeConfigV2 {
+            .map(|config| choregraph_nickel::model::projection::LatticeNodeConfigV2 {
                 node_id: config.node_id,
                 operation: config.kind.clone(),
                 effectful: effect_contract(config).is_some(),
@@ -224,9 +226,12 @@ pub fn lower_portable(
     };
     let evaluated_json =
         serde_json::to_vec(&evaluated).map_err(|_| super::WorkflowFormatError::ChoregraphInputEncoding)?;
-    let lowering =
-        choregraph_nickel::lower_evaluated_json(&evaluated_json, &[], choregraph_nickel::reviewed_frontend_limits())
-            .map_err(failure)?;
+    let lowering = choregraph_nickel::lower::lower_evaluated_json(
+        &evaluated_json,
+        &[],
+        choregraph_nickel::profile::reviewed_frontend_limits(),
+    )
+    .map_err(failure)?;
     debug_assert_eq!(lowering.machine.node_ids().len(), portable.nodes.len());
     let expected_edge_count = portable
         .edges

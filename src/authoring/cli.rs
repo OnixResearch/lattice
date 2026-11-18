@@ -11,19 +11,7 @@ pub struct Args {
 #[derive(Debug, clap::Subcommand)]
 pub enum Command {
     /// Capture an editable draft; omitting input copies the admitted source snapshot.
-    Draft {
-        workflow: String,
-        id: String,
-        #[arg(long)]
-        input: Option<std::path::PathBuf>,
-        #[arg(long, requires = "input")]
-        archive: bool,
-        #[arg(long, requires = "input", conflicts_with = "archive")]
-        parameterized: bool,
-        /// Explicit captured members relative to input's directory; not import discovery.
-        #[arg(long, requires = "input", conflicts_with = "archive")]
-        member: Vec<String>,
-    },
+    Draft(DraftArgs),
     /// Replace exact captured member bytes without touching the admitted workflow.
     SetFile {
         draft: String,
@@ -42,6 +30,13 @@ pub enum Command {
     Admit { draft: String },
     /// Report association facts without dumping captured source or configuration.
     Inspect { workflow: String },
+    /// Inspect a selected graph node or port's verified logical source location.
+    Origin {
+        workflow: String,
+        node: u64,
+        #[arg(long)]
+        port: Option<u64>,
+    },
     /// Preserve exact captured inputs unless --expanded explicitly requests flat Nickel.
     Export {
         workflow: String,
@@ -49,6 +44,35 @@ pub enum Command {
         #[arg(long)]
         expanded: bool,
     },
+}
+
+#[derive(Debug, clap::Args)]
+pub struct DraftArgs {
+    pub workflow: String,
+    pub id: String,
+    #[arg(long)]
+    pub input: Option<std::path::PathBuf>,
+    #[arg(long, requires = "input")]
+    pub archive: bool,
+    #[arg(long, requires = "input", conflicts_with = "archive")]
+    pub parameterized: bool,
+    /// Compile the selected captured construction profile rather than a flat workflow.
+    #[arg(long, requires = "input", conflicts_with = "archive")]
+    pub construction: bool,
+    /// Explicit captured members relative to input's directory; not import discovery.
+    #[arg(long, requires = "input", conflicts_with = "archive")]
+    pub member: Vec<String>,
+}
+
+impl DraftArgs {
+    const fn kind(&self) -> ProgramKind {
+        match (self.construction, self.parameterized) {
+            (false, false) => ProgramKind::Workflow,
+            (false, true) => ProgramKind::Parameterized,
+            (true, false) => ProgramKind::Construction,
+            (true, true) => ProgramKind::ParameterizedConstruction,
+        }
+    }
 }
 
 fn draft(store: &crate::store::Store, id: &str) -> Result<SourceDraft, String> {
@@ -63,49 +87,17 @@ fn workflow(store: &crate::store::Store, name: &str) -> Result<crate::engine::Wo
 
 pub fn run(store: &crate::store::Store, args: &Args) -> Result<(), String> {
     match &args.command {
-        Command::Draft {
-            workflow: name,
-            id,
-            input,
-            archive,
-            parameterized,
-            member,
-        } => {
-            if store.load_source_draft(id).map_err(|e| e.to_string())?.is_some() {
-                return Err("draft identifier already exists; choose a distinct draft".into());
-            }
-            let current = store.load_workflow(name).map_err(|e| e.to_string())?;
-            let kind = if *parameterized {
-                ProgramKind::Parameterized
-            } else {
-                ProgramKind::Workflow
-            };
-            let program = captured_program(input.as_deref(), *archive, kind, member, current.as_ref())?;
-            let draft = SourceDraft {
-                id: id.clone(),
-                workflow_name: name.clone(),
-                expected_revision: current.and_then(|workflow| workflow.catalog_revision),
-                program,
-                diagnostic: None,
-                preview: None,
-            };
-            store.save_source_draft(&draft).map_err(|e| e.to_string())?;
-            println!("Captured source draft; input revision {} (snapshot only)", draft.program.identity()?.as_str());
-        }
+        Command::Draft(request) => capture_draft(store, request)?,
         Command::SetFile {
             draft: id,
             member,
             input,
         } => {
-            let mut draft = draft(store, id)?;
-            replace_member(&mut draft, member, input)?;
-            store.save_source_draft(&draft).map_err(|e| e.to_string())?;
+            edit_draft(store, id, |draft| replace_member(draft, member, input))?;
             println!("Updated captured member; preview invalidated");
         }
         Command::SetParameters { draft: id, input } => {
-            let mut draft = draft(store, id)?;
-            replace_parameters(&mut draft, input)?;
-            store.save_source_draft(&draft).map_err(|e| e.to_string())?;
+            edit_draft(store, id, |draft| replace_parameters(draft, input))?;
             println!("Updated parameter overrides; preview invalidated");
         }
         Command::Preview {
@@ -122,6 +114,11 @@ pub fn run(store: &crate::store::Store, args: &Args) -> Result<(), String> {
             );
         }
         Command::Inspect { workflow: name } => inspect(&workflow(store, name)?)?,
+        Command::Origin {
+            workflow: name,
+            node,
+            port,
+        } => origin(&workflow(store, name)?, *node, *port)?,
         Command::Export {
             workflow: name,
             output,
@@ -129,6 +126,69 @@ pub fn run(store: &crate::store::Store, args: &Args) -> Result<(), String> {
         } => export(&workflow(store, name)?, output, *expanded)?,
     }
     Ok(())
+}
+
+fn capture_draft(store: &crate::store::Store, request: &DraftArgs) -> Result<(), String> {
+    if store.load_source_draft(&request.id).map_err(|e| e.to_string())?.is_some() {
+        return Err("draft identifier already exists; choose a distinct draft".into());
+    }
+    let current = store.load_workflow(&request.workflow).map_err(|e| e.to_string())?;
+    let program =
+        captured_program(request.input.as_deref(), request.archive, request.kind(), &request.member, current.as_ref())?;
+    let draft = SourceDraft {
+        id: request.id.clone(),
+        workflow_name: request.workflow.clone(),
+        expected_revision: current.and_then(|workflow| workflow.catalog_revision),
+        program,
+        diagnostic: None,
+        preview: None,
+    };
+    store.save_source_draft(&draft).map_err(|e| e.to_string())?;
+    println!("Captured source draft; input revision {} (snapshot only)", draft.program.identity()?.as_str());
+    Ok(())
+}
+
+fn edit_draft(
+    store: &crate::store::Store,
+    id: &str,
+    edit: impl FnOnce(&mut SourceDraft) -> Result<(), String>,
+) -> Result<(), String> {
+    let mut draft = draft(store, id)?;
+    edit(&mut draft)?;
+    store.save_source_draft(&draft).map_err(|e| e.to_string())
+}
+
+// r[impl lattice.graph_construction.origins.navigation]
+fn origin(workflow: &crate::engine::Workflow, node: u64, port: Option<u64>) -> Result<(), String> {
+    let element = origin_element(workflow, node, port)?;
+    let origin = construction::lowering::origin_for(workflow, &element).ok_or(ORIGIN_UNAVAILABLE)?;
+    let location = origin.location.map_or_else(
+        || "unavailable".to_owned(),
+        |span| format!("{}:{}..{}", span.logical_module, span.start, span.end),
+    );
+    println!(
+        "template={} instance={} generation={} location={}",
+        origin.template,
+        origin.instance_path.join("/"),
+        origin.generation.as_deref().unwrap_or("unavailable"),
+        location
+    );
+    Ok(())
+}
+
+/// The selected node, or one of its own ports, as a native element reference.
+fn origin_element(workflow: &crate::engine::Workflow, node: u64, port: Option<u64>) -> Result<String, String> {
+    let node_id = crate::engine::workflow::NodeId(node);
+    if workflow.graph.node(node_id).is_none() {
+        return Err("selected node does not exist".into());
+    }
+    let Some(port) = port else {
+        return Ok(format!("node/{node}"));
+    };
+    if workflow.graph.port_owner(crate::engine::workflow::PortId(port)) != Some(node_id) {
+        return Err("selected port does not belong to node".into());
+    }
+    Ok(format!("port/{port}"))
 }
 
 fn captured_program(
@@ -195,19 +255,22 @@ fn preview(store: &crate::store::Store, id: &str, output: Option<&std::path::Pat
 }
 
 fn inspect(workflow: &crate::engine::Workflow) -> Result<(), String> {
-    if let Some(source) = &workflow.authoring {
-        println!(
-            "source_revision={}\nstate={:?}\ncompiler_current={}\nexpanded_artifact={}\ncomplete_module_provenance={}\norigins={}",
-            source.source_revision.as_str(),
-            source.state,
-            source.compiler == CompilerIdentity::current()?,
-            source.expanded_artifact.as_str(),
-            COMPLETE_MODULE_PROVENANCE_UNAVAILABLE,
-            ORIGIN_UNAVAILABLE
-        );
-    } else {
+    let Some(source) = &workflow.authoring else {
         println!("No captured source association (legacy materialized workflow)");
-    }
+        return Ok(());
+    };
+    let provenance = source
+        .observation
+        .as_ref()
+        .map_or(COMPLETE_MODULE_PROVENANCE_UNAVAILABLE, |_| "native-observed-closure");
+    let origins = source.construction.as_ref().map_or(ORIGIN_UNAVAILABLE, |_| "native-template-instance-map");
+    println!(
+        "source_revision={}\nstate={:?}\ncompiler_current={}\nexpanded_artifact={}\ncomplete_module_provenance={provenance}\norigins={origins}",
+        source.source_revision.as_str(),
+        source.state,
+        source.compiler == CompilerIdentity::current()?,
+        source.expanded_artifact.as_str(),
+    );
     Ok(())
 }
 

@@ -16,7 +16,9 @@ const TEST_IDENTITY_DIGITS: usize = 64;
 const TEST_WORKFLOW: &str = "exchange-test";
 const TEST_COMMAND: &str = "printf exchange";
 const TEST_SOCKET: &str = "/tmp/lattice-workflow-exchange-test.sock";
-const SOCKET_READY_ATTEMPTS: usize = 100;
+/// Upper bound for server startup under heavily loaded hosts; the loop exits as
+/// soon as the socket exists or the server thread has already returned.
+const SOCKET_READY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 const SOCKET_READY_DELAY_MILLISECONDS: u64 = 10;
 const RUNNING_OBSERVATION_ATTEMPTS: usize = 100;
 const RUNNING_OBSERVATION_DELAY_MILLISECONDS: u64 = 10;
@@ -763,13 +765,14 @@ fn unix_service_composes_the_application_handler_and_bounded_transport() {
     profile.transport.peers.allowed_user_ids = vec![nix::unistd::getuid().as_raw()];
     let client_profile = profile.transport.clone();
     let server = std::thread::spawn(move || super::serve(store, profile, crate::agent_node::RuntimeOptions::default()));
-    for _attempt in 0..SOCKET_READY_ATTEMPTS {
-        if socket_path.exists() {
-            break;
-        }
+    let ready_deadline = std::time::Instant::now() + SOCKET_READY_TIMEOUT;
+    while !socket_path.exists() && !server.is_finished() && std::time::Instant::now() < ready_deadline {
         std::thread::sleep(std::time::Duration::from_millis(SOCKET_READY_DELAY_MILLISECONDS));
     }
-    assert!(socket_path.exists());
+    if !socket_path.exists() {
+        let finished = server.is_finished().then(|| server.join().map(|served| served.err()));
+        panic!("workflow exchange socket was not ready; finished server outcome: {finished:?}");
+    }
     let dispatch = new_request(ExchangeCommand::Dispatch {
         profile: contract,
         request,

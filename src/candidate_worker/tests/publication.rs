@@ -175,6 +175,7 @@ fn reconciliation_reports_missing_and_incomplete_publication() {
         provenance: crate::orchestration::UsageProvenance::HostMeasured,
         complete: true,
         accounting: None,
+        execution_binding: None,
     };
     store.save_command_worker_usage(&usage).expect("usage saves");
     assert!(matches!(reconcile_attempt(&store, "attempt-usage-only"), Ok(Recovery::Incomplete { .. })));

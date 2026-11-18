@@ -17,7 +17,7 @@ pub struct TransitionContext {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TransitionResult {
     Accepted {
-        next: choregraph_core::MachineState,
+        next: choregraph_core::model::automaton::MachineState,
         bindings: Vec<super::authority::IntentBinding>,
     },
     Denied,
@@ -28,23 +28,23 @@ pub struct EventRequest {
     pub declaration_key: String,
     pub node_id: String,
     pub source_node_id: String,
-    pub action: choregraph_core::Action,
+    pub action: choregraph_core::model::semantics::Action,
     pub request_ref: String,
     pub payload_ref: String,
 }
 
 #[must_use]
 pub fn transition(
-    machine: &choregraph_core::AdmittedMachine,
-    state: &choregraph_core::MachineState,
-    event: &choregraph_core::ConcreteEvent,
+    machine: &choregraph_core::model::automaton::AdmittedMachine,
+    state: &choregraph_core::model::automaton::MachineState,
+    event: &choregraph_core::concrete::event::ConcreteEvent,
     context: &TransitionContext,
 ) -> TransitionResult {
-    let Ok(plan) = seaglass_execution_graph::admit_concrete_machine(machine.clone()) else {
+    let Ok(plan) = seaglass_execution_graph::v2::admit_concrete_machine(machine.clone()) else {
         return TransitionResult::Denied;
     };
-    match seaglass_execution_graph::step_concrete_machine(&plan, state, event) {
-        seaglass_execution_graph::ConcreteMachineDecision::Accept { next, intents } => {
+    match seaglass_execution_graph::v2::step_concrete_machine(&plan, state, event) {
+        Ok(seaglass_execution_graph::v2::ConcreteMachineDecision::Accept { next, intents }) => {
             let mut bindings = Vec::with_capacity(intents.len());
             for intent in &intents {
                 let Ok(binding) = bind_handoff(intent, context) else {
@@ -54,16 +54,16 @@ pub fn transition(
             }
             TransitionResult::Accepted { next, bindings }
         }
-        seaglass_execution_graph::ConcreteMachineDecision::Deny { .. } => TransitionResult::Denied,
+        Ok(seaglass_execution_graph::v2::ConcreteMachineDecision::Deny { .. }) | Err(_) => TransitionResult::Denied,
     }
 }
 
 #[must_use]
-pub fn requested_event(request: EventRequest) -> choregraph_core::ConcreteEvent {
-    let mut event = choregraph_core::ConcreteEvent::new(request.node_id, request.action);
+pub fn requested_event(request: EventRequest) -> choregraph_core::concrete::event::ConcreteEvent {
+    let mut event = choregraph_core::concrete::event::ConcreteEvent::new(request.node_id, request.action);
     let request_source = format!("node/{}/input/request", request.source_node_id);
     let payload_source = format!("node/{}/input/payload", request.source_node_id);
-    event.effects.push(choregraph_core::ConcreteEffectRequest {
+    event.effects.push(choregraph_core::concrete::effect::ConcreteEffectRequest {
         declaration_key: request.declaration_key,
         request: slot_binding(DISPATCH_REQUEST_SLOT, BindingReference {
             source: request_source,
@@ -77,16 +77,79 @@ pub fn requested_event(request: EventRequest) -> choregraph_core::ConcreteEvent 
     event
 }
 
+/// Host-generated identities consumed by one native effect invocation.
+#[derive(Debug, Clone)]
+pub struct InvocationReferences {
+    pub request_ref: String,
+    pub payload_ref: String,
+}
+
+/// Only the owning node's native invocation roles may consume host-generated
+/// dispatch and resolved-payload identities. Exact content refs are not accepted.
+#[must_use]
+pub fn requested_construction_event(
+    effect: &choregraph_nickel::construction::model::projection::ExpandedEffect,
+    references: InvocationReferences,
+) -> Option<choregraph_core::concrete::event::ConcreteEvent> {
+    let request = native_invocation_slot(&effect.request_binding, effect.node_id, DISPATCH_REQUEST_SLOT)?;
+    let payload = native_invocation_slot(&effect.payload_binding, effect.node_id, RESOLVED_PAYLOAD_SLOT)?;
+    if effect.from_state != "ready" || effect.action != "start" {
+        return None;
+    }
+    let mut event = choregraph_core::concrete::event::ConcreteEvent::new(
+        format!("lattice-node/{}", effect.node_id),
+        choregraph_core::model::semantics::Action::Start,
+    );
+    event.effects.push(choregraph_core::concrete::effect::ConcreteEffectRequest {
+        declaration_key: effect.declaration_key.clone(),
+        request: slot_binding(request.slot_id, request.reference(references.request_ref)),
+        payload: slot_binding(payload.slot_id, payload.reference(references.payload_ref)),
+    });
+    Some(event)
+}
+
+/// Slot binding sourced from the owning node's native invocation role.
+struct InvocationSlot<'effect> {
+    slot_id: &'effect str,
+    source_ref: &'effect str,
+}
+
+impl InvocationSlot<'_> {
+    fn reference(&self, identity: String) -> BindingReference {
+        BindingReference {
+            source: self.source_ref.to_owned(),
+            identity,
+        }
+    }
+}
+
+fn native_invocation_slot<'effect>(
+    binding: &'effect choregraph_nickel::construction::model::projection::ExpandedBinding,
+    node_id: u64,
+    role: &str,
+) -> Option<InvocationSlot<'effect>> {
+    let choregraph_nickel::construction::model::projection::ExpandedBinding::Slot { slot_id, source_ref } = binding
+    else {
+        return None;
+    };
+    let is_owned_source = *source_ref == format!("node/{node_id}/invocation/{role}");
+    let is_role_slot = slot_id.ends_with(&format!("/{role}"));
+    (is_owned_source && is_role_slot).then_some(InvocationSlot { slot_id, source_ref })
+}
+
 struct BindingReference {
     source: String,
     identity: String,
 }
 
-fn slot_binding(slot_id: &str, reference: BindingReference) -> choregraph_core::ConcreteBindingInput {
-    choregraph_core::ConcreteBindingInput {
+fn slot_binding(
+    slot_id: &str,
+    reference: BindingReference,
+) -> choregraph_core::concrete::reference::ConcreteBindingInput {
+    choregraph_core::concrete::reference::ConcreteBindingInput {
         slot_id: Some(slot_id.to_owned()),
         source_ref: Some(reference.source),
-        reference: choregraph_core::ConcreteReferenceSpec {
+        reference: choregraph_core::concrete::reference::ConcreteReferenceSpec {
             profile: super::authority::REQUEST_REFERENCE_PROFILE.to_owned(),
             identity: reference.identity,
         },
@@ -94,7 +157,7 @@ fn slot_binding(slot_id: &str, reference: BindingReference) -> choregraph_core::
 }
 
 fn bind_handoff(
-    intent: &seaglass_execution_graph::ConcreteIntentHandoff,
+    intent: &seaglass_execution_graph::v2::ConcreteIntentHandoff,
     context: &TransitionContext,
 ) -> Result<super::authority::IntentBinding, super::authority::BindingError> {
     debug_assert!(!intent.node_id.is_empty());
@@ -139,23 +202,23 @@ fn bind_handoff(
     })
 }
 
-fn seaglass_state_label(state: seaglass_execution_graph::StepState) -> &'static str {
+fn seaglass_state_label(state: seaglass_execution_graph::lifecycle::StepState) -> &'static str {
     match state {
-        seaglass_execution_graph::StepState::Pending => "pending",
-        seaglass_execution_graph::StepState::Ready => "ready",
-        seaglass_execution_graph::StepState::Running => "running",
-        seaglass_execution_graph::StepState::Completed => "completed",
-        seaglass_execution_graph::StepState::Failed => "failed",
-        seaglass_execution_graph::StepState::Cancelled => "cancelled",
+        seaglass_execution_graph::lifecycle::StepState::Pending => "pending",
+        seaglass_execution_graph::lifecycle::StepState::Ready => "ready",
+        seaglass_execution_graph::lifecycle::StepState::Running => "running",
+        seaglass_execution_graph::lifecycle::StepState::Completed => "completed",
+        seaglass_execution_graph::lifecycle::StepState::Failed => "failed",
+        seaglass_execution_graph::lifecycle::StepState::Cancelled => "cancelled",
     }
 }
 
-fn seaglass_action_label(action: seaglass_execution_graph::StepAction) -> &'static str {
+fn seaglass_action_label(action: seaglass_execution_graph::lifecycle::StepAction) -> &'static str {
     match action {
-        seaglass_execution_graph::StepAction::MarkReady => "mark-ready",
-        seaglass_execution_graph::StepAction::Start => "start",
-        seaglass_execution_graph::StepAction::Complete => "complete",
-        seaglass_execution_graph::StepAction::Fail => "fail",
-        seaglass_execution_graph::StepAction::Cancel => "cancel",
+        seaglass_execution_graph::lifecycle::StepAction::MarkReady => "mark-ready",
+        seaglass_execution_graph::lifecycle::StepAction::Start => "start",
+        seaglass_execution_graph::lifecycle::StepAction::Complete => "complete",
+        seaglass_execution_graph::lifecycle::StepAction::Fail => "fail",
+        seaglass_execution_graph::lifecycle::StepAction::Cancel => "cancel",
     }
 }

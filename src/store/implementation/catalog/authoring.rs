@@ -50,24 +50,34 @@ fn source_transition(
     readmission: bool,
 ) -> Result<crate::engine::Workflow, crate::store::StoreError> {
     let mut candidate = workflow.clone();
+    if !readmission
+        && previous.and_then(|workflow| workflow.authoring.as_ref()).is_none()
+        && candidate.authoring.as_ref().is_some_and(|new| {
+            new.state == crate::authoring::AssociationState::CapturedModules
+                || new.observation.is_some()
+                || new.construction.is_some()
+        })
+    {
+        return Err(error("captured source requires exact source preview admission"));
+    }
     if !readmission && let Some(old) = previous.and_then(|workflow| workflow.authoring.as_ref()) {
         if let Some(new) = &candidate.authoring {
-            if new.program != old.program || new.source_revision != old.source_revision {
-                return Err(error("source association changed; use exact source preview admission"));
-            }
-            if new.compiler != old.compiler
-                || new.evaluated_output != old.evaluated_output
-                || new.expanded_artifact != old.expanded_artifact
-            {
+            let has_same_program = new.program == old.program && new.source_revision == old.source_revision;
+            let has_same_evaluation = new.compiler == old.compiler
+                && new.evaluated_output == old.evaluated_output
+                && new.expanded_artifact == old.expanded_artifact;
+            let has_same_construction = new.observation == old.observation && new.construction == old.construction;
+            if !(has_same_program && has_same_evaluation && has_same_construction) {
                 return Err(error("source association changed; use exact source preview admission"));
             }
         } else {
             candidate.authoring = Some(old.clone());
         }
-        if old.state == crate::authoring::AssociationState::MaterializedFork
-            && let Some(new) = &mut candidate.authoring
-        {
-            new.state = crate::authoring::AssociationState::MaterializedFork;
+        // Ordinary publication may materialize an edit, but cannot choose the
+        // provenance state. Keep the stored state (including a sticky fork);
+        // prepare() will mark a real expanded-identity delta as a fork.
+        if let Some(new) = &mut candidate.authoring {
+            new.state = old.state.clone();
         }
     }
     debug_assert_eq!(crate::authoring::expanded_identity(&candidate), crate::authoring::expanded_identity(workflow));

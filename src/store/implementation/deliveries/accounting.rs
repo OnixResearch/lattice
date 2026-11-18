@@ -46,7 +46,9 @@ impl crate::store::Store {
                 .insert(observation.attempt_id.as_str(), data.as_bytes())
                 .map_err(|error| crate::store::StoreError::Db(error.to_string()))?;
         }
-        {
+        // Attempt receipts have no run; they stay keyed only by attempt id.
+        // r[impl lattice.execution_binding.usage_provenance.scenario.replay]
+        if observation.scope != crate::orchestration::Scope::Attempt {
             let mut index = txn
                 .open_table(crate::store::COMMAND_WORKER_USAGE_BY_RUN)
                 .map_err(|error| crate::store::StoreError::Table(error.to_string()))?;

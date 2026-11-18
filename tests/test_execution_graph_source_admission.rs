@@ -9,15 +9,15 @@ const FLAKE_SOURCE: &str = include_str!("../flake.nix");
 const FLAKE_LOCK_SOURCE: &str = include_str!("../flake.lock");
 
 const RID: &str = "rad:zL2ncTUeASVYwcoGkEXv9JKgGbAF";
-const REVISION: &str = "0b2000edaf86d5a7a8601246afbc0d526f4a2a07";
-const READINESS_PROOF_REVISION: &str = "b3e08e19750f53bdbcae970cdf58a47a791ed20b";
-const ARCHIVE_BLAKE3: &str = "8c35370153e249cc2fe9454746a82950d830e1451b3cd77cece96321acf1ea1e";
+const REVISION: &str = "c3577352ee1e39391f5204ee234d991c7dbeb151";
+const READINESS_PROOF_REVISION: &str = "c3577352ee1e39391f5204ee234d991c7dbeb151";
+const ARCHIVE_BLAKE3: &str = "da3c399ef60b65a7b2067f7e3105cb25f35c5c4110a3910365f42f2ace72f2d1";
 const LICENSE: &str = "AGPL-3.0-or-later";
 const HTTPS_URL: &str = "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git";
-const NAR_HASH: &str = "sha256-0aF9Hhhp/9yrm6tO977JSss0FcqmqPNYKZocqF4PbBA=";
-const CARGO_PIN: &str = "seaglass-execution-graph = { package = \"choregraph-seaglass\", git = \"https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git\", rev = \"0b2000edaf86d5a7a8601246afbc0d526f4a2a07\" }";
-const LOCK_SOURCE: &str = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=0b2000edaf86d5a7a8601246afbc0d526f4a2a07#0b2000edaf86d5a7a8601246afbc0d526f4a2a07";
-const FLAKE_PIN: &str = "url = \"git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=0b2000edaf86d5a7a8601246afbc0d526f4a2a07\";";
+const NAR_HASH: &str = "sha256-3ct+0RK3oCsSqNZlxXpbgdw6EJYJf+e+YmvPS7HgAzw=";
+const CARGO_PIN: &str = "seaglass-execution-graph = { package = \"choregraph-seaglass\", git = \"https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git\", rev = \"c3577352ee1e39391f5204ee234d991c7dbeb151\" }";
+const LOCK_SOURCE: &str = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=c3577352ee1e39391f5204ee234d991c7dbeb151#c3577352ee1e39391f5204ee234d991c7dbeb151";
+const FLAKE_PIN: &str = "url = \"git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=c3577352ee1e39391f5204ee234d991c7dbeb151\";";
 const CARGO_LOCK_PACKAGE_COUNT: usize = 5;
 const HISTORICAL_PUBLICATION_REVISION: &str = "fc47c5f4ecbb7b4341af690fa42199f25d57f54c";
 

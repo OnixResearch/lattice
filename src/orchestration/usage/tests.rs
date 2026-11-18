@@ -69,7 +69,7 @@ fn owned_outcomes_refine_missing_evidence_but_never_conflict_or_downgrade() {
     }
 }
 
-pub(super) fn observation() -> CommandWorkerObservation {
+pub(crate) fn observation() -> CommandWorkerObservation {
     CommandWorkerObservation {
         schema: USAGE_OBSERVATION_SCHEMA.to_string(),
         scope: Scope::Run,
@@ -90,6 +90,7 @@ pub(super) fn observation() -> CommandWorkerObservation {
         provenance: UsageProvenance::ProviderReported,
         complete: true,
         accounting: None,
+        execution_binding: None,
     }
 }
 
@@ -153,4 +154,101 @@ fn observation_json_round_trips_after_admission() {
     assert!(CommandWorkerObservation::from_json(&duplicate).is_err());
     let unsupported = json.replace(USAGE_OBSERVATION_SCHEMA, "lattice.command-worker-usage.v999");
     assert!(CommandWorkerObservation::from_json(&unsupported).is_err());
+}
+
+/// A host-local attempt receipt with frozen binding provenance.
+pub(crate) fn attempt_observation() -> CommandWorkerObservation {
+    let declaration = lattice_core::execution_binding::request::Declaration {
+        schema: lattice_core::execution_binding::request::DECLARATION_SCHEMA.into(),
+        compute: lattice_core::execution_binding::request::ComputeDeclaration::HostLocal {},
+        model_routes: lattice_core::execution_binding::request::RouteDeclaration::NoModel {},
+    };
+    let requirement = lattice_core::execution_binding::request::WorkerRequirement {
+        compute: lattice_core::execution_binding::request::ComputeRequirement::HostLocal {},
+        model: lattice_core::execution_binding::request::ModelRequirement::NoModel {},
+    };
+    let attempt = lattice_core::execution_binding::request::AttemptContext {
+        work_id: "instance-1",
+        attempt_id: "attempt-bound",
+        fence: 7,
+        envelope_identity: "revision-1",
+        profile_revision: "profile-1",
+    };
+    let lattice_core::execution_binding::admission::Decision::Admitted(admitted) =
+        lattice_core::execution_binding::admission::admit(
+            &declaration,
+            &requirement,
+            attempt,
+            lattice_core::execution_binding::admission::ProviderReading::NotRead,
+        )
+    else {
+        panic!("host-local binding admits");
+    };
+    let mut observation = observation();
+    observation.scope = Scope::Attempt;
+    observation.run_id = 0;
+    observation.node_id = 0;
+    observation.attempt_id = "attempt-bound".into();
+    observation.agent_invocations = None;
+    observation.model_requests = None;
+    observation.subagent_calls = None;
+    observation.tokens = None;
+    observation.cost_microunits = None;
+    observation.provenance = UsageProvenance::HostMeasured;
+    observation.complete = false;
+    observation.execution_binding = Some(lattice_core::execution_binding::projection::accounting::provenance(
+        &admitted,
+        &observation.invocation_id,
+        lattice_core::execution_binding::projection::accounting::WorkerCoverage::HostMeasured,
+    ));
+    observation
+}
+
+// r[verify lattice.execution_binding.usage_provenance]
+// r[verify lattice.execution_binding.usage_provenance.scenario.bound]
+#[test]
+fn historical_rows_without_binding_decode_as_unknown_provenance() {
+    let json = observation().to_json().expect("historical row");
+    assert!(!json.contains("execution_binding"));
+    assert_eq!(CommandWorkerObservation::from_json(&json).expect("decodes").execution_binding, None);
+    let bound = attempt_observation();
+    let json = bound.to_json().expect("attempt receipt");
+    assert_eq!(CommandWorkerObservation::from_json(&json), Ok(bound));
+}
+
+#[test]
+fn attempt_scope_requires_binding_and_forbids_accounting_runs_and_worker_values() {
+    assert_eq!(attempt_observation().validate(), Ok(()));
+    type Mutation = fn(&mut CommandWorkerObservation);
+    let mutations: &[Mutation] = &[
+        |observation| observation.execution_binding = None,
+        |observation| observation.run_id = 1,
+        |observation| observation.node_id = 1,
+        |observation| observation.complete = true,
+        |observation| observation.tokens = Some(0),
+        |observation| observation.model_requests = Some(0),
+        |observation| observation.duration_millis = None,
+        |observation| observation.provenance = UsageProvenance::ProviderReported,
+        |observation| observation.attempt_id = "attempt-other".into(),
+        |observation| observation.invocation_id = "invocation-other".into(),
+        |observation| observation.scope = Scope::Run,
+        |observation| {
+            if let Some(binding) = observation.execution_binding.as_mut() {
+                binding.coverage.unknown_owner.model_requests = "nobody".into();
+            }
+        },
+    ];
+    for mutate in mutations {
+        let mut observation = attempt_observation();
+        mutate(&mut observation);
+        assert!(observation.validate().is_err(), "{observation:?}");
+    }
+    let mut unknown = attempt_observation();
+    unknown.provenance = UsageProvenance::Unknown;
+    unknown.duration_millis = None;
+    if let Some(binding) = unknown.execution_binding.as_mut() {
+        binding.coverage.worker_process =
+            lattice_core::execution_binding::projection::accounting::WorkerCoverage::Unknown;
+    }
+    assert_eq!(unknown.validate(), Ok(()), "unmeasured duration stays unknown");
 }

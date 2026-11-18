@@ -199,6 +199,12 @@ struct ExportWorkflowArgs {
 struct ImportWorkflowArgs {
     /// Nickel workflow file to import
     path: PathBuf,
+    /// Compile captured modules with the selected native graph-construction target.
+    #[arg(long)]
+    construction: bool,
+    /// Additional explicitly captured relative modules (no ambient import resolution).
+    #[arg(long, requires = "construction")]
+    member: Vec<String>,
 }
 
 #[derive(clap::Args, Debug)]
@@ -512,7 +518,7 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
         return Ok(lattice::render::cli::run(&app_config, render_args));
     }
     if let Some(CliCommand::Authoring(authoring_args)) = &args.command {
-        if matches!(&authoring_args.command, lattice::authoring::cli::Command::Draft { .. }) {
+        if matches!(&authoring_args.command, lattice::authoring::cli::Command::Draft(_)) {
             std::fs::create_dir_all(&app_config.data_dir).map_err(|source| lattice::error::Error::Io { source })?;
         }
         let store = open_store(&app_config).map_err(|message| lattice::error::Error::Config { message })?;
@@ -1867,8 +1873,26 @@ fn export_workflow_command(app_config: &config::AppConfig, args: &ExportWorkflow
 }
 
 // r[impl n8nclone.workflow_format.nickel.import]
+// r[impl lattice.graph_construction.profile.cli]
 fn import_workflow_command(app_config: &config::AppConfig, args: &ImportWorkflowArgs) -> ExitCode {
-    let workflow = match workflow_format::load_workflow_nickel_file(&args.path) {
+    let loaded = if args.construction {
+        (|| {
+            let mut program =
+                lattice::authoring::shell::capture_file(&args.path, lattice::authoring::ProgramKind::Construction)?;
+            let root = args
+                .path
+                .parent()
+                .filter(|parent| !parent.as_os_str().is_empty())
+                .unwrap_or(std::path::Path::new("."));
+            lattice::authoring::shell::capture_members(&mut program, root, &args.member)?;
+            // The compiled candidate is durably previewed and replayed at import admission.
+            lattice::authoring::shell::compile(&program)
+        })()
+        .map_err(str::to_owned)
+    } else {
+        workflow_format::load_workflow_nickel_file(&args.path).map_err(|error| error.to_string())
+    };
+    let workflow = match loaded {
         Ok(workflow) => workflow,
         Err(error) => {
             eprintln!("Import failed: {error}");
@@ -1893,8 +1917,8 @@ fn import_workflow_command(app_config: &config::AppConfig, args: &ImportWorkflow
         }
     };
 
-    match save_workflow_with_import_triggers(&store, &workflow) {
-        Ok(()) => {
+    match save_workflow_with_import_triggers(&store, workflow) {
+        Ok(workflow) => {
             println!("Imported '{}'", workflow.meta.name);
             if workflow.authoring.is_none() {
                 eprintln!("Author source retention unavailable; imported materialized workflow only");
@@ -1908,14 +1932,38 @@ fn import_workflow_command(app_config: &config::AppConfig, args: &ImportWorkflow
     }
 }
 
-fn save_workflow_with_import_triggers(store: &Store, workflow: &lattice::engine::Workflow) -> Result<(), String> {
+fn save_workflow_with_import_triggers(
+    store: &Store,
+    workflow: lattice::engine::Workflow,
+) -> Result<lattice::engine::Workflow, String> {
     let previous = store.load_workflow(&workflow.meta.name).map_err(|error| error.to_string())?;
-    let expected = previous.as_ref().and_then(|workflow| workflow.catalog_revision.as_ref());
-    store.admit_imported_workflow(workflow, expected).map_err(|error| error.to_string())?;
+    let expected = previous.and_then(|workflow| workflow.catalog_revision);
+    let workflow = if let Some(source) = workflow
+        .authoring
+        .as_ref()
+        .filter(|source| source.state == lattice::authoring::AssociationState::CapturedModules)
+    {
+        let draft = lattice::authoring::SourceDraft {
+            id: format!("import-{:032x}", rand::random::<u128>()),
+            workflow_name: workflow.meta.name.clone(),
+            expected_revision: expected,
+            program: source.program.as_ref().clone(),
+            diagnostic: None,
+            preview: Some(lattice::authoring::SourcePreview {
+                input_identity: source.source_revision.clone(),
+                compiler: source.compiler.clone(),
+                candidate: workflow,
+            }),
+        };
+        store.save_source_draft(&draft).map_err(|error| error.to_string())?;
+        store.admit_source_draft(&draft).map_err(|error| error.to_string())?
+    } else {
+        store.admit_imported_workflow(&workflow, expected.as_ref()).map_err(|error| error.to_string())?
+    };
     for trigger in &workflow.triggers {
         store.save_trigger(trigger).map_err(|error| error.to_string())?;
     }
-    Ok(())
+    Ok(workflow)
 }
 
 // r[impl n8nclone.workflow_format.n8n_json.import_cli]
@@ -1946,8 +1994,8 @@ fn import_n8n_workflow_command(app_config: &config::AppConfig, args: &ImportN8nW
             return ExitCode::FAILURE;
         }
     };
-    match save_workflow_with_import_triggers(&store, &workflow) {
-        Ok(()) => {
+    match save_workflow_with_import_triggers(&store, workflow) {
+        Ok(workflow) => {
             println!("Imported n8n workflow '{}'", workflow.meta.name);
             ExitCode::SUCCESS
         }

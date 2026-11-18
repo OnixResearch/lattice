@@ -30,8 +30,26 @@ interfaces.
 - Material-free configured agent profiles and persisted configuration provenance;
   these do not advertise worker ownership, compute reservations or service readiness.
 - Captured workflow-source drafts with durable revision CAS, explicit admission,
-  exact source archives and materialized-fork tracking. Complete module closure
-  and Choregraph construction origins remain unqualified.
+  exact source archives and materialized-fork tracking.
+- Native graph construction for captured Nickel programs (#20, #21):
+  `import --construction` and `authoring draft --construction|--parameterized`
+  evaluate captured modules in the companion `lattice-closed-eval-worker`
+  (nickel-eval's captured-module profile) and compile them through Choregraph's
+  `choregraph.graph-construction.v1` into the existing admission path. Workflows
+  retain the observed module closure, template/instance origins (`authoring
+  origin`, TUI navigation) and exact v3 runtime bindings; effects stay denied
+  until a separate exact v3 grant is selected. Qualification runs on the host with
+  `nix run .#construction-runtime-qualification -- NEW_DIR`, because a Nix build
+  sandbox cannot present root-owned store executables.
+- Worker compute binding for implementation attempts (#24 compute half, #13
+  provenance): the `lattice.compute-allocation-observation.v1` consumer DTO for
+  Aspen `aac7b5ba` compute-capacity records with bounded pure validation, a
+  read-only injected `ComputeAllocationPort` (the standalone CLI uses
+  `UnavailableComputePort`; embedders use `run_command_with_compute_port`), pure
+  admission and pre-spawn revalidation, `execution-binding.json` written before
+  the intent, `implementation-attempt inspect`, and `Scope::Attempt` usage
+  provenance. Producer references stay opaque; no live provider, enforcement or
+  serving qualification is claimed.
 - A finite, deterministic `workflow-intent` compile/compare boundary over explicit
   host-normalized facts. Plans are inert; typed Cairn/Kiln producer integration
   and execution acceptance remain separate prerequisites.
@@ -42,6 +60,23 @@ interfaces.
 
 ### Changed
 
+- Adopted published Choregraph `c3577352` and nickel-eval `f0ea0d2a` from their
+  canonical Radicle seeds. The producer carries the imported-JSON merge repair, so
+  the vendored `nickel-lang-core` snapshot and root patch are removed, along with
+  52 transitive crates the crates.io `nickel-lang` REPL/formatter pulled in.
+  Construction and restricted-lowering callers use the responsibility-qualified
+  Choregraph APIs; persisted workflow/source archive keys are unchanged.
+- **Breaking:** implementation-attempt requests are `lattice.implementation-attempt-run.v3`.
+  Since 0.1.0 they dropped shared-network/namespace fields (scoped broker
+  profiles require explicit readmission) and now require `worker_compute` and
+  `execution_binding`; v1 and v2 requests are refused before any effect.
+- Tests that need the immutable captured worker or v3 runtime are ignored in plain
+  Cargo and `nextest` and run only in the host qualification; captured evaluation
+  fails closed when no worker is selected.
+- Re-keyed the root and `lattice-core` Octet baselines after the root manifest
+  changed (the pinned Octet hashes `Cargo.toml` into finding identities). New
+  findings were fixed in code; the semantic finding multiset only shrank
+  (root 1055 → 1052, core 25 → 25).
 - Removed stale repository-verifier, source-byte and marker-placement snapshot
   tests instead of re-pinning formatting, URL literals, counts, byte hashes or
   private-module locations. Actual Cargo/Nix checks and native lifecycle
@@ -49,8 +84,6 @@ interfaces.
 - Corrected shell-preview activation fixtures to request only their actual
   round/duration accounting; production worker/model admission remains closed
   without a qualified worker profile.
-- Implementation-attempt requests use version 2 and remove shared-network/namespace
-  fields; scoped broker profiles require explicit readmission.
 
 - Orchestration retains reservation, conservative charges, host duration, partial
   provider observations, and unknown usage separately before settlement. Actual

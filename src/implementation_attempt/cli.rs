@@ -1,13 +1,19 @@
 //! Operator-owned one-attempt shell over the existing isolated OMP worker.
 mod artifacts;
+mod binding;
 mod cancellation;
 mod execution;
 mod export;
+mod inspect;
 mod recovery;
 #[cfg(test)]
 mod tests;
 
-pub const REQUEST_SCHEMA: &str = "lattice.implementation-attempt-run.v2";
+// r[impl lattice.execution_binding.profile_facts.scenario.unsupported]
+// r[impl lattice.execution_binding.persistence.scenario.changed_binding]
+pub const REQUEST_SCHEMA: &str = "lattice.implementation-attempt-run.v3";
+/// Refused before any effect; such requests need explicit readmission as v3.
+pub const LEGACY_REQUEST_SCHEMA: &str = "lattice.implementation-attempt-run.v2";
 const MAX_REQUEST_BYTES: usize = 2_097_152;
 const MAX_OUTPUT_BYTES: usize = 16_777_216;
 
@@ -53,6 +59,13 @@ pub enum Command {
         #[arg(long)]
         output_parent: std::path::PathBuf,
     },
+    /// Print separate profile and instance facts without executing anything.
+    Inspect {
+        #[arg(long)]
+        request: std::path::PathBuf,
+        #[arg(long)]
+        state: std::path::PathBuf,
+    },
 }
 
 /// Exported typed configuration, not worker-provided completion assertions.
@@ -72,6 +85,10 @@ pub struct Request {
     pub output_limit_bytes: usize,
     #[serde(default)]
     pub allow_unchanged: bool,
+    /// Compute the worker profile requires; part of the profile revision.
+    pub worker_compute: lattice_core::execution_binding::request::ComputeRequirement,
+    /// Per-attempt expected compute allocation and model routes.
+    pub execution_binding: lattice_core::execution_binding::request::Declaration,
 }
 
 impl Request {
@@ -84,6 +101,7 @@ impl Request {
             &self.write_paths,
             self.output_limit_bytes,
             self.allow_unchanged,
+            &self.worker_compute,
         ))
         .map_err(|error| error.to_string())?;
         Ok(blake3::hash(&bytes).to_hex().to_string())
@@ -101,7 +119,7 @@ impl Request {
         {
             return Err("implementation request is stale, crossed or unsupported".into());
         }
-        Ok(())
+        binding::validate_request(self)
     }
 
     fn validate_execution(&self, now_ms: u64) -> Result<(), String> {
@@ -137,12 +155,22 @@ fn now_ms() -> Result<u64, String> {
 }
 
 // r[impl lattice.implementation_attempt.consumer]
+// r[impl lattice.execution_binding.port_boundary.scenario.unavailable]
 pub async fn run_command(args: &CommandArgs) -> Result<(), String> {
+    run_command_with_compute_port(args, &mut crate::execution_binding::UnavailableComputePort).await
+}
+
+/// Run with an embedder-supplied read-only compute port.
+pub async fn run_command_with_compute_port(
+    args: &CommandArgs,
+    port: &mut dyn crate::execution_binding::ComputeAllocationPort,
+) -> Result<(), String> {
     match &args.command {
         Command::Cancel { request, state } => cancel(request, state),
         Command::Prepare { request, output } => prepare(request, output),
-        Command::Run { request, state } => execution::run(request, state, true).await,
-        Command::Recover { request, state } => execution::run(request, state, false).await,
+        Command::Run { request, state } => execution::run(request, state, Some(port)).await,
+        Command::Recover { request, state } => execution::run(request, state, None).await,
+        Command::Inspect { request, state } => inspect::run(request, state),
         Command::ExportCandidate {
             request,
             state,
@@ -151,6 +179,8 @@ pub async fn run_command(args: &CommandArgs) -> Result<(), String> {
     }
 }
 
+/// Request cancellation only; no compute port is called and nothing is released.
+// r[impl lattice.execution_binding.recovery.scenario.cancellation]
 fn cancel(request_path: &std::path::Path, state: &std::path::Path) -> Result<(), String> {
     let (request, bytes) = artifacts::load_request(request_path)?;
     request.envelope.validate().map_err(|error| error.to_string())?;
@@ -170,6 +200,7 @@ fn normalized_request(request_path: &std::path::Path) -> Result<(Request, Vec<u8
     request.omp.base_identity = crate::candidate::snapshot_identity(&baseline).map_err(|error| error.to_string())?;
     request.envelope.worker_profile = request.worker_profile_identity()?;
     request.admitted_envelope = request.envelope.identity();
+    binding::normalize_primary_route(&mut request)?;
     request.validate(now_ms()?)?;
     let bytes = serde_json::to_vec_pretty(&request).map_err(|error| error.to_string())?;
     Ok((request, bytes))

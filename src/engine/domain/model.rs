@@ -175,6 +175,14 @@ impl WorkflowGraph {
         }
     }
 
+    /// Preserve identities from an already-admitted graph and restore allocator high-water marks.
+    pub(crate) fn from_admitted_nodes(nodes: BTreeMap<NodeId, Node>) -> Result<Self, GraphError> {
+        let mut graph = Self::new();
+        graph.nodes = nodes;
+        graph.restore_indexes()?;
+        Ok(graph)
+    }
+
     pub fn nodes(&self) -> impl Iterator<Item = &Node> {
         self.nodes.values()
     }

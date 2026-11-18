@@ -128,6 +128,7 @@ pub mod control_flow {
 pub mod credentials;
 pub mod engine;
 pub mod error;
+pub mod execution_binding;
 #[path = "workflow/expression/dependencies.rs"]
 pub mod expression_dependencies;
 pub mod expressions;

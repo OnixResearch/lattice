@@ -35,8 +35,8 @@ const MINIMUM_TIMEOUT_MS: u64 = 1;
 
 #[derive(Clone, Copy)]
 pub struct FrozenProjection<'a> {
-    pub projected: &'a choregraph_choreography::ProjectedChoreography,
-    pub bundle: &'a choregraph_choreography::ProjectionBundle,
+    pub projected: &'a choregraph_choreography::endpoint::Projected,
+    pub bundle: &'a choregraph_choreography::linkage::ProjectionBundle,
 }
 
 #[derive(serde::Serialize)]
@@ -56,7 +56,8 @@ pub fn admit_projection(input: FrozenProjection<'_>) -> Result<Cohort, Error> {
     {
         return Err(Issue::UnsupportedCohort.into());
     }
-    choregraph_choreography::verify_projection_receipt(input.bundle, receipt, &input.bundle.receipt().packed_bytes)
+    let receipt_bytes = &input.bundle.receipt().packed_bytes;
+    choregraph_choreography::linkage::verify_projection_receipt(input.bundle, receipt, receipt_bytes)
         .map_err(|_| Issue::IdentityMismatch)?;
     verify_projected_artifacts(input)?;
 
@@ -147,19 +148,19 @@ pub fn plan_session(cohort: Cohort, placements: Vec<RolePlacement>, nonce: Ident
 }
 
 fn verify_projected_artifacts(input: FrozenProjection<'_>) -> Result<(), Error> {
-    let global = choregraph_kamacite::encode_role_choreography_global(&input.projected.global)
+    let global = choregraph_kamacite::profile::protocol::encode_global(&input.projected.global)
         .map_err(|_| Issue::IdentityMismatch)?;
     if global.packed_bytes != input.bundle.global().packed_bytes {
         return Err(Issue::IdentityMismatch.into());
     }
-    let local_set = choregraph_kamacite::encode_role_choreography_local_set(&input.projected.locals)
+    let local_set = choregraph_kamacite::profile::protocol::encode_local_set(&input.projected.locals)
         .map_err(|_| Issue::IdentityMismatch)?;
     if local_set.packed_bytes != input.bundle.local_set().packed_bytes {
         return Err(Issue::IdentityMismatch.into());
     }
     for (local, artifact) in input.projected.locals.locals.iter().zip(input.bundle.locals()) {
         let encoded =
-            choregraph_kamacite::encode_role_choreography_local(local).map_err(|_| Issue::IdentityMismatch)?;
+            choregraph_kamacite::profile::protocol::encode_local(local).map_err(|_| Issue::IdentityMismatch)?;
         if encoded.packed_bytes != artifact.artifact.packed_bytes {
             return Err(Issue::IdentityMismatch.into());
         }
@@ -168,8 +169,8 @@ fn verify_projected_artifacts(input: FrozenProjection<'_>) -> Result<(), Error> 
 }
 
 fn validate_placement(definition: &RoleDefinition, placement: &RolePlacement) -> Result<(), Error> {
-    let maximum_envelope_bytes =
-        u64::try_from(choregraph_choreography::MAX_CANONICAL_OUTPUT_BYTES).map_err(|_| Issue::InvalidPlacement)?;
+    let maximum_envelope_bytes = u64::try_from(choregraph_choreography::model::bounds::MAX_CANONICAL_OUTPUT_BYTES)
+        .map_err(|_| Issue::InvalidPlacement)?;
     let has_matching_role = definition.role == placement.role;
     let has_valid_byte_limit = placement.limits.max_envelope_bytes >= MINIMUM_LIMIT
         && placement.limits.max_envelope_bytes <= maximum_envelope_bytes;
@@ -196,14 +197,14 @@ fn validate_placement(definition: &RoleDefinition, placement: &RolePlacement) ->
     }
 }
 
-fn producer_identity(identity: &choregraph_choreography::ChoreographyIdentity) -> Result<Identity, Error> {
-    Identity::new(choregraph_choreography::prefixed_identity(identity))
+fn producer_identity(identity: &choregraph_choreography::linkage::digest::Identity) -> Result<Identity, Error> {
+    Identity::new(choregraph_choreography::linkage::digest::prefixed_identity(identity))
 }
 
-fn role_kind(kind: &choregraph_choreography::RoleKind) -> Result<RoleKind, Error> {
+fn role_kind(kind: &choregraph_choreography::model::participants::RoleKind) -> Result<RoleKind, Error> {
     match kind {
-        choregraph_choreography::RoleKind::Native => Ok(RoleKind::Native),
-        choregraph_choreography::RoleKind::External {
+        choregraph_choreography::model::participants::RoleKind::Native => Ok(RoleKind::Native),
+        choregraph_choreography::model::participants::RoleKind::External {
             contract_identity,
             input_schema_identity,
             output_schema_identity,
@@ -215,17 +216,17 @@ fn role_kind(kind: &choregraph_choreography::RoleKind) -> Result<RoleKind, Error
     }
 }
 
-fn local_branch(branch: &choregraph_choreography::LocalProtocolBranch) -> Result<Branch, Error> {
+fn local_branch(branch: &choregraph_choreography::endpoint::LocalProtocolBranch) -> Result<Branch, Error> {
     Ok(Branch {
         label: super::model::LabelId(branch.label.0),
         body: convert_local(&branch.body)?,
     })
 }
 
-fn convert_local(protocol: &choregraph_choreography::LocalProtocol) -> Result<RoleProgram, Error> {
+fn convert_local(protocol: &choregraph_choreography::endpoint::LocalProtocol) -> Result<RoleProgram, Error> {
     Ok(match protocol {
-        choregraph_choreography::LocalProtocol::End => RoleProgram::End,
-        choregraph_choreography::LocalProtocol::Send {
+        choregraph_choreography::endpoint::LocalProtocol::End => RoleProgram::End,
+        choregraph_choreography::endpoint::LocalProtocol::Send {
             peer,
             label,
             payload_tag,
@@ -236,7 +237,7 @@ fn convert_local(protocol: &choregraph_choreography::LocalProtocol) -> Result<Ro
             payload_tag: super::model::PayloadTag(payload_tag.0),
             next: Box::new(convert_local(next)?),
         },
-        choregraph_choreography::LocalProtocol::Receive {
+        choregraph_choreography::endpoint::LocalProtocol::Receive {
             peer,
             label,
             payload_tag,
@@ -247,7 +248,7 @@ fn convert_local(protocol: &choregraph_choreography::LocalProtocol) -> Result<Ro
             payload_tag: super::model::PayloadTag(payload_tag.0),
             next: Box::new(convert_local(next)?),
         },
-        choregraph_choreography::LocalProtocol::SendOwned {
+        choregraph_choreography::endpoint::LocalProtocol::SendOwned {
             peer,
             label,
             payload_tag,
@@ -260,7 +261,7 @@ fn convert_local(protocol: &choregraph_choreography::LocalProtocol) -> Result<Ro
             value: super::model::ValueId(value.0),
             next: Box::new(convert_local(next)?),
         },
-        choregraph_choreography::LocalProtocol::ReceiveOwned {
+        choregraph_choreography::endpoint::LocalProtocol::ReceiveOwned {
             peer,
             label,
             payload_tag,
@@ -273,10 +274,10 @@ fn convert_local(protocol: &choregraph_choreography::LocalProtocol) -> Result<Ro
             value: super::model::ValueId(value.0),
             next: Box::new(convert_local(next)?),
         },
-        choregraph_choreography::LocalProtocol::InternalChoice { branches } => RoleProgram::InternalChoice {
+        choregraph_choreography::endpoint::LocalProtocol::InternalChoice { branches } => RoleProgram::InternalChoice {
             branches: branches.iter().map(local_branch).collect::<Result<_, _>>()?,
         },
-        choregraph_choreography::LocalProtocol::Offer { from, branches } => RoleProgram::Offer {
+        choregraph_choreography::endpoint::LocalProtocol::Offer { from, branches } => RoleProgram::Offer {
             from: RoleId(from.0),
             branches: branches.iter().map(local_branch).collect::<Result<_, _>>()?,
         },

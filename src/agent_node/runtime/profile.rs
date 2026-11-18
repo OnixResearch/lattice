@@ -131,3 +131,64 @@ impl super::super::RuntimeOptions {
         })
     }
 }
+
+impl super::super::RuntimeOptions {
+    /// `lattice.worker-profile-facts.v1` for the configured routes. Compute
+    /// reservations and model-service bindings stay unavailable, executable
+    /// bytes stay unknown, and appearing in configuration never qualifies a
+    /// route.
+    // r[impl lattice.execution_binding.profile_facts.scenario.compatibility]
+    pub fn worker_profile_facts(
+        &self,
+    ) -> Result<Vec<lattice_core::execution_binding::projection::inventory::WorkerProfileFacts>, super::super::Error>
+    {
+        self.configured_profiles()?.iter().map(configured_facts).collect()
+    }
+}
+
+fn configured_facts(
+    profile: &ConfiguredProfile,
+) -> Result<lattice_core::execution_binding::projection::inventory::WorkerProfileFacts, super::super::Error> {
+    let outputs = profile.output_modes.iter().map(super::super::OutputMode::as_str).collect::<Vec<_>>().join(",");
+    let max_output_bytes = u64::try_from(profile.max_output_bytes)
+        .map_err(|_| super::super::Error::PreflightRejected("configured output bound is unaddressable".into()))?;
+    debug_assert_eq!(profile.compute_reservations, CompatibilitySupport::Unsupported);
+    debug_assert_eq!(profile.model_service_bindings, CompatibilitySupport::Unsupported);
+    let unknown = lattice_core::execution_binding::projection::Offered::Unknown;
+    let inputs = match profile.image_inputs {
+        CompatibilitySupport::Unsupported => {
+            lattice_core::execution_binding::projection::Offered::Declared("text-prompt-without-images")
+        }
+        CompatibilitySupport::Unknown => unknown,
+    };
+    lattice_core::execution_binding::projection::inventory::project_profile(
+        &lattice_core::execution_binding::projection::inventory::ProfileInput {
+            owner: lattice_core::execution_binding::projection::inventory::ProfileOwner::ConfiguredRuntime,
+            revision: &profile.binding.revision,
+            qualification_ref: None,
+            adapter: lattice_core::execution_binding::projection::Offered::Declared(profile.adapter),
+            protocol_revision: lattice_core::execution_binding::projection::Offered::Declared(profile.protocol),
+            executable_identity: unknown,
+            inputs,
+            outputs: lattice_core::execution_binding::projection::Offered::Declared(&outputs),
+            sessions: limit(profile.sessions),
+            checkpoint: limit(profile.checkpoint),
+            workspace: unknown,
+            network: unknown,
+            isolation: unknown,
+            deadline_secs: lattice_core::execution_binding::projection::Offered::Declared(profile.deadline_secs),
+            max_output_bytes: lattice_core::execution_binding::projection::Offered::Declared(max_output_bytes),
+            model_routes: lattice_core::execution_binding::projection::Offered::Unavailable,
+            compute: lattice_core::execution_binding::projection::Offered::Unavailable,
+        },
+    )
+    .map_err(|defect| super::super::Error::PreflightRejected(format!("configured profile facts: {defect:?}")))
+}
+
+/// `Unsupported` stays unavailable and `Unknown` stays unknown.
+fn limit(value: CompatibilitySupport) -> lattice_core::execution_binding::projection::Offered<&'static str> {
+    match value {
+        CompatibilitySupport::Unsupported => lattice_core::execution_binding::projection::Offered::Unavailable,
+        CompatibilitySupport::Unknown => lattice_core::execution_binding::projection::Offered::Unknown,
+    }
+}

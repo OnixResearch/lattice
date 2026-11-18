@@ -89,8 +89,8 @@ pub struct CompiledPlan {
     pub(super) schema: &'static str,
     pub(super) compiler_revision: &'static str,
     pub(super) identity: String,
-    pub(super) graph_identity: choregraph_kamacite::ArtifactIdentity,
-    pub(super) graph: choregraph_kamacite::ConcreteMachineDescriptorV2,
+    pub(super) graph_identity: choregraph_kamacite::identity::ArtifactIdentity,
+    pub(super) graph: choregraph_kamacite::concrete::record::ConcreteMachineDescriptorV2,
     pub(super) intent: Definition,
     pub(super) facts: CompilerFacts,
     pub(super) nodes: Vec<String>,
@@ -107,7 +107,7 @@ impl CompiledPlan {
     pub fn nodes(&self) -> &[String] {
         &self.nodes
     }
-    pub fn graph(&self) -> &choregraph_kamacite::ConcreteMachineDescriptorV2 {
+    pub fn graph(&self) -> &choregraph_kamacite::concrete::record::ConcreteMachineDescriptorV2 {
         &self.graph
     }
 }

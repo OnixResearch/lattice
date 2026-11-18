@@ -1,0 +1,207 @@
+{
+  "kind": "measured-host-run-construction-qualification",
+  "scope": "Linux host with a root-owned Nix store; flake-built release store artifacts at the current producer cohort (Choregraph c3577352ee1e39391f5204ee234d991c7dbeb151, nickel-eval f0ea0d2a31d3482ddf4e575482f6ddf7a7e7d4e9). Bounded consumer evidence, not semantic-equivalence, producer, external-service or release qualification.",
+  "artifacts": {
+    "lattice": "packages.x86_64-linux.lattice (bin/lattice, bin/lattice-closed-eval-worker)",
+    "tests": "packages.x86_64-linux.construction-runtime-tests",
+    "shell_backend": "the flake's reviewed pkgs.bash"
+  },
+  "script_run": {
+    "command": "scripts/construction-runtime-qualification.sh NEW_OUTPUT_DIRECTORY with the environment the app wrapper exports, over the built store artifacts",
+    "exit_code": 1,
+    "unexpected_outcomes": [
+      "run-completed-every-node"
+    ],
+    "cause": "The derived check expected status \"Succeeded\"; the run JSON reports \"succeeded\" (status succeeded, completed 6, failures 0). The expectation is corrected in the script; the flake-app rerun is recorded below.",
+    "wall_time_seconds": 94,
+    "steps": [
+      {
+        "name": "import-construction",
+        "expected": "pass",
+        "exit_code": 0
+      },
+      {
+        "name": "authoring-inspect",
+        "expected": "pass",
+        "exit_code": 0
+      },
+      {
+        "name": "export-author-source",
+        "expected": "pass",
+        "exit_code": 0
+      },
+      {
+        "name": "export-expanded",
+        "expected": "pass",
+        "exit_code": 0
+      },
+      {
+        "name": "negative-export-unlabeled-source",
+        "expected": "fail",
+        "exit_code": 1
+      },
+      {
+        "name": "negative-export-unlabeled-source-absent",
+        "expected": "pass",
+        "exit_code": 0
+      },
+      {
+        "name": "authority-inspect",
+        "expected": "pass",
+        "exit_code": 0
+      },
+      {
+        "name": "origin-node-1..6",
+        "expected": "pass",
+        "exit_code": 0
+      },
+      {
+        "name": "origin-template-instances",
+        "expected": "pass",
+        "exit_code": 0
+      },
+      {
+        "name": "negative-run-without-authority",
+        "expected": "fail",
+        "exit_code": 1
+      },
+      {
+        "name": "negative-run-with-foreign-authority",
+        "expected": "fail",
+        "exit_code": 1
+      },
+      {
+        "name": "run-with-exact-authority",
+        "expected": "pass",
+        "exit_code": 0,
+        "stdout": {
+          "status": "succeeded",
+          "node_count": 6,
+          "completed": 6,
+          "failures": 0
+        }
+      },
+      {
+        "name": "negative-import-wrong-scope-handle",
+        "expected": "fail",
+        "exit_code": 1
+      },
+      {
+        "name": "negative-import-generation-overflow",
+        "expected": "fail",
+        "exit_code": 1
+      },
+      {
+        "name": "authoring-inspect-after-negatives",
+        "expected": "pass",
+        "exit_code": 0
+      },
+      {
+        "name": "rejected-imports-keep-admitted-revision",
+        "expected": "pass",
+        "exit_code": 0
+      }
+    ],
+    "suites": [
+      {
+        "target": "test_construction_authoring --include-ignored",
+        "passed": 11,
+        "failed": 0
+      },
+      {
+        "target": "test_construction_runtime_binding --include-ignored",
+        "passed": 14,
+        "failed": 0,
+        "note": "plus three passing child-process re-invocations"
+      },
+      {
+        "target": "test_construction_qualification --include-ignored",
+        "passed": 8,
+        "failed": 0
+      },
+      {
+        "target": "test_source_authoring --include-ignored",
+        "passed": 30,
+        "failed": 0
+      },
+      {
+        "target": "test_workflow_format flat_v3_file_import_selects_only_missing_runtime_bindings",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "target": "lattice-lib tui::authoring::tests::source_origins_target_only_matching_displayed_source_bytes",
+        "passed": 1,
+        "failed": 0
+      }
+    ],
+    "retained": [
+      "source/local-shell-construction.ncl",
+      "source/local-shell-demo.author.json",
+      "expanded/local-shell-demo.ncl",
+      "commands.tsv",
+      "logs/",
+      "work/"
+    ]
+  },
+  "existing_output_refusal": {
+    "command": "construction-runtime-qualification EXISTING_DIRECTORY",
+    "exit_code": 2,
+    "stderr": "refusing to reuse existing output"
+  },
+  "app_run": {
+    "command": "nix run path:.#construction-runtime-qualification -- NEW_OUTPUT_DIRECTORY (host, after nix build of packages.x86_64-linux.construction-runtime-qualification)",
+    "build_exit_code": 0,
+    "exit_code": 0,
+    "summary": {
+      "unexpected_outcomes": 0,
+      "steps": 28
+    },
+    "negative_controls_observed_failing": [
+      "negative-export-unlabeled-source",
+      "negative-run-without-authority",
+      "negative-run-with-foreign-authority",
+      "negative-import-wrong-scope-handle",
+      "negative-import-generation-overflow"
+    ],
+    "run_with_exact_authority": {
+      "status": "succeeded",
+      "node_count": 6,
+      "completed": 6,
+      "failures": 0
+    },
+    "suites": [
+      {
+        "target": "test_construction_authoring --include-ignored",
+        "passed": 11,
+        "failed": 0
+      },
+      {
+        "target": "test_construction_runtime_binding --include-ignored",
+        "passed": 14,
+        "failed": 0
+      },
+      {
+        "target": "test_construction_qualification --include-ignored",
+        "passed": 8,
+        "failed": 0
+      },
+      {
+        "target": "test_source_authoring --include-ignored",
+        "passed": 32,
+        "failed": 0
+      },
+      {
+        "target": "test_workflow_format flat_v3_file_import_selects_only_missing_runtime_bindings",
+        "passed": 1,
+        "failed": 0
+      },
+      {
+        "target": "lattice-lib tui::authoring::tests::source_origins_target_only_matching_displayed_source_bytes",
+        "passed": 1,
+        "failed": 0
+      }
+    ],
+    "note": "Final source including the ignored-partition change; supersedes script_run."
+  }
+}

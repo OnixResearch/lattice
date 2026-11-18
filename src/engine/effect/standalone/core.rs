@@ -45,6 +45,12 @@ impl Grant {
     /// Return the reviewed policy contract only for a complete, closed grant tuple.
     #[must_use]
     pub fn contract_id(&self) -> Option<&'static str> {
+        if matches!(self.operation.as_str(), "lattice/shell-source" | "lattice/shell-stdin")
+            && self.ability == "process/execute"
+            && self.resource == crate::authoring::construction::RESOURCE
+        {
+            return Some("lattice-process");
+        }
         let (resource_prefix, contract) = match (self.operation.as_str(), self.ability.as_str()) {
             ("lattice/shell" | "lattice/operation", "process/execute") => (PROCESS_RESOURCE_PREFIX, "lattice-process"),
             ("lattice/http", "network/request") => (NETWORK_RESOURCE_PREFIX, "lattice-network"),

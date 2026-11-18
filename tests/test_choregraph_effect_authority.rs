@@ -991,7 +991,10 @@ async fn v2_handoff_authorizes_executor_network_effect_and_persists_outcome() {
         authority: id(authority::AuthorityIdentity::new, END_TO_END_AUTHORITY_REF),
         scope: authority::CollaborationScopeBinding::Unscoped,
     };
-    let ready = choregraph_core::ConcreteEvent::new(choregraph_node.clone(), choregraph_core::Action::MarkReady);
+    let ready = choregraph_core::concrete::event::ConcreteEvent::new(
+        choregraph_node.clone(),
+        choregraph_core::model::semantics::Action::MarkReady,
+    );
     let lattice::engine::effect::choregraph::TransitionResult::Accepted {
         next: ready_state,
         bindings: ready_bindings,
@@ -1010,7 +1013,7 @@ async fn v2_handoff_authorizes_executor_network_effect_and_persists_outcome() {
             declaration_key: format!("{END_TO_END_DECLARATION_PREFIX}{}", node_id.0),
             node_id: choregraph_node,
             source_node_id: node_id.0.to_string(),
-            action: choregraph_core::Action::Start,
+            action: choregraph_core::model::semantics::Action::Start,
             request_ref,
             payload_ref,
         });

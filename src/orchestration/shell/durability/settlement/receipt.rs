@@ -58,5 +58,7 @@ pub(super) fn host_observation(
             diagnostic: "conservative fallback; qualified worker/service/request bindings require #24; provider cost lacks currency/pricing identity".to_string(),
             outcome: Some(request.status),
         }),
+        // Orchestration Agent nodes have no execution binding.
+        execution_binding: None,
     })
 }

@@ -1,3 +1,188 @@
+// r[verify lattice.execution_binding.profile_facts.scenario.unsupported]
+// r[verify lattice.execution_binding.persistence.scenario.changed_binding]
+
+/// A valid v3 request with one brokered `primary` route.
+pub(super) fn request(
+    attempt_id: &str,
+    compute: lattice_core::execution_binding::request::ComputeRequirement,
+    declared: lattice_core::execution_binding::request::ComputeDeclaration,
+) -> super::Request {
+    let mut envelope = crate::implementation_attempt::ImplementationAttemptEnvelope {
+        schema: crate::implementation_attempt::IMPLEMENTATION_ATTEMPT_ENVELOPE_SCHEMA.into(),
+        work_id: "work-24".into(),
+        work_version: 1,
+        source_kind: crate::implementation_attempt::SourceKind::CairnTask,
+        source_id: "task-24".into(),
+        repository: "OnixResearch/lattice".into(),
+        base: "a".repeat(40),
+        readiness_snapshot: "b".repeat(64),
+        task_spec_digest: "c".repeat(64),
+        verification_profile: "f".repeat(64),
+        attempt_id: attempt_id.into(),
+        fence: 7,
+        workspace_id: "workspace-24".into(),
+        worker_profile: String::new(),
+        budget: crate::implementation_attempt::AttemptBudget {
+            max_turns: 1,
+            max_seconds: 60,
+            max_cost_micros: 1,
+        },
+        policy_digest: "d".repeat(64),
+    };
+    let mut request = super::Request {
+        schema: super::REQUEST_SCHEMA.into(),
+        envelope: envelope.clone(),
+        admitted_envelope: String::new(),
+        expires_at_ms: u64::MAX,
+        workspace_root: "/workspace".into(),
+        read_paths: vec!["src".into()],
+        write_paths: vec!["src".into()],
+        program: "/usr/bin/worker".into(),
+        sandbox_program: "/usr/bin/bwrap".into(),
+        omp: crate::candidate_worker::omp::Profile {
+            revision: crate::candidate_worker::omp::OMP_REVISION.into(),
+            executable_blake3: "e".repeat(64),
+            base_identity: "0".repeat(64),
+            model: "lattice/model".into(),
+            prompt: "make the candidate".into(),
+            model_broker: crate::candidate_worker::broker::Profile {
+                schema: crate::candidate_worker::broker::SCHEMA.into(),
+                endpoint: "https://model.invalid/v1/chat/completions".into(),
+                model: "model".into(),
+                credential: Some(crate::credentials::SecretRef::new("env", "MODEL_TOKEN", None)),
+                relay: crate::candidate_worker::broker::Executable {
+                    path: "/nix/store/relay".into(),
+                    blake3: "a".repeat(64),
+                },
+                shell: crate::candidate_worker::broker::Executable {
+                    path: "/nix/store/shell".into(),
+                    blake3: "b".repeat(64),
+                },
+                sandbox_blake3: "c".repeat(64),
+                expires_at_ms: u64::MAX,
+                max_requests: 1,
+            },
+        },
+        output_limit_bytes: 4096,
+        allow_unchanged: false,
+        worker_compute: compute,
+        execution_binding: lattice_core::execution_binding::request::Declaration {
+            schema: lattice_core::execution_binding::request::DECLARATION_SCHEMA.into(),
+            compute: declared,
+            model_routes: lattice_core::execution_binding::request::RouteDeclaration::NoModel {},
+        },
+    };
+    request.execution_binding.model_routes = lattice_core::execution_binding::request::RouteDeclaration::Routes {
+        routes: vec![super::binding::primary_route(&request).expect("primary route identity")],
+    };
+    envelope.worker_profile = request.worker_profile_identity().expect("profile identity");
+    request.envelope = envelope;
+    request.admitted_envelope = request.envelope.identity();
+    request
+}
+
+pub(super) fn host_local() -> super::Request {
+    request(
+        "attempt-host-local",
+        lattice_core::execution_binding::request::ComputeRequirement::HostLocal {},
+        lattice_core::execution_binding::request::ComputeDeclaration::HostLocal {},
+    )
+}
+
+#[test]
+fn legacy_v2_requests_are_refused_and_name_v3_readmission() {
+    let root = tempfile::tempdir().expect("scratch");
+    let path = root.path().join("request.json");
+    let mut legacy = serde_json::to_value(host_local()).expect("request value");
+    legacy["schema"] = serde_json::Value::from(super::LEGACY_REQUEST_SCHEMA);
+    std::fs::write(&path, serde_json::to_vec(&legacy).expect("legacy bytes")).expect("write legacy");
+    let error = super::artifacts::load_request(&path).expect_err("v2 refused before effects");
+    assert!(error.contains("readmit"), "{error}");
+    assert!(error.contains(super::REQUEST_SCHEMA), "{error}");
+    let mut unknown = serde_json::to_value(host_local()).expect("request value");
+    unknown["worker_compute"] = serde_json::json!({"kind": "gpu_local"});
+    std::fs::write(&path, serde_json::to_vec(&unknown).expect("bytes")).expect("write unknown variant");
+    assert!(super::artifacts::load_request(&path).is_err());
+    let mut extra = serde_json::to_value(host_local()).expect("request value");
+    extra["execution_binding"]["lease"] = serde_json::Value::from("fabricated");
+    std::fs::write(&path, serde_json::to_vec(&extra).expect("bytes")).expect("write unknown field");
+    assert!(super::artifacts::load_request(&path).is_err());
+}
+
+#[test]
+fn unsupported_model_and_compute_declarations_fail_validation() {
+    let request = host_local();
+    request.validate(1).expect("host-local hosted-API request validates");
+    let mut no_model = host_local();
+    no_model.execution_binding.model_routes = lattice_core::execution_binding::request::RouteDeclaration::NoModel {};
+    assert!(no_model.validate(1).expect_err("no-model OMP").contains("no-model"));
+    let mut extra = host_local();
+    if let lattice_core::execution_binding::request::RouteDeclaration::Routes { routes } =
+        &mut extra.execution_binding.model_routes
+    {
+        let mut second = routes[0].clone();
+        second.name = "secondary".into();
+        routes.push(second);
+    }
+    assert!(extra.validate(1).expect_err("extra route").contains("extra routes"));
+    let mut crossed = host_local();
+    if let lattice_core::execution_binding::request::RouteDeclaration::Routes { routes } =
+        &mut crossed.execution_binding.model_routes
+    {
+        routes[0].route_identity = format!("blake3:{}", "9".repeat(64));
+    }
+    assert!(crossed.validate(1).expect_err("substituted route").contains("differs"));
+    let accelerator =
+        request_with_accelerator(lattice_core::execution_binding::request::ComputeDeclaration::HostLocal {});
+    assert!(accelerator.validate(1).expect_err("accelerator on host").contains("placement"));
+}
+
+fn request_with_accelerator(declared: lattice_core::execution_binding::request::ComputeDeclaration) -> super::Request {
+    request(
+        "attempt-accelerator",
+        lattice_core::execution_binding::request::ComputeRequirement::ProviderExecution {
+            direct_accelerator: Some(lattice_core::execution_binding::request::DirectAccelerator {
+                min_chips: 1,
+                accepted_granularities: vec![lattice_core::execution_binding::model::Granularity::Chip],
+                backend: None,
+                runtime: None,
+                architecture: None,
+                minimum_enforcement: lattice_core::execution_binding::model::Enforcement::BackendFenced,
+            }),
+        },
+        declared,
+    )
+}
+
+#[test]
+fn compute_requirement_is_part_of_the_profile_revision() {
+    let mut changed = host_local();
+    changed.worker_compute = lattice_core::execution_binding::request::ComputeRequirement::ProviderExecution {
+        direct_accelerator: None,
+    };
+    assert_ne!(changed.worker_profile_identity().expect("identity"), changed.envelope.worker_profile);
+    assert!(changed.validate(1).expect_err("stale profile revision").contains("stale, crossed"));
+}
+
+#[test]
+fn prepare_normalizes_only_a_single_primary_route() {
+    let mut request = host_local();
+    let expected = super::binding::primary_route(&request).expect("derived route");
+    if let lattice_core::execution_binding::request::RouteDeclaration::Routes { routes } =
+        &mut request.execution_binding.model_routes
+    {
+        routes[0].route_identity = format!("blake3:{}", "0".repeat(64));
+    }
+    super::binding::normalize_primary_route(&mut request).expect("normalized");
+    assert_eq!(
+        request.execution_binding.model_routes,
+        lattice_core::execution_binding::request::RouteDeclaration::Routes { routes: vec![expected] }
+    );
+    request.execution_binding.model_routes = lattice_core::execution_binding::request::RouteDeclaration::NoModel {};
+    super::binding::normalize_primary_route(&mut request).expect("unchanged");
+    assert!(request.validate(1).is_err());
+}
+
 #[test]
 fn intent_is_one_shot_and_crossed_requests_are_refused() {
     let root = tempfile::tempdir().expect("scratch");

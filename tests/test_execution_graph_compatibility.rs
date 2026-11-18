@@ -1,16 +1,16 @@
 use std::collections::BTreeMap;
 
-use seaglass_execution_graph::ExecutionEdge;
-use seaglass_execution_graph::ExecutionGraph;
-use seaglass_execution_graph::ExecutionNode;
-use seaglass_execution_graph::GraphDiagnosticCode;
-use seaglass_execution_graph::ResumeDecision;
-use seaglass_execution_graph::StepAction;
-use seaglass_execution_graph::StepState;
-use seaglass_execution_graph::admit_graph;
-use seaglass_execution_graph::ready_nodes;
-use seaglass_execution_graph::resume_decision;
-use seaglass_execution_graph::transition_step_state;
+use seaglass_execution_graph::admission::GraphDiagnosticCode;
+use seaglass_execution_graph::admission::admit_graph;
+use seaglass_execution_graph::aggregate::ResumeDecision;
+use seaglass_execution_graph::aggregate::ready_nodes;
+use seaglass_execution_graph::aggregate::resume_decision;
+use seaglass_execution_graph::lifecycle::StepAction;
+use seaglass_execution_graph::lifecycle::StepState;
+use seaglass_execution_graph::lifecycle::transition_step_state;
+use seaglass_execution_graph::topology::ExecutionEdge;
+use seaglass_execution_graph::topology::ExecutionGraph;
+use seaglass_execution_graph::topology::ExecutionNode;
 
 const SOURCE: &str = "source";
 const LEFT: &str = "left";

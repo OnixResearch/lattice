@@ -213,9 +213,11 @@ fn runner_and_machine_identities_bind_the_derived_dependency() {
         workflow_format::choregraph::lower_portable(&workflow_format::workflow_to_portable(&with_dependency))
             .expect("projected workflow lowers");
     let plain_machine =
-        choregraph_kamacite::build_concrete_machine_artifact(&plain_lowered.machine).expect("plain machine identity");
-    let projected_machine = choregraph_kamacite::build_concrete_machine_artifact(&projected_lowered.machine)
-        .expect("projected machine identity");
+        choregraph_kamacite::concrete::conversion::build_concrete_machine_artifact(&plain_lowered.machine)
+            .expect("plain machine identity");
+    let projected_machine =
+        choregraph_kamacite::concrete::conversion::build_concrete_machine_artifact(&projected_lowered.machine)
+            .expect("projected machine identity");
 
     assert_eq!(portable_bytes.len(), PORTABLE_BYTE_LENGTH);
     assert_eq!(blake3::hash(&portable_bytes).to_hex().as_str(), PORTABLE_BLAKE3);

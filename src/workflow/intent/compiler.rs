@@ -20,7 +20,7 @@ pub fn compile(mut request: super::CompileRequest) -> Result<super::CompiledPlan
                 "{}/{}/{}",
                 obligation.operation_class, obligation.action_identity, implementation
             )];
-            choregraph_core::NodeSpec::new(&obligation.id, operations)
+            choregraph_core::model::graph::NodeSpec::new(&obligation.id, operations)
         })
         .collect::<Vec<_>>();
     let edges = request
@@ -28,26 +28,32 @@ pub fn compile(mut request: super::CompileRequest) -> Result<super::CompiledPlan
         .obligations
         .iter()
         .flat_map(|obligation| {
-            obligation.prerequisites.iter().map(|source| choregraph_core::EdgeSpec::new(source, &obligation.id))
+            obligation
+                .prerequisites
+                .iter()
+                .map(|source| choregraph_core::model::graph::EdgeSpec::new(source, &obligation.id))
         })
         .collect::<Vec<_>>();
     debug_assert_eq!(nodes.len(), request.intent.obligations.len());
     debug_assert!(edges.len() <= super::MAX_DEPENDENCIES);
     let node_ids = nodes.iter().map(|node| node.id.clone()).collect::<Vec<_>>();
-    let limits = choregraph_core::AdmissionLimits {
+    let limits = choregraph_core::model::capacity::AdmissionLimits {
         max_nodes: super::MAX_OBLIGATIONS,
         max_edges: super::MAX_DEPENDENCIES,
-        max_operations: choregraph_core::DEFAULT_MAX_OPERATIONS,
-        max_effect_declarations: choregraph_core::DEFAULT_MAX_EFFECT_DECLARATIONS,
-        max_identifier_bytes: choregraph_core::DEFAULT_MAX_IDENTIFIER_BYTES,
-        max_reference_bytes: choregraph_core::DEFAULT_MAX_REFERENCE_BYTES,
-        max_event_bytes: choregraph_core::DEFAULT_MAX_EVENT_BYTES,
-        max_intent_bytes: choregraph_core::DEFAULT_MAX_INTENT_BYTES,
-        max_intents_per_transition: choregraph_core::DEFAULT_MAX_INTENTS_PER_TRANSITION,
+        max_operations: choregraph_core::model::capacity::DEFAULT_MAX_OPERATIONS,
+        max_effect_declarations: choregraph_core::model::capacity::DEFAULT_MAX_EFFECT_DECLARATIONS,
+        max_identifier_bytes: choregraph_core::model::capacity::DEFAULT_MAX_IDENTIFIER_BYTES,
+        max_reference_bytes: choregraph_core::model::capacity::DEFAULT_MAX_REFERENCE_BYTES,
+        max_event_bytes: choregraph_core::model::capacity::DEFAULT_MAX_EVENT_BYTES,
+        max_intent_bytes: choregraph_core::model::capacity::DEFAULT_MAX_INTENT_BYTES,
+        max_intents_per_transition: choregraph_core::model::capacity::DEFAULT_MAX_INTENTS_PER_TRANSITION,
     };
-    let machine = choregraph_core::AdmittedMachine::admit_v2(choregraph_core::MachineSpecV2::new(nodes, edges), limits)
-        .map_err(|_| super::Diagnostic::new(super::DiagnosticCode::GraphAdmission, "dependency_dag"))?;
-    let artifact = choregraph_kamacite::build_concrete_machine_artifact(&machine)
+    let machine = choregraph_core::model::automaton::AdmittedMachine::admit_v2(
+        choregraph_core::concrete::machine::MachineSpecV2::new(nodes, edges),
+        limits,
+    )
+    .map_err(|_| super::Diagnostic::new(super::DiagnosticCode::GraphAdmission, "dependency_dag"))?;
+    let artifact = choregraph_kamacite::concrete::conversion::build_concrete_machine_artifact(&machine)
         .map_err(|_| super::Diagnostic::new(super::DiagnosticCode::Encoding, "dependency_dag"))?;
     let identity = plan_identity(&request, &artifact.identity)?;
     Ok(super::CompiledPlan {
@@ -65,7 +71,7 @@ pub fn compile(mut request: super::CompileRequest) -> Result<super::CompiledPlan
 
 fn plan_identity(
     request: &super::CompileRequest,
-    graph: &choregraph_kamacite::ArtifactIdentity,
+    graph: &choregraph_kamacite::identity::ArtifactIdentity,
 ) -> Result<String, super::Diagnostic> {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"lattice.workflow-intent-plan.v1\0");

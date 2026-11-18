@@ -11,7 +11,7 @@
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SessionCreateInput {
-    pub choreography: choregraph_choreography::RoleChoreographySource,
+    pub choreography: choregraph_choreography::model::schema::RoleSource,
     pub placements: Vec<crate::engine::protocol::RolePlacement>,
     pub nonce: crate::engine::protocol::Identity,
 }
@@ -127,12 +127,12 @@ fn load_plan(path: &std::path::Path) -> Result<crate::engine::protocol::SessionP
         serde_json::from_value(value).map_err(|_| crate::engine::protocol::Issue::InvalidPlacement)?;
     let evaluated =
         serde_json::to_vec(&input.choreography).map_err(|_| crate::engine::protocol::Issue::IncompleteArtifacts)?;
-    let admitted = choregraph_choreography::admit_source(input.choreography)
+    let admitted = choregraph_choreography::admission::admit_source(input.choreography)
         .map_err(|_| crate::engine::protocol::Issue::IncompleteArtifacts)?;
-    let projected = choregraph_choreography::project_all(&admitted)
+    let projected = choregraph_choreography::endpoint::project_all(&admitted)
         .map_err(|_| crate::engine::protocol::Issue::IncompleteArtifacts)?;
-    let materials = choregraph_choreography::ProjectionMaterials::reviewed(&source_envelope, &evaluated);
-    let bundle = choregraph_choreography::build_projection_bundle(&admitted, &materials)
+    let materials = choregraph_choreography::linkage::ProjectionMaterials::reviewed(&source_envelope, &evaluated);
+    let bundle = choregraph_choreography::linkage::build_projection_bundle(&admitted, &materials)
         .map_err(|_| crate::engine::protocol::Issue::IncompleteArtifacts)?;
     let cohort = crate::engine::protocol::admit_projection(crate::engine::protocol::FrozenProjection {
         projected: &projected,

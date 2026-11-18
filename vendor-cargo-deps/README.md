@@ -2,18 +2,17 @@
 
 These snapshots keep product builds independent of sibling checkout paths. The
 import scripts copy only explicitly selected Git archive paths; Basalt, Host
-Control, hardened runtime, Mantle and the Nickel snapshot also write a `SOURCE`
+Control, hardened runtime and Mantle also write a `SOURCE`
 file with the repository and exact revision, while Rats and Animus record their
 revisions below.
 
 - `rats/source/` comes from Rats revision `ef26e13b2e9cbcb4a0c902f9caff641b6d013867`.
-- `animus/` comes from Animus revision `f1662a8ed290b170c3986d2ddf2909b36d7e5fdc`.
+- `animus/` comes from Animus revision `51d2683776ab73d4fd36d3d9e6ced2beadf9793d`, as recorded in `animus/source.ncl`.
 - `host-control/` comes from Host Control revision `7735faf3d8895b0bfa89f563184c4321b3b144a1`.
 - `basalt/` comes from Basalt revision `b34d6ac27ad396530fb799e79223acf71112ee0f`.
 - `hardened-wasmtime-runtime/` comes from shared runtime revision `1d642fa5cba7ce8a6d8f127f28ec6d8505842378`.
 - `mantle/` comes from Mantle revision `dcf4b51b3210f25f08e96d4e7bc1653d2fbcd240`.
 - `bounded-exec/` is an exact source snapshot at revision `29dac88ecded94457572db3fdfaaaab95fa91525`, imported from the public GitHub mirror and verified byte-for-byte against the admitted Radicle tree (`fc0b6f75a01088faf4f22be57edc073a3fe45e54`). The Radicle RID remains `rad:z2CpqLFpdP36fZXYUK5ZNWxMibpCo`; the snapshot is not a live GitHub fallback.
-- `nickel-lang-core-0.18.0/` is a byte-exact snapshot of the producer repair at nickel-eval revision `b4ddff052105eb4b75827e228a65b823dc1a0444` (tag `nickel-eval-import-closurization-20261016`), selected by the root `[patch.crates-io]` entry. Refresh it with the producer's `scripts/import-nickel-core.py` from that revision.
 
 The snapshots preserve source provenance. They do not transfer correctness claims.
 

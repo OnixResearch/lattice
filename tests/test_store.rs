@@ -178,6 +178,7 @@ fn command_worker_usage_persists_and_revalidates() {
         provenance: UsageProvenance::ProviderReported,
         complete: true,
         accounting: None,
+        execution_binding: None,
     };
     store.save_command_worker_usage(&observation).expect("usage saves");
     store.save_command_worker_usage(&observation).expect("identical usage is idempotent");

@@ -16,13 +16,19 @@ pub fn replay_request(
             return Err(error(AdapterErrorCode::UnknownNode, "Choregraph replay omitted a workflow node"));
         };
         let persisted = match local {
-            choregraph_core::LocalState::Completed => Some(crate::workflow::gate::model::PersistedNodeState::Completed),
-            choregraph_core::LocalState::Failed => Some(crate::workflow::gate::model::PersistedNodeState::Failed),
-            choregraph_core::LocalState::Cancelled => Some(crate::workflow::gate::model::PersistedNodeState::Cancelled),
-            choregraph_core::LocalState::Pending
-            | choregraph_core::LocalState::Ready
-            | choregraph_core::LocalState::Running
-            | choregraph_core::LocalState::Suspended => None,
+            choregraph_core::model::semantics::LocalState::Completed => {
+                Some(crate::workflow::gate::model::PersistedNodeState::Completed)
+            }
+            choregraph_core::model::semantics::LocalState::Failed => {
+                Some(crate::workflow::gate::model::PersistedNodeState::Failed)
+            }
+            choregraph_core::model::semantics::LocalState::Cancelled => {
+                Some(crate::workflow::gate::model::PersistedNodeState::Cancelled)
+            }
+            choregraph_core::model::semantics::LocalState::Pending
+            | choregraph_core::model::semantics::LocalState::Ready
+            | choregraph_core::model::semantics::LocalState::Running
+            | choregraph_core::model::semantics::LocalState::Suspended => None,
         };
         if let Some(persisted) = persisted {
             result.push((node.id, persisted));
@@ -35,11 +41,11 @@ pub fn replay_request(
 
 fn approval_machine(
     workflow: &crate::engine::workflow::Workflow,
-) -> Result<choregraph_core::AdmittedMachine, AdapterError> {
+) -> Result<choregraph_core::model::automaton::AdmittedMachine, AdapterError> {
     let nodes = workflow
         .graph
         .nodes()
-        .map(|node| choregraph_core::NodeSpec::new(node_reference(node.id), Vec::new()))
+        .map(|node| choregraph_core::model::graph::NodeSpec::new(node_reference(node.id), Vec::new()))
         .collect::<Vec<_>>();
     let node_count = nodes.len();
     let port_owners = workflow
@@ -62,31 +68,33 @@ fn approval_machine(
     edge_pairs.dedup();
     let edges = edge_pairs
         .into_iter()
-        .map(|(source, target)| choregraph_core::EdgeSpec::new(node_reference(source), node_reference(target)))
+        .map(|(source, target)| {
+            choregraph_core::model::graph::EdgeSpec::new(node_reference(source), node_reference(target))
+        })
         .collect::<Vec<_>>();
-    let mut spec = choregraph_core::MachineSpec::new(nodes, edges);
+    let mut spec = choregraph_core::model::automaton::MachineSpec::new(nodes, edges);
     spec.lifecycle_profile = crate::workflow::gate::model::CHOREGRAPH_SUSPENSION_PROFILE.to_owned();
-    let limits = choregraph_core::AdmissionLimits {
-        max_nodes: choregraph_core::DEFAULT_MAX_NODES,
-        max_edges: choregraph_core::DEFAULT_MAX_EDGES,
-        max_operations: choregraph_core::DEFAULT_MAX_OPERATIONS,
-        max_effect_declarations: choregraph_core::DEFAULT_MAX_EFFECT_DECLARATIONS,
-        max_identifier_bytes: choregraph_core::DEFAULT_MAX_IDENTIFIER_BYTES,
-        max_reference_bytes: choregraph_core::DEFAULT_MAX_REFERENCE_BYTES,
-        max_event_bytes: choregraph_core::DEFAULT_MAX_EVENT_BYTES,
-        max_intent_bytes: choregraph_core::DEFAULT_MAX_INTENT_BYTES,
-        max_intents_per_transition: choregraph_core::DEFAULT_MAX_INTENTS_PER_TRANSITION,
+    let limits = choregraph_core::model::capacity::AdmissionLimits {
+        max_nodes: choregraph_core::model::capacity::DEFAULT_MAX_NODES,
+        max_edges: choregraph_core::model::capacity::DEFAULT_MAX_EDGES,
+        max_operations: choregraph_core::model::capacity::DEFAULT_MAX_OPERATIONS,
+        max_effect_declarations: choregraph_core::model::capacity::DEFAULT_MAX_EFFECT_DECLARATIONS,
+        max_identifier_bytes: choregraph_core::model::capacity::DEFAULT_MAX_IDENTIFIER_BYTES,
+        max_reference_bytes: choregraph_core::model::capacity::DEFAULT_MAX_REFERENCE_BYTES,
+        max_event_bytes: choregraph_core::model::capacity::DEFAULT_MAX_EVENT_BYTES,
+        max_intent_bytes: choregraph_core::model::capacity::DEFAULT_MAX_INTENT_BYTES,
+        max_intents_per_transition: choregraph_core::model::capacity::DEFAULT_MAX_INTENTS_PER_TRANSITION,
     };
     debug_assert_eq!(spec.nodes.len(), node_count);
     debug_assert!(spec.edges.len() <= edge_count);
-    choregraph_core::AdmittedMachine::admit(spec, limits)
+    choregraph_core::model::automaton::AdmittedMachine::admit(spec, limits)
         .map_err(|_| error(AdapterErrorCode::GraphAdmission, "workflow approval graph failed Choregraph admission"))
 }
 
 fn replay(
-    machine: &choregraph_core::AdmittedMachine,
+    machine: &choregraph_core::model::automaton::AdmittedMachine,
     events: &[crate::workflow::gate::model::ApprovalGraphEvent],
-) -> Result<choregraph_core::MachineState, AdapterError> {
+) -> Result<choregraph_core::model::automaton::MachineState, AdapterError> {
     let mut state = machine.initial_state();
     for approval_event in events {
         state = apply_event(machine, &state, approval_event)?;
@@ -95,13 +103,13 @@ fn replay(
 }
 
 fn apply_event(
-    machine: &choregraph_core::AdmittedMachine,
-    state: &choregraph_core::MachineState,
+    machine: &choregraph_core::model::automaton::AdmittedMachine,
+    state: &choregraph_core::model::automaton::MachineState,
     event: &crate::workflow::gate::model::ApprovalGraphEvent,
-) -> Result<choregraph_core::MachineState, AdapterError> {
+) -> Result<choregraph_core::model::automaton::MachineState, AdapterError> {
     let event = event_to_core(event)?;
-    match choregraph_core::step(machine, state, &event) {
-        choregraph_core::Decision::Accept { next, intents } => {
+    match choregraph_core::transition::step(machine, state, &event) {
+        choregraph_core::model::outcome::Decision::Accept { next, intents } => {
             if !intents.is_empty() {
                 return Err(error(
                     AdapterErrorCode::UnexpectedIntent,
@@ -110,7 +118,7 @@ fn apply_event(
             }
             Ok(next)
         }
-        choregraph_core::Decision::Deny { .. } => Err(error(
+        choregraph_core::model::outcome::Decision::Deny { .. } => Err(error(
             AdapterErrorCode::TransitionDenied,
             "Choregraph denied the exact workflow approval suspension transition",
         )),
@@ -119,18 +127,26 @@ fn apply_event(
 
 fn event_to_core(
     event: &crate::workflow::gate::model::ApprovalGraphEvent,
-) -> Result<choregraph_core::Event, AdapterError> {
+) -> Result<choregraph_core::model::dispatch::Event, AdapterError> {
     let node = node_reference(event.node_id);
     debug_assert!(!node.is_empty());
     debug_assert!(node.starts_with(CHOREGRAPH_NODE_PREFIX));
     let action = match event.action {
-        crate::workflow::gate::model::ApprovalGraphAction::MarkReady => choregraph_core::Action::MarkReady,
-        crate::workflow::gate::model::ApprovalGraphAction::Start => choregraph_core::Action::Start,
-        crate::workflow::gate::model::ApprovalGraphAction::Complete => choregraph_core::Action::Complete,
-        crate::workflow::gate::model::ApprovalGraphAction::Fail => choregraph_core::Action::Fail,
-        crate::workflow::gate::model::ApprovalGraphAction::Cancel => choregraph_core::Action::Cancel,
-        crate::workflow::gate::model::ApprovalGraphAction::Suspend => choregraph_core::Action::Suspend,
-        crate::workflow::gate::model::ApprovalGraphAction::ResumeSignal => choregraph_core::Action::ResumeSignal,
+        crate::workflow::gate::model::ApprovalGraphAction::MarkReady => {
+            choregraph_core::model::semantics::Action::MarkReady
+        }
+        crate::workflow::gate::model::ApprovalGraphAction::Start => choregraph_core::model::semantics::Action::Start,
+        crate::workflow::gate::model::ApprovalGraphAction::Complete => {
+            choregraph_core::model::semantics::Action::Complete
+        }
+        crate::workflow::gate::model::ApprovalGraphAction::Fail => choregraph_core::model::semantics::Action::Fail,
+        crate::workflow::gate::model::ApprovalGraphAction::Cancel => choregraph_core::model::semantics::Action::Cancel,
+        crate::workflow::gate::model::ApprovalGraphAction::Suspend => {
+            choregraph_core::model::semantics::Action::Suspend
+        }
+        crate::workflow::gate::model::ApprovalGraphAction::ResumeSignal => {
+            choregraph_core::model::semantics::Action::ResumeSignal
+        }
     };
     if matches!(
         event.action,
@@ -144,7 +160,7 @@ fn event_to_core(
         let reference = event.suspension_reference.as_deref().ok_or_else(|| {
             error(AdapterErrorCode::StateMismatch, "approval suspension event is missing its reference")
         })?;
-        Ok(choregraph_core::Event::suspension(node, action, class, reference))
+        Ok(choregraph_core::model::dispatch::Event::suspension(node, action, class, reference))
     } else {
         if event.suspension_class.is_some() || event.suspension_reference.is_some() {
             return Err(error(
@@ -152,14 +168,14 @@ fn event_to_core(
                 "non-suspension approval event contains suspension facts",
             ));
         }
-        Ok(choregraph_core::Event::new(node, action))
+        Ok(choregraph_core::model::dispatch::Event::new(node, action))
     }
 }
 
 fn machine_node_id(
-    machine: &choregraph_core::AdmittedMachine,
+    machine: &choregraph_core::model::automaton::AdmittedMachine,
     node_id: crate::engine::workflow::NodeId,
-) -> Result<choregraph_core::NodeId, AdapterError> {
+) -> Result<choregraph_core::id::bounded::NodeId, AdapterError> {
     let expected = node_reference(node_id);
     machine
         .node_ids()

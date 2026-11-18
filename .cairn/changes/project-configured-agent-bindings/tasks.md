@@ -12,3 +12,5 @@
 - [ ] [serial] Separately authorize and qualify the exact worker/compute/service path, owned lifecycle and supported per-request telemetry. r[lattice.agent_runtime.configured_bindings.scenario.boundary]
 
 The parent passed all 32 x86_64-linux Nix checks, including 1,445 passing Nextest cases with 10 optional cases skipped, and the six native proposal/design/tasks gates for this change and preserve-candidate-worker-observations. The selected OMP normal/failure/cancellation cases were separately exercised and are retained in that change's source-qualification record. These are local integration observations, not compute-reservation or inference-service qualification; issues #24/#13 remain open for actual producer contracts and joined live usage.
+
+The compute half of the first open task (Aspen `aac7b5ba` compute-capacity records through a read-only injected port, with exact attempt/fence/owner-generation revalidation) is carried by `bind-worker-compute-allocations`. That task stays open here for the serving readiness and request-admission schemas still blocked on Animus #17.

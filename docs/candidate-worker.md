@@ -250,10 +250,11 @@ lattice implementation-attempt prepare --request seed.json --output request.json
 lattice implementation-attempt run --request request.json --state /var/lib/lattice/implementation
 lattice implementation-attempt recover --request request.json --state /var/lib/lattice/implementation
 lattice implementation-attempt cancel --request request.json --state /var/lib/lattice/implementation
+lattice implementation-attempt inspect --request request.json --state /var/lib/lattice/implementation
 lattice implementation-attempt export-candidate --request request.json --state /var/lib/lattice/implementation --output-parent /var/lib/lattice/candidates
 ```
 
-The strict `lattice.implementation-attempt-run.v2` fields and canonical profile
+The strict `lattice.implementation-attempt-run.v3` fields and canonical profile
 codec are in `src/implementation_attempt/cli.rs`. Preparation reads the actual
 workspace snapshot and emits snapshot/profile/envelope/request-byte identities;
 it reports `admitted:false` and grants no authority. The installed operator
@@ -262,17 +263,46 @@ Only the trusted Kiln dispatcher may admit it through current claim/resource
 grants. Publisher authority remains unavailable; selected model credentials stay
 in the host broker.
 
-A private one-shot execution intent is fsynced before the worker starts. Re-entry
-with the exact request only reconciles retained results; changed requests and
-missing/incomplete evidence never authorize another execution. Raw JSONL and
-normalization artifacts are separately fsynced before the candidate result.
-Recovery bounds their reads, rejects symbolic links, checks the raw digest against
-the owned stdout observation, and independently repeats normalization. Missing,
-substituted, or contradictory artifacts cannot become a published result.
-Version 2 removes the old `network`/`network_namespace` fields rather than
-accepting shared-network compatibility requests. Broker expiry cannot exceed
-the enclosing attempt expiry; existing version-1 requests require explicit
-readmission as version 2. This shell creates no external authorization grant.
+Version 3 adds two required fields. `worker_compute` is the worker's compute
+requirement (`host_local`, or `provider_execution` with an optional
+direct-accelerator requirement); it is part of `worker_profile_identity`, so a
+changed requirement changes the profile revision. `execution_binding`
+(`lattice.execution-binding.v1`) declares the expected compute (`host_local` or
+one `provider_allocation` with allocation, host, consumer and owner generation)
+and the model routes. The OMP worker has exactly one route named `primary`,
+whose identity is derived from `omp.model_broker`; preparation normalizes that
+single route's identity. No-model, extra-route, substituted-route and
+mismatched-placement declarations are refused before any effect. Version-2
+requests are refused before any effect with a diagnostic naming explicit
+readmission as version 3, as version-1 requests required readmission as
+version 2. The Kiln dispatcher must readmit requests as v3. When it reserves a
+provider allocation, it must use Lattice's envelope `attempt_id` as the
+producer `attempt_id`, use globally unique operation ids, and declare the
+expected producer owner generation; that generation is not Lattice's `fence`.
+
+A private one-shot execution intent is fsynced before the worker starts. The
+admitted execution binding is fsynced once to `execution-binding.json` before
+that intent. The standalone CLI's compute port is always unavailable, so a
+provider-allocation request stops before the binding, intent or worker; an
+embedding host supplies a read-only port through
+`run_command_with_compute_port`. After the intent and immediately before spawn,
+a provider binding is re-observed and revalidated; a refusal is written once to
+`binding-revalidation.json`, the worker never starts, and recovery reports
+`not_dispatched_binding_rejected`. The `Scope::Attempt` usage observation with
+frozen binding provenance is stored before the attempt result. See
+[worker compute binding](worker-compute-binding.md).
+
+Re-entry with the exact request only reconciles retained results and reports the
+persisted binding identity; it never calls the compute port, rebinds or
+releases compute. Changed requests and missing/incomplete evidence never
+authorize another execution. Raw JSONL and normalization artifacts are
+separately fsynced before the candidate result. Recovery bounds their reads,
+rejects symbolic links, checks the raw digest against the owned stdout
+observation, and independently repeats normalization. Missing, substituted, or
+contradictory artifacts cannot become a published result. Version 2 removed the
+old `network`/`network_namespace` fields rather than accepting shared-network
+compatibility requests. Broker expiry cannot exceed the enclosing attempt
+expiry. This shell creates no external authorization grant.
 
 Cancel writes only an exact persisted request; the running owner observes it and
 uses the existing process-group cancellation. Requested cancellation is not a

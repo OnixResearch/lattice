@@ -244,7 +244,7 @@ fn plan(fanout: bool) -> (SessionPlan, Vec<RolePlacement>) {
         third.id = fixture::ROLE_C;
         source.roles.push(third);
         let mut choice = fixture::choice();
-        let choregraph_choreography::ChoreographyNode::Choice { branches, .. } = &mut choice else {
+        let choregraph_choreography::model::tree::Node::Choice { branches, .. } = &mut choice else {
             panic!("choice fixture lost its choice");
         };
         for branch in branches {

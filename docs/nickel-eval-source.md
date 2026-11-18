@@ -2,7 +2,7 @@
 
 Lattice uses `nickel-eval` from canonical Radicle RID `rad:z21miuQLqLwe1HkaMu2mEZy5fdG9F`.
 
-Cargo and Nix pin reviewed object `f23be09e41337de8fa729274f50023f861ae0e8a` through `https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git`.
+Cargo and Nix pin reviewed object `f0ea0d2a31d3482ddf4e575482f6ddf7a7e7d4e9` through `https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git`.
 
 The supported cohort is Nickel CLI `1.17.0` at upstream commit `1320a983e6c3d1e2fb53dd2464b084b4903b1426`, `nickel-lang 2.2.0`, and `nickel-lang-core 0.18.0`.
 
@@ -25,6 +25,22 @@ r[impl lattice.nickel_eval_adoption.cutover.scenario.non-claim]
 
 Passing checks prove selected fixture compatibility. They do not prove Nickel soundness, evaluator equivalence, import-closure completeness, contract correctness, configuration safety, or release readiness.
 
+r[verify lattice.nickel_eval_adoption.compatibility]
+r[verify lattice.nickel_eval_adoption.compatibility.scenario.agree]
+r[verify lattice.nickel_eval_adoption.cutover.scenario.accepted]
+r[verify lattice.nickel_toolchain.fixture_cohort.scenario.aligned]
+
+The original direct/shared migration comparison is retained in VCS at Lattice
+`3539ade3d6c6f5ea0c37a896761dfc5da1deb856`, whose repository harness and Nix
+receipt are recorded in `target/publication-candidate-current.json`. It is
+historical evidence for that selected cohort, not qualification of the new
+captured construction profile. The duplicate direct-core test path and direct
+dependency are removed; ongoing product regressions assert expected admitted
+values and safe failures through the Lattice adapter. The cohort guard checks
+all resolved native package versions and the pinned external CLI, and requires
+`nickel-eval`, `nickel-lang` and `nickel-lang-core` to resolve from the same
+pinned producer source and revision.
+
 ## Imported JSON record merges
 
 r[impl lattice.nickel_import_merge.values]
@@ -38,64 +54,69 @@ fixpoint construction. This is a producer deserialization bug, not a reason to
 reconstruct profile fields, remove assertions, intercept panics, or invoke an
 external evaluator at runtime.
 
-The owned producer repair backports upstream
+The producer repair backports upstream
 [PR 2677](https://github.com/nickel-lang/nickel/pull/2677), source commit
 `aa94d9b1f7a0981b4f0d6e8dff79f0a74ff1bb1a`, to the exact published core `0.18.0`
 package. It adds the existing closurization operation at JSON/YAML conversion and
 generic serde container creation. Runtime fixpoint and merge behavior remain
-unchanged. The producer owns `scripts/import-nickel-core.py`, the source patch,
-MIT notice, complete package snapshot at `vendor/nickel-lang-core-0.18.0`, and
-exact provenance checks; Lattice does not carry an independently edited copy.
+unchanged. The producer owns `scripts/import-native-captured.sh`, its
+repository-owned patches (import closurization, the captured-module seam and the
+local-core wrapper), the retained MIT notice, and the complete package snapshots
+at `vendor/nickel-lang-core` and `vendor/nickel-lang`. The import script checks
+the pristine crate archives' SHA-256 and BLAKE3 identities and the declared
+upstream core revision before applying those patches.
 
-Cargo patch tables are root-only. Lattice selects `nickel-lang-core` from the
-**same immutable producer revision** as `nickel-eval` through a byte-exact
-vendored snapshot and a root patch entry, and records the producer revision and
-anonymous source URL in the snapshot provenance.
+### Admitted producer cohort
 
-The producer's owning Rust `1.90.0` environment passed all 43 tests, including
-the five imported-container regressions, and strict Clippy. Its native retained
-fixture smoke produced the complete expected value below, matching the pinned
-external CLI's observed value. The admitted snapshot retains those producer
-checks; Lattice's native adapter regressions pass against the vendored selection.
-Neither result is a claim of arbitrary evaluator equivalence or Nickel soundness.
+Cargo patch tables are root-only, but Lattice needs none: `nickel-eval` selects
+both packages through path dependencies inside its own repository, so Cargo
+resolves `nickel-eval`, `nickel-lang` and `nickel-lang-core` from the single
+pinned producer source and revision. Lattice carries no consumer-owned snapshot
+or root patch. The Nix cohort guard rejects a reintroduced `nickel-lang-core`
+path patch and requires all three packages to resolve from that exact source.
 
-### Admitted import repair
+Lattice previously vendored a byte-exact snapshot of this repair from producer
+revision `b4ddff052105eb4b75827e228a65b823dc1a0444` because the published
+evaluator did not yet carry it. The adopted producer revision carries the repair
+and the captured-module seam itself, so that snapshot and its root patch are
+removed; rollback restores them with the previous pins in one VCS revert.
 
-Lattice vendors the exact producer repair at
-`vendor-cargo-deps/nickel-lang-core-0.18.0` and selects it with a root
-`[patch.crates-io]` entry. The snapshot is byte-exact from nickel-eval revision
-`b4ddff052105eb4b75827e228a65b823dc1a0444` (tag
-`nickel-eval-import-closurization-20261016`) and retains the producer's
-`SOURCE.json` archive, patch, license, and snapshot identities plus a Lattice
-`SOURCE` provenance file. Refresh it with the producer's
-`scripts/import-nickel-core.py`; do not edit imported files.
+The first published captured-module revision, `2d1fb2b59f373967cc69e13ec289759d9cd4df46`,
+kept the crate archives' `.cargo_vcs_info.json` and `Cargo.toml.orig` in its
+vendored package trees. Cargo reserves those names, so Lattice's crane vendoring
+of the git dependency failed before compilation. The adopted revision is the
+producer's import fix: it validates those files inside the pinned archives,
+omits them from the vendored trees, and gates `cargo package --list` on both
+packages. Evaluator sources, patches and the language cohort are unchanged.
 
 The retained core remains `0.18.0`, the evaluator cohort remains Nickel CLI
-`1.17.0` / `nickel-lang 2.2.0`, and the native imported-merge regressions pass.
-This is a consumer-owned byte-exact import, not an independently edited fork.
-Merging the repair onto producer `main` remains unsafe because the newer
-evaluator classifies the invalid-contract fixture as `Evaluation` and does not
-compile the retained core snapshot; Lattice no longer depends on that merge.
+`1.17.0` / `nickel-lang 2.2.0`, and the native imported-merge regressions pass
+against the producer-selected core.
 
-Native adapter regression command:
+Native adapter regressions:
 
 ```sh
 cargo test --lib nickel::tests::imported_json_merge
 ```
 
-The producer retains `fixtures/imported-merge/profile.ncl` and its relative JSON
-input, plus a native `export_json` example. From the exact producer checkout,
-compare the JSON values from these commands, with the CLI path set explicitly
-to the pinned `1.17.0` executable:
+They write the JSON imports and Nickel sources to a temporary directory and
+assert these complete values through the Lattice adapter:
 
-```sh
-cargo test --test imported_merge
-cargo run --example export_json -- fixtures/imported-merge/profile.ncl
-"$PINNED_NICKEL" export --format json fixtures/imported-merge/profile.ncl
-```
+- `identity & { machine.reviewed = true, expires = 1234 }` and the reversed
+  operand order, over `{"machine":{"id":"machine-1"},"grants":[{"operation":"shell","allowed":true}]}`:
+  `{"expires":1234,"grants":[{"allowed":true,"operation":"shell"}],"machine":{"id":"machine-1","reviewed":true}}`.
+- The recursive default/force override over
+  `{"base":3,"nested":{"answer":42},"items":[{"enabled":true}]}`:
+  `{"base":5,"derived":6,"items":[{"enabled":true}],"nested":{"answer":42,"extra":"retained"}}`.
 
-Expected complete value: `{"attachment_ref":{"token_id":1},"base":5,"data":{"extra":"kept","string":"value"},"derived":6,"items":[{"flag":true}]}`.
-Tests also cover both merge operand orders, captured source, nested record/array
-contracts, recursive overriding, malformed/missing imports, and safe contract
-errors. Selected agreement is not proof of arbitrary evaluator equivalence,
-Nickel soundness, import closure completeness, or workflow correctness.
+To compare against the pinned external CLI, write the same files and run
+`nickel export --format json <file>` with the dev shell's Nickel `1.17.0`
+(rev `1320a98`), then compare `jq -cS` canonical output with the values above.
+On 2026-11-18 all three CLI exports matched exactly. The producer's own
+`tests/imported_merge.rs` at the pinned revision covers JSON/YAML merges in both
+orders, nested record/array contracts, deserialized and serde-created containers,
+and safe failure categories; it passed with `cargo test --locked --test
+imported_merge` from that checkout. Tests also cover malformed/missing imports and
+safe contract errors through the adapter. Selected agreement is not proof of
+arbitrary evaluator equivalence, Nickel soundness, import closure completeness,
+or workflow correctness.

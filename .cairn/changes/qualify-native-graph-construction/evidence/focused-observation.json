@@ -1,0 +1,282 @@
+{
+  "kind": "bounded-focused-integration-observation",
+  "scope": "actual local consumer commands for issues #20/#21; not producer, semantic-equivalence, external-service or release qualification",
+  "dev_shell_prefix": "env TMPDIR=<tmp> CARGO_TARGET_DIR=<target> CARGO_BUILD_JOBS=8 nix develop path:. --builders '' --max-jobs 2 --cores 4 --option accept-flake-config false --option secret-key-files '' -c",
+  "producer_cohort": {
+    "choregraph": "c3577352ee1e39391f5204ee234d991c7dbeb151",
+    "nickel_eval": "f0ea0d2a31d3482ddf4e575482f6ddf7a7e7d4e9",
+    "note": "Observations marked old_pin ran before the authorized nickel-eval re-pin from 2d1fb2b59f373967cc69e13ec289759d9cd4df46."
+  },
+  "dev_shell": [
+    {
+      "command": "cargo test --test test_construction_qualification --test test_construction_authoring --test test_construction_runtime_binding --test test_source_authoring --test test_subworkflow_execution --test test_workflow_format",
+      "exit_code": 101,
+      "suites": [
+        {
+          "target": "test_construction_authoring",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 11
+        },
+        {
+          "target": "test_construction_qualification",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 8
+        },
+        {
+          "target": "test_construction_runtime_binding",
+          "passed": 9,
+          "failed": 0,
+          "ignored": 5
+        }
+      ],
+      "note": "Cargo stopped after test_source_authoring; see the no-fail-fast run."
+    },
+    {
+      "command": "cargo test --no-fail-fast --test test_subworkflow_execution --test test_workflow_format --test test_source_authoring",
+      "exit_code": 101,
+      "suites": [
+        {
+          "target": "test_source_authoring",
+          "passed": 5,
+          "failed": 24,
+          "ignored": 1
+        },
+        {
+          "target": "test_subworkflow_execution",
+          "passed": 5,
+          "failed": 0,
+          "ignored": 0
+        },
+        {
+          "target": "test_workflow_format",
+          "passed": 26,
+          "failed": 0,
+          "ignored": 1
+        }
+      ],
+      "note": "All 24 test_source_authoring failures are `captured evaluation failed`: source preview now requires the immutable captured worker, which a dev-shell Cargo build cannot select. The same suite runs in the host-run app."
+    },
+    {
+      "command": "cargo test --lib -- authoring tui::authoring nickel::",
+      "exit_code": 0,
+      "old_pin": true,
+      "suites": [
+        {
+          "target": "lattice (lib)",
+          "passed": 41,
+          "failed": 0,
+          "ignored": 1
+        }
+      ]
+    },
+    {
+      "command": "cargo clippy --workspace --all-targets -- -D warnings",
+      "exit_code": 101,
+      "old_pin": true,
+      "note": "Fails only in the intentional negative fixture lattice-repository-validation-fixture (clippy::ptr_arg); scripts/check.rs excludes it."
+    },
+    {
+      "command": "cargo clippy --workspace --exclude lattice-repository-validation-fixture --all-targets --no-deps -- -D warnings",
+      "exit_code": 0,
+      "old_pin": true
+    },
+    {
+      "command": "cargo fmt --check --package lattice",
+      "exit_code": 0
+    },
+    {
+      "command": "sh -c 'exec \"$LATTICE_CAIRN_BIN\" \"$@\"' lattice-cairn validate --root .",
+      "exit_code": 0,
+      "valid": true,
+      "changes": 24,
+      "specs_validated": 55,
+      "change_spec": {
+        "requirement_blocks": 15,
+        "scenario_blocks": 18,
+        "substantive_requirement_blocks": 15
+      }
+    },
+    {
+      "command": "cargo test --workspace --exclude lattice-repository-validation-fixture --no-fail-fast",
+      "exit_code": 101,
+      "after_partition": true,
+      "totals": {
+        "passed": 1578,
+        "failed": 5,
+        "ignored": 77
+      },
+      "suites": [
+        {
+          "target": "test_source_authoring",
+          "passed": 7,
+          "failed": 0,
+          "ignored": 25
+        },
+        {
+          "target": "test_construction_authoring",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 11
+        },
+        {
+          "target": "test_construction_qualification",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 8
+        },
+        {
+          "target": "test_workflow_format",
+          "passed": 26,
+          "failed": 0,
+          "ignored": 1
+        },
+        {
+          "target": "tui_aggregate_lifecycle",
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0
+        }
+      ],
+      "unrelated_failures": [
+        "test_orchestration_shell::restart_duplicate_trigger_reuses_original_admission_across_processes (restart child phase not recognized)",
+        "test_workflow_templates::non_regular_bundle_members_and_catalog_or_bundle_overflow_are_rejected (Unix socket path exceeds SUN_LEN under the long TMPDIR)",
+        "lattice-workflow-transport tests::socket::* x3 (Unix socket path exceeds SUN_LEN under the long TMPDIR)"
+      ],
+      "note": "No failure is a captured-worker or v3 dependency; captured_evaluation_fails_closed_without_a_selected_worker passed."
+    },
+    {
+      "command": "cargo fmt --check --package lattice",
+      "exit_code": 0,
+      "after_partition": true
+    },
+    {
+      "command": "cargo clippy --workspace --exclude lattice-repository-validation-fixture --all-targets --no-deps -- -D warnings",
+      "exit_code": 0,
+      "after_partition": true
+    },
+    {
+      "command": "cargo test --lib -- authoring tui::authoring nickel::",
+      "exit_code": 0,
+      "after_partition": true,
+      "suites": [
+        {
+          "target": "lattice (lib)",
+          "passed": 41,
+          "failed": 0,
+          "ignored": 1
+        }
+      ]
+    }
+  ],
+  "host_store_executables": {
+    "route": "dev-shell debug build with the flake's LATTICE_CONSTRUCTION_SHELL_DEFAULT/PATH_DEFAULT, stripped, added with `nix store add-path`, run on the host with LATTICE_CLOSED_EVAL_WORKER, LATTICE_CONSTRUCTION_SHELL and LATTICE_QUALIFIED_BINARY",
+    "old_pin": true,
+    "runs": [
+      {
+        "command": "test_construction_qualification --include-ignored --test-threads 1",
+        "exit_code": 124,
+        "passed": [
+          "fanout_and_join_follow_selected_copy_and_drop_rules",
+          "generated_instances_keep_identities_shared_handle_and_attached_facts",
+          "generation_and_expansion_overflow_reject_before_any_candidate",
+          "orchestration_budget_gates_constructed_rounds",
+          "parameter_member_and_elaborator_drift_invalidate_the_binding",
+          "result_validation_and_cancellation_stop_the_dependent_effect"
+        ],
+        "failed": [
+          "in_flight_run_keeps_its_exact_admitted_snapshot_while_source_readmits"
+        ],
+        "unfinished": [
+          "same_constructed_graph_runs_only_with_its_exact_authority"
+        ],
+        "note": "The in-flight failure was the 10 s start bound expiring while the debug worker replayed admission; the bound is now 120 s. The 900 s timeout stopped the last test."
+      },
+      {
+        "command": "test_construction_authoring --include-ignored --test-threads 1",
+        "exit_code": "terminated",
+        "passed": [
+          "absent_authority_denies_before_shell_adapter_and_new_grants_do_not_match_v2",
+          "captured_instances_reopen_with_exact_closure_and_native_origins",
+          "construction_receipts_cannot_change_under_ordinary_cas",
+          "equal_export_does_not_merge_distinct_source_or_observed_closure",
+          "generated_graph_agrees_with_independent_runtime_reference",
+          "invalid_materialized_bindings_never_reach_dispatch",
+          "mutated_closure_registry_and_projection_never_authorize_a_retained_receipt",
+          "self_consistent_foreign_registry_implementation_cannot_admit_on_current_host"
+        ],
+        "unfinished": [
+          "source_template_and_instance_parameter_edits_readmit_independently",
+          "v3_zero_data_barrier_waits_for_first_effect_completion",
+          "wrong_scope_handle_is_rejected_by_selected_elaborator"
+        ],
+        "note": "Superseded by the host-run app and stopped after 767 s."
+      }
+    ]
+  },
+  "octet": {
+    "command": "octet-precommit-check",
+    "exit_code": 1,
+    "status": "lint-failure; every baseline ID is stale because the pinned cargo-octet config_hash changes with the root Cargo.toml pin",
+    "comparison": "Same-environment run on a copy with src restored to the base revision; findings compared by (lint, file, message)",
+    "new_semantic_findings": 0,
+    "message_only_changes": [
+      "excessive_file_length src/authoring/construction.rs 562 -> 577 lines",
+      "excessive_file_length src/authoring/mod.rs 327 -> 328 lines",
+      "excessive_file_length src/engine/executor.rs 3194 -> 3195 lines",
+      "excessive_file_length src/engine/runner.rs 1114 -> 1115 lines"
+    ],
+    "removed_findings": [
+      "path_segment_repetition src/authoring/construction.rs has_retained_construction_lineage"
+    ]
+  },
+  "partition": {
+    "rule": "Tests needing the captured worker or the v3 runtime are #[ignore]d with a reason; plain Cargo and the sandboxed nextest check (no LATTICE_CLOSED_EVAL_WORKER) run the rest; the host-run app runs the ignored partition with --include-ignored or --ignored --exact.",
+    "ignored": {
+      "test_construction_authoring": "all 11",
+      "test_construction_qualification": "all 8",
+      "test_construction_runtime_binding": [
+        "captured_no_control_fork_retains_v3_authority_and_rejects_saved_profile_downgrade",
+        "flat_v3_controls_admit_with_runtime_binding",
+        "captured_flat_v3_controls_replay_before_authority",
+        "same_named_changed_backend_or_runtime_refuses_old_authority",
+        "immutable_non_bash_backend_is_rejected_at_selection"
+      ],
+      "test_workflow_format": [
+        "flat_v3_file_import_selects_only_missing_runtime_bindings"
+      ],
+      "lattice lib": [
+        "tui::authoring::tests::source_origins_target_only_matching_displayed_source_bytes"
+      ],
+      "test_source_authoring": [
+        "construction_cli_import_readmits_captured_source_without_weakening_file_import",
+        "authoring_import_store_reopen_and_exact_source_archive_preserve_helpers_and_parameters",
+        "authoring_parameter_preview_is_inspectable_and_changes_only_source_defined_instance",
+        "authoring_template_source_edit_recompiles_all_source_defined_instances",
+        "authoring_failed_draft_is_bounded_editable_and_does_not_replace_admission",
+        "authoring_undeclared_parameters_and_drifted_compiler_are_not_admitted",
+        "authoring_stale_and_concurrent_drafts_cannot_replace_newer_revision",
+        "authoring_durable_preview_replacement_and_candidate_mutation_are_stale",
+        "authoring_materialized_edit_paths_fork_and_old_snapshot_retains_exact_association",
+        "authoring_source_artifact_and_compiler_identities_are_not_execution_or_semantic_equivalence",
+        "authoring_preview_export_and_store_do_not_execute_shell_or_deliver_credentials",
+        "authoring_tui_source_preview_failure_reopen_admission_and_materialized_save_are_distinct",
+        "authoring_cli_source_commands_are_registered_and_keep_artifact_kinds_explicit",
+        "authoring_catalog_delete_recreate_does_not_allow_revision_aba",
+        "authoring_generic_save_cannot_erase_lineage_promote_a_fork_or_replace_source_without_admission",
+        "authoring_state_only_downgrade_does_not_skip_replay_and_real_forks_remain_sticky",
+        "authoring_captured_import_requires_observed_members_but_not_comments_or_strings",
+        "authoring_readmission_rechecks_current_native_validation_of_persisted_candidate",
+        "authoring_parameter_interpolation_text_is_data_in_preview_and_expanded_export",
+        "authoring_file_import_cas_rejects_stale_or_changed_candidates",
+        "self_consistent_observation_for_other_entry_cannot_publish_on_new_name",
+        "parameter_application_receipt_is_rebuilt_from_declared_defaults",
+        "admitted_four_mebibyte_source_archive_roundtrips_even_with_decimal_byte_arrays",
+        "source_archive_accepts_exact_limit_but_rejects_valid_json_with_oversized_whitespace",
+        "cas_cannot_replace_a_same_output_parameter_observation"
+      ]
+    },
+    "plain_negative": "test_source_authoring::captured_evaluation_fails_closed_without_a_selected_worker"
+  }
+}

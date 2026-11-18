@@ -8,14 +8,22 @@ use lattice::engine::protocol::RolePlacement;
 use lattice::engine::protocol::admit_projection;
 use lattice::engine::protocol::reviewed_limits;
 
-pub const ROLE_A: choregraph_choreography::RoleId = choregraph_choreography::RoleId(1);
-pub const ROLE_B: choregraph_choreography::RoleId = choregraph_choreography::RoleId(2);
-pub const ROLE_C: choregraph_choreography::RoleId = choregraph_choreography::RoleId(3);
-pub const VALUE_A: choregraph_choreography::ValueId = choregraph_choreography::ValueId(10);
-pub const PAYLOAD_A: choregraph_choreography::PayloadTag = choregraph_choreography::PayloadTag(20);
-pub const PAYLOAD_B: choregraph_choreography::PayloadTag = choregraph_choreography::PayloadTag(21);
-pub const LABEL_A: choregraph_choreography::LabelId = choregraph_choreography::LabelId(30);
-pub const LABEL_B: choregraph_choreography::LabelId = choregraph_choreography::LabelId(31);
+pub const ROLE_A: choregraph_choreography::model::participants::RoleId =
+    choregraph_choreography::model::participants::RoleId(1);
+pub const ROLE_B: choregraph_choreography::model::participants::RoleId =
+    choregraph_choreography::model::participants::RoleId(2);
+pub const ROLE_C: choregraph_choreography::model::participants::RoleId =
+    choregraph_choreography::model::participants::RoleId(3);
+pub const VALUE_A: choregraph_choreography::model::participants::ValueId =
+    choregraph_choreography::model::participants::ValueId(10);
+pub const PAYLOAD_A: choregraph_choreography::model::participants::PayloadTag =
+    choregraph_choreography::model::participants::PayloadTag(20);
+pub const PAYLOAD_B: choregraph_choreography::model::participants::PayloadTag =
+    choregraph_choreography::model::participants::PayloadTag(21);
+pub const LABEL_A: choregraph_choreography::model::participants::LabelId =
+    choregraph_choreography::model::participants::LabelId(30);
+pub const LABEL_B: choregraph_choreography::model::participants::LabelId =
+    choregraph_choreography::model::participants::LabelId(31);
 pub const MAX_ENVELOPE_BYTES: u64 = 4_096;
 pub const ADAPTER_TIMEOUT_MS: u64 = 1_000;
 const SPAN_START: u32 = 0;
@@ -28,18 +36,18 @@ pub fn identity(seed: &str) -> Identity {
     }
 }
 
-pub fn end() -> choregraph_choreography::ChoreographyNode {
-    choregraph_choreography::ChoreographyNode::End { span: span() }
+pub fn end() -> choregraph_choreography::model::tree::Node {
+    choregraph_choreography::model::tree::Node::End { span: span() }
 }
 
 pub fn communication(
-    from: choregraph_choreography::RoleId,
-    to: choregraph_choreography::RoleId,
-    label: choregraph_choreography::LabelId,
-    payload_tag: choregraph_choreography::PayloadTag,
-    next: choregraph_choreography::ChoreographyNode,
-) -> choregraph_choreography::ChoreographyNode {
-    choregraph_choreography::ChoreographyNode::Communication {
+    from: choregraph_choreography::model::participants::RoleId,
+    to: choregraph_choreography::model::participants::RoleId,
+    label: choregraph_choreography::model::participants::LabelId,
+    payload_tag: choregraph_choreography::model::participants::PayloadTag,
+    next: choregraph_choreography::model::tree::Node,
+) -> choregraph_choreography::model::tree::Node {
+    choregraph_choreography::model::tree::Node::Communication {
         from,
         to,
         label,
@@ -50,12 +58,12 @@ pub fn communication(
 }
 
 pub fn transfer(
-    from: choregraph_choreography::RoleId,
-    to: choregraph_choreography::RoleId,
-    label: choregraph_choreography::LabelId,
-    next: choregraph_choreography::ChoreographyNode,
-) -> choregraph_choreography::ChoreographyNode {
-    choregraph_choreography::ChoreographyNode::Transfer {
+    from: choregraph_choreography::model::participants::RoleId,
+    to: choregraph_choreography::model::participants::RoleId,
+    label: choregraph_choreography::model::participants::LabelId,
+    next: choregraph_choreography::model::tree::Node,
+) -> choregraph_choreography::model::tree::Node {
+    choregraph_choreography::model::tree::Node::Transfer {
         from,
         to,
         label,
@@ -66,16 +74,16 @@ pub fn transfer(
     }
 }
 
-pub fn choice() -> choregraph_choreography::ChoreographyNode {
-    choregraph_choreography::ChoreographyNode::Choice {
+pub fn choice() -> choregraph_choreography::model::tree::Node {
+    choregraph_choreography::model::tree::Node::Choice {
         decider: ROLE_A,
         branches: vec![
-            choregraph_choreography::ChoiceBranch {
+            choregraph_choreography::model::tree::ChoiceBranch {
                 label: LABEL_A,
                 body: communication(ROLE_A, ROLE_B, LABEL_A, PAYLOAD_A, end()),
                 span: span(),
             },
-            choregraph_choreography::ChoiceBranch {
+            choregraph_choreography::model::tree::ChoiceBranch {
                 label: LABEL_B,
                 body: communication(ROLE_A, ROLE_B, LABEL_B, PAYLOAD_B, end()),
                 span: span(),
@@ -86,40 +94,40 @@ pub fn choice() -> choregraph_choreography::ChoreographyNode {
 }
 
 pub fn native_source(
-    protocol: choregraph_choreography::ChoreographyNode,
-) -> choregraph_choreography::RoleChoreographySource {
+    protocol: choregraph_choreography::model::tree::Node,
+) -> choregraph_choreography::model::schema::RoleSource {
     source(protocol, false)
 }
 
 pub fn external_source(
-    protocol: choregraph_choreography::ChoreographyNode,
-) -> choregraph_choreography::RoleChoreographySource {
+    protocol: choregraph_choreography::model::tree::Node,
+) -> choregraph_choreography::model::schema::RoleSource {
     source(protocol, true)
 }
 
 pub fn projection_parts(
-    source: choregraph_choreography::RoleChoreographySource,
-) -> (choregraph_choreography::ProjectedChoreography, choregraph_choreography::ProjectionBundle) {
-    let admitted = match choregraph_choreography::admit_source(source) {
+    source: choregraph_choreography::model::schema::RoleSource,
+) -> (choregraph_choreography::endpoint::Projected, choregraph_choreography::linkage::ProjectionBundle) {
+    let admitted = match choregraph_choreography::admission::admit_source(source) {
         Ok(admitted) => admitted,
         Err(diagnostics) => panic!("fixture admission failed: {diagnostics:?}"),
     };
-    let projected = match choregraph_choreography::project_all(&admitted) {
+    let projected = match choregraph_choreography::endpoint::project_all(&admitted) {
         Ok(projected) => projected,
         Err(diagnostics) => panic!("fixture projection failed: {diagnostics:?}"),
     };
-    let materials = choregraph_choreography::ProjectionMaterials::reviewed(
+    let materials = choregraph_choreography::linkage::ProjectionMaterials::reviewed(
         b"lattice-role-protocol-source",
         b"lattice-role-protocol-evaluated",
     );
-    let bundle = match choregraph_choreography::build_projection_bundle(&admitted, &materials) {
+    let bundle = match choregraph_choreography::linkage::build_projection_bundle(&admitted, &materials) {
         Ok(bundle) => bundle,
         Err(diagnostics) => panic!("fixture bundle failed: {diagnostics:?}"),
     };
     (projected, bundle)
 }
 
-pub fn cohort(source: choregraph_choreography::RoleChoreographySource) -> Cohort {
+pub fn cohort(source: choregraph_choreography::model::schema::RoleSource) -> Cohort {
     let (projected, bundle) = projection_parts(source);
     match admit_projection(FrozenProjection {
         projected: &projected,
@@ -188,52 +196,52 @@ pub fn external_placements(cohort: &Cohort) -> Vec<RolePlacement> {
 }
 
 fn source(
-    protocol: choregraph_choreography::ChoreographyNode,
+    protocol: choregraph_choreography::model::tree::Node,
     external_b: bool,
-) -> choregraph_choreography::RoleChoreographySource {
+) -> choregraph_choreography::model::schema::RoleSource {
     let role_b_kind = if external_b {
-        choregraph_choreography::RoleKind::External {
+        choregraph_choreography::model::participants::RoleKind::External {
             contract_identity: identity("external-contract").as_str().to_owned(),
             input_schema_identity: identity("external-input").as_str().to_owned(),
             output_schema_identity: identity("external-output").as_str().to_owned(),
         }
     } else {
-        choregraph_choreography::RoleKind::Native
+        choregraph_choreography::model::participants::RoleKind::Native
     };
-    choregraph_choreography::RoleChoreographySource {
-        schema: choregraph_choreography::ROLE_CHOREOGRAPHY_SCHEMA.to_owned(),
-        limits: choregraph_choreography::ChoreographyLimits::reviewed(),
+    choregraph_choreography::model::schema::RoleSource {
+        schema: choregraph_choreography::model::schema::ROLE_CHOREOGRAPHY_SCHEMA.to_owned(),
+        limits: choregraph_choreography::model::bounds::Limits::reviewed(),
         imports: Vec::new(),
         roles: vec![
-            role(ROLE_A, choregraph_choreography::RoleKind::Native),
+            role(ROLE_A, choregraph_choreography::model::participants::RoleKind::Native),
             role(ROLE_B, role_b_kind),
         ],
-        values: vec![choregraph_choreography::ValueDeclaration {
+        values: vec![choregraph_choreography::model::participants::ValueDeclaration {
             id: VALUE_A,
             payload_tag: PAYLOAD_A,
             initial_owner: ROLE_A,
             span: span(),
         }],
         protocol,
-        non_claims: choregraph_choreography::REQUIRED_NON_CLAIMS.map(str::to_owned).to_vec(),
+        non_claims: choregraph_choreography::model::schema::REQUIRED_NON_CLAIMS.map(str::to_owned).to_vec(),
     }
 }
 
 fn role(
-    id: choregraph_choreography::RoleId,
-    kind: choregraph_choreography::RoleKind,
-) -> choregraph_choreography::RoleDeclaration {
-    choregraph_choreography::RoleDeclaration { id, kind, span: span() }
+    id: choregraph_choreography::model::participants::RoleId,
+    kind: choregraph_choreography::model::participants::RoleKind,
+) -> choregraph_choreography::model::participants::RoleDeclaration {
+    choregraph_choreography::model::participants::RoleDeclaration { id, kind, span: span() }
 }
 
-const fn span() -> choregraph_choreography::SourceSpan {
-    choregraph_choreography::SourceSpan {
+const fn span() -> choregraph_choreography::model::participants::SourceSpan {
+    choregraph_choreography::model::participants::SourceSpan {
         start: SPAN_START,
         end: SPAN_END,
     }
 }
 
-pub const fn lattice_role(id: choregraph_choreography::RoleId) -> RoleId {
+pub const fn lattice_role(id: choregraph_choreography::model::participants::RoleId) -> RoleId {
     RoleId(id.0)
 }
 

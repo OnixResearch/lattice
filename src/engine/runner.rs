@@ -14,16 +14,16 @@ use crate::engine::workflow::PortDirection;
 use crate::engine::workflow::PortId;
 
 /// Decision returned when durable execution considers resuming a node.
-pub type DurableRunnerDecision = seaglass_execution_graph::ResumeDecision;
+pub type DurableRunnerDecision = seaglass_execution_graph::aggregate::ResumeDecision;
 /// Requested transition for a runner step lifecycle.
-pub type RunnerStepAction = seaglass_execution_graph::StepAction;
+pub type RunnerStepAction = seaglass_execution_graph::lifecycle::StepAction;
 /// Durable lifecycle state of one runner step.
-pub type RunnerStepState = seaglass_execution_graph::StepState;
+pub type RunnerStepState = seaglass_execution_graph::lifecycle::StepState;
 /// Error returned when a runner step lifecycle transition is invalid.
-pub type RunnerTransitionError = seaglass_execution_graph::StepTransitionError;
+pub type RunnerTransitionError = seaglass_execution_graph::lifecycle::StepTransitionError;
 
 pub const LEGACY_MACHINE_STATE_SCHEMA: &str = "seaglass.execution-graph.state.v1";
-pub const CHOREGRAPH_MACHINE_STATE_SCHEMA: &str = choregraph_core::MACHINE_SCHEMA_V1;
+pub const CHOREGRAPH_MACHINE_STATE_SCHEMA: &str = choregraph_core::model::semantics::MACHINE_SCHEMA_V1;
 const RUNNER_PLAN_IDENTITY_DOMAIN: &[u8] = b"lattice.runner-plan.v1\0";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -97,10 +97,10 @@ pub enum PersistedStateIssue {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PersistedReplayIdentity {
-    pub expected_machine: [u8; choregraph_core::TRACE_BINDING_BYTES],
-    pub expected_initial_state: [u8; choregraph_core::TRACE_BINDING_BYTES],
-    pub observed_machine: [u8; choregraph_core::TRACE_BINDING_BYTES],
-    pub observed_initial_state: [u8; choregraph_core::TRACE_BINDING_BYTES],
+    pub expected_machine: [u8; choregraph_core::model::history::TRACE_BINDING_BYTES],
+    pub expected_initial_state: [u8; choregraph_core::model::history::TRACE_BINDING_BYTES],
+    pub observed_machine: [u8; choregraph_core::model::history::TRACE_BINDING_BYTES],
+    pub observed_initial_state: [u8; choregraph_core::model::history::TRACE_BINDING_BYTES],
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -112,7 +112,7 @@ pub struct PersistedMachineEvent {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PersistedReplayError {
     Graph(RunnerDiagnostic),
-    State(seaglass_execution_graph::StateConversionError),
+    State(seaglass_execution_graph::aggregate::StateConversionError),
 }
 
 use crate::agent_node;
@@ -153,6 +153,11 @@ pub struct RunnerWorkflow {
     pub name: String,
     pub nodes: Vec<RunnerNode>,
     pub edges: Vec<RunnerEdge>,
+    #[serde(
+        default = "crate::engine::workflow::no_control_dependencies",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub control_dependencies: Vec<(u64, u64)>,
     pub expression_dependencies: Vec<crate::expression_dependencies::ExpressionDependency>,
 }
 
@@ -405,6 +410,7 @@ pub fn build_runner_plan(workflow: &Workflow) -> RunnerPlanBuild {
                 name: workflow.meta.name.clone(),
                 nodes,
                 edges,
+                control_dependencies: workflow.control_dependencies.clone(),
                 expression_dependencies,
             }),
             diagnostics,
@@ -609,7 +615,7 @@ pub fn ready_nodes(plan: &RunnerWorkflow, states: &BTreeMap<RunnerNodeId, Runner
         return Vec::new();
     };
     let shared_states = shared_step_states(states);
-    seaglass_execution_graph::ready_nodes(&shared_plan, &shared_states)
+    seaglass_execution_graph::aggregate::ready_nodes(&shared_plan, &shared_states)
         .iter()
         .filter_map(|node_id| node_id.parse::<RunnerNodeId>().ok())
         .collect()
@@ -645,29 +651,31 @@ pub fn transition_step_state(
     from: RunnerStepState,
     action: RunnerStepAction,
 ) -> Result<RunnerStepState, RunnerTransitionError> {
-    seaglass_execution_graph::transition_step_state(from, action)
+    seaglass_execution_graph::lifecycle::transition_step_state(from, action)
 }
 
 /// Return whether a runner step state forbids further execution transitions.
 pub fn is_terminal_step_state(state: RunnerStepState) -> bool {
-    seaglass_execution_graph::is_terminal_state(state)
+    seaglass_execution_graph::lifecycle::is_terminal_state(state)
 }
 
 // r[impl lattice.choregraph_adoption.adapter]
-fn admitted_execution_plan(plan: &RunnerWorkflow) -> Result<seaglass_execution_graph::ExecutionPlan, RunnerDiagnostic> {
-    seaglass_execution_graph::admit_graph(&shared_execution_graph(plan)).map_err(|diagnostics| {
+fn admitted_execution_plan(
+    plan: &RunnerWorkflow,
+) -> Result<seaglass_execution_graph::aggregate::ExecutionPlan, RunnerDiagnostic> {
+    seaglass_execution_graph::admission::admit_graph(&shared_execution_graph(plan)).map_err(|diagnostics| {
         diagnostics.first().map_or_else(invalid_shared_graph_diagnostic, shared_graph_diagnostic)
     })
 }
 
-fn shared_execution_graph(plan: &RunnerWorkflow) -> seaglass_execution_graph::ExecutionGraph {
+fn shared_execution_graph(plan: &RunnerWorkflow) -> seaglass_execution_graph::topology::ExecutionGraph {
     let nodes = plan
         .nodes
         .iter()
-        .map(|node| seaglass_execution_graph::ExecutionNode::new(node.id.to_string()))
+        .map(|node| seaglass_execution_graph::topology::ExecutionNode::new(node.id.to_string()))
         .collect();
-    debug_assert!(plan.edges.len() <= choregraph_core::DEFAULT_MAX_EDGES);
-    debug_assert!(plan.expression_dependencies.len() <= choregraph_core::DEFAULT_MAX_EDGES);
+    debug_assert!(plan.edges.len() <= choregraph_core::model::capacity::DEFAULT_MAX_EDGES);
+    debug_assert!(plan.expression_dependencies.len() <= choregraph_core::model::capacity::DEFAULT_MAX_EDGES);
     let edges = plan
         .edges
         .iter()
@@ -677,16 +685,20 @@ fn shared_execution_graph(plan: &RunnerWorkflow) -> seaglass_execution_graph::Ex
                 .iter()
                 .map(|dependency| (dependency.producer_node, dependency.consumer_node)),
         )
+        // r[impl lattice.graph_construction.control_order.barrier]
+        .chain(plan.control_dependencies.iter().copied())
         .collect::<BTreeSet<_>>()
         .into_iter()
-        .map(|(source, target)| seaglass_execution_graph::ExecutionEdge::new(source.to_string(), target.to_string()))
+        .map(|(source, target)| {
+            seaglass_execution_graph::topology::ExecutionEdge::new(source.to_string(), target.to_string())
+        })
         .collect();
-    seaglass_execution_graph::ExecutionGraph::new(nodes, edges)
+    seaglass_execution_graph::topology::ExecutionGraph::new(nodes, edges)
 }
 
 fn shared_step_states(
     states: &BTreeMap<RunnerNodeId, RunnerStepState>,
-) -> BTreeMap<String, seaglass_execution_graph::StepState> {
+) -> BTreeMap<String, seaglass_execution_graph::lifecycle::StepState> {
     states.iter().map(|(node_id, state)| (node_id.to_string(), *state)).collect()
 }
 
@@ -762,33 +774,33 @@ pub fn migrate_persisted_states(
     Ok(states)
 }
 
-const fn core_action(action: RunnerStepAction) -> choregraph_core::Action {
+const fn core_action(action: RunnerStepAction) -> choregraph_core::model::semantics::Action {
     match action {
-        RunnerStepAction::MarkReady => choregraph_core::Action::MarkReady,
-        RunnerStepAction::Start => choregraph_core::Action::Start,
-        RunnerStepAction::Complete => choregraph_core::Action::Complete,
-        RunnerStepAction::Fail => choregraph_core::Action::Fail,
-        RunnerStepAction::Cancel => choregraph_core::Action::Cancel,
+        RunnerStepAction::MarkReady => choregraph_core::model::semantics::Action::MarkReady,
+        RunnerStepAction::Start => choregraph_core::model::semantics::Action::Start,
+        RunnerStepAction::Complete => choregraph_core::model::semantics::Action::Complete,
+        RunnerStepAction::Fail => choregraph_core::model::semantics::Action::Fail,
+        RunnerStepAction::Cancel => choregraph_core::model::semantics::Action::Cancel,
     }
 }
 
-fn replay_events(events: &[PersistedMachineEvent]) -> Vec<choregraph_core::Event> {
+fn replay_events(events: &[PersistedMachineEvent]) -> Vec<choregraph_core::model::dispatch::Event> {
     events
         .iter()
-        .map(|event| choregraph_core::Event::new(event.node_id.to_string(), core_action(event.action)))
+        .map(|event| choregraph_core::model::dispatch::Event::new(event.node_id.to_string(), core_action(event.action)))
         .collect()
 }
 
 fn replay_bindings(
     identity: PersistedReplayIdentity,
-) -> (choregraph_core::ReplayBindings, choregraph_core::ReplayBindings) {
-    let expected = choregraph_core::ReplayBindings::new(
-        choregraph_core::TraceBinding::from_bytes(identity.expected_machine),
-        choregraph_core::TraceBinding::from_bytes(identity.expected_initial_state),
+) -> (choregraph_core::model::history::ReplayBindings, choregraph_core::model::history::ReplayBindings) {
+    let expected = choregraph_core::model::history::ReplayBindings::new(
+        choregraph_core::model::history::TraceBinding::from_bytes(identity.expected_machine),
+        choregraph_core::model::history::TraceBinding::from_bytes(identity.expected_initial_state),
     );
-    let observed = choregraph_core::ReplayBindings::new(
-        choregraph_core::TraceBinding::from_bytes(identity.observed_machine),
-        choregraph_core::TraceBinding::from_bytes(identity.observed_initial_state),
+    let observed = choregraph_core::model::history::ReplayBindings::new(
+        choregraph_core::model::history::TraceBinding::from_bytes(identity.observed_machine),
+        choregraph_core::model::history::TraceBinding::from_bytes(identity.observed_initial_state),
     );
     (expected, observed)
 }
@@ -799,23 +811,23 @@ pub fn replay_persisted_events(
     states: &BTreeMap<RunnerNodeId, RunnerStepState>,
     identity: PersistedReplayIdentity,
     events: &[PersistedMachineEvent],
-) -> Result<choregraph_core::ReplayDecision, PersistedReplayError> {
+) -> Result<choregraph_core::model::history::ReplayDecision, PersistedReplayError> {
     let shared_plan = admitted_execution_plan(plan).map_err(PersistedReplayError::Graph)?;
-    let initial_state = seaglass_execution_graph::expand_state(&shared_plan, &shared_step_states(states))
+    let initial_state = seaglass_execution_graph::aggregate::expand_state(&shared_plan, &shared_step_states(states))
         .map_err(PersistedReplayError::State)?;
     let core_events = replay_events(events);
     let (expected_bindings, observed_bindings) = replay_bindings(identity);
-    let trace = choregraph_core::BoundedTrace::new(observed_bindings, &core_events);
-    let input = choregraph_core::ReplayInput::new(
+    let trace = choregraph_core::model::history::BoundedTrace::new(observed_bindings, &core_events);
+    let input = choregraph_core::model::history::ReplayInput::new(
         shared_plan.machine(),
         &initial_state,
         expected_bindings,
         trace,
-        choregraph_core::ReplayLimits {
-            max_events: choregraph_core::DEFAULT_MAX_TRACE_EVENTS,
+        choregraph_core::model::history::ReplayLimits {
+            max_events: choregraph_core::model::capacity::DEFAULT_MAX_TRACE_EVENTS,
         },
     );
-    Ok(choregraph_core::replay(input))
+    Ok(choregraph_core::transition::replay(input))
 }
 
 fn parse_node_ids(node_ids: &[String]) -> Result<Vec<RunnerNodeId>, RunnerDiagnostic> {
@@ -834,23 +846,28 @@ fn parse_node_id(node_id: &str) -> Result<RunnerNodeId, RunnerDiagnostic> {
     }
 }
 
-fn shared_graph_diagnostic(diagnostic: &seaglass_execution_graph::GraphDiagnostic) -> RunnerDiagnostic {
-    let code = match diagnostic.code {
-        seaglass_execution_graph::GraphDiagnosticCode::CycleDetected => RunnerDiagnosticCode::CycleDetected,
-        seaglass_execution_graph::GraphDiagnosticCode::SelfLoop => RunnerDiagnosticCode::EdgeSelfLoop,
-        seaglass_execution_graph::GraphDiagnosticCode::EmptyNodeId
-        | seaglass_execution_graph::GraphDiagnosticCode::DuplicateNodeId
-        | seaglass_execution_graph::GraphDiagnosticCode::DuplicateEdge
-        | seaglass_execution_graph::GraphDiagnosticCode::MissingSourceNode
-        | seaglass_execution_graph::GraphDiagnosticCode::MissingTargetNode
-        | seaglass_execution_graph::GraphDiagnosticCode::GraphTooLarge => RunnerDiagnosticCode::RuntimeFailure,
-    };
+fn shared_graph_diagnostic(diagnostic: &seaglass_execution_graph::admission::GraphDiagnostic) -> RunnerDiagnostic {
     let node_id = diagnostic
         .node_id
         .as_deref()
         .and_then(|node_id| node_id.parse::<RunnerNodeId>().ok())
         .map(crate::engine::workflow::NodeId);
-    runner_diagnostic(code, node_id, None, diagnostic.to_string())
+    runner_diagnostic(shared_graph_code(&diagnostic.code), node_id, None, diagnostic.to_string())
+}
+
+fn shared_graph_code(code: &seaglass_execution_graph::admission::GraphDiagnosticCode) -> RunnerDiagnosticCode {
+    match code {
+        seaglass_execution_graph::admission::GraphDiagnosticCode::CycleDetected => RunnerDiagnosticCode::CycleDetected,
+        seaglass_execution_graph::admission::GraphDiagnosticCode::SelfLoop => RunnerDiagnosticCode::EdgeSelfLoop,
+        seaglass_execution_graph::admission::GraphDiagnosticCode::EmptyNodeId
+        | seaglass_execution_graph::admission::GraphDiagnosticCode::DuplicateNodeId
+        | seaglass_execution_graph::admission::GraphDiagnosticCode::DuplicateEdge
+        | seaglass_execution_graph::admission::GraphDiagnosticCode::MissingSourceNode
+        | seaglass_execution_graph::admission::GraphDiagnosticCode::MissingTargetNode
+        | seaglass_execution_graph::admission::GraphDiagnosticCode::GraphTooLarge => {
+            RunnerDiagnosticCode::RuntimeFailure
+        }
+    }
 }
 
 fn invalid_shared_graph_diagnostic() -> RunnerDiagnostic {
@@ -1082,7 +1099,11 @@ pub fn durable_runner_decision(
     let Ok(shared_plan) = admitted_execution_plan(plan) else {
         return DurableRunnerDecision::RejectTerminalMutation;
     };
-    seaglass_execution_graph::resume_decision(&shared_plan, &shared_step_states(states), &node_id.to_string())
+    seaglass_execution_graph::aggregate::resume_decision(
+        &shared_plan,
+        &shared_step_states(states),
+        &node_id.to_string(),
+    )
 }
 
 fn runner_diagnostic(

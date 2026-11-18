@@ -1615,6 +1615,19 @@ impl Executor {
         let node_credentials = workflow.node_credentials(node_id);
         let input_hash = precomputed_input_hash
             .unwrap_or_else(|| node_execution_cache_key_with_credentials(node_id, config, node_credentials, inputs));
+        // r[impl lattice.graph_construction.authority]
+        if matches!(&effect, EffectExecution::Compatibility)
+            && (workflow.construction_profile
+                || crate::authoring::construction::has_retained_construction_lineage(workflow))
+        {
+            return StepResult {
+                node_id,
+                status: NodeStatus::Failed {
+                    error: "construction effects require admitted authority".to_owned(),
+                },
+                input_hash,
+            };
+        }
         if let EffectExecution::Exact { binding, .. } = &effect
             && !authorized_binding_matches_node(binding, node_id, config)
         {
@@ -1637,6 +1650,15 @@ impl Executor {
                 timeout_secs,
                 pipe_stdin,
             } => {
+                if let Err(error) = crate::authoring::construction::check_runtime(workflow) {
+                    return StepResult {
+                        node_id,
+                        status: NodeStatus::Failed {
+                            error: error.to_owned(),
+                        },
+                        input_hash,
+                    };
+                }
                 let output_ports = match shell_output_port_ids(node) {
                     Ok(ports) => ports,
                     Err(error) => {
@@ -1694,10 +1716,17 @@ impl Executor {
                     should_pipe_stdin: *pipe_stdin,
                     stdin_value,
                 };
+                let construction_backend = if workflow.construction_profile {
+                    workflow.construction_runtime.as_ref()
+                } else {
+                    None
+                };
                 let result = match effect {
                     EffectExecution::Exact { binding, dispatch } => {
-                        let request = crate::engine::effect::runtime::credential::ProcessRecipe::new(
-                            shell_process_request(&shell_input, &self.local_process),
+                        let request = shell_process_recipe(
+                            &shell_input,
+                            &self.local_process,
+                            construction_backend,
                             node_credentials,
                             std::sync::Arc::clone(&self.credential_provider),
                         );
@@ -1719,8 +1748,10 @@ impl Executor {
                         })
                     }
                     EffectExecution::Product(session) => {
-                        let request = crate::engine::effect::runtime::credential::ProcessRecipe::new(
-                            shell_process_request(&shell_input, &self.local_process),
+                        let request = shell_process_recipe(
+                            &shell_input,
+                            &self.local_process,
+                            construction_backend,
                             node_credentials,
                             std::sync::Arc::clone(&self.credential_provider),
                         );
@@ -3020,11 +3051,34 @@ struct ShellExecutionInput<'a> {
     stdin_value: Option<&'a crate::engine::value::Value>,
 }
 
+fn shell_process_recipe(
+    input: &ShellExecutionInput<'_>,
+    config: &LocalProcessConfig,
+    construction: Option<&crate::engine::workflow::ConstructionRuntimeBinding>,
+    references: Option<&NodeCredentialRefs>,
+    provider: std::sync::Arc<dyn crate::credentials::CredentialProvider>,
+) -> Result<crate::engine::effect::runtime::credential::ProcessRecipe, String> {
+    let mut request = shell_process_request(input, config, construction);
+    if construction.is_some() {
+        if !input.environment.is_empty() {
+            return Err("construction shell does not admit configurable environment".to_owned());
+        }
+        let path = option_env!("LATTICE_CONSTRUCTION_PATH_DEFAULT")
+            .filter(|path| path.starts_with("/nix/store/") && path.ends_with("/bin"))
+            .ok_or("construction tool PATH is not selected as a Nix-store bin directory")?;
+        request.env.insert("PATH".to_owned(), path.to_owned());
+        crate::engine::effect::runtime::credential::ProcessRecipe::new_clear_environment(request, references, provider)
+    } else {
+        crate::engine::effect::runtime::credential::ProcessRecipe::new(request, references, provider)
+    }
+}
+
 /// Execute a shell command through the shared blocking bounded-process shell.
 // r[impl lattice.workflow_execution.bounded_process_compatibility]
 fn shell_process_request(
     input: &ShellExecutionInput<'_>,
     config: &LocalProcessConfig,
+    construction: Option<&crate::engine::workflow::ConstructionRuntimeBinding>,
 ) -> crate::agent_node::ProcessRequest {
     let stdin = if input.should_pipe_stdin {
         input
@@ -3036,7 +3090,7 @@ fn shell_process_request(
         Vec::new()
     };
     let request = crate::agent_node::ProcessRequest {
-        program: config.shell_program.clone(),
+        program: construction.map_or_else(|| config.shell_program.clone(), |binding| binding.shell_path.clone()),
         args: vec![SHELL_COMMAND_FLAG.to_owned(), input.command.to_owned()],
         cwd: input.cwd.clone(),
         env: input.environment.iter().map(|(key, value)| (key.clone(), value.clone())).collect(),
@@ -3045,7 +3099,10 @@ fn shell_process_request(
         output_limit_bytes: config.limits.stdout_max_bytes.max(config.limits.stderr_max_bytes),
     };
     debug_assert_eq!(request.args.len(), SHELL_ARGUMENT_COUNT);
-    debug_assert_eq!(request.program, config.shell_program);
+    debug_assert_eq!(
+        request.program,
+        construction.map_or(config.shell_program.as_str(), |binding| binding.shell_path.as_str())
+    );
     request
 }
 
@@ -3062,7 +3119,8 @@ async fn execute_shell(
     config: &LocalProcessConfig,
     cancellation: std::sync::Arc<std::sync::atomic::AtomicBool>,
 ) -> Result<crate::agent_node::ProcessOutput, crate::agent_node::ProcessError> {
-    let request = crate::agent_node::runtime::host::ExecutionProcessRequest(shell_process_request(&input, config));
+    let request =
+        crate::agent_node::runtime::host::ExecutionProcessRequest(shell_process_request(&input, config, None));
     let runner = crate::agent_node::ProductionProcessRunner::new(config.clone());
     let output = tokio::task::spawn_blocking(move || runner.run_with_cancellation(&request.0, &cancellation))
         .await

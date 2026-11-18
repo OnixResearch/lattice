@@ -523,6 +523,7 @@ pub fn observe_pending_usage(store: &lattice::store::Store, instance: &lattice::
                     cancelled: Some(outcome.cancelled),
                 }),
             }),
+            execution_binding: None,
         })
         .expect("typed fixture receipt persists before settlement");
 }

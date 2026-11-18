@@ -85,6 +85,15 @@ fn fixture() -> Fixture {
         },
         output_limit_bytes: 4096,
         allow_unchanged: false,
+        worker_compute: lattice_core::execution_binding::request::ComputeRequirement::HostLocal {},
+        execution_binding: lattice_core::execution_binding::request::Declaration {
+            schema: lattice_core::execution_binding::request::DECLARATION_SCHEMA.into(),
+            compute: lattice_core::execution_binding::request::ComputeDeclaration::HostLocal {},
+            model_routes: lattice_core::execution_binding::request::RouteDeclaration::NoModel {},
+        },
+    };
+    request_value.execution_binding.model_routes = lattice_core::execution_binding::request::RouteDeclaration::Routes {
+        routes: vec![super::super::binding::primary_route(&request_value).expect("primary route")],
     };
     envelope.worker_profile = request_value.worker_profile_identity().expect("profile identity");
     request_value.envelope = envelope;
@@ -131,6 +140,10 @@ fn retain_completed(f: &Fixture) {
         std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).expect("attempt mode");
     }
     let request_bytes = std::fs::read(&f.request).expect("request bytes");
+    let (bound, observation) =
+        super::super::binding::admit(&f.request_value, &mut crate::execution_binding::UnavailableComputePort)
+            .expect("host-local binding");
+    super::super::binding::persist(&dir, &bound, observation).expect("binding before intent");
     super::super::artifacts::write_once(&dir.join("intent.json"), blake3::hash(&request_bytes).to_hex().as_bytes())
         .expect("intent");
     let raw = concat!(

@@ -9,7 +9,7 @@ use thiserror::Error;
 mod validation;
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 
 #[cfg(test)]
 mod host_tests;
@@ -37,6 +37,9 @@ pub enum Scope {
     Node,
     /// Host-owned run receipt; does not assert a qualified worker profile.
     HostRun,
+    /// Host-owned implementation-attempt receipt bound to one admitted
+    /// execution binding; it carries no budget accounting and no run or node.
+    Attempt,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -62,6 +65,15 @@ pub struct CommandWorkerObservation {
     pub complete: bool,
     #[serde(default = "absent_accounting", skip_serializing_if = "Option::is_none")]
     pub accounting: Option<RunAccounting>,
+    /// Frozen binding provenance. Historical rows decode as `None`, which is
+    /// unknown provenance, never host-local.
+    // r[impl lattice.execution_binding.usage_provenance]
+    #[serde(default = "absent_binding", skip_serializing_if = "Option::is_none")]
+    pub execution_binding: Option<lattice_core::execution_binding::projection::accounting::AttemptProvenance>,
+}
+
+fn absent_binding() -> Option<lattice_core::execution_binding::projection::accounting::AttemptProvenance> {
+    None
 }
 
 /// Frozen usage settlement with monotonically refinable owned outcome evidence.
@@ -166,6 +178,8 @@ pub enum ObservationError {
     EmptyCompleteObservation,
     #[error("host accounting receipt has invalid scope, interval, bounds, or fallback charge")]
     InvalidHostReceipt,
+    #[error("attempt receipt has invalid scope, binding provenance, identities or values")]
+    InvalidAttemptReceipt,
     #[error("owned run outcome contradicts previously persisted evidence")]
     ConflictingOutcome,
     #[error("usage observation JSON is malformed: {0}")]

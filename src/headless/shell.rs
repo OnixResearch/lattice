@@ -107,6 +107,8 @@ pub async fn run_owned_workflow_with_authority_provider_and_cancellation(
 }
 
 // r[impl n8nclone.workflow_execution.trait_boundaries.storage_ports]
+// r[impl lattice.graph_construction.snapshot]
+// r[impl lattice.graph_construction.snapshot.readmit]
 pub(super) async fn run_saved_workflow_with_executor_factory(
     request: ProductRunRequest<'_>,
     executor_factory: impl FnOnce() -> crate::engine::executor::Executor,
@@ -215,6 +217,8 @@ pub struct SnapshotRunRequest {
     pub cancellation: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
+// r[impl lattice.graph_construction.runtime_controls]
+// r[impl lattice.graph_construction.runtime_controls.result]
 pub async fn run_workflow_snapshot_with_authority_provider_and_cancellation(
     store: &crate::store::Store,
     request: SnapshotRunRequest,

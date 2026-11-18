@@ -24,6 +24,21 @@ They are useful for demos, import/export validation, and headless regression tes
 - `animus-bounded-agent.ncl` — runs one generic agent node through the fixed two-turn, model-only Animus leaf runtime.
 - `bounded-build-loop.ncl` — the fixed planner/generator/evaluator DAG used by the bounded local build-and-test host below.
 
+## Construction programs
+
+`examples/construction/` contains captured graph-construction programs. They
+import `./choregraph/graph-construction-v1.ncl`, which the native construction
+path supplies from the exact selected Choregraph library bytes, so they are not
+standalone files for `nickel typecheck` or plain `import`:
+
+- `local-shell-construction.ncl` — one shell `worker` template instantiated twice by name and twice by finite generation, fanned out from a fork and followed by a control-sequenced join.
+- `parameterized-shell-construction.ncl` — explicit parameters, independently scoped instances and finite generation.
+
+Compile them through `lattice import --construction` or `lattice authoring draft
+... --construction`; the construction authoring tests compile both through that
+native path. Construction source is inert until a separate exact effect grant is
+selected.
+
 ## Orchestrations
 
 `examples/orchestrations/llm-review-loop.ncl` adds a durable multi-round policy to the Markdown-backed LLM operating graph.

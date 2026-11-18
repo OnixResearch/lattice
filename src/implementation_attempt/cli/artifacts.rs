@@ -1,8 +1,23 @@
 use std::io::Read;
 use std::io::Write;
 
+/// Only the schema is read first so a legacy request names its readmission
+/// path instead of failing on the fields it lacks.
+#[derive(serde::Deserialize)]
+struct SchemaProbe {
+    schema: String,
+}
+
 pub(super) fn load_request(path: &std::path::Path) -> Result<(super::Request, Vec<u8>), String> {
     let bytes = read_bounded(path, super::MAX_REQUEST_BYTES)?;
+    let probe: SchemaProbe = serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
+    if probe.schema == super::LEGACY_REQUEST_SCHEMA {
+        return Err(format!(
+            "{} requests are refused; readmit them explicitly as {}",
+            super::LEGACY_REQUEST_SCHEMA,
+            super::REQUEST_SCHEMA
+        ));
+    }
     let request = serde_json::from_slice(&bytes).map_err(|error| error.to_string())?;
     Ok((request, bytes))
 }
@@ -61,19 +76,34 @@ fn create_once(path: &std::path::Path) -> std::io::Result<std::fs::File> {
     options.open(path)
 }
 
-pub(super) fn write_once(path: &std::path::Path, bytes: &[u8]) -> Result<bool, String> {
+/// Create and fsync a new private file; `false` when it already exists.
+pub(super) fn create_new(path: &std::path::Path, bytes: &[u8]) -> Result<bool, String> {
     match create_once(path) {
         Ok(file) => {
             sync_created_file(file, path, bytes)?;
             Ok(true)
         }
-        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-            if read_bounded(path, bytes.len())? != bytes {
-                return Err("attempt state contains a different immutable binding".into());
-            }
-            Ok(false)
-        }
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Ok(false),
         Err(error) => Err(error.to_string()),
+    }
+}
+
+pub(super) fn write_once(path: &std::path::Path, bytes: &[u8]) -> Result<bool, String> {
+    if create_new(path, bytes)? {
+        return Ok(true);
+    }
+    if read_bounded(path, bytes.len())? != bytes {
+        return Err("attempt state contains a different immutable binding".into());
+    }
+    Ok(false)
+}
+
+/// Read an optional retained artifact; only a missing file is `None`.
+pub(super) fn read_optional(path: &std::path::Path, max_bytes: usize) -> Result<Option<Vec<u8>>, String> {
+    match std::fs::symlink_metadata(path) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(_) => Err("retained artifact metadata is unavailable".into()),
+        Ok(_) => read_bounded(path, max_bytes).map(Some),
     }
 }
 

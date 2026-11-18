@@ -1,5 +1,6 @@
 [package]
 name = "lattice"
+default-run = "lattice"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
@@ -55,6 +56,10 @@ cargo_check_args = ["--lib"]
 name = "lattice"
 path = "src/main.rs"
 
+[[bin]]
+name = "lattice-closed-eval-worker"
+path = "src/bin/lattice-closed-eval-worker.rs"
+
 [dependencies]
 budget-ledger-core = { path = "crates/budget-ledger-core" }
 lattice-core = { path = "crates/lattice-core" }
@@ -83,15 +88,15 @@ reqwest = { version = "0.12.28", default-features = false, features = ["blocking
 redb = "3.1.1"
 content-identity-core = { git = "https://seed.radicle.garden/zA14jhTdwST4PxPBdsryc4zS7Kpq.git", rev = "7f55597b5dc879b7601856e8d7fd0dbacaa2a498" }
 transactional-reconciliation-core = { git = "https://seed.radicle.garden/z4Tky6zvC8w4Y6c4YBzNxVbq5n752.git", rev = "eb2bd3441753af97bfcb247cef7cc22d72675b62" }
-nickel-eval = { git = "https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git", rev = "f23be09e41337de8fa729274f50023f861ae0e8a" }
+nickel-eval = { git = "https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git", rev = "f0ea0d2a31d3482ddf4e575482f6ddf7a7e7d4e9" }
 blake3 = "1.8.3"
 crossterm = "0.29.0"
 ratatui = "0.30.0"
-choregraph-choreography = { git = "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git", rev = "0b2000edaf86d5a7a8601246afbc0d526f4a2a07" }
-choregraph-core = { git = "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git", rev = "0b2000edaf86d5a7a8601246afbc0d526f4a2a07" }
-choregraph-kamacite = { git = "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git", rev = "0b2000edaf86d5a7a8601246afbc0d526f4a2a07" }
-choregraph-nickel = { git = "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git", rev = "0b2000edaf86d5a7a8601246afbc0d526f4a2a07" }
-seaglass-execution-graph = { package = "choregraph-seaglass", git = "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git", rev = "0b2000edaf86d5a7a8601246afbc0d526f4a2a07" }
+choregraph-choreography = { git = "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git", rev = "c3577352ee1e39391f5204ee234d991c7dbeb151" }
+choregraph-core = { git = "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git", rev = "c3577352ee1e39391f5204ee234d991c7dbeb151" }
+choregraph-kamacite = { git = "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git", rev = "c3577352ee1e39391f5204ee234d991c7dbeb151" }
+choregraph-nickel = { git = "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git", rev = "c3577352ee1e39391f5204ee234d991c7dbeb151" }
+seaglass-execution-graph = { package = "choregraph-seaglass", git = "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git", rev = "c3577352ee1e39391f5204ee234d991c7dbeb151" }
 cap-root-core = { git = "https://seed.radicle.garden/z3cWBCK7VPbEmbL5MAvKJWKjCE745.git", rev = "545e77e5a49e4e1d34037aa9a82d924944ac0a1b" }
 basalt = { path = "vendor-cargo-deps/basalt", default-features = false, features = ["oidc-exchange", "durable-authority"] }
 rat-nodegraph = { path = "vendor-cargo-deps/rats/source/subwayrat/crates/rat-nodegraph" }
@@ -121,7 +126,6 @@ zeroize = "1"
 molten-render-pilot = { path = "vendor-cargo-deps/aspen-render/source/render" }
 molten-batch-core = { path = "vendor-cargo-deps/aspen-render/source/batch-core" }
 molten-orchestrator-codec = { path = "vendor-cargo-deps/aspen-render/source/codec" }
-nickel-lang-core = "=0.18.0"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
@@ -144,9 +148,6 @@ crunch-wasm-component-core = { path = "vendor-cargo-deps/mantle/crates/crunch-wa
 [features]
 default = []
 animus-secretspec = ["dep:animus-std-secretspec"]
-
-[patch.crates-io]
-nickel-lang-core = { path = "vendor-cargo-deps/nickel-lang-core-0.18.0" }
 
 # Upstream manifests still name these public repositories over SSH. Patch the
 # exact revisions to their anonymous HTTPS sources so the public build closure

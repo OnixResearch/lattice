@@ -1,11 +1,24 @@
 # Captured workflow source revisions
 
 Lattice retains bounded author inputs separately from the executable materialized
-workflow. This implements the local source-draft, admission, fork and export
-portion of [issue #21](https://github.com/OnixResearch/lattice/issues/21). It does
-**not** close that issue or implement the missing Choregraph construction API.
-The maintenance owner is Lattice authoring/store; graph construction/origins stay
-with Choregraph and evaluation/import closure stays with nickel-eval.
+workflow. The selected `nickel-eval.captured-modules.v1` profile and Choregraph
+construction/v3 projection add finite native compilation to the existing
+source-draft, admission, fork and export routes for issues #20/#21. Lattice owns
+captured inputs, concrete shell registry/configuration, runtime effects and
+durable admission; the producer APIs own native evaluation/elaboration.
+
+Cargo and Nix pin the published producer cohorts that provide these APIs:
+nickel-eval `f0ea0d2a31d3482ddf4e575482f6ddf7a7e7d4e9` (captured-module
+evaluator) and Choregraph `c3577352ee1e39391f5204ee234d991c7dbeb151`
+(construction/v3 projection), both acquired anonymously from their canonical
+Radicle seeds. No sibling path, private override or runtime fallback selects them.
+
+Rust callers use the producer's responsibility-qualified APIs: construction data
+under `choregraph_nickel::construction::model`, compilation bindings under
+`construction::association`, and current-registry readmission under
+`construction::admission`. Restricted lowering uses its separate `model`, `lower`,
+`identity` and `diagnostic` owners. No flat alias bridge changes the selected
+canonical cohort.
 
 ## What is retained
 
@@ -16,10 +29,10 @@ source, template or instance is inferred for them. Associated workflows retain:
   type and byte/path bounds: at most 64 files, 1 MiB per file and 4 MiB total;
 - explicit parameter overrides (at most 64 names and 1 MiB encoded), program kind
   and the identity of this captured input revision;
-- the selected evaluator source/library/core cohort, locked dependency material,
-  Lattice lowerer adapter and evaluation-profile identity;
-- the observed evaluator JSON identity and the exact materialized workflow
-  identity at compilation, including resolved prompt contents;
+- the selected exact captured-module evaluator artifact, observed closure/binding,
+  library/contracts, construction registry/implementation, lowerer and profile;
+- the exact observed evaluator output, native projection/binding/origins and
+  materialized workflow identity at compilation, including port correspondence;
 - an explicit association state, plus a durable catalog CAS token on the
   containing workflow. The workflow and association publish in one transaction.
 
@@ -35,22 +48,44 @@ snapshot clones share immutable captured bytes rather than copying the bundle.
 Editable drafts own their mutable program independently; serialized store and
 archive content is unchanged by shared ownership.
 
-Ordinary Nickel import keeps its existing evaluator/file-context semantics. When
-bounded capture succeeds it retains entry and resolved prompt-asset bytes with
-`RetainedEntrySnapshot`: these are **retained inputs**, not proof that the file
-API evaluated these exact bytes or a complete import closure. If capture cannot
-satisfy the bundle bounds/path policy, ordinary compatible materialized import
-still succeeds without an association. Check `authoring inspect`; absence is not
-reproducibility evidence.
+Ordinary Nickel file import keeps its existing evaluator/file-context semantics.
+When bounded capture succeeds it retains entry and resolved prompt-asset bytes
+with `RetainedEntrySnapshot`; these are retained inputs, not proof that the file
+API evaluated these exact bytes or a complete import closure. Failed capture
+does not break compatible materialized import.
 
-`CapturedSnapshot` means the source-text evaluator received the captured entry
-and explicit parameters and Lattice admitted the observed output. Source editing
-first uses the selected native Nickel parser to reject **every syntactic import**,
-including imports in dormant branches, helper functions and type annotations.
-Literal strings/comments containing `import` are not import nodes. Extra captured
-members may be retained assets/lineage, never substituted ambient modules. No
-association is a complete-module/toolchain reproducibility receipt or safe cache
-key; the supported editable program cohort is import-free entry source.
+Captured source uses the selected isolated worker with an explicit bounded
+logical module map, including exact Choregraph library/contracts for construction.
+Parameterized source first evaluates declared defaults, then renders a literal
+application module from those defaults and explicit overrides. The worker returns
+declared/observed closure, output bytes, selector policy and cohort binding.
+This binding proves request/response correspondence, **not** that the worker
+actually ran: exact source readmission repeats bounded worker evaluation and
+compares the complete request (entry, every module and application byte) and
+response, including worker artifact. Construction execution repeats that check
+before rebuilding the current concrete registry projection and comparing its
+binding and materialized graph. A generic save on a new workflow name cannot
+publish a caller-supplied `CapturedModules` association, even with matching
+hashes. An uncaptured selected import fails closed rather than using an ambient
+path; comments and literal strings containing `import` are not imports. Ordinary
+file-context imports and the restricted Nickel CLI gate retain their own behavior.
+
+The first local construction profile requires Linux and canonical regular
+executable Nix-store paths for the running runtime, shell backend and captured
+worker. Each selected store entry and descendant must be root-owned and
+non-writable. The root-owned Nix root must not be group/other writable; a
+root-owned sticky `/nix/store` namespace (including normal multi-user mode
+`01775`) is accepted. Missing, mutable or oversized executables fail closed;
+no same-named PATH fallback is permitted. Executable identity uses bounded
+artifact bytes; build-generated source-cohort IDs remain declarations, not
+executable attestations.
+
+The operator may select `LATTICE_CONSTRUCTION_SHELL` and
+`LATTICE_CLOSED_EVAL_WORKER`. Packaged defaults are
+`LATTICE_CONSTRUCTION_SHELL_DEFAULT` (the exact Nix-store Bash executable) and
+`LATTICE_CLOSED_EVAL_WORKER_DEFAULT` (the shipped companion worker). Changing
+either selected artifact or the running runtime invalidates the retained v3
+runtime binding and its exact effect-authority inspection.
 
 Parameter values are rendered through the selected native Nickel value printer,
 which preserves import/interpolation-like strings as literal data. Expanded
@@ -60,39 +95,38 @@ override is not evaluated as source code.
 ## Source editing and parameter convention
 
 The real command route is `lattice authoring`. It never runs a workflow, resolves
-a credential provider or grants authority. Admission uses the existing Nickel
-adapter, portable decoding, Choregraph lowering and native validation.
+a credential provider or grants authority. Flat programs use existing portable
+decoding and admission. Captured construction programs instead use the selected
+bounded evaluator, native Choregraph elaboration and the host shell registry;
+their output is still only a graph candidate, not execution permission.
 
-A flat program evaluates directly to the ordinary portable workflow. A
-parameterized program evaluates to a record with:
+A parameterized program evaluates to a record with `parameters` (JSON-exportable
+defaults) and `build` (a Nickel function receiving selected overrides). Use
+`--parameterized` for this convention and `--construction` for a native
+construction candidate; both flags together select a parameterized construction.
+Override names must occur in the declaration. Helpers/templates, per-instance
+parameters and generated collections behave according to source recompilation;
+labels are not reverse-compiled into source. Parameters grant no runtime authority.
 
-- `parameters`: a JSON-exportable record of source-declared defaults;
-- `build`: a Nickel function receiving that record with the selected overrides.
-
-Use `authoring draft ... --parameterized` for that convention. Override names
-must already occur in the evaluated declaration. Lattice does not infer template
-parameters from graph labels or try to recover functions from expanded nodes.
-Changing a shared helper or one instance parameter does exactly what the source
-program defines. Parameters do not convey runtime authority.
-
-An effect-free editing cycle, using an already reviewed import-free author
-program, is:
+An effect-free editing cycle, using captured `local-shell-construction.ncl` and
+the exact shipped construction library/contracts, is:
 
 ```sh
-lattice authoring draft my-workflow edit-1 --input author.ncl --parameterized
+lattice authoring draft local-shell-demo edit-1 --input examples/construction/local-shell-construction.ncl --construction
 lattice authoring preview edit-1 --expanded-output preview.ncl
 # Inspect preview.ncl before admission. No workflow has run.
 lattice authoring admit edit-1
-lattice authoring inspect my-workflow
-lattice export my-workflow author.author.json
-lattice export my-workflow expanded.ncl --expanded
+lattice authoring inspect local-shell-demo
+lattice export local-shell-demo author.author.json
+lattice export local-shell-demo expanded.ncl --expanded
 ```
 
 `draft NAME ID` without `--input` copies an admitted source snapshot. For a new
 workflow, NAME must equal the source's workflow name. `--member relative/path`
-retains an explicitly selected file beneath the input directory; it does **not**
-make that file the evaluator's import resolver. `--archive --input file.author.json`
-restores exact retained inputs, not execution or an old admission.
+captures a selected file beneath the input directory; captured construction
+imports resolve only from that map and the exact shipped library/contracts.
+`--archive --input file.author.json` restores source inputs for new compilation,
+not an old executable admission or effect grant.
 
 `set-file ID MEMBER INPUT` replaces an existing captured member.
 `set-parameters ID INPUT.json` replaces the override record. Both invalidate the
@@ -128,10 +162,13 @@ admission or a stale workflow token is rejected. Per-workflow durable generation
 counters prevent delete/recreate ABA from reusing a prior revision token.
 
 TUI saves use the same expected-revision CAS. Associated workflow saves cannot
-be overwritten by a source-free legacy upsert. Legacy no-source repository
-callers retain their old upsert compatibility; they do not gain source claims.
-A failed admission retains the draft and a bounded admission-failure category
-without overwriting a newer draft's diagnostics.
+be overwritten by a source-free legacy upsert. A generic new-name save cannot
+publish captured-module provenance; source preview/readmission owns that path.
+For existing associations, observation and construction receipt fields are as
+immutable under ordinary CAS as source, compiler and expanded identity. Only an
+exact source readmission can replace them. Legacy no-source callers retain their
+upsert compatibility without gaining source claims. A failed admission retains
+the draft and a bounded category, without overwriting newer diagnostics.
 
 Every materialized edit/save/export route uses
 `authoring::reconcile_materialized`: a difference from the compiled materialized
@@ -144,8 +181,11 @@ rewritten. Arbitrary direct public-field changes are reconciled at save/export.
 In-flight workflow clones retain their old association and catalog token; source
 readmission replaces the catalog object, not the existing clone. This adds no
 runtime dispatch, retry, credential, authority, cancellation or budget path.
-The regression definitions check retained snapshot values without claiming a
-new live-workload qualification.
+A host-qualified regression admits a newer source revision while a run of the
+older revision is blocked on its first effect; that run completes the old graph,
+and the old exact grant does not authorize the newer revision. Constructed runs
+use the existing snapshot cancellation, shell-result validation and
+orchestration budget routes.
 
 ## Export kinds and identities
 
@@ -155,6 +195,12 @@ module/function/helper bytes and parameters, plus association status; it is not
 a flat Nickel program disguised with `.ncl`. A materialized fork's archive
 preserves its old source lineage and explicitly says `MaterializedFork`; use
 expanded export to retain the edited materialized result.
+The archive reader and exporter share a 64 MiB (67,108,864-byte) serialized
+representation limit, including both source and observation byte arrays, receipt
+and framing. Capture itself remains at most 64 files, 1 MiB per file and 4 MiB
+total; every successfully emitted archive is readable under the same cap. An
+archive restores editable source, never an executable admission.
+
 
 `--expanded` writes flat Nickel with a `lattice.expanded-workflow.v1` artifact
 header. For legacy no-source workflows this remains the default. It is a
@@ -169,8 +215,8 @@ These identities are deliberately distinct:
 | Source revision | Captured path/byte/program-kind/explicit-parameter identity; changing an unused retained member still changes it. |
 | Materialized artifact | Exact serialized workflow semantics/configuration/metadata, with authoring and catalog token excluded; includes resolved prompt text and allocator state. It is not a normalized logical graph or execution identity. |
 | Catalog revision | Durable storage admission/CAS identity and generation, atomically associated with the source. Not a runtime implementation identity. |
-| Compiler association | Partial observed evaluator cohort/lock/adapter/profile facts, not a complete compiler executable or execution-stage identity. Not observation of ambient imports or registry executables. |
-| Logical / execution identity | Remain owned by existing admission and runtime binding mechanisms; this feature does not mint substitutes. |
+| Compiler association | Exact selected evaluator/cohort/observed-module and construction materials for captured construction; incomplete retained snapshots and legacy flat source are distinguished explicitly. Current host implementation is revalidated on execution. |
+| Logical / execution identity | Native construction binding and current v3 admission remain separate from source or catalog identity; effects still require a fresh exact run-scoped authority grant. |
 | Semantic equivalence | Equal source/output hashes do not prove whole-workflow behavioral equivalence. Equal materialized values in a bounded test are only that comparison. |
 
 No labels, coordinates, port names or config fields are silently removed from
@@ -180,48 +226,85 @@ digests**. Diagnostic display names do not supply executable identity. This
 feature does not invent a new logical-graph canonicalizer that declares such
 fields universally cosmetic.
 
-## Explicitly blocked acceptance criteria
+## Scope and qualification
 
-The selected nickel-eval API accepts source/file and ambient import paths, but
-has no captured-byte-map-only import resolver or complete dependency-closure
-receipt. Captured member bytes are preserved, not proof of evaluated module
-closure. **Source preview/readmission fails closed for syntactic imports** rather
-than appearing to compile an edited module while reading an ambient old module.
-Ordinary materialized file/bundle import remains explicitly retained-snapshot
-compatibility, not source readmission. Complete selected-module reproducibility
-and import/library closure drift invalidation remain unqualified. Ambient imports
-are never promoted to captured provenance. Current native workflow validation and
-Choregraph graph admission run again at readmission; a persisted preview cannot
-skip the current host's validation policy.
+The finite construction profile initially supports the real local shell runtime:
+`shell-source` (no input) and `shell-stdin` (string stdin), string stdout/stderr,
+exitcode output, and Unit/zero-data control dependencies. Typed signatures,
+copy/drop rules, effect and invocation slot facts come from the selected host
+registry, not Nickel labels. Ordinary materialized workflows retain their old
+v1/v2 import/export and named-child behavior; explicit construction forks are
+re-admitted as v3 without claiming source reproduction. Absent construction and
+control facts are never serialized: legacy stored, portable and runner-plan
+bytes, compiler identities and expanded `| Workflow` exports stay identical to
+the committed format, so earlier readers that deny unknown fields still accept
+them. Runtime topology changes must be newly admitted revisions, not mutations
+of running snapshots.
 
-[Choregraph #6](https://github.com/OnixResearch/choregraph/issues/6) remains the
-producer prerequisite for construction and bounded template/instance/port
-origin mappings. The selected public Choregraph API exposes lowering and
-caller-bound translation identity materials, **not** construction origins or
-supported captured logical source spans. Node/port attribution therefore reports
-unavailable. There are no fabricated translation receipts, inferred origins,
-inverse compiler, hygienic-instance claims or generated-node source navigation.
+Native origins describe scoped template/instance/node/port relationships; source
+navigation uses a captured logical module and a validated byte span only where
+the producer provides one. Other locations report unavailable attribution. A
+graph edit never synthesizes an inverse Nickel edit: materialized forks retain
+lineage but explicitly cease to claim that unchanged source reproduces them.
+Source capture, preview, navigation and export do not start workloads or deliver
+credentials. An operator must select a separate exact authority grant at run time.
 
-Registry implementation drift and execution-stage binding remain with #20 and
-the existing exact runtime owners; registry-name equality is insufficient.
-Tests do not qualify complete-module origins, complete closure, general shared
-handle semantics, logical equivalence or live execution provenance. Issue #21's
-full compositional import/origin-navigation/drift/four-identity-equivalence
-acceptance remains open even when the local source-edit/store regressions pass.
+This is authored consumer implementation, not a release receipt. Every test
+that needs the captured worker or the v3 runtime is `#[ignore]`d with a reason:
+the construction scenarios in `tests/test_construction_authoring.rs` and
+`tests/test_construction_qualification.rs`, the v3 cases in
+`tests/test_construction_runtime_binding.rs` and `tests/test_workflow_format.rs`,
+every captured-preview case in `tests/test_source_authoring.rs`, and the TUI
+source-origin case. Plain Cargo and the sandboxed `nextest` check run only the
+non-ignored partition, which includes a regression proving that captured
+evaluation fails closed when no worker is selected. The host-run qualification
+app below runs the ignored partition. No general
+semantic-equivalence proof, arbitrary operation pack, inverse source compiler,
+or post-result mutation of an in-flight graph is provided; an in-flight run keeps
+executing the exact snapshot it loaded while a newer source revision is admitted.
 
 ## Integration verification
 
-The integrated focused targets passed. Their exact invocation and per-target
-observations are retained in the [focused integration record](../.cairn/changes/preserve-captured-workflow-source/evidence/focused-observation.json).
-The following narrower entrypoints remain useful for reproducing individual paths:
+The earlier flat-source focused targets and their observations remain in the
+[focused integration record](../.cairn/changes/preserve-captured-workflow-source/evidence/focused-observation.json).
+They are not a passing receipt for the new captured construction profile.
+Useful narrow entrypoints after selecting the exact producer artifacts include:
 
 ```sh
-nix develop -c cargo test --locked --test test_source_authoring
+nix build .#checks.x86_64-linux.nextest --no-link -L
+nix run .#construction-runtime-qualification -- ./construction-qualification-output
 nix develop -c cargo test --locked --test test_workflow_format
 nix develop -c cargo test --locked workflow_template
 nix develop -c cargo test --locked tui::authoring
 nix develop -c cargo test --locked tui::app::tests::lifecycle
 ```
+
+The v3 runtime admits only root-owned, non-writable Nix-store executables. A Nix
+build sandbox does not map host root, so store entries appear owned by the
+overflow user there and every sandboxed v3 positive fails closed. Qualification
+is therefore a host-run flake app, not a flake check. `packages.<system>.construction-runtime-tests`
+installs the release test executables into an immutable store output. The
+`construction-runtime-qualification` app (Linux only) then runs, on the host:
+
+- the real `lattice` binary: `import --construction` of
+  `examples/construction/local-shell-construction.ncl`, `authoring inspect`,
+  `authoring origin` for every node, author-source and `--expanded` export,
+  `authority inspect`, and `run` with an exact grant derived from that inspection;
+- negative controls: unlabeled `.ncl` source export, `run` without authority,
+  `run` with a grant for another revision, and wrong-scope-handle and
+  generation-cap-overflow imports that must leave the admitted revision unchanged;
+- every ignored construction, runtime-binding, qualification and source-authoring
+  test with the packaged companion worker and the reviewed Bash backend.
+
+It requires one new output directory and refuses an existing path. The
+directory retains `source/` (the captured example and its `.author.json`
+archive), `expanded/` (the flat expanded graph), `commands.tsv` (each exact
+command, expected outcome and observed exit code), `logs/` (each step's stdout
+and stderr), `work/` (the store, configurations and grants used) and
+`summary.json`. The output is bounded host evidence for the selected store
+artifacts; it is not a semantic-equivalence, external-service, producer or
+release claim. In-build Cargo/nextest binaries do not meet the v3 runtime
+artifact policy and are not a qualification route.
 
 The source regressions cover exact helper/parameter retention through store
 reopen/archive; source-defined instance/shared-helper changes; failed/stale and
@@ -229,5 +312,5 @@ concurrent drafts; replaced/tampered previews; compiler drift; deletion ABA;
 materialized forks; legacy imports/expanded compatibility; retained old clones;
 non-execution with inert shell commands and unresolved credential references;
 TUI failed-draft reopen and explicit admission; and actual registered CLI
-commands/default archive versus explicit expanded export. These observations do
-not qualify the blocked producer contracts above or constitute lifecycle acceptance.
+commands/default archive versus explicit expanded export. These earlier
+observations do not qualify new captured construction or lifecycle acceptance.

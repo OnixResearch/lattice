@@ -30,7 +30,7 @@
       flake = false;
     };
     choregraph = {
-      url = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=0b2000edaf86d5a7a8601246afbc0d526f4a2a07";
+      url = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=c3577352ee1e39391f5204ee234d991c7dbeb151";
       flake = false;
     };
     cap-root = {
@@ -38,7 +38,7 @@
       flake = false;
     };
     nickel-eval = {
-      url = "git+https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=f23be09e41337de8fa729274f50023f861ae0e8a";
+      url = "git+https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=f0ea0d2a31d3482ddf4e575482f6ddf7a7e7d4e9";
       flake = false;
     };
     content-identity-core = {
@@ -244,9 +244,6 @@
           || pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/animus/policy/" (toString path);
         isToonVendorPath =
           path: pkgs.lib.hasPrefix "${sourceRoot}/src/vendor-cargo-deps/toon-format/" (toString path);
-        isNickelCoreVendorPath =
-          path:
-          pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/nickel-lang-core-0.18.0/" (toString path);
         isRatsCompileTimeAssetPath =
           path:
           toString path == "${sourceRoot}/vendor-cargo-deps/rats/source/SOURCE"
@@ -316,7 +313,6 @@
               || isSourceFixturePath path
               || isAnimusCompileTimeAssetPath path
               || isToonVendorPath path
-              || isNickelCoreVendorPath path
               || isRatsCompileTimeAssetPath path
               || isRuntimeConfigAssetPath path
               || isCompileTimeDocPath path
@@ -330,8 +326,8 @@
             );
         };
 
-        choregraphCargoSource = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=0b2000edaf86d5a7a8601246afbc0d526f4a2a07#0b2000edaf86d5a7a8601246afbc0d526f4a2a07";
-        nickelEvalCargoSource = "git+https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=f23be09e41337de8fa729274f50023f861ae0e8a#f23be09e41337de8fa729274f50023f861ae0e8a";
+        choregraphCargoSource = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=c3577352ee1e39391f5204ee234d991c7dbeb151#c3577352ee1e39391f5204ee234d991c7dbeb151";
+        nickelEvalCargoSource = "git+https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=f0ea0d2a31d3482ddf4e575482f6ddf7a7e7d4e9#f0ea0d2a31d3482ddf4e575482f6ddf7a7e7d4e9";
         contentIdentityCoreCargoSource = "git+https://seed.radicle.garden/zA14jhTdwST4PxPBdsryc4zS7Kpq.git?rev=7f55597b5dc879b7601856e8d7fd0dbacaa2a498#7f55597b5dc879b7601856e8d7fd0dbacaa2a498";
         transactionalReconciliationCoreCargoSource = "git+https://seed.radicle.garden/z4Tky6zvC8w4Y6c4YBzNxVbq5n752.git?rev=eb2bd3441753af97bfcb247cef7cc22d72675b62#eb2bd3441753af97bfcb247cef7cc22d72675b62";
         baseCargoVendorDir = craneLib.vendorCargoDeps {
@@ -374,9 +370,18 @@
           install -D -m 0444 \
             ${choregraph}/vendor/kamacite-core-selected/preserves/codec.rs \
             "$out/vendor/kamacite-core-selected/preserves/codec.rs"
+          install -D -m 0444 \
+            ${choregraph}/vendor/kamacite-core-selected/preserves/tests.rs \
+            "$out/vendor/kamacite-core-selected/preserves/tests.rs"
           mkdir -p "$choregraphCheckoutRoot/schemas"
           cp -RL ${choregraph}/schemas/preserves \
             "$choregraphCheckoutRoot/schemas/preserves"
+          install -D -m 0444 \
+            ${choregraph}/library/nickel/graph-construction-v1.ncl \
+            "$choregraphCheckoutRoot/library/nickel/graph-construction-v1.ncl"
+          install -D -m 0444 \
+            ${choregraph}/contracts/nickel/graph-construction-contracts-v1.ncl \
+            "$choregraphCheckoutRoot/contracts/nickel/graph-construction-contracts-v1.ncl"
         '';
 
         # Common build inputs
@@ -397,10 +402,9 @@
             pkgs.darwin.apple_sdk.frameworks.SystemConfiguration
           ];
 
-        # Build the cargo dependency closure. The real source is used instead of
-        # crane's default dummy source because the root `nickel-lang-core` patch
-        # is a path dependency of the external `nickel-lang` crate; stubbing it
-        # would remove the module surface that `nickel-lang` imports.
+        # Build the cargo dependency closure from the real source. Crane's default
+        # dummy source would stub the in-tree vendored path dependencies under
+        # `vendor-cargo-deps/`, removing module surfaces their dependents import.
         cargoArtifacts = craneLib.buildDepsOnly {
           dummySrc = src;
           inherit
@@ -670,10 +674,10 @@
                 .admission.schema == "lattice.choregraph-source-admission.v1"
                 and .admission.status == "accepted"
                 and .admission.rid == "rad:zL2ncTUeASVYwcoGkEXv9JKgGbAF"
-                and .admission.revision == "0b2000edaf86d5a7a8601246afbc0d526f4a2a07"
+                and .admission.revision == "c3577352ee1e39391f5204ee234d991c7dbeb151"
                 and .admission.cargo_revision == .admission.revision
                 and .admission.nix_revision == .admission.revision
-                and .admission.source_archive_blake3 == "8c35370153e249cc2fe9454746a82950d830e1451b3cd77cece96321acf1ea1e"
+                and .admission.source_archive_blake3 == "da3c399ef60b65a7b2067f7e3105cb25f35c5c4110a3910365f42f2ace72f2d1"
                 and .admission.release_bundle_blake3 == "a2ac1336679542fa9573b356daddc18266fdda8147ddbe28f85aa37d135030d9"
                 and .admission.candidate_blake3 == "e4b5cd7bd77d78c20cf8b96cd0c038144028d2287000757c8ab68f5f5dfdff1a"
                 and ([.admission.prerequisites[]] | all(. == true))
@@ -694,15 +698,15 @@
 
               grep --fixed-strings 'package = "choregraph-seaglass"' ${self}/Cargo.toml > /dev/null
               grep --fixed-strings 'git = "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git"' ${self}/Cargo.toml > /dev/null
-              grep --fixed-strings 'rev = "0b2000edaf86d5a7a8601246afbc0d526f4a2a07"' ${self}/Cargo.toml > /dev/null
+              grep --fixed-strings 'rev = "c3577352ee1e39391f5204ee234d991c7dbeb151"' ${self}/Cargo.toml > /dev/null
               test "$(grep --count '^name = "choregraph-choreography"$' ${self}/Cargo.lock)" -eq 1
               test "$(grep --count '^name = "choregraph-core"$' ${self}/Cargo.lock)" -eq 1
               test "$(grep --count '^name = "choregraph-nickel"$' ${self}/Cargo.lock)" -eq 1
               test "$(grep --count '^name = "choregraph-seaglass"$' ${self}/Cargo.lock)" -eq 1
               grep --fixed-strings '${choregraphCargoSource}' ${self}/Cargo.lock > /dev/null
               jq --exit-status '
-                .nodes.choregraph.locked.rev == "0b2000edaf86d5a7a8601246afbc0d526f4a2a07"
-                and .nodes.choregraph.original.rev == "0b2000edaf86d5a7a8601246afbc0d526f4a2a07"
+                .nodes.choregraph.locked.rev == "c3577352ee1e39391f5204ee234d991c7dbeb151"
+                and .nodes.choregraph.original.rev == "c3577352ee1e39391f5204ee234d991c7dbeb151"
               ' ${self}/flake.lock > /dev/null
 
               test -f ${choregraph}/crates/choregraph-choreography/Cargo.toml
@@ -721,12 +725,24 @@
                 | sort > "$TMPDIR/expected-seaglass-import-files"
               cmp "$TMPDIR/expected-seaglass-import-files" "$TMPDIR/seaglass-import-files"
               grep -R -l 'choregraph_nickel' ${self}/src --include='*.rs' | sort > "$TMPDIR/choregraph-import-files"
-              printf '%s\n%s\n' \
+              # Restricted lowering stays in workflow_format; the construction/v3 consumer
+              # adds the authoring adapter, the Choregraph effect adapter and its
+              # projection-effect store, and the TUI origin display. Any new importer
+              # must be reviewed here.
+              printf '%s\n' \
+                "${self}/src/authoring/captured.rs" \
+                "${self}/src/authoring/construction.rs" \
+                "${self}/src/authoring/construction/lowering.rs" \
+                "${self}/src/authoring/construction/materialized.rs" \
+                "${self}/src/authoring/mod.rs" \
+                "${self}/src/engine/effect/choregraph.rs" \
+                "${self}/src/engine/effect/execution.rs" \
+                "${self}/src/tui/app/editing/source.rs" \
                 "${self}/src/workflow_format.rs" \
                 "${self}/src/workflow_format/choregraph.rs" \
-                > "$TMPDIR/expected-choregraph-import-files"
+                | sort > "$TMPDIR/expected-choregraph-import-files"
               cmp "$TMPDIR/expected-choregraph-import-files" "$TMPDIR/choregraph-import-files"
-              grep --fixed-strings 'choregraph::lower_portable(&workflow_to_portable(&workflow))?;' \
+              grep --fixed-strings 'choregraph::lower_portable(&workflow_to_portable(workflow))?;' \
                 ${self}/src/workflow_format.rs > /dev/null
               if grep -E 'std::fs|std::process|std::net|std::env|Path|Command|read_to_string|read_dir|tokio::|async|unsafe' \
                 ${self}/src/workflow_format/choregraph.rs; then
@@ -1067,10 +1083,77 @@
             buildInputs
             ;
           nativeBuildInputs = nativeBuildInputs ++ [ pkgs.nickel ];
+          cargoExtraArgs = "--package lattice --bins";
+          preBuild = ''
+            export LATTICE_CLOSED_EVAL_WORKER_DEFAULT="$out/bin/lattice-closed-eval-worker"
+            export LATTICE_CONSTRUCTION_SHELL_DEFAULT="${pkgs.bash}/bin/bash"
+            export LATTICE_CONSTRUCTION_PATH_DEFAULT="${pkgs.lib.makeBinPath [ pkgs.coreutils ]}"
+          '';
           # Tests run in the dedicated `nextest` check, which supplies the
           # pinned Cairn binary and the full test environment. The release
           # package build only produces the binary.
           doCheck = false;
+        };
+
+        # V3 admission binds /proc/self/exe and requires root-owned store entries.
+        # Nix sandboxes do not map host root, so these installed executables run
+        # only through the host-run construction-runtime-qualification app.
+        constructionRuntimeTests = craneLib.mkCargoDerivation {
+          pname = "lattice-construction-test-executables";
+          inherit src cargoArtifacts cargoVendorDir buildInputs;
+          nativeBuildInputs = nativeBuildInputs ++ [ pkgs.jq ];
+          doCheck = false;
+          doInstallCargoArtifacts = false;
+          preBuild = ''
+            export LATTICE_CONSTRUCTION_SHELL_DEFAULT="${pkgs.bash}/bin/bash"
+            export LATTICE_CONSTRUCTION_PATH_DEFAULT="${pkgs.lib.makeBinPath [ pkgs.coreutils ]}"
+          '';
+          buildPhaseCargoCommand = ''
+            cargo test --locked --release --no-run --package lattice --lib \
+              --test test_construction_authoring \
+              --test test_construction_runtime_binding \
+              --test test_construction_qualification \
+              --test test_source_authoring \
+              --test test_workflow_format \
+              --message-format=json-render-diagnostics > "$TMPDIR/construction-tests.jsonl"
+          '';
+          installPhaseCommand = ''
+            mkdir -p "$out/bin"
+            jq --raw-output '
+              select(.reason == "compiler-artifact" and .profile.test == true
+                and (.target.kind == ["test"] or .target.kind == ["lib"]) and .executable != null)
+              | [(if .target.kind == ["lib"] then "lattice-lib" else .target.name end), .executable] | @tsv
+            ' "$TMPDIR/construction-tests.jsonl" \
+              | while IFS="$(printf '\t')" read -r name executable; do
+                  install -m 0555 "$executable" "$out/bin/$name"
+                done
+            test -x "$out/bin/test_construction_authoring"
+            test -x "$out/bin/test_construction_runtime_binding"
+            test -x "$out/bin/test_construction_qualification"
+            test -x "$out/bin/test_source_authoring"
+            test -x "$out/bin/test_workflow_format"
+            test -x "$out/bin/lattice-lib"
+          '';
+        };
+
+        # Host-run because the sandbox cannot satisfy the immutable-executable policy.
+        constructionRuntimeQualification = pkgs.writeShellApplication {
+          name = "construction-runtime-qualification";
+          runtimeInputs = [
+            pkgs.coreutils
+            pkgs.diffutils
+            pkgs.gnugrep
+            pkgs.gnused
+            pkgs.jq
+          ];
+          text = ''
+            export LATTICE_QUALIFIED_BINARY="${lattice}/bin/lattice"
+            export LATTICE_CLOSED_EVAL_WORKER="${lattice}/bin/lattice-closed-eval-worker"
+            export LATTICE_CONSTRUCTION_SHELL="${pkgs.bash}/bin/bash"
+            export LATTICE_CONSTRUCTION_TEST_BIN="${constructionRuntimeTests}/bin"
+            export LATTICE_CONSTRUCTION_EXAMPLES="${./examples/construction}"
+            exec ${pkgs.bash}/bin/bash ${./scripts/construction-runtime-qualification.sh} "$@"
+          '';
         };
       in
       {
@@ -1080,6 +1163,15 @@
           lattice = lattice;
           workflow-contract-octet-deny-all = workflowContractOctetRunner;
           workflow-transport-octet-deny-all = workflowTransportOctetRunner;
+          construction-runtime-tests = constructionRuntimeTests;
+          construction-runtime-qualification = constructionRuntimeQualification;
+        };
+
+        apps = pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
+          construction-runtime-qualification = {
+            type = "app";
+            program = "${constructionRuntimeQualification}/bin/construction-runtime-qualification";
+          };
         };
 
         checks = {
@@ -1112,12 +1204,13 @@
                 fixture_root=${self}/tests/fixtures/nickel-toolchain
                 test '${nickel-1-17-0.rev}' = '1320a983e6c3d1e2fb53dd2464b084b4903b1426'
                 test "$(nickel --version)" = 'nickel-lang-cli nickel 1.17.0 (rev 1320a98)'
-                grep -F 'f23be09e41337de8fa729274f50023f861ae0e8a' ${self}/Cargo.toml >/dev/null
-                grep -F 'nickel-lang-core = "=0.18.0"' ${self}/Cargo.toml >/dev/null
-                grep -F 'nickel-lang-core = { path = "vendor-cargo-deps/nickel-lang-core-0.18.0" }' ${self}/Cargo.toml >/dev/null
-                test -f ${self}/vendor-cargo-deps/nickel-lang-core-0.18.0/SOURCE
+                grep -F 'f0ea0d2a31d3482ddf4e575482f6ddf7a7e7d4e9' ${self}/Cargo.toml >/dev/null
+                if grep -F 'nickel-lang-core = { path' ${self}/Cargo.toml; then
+                  echo 'a consumer-owned Nickel core snapshot would split the producer cohort' >&2
+                  exit 1
+                fi
                 source_url=https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git
-                revision=f23be09e41337de8fa729274f50023f861ae0e8a
+                revision=f0ea0d2a31d3482ddf4e575482f6ddf7a7e7d4e9
                 test -f ${nickel-eval}/LICENSE
                 grep -Fx 'name = "nickel-eval"' ${nickel-eval}/Cargo.toml >/dev/null
                 grep -Fx 'license = "MIT"' ${nickel-eval}/Cargo.toml >/dev/null
@@ -1128,11 +1221,11 @@
                   and .nodes["nickel-eval"].locked.url == $url
                   and .nodes["nickel-eval"].original.rev == $rev
                 ' ${self}/flake.lock >/dev/null
-                python3 -c 'import sys,tomllib; p=tomllib.load(open(sys.argv[1],"rb"))["package"]; assert {(x["name"],x["version"]) for x in p if x["name"] in ("nickel-lang","nickel-lang-core")} == {("nickel-lang","2.2.0"),("nickel-lang-core","0.18.0")}, "mixed Nickel cohort"' ${self}/Cargo.lock
+                python3 -c 'import sys,tomllib; p=tomllib.load(open(sys.argv[1],"rb"))["package"]; assert {(x["name"],x["version"],x.get("source")) for x in p if x["name"] in ("nickel-lang","nickel-lang-core")} == {("nickel-lang","2.2.0",sys.argv[2]),("nickel-lang-core","0.18.0",sys.argv[2])}, "mixed or unpinned Nickel cohort"' ${self}/Cargo.lock "git+$source_url?rev=$revision#$revision"
                 # r[impl lattice.nickel_eval_adoption.boundary]
                 # r[impl lattice.nickel_eval_adoption.boundary.scenario.denied]
                 grep -R -l 'nickel_eval::' ${self}/src --include='*.rs' | sort > "$TMPDIR/evaluator-imports"
-                printf '%s\n' '${self}/src/nickel/mod.rs' > "$TMPDIR/expected-evaluator-imports"
+                printf '%s\n' '${self}/src/bin/lattice-closed-eval-worker.rs' '${self}/src/nickel/mod.rs' > "$TMPDIR/expected-evaluator-imports"
                 cmp "$TMPDIR/expected-evaluator-imports" "$TMPDIR/evaluator-imports"
                 if grep -E 'bf16cf223ed3dfe75a28f02ac21ed7891a60bac1|nickel-lang-core = "=0.17.0"' \
                   ${self}/Cargo.toml ${self}/docs/nickel-eval-source.md; then
@@ -1171,6 +1264,8 @@
               pkgs.coreutils
               pkgs.nickel
             ];
+            # Only the non-ignored partition runs here: the sandbox cannot provide a
+            # root-owned worker, so captured-worker and v3 cases run in the host app.
             LATTICE_CAIRN_BIN = "${cairnNative}/bin/cairn";
             cargoNextestExtraArgs = "--test-threads 1";
             partitions = 1;

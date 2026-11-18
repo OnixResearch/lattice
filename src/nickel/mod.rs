@@ -7,6 +7,9 @@ pub(crate) const SOURCE_REVISION: &str = nickel_eval::NICKEL_SOURCE_REVISION;
 pub(crate) const LIBRARY_VERSION: &str = nickel_eval::NICKEL_LANG_VERSION;
 pub(crate) const CORE_VERSION: &str = nickel_eval::NICKEL_LANG_CORE_VERSION;
 
+pub use nickel_eval::captured::Evaluated;
+pub const CAPTURED_PROFILE: &str = nickel_eval::captured::PROFILE;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SafeFailure {
     InvalidRequest,
@@ -44,6 +47,99 @@ pub const fn classify_failure(error: &nickel_eval::NickelError) -> SafeFailure {
         | nickel_eval::NickelErrorCategory::StdlibResolution
         | nickel_eval::NickelErrorCategory::TemplateGeneration => SafeFailure::Serialization,
     }
+}
+
+pub(crate) fn string_literal(value: &str) -> String {
+    nickel_eval::serialize::render_native_string(value)
+}
+
+pub(crate) fn value_literal(value: &serde_json::Value) -> Result<String, SafeFailure> {
+    nickel_eval::serialize::render_native_value(value).map_err(|error| classify_failure(&error))
+}
+
+/// The worker executable is an explicitly selected local artifact, never a PATH lookup.
+/// Its bytes are bound separately from the native evaluator cohort.
+pub fn captured_worker() -> Result<(std::path::PathBuf, String), SafeFailure> {
+    let path = crate::config::read_path_env("LATTICE_CLOSED_EVAL_WORKER")
+        .map_err(|()| SafeFailure::InvalidRequest)?
+        .or_else(|| option_env!("LATTICE_CLOSED_EVAL_WORKER_DEFAULT").map(std::path::PathBuf::from))
+        .ok_or(SafeFailure::InvalidRequest)?;
+    if !path.is_absolute() {
+        return Err(SafeFailure::InvalidRequest);
+    }
+    let artifact =
+        crate::authoring::construction::store::immutable_executable(&path).map_err(|_| SafeFailure::FileAccess)?;
+    Ok((path, artifact))
+}
+
+pub const CAPTURED_LIMITS: nickel_eval::captured::Limits = nickel_eval::captured::Limits {
+    input_bytes: 5_242_880,
+    module_count: 128,
+    name_depth: 16,
+    resolution_edges: 1024,
+    output_bytes: 1_048_576,
+    response_bytes: 4_194_304,
+    memory_bytes: 2_147_483_648,
+    execution_millis: 5_000,
+};
+
+fn captured_modules(
+    files: &std::collections::BTreeMap<String, Vec<u8>>,
+) -> Result<Vec<nickel_eval::captured::Module<'_>>, SafeFailure> {
+    files
+        .iter()
+        .map(|(name, bytes)| {
+            std::str::from_utf8(bytes)
+                .map(|source| nickel_eval::captured::Module { name, source })
+                .map_err(|_| SafeFailure::InvalidRequest)
+        })
+        .collect()
+}
+
+/// Admits captured modules under the reviewed cohort, policy and Lattice limits.
+fn admit_captured<'a>(
+    entry: &'a str,
+    modules: &'a [nickel_eval::captured::Module<'a>],
+) -> Result<nickel_eval::captured::Admitted<'a>, SafeFailure> {
+    nickel_eval::captured::admit(nickel_eval::captured::Request {
+        entry,
+        modules,
+        cohort: nickel_eval::captured::reviewed_cohort(),
+        policy: nickel_eval::captured::POLICY,
+        limits: CAPTURED_LIMITS,
+    })
+    .map_err(|_| SafeFailure::InvalidRequest)
+}
+
+pub(crate) fn validate_captured_response(
+    entry: &str,
+    files: &std::collections::BTreeMap<String, Vec<u8>>,
+    evaluated: &Evaluated,
+) -> Result<(), SafeFailure> {
+    let modules = captured_modules(files)?;
+    let admitted = admit_captured(entry, &modules)?;
+    nickel_eval::captured::validate_response(&admitted, evaluated.clone())
+        .map(|_| ())
+        .map_err(|_| SafeFailure::Evaluation)
+}
+
+/// Captured modules are admitted and evaluated only by the isolated native worker.
+pub fn evaluate_captured(
+    entry: &str,
+    files: &std::collections::BTreeMap<String, Vec<u8>>,
+) -> Result<(Evaluated, String), SafeFailure> {
+    let modules = captured_modules(files)?;
+    let admitted = admit_captured(entry, &modules)?;
+    let (worker, artifact) = captured_worker()?;
+    let evaluated =
+        nickel_eval::captured::evaluate_isolated(&admitted, &worker).map_err(|_| SafeFailure::Evaluation)?;
+    let evaluated =
+        nickel_eval::captured::validate_response(&admitted, evaluated).map_err(|_| SafeFailure::Evaluation)?;
+    let (_, after) = captured_worker()?;
+    if artifact != after {
+        return Err(SafeFailure::Evaluation);
+    }
+    Ok((evaluated, artifact))
 }
 
 pub fn evaluate_file(path: &std::path::Path) -> Result<serde_json::Value, SafeFailure> {

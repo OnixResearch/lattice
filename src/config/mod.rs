@@ -195,16 +195,24 @@ fn default_data_dir() -> Option<std::path::PathBuf> {
     let home_dir = home::home_dir();
     let has_legacy_default = home_dir.as_ref().is_some_and(|home| home.join(identity::LEGACY_DATA_DIR_NAME).exists());
     identity::select_data_dir(identity::DataDirFacts {
-        canonical_override: read_data_dir_env(identity::CANONICAL_DATA_DIR_ENV),
-        legacy_override: read_data_dir_env(identity::LEGACY_DATA_DIR_ENV),
+        canonical_override: read_path_env(identity::CANONICAL_DATA_DIR_ENV).ok().flatten(),
+        legacy_override: read_path_env(identity::LEGACY_DATA_DIR_ENV).ok().flatten(),
         home_dir,
         has_legacy_default,
     })
     .map(expand_home)
 }
 
-fn read_data_dir_env(name: &str) -> Option<std::path::PathBuf> {
-    std::env::var(name).ok().map(std::path::PathBuf::from)
+/// Imperative shell: the only ambient read of operator-selected paths, namely the data
+/// directory, the construction shell backend and the captured evaluator worker.
+/// An absent variable is `Ok(None)`; a non-UTF-8 value is `Err(())`, and each caller
+/// decides whether to ignore it (data directory) or refuse it (executable selections).
+pub(crate) fn read_path_env(name: &str) -> Result<Option<std::path::PathBuf>, ()> {
+    match std::env::var(name) {
+        Ok(value) => Ok(Some(std::path::PathBuf::from(value))),
+        Err(std::env::VarError::NotPresent) => Ok(None),
+        Err(std::env::VarError::NotUnicode(_)) => Err(()),
+    }
 }
 
 /// Imperative shell: collect filesystem facts for the configured store directory.
@@ -778,5 +786,28 @@ mod tests {
 
         let config = super::load_app_config(&path).expect("config loads");
         assert_eq!(config.data_dir, home::home_dir().expect("home directory").join(".lattice"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn path_selection_refuses_non_utf8_value() {
+        use std::os::unix::ffi::OsStrExt as _;
+        let status = std::process::Command::new(std::env::current_exe().expect("test executable"))
+            .args(["--exact", "config::tests::non_utf8_path_selection_child", "--nocapture"])
+            .env("LATTICE_TEST_NON_UTF8_PATH_CHILD", "1")
+            .env("LATTICE_TEST_NON_UTF8_PATH", std::ffi::OsStr::from_bytes(b"/nix/store/\xff-worker"))
+            .env_remove("LATTICE_TEST_ABSENT_PATH")
+            .status()
+            .expect("child test runs");
+        assert!(status.success(), "a non-UTF-8 path selection must be refused, not ignored");
+    }
+
+    #[test]
+    fn non_utf8_path_selection_child() {
+        if std::env::var_os("LATTICE_TEST_NON_UTF8_PATH_CHILD").is_none() {
+            return;
+        }
+        assert_eq!(super::read_path_env("LATTICE_TEST_NON_UTF8_PATH"), Err(()));
+        assert_eq!(super::read_path_env("LATTICE_TEST_ABSENT_PATH"), Ok(None));
     }
 }

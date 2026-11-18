@@ -275,6 +275,14 @@ Octet gate rejects new finding IDs outside the reviewed baseline. The Nix
 command disables host signing keys only for that check invocation; it does not
 change normal package or release signing policy.
 
+The captured graph-construction runtime cannot be qualified inside a Nix build
+sandbox, because sandboxed store entries are not root-owned. Run its host-run
+qualification on Linux with
+`nix run .#construction-runtime-qualification -- NEW_OUTPUT_DIRECTORY`; it
+refuses an existing directory and retains the source, expanded graph, exact
+commands, results and negative controls there. See
+[captured workflow source revisions](docs/source-authoring.md#integration-verification).
+
 `scripts/octet-baseline-migrate.rs` defaults to identity-only migration. Its
 explicit `--prune-resolved` mode also removes resolved findings, but cannot grow
 the baseline identity count or any complete raw semantic occurrence budget.

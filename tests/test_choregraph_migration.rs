@@ -4,10 +4,10 @@ mod common;
 
 use std::collections::BTreeMap;
 
-use choregraph_core::DenialReason;
-use choregraph_core::LocalState;
-use choregraph_core::ReplayDecision;
-use choregraph_core::ReplayFailureReason;
+use choregraph_core::model::history::ReplayDecision;
+use choregraph_core::model::history::ReplayFailureReason;
+use choregraph_core::model::outcome::DenialReason;
+use choregraph_core::model::semantics::LocalState;
 use lattice::engine::runner::PersistedMachineBinding;
 use lattice::engine::runner::PersistedMachineEvent;
 use lattice::engine::runner::PersistedReplayIdentity;
@@ -154,10 +154,10 @@ fn replay_reconstructs_state_without_intents_and_rejects_stale_bindings() {
         },
     ];
     let identity = PersistedReplayIdentity {
-        expected_machine: [MACHINE_BINDING_BYTE; choregraph_core::TRACE_BINDING_BYTES],
-        expected_initial_state: [INITIAL_STATE_BINDING_BYTE; choregraph_core::TRACE_BINDING_BYTES],
-        observed_machine: [MACHINE_BINDING_BYTE; choregraph_core::TRACE_BINDING_BYTES],
-        observed_initial_state: [INITIAL_STATE_BINDING_BYTE; choregraph_core::TRACE_BINDING_BYTES],
+        expected_machine: [MACHINE_BINDING_BYTE; choregraph_core::model::history::TRACE_BINDING_BYTES],
+        expected_initial_state: [INITIAL_STATE_BINDING_BYTE; choregraph_core::model::history::TRACE_BINDING_BYTES],
+        observed_machine: [MACHINE_BINDING_BYTE; choregraph_core::model::history::TRACE_BINDING_BYTES],
+        observed_initial_state: [INITIAL_STATE_BINDING_BYTE; choregraph_core::model::history::TRACE_BINDING_BYTES],
     };
 
     let decision = replay_persisted_events(&plan, &states, identity, &events).expect("replay inputs convert");
@@ -166,18 +166,21 @@ fn replay_reconstructs_state_without_intents_and_rejects_stale_bindings() {
     };
     assert_eq!(failure.consumed.get(), REPLAY_EVENT_COUNT - 1);
     assert!(matches!(failure.reason, ReplayFailureReason::TransitionDenied(DenialReason::TerminalState { .. })));
-    let source_id = choregraph_core::NodeId::parse(source.0.to_string(), choregraph_core::DEFAULT_MAX_IDENTIFIER_BYTES)
-        .expect("runner id is valid");
+    let source_id = choregraph_core::id::bounded::NodeId::parse(
+        source.0.to_string(),
+        choregraph_core::model::capacity::DEFAULT_MAX_IDENTIFIER_BYTES,
+    )
+    .expect("runner id is valid");
     assert_eq!(failure.last_valid_state.state().state(&source_id), Some(LocalState::Completed));
 
     let stale_identity = PersistedReplayIdentity {
-        observed_machine: [STALE_BINDING_BYTE; choregraph_core::TRACE_BINDING_BYTES],
+        observed_machine: [STALE_BINDING_BYTE; choregraph_core::model::history::TRACE_BINDING_BYTES],
         ..identity
     };
     let stale = replay_persisted_events(&plan, &states, stale_identity, &events).expect("stale replay inputs convert");
     assert!(matches!(
         stale,
-        ReplayDecision::Failed(choregraph_core::ReplayFailure {
+        ReplayDecision::Failed(choregraph_core::model::history::ReplayFailure {
             reason: ReplayFailureReason::MachineBindingMismatch,
             ..
         })

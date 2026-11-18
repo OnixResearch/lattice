@@ -23,7 +23,7 @@ pub const CHOREGRAPH_EFFECT_AUTHORITY_POLICY_SCHEMA: &str = basalt::SUPPORTED_SC
 pub const CHOREGRAPH_EFFECT_AUTHORITY_BINDING_SCHEMA: &str = "lattice.choregraph-effect-binding.v1";
 pub const CHOREGRAPH_EFFECT_SCOPE_SCHEMA: &str = "molten.collaboration-scope.snapshot.v1";
 pub const UNSCOPED_SCOPE_IDENTITY: &str = "unscoped";
-pub const REQUEST_REFERENCE_PROFILE: &str = choregraph_core::CANONICAL_REFERENCE_PROFILE_V1;
+pub const REQUEST_REFERENCE_PROFILE: &str = choregraph_core::concrete::reference::CANONICAL_REFERENCE_PROFILE_V1;
 
 macro_rules! identity_type {
     ($name:ident) => {

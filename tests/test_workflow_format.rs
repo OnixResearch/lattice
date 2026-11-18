@@ -4,8 +4,6 @@ mod common;
 
 use std::process::Command;
 
-use choregraph_nickel::FrontendIssueCode;
-use choregraph_nickel::LoweredSourceFormat;
 use lattice::agent_node::OutputMode;
 use lattice::agent_node::Target;
 use lattice::control_flow::ConditionBranch;
@@ -139,6 +137,86 @@ fn nickel_export_import_preserves_pipeline_shape_and_config() {
     assert!(workflow.graph.node(target).is_some());
 }
 
+// Older readers deny unknown `Workflow` fields, so legacy exports must not gain v3 control fields.
+// r[verify n8nclone.workflow_format.nickel.export]
+// r[verify lattice.graph_construction.compatibility]
+// r[verify lattice.graph_construction.compatibility.legacy]
+#[test]
+fn legacy_export_keeps_committed_contract_without_construction_fields() {
+    let (workflow, _source, _target) = common::two_node_pipeline();
+
+    let exported = workflow_to_nickel(&workflow);
+    let portable = serde_json::to_value(workflow_to_portable(&workflow)).expect("portable workflow encodes");
+    let stored = serde_json::to_value(&workflow).expect("stored workflow encodes");
+
+    assert!(exported.ends_with(") | Workflow\n"));
+    assert!(!exported.contains("WorkflowWithControls"));
+    assert!(!exported.contains("construction_profile"));
+    assert!(!exported.contains("control_dependencies"));
+    for encoded in [&portable, &stored] {
+        assert!(encoded.get("construction_profile").is_none());
+        assert!(encoded.get("control_dependencies").is_none());
+    }
+    assert!(!exported_then_loaded(&workflow).construction_profile);
+}
+
+#[test]
+#[ignore = "requires immutable Nix-store runtime and shell selection"]
+fn flat_v3_file_import_selects_only_missing_runtime_bindings() {
+    let mut workflow = Workflow::new("flat-controls-file", lattice::engine::workflow::WorkflowTimestamp::epoch());
+    let outputs = [
+        lattice::engine::workflow::PortSpec::new("stdout", "string"),
+        lattice::engine::workflow::PortSpec::new("stderr", "string"),
+        lattice::engine::workflow::PortSpec::new("exit", "exitcode"),
+    ];
+    for label in ["first", "second"] {
+        let node = workflow.graph.add_node(label, &[], &outputs);
+        let mut config = NodeConfig::shell(format!("printf '{label}'"));
+        if let NodeConfig::Shell { pipe_stdin, .. } = &mut config {
+            *pipe_stdin = false;
+        }
+        workflow.set_node_config(node, config);
+    }
+    let control = {
+        let mut nodes = workflow.graph.nodes();
+        (nodes.next().unwrap().id.0, nodes.next().unwrap().id.0)
+    };
+    workflow.control_dependencies.push(control);
+    workflow.construction_profile = true;
+    let selected = lattice::authoring::construction::selected_runtime().expect("immutable runtime selected");
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join(EXPORTED_WORKFLOW_FILE_NAME);
+
+    for binding in [None, Some(selected.clone())] {
+        workflow.construction_runtime = binding;
+        std::fs::write(&path, workflow_to_nickel(&workflow)).unwrap();
+        let imported = load_workflow_nickel_file(&path).expect("flat file admits under selected runtime");
+        assert_eq!(imported.construction_runtime.as_ref(), Some(&selected));
+        assert_eq!(imported.control_dependencies, workflow.control_dependencies);
+        assert_eq!(
+            lattice::authoring::construction::admit_materialized(&imported)
+                .unwrap()
+                .projection
+                .control_edges
+                .len(),
+            1
+        );
+    }
+
+    for stale_field in ["runtime", "shell"] {
+        let mut stale = selected.clone();
+        if stale_field == "runtime" {
+            stale.runtime_artifact.push('0');
+        } else {
+            stale.shell_artifact.push('0');
+        }
+        workflow.construction_runtime = Some(stale);
+        std::fs::write(&path, workflow_to_nickel(&workflow)).unwrap();
+        let error = load_workflow_nickel_file(&path).expect_err("explicit stale binding must not be replaced");
+        assert!(error.to_string().contains("selected construction runtime or shell backend changed"), "{error}");
+    }
+}
+
 // r[verify lattice.choregraph_adoption.lowering]
 #[test]
 fn decoded_workflow_lowers_in_memory_through_choregraph() {
@@ -148,7 +226,7 @@ fn decoded_workflow_lowers_in_memory_through_choregraph() {
     let lowered = lattice::workflow_format::choregraph::lower_portable(&portable).expect("decoded workflow lowers");
     // r[verify lattice.workflow_validation.domain_boundary.choregraph]
 
-    assert_eq!(lowered.source_format, LoweredSourceFormat::LatticeWorkflowV2);
+    assert_eq!(lowered.source_format, choregraph_nickel::lower::LoweredSourceFormat::LatticeWorkflowV2);
     assert_eq!(lowered.machine.node_ids().len(), IMPORTED_NODE_COUNT);
     assert_eq!(lowered.machine.edges().len(), IMPORTED_EDGE_COUNT);
     assert_eq!(lowered.machine.concrete_effect_declarations().len(), IMPORTED_NODE_COUNT);
@@ -163,7 +241,10 @@ fn lowered_v2_effect_handoff_binds_exact_runtime_identities() {
     let lowered = lattice::workflow_format::choregraph::lower_portable(&portable).expect("decoded workflow lowers");
     let mut state = lowered.machine.initial_state();
     let choregraph_node = format!("lattice-node/{}", source.0);
-    let ready = choregraph_core::ConcreteEvent::new(choregraph_node.clone(), choregraph_core::Action::MarkReady);
+    let ready = choregraph_core::concrete::event::ConcreteEvent::new(
+        choregraph_node.clone(),
+        choregraph_core::model::semantics::Action::MarkReady,
+    );
     let context = choregraph::TransitionContext {
         machine: authority::MachineIdentity::new("machine-v2").expect("machine identity"),
         workflow_revision: authority::WorkflowRevisionIdentity::new("revision-v2").expect("revision identity"),
@@ -182,7 +263,7 @@ fn lowered_v2_effect_handoff_binds_exact_runtime_identities() {
         declaration_key: format!("lattice-effect-{}", source.0),
         node_id: choregraph_node.clone(),
         source_node_id: source.0.to_string(),
-        action: choregraph_core::Action::Start,
+        action: choregraph_core::model::semantics::Action::Start,
         request_ref: EFFECT_REQUEST_REF.to_owned(),
         payload_ref: EFFECT_PAYLOAD_REF.to_owned(),
     });
@@ -215,7 +296,12 @@ fn decoded_workflow_cycle_fails_choregraph_admission() {
     let error = lattice::workflow_format::choregraph::lower_portable(&portable).expect_err("cycle rejected");
 
     // r[verify lattice.workflow_validation.domain_boundary.choregraph.rejected]
-    assert_eq!(error, WorkflowFormatError::ChoregraphLowering(FrontendIssueCode::MachineAdmissionRejected),);
+    assert_eq!(
+        error,
+        WorkflowFormatError::ChoregraphLowering(
+            choregraph_nickel::diagnostic::FrontendIssueCode::MachineAdmissionRejected
+        ),
+    );
 
     let directory = tempfile::tempdir().expect("cyclic Nickel directory");
     let path = directory.path().join("cycle.ncl");

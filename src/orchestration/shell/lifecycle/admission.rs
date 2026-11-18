@@ -69,6 +69,7 @@ pub(in crate::orchestration::shell) fn load_validated_workflow(
 }
 
 // r[impl lattice.agent_orchestration.usage.scenario.shell]
+// r[impl lattice.graph_construction.runtime_controls.budget]
 pub(in crate::orchestration::shell) fn planned_charge(
     definition: &crate::orchestration::core::Definition,
     workflow: &crate::engine::Workflow,

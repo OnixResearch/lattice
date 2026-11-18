@@ -1,20 +1,57 @@
+/// Reconcile retained results only. The persisted binding identity is
+/// reported unchanged; nothing here observes, rebinds or releases compute.
+// r[impl lattice.execution_binding.recovery.scenario.lost_acknowledgement]
 pub(super) fn recover(
     store: &crate::store::Store,
     request: &super::Request,
     directory: &std::path::Path,
+    binding_identity: &str,
 ) -> Result<serde_json::Value, String> {
     let result = match crate::candidate_worker::reconcile_attempt(store, &request.envelope.attempt_id)
         .map_err(|error| error.to_string())?
     {
         crate::candidate_worker::Recovery::Published(result) => result,
         crate::candidate_worker::Recovery::Missing | crate::candidate_worker::Recovery::Incomplete { .. } => {
-            return Err("possible prior execution has no complete retained result; retain workspace and reconcile, do not rerun".into());
+            return Err(format!(
+                "possible prior execution has no complete retained result; retain workspace and reconcile, do not rerun; execution binding {binding_identity}"
+            ));
         }
     };
     super::artifacts::verify_events(directory, request.output_limit_bytes, &result.stdout_blake3)?;
     validate_receipt(&result, request)?;
     let unchanged = load_unchanged(request, directory)?;
-    Ok(project(request, directory, &result, unchanged.as_ref()))
+    debug_assert!(result.validate().is_ok(), "reconciled results are validated on load");
+    debug_assert_eq!(result.stdout_blake3.len(), 64);
+    let mut projected = project(request, directory, &result, unchanged.as_ref());
+    if let Some(fields) = projected.as_object_mut() {
+        fields.insert("execution_binding".to_owned(), serde_json::Value::from(binding_identity));
+    }
+    Ok(projected)
+}
+
+/// A pre-spawn refusal with no worker artifacts is a definite non-dispatch.
+pub(super) fn not_dispatched(
+    directory: &std::path::Path,
+    admitted: &lattice_core::execution_binding::admission::bound::Admitted,
+    refusal: &serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let is_same_binding =
+        refusal.get("binding_identity").and_then(serde_json::Value::as_str) == Some(admitted.binding_identity.as_str());
+    let has_worker_artifacts = ["raw-events.jsonl", "omp-observation.json"]
+        .iter()
+        .any(|name| std::fs::symlink_metadata(directory.join(name)).is_ok());
+    if !is_same_binding || has_worker_artifacts {
+        return Err("binding refusal contradicts the retained binding or worker artifacts".into());
+    }
+    Ok(serde_json::json!({
+        "schema": "lattice.implementation-attempt-observation.v1",
+        "envelope_attempt": admitted.attempt.attempt_id,
+        "status": "not_dispatched_binding_rejected",
+        "execution_binding": admitted.binding_identity,
+        "revalidation": refusal.get("decision"),
+        "accepted": false,
+        "integrated": false,
+    }))
 }
 
 fn validate_receipt(result: &crate::candidate_worker::AttemptResult, request: &super::Request) -> Result<(), String> {

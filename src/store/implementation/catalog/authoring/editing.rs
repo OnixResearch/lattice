@@ -46,6 +46,7 @@ impl crate::store::Store {
     }
 
     // r[impl lattice.source_authoring.admission]
+    // r[impl lattice.graph_construction.editing.scope]
     pub fn admit_source_draft(
         &self,
         draft: &crate::authoring::SourceDraft,
@@ -137,7 +138,7 @@ fn checked_preview(
     association.validate().map_err(super::error)?;
     if association.program.as_ref() != &draft.program
         || association.compiler != preview.compiler
-        || association.state != crate::authoring::AssociationState::CapturedSnapshot
+        || association.state != crate::authoring::AssociationState::CapturedModules
     {
         return Err(super::error("preview candidate changed since compilation"));
     }
@@ -146,17 +147,29 @@ fn checked_preview(
     {
         return Err(super::error("preview candidate changed since compilation"));
     }
-    let source = std::str::from_utf8(&draft.program.files[&draft.program.entry])
-        .map_err(|_| super::error("entry is not UTF-8"))?;
-    crate::authoring::admission::require_import_free(source).map_err(super::error)?;
+    let rebuilt = crate::authoring::shell::compile(&draft.program).map_err(super::error)?;
+    if crate::authoring::expanded_identity(&rebuilt).map_err(super::error)?
+        != crate::authoring::expanded_identity(&preview.candidate).map_err(super::error)?
+        || rebuilt.authoring.as_ref().and_then(|source| source.observation.as_ref()) != association.observation.as_ref()
+        || rebuilt.authoring.as_ref().and_then(|source| source.construction.as_ref())
+            != association.construction.as_ref()
+    {
+        return Err(super::error("source preview differs from current captured compilation"));
+    }
     let diagnostics = crate::workflow_validation::validate_workflow(&preview.candidate);
     if crate::workflow_validation::has_fatal_diagnostics(&diagnostics) {
         return Err(super::error("current native workflow validation rejected preview"));
     }
-    crate::workflow_format::choregraph::lower_portable(&crate::workflow_format::workflow_to_portable(
-        &preview.candidate,
-    ))
-    .map_err(|_| super::error("current graph admission rejected preview"))?;
+    if preview.candidate.construction_profile {
+        // The fresh rebuild above re-evaluated the selected worker and compared
+        // the entire observation and any native construction binding.
+        crate::authoring::construction::admit_materialized(&preview.candidate).map_err(super::error)?;
+    } else {
+        crate::workflow_format::choregraph::lower_portable(&crate::workflow_format::workflow_to_portable(
+            &preview.candidate,
+        ))
+        .map_err(|_| super::error("current graph admission rejected preview"))?;
+    }
     debug_assert_eq!(preview.candidate.meta.name, draft.workflow_name);
     debug_assert_eq!(association.program.as_ref(), &draft.program);
     Ok(preview)

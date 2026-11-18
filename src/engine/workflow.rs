@@ -225,6 +225,22 @@ impl NodeRunnerSettings {
     }
 }
 
+/// Executable facts observed for the first immutable local construction profile.
+/// The registry's build-time source cohort is a declaration, not this attestation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ConstructionRuntimeBinding {
+    pub runtime_artifact: String,
+    pub shell_path: String,
+    pub shell_artifact: String,
+    pub shell_implementation: String,
+}
+
+/// Omits the absent v3 profile so legacy workflow bytes stay unchanged.
+pub(crate) const fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 // r[impl lattice.workflow_validation.domain_boundary.application_model]
 /// A complete workflow: graph topology + node configs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -238,12 +254,30 @@ pub struct Workflow {
     pub runner: HashMap<u64, NodeRunnerSettings>,
     #[serde(default)]
     pub triggers: Vec<TriggerDefinition>,
+    /// Required node ordering without a payload edge; validated again at admission.
+    #[serde(default = "no_control_dependencies", skip_serializing_if = "Vec::is_empty")]
+    pub control_dependencies: Vec<(u64, u64)>,
+    /// Native shell construction profile; a fork is re-admitted as materialized v3.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub construction_profile: bool,
+    /// Required for v3; selected again before authority inspection and dispatch.
+    #[serde(default = "no_construction_runtime", skip_serializing_if = "Option::is_none")]
+    pub construction_runtime: Option<ConstructionRuntimeBinding>,
     /// Optional captured author revision; absent on legacy materialized workflows.
     #[serde(default = "no_captured_authoring", skip_serializing_if = "Option::is_none")]
     pub authoring: Option<crate::authoring::SourceAssociation>,
     /// Durable catalog compare-and-swap token, not an execution identity.
     #[serde(default = "no_catalog_revision", skip_serializing_if = "Option::is_none")]
     pub catalog_revision: Option<crate::authoring::ContentIdentity>,
+}
+
+/// Absent control dependencies mean payload edges alone order the workflow.
+pub(crate) fn no_control_dependencies() -> Vec<(u64, u64)> {
+    Vec::new()
+}
+
+pub(crate) fn no_construction_runtime() -> Option<ConstructionRuntimeBinding> {
+    None
 }
 
 fn no_captured_authoring() -> Option<crate::authoring::SourceAssociation> {
@@ -279,6 +313,7 @@ pub struct NodeRemovalPlan {
     credentials: Option<NodeCredentialRefs>,
     runner: Option<NodeRunnerSettings>,
     incident_edges: Vec<Edge>,
+    incident_controls: Vec<(u64, u64)>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -299,6 +334,9 @@ impl Workflow {
             credentials: HashMap::new(),
             runner: HashMap::new(),
             triggers: Vec::new(),
+            control_dependencies: Vec::new(),
+            construction_profile: false,
+            construction_runtime: None,
             authoring: None,
             catalog_revision: None,
         }
@@ -519,17 +557,13 @@ impl Workflow {
             credentials: self.credentials.get(&node_id.0).cloned(),
             runner: self.runner.get(&node_id.0).cloned(),
             incident_edges: self.incident_edges(node_id).cloned().collect(),
+            incident_controls: self.incident_control_dependencies(node_id).copied().collect(),
         })
     }
 
     /// Reject stale owners before validating and committing the complete candidate.
     pub fn apply_node_removal(&mut self, plan: NodeRemovalPlan) -> Result<(), MutationError> {
-        if self.graph.node(plan.node_id) != Some(&plan.node)
-            || self.configs.get(&plan.node_id.0) != Some(&plan.config)
-            || self.credentials.get(&plan.node_id.0) != plan.credentials.as_ref()
-            || self.runner.get(&plan.node_id.0) != plan.runner.as_ref()
-            || !self.incident_edges(plan.node_id).eq(plan.incident_edges.iter())
-        {
+        if !self.is_current_removal_plan(&plan) {
             return Err(MutationError::StaleEdit(plan.node_id));
         }
         self.validate_aggregate_ownership()?;
@@ -538,6 +572,9 @@ impl Workflow {
         candidate.configs.remove(&plan.node_id.0);
         candidate.credentials.remove(&plan.node_id.0);
         candidate.runner.remove(&plan.node_id.0);
+        candidate
+            .control_dependencies
+            .retain(|&(source, target)| source != plan.node_id.0 && target != plan.node_id.0);
         candidate.validate_aggregate_ownership()?;
         candidate.validate_expression_ownership()?;
         *self = candidate;
@@ -554,6 +591,23 @@ impl Workflow {
         self.graph.edges().iter().filter(move |edge| {
             self.graph.port_owner(edge.source) == Some(node_id) || self.graph.port_owner(edge.target) == Some(node_id)
         })
+    }
+
+    /// The plan still describes the owner's node-local state and incident topology.
+    fn is_current_removal_plan(&self, plan: &NodeRemovalPlan) -> bool {
+        let has_same_owner = self.graph.node(plan.node_id) == Some(&plan.node)
+            && self.configs.get(&plan.node_id.0) == Some(&plan.config);
+        let has_same_settings = self.credentials.get(&plan.node_id.0) == plan.credentials.as_ref()
+            && self.runner.get(&plan.node_id.0) == plan.runner.as_ref();
+        let has_same_topology = self.incident_edges(plan.node_id).eq(plan.incident_edges.iter())
+            && self.incident_control_dependencies(plan.node_id).eq(plan.incident_controls.iter());
+        has_same_owner && has_same_settings && has_same_topology
+    }
+
+    fn incident_control_dependencies(&self, node_id: NodeId) -> impl Iterator<Item = &(u64, u64)> {
+        self.control_dependencies
+            .iter()
+            .filter(move |&&(source, target)| source == node_id.0 || target == node_id.0)
     }
 
     /// Structural admission deliberately excludes unrelated runtime/provider policy.
@@ -734,6 +788,9 @@ mod tests {
         let source_port = workflow.graph.node(source).expect("source node").output_ports[0].id;
         let target_port = workflow.graph.node(target).expect("target node").input_ports[0].id;
         workflow.graph.add_edge(source_port, target_port).expect("compatible edge");
+        let preceding = workflow.add_shell_node("preceding", "true");
+        let following = workflow.add_shell_node("following", "true");
+        workflow.control_dependencies = vec![(source.0, target.0), (preceding.0, source.0), (target.0, following.0)];
 
         let mut credentials = NodeCredentialRefs::default();
         credentials.env.insert("TOKEN".to_string(), SecretRef::new("env", "TOKEN", None));
@@ -749,6 +806,7 @@ mod tests {
         assert!(workflow.node_credentials(source).is_none());
         assert!(workflow.node_runner_settings(source).is_none());
         assert_eq!(workflow.graph.edge_count(), 0);
+        assert_eq!(workflow.control_dependencies, vec![(target.0, following.0)]);
     }
 
     #[test]
@@ -889,7 +947,7 @@ mod tests {
 
     #[test]
     fn removal_plan_rejects_changed_or_replaced_owner_and_incident_topology() {
-        for change in 0..7 {
+        for change in 0..8 {
             let mut workflow = Workflow::new("stale owners", WorkflowTimestamp::epoch());
             let owner = workflow.add_shell_node("owner", "true");
             let other = workflow.add_shell_node("other", "cat");
@@ -917,6 +975,7 @@ mod tests {
                     assert_eq!(replacement, owner);
                 }
                 6 => workflow.graph.node_mut(owner).expect("owner").x = 42,
+                7 => workflow.control_dependencies.push((owner.0, other.0)),
                 _ => unreachable!("bounded test cases"),
             }
             let before = snapshot(&workflow);
@@ -933,12 +992,16 @@ mod tests {
         let plan = workflow.plan_node_removal(owner).expect("plan");
         workflow.set_node_config(other, NodeConfig::shell("printf changed"));
         workflow.meta.description = "keep new description".to_string();
+        let added = workflow.add_shell_node("added after plan", "true");
+        workflow.control_dependencies.push((other.0, added.0));
         let other_node = workflow.graph.node(other).cloned().expect("other");
         let other_config = workflow.node_config(other).cloned().expect("config");
         workflow.apply_node_removal(plan).expect("unchanged owner");
         assert_eq!(workflow.graph.node(other), Some(&other_node));
         assert_eq!(workflow.node_config(other), Some(&other_config));
         assert_eq!(workflow.meta.description, "keep new description");
+        assert!(workflow.graph.node(added).is_some());
+        assert_eq!(workflow.control_dependencies, vec![(other.0, added.0)]);
     }
 
     #[test]

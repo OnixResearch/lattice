@@ -1,0 +1,88 @@
+{
+  "schema": "lattice.fixture-qualification.v1",
+  "change": "bind-worker-compute-allocations",
+  "kind": "synthetic-fixture-qualification",
+  "live_qualification": false,
+  "backend_enforcement_observed": false,
+  "producer": {
+    "repository": "aspen",
+    "revision": "aac7b5ba974cc9660749dab6d8ef4b7db04e3cb4",
+    "records": ["compute-capacity-allocation-v2", "compute-capacity-readback-v1", "compute-capacity-offer-v2"],
+    "inner_schemas": ["molten.compute.reservation.v1", "molten.compute.offer.v1"],
+    "read_as": "specification only; no crate, codec, Cargo, Nix or sibling-path dependency"
+  },
+  "consumer_schemas": [
+    "lattice.compute-allocation-observation.v1",
+    "lattice.execution-binding.v1",
+    "lattice.admitted-execution-binding.v1",
+    "lattice.persisted-execution-binding.v1",
+    "lattice.binding-revalidation.v1",
+    "lattice.execution-binding-provenance.v1",
+    "lattice.worker-profile-facts.v1",
+    "lattice.worker-instance-observation.v1",
+    "lattice.worker-execution-binding.v1",
+    "lattice.implementation-attempt-run.v3"
+  ],
+  "identity_domains": {
+    "lattice-execution-binding-v1": {
+      "host_local_vector": "blake3:8b10b32df47976538796d8f83e99bf8c7fea5e9b1ebef7497ffcb4a63ae374c3",
+      "provider_vector": "blake3:cbe086cec074dfec82032a440374eb804c8ffd2028981cc74dda52a2fb8cad94",
+      "device_fixture_vector": "blake3:0ce7ce5decc45b238a33e81a5beab7463b59cd90ec437926e07a180b8590d98b"
+    },
+    "lattice-model-route-v1": {
+      "route_vector": "blake3:de3129027952ff48140d442f8ddde339fe681735501958ce08665b3d5c748ec5"
+    }
+  },
+  "executable_identities": {
+    "worker": "none executed; deterministic fixtures and the recording FixtureComputePort only",
+    "omp_revision_referenced": "e325ffc73ab86e03bdd20a91b77d8e2b3964c906"
+  },
+  "fixtures": {
+    "observations_positive": ["agent-a-1-active", "agent-a-2-active", "serving-b-deployment", "device-active"],
+    "observations_negative": {
+      "allocation-v1-label": "producer_label allocation_label",
+      "readback-v2-label": "producer_label readback_label",
+      "wrong-reservation-schema": "producer_label schema",
+      "id-not-operation": "id_not_operation",
+      "repeated-pool": "repeated_pool",
+      "zero-quantity": "zero quantity",
+      "authority-count": "authority_count",
+      "serving-references-serving": "serving_references_serving",
+      "active-without-evidence": "activation_evidence",
+      "uppercase-ref": "reference grant_ref",
+      "oversized-claims": "bound claims",
+      "row-owner-mismatch": "readback_row owner_generation",
+      "row-fence-mismatch": "readback_row is_logically_fenced",
+      "offer-revision-mismatch": "offer revision",
+      "offer-authority-mismatch": "offer authority_id"
+    },
+    "nickel_positive": ["host-local-hosted-api", "provider-cpu-remote-model", "provider-direct-chip"],
+    "nickel_negative_refused": [
+      "direct-accelerator-host-local",
+      "zero-chips",
+      "duplicate-route-names",
+      "nine-routes",
+      "unknown-granularity",
+      "serving-kind-expectation",
+      "noncanonical-route-identity"
+    ]
+  },
+  "observed_test_results": [
+    {"command": "cargo test --locked --no-fail-fast --test test_execution_binding_observation", "passed": 8, "failed": 0},
+    {"command": "cargo test --locked --no-fail-fast --test test_execution_binding_admission", "passed": 9, "failed": 0},
+    {"command": "cargo test --locked --no-fail-fast --test test_execution_binding_identity", "passed": 4, "failed": 0},
+    {"command": "cargo test --locked --no-fail-fast --test test_execution_binding_inventory", "passed": 4, "failed": 0},
+    {"command": "cargo test --locked --no-fail-fast --test test_execution_binding_port", "passed": 4, "failed": 0},
+    {"command": "cargo test --locked --no-fail-fast --test test_execution_binding_contracts", "passed": 3, "failed": 0},
+    {"command": "cargo test --locked --no-fail-fast --test test_execution_binding_usage", "passed": 3, "failed": 0},
+    {"command": "cargo test --locked --no-fail-fast --lib implementation_attempt", "passed": 26, "failed": 0},
+    {"command": "cargo test --locked --no-fail-fast --lib orchestration::", "passed": 26, "failed": 0}
+  ],
+  "non_claims": [
+    "synthetic fixtures and the fixture port are not live capacity, enforcement or serving evidence",
+    "no provider, host, device, worker or model was contacted or executed",
+    "producer record references are validated for shape and compared exactly; they are not decoded or recomputed",
+    "no cross-host operation is claimed; live qualification belongs to Kiln #49 with Aspen #15/#20",
+    "serving readiness, request admission and per-request usage remain unknown with owner Animus #17"
+  ]
+}

@@ -11,6 +11,8 @@
 pub mod content_identity;
 #[path = "control/flow.rs"]
 pub mod control_flow;
+// r[impl lattice.execution_binding.port_boundary]
+pub mod execution_binding;
 #[path = "expression/dependencies.rs"]
 pub mod mapping;
 #[allow(

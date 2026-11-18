@@ -158,3 +158,33 @@ fn configured_runtime_provenance_survives_restart_and_cannot_be_rebound() {
         Some(observation)
     );
 }
+
+// r[verify lattice.execution_binding.usage_provenance.scenario.replay]
+#[test]
+fn attempt_receipts_skip_the_run_index_and_keep_immutable_attempt_replay() {
+    let directory = tempfile::tempdir().expect("usage store directory");
+    let path = directory.path().join("usage.redb");
+    let store = crate::store::Store::new(&path).expect("store opens");
+    let host = host_observation();
+    store.save_command_worker_usage(&host).expect("host receipt owns its run index");
+    let attempt = super::tests::attempt_observation();
+    store.save_command_worker_usage(&attempt).expect("attempt receipt persists");
+    store.save_command_worker_usage(&attempt).expect("identical replay is idempotent");
+    drop(store);
+    let store = crate::store::Store::new(&path).expect("store reopens");
+    store.save_command_worker_usage(&attempt).expect("restart applies the same receipt once");
+    assert_eq!(
+        store.load_command_worker_usage_for_run(crate::engine::RunId(host.run_id)).expect("run index"),
+        Some(host)
+    );
+    assert_eq!(store.load_command_worker_usage_for_run(crate::engine::RunId(0)).expect("no attempt index"), None);
+    let mut moved = attempt.clone();
+    if let Some(binding) = moved.execution_binding.as_mut() {
+        binding.binding_identity = format!("blake3:{}", "1".repeat(64));
+    }
+    assert!(matches!(store.save_command_worker_usage(&moved), Err(crate::store::StoreError::Conflict(_))));
+    let mut crossed = attempt.clone();
+    crossed.duration_millis = Some(1);
+    assert!(matches!(store.save_command_worker_usage(&crossed), Err(crate::store::StoreError::Conflict(_))));
+    assert_eq!(store.load_command_worker_usage(&attempt.attempt_id).expect("original"), Some(attempt));
+}

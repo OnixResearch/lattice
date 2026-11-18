@@ -1,0 +1,45 @@
+{
+  "schema": "lattice.nickel-import-merge.adoption-evidence.v1",
+  "observed_on": "2026-11-18",
+  "scope": "Consumer adoption of the published producer repair; selected fixture agreement only, not evaluator equivalence, Nickel soundness, import-closure completeness or release readiness.",
+  "producer": {
+    "rid": "rad:z21miuQLqLwe1HkaMu2mEZy5fdG9F",
+    "source_url": "https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git",
+    "pinned_revision": "f0ea0d2a31d3482ddf4e575482f6ddf7a7e7d4e9",
+    "seed_main_observed": "f0ea0d2a31d3482ddf4e575482f6ddf7a7e7d4e9",
+    "evaluator_code_revision": "bc1351373195ff81f1e7c1c395b1a16fb7417a31",
+    "evaluator_code_note": "f0ea0d2a adds only the archived lifecycle record to bc135137; bc135137 changes only Cargo-reserved vendor metadata and gates relative to 2d1fb2b59f373967cc69e13ec289759d9cd4df46, which first carried the import closurization repair (upstream aa94d9b1f7a0981b4f0d6e8dff79f0a74ff1bb1a) and the captured-module seam.",
+    "landing_revision_archive_blake3": "990fd32a885859f94e1f3b6ad129d1cf567545e11a4c8b8e56db804dfabbd86d",
+    "landing_verification": "Producer-owned record .cairn/archive/2026-11-18-cargo-packageable-native-vendor/evidence/implementation-evidence.md: formatting, 116 all-target tests including tests/imported_merge.rs, strict Clippy, both vendored package listings and nix flake check passed on bc135137."
+  },
+  "consumer_resolution": {
+    "cargo_lock_source": "git+https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=f0ea0d2a31d3482ddf4e575482f6ddf7a7e7d4e9#f0ea0d2a31d3482ddf4e575482f6ddf7a7e7d4e9",
+    "cargo_lock_packages": [
+      {"name": "nickel-eval", "version": "0.1.0"},
+      {"name": "nickel-lang", "version": "2.2.0"},
+      {"name": "nickel-lang-core", "version": "0.18.0"}
+    ],
+    "flake_lock": {"rev": "f0ea0d2a31d3482ddf4e575482f6ddf7a7e7d4e9", "nar_hash": "sha256-faGsaWICfFaA1Jzl4eRW8NxQMpDscikTZSR2vd6XlV4="},
+    "removed": ["vendor-cargo-deps/nickel-lang-core-0.18.0 snapshot", "root [patch.crates-io] nickel-lang-core path entry", "direct nickel-lang-core dependency"],
+    "crane_vendoring_probe": "lattice-cargo-vendor built (exit 0) with the nickel-eval flake input overridden to bc135137 before publication; 2d1fb2b had failed with Cargo's reserved-file rejection."
+  },
+  "native_adapter_regressions": {
+    "command": "scripts/check.rs step 'all features tests' (cargo test --workspace --all-features --locked), lib unit target",
+    "observed": "lib suite 415 passed, 0 failed, 8 ignored, including nickel::tests::imported_json_merge_preserves_nested_values_in_both_orders, imported_json_merge_preserves_recursive_overrides_and_contracts and imported_json_merge_rejects_invalid_imports_and_contracts_safely",
+    "boundary": "Observed in the run whose later integration targets failed for an unrelated captured-worker selection; this record claims only the lib-suite observation."
+  },
+  "pinned_cli_comparison": {
+    "cli": "nickel-lang-cli nickel 1.17.0 (rev 1320a98)",
+    "procedure": "Wrote the adapter regression inputs to a temporary directory, ran nickel export --format json for each, and compared jq -cS canonical output with the values the adapter tests assert.",
+    "cases": [
+      {"source": "identity & { machine.reviewed = true, expires = 1234 }", "exit": 0, "matches_adapter_expectation": true, "canonical_blake3": "55f43d1fba83c3afa69822bc7940962100ea4b40777f639f36bf571c3fdcce76"},
+      {"source": "{ machine.reviewed = true, expires = 1234 } & identity", "exit": 0, "matches_adapter_expectation": true, "canonical_blake3": "55f43d1fba83c3afa69822bc7940962100ea4b40777f639f36bf571c3fdcce76"},
+      {"source": "recursive default/force override over defaults.json", "exit": 0, "matches_adapter_expectation": true, "canonical_blake3": "49928777ef5e3a0aa98bfe9e13a424ecd9b7d5f88ab30c4d219b6e876ff7d3b4"}
+    ]
+  },
+  "non_claims": [
+    "No proof of arbitrary evaluator equivalence between the native core and the external CLI.",
+    "No Nickel soundness, import-closure completeness, contract correctness or configuration safety claim.",
+    "No release readiness claim."
+  ]
+}

@@ -124,3 +124,44 @@ fn production_metadata_reuses_admitted_identity_without_dynamic_input_or_service
     changed.openai_compatible.get_mut("pi").expect("route").model = "changed-model".to_string();
     assert_ne!(changed.configured_profile(Target::Pi).expect("changed profile").binding, binding);
 }
+
+// r[verify lattice.execution_binding.profile_facts.scenario.compatibility]
+#[test]
+fn configured_routes_project_worker_facts_without_compute_service_or_qualification() {
+    let unavailable = lattice::execution_binding::core::projection::SupportLevel::Unavailable;
+    let unknown = lattice::execution_binding::core::projection::SupportLevel::Unknown;
+    let mut config = RuntimeOptions::default();
+    config.runtimes.get_mut("pi").expect("Pi").command = "/private/newly-advertised-worker".to_string();
+    let profiles = config.configured_profiles().expect("command profiles");
+    let facts = config.worker_profile_facts().expect("command facts");
+    assert_eq!(facts.len(), profiles.len());
+    for (fact, profile) in facts.iter().zip(&profiles) {
+        assert_eq!(fact.revision, profile.binding.revision);
+        assert_eq!(fact.compute.support, unavailable);
+        assert_eq!(fact.model_routes.support, unavailable);
+        assert_eq!(fact.executable_identity.support, unknown);
+        assert_eq!(fact.sessions.support, unknown);
+        assert_eq!(fact.adapter.value.as_deref(), Some("command"));
+    }
+    let text = serde_json::to_string(&facts).expect("facts json");
+    assert!(!text.contains("qualified"), "configuration never qualifies an executable");
+    assert!(!text.contains("/private/"));
+    for (label, target) in [
+        ("pi", Target::Pi),
+        ("clankers", Target::Clankers),
+        ("animus", Target::Animus),
+    ] {
+        let config = direct_config(label);
+        let facts = config.worker_profile_facts().expect("direct facts");
+        assert_eq!(facts.len(), 1);
+        let fact = &facts[0];
+        assert_eq!(fact.revision, config.configured_profile(target).expect("profile").binding.revision);
+        assert_eq!(fact.sessions.support, unavailable);
+        assert_eq!(fact.outputs.value.as_deref(), Some("text,json"));
+        assert_eq!(fact.inputs.value.as_deref(), Some("text-prompt-without-images"));
+        assert_eq!((fact.compute.support, fact.model_routes.support), (unavailable, unavailable));
+        let text = serde_json::to_string(fact).expect("direct json");
+        assert!(!text.contains("fixture.invalid"));
+        assert!(!text.contains("fixture-model"));
+    }
+}

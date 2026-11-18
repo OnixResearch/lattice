@@ -18,6 +18,13 @@ use crate::engine::effect::dispatch::Error;
 
 const PROCESS_DOMAIN: &[u8] = b"lattice.effect.credential-process-plan.v1";
 const NETWORK_DOMAIN: &[u8] = b"lattice.effect.credential-network-plan.v1";
+const CLEAR_ENVIRONMENT_PROCESS_DOMAIN: &[u8] = b"lattice.effect.process-plan.clear-environment.v1";
+
+#[derive(Clone, Copy)]
+enum ProcessEnvironmentMode {
+    Inherit,
+    Clear,
+}
 
 // Ownership transfers from ResolvedSecretEnv into these requests. Keep the
 // request buffers guarded across transport errors, cancellation, and unwinding.
@@ -45,6 +52,7 @@ pub(crate) struct ProcessRecipe {
     request: RefCell<Option<crate::agent_node::ProcessRequest>>,
     bindings: Bindings,
     payload: String,
+    environment_mode: ProcessEnvironmentMode,
     cancellation_observed: Cell<bool>,
 }
 
@@ -54,9 +62,36 @@ impl ProcessRecipe {
         references: Option<&NodeCredentialRefs>,
         provider: Arc<dyn CredentialProvider>,
     ) -> Result<Self, String> {
+        Self::with_environment_mode(request, references, provider, ProcessEnvironmentMode::Inherit)
+    }
+
+    pub(crate) fn new_clear_environment(
+        request: crate::agent_node::ProcessRequest,
+        references: Option<&NodeCredentialRefs>,
+        provider: Arc<dyn CredentialProvider>,
+    ) -> Result<Self, String> {
+        if references.is_some_and(|references| !references.env.is_empty())
+            || request.env.len() != 1
+            || request.env.get("PATH").is_none_or(String::is_empty)
+        {
+            return Err(
+                "construction process environment must contain only explicit PATH and no credentials".to_owned()
+            );
+        }
+        Self::with_environment_mode(request, references, provider, ProcessEnvironmentMode::Clear)
+    }
+
+    fn with_environment_mode(
+        request: crate::agent_node::ProcessRequest,
+        references: Option<&NodeCredentialRefs>,
+        provider: Arc<dyn CredentialProvider>,
+        environment_mode: ProcessEnvironmentMode,
+    ) -> Result<Self, String> {
         let bindings = Bindings::new(references, CredentialDestination::ShellEnvironment, provider)
             .map_err(|_| "credential_binding_rejected".to_owned())?;
-        let payload = if bindings.is_empty() {
+        let payload = if matches!(environment_mode, ProcessEnvironmentMode::Clear) {
+            super::plan_identity(CLEAR_ENVIRONMENT_PROCESS_DOMAIN, &super::process_plan_fields(&request))
+        } else if bindings.is_empty() {
             super::process_plan_identity(&request)
         } else {
             bindings
@@ -77,6 +112,7 @@ impl ProcessRecipe {
         Ok(Self {
             request: RefCell::new(Some(request)),
             bindings,
+            environment_mode,
             payload,
             cancellation_observed: Cell::new(false),
         })
@@ -103,7 +139,15 @@ impl ProcessRecipe {
                 zeroize::Zeroize::zeroize(&mut replaced);
             }
         }
-        let mut output = crate::process::shell::run_bounded(&request.0, process, cancellation).map_err(|error| {
+        let execution = match self.environment_mode {
+            ProcessEnvironmentMode::Inherit => crate::process::shell::run_bounded(&request.0, process, cancellation),
+            ProcessEnvironmentMode::Clear => crate::process::shell::run_bounded_clear_environment_with_cancellation(
+                &request.0,
+                process,
+                cancellation,
+            ),
+        };
+        let mut output = execution.map_err(|error| {
             self.cancellation_observed.set(matches!(error, crate::agent_node::ProcessError::Cancelled));
             Error::AdapterRejected
         })?;
@@ -240,6 +284,9 @@ impl AuthorizedAdapterRequest for NetworkRecipe {
         self.consume(runtime.http, runtime.cancellation, &authorized_subject(&authorized.attempt.binding))
     }
 }
+
+#[cfg(all(test, target_os = "linux"))]
+mod environment_tests;
 
 #[cfg(test)]
 mod tests;

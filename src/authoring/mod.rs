@@ -1,10 +1,11 @@
 //! Captured author inputs and their association with admitted, materialized workflows.
 //!
-//! These records are not Choregraph construction receipts or executable identities.
-//! The selected evaluator cannot resolve imports exclusively from a supplied byte map.
+//! A captured-module evaluation observes a native closure; source and graph
+//! associations remain distinct from executable authority.
 
-pub mod admission;
+mod captured;
 pub mod cli;
+pub mod construction;
 pub mod shell;
 
 pub use crate::workflow_template::ContentIdentity;
@@ -14,6 +15,10 @@ pub enum ProgramKind {
     Workflow,
     /// Source evaluates to { parameters = <record>, build = fun parameters => <workflow> }.
     Parameterized,
+    /// Captured graph-construction candidate using the selected Lattice shell target.
+    Construction,
+    /// Parameterized source whose build result is a graph-construction candidate.
+    ParameterizedConstruction,
 }
 
 /// Reuses the workflow-template byte/path bounds and content identity type.
@@ -76,6 +81,8 @@ pub struct CompilerIdentity {
     pub lowerer_adapter: ContentIdentity,
     pub source_adapter: ContentIdentity,
     pub profile: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub worker_artifact: Option<String>,
 }
 
 impl CompilerIdentity {
@@ -87,7 +94,8 @@ impl CompilerIdentity {
             dependency_lock: frozen_identity(env!("LATTICE_DEPENDENCY_LOCK_BLAKE3"))?,
             lowerer_adapter: frozen_identity(env!("LATTICE_WORKFLOW_LOWERER_BLAKE3"))?,
             source_adapter: frozen_identity(env!("LATTICE_SOURCE_ADAPTER_BLAKE3"))?,
-            profile: "lattice.captured-entry.snapshot-only.v1".into(),
+            worker_artifact: crate::nickel::captured_worker().ok().map(|(_, digest)| digest),
+            profile: "lattice.author-association.v2".into(),
         })
     }
 }
@@ -98,13 +106,44 @@ fn frozen_identity(value: &str) -> Result<ContentIdentity, &'static str> {
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum AssociationState {
-    /// Evaluation observed these inputs and this output. Complete import closure is unavailable.
+    /// Historical import-free source-text evaluation, without native closure evidence.
     CapturedSnapshot,
+    /// Captured-only native evaluation receipt; authenticity requires shell replay.
+    CapturedModules,
     /// File-context import retained these entry bytes. The evaluator did not expose
     /// a captured-byte request/closure receipt; no exact-input replay claim is made.
     RetainedEntrySnapshot,
     /// Materialized edits do not reproduce from the retained source revision.
     MaterializedFork,
+}
+
+/// Exact native worker request/response, not an attestation of the selected worker.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EvaluatorObservation {
+    pub modules: std::collections::BTreeMap<String, Vec<u8>>,
+    pub entry: String,
+    pub result: crate::nickel::Evaluated,
+    pub worker_artifact: String,
+}
+
+impl EvaluatorObservation {
+    pub fn validate(&self) -> Result<(), &'static str> {
+        crate::nickel::validate_captured_response(&self.entry, &self.modules, &self.result)
+            .map_err(|_| "captured evaluator observation changed")
+    }
+}
+
+/// Native candidate, projection, binding and bounded origin facts from one compilation.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ConstructionAssociation {
+    pub projection_json: Vec<u8>,
+    pub binding_json: Vec<u8>,
+    pub origins: Vec<choregraph_nickel::construction::model::projection::Origin>,
+    /// Runtime port ID to native projection port ID; never inferred from labels.
+    #[serde(default = "std::collections::BTreeMap::new")]
+    pub port_map: std::collections::BTreeMap<u64, u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -116,12 +155,40 @@ pub struct SourceAssociation {
     pub evaluated_output: ContentIdentity,
     pub expanded_artifact: ContentIdentity,
     pub state: AssociationState,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub observation: Option<EvaluatorObservation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub construction: Option<ConstructionAssociation>,
 }
 
+/// Pure structural/receipt correspondence checks, not evidence that a worker ran.
+/// Trust-boundary callers must use `shell::verify_observation` or a freshly
+/// rebuilt exact source preview before admitting captured provenance.
 impl SourceAssociation {
     pub fn validate(&self) -> Result<(), &'static str> {
         if self.program.identity()? != self.source_revision {
             return Err("captured source revision identity differs");
+        }
+        if self.state == AssociationState::RetainedEntrySnapshot
+            && (self.observation.is_some() || self.construction.is_some())
+        {
+            return Err("retained entry snapshot cannot carry captured evaluation or construction evidence");
+        }
+        if let Some(observation) = &self.observation {
+            if self.state == AssociationState::CapturedModules
+                && self.evaluated_output != ContentIdentity::from_bytes(observation.result.json.as_bytes())
+            {
+                return Err("captured output identity changed");
+            }
+            observation.validate()?;
+            if self.state == AssociationState::CapturedModules
+                && (self.compiler.worker_artifact.as_deref() != Some(observation.worker_artifact.as_str())
+                    || self.program.files.iter().any(|(name, bytes)| observation.modules.get(name) != Some(bytes)))
+            {
+                return Err("captured source/evaluator association changed");
+            }
+        } else if self.state == AssociationState::CapturedModules {
+            return Err("captured evaluation observation is unavailable");
         }
         Ok(())
     }
@@ -136,6 +203,14 @@ pub fn identity<T: serde::Serialize>(domain: &str, value: &T) -> Result<ContentI
 }
 
 pub fn expanded_identity(workflow: &crate::engine::Workflow) -> Result<ContentIdentity, &'static str> {
+    // The published v1 identity predates construction facts. Preserve its exact
+    // six-field encoding for unchanged legacy workflows, not a nine-field v1.
+    if !workflow.control_dependencies.is_empty()
+        || workflow.construction_profile
+        || workflow.construction_runtime.is_some()
+    {
+        return construction_identity(workflow);
+    }
     identity(
         "lattice.materialized-workflow.v1",
         &(
@@ -145,6 +220,23 @@ pub fn expanded_identity(workflow: &crate::engine::Workflow) -> Result<ContentId
             &workflow.credentials,
             &workflow.runner,
             &workflow.triggers,
+        ),
+    )
+}
+
+fn construction_identity(workflow: &crate::engine::Workflow) -> Result<ContentIdentity, &'static str> {
+    identity(
+        "lattice.materialized-workflow.v2",
+        &(
+            &workflow.meta,
+            &workflow.graph,
+            &workflow.configs,
+            &workflow.credentials,
+            &workflow.runner,
+            &workflow.triggers,
+            &workflow.control_dependencies,
+            &workflow.construction_profile,
+            &workflow.construction_runtime,
         ),
     )
 }
@@ -200,7 +292,7 @@ impl SourceDraft {
     }
 }
 
-/// There is deliberately no inferred template/instance/source-span mapping.
-pub const ORIGIN_UNAVAILABLE: &str = "unavailable: selected Choregraph API has no construction/origin map";
+/// Never infer missing template, instance or source-span attribution.
+pub const ORIGIN_UNAVAILABLE: &str = "unavailable: retained source has no construction origin for this element";
 pub const COMPLETE_MODULE_PROVENANCE_UNAVAILABLE: &str =
-    "unavailable: selected nickel-eval cannot evaluate imports exclusively from captured module bytes";
+    "unavailable: workflow has no retained captured-module evaluation receipt";

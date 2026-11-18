@@ -7,11 +7,11 @@ Lattice dispatches ready workflow nodes without a dependency-level barrier. Chor
 
 ## Source and proof boundary
 
-Lattice pins Choregraph runtime revision `0b2000edaf86d5a7a8601246afbc0d526f4a2a07` from its canonical Radicle repository. It separately pins accepted readiness-completeness evidence at revision `b3e08e19750f53bdbcae970cdf58a47a791ed20b`.
+Lattice pins Choregraph runtime revision `c3577352ee1e39391f5204ee234d991c7dbeb151` from its canonical Radicle repository. Its production readiness routes through the verified kernel, and its readiness-completeness evidence is accepted at that same revision.
 
-The proof revision routes readiness through the verified kernel. The runtime revision uses the preceding direct implementation. Lattice therefore claims bounded frontier compatibility, not direct proof linkage.
+The runtime and readiness-proof revisions therefore coincide. Lattice still compares the Choregraph runtime frontier with the compatibility runner projection and claims bounded frontier compatibility, not whole-product correctness.
 
-At each product dispatch step, Lattice compares the Choregraph runtime frontier with the compatibility runner projection. A mismatch stops dispatch. Focused fixtures also enforce the proof revision and runtime revision as separate immutable identities.
+At each product dispatch step, Lattice compares the Choregraph runtime frontier with the compatibility runner projection. A mismatch stops dispatch. Focused fixtures enforce the runtime and readiness-proof identities independently, even though they now name the same revision.
 
 The accepted proof establishes Choregraph readiness completeness under its stated assumptions. It does not prove Lattice effects, persistence, recovery, or scheduling policy.
 

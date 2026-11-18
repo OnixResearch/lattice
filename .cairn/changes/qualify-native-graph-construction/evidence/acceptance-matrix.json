@@ -1,0 +1,384 @@
+{
+  "kind": "issue-acceptance-criterion-matrix",
+  "status_vocabulary": "covered = the cited tests establish the criterion through production routes; partial = some aspect lacked a test or observation; missing = no test or route established it. Every cited test was observed passing on the current pin (host-run release store executables for ignored cases; dev shell for non-ignored cases); see focused-observation.json and host-run-observation.json.",
+  "summary": {
+    "issue_20": {
+      "before": {
+        "covered": 8,
+        "partial": 6,
+        "missing": 1
+      },
+      "after": {
+        "covered": 15,
+        "partial": 0,
+        "missing": 0
+      }
+    },
+    "issue_21": {
+      "before": {
+        "covered": 10,
+        "partial": 3,
+        "missing": 1
+      },
+      "after": {
+        "covered": 14,
+        "partial": 0,
+        "missing": 0
+      }
+    },
+    "observation_gap": "None for the cited tests. The flake-app invocation itself is recorded separately in host-run-observation.json."
+  },
+  "criteria": [
+    {
+      "issue": 20,
+      "criterion": "The real selected evaluator constructs the example and the production import/runtime paths execute it.",
+      "before": "partial",
+      "after": "covered",
+      "tests": [
+        "test_construction_authoring::captured_instances_reopen_with_exact_closure_and_native_origins",
+        "test_source_authoring::construction_cli_import_readmits_captured_source_without_weakening_file_import",
+        "test_construction_qualification::same_constructed_graph_runs_only_with_its_exact_authority"
+      ],
+      "observed": true,
+      "notes": "Before: execution used Executor::run_authorized directly. Added `lattice authority inspect` + `lattice run` with an exact grant and the headless saved-workflow route."
+    },
+    {
+      "issue": 20,
+      "criterion": "Two instances receive independent identities; nested and cross-instance connections resolve correctly.",
+      "before": "partial",
+      "after": "covered",
+      "tests": [
+        "test_construction_qualification::generated_instances_keep_identities_shared_handle_and_attached_facts",
+        "test_construction_authoring::generated_graph_agrees_with_independent_runtime_reference"
+      ],
+      "observed": true,
+      "notes": "Identities and edge targets were only implied by per-role outputs; now asserted directly."
+    },
+    {
+      "issue": 20,
+      "criterion": "Reusing a handle adds no extra operation instance.",
+      "before": "covered",
+      "after": "covered",
+      "tests": [
+        "test_construction_authoring::captured_instances_reopen_with_exact_closure_and_native_origins",
+        "test_construction_qualification::generated_instances_keep_identities_shared_handle_and_attached_facts"
+      ],
+      "observed": true,
+      "notes": "Six operations with four edges from one shared output port."
+    },
+    {
+      "issue": 20,
+      "criterion": "Fanout/join obey the selected target's value-sharing/discard rules.",
+      "before": "partial",
+      "after": "covered",
+      "tests": [
+        "test_construction_qualification::fanout_and_join_follow_selected_copy_and_drop_rules"
+      ],
+      "observed": true,
+      "notes": "Before: only the permissive positive. Now non-copyable string and non-droppable exitcode registries reject in elaboration and admission."
+    },
+    {
+      "issue": 20,
+      "criterion": "An independently authored reference agrees on ordered boundary values and required dependencies, without demanding incidental event-order or numeric-ID equality.",
+      "before": "partial",
+      "after": "covered",
+      "tests": [
+        "test_construction_authoring::generated_graph_agrees_with_independent_runtime_reference"
+      ],
+      "observed": true,
+      "notes": "Dependencies were compared by count only; now by admitted instance role."
+    },
+    {
+      "issue": 20,
+      "criterion": "Run one supported local operation profile with exact fixture authority; no external service is required.",
+      "before": "covered",
+      "after": "covered",
+      "tests": [
+        "test_construction_authoring::generated_graph_agrees_with_independent_runtime_reference",
+        "test_construction_qualification::same_constructed_graph_runs_only_with_its_exact_authority"
+      ],
+      "observed": true,
+      "notes": "Local shell profile (shell-source/shell-stdin) under an OperatorRunContextSource grant."
+    },
+    {
+      "issue": 20,
+      "criterion": "The same effectful graph without required authority fails before adapter execution or credential delivery.",
+      "before": "partial",
+      "after": "covered",
+      "tests": [
+        "test_construction_qualification::same_constructed_graph_runs_only_with_its_exact_authority",
+        "test_construction_authoring::absent_authority_denies_before_shell_adapter_and_new_grants_do_not_match_v2",
+        "test_construction_runtime_binding::construction_compatibility_denies_every_adapter_and_credentials_through_both_public_paths"
+      ],
+      "observed": true,
+      "notes": "Before: the denial used an edited fork, not the same graph. Added the same admitted graph with none, foreign and exact grants."
+    },
+    {
+      "issue": 20,
+      "criterion": "A barrier/event-controlled zero-data sequence proves the second effect cannot start before its prerequisite.",
+      "before": "covered",
+      "after": "covered",
+      "tests": [
+        "test_construction_authoring::v3_zero_data_barrier_waits_for_first_effect_completion",
+        "test_construction_runtime_binding::flat_v3_controls_admit_with_runtime_binding"
+      ],
+      "observed": true,
+      "notes": "Defined before this change; observed passing in the host run."
+    },
+    {
+      "issue": 20,
+      "criterion": "Unknown runtime binding, wrong types, invalid expression dependency, collision, wrong-scope handle, cycle, and expansion overflow reject before dispatch.",
+      "before": "partial",
+      "after": "covered",
+      "tests": [
+        "test_construction_authoring::invalid_materialized_bindings_never_reach_dispatch",
+        "test_construction_authoring::wrong_scope_handle_is_rejected_by_selected_elaborator",
+        "test_construction_qualification::generation_and_expansion_overflow_reject_before_any_candidate"
+      ],
+      "observed": true,
+      "notes": "Overflow was only tested at projection admission; added library generation cap and native node/instance expansion limits with a fitting control."
+    },
+    {
+      "issue": 20,
+      "criterion": "Configuration expressions, effects, and implementation references remain attached to the intended instances after remapping.",
+      "before": "partial",
+      "after": "covered",
+      "tests": [
+        "test_construction_qualification::generated_instances_keep_identities_shared_handle_and_attached_facts",
+        "test_construction_authoring::source_template_and_instance_parameter_edits_readmit_independently"
+      ],
+      "observed": true,
+      "notes": "Per-node effect slot, implementation and command now asserted against the admitted origin role."
+    },
+    {
+      "issue": 20,
+      "criterion": "Independently changing an import, parameter, contract default, evaluator, selector, same-named registry implementation, elaborator, or final graph invalidates the affected binding.",
+      "before": "partial",
+      "after": "covered",
+      "tests": [
+        "test_construction_authoring::mutated_closure_registry_and_projection_never_authorize_a_retained_receipt",
+        "test_construction_authoring::self_consistent_foreign_registry_implementation_cannot_admit_on_current_host",
+        "test_construction_qualification::parameter_member_and_elaborator_drift_invalidate_the_binding"
+      ],
+      "observed": true,
+      "notes": "Added parameter, imported member, evaluator-source and elaborator drift."
+    },
+    {
+      "issue": 20,
+      "criterion": "A same-output control retains distinct provenance when source/evaluator inputs differ.",
+      "before": "covered",
+      "after": "covered",
+      "tests": [
+        "test_construction_authoring::equal_export_does_not_merge_distinct_source_or_observed_closure"
+      ],
+      "observed": true,
+      "notes": "Source difference; one selected worker cannot produce a distinct-evaluator same-output pair."
+    },
+    {
+      "issue": 20,
+      "criterion": "Existing materialized workflow import/export and named-child semantics remain compatible.",
+      "before": "covered",
+      "after": "covered",
+      "tests": [
+        "test_workflow_format::legacy_export_keeps_committed_contract_without_construction_fields",
+        "test_subworkflow_execution::saved_child_executes_and_routes_declared_output_to_the_real_parent_port",
+        "test_construction_runtime_binding::materialized_flat_fork_retains_v2_execution"
+      ],
+      "observed": true,
+      "notes": "test_workflow_format 26 passed, test_subworkflow_execution 5 passed on the current pin."
+    },
+    {
+      "issue": 20,
+      "criterion": "Cancellation, budgets, result validation, and effect checks continue through existing production routes.",
+      "before": "partial",
+      "after": "covered",
+      "tests": [
+        "test_construction_qualification::result_validation_and_cancellation_stop_the_dependent_effect",
+        "test_construction_qualification::orchestration_budget_gates_constructed_rounds"
+      ],
+      "observed": true,
+      "notes": "Only effect checks were tested before. Snapshot cancellation, required shell success and orchestration round budgets now run a constructed sequence."
+    },
+    {
+      "issue": 20,
+      "criterion": "Retain source, expanded graph, exact command/results, and negative controls in the supported Nix qualification workflow.",
+      "before": "missing",
+      "after": "covered",
+      "tests": [
+        "apps.x86_64-linux.construction-runtime-qualification"
+      ],
+      "observed": true,
+      "notes": "The sandboxed construction-runtime check could never pass (sandbox store entries are not root-owned) and retained only logs. Replaced by the host-run app; see host-run-observation.json."
+    },
+    {
+      "issue": 21,
+      "criterion": "Import/store/reopen a program with a helper function, selected module, two instances, and generated collection while preserving source/parameter identities.",
+      "before": "covered",
+      "after": "covered",
+      "tests": [
+        "test_construction_authoring::captured_instances_reopen_with_exact_closure_and_native_origins",
+        "test_source_authoring::construction_cli_import_readmits_captured_source_without_weakening_file_import",
+        "test_source_authoring::authoring_import_store_reopen_and_exact_source_archive_preserve_helpers_and_parameters"
+      ],
+      "observed": true,
+      "notes": "Selected member via `--member` is in the CLI case."
+    },
+    {
+      "issue": 21,
+      "criterion": "Author-source export preserves the captured structure; expanded export is separately identified.",
+      "before": "covered",
+      "after": "covered",
+      "tests": [
+        "test_source_authoring::authoring_cli_source_commands_are_registered_and_keep_artifact_kinds_explicit",
+        "test_construction_authoring::source_template_and_instance_parameter_edits_readmit_independently"
+      ],
+      "observed": true,
+      "notes": "Requires the captured worker; runs in the host app."
+    },
+    {
+      "issue": 21,
+      "criterion": "Existing workflows with no source association continue to work without fabricated provenance.",
+      "before": "covered",
+      "after": "covered",
+      "tests": [
+        "test_source_authoring::authoring_legacy_and_explicit_expanded_roundtrips_have_no_fabricated_source",
+        "test_construction_runtime_binding::materialized_flat_fork_retains_v2_execution"
+      ],
+      "observed": true,
+      "notes": ""
+    },
+    {
+      "issue": 21,
+      "criterion": "Selecting a generated node shows its template/instance and a valid location where mapping is available.",
+      "before": "partial",
+      "after": "covered",
+      "tests": [
+        "tui::authoring::tests::source_origins_target_only_matching_displayed_source_bytes",
+        "test_source_authoring::construction_cli_import_readmits_captured_source_without_weakening_file_import",
+        "test_construction_authoring::captured_instances_reopen_with_exact_closure_and_native_origins"
+      ],
+      "observed": true,
+      "notes": "Instance was never asserted and `lattice authoring origin` was untested; both added, with port and unavailable controls."
+    },
+    {
+      "issue": 21,
+      "criterion": "Parameter edits compile/readmit a new revision with topology/configuration differences inspectable before execution.",
+      "before": "covered",
+      "after": "covered",
+      "tests": [
+        "test_construction_authoring::source_template_and_instance_parameter_edits_readmit_independently",
+        "test_source_authoring::authoring_parameter_preview_is_inspectable_and_changes_only_source_defined_instance"
+      ],
+      "observed": true,
+      "notes": ""
+    },
+    {
+      "issue": 21,
+      "criterion": "A graph edit without an unambiguous supported source correspondence requires materialized editing or remains unapplied; it cannot silently rewrite arbitrary source.",
+      "before": "covered",
+      "after": "covered",
+      "tests": [
+        "test_source_authoring::authoring_materialized_edit_paths_fork_and_old_snapshot_retains_exact_association",
+        "test_construction_runtime_binding::captured_no_control_fork_retains_v3_authority_and_rejects_saved_profile_downgrade"
+      ],
+      "observed": true,
+      "notes": ""
+    },
+    {
+      "issue": 21,
+      "criterion": "Editing a template affects its instances after recompilation; changing one instance parameter affects only that instance as defined by the source.",
+      "before": "covered",
+      "after": "covered",
+      "tests": [
+        "test_construction_authoring::source_template_and_instance_parameter_edits_readmit_independently"
+      ],
+      "observed": true,
+      "notes": ""
+    },
+    {
+      "issue": 21,
+      "criterion": "Source/import/library/parameter/registry/evaluator drift invalidates the appropriate compilation association.",
+      "before": "partial",
+      "after": "covered",
+      "tests": [
+        "test_construction_authoring::mutated_closure_registry_and_projection_never_authorize_a_retained_receipt",
+        "test_construction_authoring::self_consistent_foreign_registry_implementation_cannot_admit_on_current_host",
+        "test_construction_qualification::parameter_member_and_elaborator_drift_invalidate_the_binding"
+      ],
+      "observed": true,
+      "notes": "Parameter and imported-member drift added."
+    },
+    {
+      "issue": 21,
+      "criterion": "Stale authoring drafts cannot overwrite newer revisions.",
+      "before": "covered",
+      "after": "covered",
+      "tests": [
+        "test_source_authoring::authoring_stale_and_concurrent_drafts_cannot_replace_newer_revision",
+        "test_construction_authoring::source_template_and_instance_parameter_edits_readmit_independently"
+      ],
+      "observed": true,
+      "notes": ""
+    },
+    {
+      "issue": 21,
+      "criterion": "Evaluation or admission failure retains the last admitted workflow and the editable failed draft with bounded diagnostics.",
+      "before": "covered",
+      "after": "covered",
+      "tests": [
+        "test_source_authoring::authoring_failed_draft_is_bounded_editable_and_does_not_replace_admission",
+        "test_construction_authoring::source_template_and_instance_parameter_edits_readmit_independently"
+      ],
+      "observed": true,
+      "notes": ""
+    },
+    {
+      "issue": 21,
+      "criterion": "Preview, compilation, navigation, and export neither start workloads nor deliver credentials.",
+      "before": "partial",
+      "after": "covered",
+      "tests": [
+        "test_construction_qualification::same_constructed_graph_runs_only_with_its_exact_authority",
+        "test_source_authoring::authoring_preview_export_and_store_do_not_execute_shell_or_deliver_credentials"
+      ],
+      "observed": true,
+      "notes": "Before: only flat source. Added an effectful constructed graph through preview, admission, origin, exports and inspection."
+    },
+    {
+      "issue": 21,
+      "criterion": "In-flight execution continues against its exact admitted snapshot.",
+      "before": "missing",
+      "after": "covered",
+      "tests": [
+        "test_construction_qualification::in_flight_run_keeps_its_exact_admitted_snapshot_while_source_readmits"
+      ],
+      "observed": true,
+      "notes": "Before: only old clones were rerun after readmission. Added a run blocked on its first effect while a newer source revision is admitted; observed passing in the host run."
+    },
+    {
+      "issue": 21,
+      "criterion": "Existing exact-preview/activation checks and materialized round trips remain valid.",
+      "before": "covered",
+      "after": "covered",
+      "tests": [
+        "test_workflow_format (26 passed)",
+        "test_source_authoring::authoring_durable_preview_replacement_and_candidate_mutation_are_stale"
+      ],
+      "observed": true,
+      "notes": ""
+    },
+    {
+      "issue": 21,
+      "criterion": "Tests distinguish source identity, graph identity, execution identity, and semantic equivalence.",
+      "before": "covered",
+      "after": "covered",
+      "tests": [
+        "test_source_authoring::authoring_source_artifact_and_compiler_identities_are_not_execution_or_semantic_equivalence",
+        "test_construction_authoring::equal_export_does_not_merge_distinct_source_or_observed_closure",
+        "test_construction_runtime_binding::same_named_changed_backend_or_runtime_refuses_old_authority"
+      ],
+      "observed": true,
+      "notes": ""
+    }
+  ]
+}

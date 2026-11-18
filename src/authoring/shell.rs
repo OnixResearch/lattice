@@ -2,41 +2,65 @@
 
 use super::*;
 
+// r[impl lattice.graph_construction.inert_authoring]
+// r[impl lattice.graph_construction.inert_authoring.marker]
+// r[impl lattice.graph_construction.drift.provenance]
 pub fn compile(program: &CapturedProgram) -> Result<crate::engine::Workflow, &'static str> {
-    program.validate()?;
-    debug_assert!(program.files.contains_key(&program.entry));
-    debug_assert!(program.files.len() <= crate::workflow_template::MAX_BUNDLE_FILES);
-    let source = std::str::from_utf8(&program.files[&program.entry]).map_err(|_| "entry is not UTF-8")?;
-    super::admission::require_import_free(source)?;
-    let value = match program.kind {
-        ProgramKind::Workflow => {
-            if !program.parameters.is_empty() {
-                return Err("flat source has no declared parameters");
-            }
-            crate::nickel::evaluate_source(source).map_err(|_| "source evaluation failed")?
-        }
-        ProgramKind::Parameterized => {
-            let declaration = format!("let program = (\n{source}\n) in program.parameters");
-            let defaults =
-                crate::nickel::evaluate_source(&declaration).map_err(|_| "parameter declaration evaluation failed")?;
-            let mut parameters: std::collections::BTreeMap<String, serde_json::Value> =
-                serde_json::from_value(defaults).map_err(|_| "source parameters must be a record")?;
-            if parameters.len() > 64 || program.parameters.keys().any(|key| !parameters.contains_key(key)) {
-                return Err("parameter is not explicitly declared by source");
-            }
-            parameters.extend(program.parameters.clone());
-            // Native value printing escapes Nickel interpolation. The selected
-            // convenience JSON-to-Nickel serializer does not escape `%{` strings.
-            let value = serde_json::to_value(&parameters).map_err(|_| "parameter encoding failed")?;
-            let parameters: nickel_lang_core::eval::value::NickelValue =
-                serde_json::from_value(value).map_err(|_| "parameter literal conversion failed")?;
-            let parameters = parameters.to_string();
-            let application = format!("let program = (\n{source}\n) in program.build ({parameters})");
-            super::admission::require_import_free(&application)?;
-            crate::nickel::evaluate_source(&application).map_err(|_| "source evaluation failed")?
-        }
+    let (value, observation) = super::captured::compile(program)?;
+    admit_observed(program, value, observation)
+}
+
+/// Reproduce the exact captured request and response with the selected worker.
+/// This is not a hash/receipt correspondence check: parameter defaults and the
+/// application module are rebuilt by the same captured compilation path.
+pub fn verify_observation(program: &CapturedProgram, observation: &EvaluatorObservation) -> Result<(), &'static str> {
+    observation.validate()?;
+    let (_, current) = super::captured::compile(program)?;
+    if &current != observation {
+        return Err("captured observation differs from current source evaluation");
+    }
+    Ok(())
+}
+
+fn admit_observed(
+    program: &CapturedProgram,
+    value: serde_json::Value,
+    observation: EvaluatorObservation,
+) -> Result<crate::engine::Workflow, &'static str> {
+    let (mut workflow, construction) = if super::construction::is_native_kind(program.kind) {
+        let (workflow, construction) = super::captured::compile_construction(&observation)?;
+        (workflow, Some(construction))
+    } else {
+        (admit_evaluated_snapshot(program, value, AssociationState::RetainedEntrySnapshot)?, None)
     };
-    admit_evaluated_snapshot(program, value, AssociationState::CapturedSnapshot)
+    let output = ContentIdentity::from_bytes(observation.result.json.as_bytes());
+    let captured = SourceAssociation {
+        observation: Some(observation),
+        construction,
+        ..association(program, &workflow, output, AssociationState::CapturedModules)?
+    };
+    captured.validate()?;
+    workflow.authoring = Some(captured);
+    Ok(workflow)
+}
+
+/// The source association of an admitted workflow at its current expanded identity.
+fn association(
+    program: &CapturedProgram,
+    workflow: &crate::engine::Workflow,
+    evaluated_output: ContentIdentity,
+    state: AssociationState,
+) -> Result<SourceAssociation, &'static str> {
+    Ok(SourceAssociation {
+        program: std::sync::Arc::new(program.clone()),
+        source_revision: program.identity()?,
+        compiler: CompilerIdentity::current()?,
+        evaluated_output,
+        expanded_artifact: expanded_identity(workflow)?,
+        state,
+        observation: None,
+        construction: None,
+    })
 }
 
 /// Retention for existing bundle/file evaluation routes is not source-editing admission.
@@ -53,17 +77,11 @@ pub(crate) fn admit_evaluated_snapshot(
     if crate::workflow_validation::has_fatal_diagnostics(&diagnostics) {
         return Err("workflow validation failed");
     }
-    workflow.authoring = Some(SourceAssociation {
-        program: std::sync::Arc::new(program.clone()),
-        source_revision: program.identity()?,
-        compiler: CompilerIdentity::current()?,
-        evaluated_output: output,
-        expanded_artifact: expanded_identity(&workflow)?,
-        state,
-    });
+    workflow.authoring = Some(association(program, &workflow, output, state)?);
     Ok(workflow)
 }
 
+// r[impl lattice.graph_construction.editing]
 /// Replaces only this draft's preview/diagnostic. The admitted workflow is untouched.
 pub fn preview(draft: &mut SourceDraft) -> Result<(), &'static str> {
     draft.preview = None;
@@ -74,10 +92,7 @@ pub fn preview(draft: &mut SourceDraft) -> Result<(), &'static str> {
             let input_identity = draft.program.identity()?;
             debug_assert!(candidate.authoring.as_ref().is_some_and(|source| source.source_revision == input_identity));
             debug_assert!(
-                candidate
-                    .authoring
-                    .as_ref()
-                    .is_some_and(|source| source.state == AssociationState::CapturedSnapshot)
+                candidate.authoring.as_ref().is_some_and(|source| source.state == AssociationState::CapturedModules)
             );
             draft.preview = Some(SourcePreview {
                 input_identity,
@@ -133,26 +148,33 @@ pub struct AuthorExport {
     pub association: SourceAssociation,
 }
 
+/// Maximum serialized archive size, including byte-array expansion and receipts.
+/// Export enforces the same cap as import; captured source remains limited to 4 MiB.
+const MAX_SOURCE_ARCHIVE_BYTES: usize = 64 * 1_048_576;
+
 // r[impl lattice.source_authoring.exports]
 pub fn source_export(workflow: &crate::engine::Workflow) -> Result<Vec<u8>, &'static str> {
     let mut workflow = workflow.clone();
     reconcile_materialized(&mut workflow)?;
     let association = workflow.authoring.ok_or("workflow has no captured author source")?;
-    serde_json::to_vec(&AuthorExport {
+    let bytes = serde_json::to_vec(&AuthorExport {
         schema: "lattice.author-source.v1".into(),
         association,
     })
-    .map_err(|_| "source archive encoding failed")
+    .map_err(|_| "source archive encoding failed")?;
+    if bytes.len() > MAX_SOURCE_ARCHIVE_BYTES {
+        return Err("source archive exceeds representational limit");
+    }
+    Ok(bytes)
 }
 
 pub fn read_source_archive(path: &std::path::Path) -> Result<CapturedProgram, &'static str> {
     let file = std::fs::File::open(path).map_err(|_| "source archive is unavailable")?;
-    // JSON byte arrays can require four bytes per captured byte plus separators.
-    let bytes = crate::capability::read_bounded(
-        cap_std::fs::File::from_std(file),
-        crate::workflow_template::MAX_BUNDLE_BYTES.checked_mul(8).ok_or("source archive bound overflows")?,
-    )
-    .map_err(|_| "source archive exceeds limit or is unreadable")?;
+    let bytes = crate::capability::read_bounded(cap_std::fs::File::from_std(file), MAX_SOURCE_ARCHIVE_BYTES)
+        .map_err(|_| "source archive exceeds limit or is unreadable")?;
+    if bytes.len() > MAX_SOURCE_ARCHIVE_BYTES {
+        return Err("source archive exceeds limit or is unreadable");
+    }
     let archive: AuthorExport = serde_json::from_slice(&bytes).map_err(|_| "source archive is invalid")?;
     if archive.schema != "lattice.author-source.v1" {
         return Err("source archive schema is unsupported");
@@ -224,8 +246,23 @@ pub fn preview_summary(
     debug_assert!(changed.len() <= changed_count);
     let before_nodes = before.as_ref().map_or(0, |workflow| workflow.nodes.len());
     let before_edges = before.as_ref().map_or(0, |workflow| workflow.edges.len());
+    let association = candidate.authoring.as_ref();
+    let modules = if association
+        .is_some_and(|source| source.state == AssociationState::CapturedModules && source.observation.is_some())
+    {
+        "native-observed-closure"
+    } else {
+        COMPLETE_MODULE_PROVENANCE_UNAVAILABLE
+    };
+    let origins = if association
+        .is_some_and(|source| source.state == AssociationState::CapturedModules && source.construction.is_some())
+    {
+        "native-template-instance-map"
+    } else {
+        ORIGIN_UNAVAILABLE
+    };
     Ok(format!(
-        "Preview only; no workloads, credential delivery or authority. Nodes {before_nodes} -> {}; edges {before_edges} -> {}; changed config nodes (first 64 of {}): {:?}; materialized identity {}. Complete import closure and origins unavailable.",
+        "Preview only; no workloads, credential delivery or authority. Nodes {before_nodes} -> {}; edges {before_edges} -> {}; changed config nodes (first 64 of {}): {:?}; materialized identity {}. complete_module_provenance={modules}; origins={origins}.",
         portable.nodes.len(),
         portable.edges.len(),
         changed_count,

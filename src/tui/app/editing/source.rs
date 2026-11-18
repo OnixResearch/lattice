@@ -18,12 +18,15 @@ fn member_fields(
     program.files.iter().filter_map(|(path, bytes)| {
         let text = std::str::from_utf8(bytes).ok()?;
         Some(crate::tui::authoring::field(&format!("source.file/{path}"), &format!("Captured source: {path}"),
-            "Edits a separate durable draft; evaluates a preview only. Inspect before explicit source admission. Module import resolution is not captured.", text))
+            "Edits a separate durable draft; evaluates a preview only. Inspect before explicit source admission. Only explicitly captured members participate in a source preview.", text))
     })
 }
 
 fn parameter_field(program: &crate::authoring::CapturedProgram) -> Option<crate::tui::authoring::Field> {
-    if program.kind != crate::authoring::ProgramKind::Parameterized {
+    if !matches!(
+        program.kind,
+        crate::authoring::ProgramKind::Parameterized | crate::authoring::ProgramKind::ParameterizedConstruction
+    ) {
         return None;
     }
     Some(crate::tui::authoring::field(
@@ -42,17 +45,62 @@ fn control_fields() -> [crate::tui::authoring::Field; 2] {
             "Type admit after inspecting the source preview. Durable expected-revision CAS rejects stale drafts.",
             "",
         ),
-        crate::tui::authoring::field("source.origins", "Source attribution", crate::authoring::ORIGIN_UNAVAILABLE, ""),
+        crate::tui::authoring::field(
+            "source.origins",
+            "Source attribution",
+            "Inspect the selected admitted node's template and instance. A location is shown only for matching displayed source bytes and a producer-supplied span.",
+            "",
+        ),
     ]
 }
 
+fn origin_summary(origin: &choregraph_nickel::construction::model::projection::Origin) -> String {
+    let instance = origin.instance_path.iter().take(6).map(String::as_str).collect::<Vec<_>>().join("/");
+    let instance = if origin.instance_path.len() > 6 {
+        format!("{instance}/…")
+    } else {
+        instance
+    };
+    let location = origin.location.as_ref().map_or_else(
+        || "source location unavailable".to_owned(),
+        |span| format!("source.file/{}:{}..{}", span.logical_module, span.start, span.end),
+    );
+    format!(
+        "template={} instance={} generation={} {location}",
+        origin.template,
+        instance,
+        origin.generation.as_deref().unwrap_or("unavailable")
+    )
+}
+
 impl State {
+    // r[impl lattice.graph_construction.origins.navigation]
+    fn source_origin_summary(&self, draft: Option<&crate::authoring::SourceDraft>) -> String {
+        self.selected_node_id()
+            .and_then(|node| {
+                crate::authoring::construction::lowering::origin_for(&self.workflow, &format!("node/{}", node.0))
+            })
+            .map(|mut origin| {
+                if draft.is_some_and(|draft| {
+                    self.workflow.authoring.as_ref().is_none_or(|source| source.program.as_ref() != &draft.program)
+                }) {
+                    // Admitted byte offsets cannot target the separate edited draft.
+                    origin.location = None;
+                }
+                origin_summary(&origin)
+            })
+            .unwrap_or_else(|| crate::authoring::ORIGIN_UNAVAILABLE.into())
+    }
+
     pub(in crate::tui::app) fn refresh_source_fields(&self, state: &mut crate::tui::authoring::State) {
-        let Some(store) = &self.store else {
-            return;
-        };
         let id = format!("tui-{}", blake3::hash(self.workflow.meta.name.as_bytes()).to_hex());
-        let Ok(Some(draft)) = store.load_source_draft(&id) else {
+        let draft = self.store.as_ref().and_then(|store| store.load_source_draft(&id).ok().flatten());
+        for field in &mut state.fields {
+            if field.id == "source.origins" {
+                field.value = self.source_origin_summary(draft.as_ref());
+            }
+        }
+        let Some(draft) = draft else {
             return;
         };
         for field in &mut state.fields {
@@ -72,7 +120,10 @@ impl State {
         let id = edit.field.id.as_str();
         let value = edit.text.as_str();
         if id == "source.origins" {
-            self.output.push_line(crate::authoring::ORIGIN_UNAVAILABLE);
+            let draft_id = format!("tui-{}", blake3::hash(self.workflow.meta.name.as_bytes()).to_hex());
+            let draft = self.store.as_ref().and_then(|store| store.load_source_draft(&draft_id).ok().flatten());
+            let description = self.source_origin_summary(draft.as_ref());
+            self.output.push_line(&description);
             return Ok(());
         }
         if self.dirty {

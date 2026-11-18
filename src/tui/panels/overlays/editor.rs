@@ -19,7 +19,7 @@ pub(in crate::tui::panels) fn render_authoring(app: &crate::tui::app::State, are
     let footer = Rect::new(inner.x, inner.y.saturating_add(inner.height.saturating_sub(1)), inner.width, 1);
     let body = Rect::new(inner.x, inner.y, inner.width, inner.height.saturating_sub(1));
     if let Some(draft) = &state.draft {
-        let mut lines = vec![Line::styled(draft.field.label.clone(), Style {
+        let mut lines = vec![Line::styled(draft.field.label.as_str(), Style {
             fg: Some(Color::Yellow),
             bg: None,
             underline_color: None,
@@ -27,14 +27,23 @@ pub(in crate::tui::panels) fn render_authoring(app: &crate::tui::app::State, are
             sub_modifier: Modifier::empty(),
         })];
         // Reserve room for validation/recovery even when the terminal is short.
-        let visible = usize::from(body.width).saturating_mul(usize::from(body.height.saturating_sub(2)));
-        let chars = draft.text.chars().count();
-        let tail: String = draft.text.chars().skip(chars.saturating_sub(visible)).collect();
-        if body.height > 2 {
-            lines.push(Line::from(format!("{tail}▏")));
+        let editable_rows = usize::from(body.height.saturating_sub(2));
+        let visible_chars = usize::from(body.width).saturating_mul(editable_rows);
+        if editable_rows > 0 && visible_chars > 0 {
+            let tail_start_bytes =
+                draft.text.char_indices().rev().nth(visible_chars.saturating_sub(1)).map_or(0, |(index, _)| index);
+            let tail = &draft.text[tail_start_bytes..];
+            let first_line_bytes = tail
+                .rmatch_indices('\n')
+                .nth(editable_rows.saturating_sub(1))
+                .map_or(0, |(index, _)| index.saturating_add(1));
+            lines.extend(tail[first_line_bytes..].split('\n').map(Line::from));
+            if let Some(last) = lines.last_mut() {
+                last.spans.push(ratatui::text::Span::raw("▏"));
+            }
         }
         lines.push(Line::styled(
-            state.error.as_deref().unwrap_or(&draft.field.help).to_string(),
+            state.error.as_deref().unwrap_or(&draft.field.help),
             Style {
                 fg: None,
                 bg: None,

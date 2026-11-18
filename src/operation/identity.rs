@@ -207,8 +207,6 @@ pub fn content(bytes: &[u8]) -> String {
 }
 
 pub fn executor_file(path: &std::path::Path) -> Result<String, super::Error> {
-    use std::io::Read as _;
-
     if !path.is_absolute() {
         return Err(super::Error::FileAccess);
     }
@@ -216,18 +214,27 @@ pub fn executor_file(path: &std::path::Path) -> Result<String, super::Error> {
     if !metadata.is_file() || metadata.file_type().is_symlink() {
         return Err(super::Error::FileAccess);
     }
+    let file = std::fs::File::open(path).map_err(|_| super::Error::FileAccess)?;
+    executor_open_file(&file)
+}
+
+/// Hash the already-open executable inode, rather than reopening a mutable name.
+pub fn executor_open_file(file: &std::fs::File) -> Result<String, super::Error> {
+    use std::io::Read as _;
+    use std::io::Seek as _;
+    let metadata = file.metadata().map_err(|_| super::Error::FileAccess)?;
+    if !metadata.is_file() || metadata.len() > MAXIMUM_EXECUTOR_BYTES as u64 {
+        return Err(super::Error::FileAccess);
+    }
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt as _;
-
         if metadata.permissions().mode() & EXECUTABLE_PERMISSION_MASK == 0 {
             return Err(super::Error::FileAccess);
         }
     }
-    if metadata.len() > u64::try_from(MAXIMUM_EXECUTOR_BYTES).map_err(|_| super::Error::FileAccess)? {
-        return Err(super::Error::FileAccess);
-    }
-    let mut file = std::fs::File::open(path).map_err(|_| super::Error::FileAccess)?;
+    let mut file = file;
+    file.seek(std::io::SeekFrom::Start(0)).map_err(|_| super::Error::FileAccess)?;
     let mut hasher = blake3::Hasher::new();
     hasher.update(EXECUTOR_DOMAIN.as_bytes());
     hasher.update(FRAME_SEPARATOR);

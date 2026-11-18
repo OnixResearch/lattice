@@ -222,9 +222,15 @@ async fn secret_derived_expression_output_is_redacted() {
     let target_id = workflow.add_shell_node(TARGET_LABEL, "placeholder");
     let target_stdin = workflow.graph.node(target_id).expect("target node").input_ports[HTTP_BODY_INPUT_INDEX].id;
     workflow.graph.add_edge(source_stdout, target_stdin).expect("connect nodes");
+    // Drain the wired stdin with shell builtins first: a command that exits before
+    // its input is written leaves the bounded runner a broken pipe after a normal
+    // exit, which it reports as a capture failure under load.
     workflow.set_node_config(
         target_id,
-        NodeConfig::shell(format!("printf 'token={}'", expression_for(source_id, source_stdout))),
+        NodeConfig::shell(format!(
+            "while read -r line; do :; done; printf 'token={}'",
+            expression_for(source_id, source_stdout)
+        )),
     );
     let cache = cache_for_node(
         &workflow,

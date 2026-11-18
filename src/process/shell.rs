@@ -32,7 +32,6 @@ pub fn run_bounded_clear_environment_with_cancellation(
     config: &super::core::RuntimeConfig,
     cancellation: Option<&std::sync::atomic::AtomicBool>,
 ) -> Result<crate::agent_node::ProcessOutput, crate::agent_node::ProcessError> {
-    debug_assert!(request.env.is_empty());
     run_bounded_with_environment(request, config, cancellation, bounded_exec::EnvironmentMode::Clear)
 }
 

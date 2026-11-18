@@ -42,16 +42,34 @@ fn build_worker(
     }
 }
 
-fn recover_existing(request: &super::Request, directory: &std::path::Path, identity: &str) -> Result<(), String> {
+// r[impl lattice.execution_binding.recovery]
+// r[impl lattice.execution_binding.recovery.scenario.lost_acknowledgement]
+pub(super) fn recover_existing(
+    request: &super::Request,
+    directory: &std::path::Path,
+    identity: &str,
+) -> Result<(), String> {
     if super::artifacts::read_bounded(&directory.join("intent.json"), identity.len())? != identity.as_bytes() {
         return Err("request differs from persisted execution intent".into());
     }
+    // Recovery reads retained evidence only; it never calls the compute port.
+    let admitted = super::binding::load(directory, request)?
+        .ok_or("execution intent exists without a persisted execution binding; outcome unknown")?;
+    if let Some(refusal) = super::binding::refusal(directory)? {
+        println!("{}", super::recovery::not_dispatched(directory, &admitted, &refusal)?);
+        return Ok(());
+    }
     let store_path = directory.join("candidate.redb");
     if !store_path.exists() {
-        return Err("execution intent exists without observed result; outcome unknown".into());
+        return Err(format!(
+            "execution intent exists without observed result; outcome unknown; execution binding {}",
+            admitted.binding_identity
+        ));
     }
+    debug_assert_eq!(admitted.attempt.attempt_id, request.envelope.attempt_id);
+    debug_assert_eq!(admitted.profile_revision, request.envelope.worker_profile);
     let store = crate::store::Store::new(&store_path).map_err(|error| error.to_string())?;
-    println!("{}", super::recovery::recover(&store, request, directory)?);
+    println!("{}", super::recovery::recover(&store, request, directory, &admitted.binding_identity)?);
     Ok(())
 }
 
@@ -61,6 +79,7 @@ struct WorkerStep {
     store: crate::store::Store,
     output_dir: std::path::PathBuf,
     is_unchanged_allowed: bool,
+    receipt: super::binding::usage::WorkerReceipt,
 }
 
 impl WorkerStep {
@@ -95,6 +114,7 @@ impl WorkerStep {
         }
         let keys: Vec<String> = reference.map(|value| value.key.clone()).into_iter().collect();
         let credentials = crate::credentials::EnvironmentCredentialProvider::from_current_env(&keys);
+        let started_epoch_ms = super::now_ms().ok();
         let result = crate::candidate_worker::omp::run(
             &self.worker,
             &self.profile,
@@ -103,7 +123,13 @@ impl WorkerStep {
             &credentials,
         )
         .map_err(|error| error.to_string())?;
+        let window = super::binding::usage::WorkerWindow {
+            started_epoch_ms,
+            finished_epoch_ms: super::now_ms().ok(),
+        };
         self.retain_events(&result)?;
+        // The attempt usage observation precedes the published attempt result.
+        self.receipt.persist(&self.store, window)?;
         let outcome =
             crate::candidate_worker::publish_outcome(&self.worker, &self.store, result.outcome, result.compatibility);
         let retained = crate::candidate_worker::AttemptResult::from_outcome(&outcome);
@@ -116,9 +142,10 @@ async fn execute(
     store: crate::store::Store,
     worker: crate::candidate_worker::Request,
     directory: &std::path::Path,
-    identity: String,
+    receipt: super::binding::usage::WorkerReceipt,
 ) -> Result<(), String> {
     let cancellation = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let identity = receipt.request_identity().to_owned();
     let signal_task = super::cancellation::watch(cancellation.clone(), directory.join("cancel.request"), identity);
     let execution = WorkerStep {
         worker,
@@ -126,6 +153,7 @@ async fn execute(
         profile: request.omp.clone(),
         output_dir: directory.to_path_buf(),
         is_unchanged_allowed: request.allow_unchanged,
+        receipt,
     };
     let observed = tokio::task::spawn_blocking(move || execution.observe(&cancellation)).await;
     // Always stop and join the watcher, including when the blocking task failed to join.
@@ -159,24 +187,34 @@ impl Context {
         })
     }
 
-    async fn run(self, is_run: bool) -> Result<(), String> {
+    async fn run(self, port: Option<&mut dyn crate::execution_binding::ComputeAllocationPort>) -> Result<(), String> {
         let intent = self.directory.join("intent.json");
-        if !is_run || intent.exists() {
+        let Some(port) = port.filter(|_| !intent.exists()) else {
             return recover_existing(&self.request, &self.directory, &self.identity);
-        }
+        };
         let worker = worker_request(&self.request)?;
+        let admitted = super::binding::admit_and_persist(&self.request, &self.directory, port)?;
         let store_path = self.directory.join("candidate.redb");
         let store = crate::store::Store::new(&store_path).map_err(|error| error.to_string())?;
         if !super::artifacts::write_once(&intent, self.identity.as_bytes())? {
             return Err("concurrent execution intent requires reconciliation".into());
         }
-        execute(&self.request, store, worker, &self.directory, self.identity).await?;
+        super::binding::revalidate(&self.directory, &admitted, port)?;
+        let binding_identity = admitted.binding_identity.clone();
+        let receipt = super::binding::usage::WorkerReceipt::new(admitted, self.identity);
+        execute(&self.request, store, worker, &self.directory, receipt).await?;
         let store = crate::store::Store::new(&store_path).map_err(|error| error.to_string())?;
-        println!("{}", super::recovery::recover(&store, &self.request, &self.directory)?);
+        println!("{}", super::recovery::recover(&store, &self.request, &self.directory, &binding_identity)?);
         Ok(())
     }
 }
 
-pub(super) async fn run(request_path: &std::path::Path, state: &std::path::Path, is_run: bool) -> Result<(), String> {
-    Context::load(request_path, state)?.run(is_run).await
+/// `None` reconciles retained evidence only; a port is used only to admit and
+/// revalidate before a first dispatch.
+pub(super) async fn run(
+    request_path: &std::path::Path,
+    state: &std::path::Path,
+    port: Option<&mut dyn crate::execution_binding::ComputeAllocationPort>,
+) -> Result<(), String> {
+    Context::load(request_path, state)?.run(port).await
 }

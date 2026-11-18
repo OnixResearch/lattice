@@ -513,3 +513,75 @@ fn every_guided_kind_rejects_invalid_or_cancelled_drafts_without_dirtying_prior_
         Some(Action::OpenAuthoring("all"))
     );
 }
+
+// r[verify lattice.graph_construction.origins]
+// r[verify lattice.graph_construction.origins.navigation]
+#[test]
+#[ignore = "requires exact captured native worker and immutable Nix-store runtime and shell selection"]
+fn source_origins_target_only_matching_displayed_source_bytes() {
+    let root = tempfile::tempdir().unwrap();
+    let mut app = app(&root);
+    let entry = "local-shell-construction.ncl";
+    let program = crate::authoring::CapturedProgram {
+        entry: entry.into(),
+        files: std::collections::BTreeMap::from([(
+            entry.into(),
+            include_bytes!("../../../examples/construction/local-shell-construction.ncl").to_vec(),
+        )]),
+        kind: crate::authoring::ProgramKind::Construction,
+        parameters: std::collections::BTreeMap::new(),
+    };
+    app.workflow = crate::authoring::shell::compile(&program).unwrap();
+    let admitted = serde_json::to_value(&app.workflow).unwrap();
+    let node = app.workflow.graph.nodes().find(|node| node.label.contains("left")).unwrap().id.0;
+    let origin = crate::authoring::construction::lowering::origin_for(&app.workflow, &format!("node/{node}")).unwrap();
+    let span = origin.location.unwrap();
+    let target = format!("source.file/{}:{}..{}", span.logical_module, span.start, span.end);
+    let field_id = format!("source.file/{}", span.logical_module);
+    assert_eq!(span.logical_module, entry);
+    select(&mut app, Some(node));
+    assert!(
+        app.authoring
+            .as_ref()
+            .unwrap()
+            .fields
+            .iter()
+            .find(|field| field.id == "source.origins")
+            .unwrap()
+            .value
+            .contains(&target)
+    );
+
+    let original = String::from_utf8(program.files[entry].clone()).unwrap();
+    let mut source_draft = crate::authoring::SourceDraft {
+        id: format!("tui-{}", blake3::hash(app.workflow.meta.name.as_bytes()).to_hex()),
+        workflow_name: app.workflow.meta.name.clone(),
+        expected_revision: app.workflow.catalog_revision.clone(),
+        program,
+        diagnostic: None,
+        preview: None,
+    };
+    for (displayed, matches_admitted) in [
+        (original.clone(), true),
+        (format!("# Pending draft shifts every admitted span\n{original}"), false),
+        (original, true),
+    ] {
+        source_draft.program.files.insert(entry.into(), displayed.as_bytes().to_vec());
+        app.store.as_ref().unwrap().save_source_draft(&source_draft).unwrap();
+        select(&mut app, Some(node));
+        let fields = &app.authoring.as_ref().unwrap().fields;
+        assert_eq!(fields.iter().find(|field| field.id == field_id).unwrap().value, displayed);
+        let summary = fields.iter().find(|field| field.id == "source.origins").unwrap().value.clone();
+        let instance = summary.split("instance=").nth(1).and_then(|rest| rest.split(' ').next()).unwrap();
+        assert!(instance.split('/').any(|part| part == "left"), "{summary}");
+        assert!(summary.contains("template=worker"), "{summary}");
+        assert_eq!(summary.contains(&target), matches_admitted, "{summary}");
+        edit(&mut app, "source.origins", "");
+        assert!(matches!(
+            app.output.get_display_line(app.output.display_line_count() - 1),
+            rat_streaming::streaming_output::DisplayLine::Text(text) if text == summary
+        ));
+        assert_eq!(serde_json::to_value(&app.workflow).unwrap(), admitted);
+    }
+    assert!(app.store.as_ref().unwrap().list_runs(10).unwrap().is_empty());
+}

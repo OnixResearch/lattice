@@ -72,6 +72,8 @@ fn completed_outputs(step_status: &NodeStatus) -> &HashMap<lattice::engine::work
 }
 
 // r[verify n8nclone.workflow_execution.subworkflows.invocation.outputs]
+// r[verify lattice.graph_construction.compatibility]
+// r[verify lattice.graph_construction.compatibility.legacy]
 #[tokio::test]
 async fn saved_child_executes_and_routes_declared_output_to_the_real_parent_port() {
     let temporary = tempfile::tempdir().expect("temporary store directory");
