@@ -1,0 +1,279 @@
+{
+  "schema": "lattice.pure_inet_profile.mneme_consumer_e2e.v1",
+  "recorded_at": "2026-11-19",
+  "kind": "executed_local_cross_repository_run",
+  "scope": "One real Lattice pure-inet result, produced by the 661499d2 release binary through `lattice pack lock` / `lattice pack run` with the pinned Noble worker, carrying a Mneme-computed `consumer_binding`, admitted and then refused by Mneme's `mneme_eval::inet::consumer` after each Mneme-owned binding is superseded separately.",
+  "criterion": {
+    "task": "3.5",
+    "requirement": "r[lattice.pure_inet_profile.ownership]",
+    "scenario": "r[lattice.pure_inet_profile.ownership.scenario.stale]",
+    "issue": "https://github.com/OnixResearch/lattice/issues/14"
+  },
+  "mneme": {
+    "repository": "https://github.com/OnixResearch/mneme",
+    "base_commit": "b9e564877141b1da30b3647268dd569a33d1673c",
+    "published_commit": "a01c953c889d75139ccfc86c5fb72278e4b03495",
+    "published_commit_note": "Mneme main after the run. Its crates/mneme-eval/src/inet/consumer tree hashes to the same tree_blake3 below with the same method, and its inet/mod.rs and crates/mneme-eval/Cargo.toml match the recorded build-input hashes, so the exercised consumer is the published one.",
+    "uncommitted_consumer": {
+      "tree": "crates/mneme-eval/src/inet/consumer",
+      "tree_blake3": "171f231c6192a66ce87f224ff9036f992ad1b9fdd383e851b2aad4f5480938ba",
+      "tree_blake3_method": "BLAKE3 of the `b3sum` listing (`<blake3>  ./<path>` lines) of every file under the tree, paths sorted with LC_ALL=C; measured before the build and again after admission, unchanged",
+      "files": {
+        "contract.rs": "d320246d974397d238965be6e490678ca2d654d8b7821418467f382058fe67a4",
+        "decision.rs": "208d428d8eeab7f4f9f187ccc13a687af6393f0a395527fa81e968a53f686c79",
+        "document.rs": "9bcabcac13defb5ffaef7ff85d4e708594cde880f89199d8d918a0b12f03b2dc",
+        "mod.rs": "96c9c1bd8a58f6c115b8ed6405ddea94001c35debdd57d7bafb54e4ff698546d",
+        "request.rs": "09ff011697bc9b854903926e8110a45932d5a585e0b75cc9fb1305dbf476ab16",
+        "tests.rs": "d1fad0580c58c1e4f5f3aa4b3d1457e3c26c4c28ec0bb8acbf8cb990d9704674",
+        "workspace.rs": "0bf3b1af35be285e59ad5a685032c3bcb7e2300ea61c409bdc36719c8aa713ef"
+      },
+      "other_uncommitted_build_inputs_blake3": {
+        "crates/mneme-eval/src/inet/mod.rs": "582f942c4528cdf9b10359c8d90127948a5b7cd44efad7c36be05469d0a8fdc5",
+        "crates/mneme-eval/Cargo.toml": "5f77b126a26291a4e9a71f0ea405aaa4d78d25ce4e74beff4f9fe1d9af4e7833",
+        "Cargo.toml": "91853d7d3eff7589fa382eb9d4a51270f3aa39dd10b8900cb208793024aa4832",
+        "Cargo.lock": "62f590e34214d77181bc7aeeff47c352ade6d34cf5eb8f241fac0eef25c1fcb9"
+      },
+      "mneme_core_revision": "9f17d7e59ff954dab7390c4db7f655f5e6fb011d"
+    },
+    "driver": {
+      "description": "Scratch crate outside both repositories depending on `crates/mneme-eval` by path; built with rustc 1.99.1 from Mneme's own dev shell (`nix develop git+file://…?rev=b9e5648…`) and Mneme's Cargo.lock (no version changes).",
+      "source_blake3": "6d971be9947133e8d52822d2eaaf770f8bee579f42a66be4b273ad7394080c55",
+      "manifest_blake3": "a720e10c763930ba00c3033cd62aabb50761384ae429121acde503cfce94275e",
+      "workspace_setup": "Workspace::create with a FixedClock; an entity and a source in project:cedar, a source in project:birch, a source in project:elm (4 records). Authorization: principal `e2e-agent` over {project:cedar, project:elm}.",
+      "api": [
+        "workspace::prepare",
+        "request::BindingRecord::lattice_arguments",
+        "request::BindingRecord::from_json",
+        "workspace::admit_current",
+        "workspace::admit_against",
+        "workspace::current_bindings"
+      ]
+    }
+  },
+  "lattice": {
+    "revision": "661499d282c2e79ebefbd0f9b35beb5f8d7795cd",
+    "executable": {
+      "path_role": "release `lattice` built from a clean 661499d2 checkout (its cargo dep-info names that checkout)",
+      "version_output": "lattice 0.1.0",
+      "blake3": "5fae6d9178e244e5277ad7bafa61597f10d54c14f9a07dd3617742385b29d9b7",
+      "bytes": 86986608
+    },
+    "authoring": {
+      "description": "Documented library steps `lattice::inet::route::pack::author` and `lattice::inet::route::instance` called from a scratch crate depending on the same 661499d2 source by path (Cargo.lock copied from Lattice; differences are only removed dev/optional/workspace-member packages).",
+      "source_blake3": "a41627ef16065c8fd131e26755443f332c1b98ae817701a5ae102743720c360d",
+      "manifest_blake3": "7e5c22aa6e857f1f6e9d8c2cb8a222958017111f9dd04bd7354fac59269d59ae"
+    },
+    "profile": {
+      "operation_type": "lattice.pure-inet-i64",
+      "type_revision": "b3:d0e29605eb0494bf5b909c7e98cf6a4095f5e41517171b6f4d3fba42e66eddfe",
+      "profile_identity": "b3:d0e29605eb0494bf5b909c7e98cf6a4095f5e41517171b6f4d3fba42e66eddfe",
+      "output_contract_identity": "b3:17c15c8f19450fe08eaba2b93a3dd17de156d4cd7c4ffa9aaee930576f3f765d"
+    },
+    "pack": {
+      "pack_id": "lattice.pure-inet-i64",
+      "pack_identity": "b3:d2aa68fe6667d004abe8adab51c763fd3d93d26058316c84c36426824d6ed043",
+      "lock_identity": "b3:456445dac73a72dffc5a73a8a97c12759905164fad19a5897158f940d40bead0",
+      "manifest_identity": "b3:a012eedaa0e9f7528c742c5b294547b9ba440ec1e73187c20f85d8f31ff63b72",
+      "runtime_identity": "b3:26d3475db7acd8f5851415f5c00aca9431556211723304408e473710e77b001c",
+      "catalog_content_identity": "b3:5332b81e7c2fe0f7745f5f56b8d4f7fa0b8117d510d4b0be5fce0618b0455883",
+      "executable_content_identity": "b3:2841e776321e2bad08a9ba66d97d2cf8fecd65817ad0cb5fde9f72496a533618",
+      "operation_executor_identity": "b3:0fde6b12633ed74ab93e3e8352a9d84e2abdf2c8f3044b05a0480bd136840c4d"
+    }
+  },
+  "noble": {
+    "repository": "https://github.com/OnixResearch/noble-lang",
+    "source_revision": "2677ec88ddb1600d42bbea8d14409c45e39edc95",
+    "build": "nix build --builders '' --option min-free 0 --no-link --print-out-paths --inputs-from 'git+file:///home/brittonr/git/OnixResearch/lattice?rev=661499d282c2e79ebefbd0f9b35beb5f8d7795cd' noble-lang#noble",
+    "store_path": "/nix/store/q09l62psd4i2hmb85qishpkl0r6rykv0-noble-0.0.0",
+    "executable_blake3": "2841e776321e2bad08a9ba66d97d2cf8fecd65817ad0cb5fde9f72496a533618",
+    "executable_bytes": 31801936,
+    "matches_selected_worker_qualification": true,
+    "reported_producer_revision": "2677ec88ddb1600d42bbea8d14409c45e39edc95",
+    "net_contract": "ngraph-net-i64/3",
+    "rule_table": "noble-net-i64-rules/3"
+  },
+  "commands": [
+    {
+      "step": "prepare",
+      "command": "mneme-side prepare RUN",
+      "result": "workspace of 4 records; features x=3, y=2; wrote artifacts/score.ngraph, artifacts/score.vectors, arguments.json, binding-record.json"
+    },
+    {
+      "step": "author",
+      "command": "lattice-author author RUN/pack $LATTICE_NOBLE_BIN && lattice-author instance RUN/pack RUN/artifacts RUN/instances.ncl"
+    },
+    {
+      "step": "lock",
+      "command": "HOME=SCRATCH/home LATTICE_DATA_DIR=RUN/data LATTICE_NOBLE_BIN=/nix/store/q09l62psd4i2hmb85qishpkl0r6rykv0-noble-0.0.0/bin/noble lattice pack lock --pack RUN/pack --confirm-trust-local --allow-license AGPL-3.0-or-later --allow-license LicenseRef-noble-lang-undeclared --destination RUN/pack.lock.json --confirm-create",
+      "exit": 0
+    },
+    {
+      "step": "run",
+      "command": "(same environment) lattice pack run --pack RUN/pack --confirm-trust-local --allow-license AGPL-3.0-or-later --allow-license LicenseRef-noble-lang-undeclared --lock RUN/pack.lock.json --instances RUN/instances.ncl --instance pure-inet-artifacts --method evaluate --arguments-json \"$(cat RUN/arguments.json)\" --confirm-read-only",
+      "exit": 0,
+      "report": {
+        "invocation_identity": "b3:f54b0016dff044ca3caf9d0f73e8a347d1cced998f5fc7f83b37a76eb72818e1",
+        "run_id": 0,
+        "operation_state": "completed",
+        "status": "completed",
+        "operation_data_version": "b3:fa1c91650c3bcc56c7e66fed6e9c347878c8ea2135f7be614f1c940e27623f38"
+      }
+    },
+    {
+      "step": "retrieve",
+      "command": "lattice-author read RUN/data b3:fa1c9165…3f38 RUN/result.json",
+      "description": "operation_data::Plane::open(store_path(data), data) + load_metadata + read_payload, as Lattice's own worker fixture reads published results; written create-only. Byte-identical to the stored payload file.",
+      "record_outcome": "completed",
+      "record_identity": "b3:c5af67d9db85f2110a55392fd0c276cef8a650e74dd49f8d9ad0da60612ad496",
+      "payload_content_identity": "b3:df1d42ef53d9847c98804e04b03311b4695275f841ded8ffe14ab4f091334863"
+    },
+    {
+      "step": "admit",
+      "command": "mneme-side admit RUN RUN/result.json",
+      "exit": 0,
+      "result": "10 of 10 outcomes matched their expectations"
+    }
+  ],
+  "artifacts": {
+    "program": {
+      "file": "score.ngraph",
+      "blake3": "7b69046e1f63ba522af418ad3589134e7ba469691d120cdc0d2088c29efbfb02",
+      "bytes": 272,
+      "note": "contract::SCORE_PROGRAM, 7*x + 3*y"
+    },
+    "inputs": {
+      "file": "score.vectors",
+      "blake3": "40c44dfb90fea36dfdcd4684eb8689c0a7b15abcf3222644e2cd72d8815dcdc3",
+      "bytes": 43,
+      "content": "noble-ngraph-vectors/0\\ntypes i64 i64\\nv 3 2\\n"
+    },
+    "arguments_json_blake3": "201930dd4d5f59e7d454b592b275438fe68ed90d3028e1ad6eb5300ff3d836f3",
+    "binding_record_json_blake3": "9a615e2204e2c6b7fce38897a2ab879d872b32b9693b702733273507772d682b",
+    "instances_ncl_blake3": "f6d0d8578b41ed79a8290ac8482f3b32b680be37dff0ddf77d73142554103365",
+    "pack_lock_json_blake3": "deb5a81e8650b1981beffed8a535f3090f25cd6598674a3f1d5f346aba536230"
+  },
+  "consumer_binding": "320907a02a727ad43e83c807e141dbd3d8e4a485bb5db039fa3836eba74aaf24",
+  "bound_state": {
+    "snapshot": {
+      "workspace": "e26e67982ac2144f78e1d398c5aa98df",
+      "revision": "37e814327510358cdcb4a43e770b8e84"
+    },
+    "schema": {
+      "features": "mneme.inet-snapshot-features/1",
+      "result": "lattice.pure-inet-result.v1"
+    },
+    "authorization": {
+      "principal": "e2e-agent",
+      "scopes": ["project:cedar", "project:elm"]
+    },
+    "erasure": {
+      "eligibility_generation": 1
+    }
+  },
+  "result_document": {
+    "schema": "lattice.pure-inet-result.v1",
+    "blake3": "53b66de2867f1b87e79491b9d2bdd6225f4d15fdea16c81e9fd880afec559a7d",
+    "bytes": 2566,
+    "evaluation": "complete",
+    "authoritative": true,
+    "result": "27",
+    "binding": {
+      "attempt": "attempt-1",
+      "computation": "b3:997034a69052626735c859d342c2ad29a7b010d82680294aa1737d110376b98f",
+      "consumer_binding": "320907a02a727ad43e83c807e141dbd3d8e4a485bb5db039fa3836eba74aaf24",
+      "executable_identity": "b3:0fde6b12633ed74ab93e3e8352a9d84e2abdf2c8f3044b05a0480bd136840c4d",
+      "graph_identity": "339a5e95fad9bfd32454d9a4e10af67a8ec7486caacdbbee5cac50e152c81ca4",
+      "inputs_identity": "40c44dfb90fea36dfdcd4684eb8689c0a7b15abcf3222644e2cd72d8815dcdc3",
+      "invocation": "b3:f54b0016dff044ca3caf9d0f73e8a347d1cced998f5fc7f83b37a76eb72818e1",
+      "net_contract": "ngraph-net-i64/3",
+      "output_contract_identity": "b3:17c15c8f19450fe08eaba2b93a3dd17de156d4cd7c4ffa9aaee930576f3f765d",
+      "producer_revision": "2677ec88ddb1600d42bbea8d14409c45e39edc95",
+      "profile_identity": "b3:d0e29605eb0494bf5b909c7e98cf6a4095f5e41517171b6f4d3fba42e66eddfe",
+      "program_identity": "7b69046e1f63ba522af418ad3589134e7ba469691d120cdc0d2088c29efbfb02",
+      "rule_table": "noble-net-i64-rules/3"
+    },
+    "counters": {
+      "interactions": "6",
+      "expected_interactions": "6",
+      "peak_live_agents": "7",
+      "retained_bytes_estimate": "665",
+      "retained_bytes_high_water": "1742"
+    },
+    "semantic_interactions_assurance": "observed"
+  },
+  "independent_score": {
+    "features": {"x": 3, "y": 2},
+    "i128_7x_plus_3y": "27",
+    "mneme_score_oracle": "27",
+    "admitted_score": "27"
+  },
+  "admission": {
+    "method": "Each scenario opens a fresh `cp -a` copy of the prepared workspace, so every binding is superseded separately; the binding record is reloaded from binding-record.json and the document is the exact retrieved bytes.",
+    "outcomes": [
+      {
+        "scenario": "baseline",
+        "change": "none",
+        "outcome": {"admitted": {"score": "27", "consumer_binding": "320907a02a727ad43e83c807e141dbd3d8e4a485bb5db039fa3836eba74aaf24"}}
+      },
+      {
+        "scenario": "new-commit",
+        "change": "a later source committed in project:cedar; revision 37e81432… -> c0467fc6b15fdcfef31ee07c6480bb30",
+        "outcome": {"refused": {"superseded": ["snapshot"]}}
+      },
+      {
+        "scenario": "schema-successor",
+        "change": "admit_against with features mneme.inet-snapshot-features/2",
+        "outcome": {"refused": {"superseded": ["schema"]}}
+      },
+      {
+        "scenario": "narrowed-scope",
+        "change": "scopes {project:cedar, project:elm} -> {project:cedar}",
+        "outcome": {"refused": {"superseded": ["authorization"]}}
+      },
+      {
+        "scenario": "widened-scope",
+        "change": "scopes -> {project:birch, project:cedar, project:elm}",
+        "outcome": {"refused": {"superseded": ["authorization"]}}
+      },
+      {
+        "scenario": "changed-principal",
+        "change": "same scopes under principal another-agent",
+        "outcome": {"refused": {"superseded": ["authorization"]}}
+      },
+      {
+        "scenario": "erasure-barrier",
+        "change": "advance_eligibility_barrier; eligibility generation 1 -> 2",
+        "outcome": {"refused": {"superseded": ["erasure"]}}
+      },
+      {
+        "scenario": "retention-forget",
+        "change": "mneme_retention Forget of the authorized project:cedar source; revision -> 3bfdbfb1bed9106b8e25bb7e8aac4290, eligibility generation 1 -> 2",
+        "outcome": {"refused": {"superseded": ["snapshot", "erasure"]}}
+      },
+      {
+        "scenario": "tampered-document",
+        "change": "one byte of the document changed (offset 1351, result '27' -> '28'; tampered BLAKE3 3caf7998abb23dd8dd69caec4041e4e97735645827302e31d0f30b067256821a), unchanged state",
+        "outcome": {"refused": "incorrect-result"}
+      },
+      {
+        "scenario": "tampered-document-stale-state",
+        "change": "the same one-byte tamper checked against the erasure-superseded state",
+        "outcome": {"refused": "incorrect-result"},
+        "note": "integrity is decided before supersession, so a corrupted document is never reported as merely stale"
+      }
+    ],
+    "all_match_expected": true
+  },
+  "observations": [
+    "`lattice operation-data show <version>` on the same data directory exits 1 with `operation data store is not initialized`: the operation-data CLI opens its payload root at `<data_dir>/operation-data`, while `pack run` publishes under `<data_dir>/payloads` (src/operation_data/cli.rs:71 versus src/operation_pack/shell/execution.rs:121 at 661499d2). The document was therefore read through the library plane API, as Lattice's worker fixture does. This is a CLI retrieval gap, not a route or admission failure."
+  ],
+  "non_claims": [
+    "One sequential local run of one computation with one attempt; no repetition, concurrency, multicore or device evaluation.",
+    "No live Mneme service, API session or product path: the check ran in a scratch driver over a scratch workspace; recall, ranking and memory operations still never call it.",
+    "Admission is point-in-time: each decision holds only for the state read at that call; a barrier landing after admission is caught by the next admission, not retroactively.",
+    "The Mneme consumer is uncommitted on top of b9e5648 and is identified only by the tree hash above.",
+    "Mneme does not check the producer's graph identity, counters or interaction count; the one-byte tamper is detected because the result disagrees with Mneme's oracle, not by a document hash.",
+    "Lattice's projection generation is not a Mneme binding; only snapshot, schema, authorization and erasure are covered.",
+    "No proof was replayed and no production deployment or default adoption is claimed."
+  ]
+}
