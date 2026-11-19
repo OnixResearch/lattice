@@ -400,7 +400,7 @@ fn command_credential_timeout_fails_without_output_or_secret_leakage() {
 #[test]
 fn truncated_credential_output_is_rejected_before_secret_parsing() {
     let script = format!(
-        "printf '{{\"value\":\"must-not-be-returned\"}}'; {}",
+        "cat >/dev/null; printf '{{\"value\":\"must-not-be-returned\"}}'; {}",
         repeated_output_script("", OVERFLOW_OUTPUT_BYTES)
     );
     let mut config = CommandCredentialProviderConfig::new(SHELL);

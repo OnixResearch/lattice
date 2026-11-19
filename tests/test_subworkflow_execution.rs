@@ -79,7 +79,7 @@ async fn saved_child_executes_and_routes_declared_output_to_the_real_parent_port
     let temporary = tempfile::tempdir().expect("temporary store directory");
     let store = Arc::new(Store::new(temporary.path().join("lattice.redb")).expect("open store"));
     let mut child = Workflow::new(CHILD_WORKFLOW, lattice::engine::workflow::WorkflowTimestamp::epoch());
-    child.add_shell_node("Child result", format!("printf {CHILD_RESULT}"));
+    child.add_shell_node("Child result", format!("cat > /dev/null; printf {CHILD_RESULT}"));
     store.save_workflow(&child).expect("save child workflow");
 
     let (parent, subworkflow_node_id) = parent_workflow(CHILD_OUTPUT);
@@ -239,7 +239,7 @@ async fn missing_runner_missing_child_output_and_correlation_drift_fail_without_
     let temporary = tempfile::tempdir().expect("temporary store directory");
     let store = Arc::new(Store::new(temporary.path().join("lattice.redb")).expect("open store"));
     let mut child = Workflow::new(CHILD_WORKFLOW, lattice::engine::workflow::WorkflowTimestamp::epoch());
-    child.add_shell_node("Child result", format!("printf {CHILD_RESULT}"));
+    child.add_shell_node("Child result", format!("cat > /dev/null; printf {CHILD_RESULT}"));
     store.save_workflow(&child).expect("save child workflow");
     let (missing_output_parent, _) = parent_workflow("missing-output");
     let mut missing_output =
