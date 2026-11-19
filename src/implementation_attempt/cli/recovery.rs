@@ -22,9 +22,17 @@ pub(super) fn recover(
     let unchanged = load_unchanged(request, directory)?;
     debug_assert!(result.validate().is_ok(), "reconciled results are validated on load");
     debug_assert_eq!(result.stdout_blake3.len(), 64);
+    // Retained request evidence is reported read-only; no serving port is called.
+    // r[impl lattice.serving_binding.usage.scenario.dedup]
+    let admitted = super::binding::load(directory, request)?.ok_or("retained result has no execution binding")?;
+    let model_requests = super::binding::requests::coverage(&admitted, directory)?;
     let mut projected = project(request, directory, &result, unchanged.as_ref());
     if let Some(fields) = projected.as_object_mut() {
         fields.insert("execution_binding".to_owned(), serde_json::Value::from(binding_identity));
+        fields.insert(
+            "model_requests".to_owned(),
+            serde_json::to_value(&model_requests).map_err(|error| error.to_string())?,
+        );
     }
     Ok(projected)
 }

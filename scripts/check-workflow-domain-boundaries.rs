@@ -27,6 +27,8 @@ const CORE_SCOPES: &[&str] = &[
     "src/replay.rs",
     "src/run/history.rs",
     "src/store",
+    "src/workflow/decision.rs",
+    "src/workflow/decision",
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]

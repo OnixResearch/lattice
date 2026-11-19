@@ -129,6 +129,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "animus-frozen-policy"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "animus-router"
 version = "0.1.0"
 dependencies = [
@@ -2614,6 +2623,7 @@ name = "lattice"
 version = "0.1.0"
 dependencies = [
  "animus-adapters",
+ "animus-frozen-policy",
  "animus-runtime",
  "animus-std-secretspec",
  "animus-steel",

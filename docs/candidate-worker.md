@@ -282,15 +282,17 @@ expected producer owner generation; that generation is not Lattice's `fence`.
 
 A private one-shot execution intent is fsynced before the worker starts. The
 admitted execution binding is fsynced once to `execution-binding.json` before
-that intent. The standalone CLI's compute port is always unavailable, so a
-provider-allocation request stops before the binding, intent or worker; an
-embedding host supplies a read-only port through
-`run_command_with_compute_port`. After the intent and immediately before spawn,
+that intent. The standalone CLI's compute and serving-owner ports are always
+unavailable, so a provider-allocation request stops before the binding, intent
+or worker, and a request on a served model route is refused before upstream
+contact. An embedding host supplies read-only ports through
+`run_command_with_ports`. After the intent and immediately before spawn,
 a provider binding is re-observed and revalidated; a refusal is written once to
 `binding-revalidation.json`, the worker never starts, and recovery reports
 `not_dispatched_binding_rejected`. The `Scope::Attempt` usage observation with
-frozen binding provenance is stored before the attempt result. See
-[worker compute binding](worker-compute-binding.md).
+frozen binding provenance and per-request serving coverage is stored before the
+attempt result. See [worker compute binding](worker-compute-binding.md) and
+[worker serving binding](worker-serving-binding.md).
 
 Re-entry with the exact request only reconciles retained results and reports the
 persisted binding identity; it never calls the compute port, rebinds or

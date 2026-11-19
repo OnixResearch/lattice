@@ -1,0 +1,30 @@
+{
+  "adoption": {
+    "max_fallback_per_mille": 0,
+    "min_gain_over_baseline_per_mille": 100,
+    "requires_random_parity": true
+  },
+  "artifact_identity": "b3:4a2c69d0ee7b5f67c14e553892a2038ea6cf82d39fe29ebbd75602b5abc1d595",
+  "baseline": "model:scripted:explore-only",
+  "non_claims": [
+    "the decision covers only the synthetic evaluator's three tasks",
+    "a fixture artifact's result does not measure learning or a trained model",
+    "scores and ranks are neither task success nor authorization",
+    "production rollout stays conditional on a trained artifact and the consumer pilot"
+  ],
+  "primary_outcome": "found",
+  "random_seeds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+  ],
+  "references": [
+    "model:scripted:signal-greedy"
+  ],
+  "schema": "animus.campaign-manager-local-scorer-eval.v1"
+}

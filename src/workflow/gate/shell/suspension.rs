@@ -12,6 +12,7 @@ pub enum Error {
     CheckpointInvalid,
     RunMissing,
     AuthorityUnavailable,
+    PolicyDecisionStale(crate::workflow::decision::ledger::ReplayRefusal),
     ActiveRequestChanged,
 }
 
@@ -27,6 +28,9 @@ impl std::fmt::Display for Error {
             Self::CheckpointInvalid => formatter.write_str("approval checkpoint is invalid"),
             Self::RunMissing => formatter.write_str("approval run history is missing"),
             Self::AuthorityUnavailable => formatter.write_str("approval resume authority is unavailable"),
+            Self::PolicyDecisionStale(refusal) => {
+                write!(formatter, "approval resume refused: stale typed policy decision: {refusal}")
+            }
             Self::ActiveRequestChanged => formatter.write_str("active workflow approval request changed"),
         }
     }
@@ -61,6 +65,8 @@ pub struct SuspensionCommitInput<'a> {
     pub observed_epoch_millis: i64,
     pub results: &'a [crate::engine::executor::StepResult],
     pub suspension: crate::engine::executor::ApprovalSuspensionPoint,
+    /// Typed policy decisions made before the suspension (Lattice #23).
+    pub policy_decisions: Vec<crate::workflow::decision::ledger::NodeRecord>,
 }
 
 // r[impl lattice.workflow_approval.suspension]
@@ -122,7 +128,9 @@ pub fn persist_suspension(
         cache_hits,
         failures: explicit_failures,
     };
-    let details = crate::run::history::detail_record_from_results(input.run_id, input.workflow, input.results);
+    let mut details = crate::run::history::detail_record_from_results(input.run_id, input.workflow, input.results);
+    // r[impl lattice.typed_policy.record]
+    crate::workflow::decision::ledger::attach_suspended(&mut details, input.policy_decisions);
     let replay_events = crate::replay::replay_events_from_results(
         input.run_id,
         input.workflow,

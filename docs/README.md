@@ -52,6 +52,9 @@ maintained topic documents by the question they answer.
   input projection.
 - [Secretspec credentials](secretspec-credentials.md): credential references and
   provider delivery.
+- [Typed policy operations](typed-policy-operations.md): the optional frozen
+  fast policy on one declared Condition branch, its validation, fallback, durable
+  decision records, replay and measured no-claim comparison.
 
 ## Operations, contracts, and integration
 

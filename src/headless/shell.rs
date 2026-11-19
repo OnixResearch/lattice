@@ -16,6 +16,14 @@ pub(super) struct ProductRunRequest<'a> {
     pub authority_provider: &'a dyn crate::engine::effect::execution::RunContextProvider,
 }
 
+/// A saved-workflow run whose bound Condition nodes use typed policy profiles.
+pub struct TypedPolicyRunRequest<'a> {
+    pub store: &'a crate::store::Store,
+    pub workflow_name: &'a str,
+    pub run_id: crate::engine::executor::RunId,
+    pub authority_provider: &'a dyn crate::engine::effect::execution::RunContextProvider,
+}
+
 pub async fn run_saved_workflow_with_app_config(
     store: &crate::store::Store,
     workflow_name: &str,
@@ -164,6 +172,7 @@ pub(super) async fn run_workflow_snapshot_with_executor_factory(
                 observed_epoch_millis: super::run_finished_epoch_ms(),
                 results: &outcome.results,
                 suspension,
+                policy_decisions: executor.take_policy_decisions(),
             })
             .map_err(|error| super::HeadlessRunError::Store(error.to_string()))?;
         return Ok(SnapshotRunOutcome {
@@ -175,12 +184,14 @@ pub(super) async fn run_workflow_snapshot_with_executor_factory(
     let summary = super::summarize_run(run_id, &workflow, &results);
     let finished_epoch_ms = super::run_finished_epoch_ms();
     let record = run_record_from_summary_with_owner(&summary, started_epoch_ms, Some(finished_epoch_ms), owner);
-    let details = crate::run::history::detail_record_from_results_with_completion_order(
+    let mut details = crate::run::history::detail_record_from_results_with_completion_order(
         run_id,
         &workflow,
         &results,
         observed_completion_order,
     );
+    // r[impl lattice.typed_policy.record]
+    crate::workflow::decision::ledger::attach(&mut details, executor.take_policy_decisions());
     debug_assert_eq!(details.run_id, run_id);
     debug_assert_eq!(details.nodes.len(), results.len());
     store.save_run(&record)?;

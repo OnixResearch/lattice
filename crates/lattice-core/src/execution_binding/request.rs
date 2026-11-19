@@ -54,6 +54,10 @@ pub struct Declaration {
     pub schema: String,
     pub compute: ComputeDeclaration,
     pub model_routes: RouteDeclaration,
+    /// Optional serving-owner binding of named routes; absent keeps the
+    /// binding's prior identity and leaves request usage unknown.
+    #[serde(default = "super::serving::absent", skip_serializing_if = "Option::is_none")]
+    pub serving: Option<super::serving::Declaration>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

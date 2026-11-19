@@ -133,6 +133,8 @@ mod roi;
 /// Transition shim for the dedicated `animus-router` crate.
 pub mod router;
 mod safe;
+/// Pure serving-readiness, request-admission, and invocation-receipt contracts.
+pub mod serving;
 /// Authority-free credential-resolution admission contracts.
 pub mod secret_resolution {
     pub use super::credentials::*;

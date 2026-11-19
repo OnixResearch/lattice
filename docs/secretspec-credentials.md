@@ -13,7 +13,7 @@ Animus archived `add-secretspec-sops-host-resolution` in commit
 cover paired environment, systemd credential, guarded SOPS, bounded-worker,
 redaction, and feature-isolation fixtures. This archive is an ancestor of the
 immutable `origin/main` revision
-`51d2683776ab73d4fd36d3d9e6ced2beadf9793d` inspected for this adapter.
+`1c370d5029a2667051c46bdfa1919e78e65e2f4b` inspected for this adapter.
 Lattice imports this exact revision through the repository-owned script. The
 generated `vendor-cargo-deps/animus/source.ncl` records its reviewed archive
 BLAKE3 identity, tar format and `0000` umask, exact dependency revisions,
@@ -37,7 +37,7 @@ The optional host itself is AGPL-3.0-or-later. These dependencies must not be
 added to pure `no_std` cores or enabled implicitly for an unconfigured provider.
 
 The reviewed Animus archive BLAKE3 is
-`5f59a2b900095aec757bad5b5542d844e92eac2a0bd818e110d70927611ddb46`,
+`ff16f0903348db1d5164d055b928d2f1f829ca1dffb6f1624e6d26779b11f2ab`,
 computed with `git -c tar.umask=0000 archive --format=tar` at the revision above.
 When changing that revision, review and update its archive identity together.
 The integrated lock uses `proc-macro-crate 2.0.0` within Bolero's `^2`

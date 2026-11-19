@@ -45,6 +45,9 @@ pub enum Rejection {
     UnsupportedDeclaration {
         defect: super::request::DeclarationDefect,
     },
+    UnsupportedServing {
+        defect: super::serving::Defect,
+    },
     RequirementMismatch,
     AllocationNotFound,
     CrossedAttempt,
@@ -128,6 +131,10 @@ fn admit_checked(
     super::request::validate_requirement(requirement).map_err(unsupported)?;
     validate_attempt(attempt).map_err(unsupported)?;
     check_routes(&declaration.model_routes, &requirement.model)?;
+    if let Some(serving) = &declaration.serving {
+        super::serving::validate(serving, &declaration.model_routes)
+            .map_err(|defect| Stop::Rejected(Rejection::UnsupportedServing { defect }))?;
+    }
     let compute = admit_compute(&declaration.compute, &requirement.compute, attempt, reading)?;
     let mut admitted = bound::Admitted {
         schema: bound::ADMITTED_SCHEMA.to_owned(),
@@ -141,6 +148,7 @@ fn admit_checked(
         },
         compute,
         model_routes: declaration.model_routes.clone(),
+        serving: declaration.serving.clone(),
     };
     let identity_defect = super::request::DeclarationDefect::Token {
         field: "binding_identity",

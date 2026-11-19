@@ -88,6 +88,7 @@ fn fixture() -> Fixture {
         worker_compute: lattice_core::execution_binding::request::ComputeRequirement::HostLocal {},
         execution_binding: lattice_core::execution_binding::request::Declaration {
             schema: lattice_core::execution_binding::request::DECLARATION_SCHEMA.into(),
+            serving: None,
             compute: lattice_core::execution_binding::request::ComputeDeclaration::HostLocal {},
             model_routes: lattice_core::execution_binding::request::RouteDeclaration::NoModel {},
         },

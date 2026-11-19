@@ -6,7 +6,7 @@
 //! [`UnavailableComputePort`], so a request that needs a provider allocation
 //! fails closed before effects. An embedding host (for example a Kiln #49 host
 //! composition or an Aspen client) supplies a real adapter through
-//! `implementation_attempt::cli::run_command_with_compute_port`. Lattice adds no
+//! `implementation_attempt::cli::run_command_with_ports`. Lattice adds no
 //! Aspen crate, Preserves codec or sibling-path dependency for this boundary.
 
 // r[impl lattice.execution_binding.port_boundary]
@@ -14,6 +14,7 @@
 
 pub mod format;
 mod port;
+pub mod serving;
 
 /// The pure decision core, re-exported from `lattice-core`.
 pub mod core {

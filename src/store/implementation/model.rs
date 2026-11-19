@@ -55,6 +55,9 @@ pub struct RunNodeDetail {
     pub cached: bool,
     pub outputs: Vec<RunOutputDetail>,
     pub error: Option<String>,
+    /// The typed policy decision of a bound Condition node; never serialized when absent.
+    #[serde(default = "no_policy_decision", skip_serializing_if = "Option::is_none")]
+    pub policy_decision: Option<crate::workflow::decision::ledger::Record>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -69,6 +72,10 @@ pub struct RunDetailRecord {
 
 fn empty_observed_completion_order() -> Vec<crate::engine::workflow::NodeId> {
     Vec::new()
+}
+
+const fn no_policy_decision() -> Option<crate::workflow::decision::ledger::Record> {
+    None
 }
 
 pub struct WorkflowApprovalAdvance<'a> {

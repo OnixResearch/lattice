@@ -1,4 +1,5 @@
 mod core;
+pub mod frozen;
 mod shell;
 
 pub use core::ANIMUS_RUNTIME_MAX_TURNS;

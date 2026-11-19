@@ -52,6 +52,9 @@ pub struct ExecutionBindingInput<'a> {
     pub allocation: Option<&'a AllocationInput<'a>>,
     /// `None` is a no-model worker.
     pub routes: Option<&'a [RouteInput<'a>]>,
+    /// Canonical serving declaration; `None` frames nothing, so bindings
+    /// without one keep their identity.
+    pub serving: Option<&'a str>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -125,6 +128,9 @@ pub fn execution_binding(input: ExecutionBindingInput<'_>) -> Result<String, con
             debug_assert_eq!(items.len(), framed.len());
             hasher.update_tagged_str(b"model-kind", "routes")?.update_ordered_strs(b"model-routes", &items)?;
         }
+    }
+    if let Some(serving) = input.serving {
+        hasher.update_tagged_str(b"serving-declaration", serving)?;
     }
     Ok(format!("{BLAKE3_REFERENCE_PREFIX}{}", hasher.finish().to_hex()))
 }

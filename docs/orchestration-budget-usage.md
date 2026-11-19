@@ -117,33 +117,63 @@ deadline limits are execution controls, separate from these accounting facts.
 
 ## Worker and inference qualification prerequisites
 
-**Qualified measured command-worker support is not established.** The current
-command adapter does not supply a qualified worker telemetry protocol; existing
-direct OpenAI-compatible metadata has model labels but lacks exact service,
-request, worker-incarnation, attempt/fence, allocation/placement and pricing
-bindings. [Execution bindings #24](https://github.com/OnixResearch/lattice/issues/24)
-must supply admitted identities and compatibility before they can be consumed
-here. No self-declared profile/service field establishes qualification, and no
-new producer schema is invented by this accounting boundary.
+**Orchestration command workers remain reservation-only.** The command adapter
+does not supply a qualified worker telemetry protocol; existing direct
+OpenAI-compatible metadata has model labels but lacks exact service, request,
+worker-incarnation, attempt/fence, allocation/placement and pricing bindings. No
+self-declared profile/service field establishes qualification, and no new
+producer schema is invented by this accounting boundary.
 
-### Current producer source boundary
+**Serving-bound measured usage exists only for implementation attempts.** An
+implementation attempt whose execution binding declares served model routes
+runs Animus's pure serving gate per request in its attempt-local model broker
+and records per-request provider-reported counters with exact worker, binding,
+service, deployment and request provenance in its `Scope::Attempt` usage
+observation. Unknown usage is counted, never zero-filled, and shared
+deployments are referenced, never charged per worker. See
+[worker serving binding](worker-serving-binding.md) for the contract and
+[worker compute binding](worker-compute-binding.md) for the compute half.
 
-The current [Aspen #42](https://github.com/brittonr/aspen/issues/42) and
-[Animus #17](https://github.com/OnixResearch/animus/issues/17) contracts are still
-proposals, not implemented compute-reservation or serving-readiness APIs in the
-inspected producer sources:
+| Mode | Reserved | Measured | Model usage |
+|---|---|---|---|
+| Reservation-only (Agent nodes; attempts without a serving declaration) | conservative configured charges | host duration when both endpoints are observed | `unknown` |
+| Serving-bound (attempts with served routes) | declared per-request token envelopes, labelled `reserved_tokens` | host duration when observed | provider-reported per-request counters plus an explicit unknown remainder |
 
-- Aspen local source `1e9c36edc437fdf4118120776d94f71570190511` retains
-  `molten-core::fabric_membership` CPU/memory/storage placement and assignment
-  contracts. It does not supply #42's device/backing-pool offers, authoritative
-  observe/reserve/inspect/release service, or qualified resource-release evidence.
-- Animus local source `1785984ec15bf8e799da13c895abe80e58788b2d` retains the Mesh
-  catalog/exact-model/dispatch contracts. Its dispatch booleans and catalog receipt
-  are not #17's serving-generation/readiness/request-slot observations or grants.
-- Lattice's unchanged reviewed Animus snapshot is
-  `51d2683776ab73d4fd36d3d9e6ced2beadf9793d`, recorded in
-  `vendor-cargo-deps/animus/source.ncl`. No sibling path dependency or pin migration
-  is introduced for absent APIs.
+Provider counters are provider reports, not measurements or invoices; no
+pricing or currency identity exists. No live serving owner, endpoint or device
+has been exercised; all serving evidence is fixture evidence and live
+qualification belongs to Kiln #49.
+
+**Serving overrun and exact ceilings.** A served attempt's usage summary keeps
+an `overrun` block beside its per-service counters. Each dispatched request
+reserves its route's declared token envelope (`reserved_tokens`); only
+requests with both provider counters add `known_tokens`. Each known request is
+compared with its own envelope, so an observed overrun stays visible
+(`overrun_requests`, `overrun_tokens`) and is never offset by an under-used
+request or by an unknown request's envelope. `is_exact_ceiling` is `true` only
+when every dispatched request reported usage within its envelope, and is
+`false` whenever any usage is unknown or any overrun was observed. When the
+serving declaration sets `stop_on_overrun`, the attempt-local broker refuses
+every later served request as `overrun-stopped` before any serving-port call.
+Its existing request budget refusal is recorded as `budget-exhausted`. Both
+count in `refused_requests`. These are execution controls over provider
+reports. They do not reach this orchestration ledger and do not bound
+in-flight overshoot, so no envelope is a billing ceiling. See
+[worker serving binding](worker-serving-binding.md#overrun-policy).
+
+### Producer source boundary
+
+- Aspen `aac7b5ba974cc9660749dab6d8ef4b7db04e3cb4` compute-capacity records are
+  consumed as a specification through `lattice.compute-allocation-observation.v1`
+  (`bind-worker-compute-allocations`).
+- Animus `1c370d5029a2667051c46bdfa1919e78e65e2f4b` supplies the pure
+  `animus_adapters::serving` core (Animus #17), vendored through
+  `scripts/sync_animus.rs` and recorded in `vendor-cargo-deps/animus/source.ncl`
+  (`bind-model-serving-admission`). The `animus-std` serving host path is not
+  vendored.
+- Earlier inspected sources (Aspen `1e9c36edc437fdf4118120776d94f71570190511`,
+  Animus `1785984ec15bf8e799da13c895abe80e58788b2d`) carried only placement and
+  Mesh catalog/dispatch contracts and are not consumed for this purpose.
 
 `RuntimeOptions::configured_profiles()` and `configured_profile(Target)` project
 only existing Pi/Clankers/Animus routes. Missing, ambiguous and invalid routes
@@ -157,17 +187,17 @@ model-service binding and qualified worker telemetry are explicitly unsupported.
 The projection is not an owned-instance inventory: it creates no worker, idle or
 healthy observation, lease, GPU allocation or request grant.
 
-Completing producer-backed admission requires their actual versioned schemas and
-ports, exact profile/consumer/attempt/fence/generation bindings, freshness and
-expiry rechecks, definite-denial versus unknown-after-effect outcomes, and
-deduplication/reconciliation semantics. Completing usage attribution additionally
-requires producer-owned per-service/request/deployment observations, supported
-coverage and units/pricing identity; shared physical allocations must remain
-provider-owned and charged once. No-model and hosted-API routes must be explicit
-without synthesized inference or device usage. Owned worker lifecycle needs real
-incarnation/termination observations, not a terminal workflow record. These are
-unavailable prerequisites, not private Lattice substitutes. Live endpoint and
-cross-host qualification remain separately authorized work under Kiln #49.
+For orchestration Agent nodes, producer-backed admission and usage attribution
+still require exact profile/consumer/attempt/fence/generation bindings,
+freshness and expiry rechecks, definite-denial versus unknown-after-effect
+outcomes, deduplication semantics, producer-owned per-service/request/deployment
+observations and units/pricing identity. Implementation attempts now have these
+for compute allocations and served model routes; Agent nodes do not, and they
+keep reservation-only accounting. Shared physical allocations stay
+provider-owned and charged once; no-model and hosted-API routes stay explicit
+without synthesized inference or device usage. Pricing identity has no producer
+contract. Live endpoint and cross-host qualification remain separately
+authorized work under Kiln #49.
 
 Until an accounted shell-worker profile is admitted, any Shell node is rejected
 before dispatch when invocation, token or monetary accounting is enforced. This

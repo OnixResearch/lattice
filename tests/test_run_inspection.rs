@@ -119,6 +119,7 @@ fn details(run_id: RunId) -> RunDetailRecord {
                 text: PRIVATE_PROMPT.to_string(),
             }],
             error: Some(PRIVATE_AUTHORIZATION.to_string()),
+            policy_decision: None,
         }],
         observed_completion_order: vec![NodeId(NODE_ID_VALUE)],
     }

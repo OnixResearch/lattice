@@ -1,0 +1,114 @@
+{
+  "action_schema": {
+    "actions": [
+      "proceed",
+      "retry",
+      "escalate"
+    ],
+    "id": "animus.frozen-policy-example-actions.v1"
+  },
+  "bounds": {
+    "operation_budget": 24,
+    "score_max": 1000,
+    "score_min": -1000
+  },
+  "feature_schema": {
+    "features": [
+      {
+        "max": 10,
+        "min": 0,
+        "name": "attempts"
+      },
+      {
+        "max": 1000,
+        "min": 0,
+        "name": "failure_rate_per_mille"
+      },
+      {
+        "max": 500,
+        "min": 0,
+        "name": "queue_depth"
+      }
+    ],
+    "id": "animus.frozen-policy-example-features.v1",
+    "normalization": "min-max-per-mille-v1"
+  },
+  "model": {
+    "kind": "mlp-per-mille-v1",
+    "layers": [
+      {
+        "activation": "relu",
+        "biases": [
+          0,
+          0,
+          1000,
+          0
+        ],
+        "weights": [
+          [
+            1000,
+            0,
+            0
+          ],
+          [
+            0,
+            1000,
+            0
+          ],
+          [
+            -1000,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            1000
+          ]
+        ]
+      },
+      {
+        "activation": "identity",
+        "biases": [
+          0,
+          0,
+          -300
+        ],
+        "weights": [
+          [
+            0,
+            -500,
+            500,
+            0
+          ],
+          [
+            -200,
+            600,
+            0,
+            0
+          ],
+          [
+            800,
+            0,
+            0,
+            200
+          ]
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "evaluation": "none: hand-authored to qualify the leaf's admission and decision boundary",
+    "kind": "fixture",
+    "non_claims": [
+      "not trained or distilled",
+      "the triage task is illustrative and measures no consumer outcome"
+    ],
+    "producer": "animus:add-frozen-policy-leaf"
+  },
+  "runtime": {
+    "artifact_api": 1,
+    "crate": "animus-frozen-policy"
+  },
+  "schema": "animus.frozen-policy.v1"
+}

@@ -16,6 +16,7 @@ pub mod model;
 pub mod projection;
 pub mod request;
 pub mod revalidation;
+pub mod serving;
 pub mod validation;
 
 /// Serialized DTO ceiling in bytes.

@@ -9,10 +9,13 @@ const HOST: &str = "127.0.0.1:41001";
 pub(super) struct Handler<'a> {
     pub profile: &'a super::Profile,
     pub credentials: &'a dyn crate::credentials::CredentialProvider,
+    pub gate: &'a mut dyn super::ModelRequestGate,
     pub cancellation: &'a std::sync::atomic::AtomicBool,
     pub stopped: &'a std::sync::atomic::AtomicBool,
     pub deadline: std::time::Instant,
     pub requests: u32,
+    /// Request evidence that could not be retained; it fails the broker.
+    pub failure: Option<String>,
 }
 
 impl Handler<'_> {
@@ -21,6 +24,9 @@ impl Handler<'_> {
         stream.set_write_timeout(Some(READ_TIMEOUT)).map_err(|_| "broker output deadline is unavailable")?;
         let previous_requests = self.requests;
         let response = read_request(&mut stream).and_then(|body| self.forward(body));
+        if let Some(failure) = self.failure.take() {
+            return Err(format!("model request evidence was not retained; upstream outcome may be unknown: {failure}"));
+        }
         let (status, content_type, body) = match &response {
             Ok(value) => (
                 value.status,
@@ -57,8 +63,18 @@ impl Handler<'_> {
             && super::admission::now_ms().is_ok_and(|now| now < self.profile.expires_at_ms)
     }
 
+    /// Every request passes the broker's checks and the route's gate before
+    /// upstream contact; the gate settles every admitted call exactly once.
     fn forward(&mut self, body: String) -> Result<crate::http::HttpResponse, ()> {
-        if !self.is_current() || self.requests >= self.profile.max_requests {
+        if !self.is_current() {
+            return Err(());
+        }
+        // An exhausted request budget refuses before any credential or gate
+        // work; a served route records that refusal once.
+        if self.requests >= self.profile.max_requests {
+            if let Err(failure) = self.gate.exhausted() {
+                self.failure = Some(failure);
+            }
             return Err(());
         }
         let value: serde_json::Value = serde_json::from_str(&body).map_err(|_| ())?;
@@ -68,6 +84,77 @@ impl Handler<'_> {
         // Re-encode the admitted object so duplicate keys cannot have different
         // authorization and upstream interpretations.
         let body = serde_json::to_string(&value).map_err(|_| ())?;
+        let timeout_secs = self.timeout_secs()?;
+        let credential = self
+            .profile
+            .credential
+            .as_ref()
+            .map(|reference| self.credentials.resolve(reference).map_err(|_| ()))
+            .transpose()?;
+        let checks = crate::execution_binding::serving::gate::Checks {
+            is_exact_model: true,
+            is_within_budget: self.requests < self.profile.max_requests,
+            is_current: self.is_current(),
+        };
+        let ticket = self.gate.admit(checks).ok_or(())?;
+        debug_assert!(checks.is_within_budget && checks.is_current, "no gate admits outside the broker checks");
+        self.requests += 1;
+        let mut request = crate::http::HttpRequestPlan {
+            method: "POST".into(),
+            url: self.profile.endpoint.clone(),
+            headers: [("content-type".into(), "application/json".into())].into(),
+            body: Some(body),
+            timeout_secs,
+        };
+        if let Some(value) = &credential {
+            request.headers.insert("authorization".into(), format!("Bearer {}", value.expose_for_execution()));
+        }
+        let response = crate::http::HttpClient::execute_bounded(
+            &crate::http::NativeHttpClient,
+            &request,
+            &crate::http::HttpBounds::default(),
+            Some(self.stopped),
+        );
+        for value in request.headers.values_mut() {
+            zeroize::Zeroize::zeroize(value);
+        }
+        let is_echoed = response.as_ref().is_ok_and(|response| {
+            credential.as_ref().is_some_and(|secret| response.body.contains(secret.expose_for_execution()))
+        });
+        self.settle(ticket, response, is_echoed)
+    }
+
+    /// Record the call; a withheld, rejected or unretained response never reaches the worker.
+    fn settle(
+        &mut self,
+        ticket: super::GateTicket,
+        response: Result<crate::http::HttpResponse, crate::http::HttpError>,
+        is_echoed: bool,
+    ) -> Result<crate::http::HttpResponse, ()> {
+        let upstream = match &response {
+            Ok(_) if is_echoed => crate::execution_binding::serving::gate::Upstream::TransportFailed,
+            Ok(value) => crate::execution_binding::serving::gate::Upstream::Responded(super::serving::response_facts(
+                &value.body,
+            )),
+            Err(crate::http::HttpError::Timeout(_)) => crate::execution_binding::serving::gate::Upstream::TimedOut,
+            Err(crate::http::HttpError::Cancelled) => crate::execution_binding::serving::gate::Upstream::Cancelled,
+            Err(
+                crate::http::HttpError::InvalidRequest(_)
+                | crate::http::HttpError::Transport(_)
+                | crate::http::HttpError::LimitExceeded(_),
+            ) => crate::execution_binding::serving::gate::Upstream::TransportFailed,
+        };
+        match self.gate.settle(ticket, upstream) {
+            Ok(true) if !is_echoed => response.map_err(|_| ()),
+            Ok(_) => Err(()),
+            Err(failure) => {
+                self.failure = Some(failure);
+                Err(())
+            }
+        }
+    }
+
+    fn timeout_secs(&self) -> Result<u64, ()> {
         let expiry_secs =
             self.profile.expires_at_ms.checked_sub(super::admission::now_ms().map_err(|_| ())?).ok_or(())? / 1000;
         let timeout_secs = expiry_secs
@@ -80,41 +167,7 @@ impl Handler<'_> {
         if timeout_secs == 0 {
             return Err(());
         }
-        self.requests += 1;
-        let mut request = crate::http::HttpRequestPlan {
-            method: "POST".into(),
-            url: self.profile.endpoint.clone(),
-            headers: [("content-type".into(), "application/json".into())].into(),
-            body: Some(body),
-            timeout_secs,
-        };
-        let credential = self
-            .profile
-            .credential
-            .as_ref()
-            .map(|reference| self.credentials.resolve(reference).map_err(|_| ()))
-            .transpose()?;
-        if !self.is_current() {
-            return Err(());
-        }
-        if let Some(value) = &credential {
-            request.headers.insert("authorization".into(), format!("Bearer {}", value.expose_for_execution()));
-        }
-        let response = crate::http::HttpClient::execute_bounded(
-            &crate::http::NativeHttpClient,
-            &request,
-            &crate::http::HttpBounds::default(),
-            Some(self.stopped),
-        )
-        .map_err(|_| ());
-        for value in request.headers.values_mut() {
-            zeroize::Zeroize::zeroize(value);
-        }
-        let response = response?;
-        if credential.as_ref().is_some_and(|secret| response.body.contains(secret.expose_for_execution())) {
-            return Err(());
-        }
-        Ok(response)
+        Ok(timeout_secs)
     }
 }
 

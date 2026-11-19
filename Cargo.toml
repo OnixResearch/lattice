@@ -114,6 +114,7 @@ cap-std = "4.0.2"
 bounded-exec = { path = "vendor-cargo-deps/bounded-exec/crates/bounded-exec" }
 which = "8.0.0"
 animus-adapters = { path = "vendor-cargo-deps/animus/crates/animus-adapters" }
+animus-frozen-policy = { path = "vendor-cargo-deps/animus/crates/animus-frozen-policy" }
 animus-runtime = { path = "vendor-cargo-deps/animus/crates/animus-runtime", default-features = false, features = ["steel"] }
 animus-steel = { path = "vendor-cargo-deps/animus/crates/animus-steel" }
 animus-std-secretspec = { path = "vendor-cargo-deps/animus/crates/animus-std-secretspec", optional = true }

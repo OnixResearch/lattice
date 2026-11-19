@@ -117,6 +117,7 @@ pub(crate) async fn run(request: RunRequest<'_>) -> RunOutcome {
                     continue;
                 }
             };
+            prepared.input_hash = executor.policy_cache_key(workflow, node_id, prepared.input_hash);
             if let Some(conflict) = executor.frontier_conflict(node_id) {
                 prepared.reservation.conflict = conflict.clone();
             }

@@ -42,6 +42,8 @@ pub struct ProfileInput<'a> {
     pub max_output_bytes: super::Offered<u64>,
     pub model_routes: super::Offered<&'a super::super::request::RouteDeclaration>,
     pub compute: super::Offered<&'a super::super::request::ComputeRequirement>,
+    /// Readiness from the injected serving-owner port, or why none was observed.
+    pub serving_readiness: &'a super::ServingReadiness,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -69,7 +71,7 @@ pub struct WorkerProfileFacts {
     pub storage_bytes: super::Fact<u64>,
     pub model_routes: super::Fact<super::super::request::RouteDeclaration>,
     pub compute: super::Fact<super::super::request::ComputeRequirement>,
-    pub serving_readiness: super::OwnedUnknown,
+    pub serving_readiness: super::ServingReadiness,
 }
 
 /// A fact the projection refuses to publish.
@@ -85,6 +87,9 @@ pub enum FactsDefect {
 pub fn project_profile(input: &ProfileInput<'_>) -> Result<WorkerProfileFacts, FactsDefect> {
     if !super::super::is_token(input.revision) {
         return Err(FactsDefect::Revision);
+    }
+    if !input.serving_readiness.is_bounded() {
+        return Err(FactsDefect::Routes);
     }
     let qualification_ref = input.qualification_ref.filter(|value| super::super::is_reference(value));
     let is_qualified = qualification_ref.is_some();
@@ -112,7 +117,7 @@ pub fn project_profile(input: &ProfileInput<'_>) -> Result<WorkerProfileFacts, F
         storage_bytes: super::Offered::Unknown.project(false, std::convert::identity),
         model_routes: routes_fact(input.model_routes, is_qualified)?,
         compute: input.compute.project(is_qualified, Clone::clone),
-        serving_readiness: super::OwnedUnknown::unknown(super::SERVING_OWNER),
+        serving_readiness: input.serving_readiness.clone(),
     };
     debug_assert_eq!(facts.cpu_millis.support, super::SupportLevel::Unknown);
     debug_assert_eq!(facts.qualification_ref.is_some(), is_qualified);

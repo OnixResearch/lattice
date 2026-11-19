@@ -80,6 +80,7 @@ struct WorkerStep {
     output_dir: std::path::PathBuf,
     is_unchanged_allowed: bool,
     receipt: super::binding::usage::WorkerReceipt,
+    serving: Box<dyn crate::execution_binding::serving::OwnerPort>,
 }
 
 impl WorkerStep {
@@ -107,7 +108,47 @@ impl WorkerStep {
         Ok(())
     }
 
-    fn observe(self, cancellation: &std::sync::atomic::AtomicBool) -> Result<(), String> {
+    /// Run the worker behind the broker. A served route passes every request
+    /// through the serving-owner gate with request files in the attempt
+    /// directory; any other route keeps the broker's own checks only.
+    // r[impl lattice.serving_binding.request_admission]
+    fn run_worker(
+        &mut self,
+        cancellation: &std::sync::atomic::AtomicBool,
+        credentials: &dyn crate::credentials::CredentialProvider,
+    ) -> Result<crate::candidate_worker::omp::RunResult, String> {
+        let admitted = self.receipt.admitted();
+        let mut direct = crate::candidate_worker::broker::DirectRoute;
+        let mut sink;
+        let mut served;
+        let gate: &mut dyn crate::candidate_worker::broker::ModelRequestGate = if admitted.serving.is_some() {
+            sink = super::binding::requests::RequestFiles::new(&self.output_dir)?;
+            let session = crate::execution_binding::serving::gate::Session::new(
+                admitted,
+                self.receipt.request_identity(),
+                self.serving.as_mut(),
+                &mut sink,
+            )?;
+            served = crate::candidate_worker::broker::OwnerGate {
+                session,
+                route_name: super::binding::PRIMARY_ROUTE.to_owned(),
+            };
+            &mut served
+        } else {
+            &mut direct
+        };
+        let services = crate::candidate_worker::broker::Services { credentials, gate };
+        crate::candidate_worker::omp::run(
+            &self.worker,
+            &self.profile,
+            &crate::process::core::RuntimeConfig::default(),
+            cancellation,
+            services,
+        )
+        .map_err(|error| error.to_string())
+    }
+
+    fn observe(mut self, cancellation: &std::sync::atomic::AtomicBool) -> Result<(), String> {
         let reference = self.profile.model_broker.credential.as_ref();
         if reference.is_some_and(|value| value.provider != "env" || value.field.is_some()) {
             return Err("standalone model broker requires an explicit env credential reference".into());
@@ -115,21 +156,14 @@ impl WorkerStep {
         let keys: Vec<String> = reference.map(|value| value.key.clone()).into_iter().collect();
         let credentials = crate::credentials::EnvironmentCredentialProvider::from_current_env(&keys);
         let started_epoch_ms = super::now_ms().ok();
-        let result = crate::candidate_worker::omp::run(
-            &self.worker,
-            &self.profile,
-            &crate::process::core::RuntimeConfig::default(),
-            cancellation,
-            &credentials,
-        )
-        .map_err(|error| error.to_string())?;
+        let result = self.run_worker(cancellation, &credentials)?;
         let window = super::binding::usage::WorkerWindow {
             started_epoch_ms,
             finished_epoch_ms: super::now_ms().ok(),
         };
         self.retain_events(&result)?;
         // The attempt usage observation precedes the published attempt result.
-        self.receipt.persist(&self.store, window)?;
+        self.receipt.persist(&self.store, window, &self.output_dir)?;
         let outcome =
             crate::candidate_worker::publish_outcome(&self.worker, &self.store, result.outcome, result.compatibility);
         let retained = crate::candidate_worker::AttemptResult::from_outcome(&outcome);
@@ -137,24 +171,10 @@ impl WorkerStep {
     }
 }
 
-async fn execute(
-    request: &super::Request,
-    store: crate::store::Store,
-    worker: crate::candidate_worker::Request,
-    directory: &std::path::Path,
-    receipt: super::binding::usage::WorkerReceipt,
-) -> Result<(), String> {
+async fn execute(execution: WorkerStep, directory: &std::path::Path) -> Result<(), String> {
     let cancellation = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let identity = receipt.request_identity().to_owned();
+    let identity = execution.receipt.request_identity().to_owned();
     let signal_task = super::cancellation::watch(cancellation.clone(), directory.join("cancel.request"), identity);
-    let execution = WorkerStep {
-        worker,
-        store,
-        profile: request.omp.clone(),
-        output_dir: directory.to_path_buf(),
-        is_unchanged_allowed: request.allow_unchanged,
-        receipt,
-    };
     let observed = tokio::task::spawn_blocking(move || execution.observe(&cancellation)).await;
     // Always stop and join the watcher, including when the blocking task failed to join.
     let signal_result = super::cancellation::finish(signal_task).await;
@@ -187,34 +207,42 @@ impl Context {
         })
     }
 
-    async fn run(self, port: Option<&mut dyn crate::execution_binding::ComputeAllocationPort>) -> Result<(), String> {
+    async fn run(self, ports: Option<super::Ports<'_>>) -> Result<(), String> {
         let intent = self.directory.join("intent.json");
-        let Some(port) = port.filter(|_| !intent.exists()) else {
+        let Some(ports) = ports.filter(|_| !intent.exists()) else {
             return recover_existing(&self.request, &self.directory, &self.identity);
         };
         let worker = worker_request(&self.request)?;
-        let admitted = super::binding::admit_and_persist(&self.request, &self.directory, port)?;
+        let admitted = super::binding::admit_and_persist(&self.request, &self.directory, ports.compute)?;
         let store_path = self.directory.join("candidate.redb");
         let store = crate::store::Store::new(&store_path).map_err(|error| error.to_string())?;
         if !super::artifacts::write_once(&intent, self.identity.as_bytes())? {
             return Err("concurrent execution intent requires reconciliation".into());
         }
-        super::binding::revalidate(&self.directory, &admitted, port)?;
+        super::binding::revalidate(&self.directory, &admitted, ports.compute)?;
         let binding_identity = admitted.binding_identity.clone();
-        let receipt = super::binding::usage::WorkerReceipt::new(admitted, self.identity);
-        execute(&self.request, store, worker, &self.directory, receipt).await?;
+        let execution = WorkerStep {
+            worker,
+            store,
+            profile: self.request.omp.clone(),
+            output_dir: self.directory.clone(),
+            is_unchanged_allowed: self.request.allow_unchanged,
+            receipt: super::binding::usage::WorkerReceipt::new(admitted, self.identity),
+            serving: ports.serving,
+        };
+        execute(execution, &self.directory).await?;
         let store = crate::store::Store::new(&store_path).map_err(|error| error.to_string())?;
         println!("{}", super::recovery::recover(&store, &self.request, &self.directory, &binding_identity)?);
         Ok(())
     }
 }
 
-/// `None` reconciles retained evidence only; a port is used only to admit and
-/// revalidate before a first dispatch.
+/// `None` reconciles retained evidence only; ports are used only to admit,
+/// revalidate and gate a first dispatch.
 pub(super) async fn run(
     request_path: &std::path::Path,
     state: &std::path::Path,
-    port: Option<&mut dyn crate::execution_binding::ComputeAllocationPort>,
+    ports: Option<super::Ports<'_>>,
 ) -> Result<(), String> {
-    Context::load(request_path, state)?.run(port).await
+    Context::load(request_path, state)?.run(ports).await
 }

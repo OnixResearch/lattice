@@ -156,21 +156,30 @@ fn now_ms() -> Result<u64, String> {
 
 // r[impl lattice.implementation_attempt.consumer]
 // r[impl lattice.execution_binding.port_boundary.scenario.unavailable]
+// r[impl lattice.serving_binding.port_boundary.scenario.unavailable]
 pub async fn run_command(args: &CommandArgs) -> Result<(), String> {
-    run_command_with_compute_port(args, &mut crate::execution_binding::UnavailableComputePort).await
+    let ports = Ports {
+        compute: &mut crate::execution_binding::UnavailableComputePort,
+        serving: Box::new(crate::execution_binding::serving::UnavailableOwner),
+    };
+    run_command_with_ports(args, ports).await
 }
 
-/// Run with an embedder-supplied read-only compute port.
-pub async fn run_command_with_compute_port(
-    args: &CommandArgs,
-    port: &mut dyn crate::execution_binding::ComputeAllocationPort,
-) -> Result<(), String> {
+/// Embedder-supplied read-only ports of one run.
+pub struct Ports<'a> {
+    pub compute: &'a mut dyn crate::execution_binding::ComputeAllocationPort,
+    pub serving: Box<dyn crate::execution_binding::serving::OwnerPort>,
+}
+
+/// Run with embedder-supplied compute and serving-owner ports. `inspect`
+/// reads only the serving port's latest snapshots; it never admits a request.
+pub async fn run_command_with_ports(args: &CommandArgs, mut ports: Ports<'_>) -> Result<(), String> {
     match &args.command {
         Command::Cancel { request, state } => cancel(request, state),
         Command::Prepare { request, output } => prepare(request, output),
-        Command::Run { request, state } => execution::run(request, state, Some(port)).await,
+        Command::Run { request, state } => execution::run(request, state, Some(ports)).await,
         Command::Recover { request, state } => execution::run(request, state, None).await,
-        Command::Inspect { request, state } => inspect::run(request, state),
+        Command::Inspect { request, state } => inspect::run(request, state, ports.serving.as_mut()),
         Command::ExportCandidate {
             request,
             state,

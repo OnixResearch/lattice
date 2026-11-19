@@ -54,6 +54,7 @@ fn bind(
     let attempt_id = observed.map_or("attempt-hosted", |observation| observation.allocation.attempt_id.as_str());
     let declaration = Declaration {
         schema: DECLARATION_SCHEMA.into(),
+        serving: None,
         compute,
         model_routes: routes,
     };
@@ -105,7 +106,12 @@ fn usage(
         provenance: lattice::orchestration::UsageProvenance::HostMeasured,
         complete: false,
         accounting: None,
-        execution_binding: Some(provenance(admitted, "request-24", WorkerCoverage::HostMeasured)),
+        execution_binding: Some(provenance(
+            admitted,
+            "request-24",
+            WorkerCoverage::HostMeasured,
+            lattice::execution_binding::core::serving::usage::ModelRequestCoverage::Unknown,
+        )),
     }
 }
 
@@ -122,7 +128,10 @@ fn bound_usage_carries_exact_identity_placement_and_reserved_claims() {
     assert_eq!((allocation.owner_generation, allocation.charge_cursor), (1, 2));
     assert_eq!(allocation.placement.topology_generation, 1);
     assert!(allocation.reserved_claims.iter().all(|claim| claim.label == ClaimLabel::Reserved));
-    assert_eq!(binding.coverage.model_requests, UnknownCoverage::Unknown);
+    assert_eq!(
+        binding.coverage.model_requests,
+        lattice::execution_binding::core::serving::usage::ModelRequestCoverage::Unknown
+    );
     assert_eq!(binding.coverage.device_utilization, UnknownCoverage::Unknown);
     let text = observation.to_json().expect("json");
     assert!(!text.contains("\"tokens\":0"));

@@ -66,6 +66,7 @@ fn input<'a>(
         attempt_id: "attempt-agent-a-device",
         fence: 7,
         envelope_identity: "envelope-24",
+        serving: None,
         allocation,
         routes,
     }
@@ -113,6 +114,7 @@ fn observation(name: &str) -> ComputeAllocationObservation {
 fn admitted_identity(observation: &ComputeAllocationObservation) -> String {
     let declaration = Declaration {
         schema: DECLARATION_SCHEMA.into(),
+        serving: None,
         compute: ComputeDeclaration::ProviderAllocation {
             allocation_id: observation.allocation.id.clone(),
             host_id: observation.allocation.host_id.clone(),

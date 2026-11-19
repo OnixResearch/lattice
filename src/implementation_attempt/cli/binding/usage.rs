@@ -38,7 +38,11 @@ impl WorkerReceipt {
         }
     }
 
-    pub(in super::super) fn observation(&self, window: WorkerWindow) -> crate::orchestration::CommandWorkerObservation {
+    pub(in super::super) fn observation(
+        &self,
+        window: WorkerWindow,
+        model_requests: lattice_core::execution_binding::serving::usage::ModelRequestCoverage,
+    ) -> crate::orchestration::CommandWorkerObservation {
         let duration_millis = window.duration_millis();
         let (provenance, coverage) = if duration_millis.is_some() {
             (
@@ -76,16 +80,32 @@ impl WorkerReceipt {
                 &self.admitted,
                 &self.request_identity,
                 coverage,
+                model_requests,
             )),
         }
     }
 
-    /// Persist before the attempt result; replay of identical content is idempotent.
-    pub(in super::super) fn persist(&self, store: &crate::store::Store, window: WorkerWindow) -> Result<(), String> {
-        store.save_command_worker_usage(&self.observation(window)).map_err(|error| error.to_string())
+    /// Persist before the attempt result with the retained per-request
+    /// coverage; replay of identical content is idempotent and different
+    /// content is refused, so settled usage cannot be reset.
+    // r[impl lattice.serving_binding.usage.scenario.settled]
+    pub(in super::super) fn persist(
+        &self,
+        store: &crate::store::Store,
+        window: WorkerWindow,
+        attempt_directory: &std::path::Path,
+    ) -> Result<(), String> {
+        let model_requests = super::requests::coverage(&self.admitted, attempt_directory)?;
+        store
+            .save_command_worker_usage(&self.observation(window, model_requests))
+            .map_err(|error| error.to_string())
     }
 
     pub(in super::super) fn request_identity(&self) -> &str {
         &self.request_identity
+    }
+
+    pub(in super::super) const fn admitted(&self) -> &lattice_core::execution_binding::admission::bound::Admitted {
+        &self.admitted
     }
 }

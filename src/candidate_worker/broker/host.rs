@@ -73,7 +73,7 @@ fn write_model_config(mount: &super::Mount, profile: &super::Profile) -> Result<
 pub(super) fn with_route<T>(
     mut request: super::super::Request,
     profile: &super::Profile,
-    credentials: &dyn crate::credentials::CredentialProvider,
+    services: super::Services<'_>,
     cancellation: &std::sync::atomic::AtomicBool,
     run: impl FnOnce(super::super::Request) -> T,
 ) -> Result<(T, bool), String> {
@@ -91,11 +91,13 @@ pub(super) fn with_route<T>(
         .ok_or("model broker deadline is invalid")?;
     let handler = super::wire::Handler {
         profile,
-        credentials,
+        credentials: services.credentials,
+        gate: services.gate,
         cancellation,
         stopped: &stopped,
         deadline,
         requests: 0,
+        failure: None,
     };
     std::thread::scope(|scope| {
         let worker = std::thread::Builder::new()

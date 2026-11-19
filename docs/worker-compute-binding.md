@@ -98,7 +98,7 @@ bytes of provider text). `NotFound` rejects; `Unavailable` and every issue
 block. The standalone CLI installs `UnavailableComputePort`, so a request that
 declares a provider allocation stops before any binding, intent or worker
 effect. An embedding host supplies a real adapter through
-`implementation_attempt::cli::run_command_with_compute_port`.
+`implementation_attempt::cli::run_command_with_ports`.
 `FixtureComputePort` replays scripted replies and records every query for
 deterministic tests only.
 
@@ -194,10 +194,13 @@ compute provenance without backend handles or grant references, model route
 identities, and one lifecycle: `admitted_not_dispatched`,
 `binding_rejected_before_dispatch`, `dispatch_recorded_outcome_unknown` or
 `terminal_observed`. Cancellation is `not_requested`, `requested_unobserved` or
-`observed_terminated`. Host reachability, model readiness and allocation
-liveness are always `unknown`. A missing intent binding or an unreadable artifact
-is an error, never a guessed state. Inspection takes no claim and schedules
-nothing.
+`observed_terminated`. Host reachability and allocation liveness are always
+`unknown`. Model readiness names its actual cause (`no_serving_port` when no
+serving-owner port is injected) or carries the injected port's latest
+snapshot readiness and freshness; see
+[inventory readiness](worker-serving-binding.md#inventory-readiness). A
+missing intent binding or an unreadable artifact is an error, never a guessed
+state. Inspection takes no claim and schedules nothing.
 
 ## Usage coverage
 
@@ -211,7 +214,7 @@ immutable attempt-keyed replay and conflict rules.
 |---|---|
 | Worker process | `host_measured` with a duration only when the host observed both endpoints; otherwise `unknown` |
 | Compute | reserved claims labelled `reserved`; never measured device use |
-| Model requests | `unknown` (owner `animus#17`) |
+| Model requests | `unknown` without a serving declaration; `no_model` for no-model workers; per-service `served` request usage for served routes (see [worker serving binding](worker-serving-binding.md)) |
 | Device utilization | `unknown` (owner `aspen#42`; no readback field) |
 
 Orchestration `HostRun` receipts carry no execution binding, and their
@@ -221,7 +224,7 @@ settlement is unchanged.
 
 | Capability | Owner | Lattice reports |
 |---|---|---|
-| Serving readiness, request admission, replica routing, per-request model-service usage | [Animus #17](https://github.com/OnixResearch/animus/issues/17) | `unknown` |
+| Serving readiness, request admission and per-request model-service usage | [Animus #17](https://github.com/OnixResearch/animus/issues/17), consumed in [worker serving binding](worker-serving-binding.md) | gated and recorded for declared served routes; `unknown` otherwise; no live serving owner qualified |
 | Live host, device and cross-host qualification; a live provider port | [Kiln #49](https://github.com/OnixResearch/kiln/issues/49) with Aspen #15/#20 | not claimed |
 | Qualification evidence that promotes `declared` to `qualified` | [Animus #18](https://github.com/OnixResearch/animus/issues/18) | `declared` only |
 | Aggregate budgets and shared-deployment apportionment | [Kiln #45](https://github.com/OnixResearch/kiln/issues/45) | not computed |

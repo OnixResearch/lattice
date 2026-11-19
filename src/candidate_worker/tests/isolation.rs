@@ -58,15 +58,18 @@ fn omp_worker_produces_a_sandboxed_candidate() {
         &profile,
         &crate::process::core::RuntimeConfig::default(),
         &std::sync::atomic::AtomicBool::new(false),
-        &crate::credentials::EnvironmentCredentialProvider::from_current_env(
-            &profile
-                .model_broker
-                .credential
-                .as_ref()
-                .map(|reference| reference.key.clone())
-                .into_iter()
-                .collect::<Vec<_>>(),
-        ),
+        super::super::broker::Services {
+            credentials: &crate::credentials::EnvironmentCredentialProvider::from_current_env(
+                &profile
+                    .model_broker
+                    .credential
+                    .as_ref()
+                    .map(|reference| reference.key.clone())
+                    .into_iter()
+                    .collect::<Vec<_>>(),
+            ),
+            gate: &mut super::super::broker::DirectRoute,
+        },
     )
     .expect("selected OMP route");
     assert_eq!(observed.observation.expect("complete JSONL").terminal, omp::Terminal::Completed);

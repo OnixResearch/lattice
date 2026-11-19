@@ -22,8 +22,8 @@ let Source = {
 } in
 {
   repository = "ssh://git@github.com/OnixResearch/animus.git",
-  revision = "51d2683776ab73d4fd36d3d9e6ced2beadf9793d",
-  source_archive_blake3 = "5f59a2b900095aec757bad5b5542d844e92eac2a0bd818e110d70927611ddb46",
+  revision = "1c370d5029a2667051c46bdfa1919e78e65e2f4b",
+  source_archive_blake3 = "ff16f0903348db1d5164d055b928d2f1f829ca1dffb6f1624e6d26779b11f2ab",
   source_archive_format = "git-tar",
   source_archive_tar_umask = "0000",
   host_control_revision = "7735faf3d8895b0bfa89f563184c4321b3b144a1",
@@ -40,6 +40,7 @@ let Source = {
     "animus-adapters",
     "animus-core",
     "animus-eval-core",
+    "animus-frozen-policy",
     "animus-router",
     "animus-runtime",
     "animus-session-core",

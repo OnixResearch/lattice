@@ -1,0 +1,105 @@
+{
+  "schema": "lattice.typed-policy-cases.v1",
+  "task": "log-triage incident routing",
+  "labels": ["page", "ticket", "ignore"],
+  "rubric": "page when critical_errors >= 1 or error_count >= 3; otherwise ticket when error_count >= 1, warn_count >= 3 or max_latency_ms >= 2000; otherwise ignore",
+  "authoring_families": ["payments-r1"],
+  "held_out_families": ["search-r1", "auth-r2", "reports-r1"],
+  "cases": [
+    { "id": "payments-r1-01", "family": "payments-r1", "expected": "ignore", "lines": [
+      "2026-11-19T10:00:00Z INFO request ok latency 120ms /api/payments"
+    ] },
+    { "id": "payments-r1-02", "family": "payments-r1", "expected": "page", "lines": [
+      "2026-11-19T10:01:00Z ERROR timeout /api/payments"
+    ] },
+    { "id": "payments-r1-03", "family": "payments-r1", "expected": "ignore", "lines": [
+      "2026-11-19T10:02:00Z WARN latency 900ms /api/payments",
+      "2026-11-19T10:02:30Z WARN latency 870ms /api/payments"
+    ] },
+    { "id": "payments-r1-04", "family": "payments-r1", "expected": "ticket", "lines": [
+      "2026-11-19T10:03:00Z WARN retry /api/payments",
+      "2026-11-19T10:03:10Z WARN retry /api/payments",
+      "2026-11-19T10:03:20Z WARN retry /api/payments"
+    ] },
+    { "id": "payments-r1-05", "family": "payments-r1", "expected": "page", "lines": [
+      "2026-11-19T10:04:00Z ERROR declined upstream /api/payments/refunds",
+      "2026-11-19T10:04:05Z WARN latency 400ms /api/payments"
+    ] },
+    { "id": "payments-r1-06", "family": "payments-r1", "expected": "ticket", "lines": [
+      "2026-11-19T10:05:00Z WARN latency 2500ms /api/payments"
+    ] },
+    { "id": "search-r1-01", "family": "search-r1", "expected": "ignore", "lines": [
+      "2026-11-19T11:00:00Z WARN latency 1200ms /api/search",
+      "2026-11-19T11:00:10Z WARN latency 980ms /api/search"
+    ] },
+    { "id": "search-r1-02", "family": "search-r1", "expected": "ticket", "lines": [
+      "2026-11-19T11:01:00Z WARN latency 4500ms /api/search"
+    ] },
+    { "id": "search-r1-03", "family": "search-r1", "expected": "ticket", "lines": [
+      "2026-11-19T11:02:00Z ERROR timeout /api/search"
+    ] },
+    { "id": "search-r1-04", "family": "search-r1", "expected": "ignore", "lines": [
+      "2026-11-19T11:03:00Z INFO request ok latency 80ms /api/search"
+    ] },
+    { "id": "search-r1-05", "family": "search-r1", "expected": "ticket", "lines": [
+      "2026-11-19T11:04:00Z WARN latency 300ms /api/search",
+      "2026-11-19T11:04:10Z WARN latency 310ms /api/search",
+      "2026-11-19T11:04:20Z WARN latency 290ms /api/search",
+      "2026-11-19T11:04:30Z WARN latency 305ms /api/search"
+    ] },
+    { "id": "search-r1-06", "family": "search-r1", "expected": "page", "lines": [
+      "2026-11-19T11:05:00Z ERROR shard unavailable /api/search",
+      "2026-11-19T11:05:01Z ERROR shard unavailable /api/search",
+      "2026-11-19T11:05:02Z ERROR shard unavailable /api/search"
+    ] },
+    { "id": "auth-r2-01", "family": "auth-r2", "expected": "page", "lines": [
+      "2026-11-19T12:00:00Z ERROR invalid token signer /api/auth"
+    ] },
+    { "id": "auth-r2-02", "family": "auth-r2", "expected": "ignore", "lines": [
+      "2026-11-19T12:01:00Z WARN latency 1500ms /api/auth",
+      "2026-11-19T12:01:05Z WARN retry /api/auth"
+    ] },
+    { "id": "auth-r2-03", "family": "auth-r2", "expected": "page", "lines": [
+      "2026-11-19T12:02:00Z ERROR session store unavailable /api/auth",
+      "2026-11-19T12:02:01Z WARN retry /api/auth",
+      "2026-11-19T12:02:02Z WARN retry /api/auth",
+      "2026-11-19T12:02:03Z WARN retry /api/auth"
+    ] },
+    { "id": "auth-r2-04", "family": "auth-r2", "expected": "ignore", "lines": [
+      "2026-11-19T12:03:00Z INFO login ok /api/auth",
+      "2026-11-19T12:03:01Z INFO login ok /api/auth",
+      "2026-11-19T12:03:02Z INFO login ok /api/auth"
+    ] },
+    { "id": "auth-r2-05", "family": "auth-r2", "expected": "ticket", "lines": [
+      "2026-11-19T12:04:00Z WARN latency 2200ms /api/auth"
+    ] },
+    { "id": "auth-r2-06", "family": "auth-r2", "expected": "ticket", "lines": [
+      "2026-11-19T12:05:00Z WARN latency 12000ms /api/auth"
+    ] },
+    { "id": "reports-r1-01", "family": "reports-r1", "expected": "ignore", "lines": [
+      "2026-11-19T13:00:00Z WARN latency 800ms /api/reports"
+    ] },
+    { "id": "reports-r1-02", "family": "reports-r1", "expected": "ticket", "lines": [
+      "2026-11-19T13:01:00Z ERROR export failed /api/reports"
+    ] },
+    { "id": "reports-r1-03", "family": "reports-r1", "expected": "ignore", "lines": [
+      "2026-11-19T13:02:00Z INFO export ok /api/reports"
+    ] },
+    { "id": "reports-r1-04", "family": "reports-r1", "expected": "ticket", "lines": [
+      "2026-11-19T13:03:00Z WARN latency 3100ms /api/reports",
+      "2026-11-19T13:03:30Z WARN latency 2900ms /api/reports"
+    ] },
+    { "id": "reports-r1-05", "family": "reports-r1", "expected": "ticket", "lines": [
+      "2026-11-19T13:04:00Z ERROR export failed /api/reports",
+      "2026-11-19T13:04:10Z ERROR export failed /api/reports",
+      "2026-11-19T13:04:20Z WARN retry /api/reports"
+    ] },
+    { "id": "reports-r1-06", "family": "reports-r1", "expected": "ticket", "lines": [
+      "2026-11-19T13:05:00Z WARN latency 100ms /api/reports",
+      "2026-11-19T13:05:01Z WARN latency 110ms /api/reports",
+      "2026-11-19T13:05:02Z WARN latency 120ms /api/reports",
+      "2026-11-19T13:05:03Z WARN latency 130ms /api/reports",
+      "2026-11-19T13:05:04Z WARN latency 140ms /api/reports"
+    ] }
+  ]
+}

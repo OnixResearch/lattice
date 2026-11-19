@@ -39,7 +39,10 @@ impl Fixture {
             &self.profile,
             &crate::process::core::RuntimeConfig::default(),
             cancellation,
-            &crate::credentials::EnvironmentCredentialProvider::from_current_env(&[]),
+            crate::candidate_worker::broker::Services {
+                credentials: &crate::credentials::EnvironmentCredentialProvider::from_current_env(&[]),
+                gate: &mut crate::candidate_worker::broker::DirectRoute,
+            },
         )
         .expect("actual selected OMP route");
         assert_eq!(observed.executable_blake3, self.profile.executable_blake3);

@@ -1,0 +1,42 @@
+{
+  "action_schema": "animus.campaign-manager-rank-action.v1",
+  "bias": 10,
+  "feature_schema": "animus.campaign-manager-brief-features.v1",
+  "features": [
+    "executed",
+    "signal",
+    "family_best_signal",
+    "family_unexplored",
+    "brief_unexplored",
+    "family_leads"
+  ],
+  "policy": "linear-per-mille-v1",
+  "provenance": {
+    "evaluation": "none: hand-authored to qualify the route boundary",
+    "kind": "fixture",
+    "non_claims": [
+      "not trained or distilled",
+      "encodes a hand-written heuristic, so its results do not measure learning",
+      "results on the synthetic evaluator do not establish consumer improvement"
+    ],
+    "producer": "animus:add-frozen-local-scorer"
+  },
+  "rank_bounds": {
+    "max": 100,
+    "min": -100
+  },
+  "runtime": {
+    "artifact_api": 1,
+    "crate": "animus-campaign-manager-eval",
+    "operation_budget": 192
+  },
+  "schema": "animus.campaign-manager-local-scorer.v1",
+  "weights": [
+    -10,
+    9,
+    5,
+    0,
+    0,
+    3
+  ]
+}

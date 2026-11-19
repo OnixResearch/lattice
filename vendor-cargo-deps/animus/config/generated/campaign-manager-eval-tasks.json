@@ -1,0 +1,194 @@
+{
+  "agent": "agent:animus-campaign-manager",
+  "environment": "environment:campaign-manager-rollout",
+  "harbor": {
+    "atif_schema": "ATIF-v1.7",
+    "release": "v0.18.0",
+    "revision": "527d50deb63a5d279e8c20593c18a2cbc7f61f9e",
+    "task_schema": "1.3"
+  },
+  "mandate": {
+    "brief_window": 64,
+    "candidate_batch": 16,
+    "guidance": 64,
+    "prune": 64,
+    "retirement": 16,
+    "revision": 16
+  },
+  "non_claims": [
+    "not-advice-quality-beyond-these-tasks",
+    "not-benchmark-superiority",
+    "not-verifier-soundness-beyond-history-replay",
+    "not-harbor-cloud-or-hub-parity",
+    "not-production-or-release-readiness"
+  ],
+  "profile_id": "campaign-manager-eval-v1",
+  "rank_dimensions": 1,
+  "rubric": "rubric:campaign-manager-v1",
+  "schema": "animus.campaign-manager-eval-tasks.v1",
+  "tasks": [
+    {
+      "candidates": [
+        {
+          "is_target": false,
+          "key": "strings-unicode",
+          "label": "strings/long runs of unicode escapes",
+          "signal": 2
+        },
+        {
+          "is_target": false,
+          "key": "numbers-exponent",
+          "label": "numbers/huge exponent literals",
+          "signal": 4
+        },
+        {
+          "is_target": true,
+          "key": "nesting-arrays",
+          "label": "nesting/arrays nested 100000 deep",
+          "signal": 9
+        },
+        {
+          "is_target": false,
+          "key": "whitespace-endings",
+          "label": "whitespace/mixed line endings",
+          "signal": 1
+        }
+      ],
+      "identity": "task:json-decoder-hang",
+      "objective": "Find the input that makes the JSON decoder hang.",
+      "offers": [
+        {
+          "is_target": false,
+          "key": "nesting-objects",
+          "label": "nesting/objects nested 1000 deep",
+          "signal": 6
+        },
+        {
+          "is_target": false,
+          "key": "numbers-negative-zero",
+          "label": "numbers/negative zero and NaN text",
+          "signal": 3
+        }
+      ],
+      "selection_budget": 4,
+      "turns": 8
+    },
+    {
+      "candidates": [
+        {
+          "is_target": false,
+          "key": "includes-missing",
+          "label": "includes/missing include target",
+          "signal": 3
+        },
+        {
+          "is_target": false,
+          "key": "includes-self",
+          "label": "includes/file that includes itself",
+          "signal": 8
+        },
+        {
+          "is_target": false,
+          "key": "keys-duplicate",
+          "label": "keys/duplicate keys in one table",
+          "signal": 2
+        },
+        {
+          "is_target": false,
+          "key": "values-long",
+          "label": "values/strings longer than one mebibyte",
+          "signal": 1
+        }
+      ],
+      "identity": "task:config-parser-crash",
+      "objective": "Find the configuration file that crashes the parser.",
+      "offers": [
+        {
+          "is_target": true,
+          "key": "includes-cycle",
+          "label": "includes/three files including each other in a cycle",
+          "signal": 9
+        },
+        {
+          "is_target": false,
+          "key": "includes-deep",
+          "label": "includes/includes nested 50 levels deep",
+          "signal": 5
+        },
+        {
+          "is_target": false,
+          "key": "keys-unicode",
+          "label": "keys/keys written with unicode escapes",
+          "signal": 2
+        },
+        {
+          "is_target": false,
+          "key": "values-binary",
+          "label": "values/binary bytes inside strings",
+          "signal": 1
+        }
+      ],
+      "selection_budget": 6,
+      "turns": 10
+    },
+    {
+      "candidates": [
+        {
+          "is_target": false,
+          "key": "headers-vary",
+          "label": "headers/vary on the cookie header only",
+          "signal": 2
+        },
+        {
+          "is_target": false,
+          "key": "paths-slash",
+          "label": "paths/trailing slash variants",
+          "signal": 7
+        },
+        {
+          "is_target": false,
+          "key": "query-order",
+          "label": "query/reordered query parameters",
+          "signal": 4
+        },
+        {
+          "is_target": false,
+          "key": "methods-head",
+          "label": "methods/HEAD versus GET",
+          "signal": 1
+        },
+        {
+          "is_target": false,
+          "key": "encoding-gzip",
+          "label": "encoding/gzip versus identity bodies",
+          "signal": 3
+        }
+      ],
+      "identity": "task:cache-key-collision",
+      "objective": "Find the request pair that collides in the response cache.",
+      "offers": [
+        {
+          "is_target": true,
+          "key": "paths-encoded-slash",
+          "label": "paths/percent-encoded slash in a segment",
+          "signal": 9
+        },
+        {
+          "is_target": false,
+          "key": "query-duplicate",
+          "label": "query/duplicate query parameters",
+          "signal": 5
+        },
+        {
+          "is_target": false,
+          "key": "headers-case",
+          "label": "headers/case-folded header names",
+          "signal": 2
+        }
+      ],
+      "selection_budget": 6,
+      "turns": 10
+    }
+  ],
+  "verifier": "verifier:campaign-history-replay"
+}

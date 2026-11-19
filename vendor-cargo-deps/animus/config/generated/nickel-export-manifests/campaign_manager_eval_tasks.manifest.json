@@ -1,0 +1,53 @@
+{
+  "schema": "onix-nickel-export-manifest/v1",
+  "generator": "nickel-export-core/v1",
+  "evaluator": {
+    "identity": "nixpkgs:nickel",
+    "version": "nickel-lang-cli-1.17.0",
+    "options": [
+      "format=json",
+      "import-path=config",
+      "import-path=policy/contracts",
+      "selector=campaign_manager_eval_tasks"
+    ],
+    "import_path_policy": "declared_only"
+  },
+  "exports": [
+    {
+      "schema": "onix-nickel-export-receipt/v1",
+      "family_id": "animus.campaign-manager-eval-tasks",
+      "source": {
+        "path": "config/campaign-manager-eval-tasks.ncl",
+        "identity": "b3:37601058351f177c56fd6aba091c235b04a2ea1de1f2603f3bab56bfe2882ecf",
+        "bytes": 5624
+      },
+      "dependencies": [],
+      "import_paths": [
+        "config",
+        "policy/contracts"
+      ],
+      "selector": "campaign_manager_eval_tasks",
+      "contract": "",
+      "format": "json",
+      "output": {
+        "path": "config/generated/campaign-manager-eval-tasks.json",
+        "identity": "b3:84275e37ccccbc76c238c6bcd545297f2ddc70413f5ab4d830684a768d82f9e1",
+        "bytes": 5224
+      },
+      "evaluator": {
+        "identity": "nixpkgs:nickel",
+        "version": "nickel-lang-cli-1.17.0",
+        "options": [
+          "format=json",
+          "import-path=config",
+          "import-path=policy/contracts",
+          "selector=campaign_manager_eval_tasks"
+        ],
+        "import_path_policy": "declared_only"
+      },
+      "diagnostics": [],
+      "non_claim": "Nickel export success proves only exact declared input and output identities under the recorded evaluator descriptor; it does not prove deployability, product-policy conformance, evaluator equivalence, build success, or release eligibility"
+    }
+  ],
+  "manifest_identity": "b3:85252e73cdcbab64bc2fbc135ef62bc444283df8c582ebd1aeb0045a8ce92b7f"
+}

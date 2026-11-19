@@ -186,6 +186,7 @@ fn catalog_identity(snapshot: &CatalogSnapshot<'_>, models: &[Model]) -> alloc::
 }
 
 /// Required canonical request capabilities and bounds.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Requirements {
     pub tools: bool,
     pub streaming: bool,
@@ -248,6 +249,7 @@ pub fn admit_exact_model(
 }
 
 /// Existing decisions required before transport effects.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct DispatchAdmission {
     pub exact_model: ExactModelDecision,
     pub profile_admitted: bool,

@@ -160,6 +160,7 @@ fn observation_json_round_trips_after_admission() {
 pub(crate) fn attempt_observation() -> CommandWorkerObservation {
     let declaration = lattice_core::execution_binding::request::Declaration {
         schema: lattice_core::execution_binding::request::DECLARATION_SCHEMA.into(),
+        serving: None,
         compute: lattice_core::execution_binding::request::ComputeDeclaration::HostLocal {},
         model_routes: lattice_core::execution_binding::request::RouteDeclaration::NoModel {},
     };
@@ -200,6 +201,7 @@ pub(crate) fn attempt_observation() -> CommandWorkerObservation {
         &admitted,
         &observation.invocation_id,
         lattice_core::execution_binding::projection::accounting::WorkerCoverage::HostMeasured,
+        lattice_core::execution_binding::serving::usage::ModelRequestCoverage::NoModel,
     ));
     observation
 }

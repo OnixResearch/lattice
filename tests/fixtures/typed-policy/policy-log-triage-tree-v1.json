@@ -1,0 +1,40 @@
+{
+  "schema": "animus.frozen-policy.v1",
+  "runtime": { "crate": "animus-frozen-policy", "artifact_api": 1 },
+  "feature_schema": {
+    "id": "lattice.log-triage-features.v1",
+    "normalization": "min-max-per-mille-v1",
+    "features": [
+      { "name": "error_count", "min": 0, "max": 50 },
+      { "name": "warn_count", "min": 0, "max": 50 },
+      { "name": "max_latency_ms", "min": 0, "max": 10000 },
+      { "name": "critical_errors", "min": 0, "max": 50 }
+    ]
+  },
+  "action_schema": { "id": "lattice.log-triage-routes.v1", "actions": ["page", "ticket", "ignore"] },
+  "model": {
+    "kind": "decision-tree-v1",
+    "nodes": [
+      { "split": { "feature": 3, "threshold": 19, "below": 1, "above": 2 } },
+      { "split": { "feature": 1, "threshold": 59, "below": 3, "above": 4 } },
+      { "leaf": { "scores": [900, 50, 0] } },
+      { "split": { "feature": 2, "threshold": 199, "below": 5, "above": 6 } },
+      { "leaf": { "scores": [50, 900, 0] } },
+      { "split": { "feature": 1, "threshold": 19, "below": 7, "above": 8 } },
+      { "leaf": { "scores": [100, 850, 0] } },
+      { "leaf": { "scores": [0, 50, 900] } },
+      { "leaf": { "scores": [0, 300, 400] } }
+    ]
+  },
+  "bounds": { "score_min": 0, "score_max": 1000, "abstain_below": 500, "operation_budget": 16 },
+  "provenance": {
+    "kind": "fixture",
+    "producer": "lattice:add-typed-policy-operation",
+    "evaluation": "none: hand-authored from the payments-r1 authoring family only; held-out families were not inspected when choosing splits or scores",
+    "non_claims": [
+      "not trained or distilled",
+      "authored by the same change that wrote the outcome rubric",
+      "qualifies the Lattice operation boundary, not model quality"
+    ]
+  }
+}

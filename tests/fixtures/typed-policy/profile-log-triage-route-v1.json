@@ -1,0 +1,33 @@
+{
+  "schema": "lattice.typed-policy-profile.v1",
+  "id": "log-triage-route",
+  "version": 1,
+  "enabled": true,
+  "shape": "select",
+  "stateful": false,
+  "binding": { "workflow": "log-triage", "node_label": "route incident" },
+  "input": {
+    "schema": "lattice.log-triage-features.v1",
+    "max_bytes": 4096,
+    "features": [
+      { "name": "error_count", "pointer": "/features/error_count", "min": 0, "max": 50 },
+      { "name": "warn_count", "pointer": "/features/warn_count", "min": 0, "max": 50 },
+      { "name": "max_latency_ms", "pointer": "/features/max_latency_ms", "min": 0, "max": 10000 },
+      { "name": "critical_errors", "pointer": "/features/critical_errors", "min": 0, "max": 50 }
+    ]
+  },
+  "labels": ["page", "ticket", "ignore"],
+  "result": { "schema": "lattice.typed-policy-result.v1", "max_receipt_bytes": 16384, "retain_receipt": true },
+  "limits": { "max_operation_count": 16, "deadline_millis": 250 },
+  "cohort": {
+    "runtime_crate": "animus-frozen-policy",
+    "runtime_version": "0.1.0",
+    "artifact_api": 1,
+    "artifact": "b3:762b41761c35533d1533415c114a6e82ecc5e1e0d861eda5be1019eaec3f9ae7",
+    "model": "b3:c5830780510e2cb0c40a3d7170822fe4779288b10524c29eb37d55c606ed7907",
+    "policy_kind": "decision-tree-v1",
+    "feature_schema": "lattice.log-triage-features.v1",
+    "action_schema": "lattice.log-triage-routes.v1"
+  },
+  "fallback": { "kind": "declared_predicates" }
+}

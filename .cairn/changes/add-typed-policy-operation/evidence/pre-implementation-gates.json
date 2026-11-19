@@ -1,0 +1,34 @@
+{
+  "recorded": "2026-11-19",
+  "stage": "before implementation",
+  "cairn_bin": "/nix/store/j5mbcqr4xwadmnbxdd0p6h9iic80kcil-cairn-0.1.0/bin/cairn",
+  "gates": [
+    {
+      "stage": "proposal",
+      "verdict": "PASS",
+      "valid": true,
+      "issues": 0,
+      "input_hash": "1a68d442fef9eb21e419e8c5b5d72a7d8ab44da57dec94a390a72634a41e4171",
+      "receipt_hash": "d518ae4de5dbef1db35af3215c8831cab2312ea3455ee9bcc18425c15ba87461",
+      "policy_hash": "ef5dca51b75c9397423b77421ce6bcbe7f872bd53e95500321ec8d7445093a1f"
+    },
+    {
+      "stage": "design",
+      "verdict": "PASS",
+      "valid": true,
+      "issues": 0,
+      "input_hash": "3eacad6564a6e449979a5416da8e1dde3789e5b76696c5bb4ac4a27b76ac5eb8",
+      "receipt_hash": "44bf5af1b203ed932ec6af12288392ce3d690274299c5851c3f7f7b2783c4836",
+      "policy_hash": "ef5dca51b75c9397423b77421ce6bcbe7f872bd53e95500321ec8d7445093a1f"
+    },
+    {
+      "stage": "tasks",
+      "verdict": "PASS",
+      "valid": true,
+      "issues": 0,
+      "input_hash": "ca32262095d167766da96e45ae4a79c9ff3c7035cb5a5fb934903fecef9d19b3",
+      "receipt_hash": "b1af593c8c88afc7562a72d89472b52d4da5d3346597c079b85832e7ef988508",
+      "policy_hash": "ef5dca51b75c9397423b77421ce6bcbe7f872bd53e95500321ec8d7445093a1f"
+    }
+  ]
+}

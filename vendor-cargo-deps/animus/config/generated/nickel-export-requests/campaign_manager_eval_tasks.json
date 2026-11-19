@@ -1,0 +1,15 @@
+{
+  "allow_secret_material": false,
+  "contract": "",
+  "dependencies": [],
+  "destination": "config/generated/campaign-manager-eval-tasks.json",
+  "family_id": "animus.campaign-manager-eval-tasks",
+  "format": "json",
+  "import_paths": [
+    "config",
+    "policy/contracts"
+  ],
+  "schema": "onix-nickel-export-request/v1",
+  "selector": "campaign_manager_eval_tasks",
+  "source": "config/campaign-manager-eval-tasks.ncl"
+}

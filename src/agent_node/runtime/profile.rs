@@ -180,6 +180,9 @@ fn configured_facts(
             max_output_bytes: lattice_core::execution_binding::projection::Offered::Declared(max_output_bytes),
             model_routes: lattice_core::execution_binding::projection::Offered::Unavailable,
             compute: lattice_core::execution_binding::projection::Offered::Unavailable,
+            // Configured runtime routes have no serving-owner port at all.
+            // r[impl lattice.serving_binding.readiness.scenario.no_port]
+            serving_readiness: &lattice_core::execution_binding::projection::ServingReadiness::NoServingPort {},
         },
     )
     .map_err(|defect| super::super::Error::PreflightRejected(format!("configured profile facts: {defect:?}")))

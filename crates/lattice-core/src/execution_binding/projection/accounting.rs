@@ -59,13 +59,15 @@ pub enum ClaimLabel {
     Reserved,
 }
 
-/// Per-dimension coverage. Model and device usage stay unknown until their
-/// owners supply them; they are never zero.
+/// Per-dimension coverage. Device usage stays unknown until its owner supplies
+/// it; model-request usage is per-service only for served routes. Neither is
+/// ever zero-filled.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Coverage {
     pub worker_process: WorkerCoverage,
-    pub model_requests: UnknownCoverage,
+    // r[impl lattice.serving_binding.usage]
+    pub model_requests: super::super::serving::usage::ModelRequestCoverage,
     pub device_utilization: UnknownCoverage,
     pub unknown_owner: UnknownOwners,
 }
@@ -96,6 +98,7 @@ pub fn provenance(
     admitted: &super::super::admission::bound::Admitted,
     worker_incarnation: &str,
     worker_process: WorkerCoverage,
+    model_requests: super::super::serving::usage::ModelRequestCoverage,
 ) -> AttemptProvenance {
     AttemptProvenance {
         schema: PROVENANCE_SCHEMA.to_owned(),
@@ -113,7 +116,7 @@ pub fn provenance(
         model_routes: admitted.model_routes.clone(),
         coverage: Coverage {
             worker_process,
-            model_requests: UnknownCoverage::Unknown,
+            model_requests,
             device_utilization: UnknownCoverage::Unknown,
             unknown_owner: UnknownOwners {
                 model_requests: super::SERVING_OWNER.to_owned(),
@@ -159,6 +162,7 @@ pub fn is_valid_provenance(record: &AttemptProvenance) -> bool {
         && has_tokens
         && record.fence > 0
         && has_owners
+        && super::super::serving::is_valid_coverage(&record.coverage.model_requests, &record.model_routes)
         && is_valid_compute(&record.compute)
 }
 

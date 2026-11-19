@@ -8,6 +8,7 @@ pub(crate) mod admission;
 mod host;
 #[cfg(all(test, unix))]
 mod isolation_tests;
+mod serving;
 #[cfg(test)]
 mod tests;
 #[cfg(unix)]
@@ -94,20 +95,79 @@ impl Mount {
     }
 }
 
+/// Per-request decision before upstream contact and settlement after it.
+/// Serving-owner admission plugs in here; the broker's own model, budget,
+/// deadline and credential checks stay in force for every gate.
+// r[impl lattice.serving_binding.port_boundary.scenario.unserved]
+pub trait ModelRequestGate: Send {
+    /// `None` refuses the request; nothing reaches the upstream endpoint.
+    fn admit(&mut self, checks: crate::execution_binding::serving::gate::Checks) -> Option<GateTicket>;
+    /// Record how the admitted call ended. `Ok(false)` withholds the response
+    /// from the worker; `Err` means evidence could not be retained.
+    fn settle(
+        &mut self,
+        ticket: GateTicket,
+        upstream: crate::execution_binding::serving::gate::Upstream,
+    ) -> Result<bool, String>;
+    /// Record that the broker's request budget refused a request before the
+    /// gate; `Err` means that refusal could not be retained.
+    fn exhausted(&mut self) -> Result<(), String>;
+}
+
+/// Permission for one upstream call; served routes carry their producer ticket.
+#[derive(Debug)]
+pub struct GateTicket(Option<Box<crate::execution_binding::serving::gate::Ticket>>);
+
+/// A route without a serving declaration: the broker's own checks decide,
+/// no serving port is called and no request record is written.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct DirectRoute;
+
+impl ModelRequestGate for DirectRoute {
+    fn admit(&mut self, checks: crate::execution_binding::serving::gate::Checks) -> Option<GateTicket> {
+        let is_admitted = checks.is_exact_model && checks.is_within_budget && checks.is_current;
+        is_admitted.then_some(GateTicket(None))
+    }
+
+    fn settle(
+        &mut self,
+        _ticket: GateTicket,
+        _upstream: crate::execution_binding::serving::gate::Upstream,
+    ) -> Result<bool, String> {
+        Ok(true)
+    }
+
+    fn exhausted(&mut self) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+/// A route served through the serving-owner gate of one attempt.
+pub struct OwnerGate<'a> {
+    pub session: crate::execution_binding::serving::gate::Session<'a>,
+    pub route_name: String,
+}
+
+/// Host-side services of one broker incarnation.
+pub struct Services<'a> {
+    pub credentials: &'a dyn crate::credentials::CredentialProvider,
+    pub gate: &'a mut dyn ModelRequestGate,
+}
+
 pub(super) fn with_route<T>(
     request: super::Request,
     profile: &Profile,
-    credentials: &dyn crate::credentials::CredentialProvider,
+    services: Services<'_>,
     cancellation: &std::sync::atomic::AtomicBool,
     run: impl FnOnce(super::Request) -> T,
 ) -> Result<(T, bool), String> {
     #[cfg(unix)]
     {
-        host::with_route(request, profile, credentials, cancellation, run)
+        host::with_route(request, profile, services, cancellation, run)
     }
     #[cfg(not(unix))]
     {
-        let _ = (request, profile, credentials, cancellation, run);
+        let _ = (request, profile, services, cancellation, run);
         Err("candidate model broker requires Unix sockets".into())
     }
 }

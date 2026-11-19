@@ -7,6 +7,7 @@
 // r[verify lattice.execution_binding.instances.scenario.unknown]
 // r[verify lattice.execution_binding.deferred.scenario.serving]
 // r[verify lattice.execution_binding.deferred]
+// r[verify lattice.serving_binding.readiness.scenario.no_port]
 
 use lattice::execution_binding::core::admission::bound::*;
 use lattice::execution_binding::core::admission::*;
@@ -16,6 +17,8 @@ use lattice::execution_binding::core::projection::*;
 use lattice::execution_binding::core::request::*;
 
 const ROUTE: &str = "blake3:9999999999999999999999999999999999999999999999999999999999999999";
+/// The standalone CLI's cause: no serving-owner port was injected.
+static NO_PORT: ServingReadiness = ServingReadiness::NoServingPort {};
 
 fn routes() -> RouteDeclaration {
     RouteDeclaration::Routes {
@@ -45,6 +48,7 @@ fn profile_input<'a>(routes: &'a RouteDeclaration, compute: &'a ComputeRequireme
         max_output_bytes: Offered::Declared(4096),
         model_routes: Offered::Declared(routes),
         compute: Offered::Declared(compute),
+        serving_readiness: &NO_PORT,
     }
 }
 
@@ -64,8 +68,7 @@ fn attempt_profile_projects_declared_facts_and_unknown_bounds() {
     for bound in [&facts.cpu_millis, &facts.memory_bytes, &facts.storage_bytes] {
         assert_eq!((bound.support, bound.value), (SupportLevel::Unknown, None));
     }
-    assert_eq!(facts.serving_readiness.support, SupportLevel::Unknown);
-    assert_eq!(facts.serving_readiness.owner, "animus#17");
+    assert_eq!(facts.serving_readiness, ServingReadiness::NoServingPort {}, "the actual cause, not an owner");
     let text = serde_json::to_string(&facts).expect("facts json");
     assert!(!text.contains("qualified"), "declared facts are never qualified without evidence");
 }
@@ -101,6 +104,7 @@ fn qualified_requires_canonical_evidence_and_bounds_are_enforced() {
 fn bound() -> Admitted {
     let declaration = Declaration {
         schema: DECLARATION_SCHEMA.into(),
+        serving: None,
         compute: ComputeDeclaration::HostLocal {},
         model_routes: routes(),
     };
@@ -132,6 +136,7 @@ fn state(admitted: Option<&Admitted>) -> AttemptState<'_> {
         terminal_disposition: None,
         has_cancel_request: false,
         artifacts: &[],
+        serving_readiness: &NO_PORT,
     }
 }
 
@@ -163,14 +168,10 @@ fn instance_lifecycle_comes_only_from_retained_artifacts() {
     let instance = project_instance(&dispatched, 1_000).expect("projection").expect("instance");
     assert_eq!(instance.binding_identity, admitted.binding_identity);
     assert_eq!((instance.incarnation.as_str(), instance.fence), ("request-24", 7));
-    for unknown in [
-        &instance.host_reachability,
-        &instance.model_readiness,
-        &instance.allocation_liveness,
-    ] {
+    for unknown in [&instance.host_reachability, &instance.allocation_liveness] {
         assert_eq!(unknown.support, SupportLevel::Unknown);
     }
-    assert_eq!(instance.model_readiness.owner, "animus#17");
+    assert_eq!(instance.model_readiness, ServingReadiness::NoServingPort {}, "the actual cause, not an owner");
     let text = serde_json::to_string(&instance).expect("instance json");
     for forbidden in ["\"idle\"", "\"running\"", "\"healthy\"", "\"available\""] {
         assert!(!text.contains(forbidden), "{forbidden}");
@@ -206,4 +207,48 @@ fn missing_or_contradictory_state_is_unknown_or_an_error_never_inferred() {
     assert_eq!(cancellation(false, None), Cancellation::NotRequested);
     assert_eq!(cancellation(true, None), Cancellation::RequestedUnobserved);
     assert_eq!(cancellation(true, Some("cancelled")), Cancellation::ObservedTerminated);
+}
+
+// r[verify lattice.serving_binding.readiness]
+#[test]
+fn injected_port_readiness_is_carried_verbatim_and_bounded() {
+    let observed = ServingReadiness::Observed {
+        routes: vec![RouteReadiness {
+            route_name: "primary".into(),
+            service_id: "svc-shared".into(),
+            snapshot: SnapshotReading::Observed {
+                snapshot_identity: format!("blake3:{}", "d".repeat(64)),
+                source_generation: 1,
+                sequence: 4,
+                readiness: "draining".into(),
+                freshness: "too-old".into(),
+            },
+        }],
+    };
+    let routes = routes();
+    let compute = ComputeRequirement::HostLocal {};
+    let mut input = profile_input(&routes, &compute);
+    input.serving_readiness = &observed;
+    assert_eq!(project_profile(&input).expect("facts").serving_readiness, observed);
+    let admitted = bound();
+    let observed_state = AttemptState {
+        serving_readiness: &observed,
+        ..state(Some(&admitted))
+    };
+    let instance = project_instance(&observed_state, 1).expect("projection").expect("instance");
+    assert_eq!(instance.model_readiness, observed, "a draining, too-old snapshot is never reported ready");
+    let unbounded = ServingReadiness::Observed {
+        routes: vec![RouteReadiness {
+            route_name: "primary\n".into(),
+            service_id: "svc-shared".into(),
+            snapshot: SnapshotReading::Unavailable {},
+        }],
+    };
+    input.serving_readiness = &unbounded;
+    assert_eq!(project_profile(&input), Err(FactsDefect::Routes));
+    let unbounded_state = AttemptState {
+        serving_readiness: &unbounded,
+        ..observed_state
+    };
+    assert_eq!(project_instance(&unbounded_state, 1), Err(StateDefect::InvalidToken));
 }

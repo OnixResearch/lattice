@@ -11,6 +11,8 @@
 // r[verify lattice.execution_binding.usage_provenance.scenario.shared_allocation]
 // r[verify lattice.execution_binding.usage_provenance.scenario.bound]
 
+mod serving;
+
 type Observation = lattice_core::execution_binding::model::ComputeAllocationObservation;
 
 fn observed(name: &str) -> Observation {
@@ -161,7 +163,10 @@ async fn standalone_port_blocks_provider_allocation_before_any_effect() {
     let error = super::super::execution::run(
         &request_path,
         &state,
-        Some(&mut crate::execution_binding::UnavailableComputePort),
+        Some(super::super::Ports {
+            compute: &mut crate::execution_binding::UnavailableComputePort,
+            serving: Box::new(crate::execution_binding::serving::UnavailableOwner),
+        }),
     )
     .await
     .expect_err("provider unavailable");
@@ -230,21 +235,26 @@ fn attempt_usage_keeps_reserved_claims_and_unknown_dimensions() {
         finished_epoch_ms: Some(52),
     };
     let receipt = super::usage::WorkerReceipt::new(first.clone(), "request-identity".into());
-    let usage = receipt.observation(both);
+    let unserved = || lattice_core::execution_binding::serving::usage::ModelRequestCoverage::Unknown;
+    let usage = receipt.observation(both, unserved());
     usage.validate().expect("bound attempt usage");
     assert_eq!(usage.duration_millis, Some(42));
     assert_eq!(usage.provenance, crate::orchestration::UsageProvenance::HostMeasured);
-    let missing = receipt.observation(super::usage::WorkerWindow {
-        started_epoch_ms: Some(10),
-        finished_epoch_ms: None,
-    });
+    let missing = receipt.observation(
+        super::usage::WorkerWindow {
+            started_epoch_ms: Some(10),
+            finished_epoch_ms: None,
+        },
+        unserved(),
+    );
     missing.validate().expect("unknown duration");
     assert_eq!(missing.duration_millis, None);
     assert_eq!(missing.provenance, crate::orchestration::UsageProvenance::Unknown);
     for bound in [&first, &second] {
-        let text =
-            serde_json::to_string(&super::usage::WorkerReceipt::new(bound.clone(), "r".into()).observation(both))
-                .expect("usage json");
+        let text = serde_json::to_string(
+            &super::usage::WorkerReceipt::new(bound.clone(), "r".into()).observation(both, unserved()),
+        )
+        .expect("usage json");
         assert!(text.contains("\"label\":\"reserved\""));
         assert!(text.contains("\"shared_serving_ref\":\"serving-b\""));
         assert!(!text.contains("host-b"), "no serving-deployment claim is charged per worker");
@@ -254,7 +264,7 @@ fn attempt_usage_keeps_reserved_claims_and_unknown_dimensions() {
         super::admit(&super::super::tests::host_local(), &mut crate::execution_binding::UnavailableComputePort)
             .expect("hosted-API binding")
             .0;
-    let hosted_usage = super::usage::WorkerReceipt::new(hosted, "r".into()).observation(both);
+    let hosted_usage = super::usage::WorkerReceipt::new(hosted, "r".into()).observation(both, unserved());
     let provenance = hosted_usage.execution_binding.expect("provenance");
     assert_eq!(
         provenance.compute,
@@ -262,14 +272,122 @@ fn attempt_usage_keeps_reserved_claims_and_unknown_dimensions() {
     );
     let store_root = tempfile::tempdir().expect("store");
     let store = crate::store::Store::new(store_root.path().join("usage.redb")).expect("store");
-    receipt.persist(&store, both).expect("persisted before result");
-    receipt.persist(&store, both).expect("replay is idempotent");
+    let directory = store_root.path();
+    receipt.persist(&store, both, directory).expect("persisted before result");
+    receipt.persist(&store, both, directory).expect("replay is idempotent");
     assert!(
         receipt
-            .persist(&store, super::usage::WorkerWindow {
-                started_epoch_ms: None,
-                finished_epoch_ms: None
-            })
+            .persist(
+                &store,
+                super::usage::WorkerWindow {
+                    started_epoch_ms: None,
+                    finished_epoch_ms: None
+                },
+                directory
+            )
             .is_err()
     );
+}
+
+/// Request files are write-once, read back in order, and feed the attempt
+/// usage; a different second write for the same request is refused.
+// r[verify lattice.serving_binding.request_observation]
+// r[verify lattice.serving_binding.usage.scenario.settled]
+#[test]
+fn retained_request_files_feed_attempt_usage_and_refuse_rewrites() {
+    let root = tempfile::tempdir().expect("attempt directory");
+    let mut request = super::super::tests::host_local();
+    let lattice_core::execution_binding::request::RouteDeclaration::Routes { routes } =
+        &request.execution_binding.model_routes
+    else {
+        panic!("primary route");
+    };
+    let route_identity = routes[0].route_identity.clone();
+    request.execution_binding.serving = Some(serving_declaration(&request.omp.model_broker.model));
+    super::validate_request(&request).expect("served primary route validates");
+    let admitted = super::admit(&request, &mut crate::execution_binding::UnavailableComputePort).expect("binding").0;
+    assert!(admitted.serving.is_some());
+    let mut files = super::requests::RequestFiles::new(root.path()).expect("request files");
+    let record = refused_record(&admitted, &route_identity);
+    crate::execution_binding::serving::Sink::write_record(&mut files, &record).expect("first write");
+    crate::execution_binding::serving::Sink::write_record(&mut files, &record).expect("identical replay");
+    let mut changed = record.clone();
+    changed.outcome.label = "other".into();
+    assert!(crate::execution_binding::serving::Sink::write_record(&mut files, &changed).is_err());
+    let coverage = super::requests::coverage(&admitted, root.path()).expect("coverage");
+    let lattice_core::execution_binding::serving::usage::ModelRequestCoverage::Served(summary) = coverage else {
+        panic!("served coverage");
+    };
+    assert_eq!(summary.services[0].not_dispatched_requests, 1);
+    let mut wrong_model = request.clone();
+    if let Some(serving) = &mut wrong_model.execution_binding.serving {
+        serving.routes[0].model_id = "another-model".into();
+    }
+    assert!(super::validate_request(&wrong_model).is_err(), "served model must equal the broker model");
+}
+
+pub(super) fn serving_declaration(model: &str) -> lattice_core::execution_binding::serving::Declaration {
+    lattice_core::execution_binding::serving::Declaration {
+        schema: lattice_core::execution_binding::serving::DECLARATION_SCHEMA.into(),
+        profile: lattice_core::execution_binding::serving::Profile {
+            profile_id: "capacity-aware-observed-v1".into(),
+            identity_rule: lattice_core::execution_binding::serving::IdentityRule::ObservedRequired,
+            capacity_rule: lattice_core::execution_binding::serving::CapacityRule::KnownRequired,
+            replica_rule: lattice_core::execution_binding::serving::ReplicaRule::SameModelAllowed,
+            max_snapshot_age_ticks: 30,
+        },
+        privacy: lattice_core::execution_binding::serving::Privacy::RemoteAllowed,
+        attribution: lattice_core::execution_binding::serving::Attribution::NotApportioned {},
+        routes: vec![lattice_core::execution_binding::serving::Route {
+            name: super::PRIMARY_ROUTE.into(),
+            service_id: "svc-shared".into(),
+            endpoint_identity: "endpoint:svc-shared".into(),
+            model_id: model.into(),
+            configuration_ref: format!("blake3:{}", "a".repeat(64)),
+            requirements: lattice_core::execution_binding::serving::Requirements {
+                needs_tools: false,
+                needs_streaming: false,
+                needs_structured_output: false,
+                needs_developer_role: false,
+                input_tokens: 1_000,
+                output_tokens: 100,
+            },
+        }],
+        stop_on_overrun: false,
+    }
+}
+
+fn refused_record(
+    admitted: &lattice_core::execution_binding::admission::bound::Admitted,
+    route_identity: &str,
+) -> lattice_core::execution_binding::serving::record::Observation {
+    lattice_core::execution_binding::serving::record::Observation {
+        schema: lattice_core::execution_binding::serving::record::OBSERVATION_SCHEMA.into(),
+        binding_identity: admitted.binding_identity.clone(),
+        profile_revision: admitted.profile_revision.clone(),
+        worker_incarnation: "incarnation".into(),
+        attempt_id: admitted.attempt.attempt_id.clone(),
+        fence: admitted.attempt.fence,
+        route_name: super::PRIMARY_ROUTE.into(),
+        route_identity: route_identity.into(),
+        service_id: "svc-shared".into(),
+        request_id: format!("blake3:{}", "c".repeat(64)),
+        ordinal: 1,
+        served: None,
+        snapshot: None,
+        admission: lattice_core::execution_binding::serving::record::Admission {
+            label: "not-requested".into(),
+            grant_ref: None,
+            admission_epoch: None,
+        },
+        outcome: lattice_core::execution_binding::serving::record::Outcome {
+            class: lattice_core::execution_binding::serving::record::OutcomeClass::NotDispatched,
+            label: "snapshot-unavailable".into(),
+            detail: None,
+        },
+        usage: lattice_core::execution_binding::serving::record::Usage::UNKNOWN,
+        evidence: lattice_core::execution_binding::serving::record::Evidence::Fixture,
+        receipt_identity: None,
+        provider_receipt_identity: None,
+    }
 }

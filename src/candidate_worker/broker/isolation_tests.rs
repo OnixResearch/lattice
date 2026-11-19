@@ -101,7 +101,11 @@ fn bubblewrap_broker_allows_only_the_model_route_and_hides_host_capabilities() {
             assert!(headers.contains("Bearer host-inference-token"));
             assert!(!headers.contains("publisher-secret"));
         });
-        let (outcome, clean) = with_route(request, &profile, &credentials, &cancellation, |selected| {
+        let services = super::Services {
+            credentials: &credentials,
+            gate: &mut super::DirectRoute,
+        };
+        let (outcome, clean) = with_route(request, &profile, services, &cancellation, |selected| {
             let mut crossed = selected.clone();
             crossed.attempt_id.push_str("-crossed");
             assert!(super::super::sandbox::command(&crossed).is_err());

@@ -211,6 +211,26 @@ pub async fn run_saved_workflow_with_authority_provider(
     .await
 }
 
+/// Runs a saved workflow with typed policy profiles bound to their declared Condition nodes
+/// (Lattice #23); decisions persist in the run detail record.
+// r[impl lattice.typed_policy.record]
+pub async fn run_saved_workflow_with_typed_policy(
+    request: shell::TypedPolicyRunRequest<'_>,
+    runtime: crate::workflow::decision::Runtime,
+) -> Result<HeadlessRunSummary, HeadlessRunError> {
+    shell::run_saved_workflow_with_executor_factory(
+        shell::ProductRunRequest {
+            store: request.store,
+            workflow_name: request.workflow_name,
+            run_id: request.run_id,
+            owner: crate::store::RunOwner::Unscoped,
+            authority_provider: request.authority_provider,
+        },
+        || Executor::new().with_typed_policy(runtime),
+    )
+    .await
+}
+
 // r[impl n8nclone.scheduling.webhook_listener.admission.valid]
 // r[impl n8nclone.scheduling.triggers.history]
 pub async fn run_admitted_trigger_plan(
@@ -297,6 +317,7 @@ pub async fn run_saved_workflow_with_agent_runtime_config_and_authority_provider
 pub use shell::OwnedRunRequest;
 pub use shell::SnapshotRunOutcome;
 pub use shell::SnapshotRunRequest;
+pub use shell::TypedPolicyRunRequest;
 pub use shell::run_owned_workflow;
 pub use shell::run_owned_workflow_with_authority_provider;
 pub use shell::run_owned_workflow_with_authority_provider_and_cancellation;

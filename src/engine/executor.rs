@@ -81,6 +81,7 @@ const AUTHORIZED_WORKFLOW_CONTEXT_REQUIRED: &str =
 const CHOREGRAPH_EXECUTION_FAILURE: &str = "Choregraph product execution failed";
 const APPROVAL_REQUIRES_DURABLE_SHELL: &str = "approval nodes require the durable workflow approval shell";
 
+mod choice;
 pub mod progress;
 
 type LocalProcessConfig = crate::process::core::RuntimeConfig;
@@ -1279,6 +1280,8 @@ pub struct Executor {
     frontier_conflicts: BTreeMap<u64, lattice_core::scheduling::ConflictState>,
     observed_completion_order: Vec<crate::engine::workflow::NodeId>,
     progress_sender: Option<progress::Sender>,
+    typed_policy: Option<crate::workflow::decision::Runtime>,
+    policy_decisions: parking_lot::Mutex<Vec<crate::workflow::decision::ledger::NodeRecord>>,
 }
 
 // r[impl n8nclone.workflow_execution.image_input_nodes.production_io.default_executor]
@@ -1319,6 +1322,8 @@ impl Executor {
             frontier_conflicts: BTreeMap::new(),
             observed_completion_order: Vec::new(),
             progress_sender: None,
+            typed_policy: None,
+            policy_decisions: parking_lot::Mutex::new(Vec::new()),
         }
     }
 
@@ -1432,6 +1437,19 @@ impl Executor {
     pub fn with_progress_sender(mut self, sender: progress::Sender) -> Self {
         self.progress_sender = Some(sender);
         self
+    }
+
+    /// Binds enabled typed policy profiles to their declared Condition nodes (Lattice #23).
+    // r[impl lattice.typed_policy.route]
+    #[must_use]
+    pub fn with_typed_policy(mut self, runtime: crate::workflow::decision::Runtime) -> Self {
+        self.typed_policy = Some(runtime);
+        self
+    }
+
+    /// Drains the typed policy decisions made since the last call, for durable persistence.
+    pub fn take_policy_decisions(&self) -> Vec<crate::workflow::decision::ledger::NodeRecord> {
+        std::mem::take(&mut *self.policy_decisions.lock())
     }
 
     pub(crate) fn progress_sender(&self) -> Option<progress::Sender> {
@@ -1638,6 +1656,19 @@ impl Executor {
                 },
                 input_hash,
             };
+        }
+
+        if let Some(step) = self
+            .decide_bound_node(choice::Step {
+                workflow,
+                node,
+                config,
+                inputs,
+                input_hash,
+            })
+            .await
+        {
+            return step;
         }
 
         info!(node = %node.label, "executing node");
@@ -2823,6 +2854,7 @@ impl Executor {
                 ),
                 None => base_input_hash,
             };
+            let input_hash = self.policy_cache_key(workflow, node_id, input_hash);
             let expression_context = expression_context_from_admitted_values(&expression_values);
 
             if matches!(workflow.node_config(node_id), Some(NodeConfig::Approval(_))) && control.stop_at_approval {

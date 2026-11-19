@@ -1,0 +1,102 @@
+{
+  "schema": "lattice.fixture-qualification.v1",
+  "change": "bind-model-serving-admission",
+  "kind": "synthetic-fixture-qualification",
+  "live_qualification": false,
+  "live_serving_owner_exercised": false,
+  "live_endpoint_exercised": false,
+  "evidence_label": "fixture",
+  "producer": {
+    "repository": "animus",
+    "revision": "1c370d5029a2667051c46bdfa1919e78e65e2f4b",
+    "source_archive_blake3": "ff16f0903348db1d5164d055b928d2f1f829ca1dffb6f1624e6d26779b11f2ab",
+    "consumed_api": "animus_adapters::serving (screen_routes, admission_query, gate_dispatch, response_provenance, project_receipt)",
+    "producer_schemas": [
+      "animus.serving-availability-snapshot.v1",
+      "animus.serving-capacity-profile.v1",
+      "animus.serving-invocation-receipt.v1"
+    ],
+    "not_vendored": "animus-std serving-admission host feature",
+    "published_at_authoring": false
+  },
+  "consumer_schemas": [
+    "lattice.serving-binding.v1",
+    "lattice.model-request-dispatch.v1",
+    "lattice.model-request-observation.v1",
+    "lattice.model-request-usage.v1",
+    "lattice.execution-binding-provenance.v1",
+    "lattice.admitted-execution-binding.v1",
+    "lattice.implementation-attempt-run.v3"
+  ],
+  "executable_identities": {
+    "worker": "none executed; FixtureOwner, MemorySink and attempt-directory request files only"
+  },
+  "fixtures": {
+    "positive": [
+      "cpu_worker_calls_a_separately_hosted_service_with_both_bindings_recorded",
+      "two_attempts_share_one_service_and_a_capacity_snapshot_is_never_a_reservation",
+      "one_worker_calling_two_services_keeps_per_service_provenance",
+      "hosted_api_binds_without_gpu_and_no_model_has_no_inference_usage",
+      "partial_telemetry_after_interruption_keeps_known_usage_and_unknown_remainder",
+      "retained_request_files_feed_attempt_usage_and_refuse_rewrites"
+    ],
+    "negative_refused_before_upstream": [
+      "expired", "too-old", "freshness-unknown", "out-of-order", "not-ready:draining",
+      "model-substituted", "configuration-changed", "endpoint-replaced", "generation-replaced",
+      "not-ready-at-dispatch", "grant-revoked", "grant-expired", "grant-for-other-request",
+      "quota-exhausted", "saturated", "existing-policy-denied", "admission-unavailable",
+      "snapshot-unavailable"
+    ],
+    "uncertain_never_retried": ["uncertain-timed-out", "uncertain-transport-failed", "uncertain-cancelled"],
+    "response_withheld": ["response-model-substituted"],
+    "usage_conflicts_refused": ["ConflictingRecord", "DispatchWithoutIntent", "Mismatch (crossed binding)", "Mismatch (crossed service)", "Unserved"],
+    "declaration_defects": ["Schema", "UndeclaredRoute", "Routes", "Token service_id", "Reference configuration_ref", "OutputTokens", "SnapshotAge", "Reference policy_ref", "NoModel"],
+    "independence": "direct-accelerator worker with a ready served route rejected InsufficientDevice from CPU-only agent-a-1-active",
+    "settled_usage": "store refuses a different summary for the same attempt; identical replay idempotent",
+    "evidence_label": {
+      "rule": "derived from OwnerPort::provenance(): fixture for FixtureOwner; live_endpoint only for an embedder-admitted upstream call; no_upstream_contact otherwise",
+      "tests": ["live_evidence_requires_an_embedder_port_and_an_admitted_upstream_call"],
+      "note": "the embedder case wraps fixture replies in a default-provenance port; no endpoint was contacted"
+    },
+    "overrun": {
+      "envelope": "route requirements input_tokens + output_tokens per dispatched request",
+      "tests": [
+        "stop_on_overrun_is_framed_into_the_identity_only_when_set",
+        "observed_overrun_stays_visible_beside_the_reservation",
+        "stop_on_overrun_refuses_the_next_request_with_zero_gate_or_port_calls",
+        "unknown_usage_is_never_headroom_and_never_an_exact_ceiling",
+        "budget_exhausted_refusal_is_recorded_once_and_replays_idempotently",
+        "implementation_attempt::cli::binding::tests::serving::inspect_names_the_missing_port_and_shows_the_budget_refusal_once"
+      ],
+      "refusal_labels": ["overrun-stopped", "budget-exhausted"]
+    },
+    "inventory_readiness": {
+      "states": ["no_serving_port", "no_served_route", "observed"],
+      "tests": [
+        "attempt_profile_projects_declared_facts_and_unknown_bounds",
+        "instance_lifecycle_comes_only_from_retained_artifacts",
+        "injected_port_readiness_is_carried_verbatim_and_bounded",
+        "implementation_attempt::cli::inspect::tests::inventory_separates_profile_and_terminal_instance_without_material",
+        "implementation_attempt::cli::binding::tests::serving::inspect_reports_the_injected_ports_latest_snapshot_readiness_and_freshness"
+      ]
+    }
+  },
+  "results": {
+    "test_execution_binding_serving": "22 passed, 0 failed",
+    "existing_execution_binding_suites": "admission 9, contracts 3, identity 4, inventory 5, observation 8, port 4, usage 3 passed",
+    "test_agent_profile_bindings": "4 passed",
+    "test_lattice_core_boundary": "3 passed",
+    "lattice_lib_implementation_attempt_broker_orchestration_store": "78 passed, 1 ignored",
+    "lattice_core": "15 passed"
+  },
+  "non_claims": [
+    "not-gpu-scheduling",
+    "not-production-availability",
+    "not-physical-placement-truth",
+    "not-model-correctness",
+    "not-capacity-reservation",
+    "not-provider-honesty",
+    "not-cost-or-pricing"
+  ],
+  "live_qualification_owner": "kiln#49"
+}

@@ -1,0 +1,99 @@
+{
+  "action_schema": {
+    "actions": [
+      "proceed",
+      "retry",
+      "escalate"
+    ],
+    "id": "animus.frozen-policy-example-actions.v1"
+  },
+  "bounds": {
+    "abstain_below": 50,
+    "operation_budget": 16,
+    "score_max": 1000,
+    "score_min": -1000
+  },
+  "feature_schema": {
+    "features": [
+      {
+        "max": 10,
+        "min": 0,
+        "name": "attempts"
+      },
+      {
+        "max": 1000,
+        "min": 0,
+        "name": "failure_rate_per_mille"
+      },
+      {
+        "max": 500,
+        "min": 0,
+        "name": "queue_depth"
+      }
+    ],
+    "id": "animus.frozen-policy-example-features.v1",
+    "normalization": "min-max-per-mille-v1"
+  },
+  "model": {
+    "kind": "decision-tree-v1",
+    "nodes": [
+      {
+        "split": {
+          "above": 2,
+          "below": 1,
+          "feature": 0,
+          "threshold": 300
+        }
+      },
+      {
+        "split": {
+          "above": 4,
+          "below": 3,
+          "feature": 1,
+          "threshold": 500
+        }
+      },
+      {
+        "leaf": {
+          "scores": [
+            0,
+            10,
+            90
+          ]
+        }
+      },
+      {
+        "leaf": {
+          "scores": [
+            100,
+            20,
+            0
+          ]
+        }
+      },
+      {
+        "leaf": {
+          "scores": [
+            10,
+            80,
+            30
+          ]
+        }
+      }
+    ]
+  },
+  "provenance": {
+    "evaluation": "none: hand-authored to qualify the leaf's admission and decision boundary",
+    "kind": "fixture",
+    "non_claims": [
+      "not trained or distilled",
+      "the triage task is illustrative and measures no consumer outcome"
+    ],
+    "producer": "animus:add-frozen-policy-leaf"
+  },
+  "runtime": {
+    "artifact_api": 1,
+    "crate": "animus-frozen-policy"
+  },
+  "schema": "animus.frozen-policy.v1"
+}

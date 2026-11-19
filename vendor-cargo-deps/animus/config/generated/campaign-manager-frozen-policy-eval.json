@@ -1,0 +1,31 @@
+{
+  "adoption": {
+    "max_fallback_per_mille": 0,
+    "min_gain_over_baseline_per_mille": 100,
+    "requires_random_parity": true
+  },
+  "artifact_identity": "b3:05cdecb7372c81a5aa28d39e5d216d60c75d8747a43b6a09d35b905047b4a9c3",
+  "baseline": "model:scripted:explore-only",
+  "non_claims": [
+    "the decision covers only the synthetic evaluator's three tasks",
+    "a hand-authored tree fixture's result does not measure learning or a trained model",
+    "scores, classes and ranks are neither task success nor authorization",
+    "cost units compare equal selection budgets; equal total compute, memory and model-load amortization are not measured",
+    "production rollout stays conditional on a trained artifact and the consumer pilot"
+  ],
+  "primary_outcome": "found",
+  "random_seeds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+  ],
+  "references": [
+    "model:scripted:signal-greedy"
+  ],
+  "schema": "animus.campaign-manager-frozen-policy-eval.v1"
+}

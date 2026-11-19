@@ -48,6 +48,7 @@ fn node_detail_from_step(
             cached: *cached,
             outputs: completed_output_details(workflow, step.node_id, outputs),
             error: None,
+            policy_decision: None,
         },
         crate::engine::executor::NodeStatus::Failed { error } => {
             terminal_detail(step.node_id, node_label, crate::store::RunNodeDetailStatus::Failed, Some(error.clone()))
@@ -82,6 +83,7 @@ fn terminal_detail(
         cached: false,
         outputs: Vec::new(),
         error,
+        policy_decision: None,
     }
 }
 

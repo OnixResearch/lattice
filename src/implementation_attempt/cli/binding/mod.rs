@@ -13,6 +13,7 @@
 // r[impl lattice.execution_binding.port_boundary.scenario.unavailable]
 // r[impl lattice.execution_binding.recovery]
 
+pub(super) mod requests;
 #[cfg(test)]
 mod tests;
 pub(super) mod usage;
@@ -113,7 +114,7 @@ pub(super) fn validate_request(request: &super::Request) -> Result<(), String> {
     if is_host_local_requirement != is_host_local_declaration {
         return Err("declared compute placement differs from the worker compute requirement".into());
     }
-    Ok(())
+    requests::validate(request)
 }
 
 pub(super) fn context(request: &super::Request) -> lattice_core::execution_binding::request::AttemptContext<'_> {

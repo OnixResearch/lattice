@@ -1,9 +1,11 @@
 //! `implementation-attempt inspect`: separate profile and instance facts.
 //!
 //! The command reads one attempt directory without creating it, takes no
-//! claim, schedules nothing and never calls the compute port. Paths,
-//! endpoints, prompts, backend handles and grant references are not printed.
-//! An unreadable or contradictory artifact is an error, never a guessed state.
+//! claim, schedules nothing and never calls the compute port. It reads only
+//! the latest snapshots of an injected serving-owner port, never admission or
+//! recheck; without one, serving readiness names that cause. Paths, endpoints,
+//! prompts, backend handles and grant references are not printed. An
+//! unreadable or contradictory artifact is an error, never a guessed state.
 
 // r[impl lattice.execution_binding.instances.scenario.projection]
 // r[impl lattice.execution_binding.instances.scenario.unknown]
@@ -14,25 +16,63 @@ mod tests;
 const INVENTORY_SCHEMA: &str = "lattice.worker-inventory.v1";
 const MAX_SMALL_ARTIFACT_BYTES: usize = 262_144;
 
-pub(super) fn run(request_path: &std::path::Path, state: &std::path::Path) -> Result<(), String> {
-    println!("{}", project(request_path, state)?);
+pub(super) fn run(
+    request_path: &std::path::Path,
+    state: &std::path::Path,
+    serving: &mut dyn crate::execution_binding::serving::OwnerPort,
+) -> Result<(), String> {
+    println!("{}", project(request_path, state, serving)?);
     Ok(())
 }
 
-pub(super) fn project(request_path: &std::path::Path, state: &std::path::Path) -> Result<serde_json::Value, String> {
+// r[impl lattice.serving_binding.readiness]
+pub(super) fn project(
+    request_path: &std::path::Path,
+    state: &std::path::Path,
+    serving: &mut dyn crate::execution_binding::serving::OwnerPort,
+) -> Result<serde_json::Value, String> {
     let (request, bytes) = super::artifacts::load_request(request_path)?;
     request.envelope.validate().map_err(|error| error.to_string())?;
     request.validate_binding()?;
-    let profile = profile_facts(&request)?;
+    let readiness = crate::execution_binding::serving::readiness::observe(
+        request.execution_binding.serving.as_ref(),
+        &request.envelope.attempt_id,
+        serving,
+    )?;
+    let profile = profile_facts(&request, &readiness)?;
     let identity = blake3::hash(&bytes).to_hex().to_string();
+    debug_assert!(readiness.is_bounded(), "readiness comes from validated producer values");
+    debug_assert_eq!(profile.serving_readiness, readiness, "profile and instance share one port read");
     let directory = super::artifacts::directory(state, &request);
-    let instance = instance(&request, &identity, &directory)?;
-    Ok(serde_json::json!({ "schema": INVENTORY_SCHEMA, "profile": profile, "instance": instance }))
+    let instance = instance(&request, &identity, &readiness, &directory)?;
+    let model_requests = model_requests(&request, &directory)?;
+    Ok(serde_json::json!({
+        "schema": INVENTORY_SCHEMA,
+        "profile": profile,
+        "instance": instance,
+        "model_requests": model_requests,
+    }))
+}
+
+/// The retained per-request summary, read-only; `None` before any binding.
+// r[impl lattice.serving_binding.overrun]
+fn model_requests(
+    request: &super::Request,
+    directory: &std::path::Path,
+) -> Result<Option<lattice_core::execution_binding::serving::usage::ModelRequestCoverage>, String> {
+    if !is_present(directory)? {
+        return Ok(None);
+    }
+    let Some(admitted) = super::binding::load(directory, request)? else {
+        return Ok(None);
+    };
+    super::binding::requests::coverage(&admitted, directory).map(Some)
 }
 
 /// OMP attempt-worker facts; every value comes from the admitted request.
 pub(super) fn profile_facts(
     request: &super::Request,
+    serving_readiness: &lattice_core::execution_binding::projection::ServingReadiness,
 ) -> Result<lattice_core::execution_binding::projection::inventory::WorkerProfileFacts, String> {
     debug_assert_eq!(request.schema, super::REQUEST_SCHEMA, "profile facts follow v3 validation");
     debug_assert_eq!(request.admitted_envelope, request.envelope.identity());
@@ -61,6 +101,7 @@ pub(super) fn profile_facts(
             ),
             model_routes: lattice_core::execution_binding::projection::Offered::Declared(&model_routes),
             compute: lattice_core::execution_binding::projection::Offered::Declared(&request.worker_compute),
+            serving_readiness,
         },
     )
     .map_err(|defect| format!("worker profile facts are unsupported: {defect:?}"))
@@ -78,6 +119,7 @@ const NAMED_ARTIFACTS: [&str; 6] = [
 fn instance(
     request: &super::Request,
     request_identity: &str,
+    serving_readiness: &lattice_core::execution_binding::projection::ServingReadiness,
     directory: &std::path::Path,
 ) -> Result<Option<lattice_core::execution_binding::projection::retained::WorkerInstanceObservation>, String> {
     if !is_present(directory)? {
@@ -102,6 +144,7 @@ fn instance(
         terminal_disposition: disposition.as_deref(),
         has_cancel_request: present("cancel.request"),
         artifacts: &pairs,
+        serving_readiness,
     };
     let observed_at_epoch_ms = i64::try_from(super::now_ms()?).map_err(|error| error.to_string())?;
     lattice_core::execution_binding::projection::retained::project_instance(&state, observed_at_epoch_ms)

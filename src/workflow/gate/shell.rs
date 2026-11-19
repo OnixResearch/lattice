@@ -2,5 +2,6 @@
 
 include!("shell/suspension.rs");
 include!("shell/resume.rs");
+include!("shell/policy.rs");
 include!("shell/inspection.rs");
 include!("shell/checkpoint.rs");

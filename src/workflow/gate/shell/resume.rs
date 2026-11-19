@@ -16,11 +16,24 @@ pub async fn resume_with_authority_provider(
     agent_runtime: crate::agent_node::RuntimeOptions,
     authority_provider: &dyn crate::engine::effect::execution::RunContextProvider,
 ) -> Result<ResumeExecution, Error> {
-    let prepared = match admit_resume(store, command)? {
+    let runtime = ResumeRuntime {
+        agent: agent_runtime,
+        typed_policy: None,
+    };
+    resume(store, command, runtime, authority_provider).await
+}
+
+async fn resume(
+    store: &crate::store::Store,
+    command: &super::ResumeCommand,
+    runtime: ResumeRuntime,
+    authority_provider: &dyn crate::engine::effect::execution::RunContextProvider,
+) -> Result<ResumeExecution, Error> {
+    let prepared = match admit_resume(store, command, runtime.typed_policy.as_ref())? {
         ResumeAdmission::Idempotent(execution) => return Ok(execution),
         ResumeAdmission::Ready(prepared) => *prepared,
     };
-    let executed = execute_remaining(store, command, agent_runtime, authority_provider, prepared).await?;
+    let executed = execute_remaining(store, command, runtime, authority_provider, prepared).await?;
     persist_resume(store, command, executed)
 }
 
@@ -29,6 +42,7 @@ struct PreparedResume {
     workflow: crate::engine::workflow::Workflow,
     signalled: super::ApprovalRequest,
     claim: super::core::ResumeClaimPlan,
+    carried_decisions: Vec<crate::workflow::decision::ledger::NodeRecord>,
 }
 
 enum ResumeAdmission {
@@ -41,9 +55,14 @@ struct ExecutedResume {
     execution: crate::engine::executor::ApprovalRunOutcome,
     completed_nodes: Vec<super::PersistedNodeOutcome>,
     completed_request: super::ApprovalRequest,
+    policy_decisions: Vec<crate::workflow::decision::ledger::NodeRecord>,
 }
 
-fn admit_resume(store: &crate::store::Store, command: &super::ResumeCommand) -> Result<ResumeAdmission, Error> {
+fn admit_resume(
+    store: &crate::store::Store,
+    command: &super::ResumeCommand,
+    typed_policy: Option<&crate::workflow::decision::Runtime>,
+) -> Result<ResumeAdmission, Error> {
     let current = store.load_workflow_approval(&command.request_id)?.ok_or(Error::RunMissing)?;
     if current.status != super::ApprovalRequestStatus::Resumed {
         require_active_request(store, &current)?;
@@ -67,6 +86,7 @@ fn admit_resume(store: &crate::store::Store, command: &super::ResumeCommand) -> 
             next_request: None,
         }));
     }
+    let carried_decisions = carried_policy_decisions(store, &current, &workflow, typed_policy)?;
     store.transition_workflow_approval(current.version, &claim.request)?;
     let mut signalled = claim.request.clone();
     super::choregraph::apply_resume_signal(&workflow, &mut signalled)?;
@@ -79,13 +99,14 @@ fn admit_resume(store: &crate::store::Store, command: &super::ResumeCommand) -> 
         workflow,
         signalled,
         claim,
+        carried_decisions,
     })))
 }
 
 async fn execute_remaining(
     store: &crate::store::Store,
     command: &super::ResumeCommand,
-    agent_runtime: crate::agent_node::RuntimeOptions,
+    runtime: ResumeRuntime,
     authority_provider: &dyn crate::engine::effect::execution::RunContextProvider,
     prepared: PreparedResume,
 ) -> Result<ExecutedResume, Error> {
@@ -97,8 +118,7 @@ async fn execute_remaining(
         .inspect_err(|_| mark_uncertain(store, &prepared.signalled, &command.owner))?;
     let workflow_catalog = std::sync::Arc::new(crate::engine::WorkflowCatalogRepository::from_repository(store)?);
     let subworkflow_shell = crate::engine::RepositorySubworkflowRunnerShell::product(workflow_catalog);
-    let mut executor = crate::engine::executor::Executor::new_with_agent_runtime_config(agent_runtime)
-        .with_subworkflow_runner_shell(Box::new(subworkflow_shell));
+    let mut executor = runtime.executor(Box::new(subworkflow_shell));
     let cache = std::collections::HashMap::new();
     let execution = executor
         .resume_authorized_after_approval(crate::engine::executor::ApprovalResumeInput {
@@ -136,6 +156,7 @@ async fn execute_remaining(
         execution,
         completed_nodes,
         completed_request,
+        policy_decisions: executor.take_policy_decisions(),
     })
 }
 
@@ -145,17 +166,26 @@ fn persist_resume(
     executed: ExecutedResume,
 ) -> Result<ResumeExecution, Error> {
     let ExecutedResume {
-        prepared,
+        mut prepared,
         execution,
         completed_nodes,
         completed_request,
+        policy_decisions,
     } = executed;
     let mut run = store.load_run(prepared.current.run_id)?.ok_or(Error::RunMissing)?;
-    let details = crate::run::history::detail_record_from_results(
+    let mut details = crate::run::history::detail_record_from_results(
         prepared.current.run_id,
         &prepared.workflow,
         &execution.results,
     );
+    let mut decisions = std::mem::take(&mut prepared.carried_decisions);
+    decisions.extend(policy_decisions);
+    // r[impl lattice.typed_policy.record]
+    if execution.suspension.is_some() {
+        crate::workflow::decision::ledger::attach_suspended(&mut details, decisions);
+    } else {
+        crate::workflow::decision::ledger::attach(&mut details, decisions);
+    }
     let replay_finished_epoch_millis = execution.suspension.is_none().then_some(command.observed_epoch_millis);
     let replay_events = crate::replay::replay_events_from_results(
         prepared.current.run_id,

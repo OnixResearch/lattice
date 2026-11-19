@@ -123,13 +123,16 @@ mod transport {
         let credentials = Credentials(AtomicUsize::new(0));
         let cancellation = AtomicBool::new(false);
         let stopped = AtomicBool::new(false);
+        let mut direct = crate::candidate_worker::broker::DirectRoute;
         let mut handler = wire::Handler {
             profile: &profile,
             credentials: &credentials,
+            gate: &mut direct,
             cancellation: &cancellation,
             stopped: &stopped,
             deadline: Instant::now() + Duration::from_secs(5),
             requests: 0,
+            failure: None,
         };
         let denied = request("/v1/chat/completions", r#"{"model":"ungranted-model"}"#);
         assert!(exchange(&mut handler, denied.as_bytes()).starts_with("HTTP/1.1 403"));
@@ -155,13 +158,17 @@ mod transport {
         let credentials = Credentials(AtomicUsize::new(0));
         let cancellation = AtomicBool::new(false);
         let stopped = AtomicBool::new(false);
+        let (mut direct, mut replacement) =
+            (crate::candidate_worker::broker::DirectRoute, crate::candidate_worker::broker::DirectRoute);
         let mut handler = wire::Handler {
             profile: &profile,
             credentials: &credentials,
+            gate: &mut direct,
             cancellation: &cancellation,
             stopped: &stopped,
             deadline: Instant::now() + Duration::from_secs(5),
             requests: 0,
+            failure: None,
         };
         for invalid in [
             request("/v1/models", r#"{"model":"admitted-model"}"#),
@@ -189,10 +196,12 @@ mod transport {
         handler = wire::Handler {
             profile: &profile,
             credentials: &credentials,
+            gate: &mut replacement,
             cancellation: &cancellation,
             stopped: &stopped,
             deadline: Instant::now() + Duration::from_secs(5),
             requests: 0,
+            failure: None,
         };
         assert!(
             exchange(&mut handler, request("/v1/chat/completions", r#"{"model":"admitted-model"}"#).as_bytes())

@@ -74,11 +74,16 @@ fn publish(retained: &Retained, disposition: crate::candidate::CandidateDisposit
     store.save_candidate_attempt_result("attempt-agent-a-1", &result).expect("terminal result");
 }
 
+/// Inventory as the standalone CLI projects it: no serving-owner port injected.
+fn project(request_path: &std::path::Path, state: &std::path::Path) -> Result<serde_json::Value, String> {
+    super::project(request_path, state, &mut crate::execution_binding::serving::UnavailableOwner)
+}
+
 #[test]
 fn inventory_separates_profile_and_terminal_instance_without_material() {
     let retained = retained(true);
     publish(&retained, crate::candidate::CandidateDisposition::Failed);
-    let output = super::project(&retained.request_path, &retained.state).expect("inventory");
+    let output = project(&retained.request_path, &retained.state).expect("inventory");
     let profile = &output["profile"];
     let instance = &output["instance"];
     assert_eq!(profile["schema"], "lattice.worker-profile-facts.v1");
@@ -91,7 +96,9 @@ fn inventory_separates_profile_and_terminal_instance_without_material() {
     assert_eq!(instance["binding_identity"], retained.binding_identity.as_str());
     assert_eq!(instance["incarnation"], retained.identity.as_str());
     assert_eq!(instance["fence"], 7);
-    assert_eq!(instance["model_readiness"]["support"], "unknown");
+    assert_eq!(instance["model_readiness"]["state"], "no_serving_port");
+    assert_eq!(profile["serving_readiness"]["state"], "no_serving_port");
+    assert_eq!(output["model_requests"], "unknown", "an unserved binding observes no per-request usage");
     let text = output.to_string();
     for forbidden in [
         "/usr/bin",
@@ -113,17 +120,17 @@ fn inventory_separates_profile_and_terminal_instance_without_material() {
 #[test]
 fn retained_lifecycle_and_cancellation_stay_conservative() {
     let admitted_only = retained(false);
-    let output = super::project(&admitted_only.request_path, &admitted_only.state).expect("inventory");
+    let output = project(&admitted_only.request_path, &admitted_only.state).expect("inventory");
     assert_eq!(output["instance"]["lifecycle"]["state"], "admitted_not_dispatched");
     let dispatched = retained(true);
-    let output = super::project(&dispatched.request_path, &dispatched.state).expect("inventory");
+    let output = project(&dispatched.request_path, &dispatched.state).expect("inventory");
     assert_eq!(output["instance"]["lifecycle"]["state"], "dispatch_recorded_outcome_unknown");
     assert_eq!(output["instance"]["cancellation"], "not_requested");
     super::super::cancel(&dispatched.request_path, &dispatched.state).expect("cancel requested");
-    let output = super::project(&dispatched.request_path, &dispatched.state).expect("inventory");
+    let output = project(&dispatched.request_path, &dispatched.state).expect("inventory");
     assert_eq!(output["instance"]["cancellation"], "requested_unobserved");
     publish(&dispatched, crate::candidate::CandidateDisposition::Cancelled);
-    let output = super::project(&dispatched.request_path, &dispatched.state).expect("inventory");
+    let output = project(&dispatched.request_path, &dispatched.state).expect("inventory");
     assert_eq!(output["instance"]["cancellation"], "observed_terminated");
 }
 
@@ -131,11 +138,11 @@ fn retained_lifecycle_and_cancellation_stay_conservative() {
 fn missing_or_unreadable_state_never_becomes_a_guessed_instance() {
     let retained = retained(true);
     let empty_state = retained.state.with_file_name("empty-state");
-    let output = super::project(&retained.request_path, &empty_state).expect("no retained execution");
+    let output = project(&retained.request_path, &empty_state).expect("no retained execution");
     assert!(output["instance"].is_null());
     assert!(output["profile"].is_object());
     std::fs::remove_file(retained.directory.join(super::super::binding::ADMITTED_FILE)).expect("remove binding");
-    assert!(super::project(&retained.request_path, &retained.state).is_err(), "intent without binding");
+    assert!(project(&retained.request_path, &retained.state).is_err(), "intent without binding");
     std::fs::write(retained.directory.join(super::super::binding::ADMITTED_FILE), b"{").expect("corrupt binding");
-    assert!(super::project(&retained.request_path, &retained.state).is_err(), "unreadable binding");
+    assert!(project(&retained.request_path, &retained.state).is_err(), "unreadable binding");
 }

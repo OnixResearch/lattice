@@ -9,9 +9,9 @@ use std::process::ExitCode;
 const EXPECTED_ARGUMENT_COUNT: usize = 3;
 const SOURCE_ARGUMENT_INDEX: usize = 1;
 const DESTINATION_ARGUMENT_INDEX: usize = 2;
-const EXPECTED_REVISION: &str = "51d2683776ab73d4fd36d3d9e6ced2beadf9793d";
+const EXPECTED_REVISION: &str = "1c370d5029a2667051c46bdfa1919e78e65e2f4b";
 // BLAKE3 of `git -c tar.umask=0000 archive --format=tar` at the exact revision.
-const SOURCE_ARCHIVE_BLAKE3: &str = "5f59a2b900095aec757bad5b5542d844e92eac2a0bd818e110d70927611ddb46";
+const SOURCE_ARCHIVE_BLAKE3: &str = "ff16f0903348db1d5164d055b928d2f1f829ca1dffb6f1624e6d26779b11f2ab";
 const HOST_CONTROL_REVISION: &str = "7735faf3d8895b0bfa89f563184c4321b3b144a1";
 const GIT_PROGRAM: &str = "git";
 const FAILURE_EXIT_CODE: u8 = 1;
@@ -79,6 +79,7 @@ const REQUIRED_CRATES: &[&str] = &[
     "animus-adapters",
     "animus-core",
     "animus-eval-core",
+    "animus-frozen-policy",
     "animus-router",
     "animus-runtime",
     "animus-session-core",
@@ -100,6 +101,7 @@ members = [
   "crates/animus-adapters",
   "crates/animus-core",
   "crates/animus-eval-core",
+  "crates/animus-frozen-policy",
   "crates/animus-router",
   "crates/animus-runtime",
   "crates/animus-session-core",
@@ -119,6 +121,7 @@ default-members = [
   "crates/animus-adapters",
   "crates/animus-core",
   "crates/animus-eval-core",
+  "crates/animus-frozen-policy",
   "crates/animus-router",
   "crates/animus-runtime",
   "crates/animus-session-core",

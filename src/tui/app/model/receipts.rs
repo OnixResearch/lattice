@@ -69,6 +69,7 @@ pub(in crate::tui::app) fn canceled_run_detail_record(
                 cached: false,
                 outputs: Vec::new(),
                 error: None,
+                policy_decision: None,
             }
         })
         .collect::<Vec<_>>();

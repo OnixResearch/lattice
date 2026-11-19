@@ -37,6 +37,7 @@ fn routes() -> RouteDeclaration {
 fn expected(observation: &ComputeAllocationObservation) -> Declaration {
     Declaration {
         schema: DECLARATION_SCHEMA.into(),
+        serving: None,
         compute: ComputeDeclaration::ProviderAllocation {
             allocation_id: observation.allocation.id.clone(),
             host_id: observation.allocation.host_id.clone(),
@@ -153,6 +154,7 @@ fn two_workers_share_serving_b_without_a_second_serving_charge() {
 fn hosted_api_and_no_model_workers_bind_without_leases() {
     let host_local = Declaration {
         schema: DECLARATION_SCHEMA.into(),
+        serving: None,
         compute: ComputeDeclaration::HostLocal {},
         model_routes: routes(),
     };
@@ -379,6 +381,7 @@ fn revalidation_rejects_enforcement_downgrade_and_accepts_upgrade() {
     let host_local = admitted(admit(
         &Declaration {
             schema: DECLARATION_SCHEMA.into(),
+            serving: None,
             compute: ComputeDeclaration::HostLocal {},
             model_routes: routes(),
         },

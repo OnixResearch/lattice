@@ -1,8 +1,9 @@
 //! `lattice.worker-instance-observation.v1`: one owned attempt's retained state.
 //!
-//! The lifecycle comes only from retained artifacts. Host reachability, model
-//! readiness and current allocation liveness stay unknown, and nothing here is
-//! a queue, claim or scheduling decision.
+//! The lifecycle comes only from retained artifacts. Host reachability and
+//! current allocation liveness stay unknown. Model readiness is the injected
+//! serving-owner port's latest snapshot, or the actual reason none was
+//! observed. Nothing here is a queue, claim or scheduling decision.
 
 // r[impl lattice.execution_binding.instances]
 // r[impl lattice.execution_binding.instances.scenario.unknown]
@@ -23,6 +24,8 @@ pub struct AttemptState<'a> {
     pub has_cancel_request: bool,
     /// `(artifact name, artifact identity)` for every present artifact.
     pub artifacts: &'a [(&'a str, &'a str)],
+    /// Readiness from the injected serving-owner port, or why none was observed.
+    pub serving_readiness: &'a super::ServingReadiness,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -60,7 +63,7 @@ pub struct WorkerInstanceObservation {
     pub lifecycle: Lifecycle,
     pub cancellation: Cancellation,
     pub host_reachability: super::OwnedUnknown,
-    pub model_readiness: super::OwnedUnknown,
+    pub model_readiness: super::ServingReadiness,
     pub allocation_liveness: super::OwnedUnknown,
     pub observed_at_epoch_ms: i64,
     pub state_digest: String,
@@ -94,8 +97,9 @@ pub fn project_instance(
     if !super::super::admission::bound::is_intact(admitted) {
         return Err(StateDefect::BindingNotIntact);
     }
-    let is_bounded =
-        super::super::is_token(state.request_identity) && state.terminal_disposition.is_none_or(super::super::is_token);
+    let is_bounded = super::super::is_token(state.request_identity)
+        && state.terminal_disposition.is_none_or(super::super::is_token)
+        && state.serving_readiness.is_bounded();
     if !is_bounded {
         return Err(StateDefect::InvalidToken);
     }
@@ -152,7 +156,7 @@ fn observation(
         lifecycle,
         cancellation: cancellation(state),
         host_reachability: super::OwnedUnknown::unknown(super::LIVE_HOST_OWNER),
-        model_readiness: super::OwnedUnknown::unknown(super::SERVING_OWNER),
+        model_readiness: state.serving_readiness.clone(),
         allocation_liveness: super::OwnedUnknown::unknown(super::LIVE_HOST_OWNER),
         observed_at_epoch_ms,
         state_digest,

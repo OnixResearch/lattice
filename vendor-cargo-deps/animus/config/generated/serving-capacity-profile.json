@@ -1,0 +1,31 @@
+{
+  "bounds": {
+    "max_capacity_observations": 16,
+    "max_rollout_operations": 8,
+    "max_route_candidates": 32,
+    "max_services": 64,
+    "max_snapshot_bytes": 262144,
+    "max_token_bytes": 256
+  },
+  "capacity_rule": "known_required",
+  "evidence_labels": [
+    "fixture",
+    "live-endpoint"
+  ],
+  "identity_rule": "observed_required",
+  "max_snapshot_age_ticks": 30,
+  "non_claims": [
+    "not-gpu-scheduling",
+    "not-production-availability",
+    "not-physical-placement-truth",
+    "not-model-correctness",
+    "not-capacity-reservation",
+    "not-provider-honesty",
+    "not-cost-or-pricing"
+  ],
+  "owner_admission": "required",
+  "profile_id": "capacity-aware-observed-v1",
+  "redaction": "metadata_only",
+  "replica_rule": "same_model_allowed",
+  "schema": "animus.serving-capacity-profile.v1"
+}

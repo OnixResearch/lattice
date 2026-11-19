@@ -1,0 +1,799 @@
+{
+  "arms": {
+    "deterministic": {
+      "authoring": {
+        "abstentions": 0,
+        "cases": 6,
+        "coverage": 0.0,
+        "failures": [
+          {
+            "case": "payments-r1-03",
+            "expected": "ignore",
+            "outcome": null,
+            "routed": "ticket"
+          }
+        ],
+        "fallback_rate": 0.0,
+        "inference_operations_total": 0,
+        "invalid_output_rate": 0.0,
+        "median_of_case_median_workflow_micros": 64312,
+        "normalization_operations_total": 0,
+        "p95_of_case_median_workflow_micros": 76165,
+        "routed_outside_declared": 0,
+        "runs_with_more_than_one_continuation": 0,
+        "successes": 5,
+        "whole_workflow_success_rate": 0.8333333333333334
+      },
+      "held_out": {
+        "abstentions": 0,
+        "cases": 18,
+        "coverage": 0.0,
+        "failures": [
+          {
+            "case": "search-r1-01",
+            "expected": "ignore",
+            "outcome": null,
+            "routed": "ticket"
+          },
+          {
+            "case": "search-r1-03",
+            "expected": "ticket",
+            "outcome": null,
+            "routed": "page"
+          },
+          {
+            "case": "auth-r2-02",
+            "expected": "ignore",
+            "outcome": null,
+            "routed": "ticket"
+          },
+          {
+            "case": "reports-r1-01",
+            "expected": "ignore",
+            "outcome": null,
+            "routed": "ticket"
+          },
+          {
+            "case": "reports-r1-02",
+            "expected": "ticket",
+            "outcome": null,
+            "routed": "page"
+          },
+          {
+            "case": "reports-r1-05",
+            "expected": "ticket",
+            "outcome": null,
+            "routed": "page"
+          }
+        ],
+        "fallback_rate": 0.0,
+        "inference_operations_total": 0,
+        "invalid_output_rate": 0.0,
+        "median_of_case_median_workflow_micros": 64902,
+        "normalization_operations_total": 0,
+        "p95_of_case_median_workflow_micros": 105018,
+        "routed_outside_declared": 0,
+        "runs_with_more_than_one_continuation": 0,
+        "successes": 12,
+        "whole_workflow_success_rate": 0.6666666666666666
+      }
+    },
+    "fast_policy": {
+      "authoring": {
+        "abstentions": 1,
+        "cases": 6,
+        "coverage": 0.8333333333333334,
+        "failures": [
+          {
+            "case": "payments-r1-03",
+            "expected": "ignore",
+            "outcome": "abstained",
+            "routed": "ticket"
+          }
+        ],
+        "fallback_rate": 0.16666666666666666,
+        "inference_operations_total": 15,
+        "invalid_output_rate": 0.0,
+        "median_of_case_median_workflow_micros": 67877,
+        "normalization_operations_total": 24,
+        "p95_of_case_median_workflow_micros": 86618,
+        "routed_outside_declared": 0,
+        "runs_with_more_than_one_continuation": 0,
+        "successes": 5,
+        "whole_workflow_success_rate": 0.8333333333333334
+      },
+      "held_out": {
+        "abstentions": 4,
+        "cases": 18,
+        "coverage": 0.7222222222222222,
+        "failures": [
+          {
+            "case": "search-r1-01",
+            "expected": "ignore",
+            "outcome": "abstained",
+            "routed": "ticket"
+          },
+          {
+            "case": "search-r1-03",
+            "expected": "ticket",
+            "outcome": "accepted",
+            "routed": "ignore"
+          },
+          {
+            "case": "search-r1-06",
+            "expected": "page",
+            "outcome": "accepted",
+            "routed": "ignore"
+          },
+          {
+            "case": "auth-r2-02",
+            "expected": "ignore",
+            "outcome": "abstained",
+            "routed": "ticket"
+          },
+          {
+            "case": "reports-r1-01",
+            "expected": "ignore",
+            "outcome": "abstained",
+            "routed": "ticket"
+          },
+          {
+            "case": "reports-r1-02",
+            "expected": "ticket",
+            "outcome": "accepted",
+            "routed": "ignore"
+          },
+          {
+            "case": "reports-r1-05",
+            "expected": "ticket",
+            "outcome": "abstained",
+            "routed": "page"
+          }
+        ],
+        "fallback_rate": 0.2777777777777778,
+        "inference_operations_total": 55,
+        "invalid_output_rate": 0.05555555555555555,
+        "median_of_case_median_workflow_micros": 65602,
+        "normalization_operations_total": 68,
+        "p95_of_case_median_workflow_micros": 69434,
+        "routed_outside_declared": 0,
+        "runs_with_more_than_one_continuation": 0,
+        "successes": 11,
+        "whole_workflow_success_rate": 0.6111111111111112
+      },
+      "policy_stage": {
+        "includes": [
+          "projection",
+          "artifact admission",
+          "inference",
+          "receipt encoding",
+          "Lattice validation"
+        ],
+        "median_micros": 5,
+        "p95_micros": 5,
+        "samples": 1200
+      }
+    },
+    "reasoning_model": {
+      "reason": "examples/workflows/log-triage.ncl contains only shell nodes (log source, grep filter, awk render); no Agent or reasoning-model node makes a routing decision in that workflow today, and the routing step exists only as the deterministic Condition this harness adds",
+      "status": "not_applicable"
+    }
+  },
+  "artifact": "b3:762b41761c35533d1533415c114a6e82ecc5e1e0d861eda5be1019eaec3f9ae7",
+  "cases": [
+    {
+      "arm": "deterministic",
+      "case": "payments-r1-01",
+      "expected": "ignore",
+      "family": "payments-r1",
+      "inference_operations": 0,
+      "median_workflow_micros": 61920,
+      "normalization_operations": 0,
+      "outcome": null,
+      "routed": "ignore",
+      "success": true
+    },
+    {
+      "arm": "fast_policy",
+      "case": "payments-r1-01",
+      "expected": "ignore",
+      "family": "payments-r1",
+      "inference_operations": 4,
+      "median_workflow_micros": 67176,
+      "normalization_operations": 4,
+      "outcome": "accepted",
+      "routed": "ignore",
+      "success": true
+    },
+    {
+      "arm": "deterministic",
+      "case": "payments-r1-02",
+      "expected": "page",
+      "family": "payments-r1",
+      "inference_operations": 0,
+      "median_workflow_micros": 63630,
+      "normalization_operations": 0,
+      "outcome": null,
+      "routed": "page",
+      "success": true
+    },
+    {
+      "arm": "fast_policy",
+      "case": "payments-r1-02",
+      "expected": "page",
+      "family": "payments-r1",
+      "inference_operations": 1,
+      "median_workflow_micros": 67311,
+      "normalization_operations": 4,
+      "outcome": "accepted",
+      "routed": "page",
+      "success": true
+    },
+    {
+      "arm": "deterministic",
+      "case": "payments-r1-03",
+      "expected": "ignore",
+      "family": "payments-r1",
+      "inference_operations": 0,
+      "median_workflow_micros": 64312,
+      "normalization_operations": 0,
+      "outcome": null,
+      "routed": "ticket",
+      "success": false
+    },
+    {
+      "arm": "fast_policy",
+      "case": "payments-r1-03",
+      "expected": "ignore",
+      "family": "payments-r1",
+      "inference_operations": 4,
+      "median_workflow_micros": 67877,
+      "normalization_operations": 4,
+      "outcome": "abstained",
+      "routed": "ticket",
+      "success": false
+    },
+    {
+      "arm": "deterministic",
+      "case": "payments-r1-04",
+      "expected": "ticket",
+      "family": "payments-r1",
+      "inference_operations": 0,
+      "median_workflow_micros": 82878,
+      "normalization_operations": 0,
+      "outcome": null,
+      "routed": "ticket",
+      "success": true
+    },
+    {
+      "arm": "fast_policy",
+      "case": "payments-r1-04",
+      "expected": "ticket",
+      "family": "payments-r1",
+      "inference_operations": 2,
+      "median_workflow_micros": 86618,
+      "normalization_operations": 4,
+      "outcome": "accepted",
+      "routed": "ticket",
+      "success": true
+    },
+    {
+      "arm": "deterministic",
+      "case": "payments-r1-05",
+      "expected": "page",
+      "family": "payments-r1",
+      "inference_operations": 0,
+      "median_workflow_micros": 73976,
+      "normalization_operations": 0,
+      "outcome": null,
+      "routed": "page",
+      "success": true
+    },
+    {
+      "arm": "fast_policy",
+      "case": "payments-r1-05",
+      "expected": "page",
+      "family": "payments-r1",
+      "inference_operations": 1,
+      "median_workflow_micros": 73999,
+      "normalization_operations": 4,
+      "outcome": "accepted",
+      "routed": "page",
+      "success": true
+    },
+    {
+      "arm": "deterministic",
+      "case": "payments-r1-06",
+      "expected": "ticket",
+      "family": "payments-r1",
+      "inference_operations": 0,
+      "median_workflow_micros": 76165,
+      "normalization_operations": 0,
+      "outcome": null,
+      "routed": "ticket",
+      "success": true
+    },
+    {
+      "arm": "fast_policy",
+      "case": "payments-r1-06",
+      "expected": "ticket",
+      "family": "payments-r1",
+      "inference_operations": 3,
+      "median_workflow_micros": 93960,
+      "normalization_operations": 4,
+      "outcome": "accepted",
+      "routed": "ticket",
+      "success": true
+    },
+    {
+      "arm": "deterministic",
+      "case": "search-r1-01",
+      "expected": "ignore",
+      "family": "search-r1",
+      "inference_operations": 0,
+      "median_workflow_micros": 331588,
+      "normalization_operations": 0,
+      "outcome": null,
+      "routed": "ticket",
+      "success": false
+    },
+    {
+      "arm": "fast_policy",
+      "case": "search-r1-01",
+      "expected": "ignore",
+      "family": "search-r1",
+      "inference_operations": 4,
+      "median_workflow_micros": 107945,
+      "normalization_operations": 4,
+      "outcome": "abstained",
+      "routed": "ticket",
+      "success": false
+    },
+    {
+      "arm": "deterministic",
+      "case": "search-r1-02",
+      "expected": "ticket",
+      "family": "search-r1",
+      "inference_operations": 0,
+      "median_workflow_micros": 105018,
+      "normalization_operations": 0,
+      "outcome": null,
+      "routed": "ticket",
+      "success": true
+    },
+    {
+      "arm": "fast_policy",
+      "case": "search-r1-02",
+      "expected": "ticket",
+      "family": "search-r1",
+      "inference_operations": 3,
+      "median_workflow_micros": 69051,
+      "normalization_operations": 4,
+      "outcome": "accepted",
+      "routed": "ticket",
+      "success": true
+    },
+    {
+      "arm": "deterministic",
+      "case": "search-r1-03",
+      "expected": "ticket",
+      "family": "search-r1",
+      "inference_operations": 0,
+      "median_workflow_micros": 65129,
+      "normalization_operations": 0,
+      "outcome": null,
+      "routed": "page",
+      "success": false
+    },
+    {
+      "arm": "fast_policy",
+      "case": "search-r1-03",
+      "expected": "ticket",
+      "family": "search-r1",
+      "inference_operations": 4,
+      "median_workflow_micros": 69170,
+      "normalization_operations": 4,
+      "outcome": "accepted",
+      "routed": "ignore",
+      "success": false
+    },
+    {
+      "arm": "deterministic",
+      "case": "search-r1-04",
+      "expected": "ignore",
+      "family": "search-r1",
+      "inference_operations": 0,
+      "median_workflow_micros": 68277,
+      "normalization_operations": 0,
+      "outcome": null,
+      "routed": "ignore",
+      "success": true
+    },
+    {
+      "arm": "fast_policy",
+      "case": "search-r1-04",
+      "expected": "ignore",
+      "family": "search-r1",
+      "inference_operations": 4,
+      "median_workflow_micros": 69000,
+      "normalization_operations": 4,
+      "outcome": "accepted",
+      "routed": "ignore",
+      "success": true
+    },
+    {
+      "arm": "deterministic",
+      "case": "search-r1-05",
+      "expected": "ticket",
+      "family": "search-r1",
+      "inference_operations": 0,
+      "median_workflow_micros": 65004,
+      "normalization_operations": 0,
+      "outcome": null,
+      "routed": "ticket",
+      "success": true
+    },
+    {
+      "arm": "fast_policy",
+      "case": "search-r1-05",
+      "expected": "ticket",
+      "family": "search-r1",
+      "inference_operations": 2,
+      "median_workflow_micros": 66053,
+      "normalization_operations": 4,
+      "outcome": "accepted",
+      "routed": "ticket",
+      "success": true
+    },
+    {
+      "arm": "deterministic",
+      "case": "search-r1-06",
+      "expected": "page",
+      "family": "search-r1",
+      "inference_operations": 0,
+      "median_workflow_micros": 62829,
+      "normalization_operations": 0,
+      "outcome": null,
+      "routed": "page",
+      "success": true
+    },
+    {
+      "arm": "fast_policy",
+      "case": "search-r1-06",
+      "expected": "page",
+      "family": "search-r1",
+      "inference_operations": 4,
+      "median_workflow_micros": 64242,
+      "normalization_operations": 4,
+      "outcome": "accepted",
+      "routed": "ignore",
+      "success": false
+    },
+    {
+      "arm": "deterministic",
+      "case": "auth-r2-01",
+      "expected": "page",
+      "family": "auth-r2",
+      "inference_operations": 0,
+      "median_workflow_micros": 62821,
+      "normalization_operations": 0,
+      "outcome": null,
+      "routed": "page",
+      "success": true
+    },
+    {
+      "arm": "fast_policy",
+      "case": "auth-r2-01",
+      "expected": "page",
+      "family": "auth-r2",
+      "inference_operations": 1,
+      "median_workflow_micros": 63255,
+      "normalization_operations": 4,
+      "outcome": "accepted",
+      "routed": "page",
+      "success": true
+    },
+    {
+      "arm": "deterministic",
+      "case": "auth-r2-02",
+      "expected": "ignore",
+      "family": "auth-r2",
+      "inference_operations": 0,
+      "median_workflow_micros": 63157,
+      "normalization_operations": 0,
+      "outcome": null,
+      "routed": "ticket",
+      "success": false
+    },
+    {
+      "arm": "fast_policy",
+      "case": "auth-r2-02",
+      "expected": "ignore",
+      "family": "auth-r2",
+      "inference_operations": 4,
+      "median_workflow_micros": 66882,
+      "normalization_operations": 4,
+      "outcome": "abstained",
+      "routed": "ticket",
+      "success": false
+    },
+    {
+      "arm": "deterministic",
+      "case": "auth-r2-03",
+      "expected": "page",
+      "family": "auth-r2",
+      "inference_operations": 0,
+      "median_workflow_micros": 63985,
+      "normalization_operations": 0,
+      "outcome": null,
+      "routed": "page",
+      "success": true
+    },
+    {
+      "arm": "fast_policy",
+      "case": "auth-r2-03",
+      "expected": "page",
+      "family": "auth-r2",
+      "inference_operations": 1,
+      "median_workflow_micros": 62810,
+      "normalization_operations": 4,
+      "outcome": "accepted",
+      "routed": "page",
+      "success": true
+    },
+    {
+      "arm": "deterministic",
+      "case": "auth-r2-04",
+      "expected": "ignore",
+      "family": "auth-r2",
+      "inference_operations": 0,
+      "median_workflow_micros": 62542,
+      "normalization_operations": 0,
+      "outcome": null,
+      "routed": "ignore",
+      "success": true
+    },
+    {
+      "arm": "fast_policy",
+      "case": "auth-r2-04",
+      "expected": "ignore",
+      "family": "auth-r2",
+      "inference_operations": 4,
+      "median_workflow_micros": 65602,
+      "normalization_operations": 4,
+      "outcome": "accepted",
+      "routed": "ignore",
+      "success": true
+    },
+    {
+      "arm": "deterministic",
+      "case": "auth-r2-05",
+      "expected": "ticket",
+      "family": "auth-r2",
+      "inference_operations": 0,
+      "median_workflow_micros": 71745,
+      "normalization_operations": 0,
+      "outcome": null,
+      "routed": "ticket",
+      "success": true
+    },
+    {
+      "arm": "fast_policy",
+      "case": "auth-r2-05",
+      "expected": "ticket",
+      "family": "auth-r2",
+      "inference_operations": 3,
+      "median_workflow_micros": 68795,
+      "normalization_operations": 4,
+      "outcome": "accepted",
+      "routed": "ticket",
+      "success": true
+    },
+    {
+      "arm": "deterministic",
+      "case": "auth-r2-06",
+      "expected": "ticket",
+      "family": "auth-r2",
+      "inference_operations": 0,
+      "median_workflow_micros": 65756,
+      "normalization_operations": 0,
+      "outcome": null,
+      "routed": "ticket",
+      "success": true
+    },
+    {
+      "arm": "fast_policy",
+      "case": "auth-r2-06",
+      "expected": "ticket",
+      "family": "auth-r2",
+      "inference_operations": 0,
+      "median_workflow_micros": 62824,
+      "normalization_operations": 0,
+      "outcome": "invalid:projection-out-of-range",
+      "routed": "ticket",
+      "success": true
+    },
+    {
+      "arm": "deterministic",
+      "case": "reports-r1-01",
+      "expected": "ignore",
+      "family": "reports-r1",
+      "inference_operations": 0,
+      "median_workflow_micros": 72991,
+      "normalization_operations": 0,
+      "outcome": null,
+      "routed": "ticket",
+      "success": false
+    },
+    {
+      "arm": "fast_policy",
+      "case": "reports-r1-01",
+      "expected": "ignore",
+      "family": "reports-r1",
+      "inference_operations": 4,
+      "median_workflow_micros": 69434,
+      "normalization_operations": 4,
+      "outcome": "abstained",
+      "routed": "ticket",
+      "success": false
+    },
+    {
+      "arm": "deterministic",
+      "case": "reports-r1-02",
+      "expected": "ticket",
+      "family": "reports-r1",
+      "inference_operations": 0,
+      "median_workflow_micros": 70421,
+      "normalization_operations": 0,
+      "outcome": null,
+      "routed": "page",
+      "success": false
+    },
+    {
+      "arm": "fast_policy",
+      "case": "reports-r1-02",
+      "expected": "ticket",
+      "family": "reports-r1",
+      "inference_operations": 4,
+      "median_workflow_micros": 67414,
+      "normalization_operations": 4,
+      "outcome": "accepted",
+      "routed": "ignore",
+      "success": false
+    },
+    {
+      "arm": "deterministic",
+      "case": "reports-r1-03",
+      "expected": "ignore",
+      "family": "reports-r1",
+      "inference_operations": 0,
+      "median_workflow_micros": 63679,
+      "normalization_operations": 0,
+      "outcome": null,
+      "routed": "ignore",
+      "success": true
+    },
+    {
+      "arm": "fast_policy",
+      "case": "reports-r1-03",
+      "expected": "ignore",
+      "family": "reports-r1",
+      "inference_operations": 4,
+      "median_workflow_micros": 61674,
+      "normalization_operations": 4,
+      "outcome": "accepted",
+      "routed": "ignore",
+      "success": true
+    },
+    {
+      "arm": "deterministic",
+      "case": "reports-r1-04",
+      "expected": "ticket",
+      "family": "reports-r1",
+      "inference_operations": 0,
+      "median_workflow_micros": 64000,
+      "normalization_operations": 0,
+      "outcome": null,
+      "routed": "ticket",
+      "success": true
+    },
+    {
+      "arm": "fast_policy",
+      "case": "reports-r1-04",
+      "expected": "ticket",
+      "family": "reports-r1",
+      "inference_operations": 3,
+      "median_workflow_micros": 63913,
+      "normalization_operations": 4,
+      "outcome": "accepted",
+      "routed": "ticket",
+      "success": true
+    },
+    {
+      "arm": "deterministic",
+      "case": "reports-r1-05",
+      "expected": "ticket",
+      "family": "reports-r1",
+      "inference_operations": 0,
+      "median_workflow_micros": 64902,
+      "normalization_operations": 0,
+      "outcome": null,
+      "routed": "page",
+      "success": false
+    },
+    {
+      "arm": "fast_policy",
+      "case": "reports-r1-05",
+      "expected": "ticket",
+      "family": "reports-r1",
+      "inference_operations": 4,
+      "median_workflow_micros": 64790,
+      "normalization_operations": 4,
+      "outcome": "abstained",
+      "routed": "page",
+      "success": false
+    },
+    {
+      "arm": "deterministic",
+      "case": "reports-r1-06",
+      "expected": "ticket",
+      "family": "reports-r1",
+      "inference_operations": 0,
+      "median_workflow_micros": 63266,
+      "normalization_operations": 0,
+      "outcome": null,
+      "routed": "ticket",
+      "success": true
+    },
+    {
+      "arm": "fast_policy",
+      "case": "reports-r1-06",
+      "expected": "ticket",
+      "family": "reports-r1",
+      "inference_operations": 2,
+      "median_workflow_micros": 61565,
+      "normalization_operations": 4,
+      "outcome": "accepted",
+      "routed": "ticket",
+      "success": true
+    }
+  ],
+  "model": "b3:c5830780510e2cb0c40a3d7170822fe4779288b10524c29eb37d55c606ed7907",
+  "non_claims": [
+    "the fixture artifact is hand-authored, not trained or distilled",
+    "the rubric and the fixture tree were written by the same change; agreement measures plumbing, not generalization",
+    "latency is wall-clock on a shared, heavily loaded host and is not a performance guarantee",
+    "no improvement claim is made from a fixture artifact"
+  ],
+  "profile_identity": "b3:d72a9d72c79cf6c83b15c2b9e5f2e0d32206c9aa1b3395c872d881cea1d74d30",
+  "repetitions": 5,
+  "runtime": "animus-frozen-policy 0.1.0",
+  "schema": "lattice.typed-policy-measurement.v1",
+  "task": "log-triage incident routing",
+  "thresholds": {
+    "T1_safety": {
+      "note": "replay adapter calls are checked by tests/test_typed_policy.rs",
+      "pass": true
+    },
+    "T2_benefit": {
+      "pass": false,
+      "required_margin": 0.1
+    },
+    "T3_coverage": {
+      "minimum": 0.8,
+      "pass": false
+    },
+    "T4_validity": {
+      "max_fallback": 0.2,
+      "max_invalid": 0.05,
+      "pass": false
+    },
+    "T5_cost": {
+      "max_latency_ratio": 1.1,
+      "max_stage_micros": 1000.0,
+      "observed_latency_ratio": 1.0107854919725123,
+      "pass": true
+    }
+  },
+  "verdict": "no-improvement-established"
+}

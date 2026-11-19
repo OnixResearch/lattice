@@ -59,7 +59,7 @@ pub fn run(
     profile: &Profile,
     config: &crate::process::core::RuntimeConfig,
     cancellation: &std::sync::atomic::AtomicBool,
-    credentials: &dyn crate::credentials::CredentialProvider,
+    services: super::broker::Services<'_>,
 ) -> Result<RunResult, super::Error> {
     if let Err(reason) = profile::admit(request, profile) {
         return Ok(blocked(profile, reason));
@@ -69,7 +69,7 @@ pub fn run(
     let mut selected = request.clone();
     selected.args = profile::arguments(request, profile);
     let argv_blake3 = argument_identity(&selected.args)?;
-    let result = super::broker::with_route(selected, &profile.model_broker, credentials, cancellation, |selected| {
+    let result = super::broker::with_route(selected, &profile.model_broker, services, cancellation, |selected| {
         let compatibility = match compatible(&selected, profile) {
             Ok(value) => Some(value),
             Err(reason) => return Ok(blocked(profile, reason)),

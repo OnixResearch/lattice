@@ -72,7 +72,8 @@ pub struct OwnedUnknown {
 
 // r[impl lattice.execution_binding.deferred]
 // r[impl lattice.execution_binding.deferred.scenario.serving]
-/// Serving readiness, request admission and per-request usage.
+/// Owner of model-request usage that no served route observed; serving
+/// readiness is reported through [`ServingReadiness`] instead.
 pub const SERVING_OWNER: &str = "animus#17";
 /// Live host, device and cross-host qualification.
 pub const LIVE_HOST_OWNER: &str = "kiln#49";
@@ -86,5 +87,56 @@ impl OwnedUnknown {
             support: SupportLevel::Unknown,
             owner: owner.to_owned(),
         }
+    }
+}
+
+/// Serving readiness of the served routes, with its actual cause when nothing
+/// was observed. It is never inferred from compute or from a profile.
+// r[impl lattice.serving_binding.readiness]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "state", rename_all = "snake_case", deny_unknown_fields)]
+pub enum ServingReadiness {
+    /// No serving-owner port was injected, so no snapshot was observed.
+    NoServingPort {},
+    /// The binding declares no served route.
+    NoServedRoute {},
+    /// The injected port's latest snapshot for each served route.
+    Observed { routes: Vec<RouteReadiness> },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RouteReadiness {
+    pub route_name: String,
+    pub service_id: String,
+    pub snapshot: SnapshotReading,
+}
+
+/// One port read. Readiness and freshness are producer labels; a service the
+/// snapshot does not list reads `not-listed`.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "reading", rename_all = "snake_case", deny_unknown_fields)]
+pub enum SnapshotReading {
+    Observed {
+        snapshot_identity: String,
+        source_generation: u64,
+        sequence: u64,
+        readiness: String,
+        freshness: String,
+    },
+    Unavailable {},
+    PortIssue {},
+}
+
+impl ServingReadiness {
+    /// At most one reading per declared route, each with token identities.
+    #[must_use]
+    pub fn is_bounded(&self) -> bool {
+        let Self::Observed { routes } = self else {
+            return true;
+        };
+        let is_named =
+            routes.iter().all(|route| super::is_token(&route.route_name) && super::is_token(&route.service_id));
+        routes.len() <= super::MAX_ROUTES && is_named
     }
 }

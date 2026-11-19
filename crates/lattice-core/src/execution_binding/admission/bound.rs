@@ -13,6 +13,9 @@ pub struct Admitted {
     pub attempt: AttemptIdentity,
     pub compute: AdmittedCompute,
     pub model_routes: super::super::request::RouteDeclaration,
+    /// Frozen serving declaration; framed into the identity only when present.
+    #[serde(default = "super::super::serving::absent", skip_serializing_if = "Option::is_none")]
+    pub serving: Option<super::super::serving::Declaration>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -84,6 +87,12 @@ pub fn identity(admitted: &Admitted) -> Result<String, content_identity_core::Id
         routes.is_some(),
         matches!(admitted.model_routes, super::super::request::RouteDeclaration::Routes { .. })
     );
+    // Serializing the plain declaration structs cannot fail.
+    let serving = admitted
+        .serving
+        .as_ref()
+        .map(|declaration| super::super::serving::canonical(declaration).unwrap_or_default());
+    debug_assert!(serving.as_ref().is_none_or(|canonical| !canonical.is_empty()));
     let input = |allocation| crate::content_identity::ExecutionBindingInput {
         profile_revision: &admitted.profile_revision,
         work_id: &admitted.attempt.work_id,
@@ -92,6 +101,7 @@ pub fn identity(admitted: &Admitted) -> Result<String, content_identity_core::Id
         envelope_identity: &admitted.attempt.envelope_identity,
         allocation,
         routes: routes.as_deref(),
+        serving: serving.as_deref(),
     };
     match &admitted.compute {
         AdmittedCompute::HostLocal {} => crate::content_identity::execution_binding(input(None)),

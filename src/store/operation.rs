@@ -133,6 +133,7 @@ fn operation_run_details(record: &crate::operation::RunRecord) -> RunDetailRecor
             cached: false,
             outputs: Vec::new(),
             error: (record.state != crate::operation::RunState::Completed).then(|| record.diagnostic.clone()),
+            policy_decision: None,
         }],
         observed_completion_order: vec![node_id],
     }

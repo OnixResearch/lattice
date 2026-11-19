@@ -68,6 +68,7 @@ pub(super) fn request(
         worker_compute: compute,
         execution_binding: lattice_core::execution_binding::request::Declaration {
             schema: lattice_core::execution_binding::request::DECLARATION_SCHEMA.into(),
+            serving: None,
             compute: declared,
             model_routes: lattice_core::execution_binding::request::RouteDeclaration::NoModel {},
         },

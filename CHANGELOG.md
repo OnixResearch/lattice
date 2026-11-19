@@ -17,6 +17,14 @@ interfaces.
   default profile reports `factors-ignored-profile-off` and leaves the cohort and
   session bytes identical to the unannotated intake. The game mapping is reported
   as not formalized.
+- An optional typed policy operation (#23): a versioned profile binds Animus's
+  frozen-policy leaf (vendored at `1c370d50`) to one declared Condition node,
+  validates receipts independently, resolves typed outcomes through a declared
+  fallback, persists bounded decision records in run details (including runs
+  that suspend at and resume from approval gates) and replays them without
+  adapter work; a resume whose stored decision no longer matches the current
+  profile or artifact is refused as stale. Disabled profiles leave runs
+  byte-identical; the fixture comparison makes no improvement claim.
 - A topological DAG rows view with bounded fork/join lanes, synchronized graph
   selection, live result metadata, and linear/fork-join/diamond snapshots.
 - A bounded local planner/generator/evaluator example that runs real Rust builds
@@ -53,11 +61,32 @@ interfaces.
   provenance): the `lattice.compute-allocation-observation.v1` consumer DTO for
   Aspen `aac7b5ba` compute-capacity records with bounded pure validation, a
   read-only injected `ComputeAllocationPort` (the standalone CLI uses
-  `UnavailableComputePort`; embedders use `run_command_with_compute_port`), pure
+  `UnavailableComputePort`; embedders use `run_command_with_ports`), pure
   admission and pre-spawn revalidation, `execution-binding.json` written before
   the intent, `implementation-attempt inspect`, and `Scope::Attempt` usage
   provenance. Producer references stay opaque; no live provider, enforcement or
   serving qualification is claimed.
+- Serving-owner request admission for implementation attempts (#24 serving
+  half, #13 usage bindings): an optional `lattice.serving-binding.v1`
+  declaration frozen into the execution binding, a read-only injected
+  `serving::OwnerPort` (standalone `UnavailableOwner`; embedders pass
+  `Ports` to `run_command_with_ports`), and Animus #17's pure serving gate run
+  per request in the attempt-local model broker. Each request leaves a
+  write-once dispatch intent and `lattice.model-request-observation.v1` record,
+  summarized into per-service `served` model-request coverage of the attempt
+  usage provenance (known versus unknown usage, deduplicated, never reset).
+  Animus is re-vendored at `1c370d50` with `animus-frozen-policy`. Record
+  evidence labels derive from the port's provenance (`live_endpoint` only for
+  an embedder-admitted upstream call, otherwise `fixture` or
+  `no_upstream_contact`). The usage summary carries an `overrun` block
+  (reserved envelopes, known tokens, per-request overruns, unknown usage,
+  refused requests, `is_exact_ceiling` false whenever usage is unknown); an
+  optional `stop_on_overrun` refuses later served requests as `overrun-stopped`
+  before any port call, and the broker's exhausted request budget is recorded
+  once as `budget-exhausted`. `implementation-attempt inspect` reports that
+  summary and serving readiness as its actual cause (`no_serving_port`) or the
+  injected port's latest snapshot readiness and freshness. Fixture evidence
+  only; no live serving owner, endpoint or device was exercised.
 - An opt-in pure interaction-net worker profile (`lattice::inet`, #14 and #22) that
   runs the pinned Noble `2677ec88` `ngraph-net-i64/3` worker through the existing
   `bounded_process` operation-pack route. It admits only the canonical acyclic
