@@ -124,6 +124,9 @@ interfaces.
 
 ### Fixed
 
+- Bounded local processes whose cancellation flag is already set return the
+  existing `Cancelled` outcome without spawning. The pinned bounded-exec runner
+  checked the flag only after spawn, so a pre-cancelled command could briefly run.
 - Live file reads and image loads participate in unresolved-effect conflict
   scheduling; read-only authority is not treated as independence evidence.
 - Role-protocol fanout preflights all adapter selections. Ambiguous HTTP responses

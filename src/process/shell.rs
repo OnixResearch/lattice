@@ -198,15 +198,34 @@ fn execute_admitted(
         outcome_policy: admitted.outcome_policy,
         termination_scope: admitted.termination_scope,
     };
+    // The pinned bounded-exec runner reads the cancellation flag only after it spawns the
+    // child, so an already-cancelled request would still start the command. Stop before
+    // spawning, with the same empty `Cancelled` outcome a cancelled teardown reports.
     let execution_output = match cancellation {
-        Some(signal) => bounded_exec::run_with_cancellation(bounded_request, signal),
-        None => bounded_exec::run(bounded_request),
-    }
-    .map_err(map_execution_error)?;
+        Some(signal) if signal.load(std::sync::atomic::Ordering::Acquire) => cancelled_before_spawn(),
+        Some(signal) => bounded_exec::run_with_cancellation(bounded_request, signal).map_err(map_execution_error)?,
+        None => bounded_exec::run(bounded_request).map_err(map_execution_error)?,
+    };
     Ok(output::classify(execution_output, output::Limits {
         stdout_max_bytes: admitted.stdout_max_bytes,
         stderr_max_bytes: admitted.stderr_max_bytes,
     }))
+}
+
+fn cancelled_before_spawn() -> bounded_exec::ExecutionOutput {
+    let empty = || bounded_exec::CapturedOutput {
+        bytes: Vec::new(),
+        observed_bytes: 0,
+        truncated: false,
+    };
+    bounded_exec::ExecutionOutput {
+        completion: bounded_exec::Completion::Cancelled,
+        exit_code: None,
+        signal: None,
+        stdout: empty(),
+        stderr: empty(),
+        disposition: bounded_exec::Disposition::Cancelled,
+    }
 }
 
 fn duration_millis(duration: std::time::Duration) -> Result<u64, crate::agent_node::ProcessError> {
