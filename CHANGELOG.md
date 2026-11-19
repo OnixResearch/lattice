@@ -50,6 +50,17 @@ interfaces.
   the intent, `implementation-attempt inspect`, and `Scope::Attempt` usage
   provenance. Producer references stay opaque; no live provider, enforcement or
   serving qualification is claimed.
+- An opt-in pure interaction-net worker profile (`lattice::inet`, #14 and #22) that
+  runs the pinned Noble `2677ec88` `ngraph-net-i64/3` worker through the existing
+  `bounded_process` operation-pack route. It admits only the canonical acyclic
+  two-input wrapping-`i64` subset, re-measures artifacts before dispatch, lowers
+  only the producer's fuel/input/retained/output ceilings, binds the report's
+  producer revision, contract, limits and input bytes, and publishes results and
+  non-authoritative diagnostics through operation data. A semantic interaction
+  count is checked only when the receipt names the model theorems and pinned
+  proof sources and two fresh admitted evaluations agree on output and count;
+  otherwise it stays observed. Not adopted by default; no multicore, device or
+  refinement claim.
 - A finite, deterministic `workflow-intent` compile/compare boundary over explicit
   host-normalized facts. Plans are inert; typed Cairn/Kiln producer integration
   and execution acceptance remain separate prerequisites.

@@ -58,6 +58,9 @@ maintained topic documents by the question they answer.
 - [Operation contracts](operation-contracts.md): typed reusable methods.
 - [Operation data](operation-data.md): versioned output data.
 - [Operation packs](operation-packs.md): content-addressed runtime admission.
+- [Pure interaction-net worker profile](pure-inet-worker-profile.md): the opt-in
+  pinned Noble worker on the existing pack route, its bounds, results and
+  checked-count recomputation.
 - [Execution backend orchestration](execution-backend-orchestration.md): admitted
   backends and dispatch bounds.
 - [Workflow exchange transport](workflow-exchange-transport.md): the versioned

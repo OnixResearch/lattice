@@ -86,6 +86,9 @@ pub fn process_request_plan(
         return crate::render::operation::process_request(plan)
             .map_err(|_| deterministic("render request differs from immutable planned binding"));
     }
+    if crate::inet::route::uses_runtime(plan) {
+        return crate::inet::worker::process_request(plan).map_err(|_| deterministic("pure net artifacts changed"));
+    }
     if plan.runtime.kind != CAIRN_RUNTIME_KIND || plan.runtime.key != CAIRN_RUNTIME_KEY {
         return Err(deterministic("operation runtime binding is unsupported"));
     }
@@ -145,16 +148,11 @@ pub fn classify_process_output(
             stderr_bytes,
         ));
     }
+    if crate::inet::route::uses_runtime(plan) {
+        return Ok(crate::inet::worker::observe(plan, &output));
+    }
     if output.status_code != Some(SUCCESS_EXIT_CODE) {
-        return Ok(Observation {
-            class: ObservationClass::DeterministicFailure,
-            output: None,
-            output_identity: None,
-            output_bytes,
-            stderr_bytes,
-            diagnostic: "operation process returned a nonzero status".to_string(),
-            redacted: true,
-        });
+        return Ok(deterministic_with_sizes("operation process returned a nonzero status", output_bytes, stderr_bytes));
     }
     let value = serde_json::from_slice::<serde_json::Value>(&output.stdout)
         .map_err(|_| deterministic_with_sizes("operation output is malformed JSON", output_bytes, stderr_bytes))?;

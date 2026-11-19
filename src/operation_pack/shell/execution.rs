@@ -21,6 +21,10 @@
     reason = "private analyzer helpers receive one explicit ordered execution context assembled at a single call site"
 )]
 
+/// Operation-data outcome of a bounded diagnostic published for a
+/// non-success observation; selection by `completed` never returns it.
+pub const NON_AUTHORITATIVE_OUTCOME: &str = "non-authoritative-diagnostic";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Status {
@@ -115,13 +119,18 @@ pub fn run(request: Request<'_>) -> Result<Report, super::super::Error> {
     let mut references = Vec::new();
     if let Some(output) = direct.output {
         let plane = crate::operation_data::Plane::open(&store_path, &data_root)?;
-        let draft = operation_record_draft(
+        let mut draft = operation_record_draft(
             &request.admitted.candidate.pack_identity,
             &admitted_plan.plan,
             run_id,
             request.sequence,
             output,
         );
+        if operation_state != crate::operation::RunState::Completed {
+            // Only an adapter that returns a bounded diagnostic for a
+            // non-success observation reaches this branch; it is never a result.
+            draft.outcome = NON_AUTHORITATIVE_OUTCOME.to_string();
+        }
         let (metadata, _) = plane.publish(&draft, &crate::operation_data::AdmissionPolicy {
             allow_sensitive: false,
             prohibited_fragments: request.prohibited_fragments,

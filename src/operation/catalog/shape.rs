@@ -53,6 +53,8 @@ fn validate_type_shape(
                 "render operation differs from the exact artifact-bound consumer profile",
             ));
         }
+    } else if crate::inet::route::is_runtime(&definition.runtime) {
+        diagnostics.extend(crate::inet::route::type_diagnostic(definition, path));
     } else {
         validate_cairn_profile(definition, path, diagnostics);
     }
@@ -146,10 +148,9 @@ fn validate_runtime(
     }
     let is_cairn =
         runtime.kind == super::runtime::CAIRN_RUNTIME_KIND && runtime.key == super::runtime::CAIRN_RUNTIME_KEY;
-    if !is_cairn
-        && !super::runtime::component::runtime_is_component(runtime)
-        && !crate::render::operation::is_runtime(runtime)
-    {
+    let is_profile_runtime =
+        crate::render::operation::is_runtime(runtime) || crate::inet::route::is_runtime(runtime);
+    if !is_cairn && !super::runtime::component::runtime_is_component(runtime) && !is_profile_runtime {
         diagnostics.push(super::diagnostic(
             super::model::DiagnosticCode::RuntimeUnavailable,
             format!("{path}.runtime"),

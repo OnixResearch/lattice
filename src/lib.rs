@@ -139,6 +139,8 @@ pub mod headless;
 pub mod http;
 pub mod image_node;
 pub mod implementation_attempt;
+// r[impl lattice.pure_inet_profile.route]
+pub mod inet;
 pub mod n8n_json;
 pub mod nickel;
 pub mod node_kind_provider;

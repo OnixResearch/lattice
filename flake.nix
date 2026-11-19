@@ -25,6 +25,17 @@
       # publicly acquirable.
       inputs.artifact.url = "git+https://github.com/OnixResearch/onix-artifact.git?rev=e41340bec587b6d049b5cc518ec7db925dde84be";
     };
+    noble-lang = {
+      # The exact Noble producer of the opt-in pure interaction-net profile
+      # (`docs/pure-inet-worker-profile.md`). Noble locks three public producer
+      # repositories over SSH; pin the same revisions to anonymous HTTPS so the
+      # Lattice flake closure stays publicly acquirable.
+      url = "git+https://github.com/OnixResearch/noble-lang.git?rev=2677ec88ddb1600d42bbea8d14409c45e39edc95";
+      inputs.octet.url = "git+https://github.com/OnixResearch/octet.git?rev=9d134f00e902586c08bc71e8dc910d305c8dd875";
+      inputs.octet.inputs.cairn.inputs.artifact.url = "git+https://github.com/OnixResearch/onix-artifact.git?rev=e41340bec587b6d049b5cc518ec7db925dde84be";
+      inputs.cairn.url = "git+https://github.com/OnixResearch/cairn.git?rev=15f00875562025e7ea7e0d1f4af24d1a2e2ac06f";
+      inputs.cairn.inputs.artifact.url = "git+https://github.com/OnixResearch/onix-artifact.git?rev=e41340bec587b6d049b5cc518ec7db925dde84be";
+    };
     role-protocol-runtime-source = {
       url = "git+https://seed.radicle.garden/z2yGPFsQZsUcFNkiyR4Dkj22BuxnC.git?rev=cbb5db0e4844b466dcd1877218eb1f00a2a7caf2";
       flake = false;
@@ -61,6 +72,7 @@
       flake-utils,
       octet,
       cairn,
+      noble-lang,
       role-protocol-runtime-source,
       choregraph,
       nickel-eval,
@@ -73,6 +85,9 @@
       let
         exactNickel = nickel-1-17-0.packages.${system}.default;
         cairnNative = cairn.packages.${system}.cairn;
+        # Noble publishes an x86_64-linux package only; other systems omit the
+        # profile's executable-backed checks instead of substituting a binary.
+        nobleNative = noble-lang.packages.${system}.noble or null;
         pkgs = import nixpkgs {
           inherit system;
           overlays = [
@@ -1267,7 +1282,11 @@
             # Only the non-ignored partition runs here: the sandbox cannot provide a
             # root-owned worker, so captured-worker and v3 cases run in the host app.
             LATTICE_CAIRN_BIN = "${cairnNative}/bin/cairn";
-            cargoNextestExtraArgs = "--test-threads 1";
+            LATTICE_NOBLE_BIN = pkgs.lib.optionalString (nobleNative != null) "${nobleNative}/bin/noble";
+            # Without the pinned Noble package the real-worker fixtures are absent, not substituted.
+            cargoNextestExtraArgs =
+              "--test-threads 1"
+              + pkgs.lib.optionalString (nobleNative == null) " -E 'not binary(test_pure_inet_worker)'";
             partitions = 1;
             partitionType = "count";
           };
@@ -1315,6 +1334,26 @@
               ;
             cargoTestExtraArgs = "--test test_operation_pack_core --test test_operation_pack_analyzers --test test_operation_pack_shell --test test_operation_pack_cli";
           };
+        }
+        // pkgs.lib.optionalAttrs (nobleNative != null) {
+          # r[verify lattice.pure_inet_profile.verification]
+          # Real pinned-worker fixtures through the existing pack/process route.
+          pure-inet-profile = craneLib.cargoTest {
+            inherit
+              src
+              cargoArtifacts
+              cargoVendorDir
+              buildInputs
+              ;
+            nativeBuildInputs = nativeBuildInputs ++ [
+              pkgs.bash
+              pkgs.coreutils
+            ];
+            LATTICE_NOBLE_BIN = "${nobleNative}/bin/noble";
+            cargoTestExtraArgs = "--test test_pure_inet_profile --test test_pure_inet_worker";
+          };
+        }
+        // {
 
           workflow-contract = workflowContractCraneLib.cargoTest (
             workflowContractCommonArgs
@@ -1480,6 +1519,7 @@
         devShells.default = craneLib.devShell {
           inherit buildInputs;
           LATTICE_CAIRN_BIN = "${cairnNative}/bin/cairn";
+          LATTICE_NOBLE_BIN = pkgs.lib.optionalString (nobleNative != null) "${nobleNative}/bin/noble";
 
           packages =
             (with pkgs; [

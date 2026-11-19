@@ -1,0 +1,167 @@
+{
+  "schema": "lattice.pure_inet_profile.selected_worker_qualification.v1",
+  "recorded_at": "2026-11-19",
+  "kind": "executed_local_qualification",
+  "supersedes_criteria_in": "evidence/producer-readiness.json",
+  "producer": {
+    "repository": "https://github.com/OnixResearch/noble-lang",
+    "flake_input": "noble-lang",
+    "source_revision": "2677ec88ddb1600d42bbea8d14409c45e39edc95",
+    "contract_source": "https://github.com/OnixResearch/noble-lang/blob/2677ec88ddb1600d42bbea8d14409c45e39edc95/docs/i64-net-contract-v3.md",
+    "report_schema": "noble-ngraph-report/v1",
+    "reported_source_revision_status": "build-declared",
+    "reported_executable_digest": null,
+    "executable_binding": "Lattice pack content identity and operation executor identity of the exact copied executable",
+    "observed_executable": {
+      "build": "unmodified flake package noble-lang.packages.x86_64-linux.noble at the source revision above, built with its own test suite through the Lattice flake input",
+      "blake3": "2841e776321e2bad08a9ba66d97d2cf8fecd65817ad0cb5fde9f72496a533618",
+      "bytes": 31801936,
+      "receipt_constants": "crates/noble-cli/src/ngraph/net.rs is byte-identical to 3fed4c4c; the real receipts were regenerated and only the header source_revision changed"
+    },
+    "net_contract": {
+      "contract": "ngraph-net-i64/3",
+      "lowering": "ngraph-net-i64-lowering/0",
+      "rule_table": "noble-net-i64-rules/3",
+      "plan": "ngraph-net-plan/1",
+      "representation": "noble-net-arena/1",
+      "plan_checker": "noble-net-plan-checker/1",
+      "plan_executor": "noble-net-plan-executor/1",
+      "schedule": "lifo",
+      "storage_policy": "reuse",
+      "identity_scheme": "blake3"
+    },
+    "semantic_count": {
+      "unit": "inets-principal-pair-interaction",
+      "census": "2*ops+dups+eras",
+      "count_basis": "census-checked",
+      "assurance": "model-only",
+      "lean_system": "NobleFoundation.NetI64.system",
+      "inets_commit": "98bbb01070664e4462a35efa5d62de6f27143572",
+      "module_blake3": "a5d9ade10d41b2c0a7e2d209ce2f162918c7250805a13187c3428be357c5dc74",
+      "receipt_blake3": "7f76a66321c597c8ac7a9aebf83a525a1d73bda73ca85f5298a0c29e843f4b1a",
+      "proof_replayed_by_lattice": false
+    }
+  },
+  "profile": {
+    "module": "src/inet",
+    "operation_type": "lattice.pure-inet-i64",
+    "runtime_class": "bounded_process",
+    "launch_label": "noble-ngraph-net-i64-v1",
+    "producer_ceilings": {
+      "fuel_interactions": 2097152,
+      "max_input_bytes": 1048576,
+      "max_retained_bytes": 67108864,
+      "max_output_bytes": 65536
+    },
+    "process_bounds": {
+      "timeout_seconds": 60,
+      "stdin_bytes": 4096,
+      "stdout_bytes": 131072
+    }
+  },
+  "commands": [
+    {
+      "command": "cargo test --locked --test test_pure_inet_profile",
+      "result": {
+        "passed": 10,
+        "failed": 0
+      }
+    },
+    {
+      "command": "cargo test --locked --test test_pure_inet_worker (LATTICE_NOBLE_BIN from the pinned package)",
+      "result": {
+        "passed": 11,
+        "failed": 0
+      }
+    },
+    {
+      "command": "cargo test --locked --lib pure_inet_profile",
+      "result": {
+        "passed": 13,
+        "failed": 0
+      }
+    },
+    {
+      "command": "nix build .#checks.x86_64-linux.pure-inet-profile",
+      "result": {
+        "passed": 21,
+        "failed": 0
+      }
+    },
+    {
+      "command": "nix build .#checks.x86_64-linux.nextest",
+      "result": {
+        "run": 1561,
+        "passed": 1561,
+        "skipped": 63
+      }
+    }
+  ],
+  "comparator": {
+    "reference": "lattice::inet::Program::evaluate (Rust wrapping_add/wrapping_sub/wrapping_mul)",
+    "cases": 35,
+    "programs": 5,
+    "input_pairs": 7,
+    "matched": 35,
+    "covers": [
+      "i64::MIN and i64::MAX",
+      "overflow in add, sub and mul",
+      "shared subexpressions lowered to dup agents",
+      "integers beyond binary64 exact range (9007199254740993)"
+    ]
+  },
+  "measured_costs": {
+    "direct_worker_process_wall_millis": {
+      "n": 30,
+      "min": 0.52,
+      "median": 0.58,
+      "max": 0.94,
+      "program": "tests/fixtures/pure-inet/program.ngraph"
+    },
+    "route_invocation_wall_seconds": {
+      "n": 5,
+      "min": 3.11,
+      "max": 3.66,
+      "executable": "earlier same-source local build of 3fed4c4c (byte-identical receipt code); not re-measured on the pinned package"
+    },
+    "route_components_seconds": {
+      "pack_load_and_content_measurement": 1.28,
+      "plan_admission_and_executor_measurement": 1.24
+    },
+    "producer_counters_for_fixture": {
+      "interactions": 10,
+      "expected_interactions": 10,
+      "peak_live_agents": 9,
+      "retained_bytes_estimate": 793,
+      "retained_bytes_high_water": 2030
+    },
+    "unavailable": [
+      "process RSS",
+      "separate encoding, reduction and read-back timings inside the worker"
+    ]
+  },
+  "failure_scope": [
+    "producer fuel, retained-bytes, output-bytes and input-bytes exhaustion through the real route",
+    "changed, crossed, linked, traversal, cyclic and unsupported artifacts refused before durable start",
+    "unknown argument (resume snapshot) and raised ceiling refused",
+    "pre-set cancellation of the real worker; mid-run cancellation and 60 s deadline with a stand-in executable on the same adapter",
+    "owned descendant terminated after cancellation",
+    "seeded Started attempt not redispatched; explicit reconciled recomputation with predecessor lineage",
+    "interrupted publication leaves an observed run without published data and without redispatch",
+    "superseded consumer binding refused"
+  ],
+  "recommendation": {
+    "decision": "keep-opt-in",
+    "revise": "route cost is dominated by host-side re-measurement of the 31.8 MB executable at pack load and planning, not by reduction",
+    "default_promotion": false
+  },
+  "open": [
+    "Mneme PR #7 has no consumer implementation to bind snapshot, schema, authorization and erasure generations; the Lattice-side supersession check is a host fixture only."
+  ],
+  "non_claims": [
+    "No live Mneme, multicore, GPU or device qualification.",
+    "Checked counts are census-checked recomputation consistency under model-only theorems, not a refinement proof of the Rust reducer.",
+    "Producer byte ceilings are accounted ceilings, not process RSS bounds; process bounds are not an OS sandbox.",
+    "One local cohort does not establish performance, confluence beyond the cited theorems, or production readiness."
+  ]
+}
