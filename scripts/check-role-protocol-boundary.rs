@@ -19,8 +19,10 @@ const REQUIRED_CORE_MODULES: &[&str] = &[
     "src/engine/protocol/identity.rs",
     "src/engine/protocol/intake.rs",
     "src/engine/protocol/model.rs",
+    "src/engine/protocol/model/annotation.rs",
     "src/engine/protocol/model/artifact.rs",
     "src/engine/protocol/model/session.rs",
+    "src/engine/protocol/preference.rs",
 ];
 const FORBIDDEN_CORE_MARKERS: &[&str] = &[
     "std::fs",

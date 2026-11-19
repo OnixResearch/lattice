@@ -1,6 +1,6 @@
 # Projected role-protocol execution
 
-Lattice executes one frozen Choregraph role-projection cohort. The cohort source is Choregraph revision `c3577352ee1e39391f5204ee234d991c7dbeb151`.
+Lattice executes one frozen Choregraph role-projection cohort. The cohort source is Choregraph revision `fcbae0aa17bc0eab1345529adb9ff104a46540ef`.
 
 ## Intake
 
@@ -88,15 +88,45 @@ The matrix varies not-applied/applied-once/in-progress receiver state independen
 
 These are deterministic regression definitions, not a recorded passing run or a qualification of the immutable published runtime revision. No model behavior, remote crash durability, transport authentication, or distributed exactly-once guarantee is inferred. Run the focused target under the pinned development shell to obtain current execution evidence.
 
-## Declared preference factors: producer prerequisite
+## Declared preference factors
 
-[Lattice #16](https://github.com/OnixResearch/lattice/issues/16) depends on an admitted annotation cohort from [Choregraph #4](https://github.com/OnixResearch/choregraph/issues/4); the related Noble filing is https://github.com/OnixResearch/noble-lang/issues/67#issuecomment-6796434640.
+r[impl lattice.role_protocol.preference_factors]
 
-The pinned Choregraph revision `c3577352ee1e39391f5204ee234d991c7dbeb151` exposes only the closed `choregraph.role-choreography.v1` source and projection surface: its `model::tree::Node::Choice` has a decider, branches and span, and `model::participants::ValueDeclaration` describes owned payloads, not preference factors. Its namespace cutover keeps the original serialized record labels and adds no annotation profile, and #4 remains open. It supplies no new annotation schema/profile, preference/world fields, complete annotated local set, or receipt binding those factors to the projection cohort. Source evidence: [pinned tree](https://github.com/OnixResearch/choregraph/blob/c3577352ee1e39391f5204ee234d991c7dbeb151/crates/choregraph-choreography/src/model/tree.rs) and [pinned participants](https://github.com/OnixResearch/choregraph/blob/c3577352ee1e39391f5204ee234d991c7dbeb151/crates/choregraph-choreography/src/model/participants.rs).
+[Lattice #16](https://github.com/OnixResearch/lattice/issues/16) consumes the default-off annotation profile that [Choregraph #4](https://github.com/OnixResearch/choregraph/issues/4) published at the pinned revision `fcbae0aa17bc0eab1345529adb9ff104a46540ef`. The related Noble filing is https://github.com/OnixResearch/noble-lang/issues/67#issuecomment-6796434640.
 
-Consequently no default-off factors profile can be truthfully admitted or compared to the exact-label baseline yet. No factor data is recorded or reported as ignored: none arrived with an admitted cohort. The implementation preserves unannotated admission, exact-label cursors, ownership and unavailable CLI authority unchanged. Implementing a local annotation/projection/solver or claiming an enabled-profile comparison would invent the missing producer contract. Once Choregraph publishes the exact schema, profile selector, identity-linked factor/world metadata, annotated complete local set and projection receipt, Lattice can review that cohort. Factors must remain metadata only: they cannot grant authority, choose a label, or turn a label set into a Boolean. **Game mapping not formalized**; Pact's unpublished solver and author claims are not admission evidence.
+The producer profile selector is `choregraph.role-choreography.profile.preference-annotations.v1`. Choregraph's own default, `choregraph.role-choreography.profile.cooperative-baseline.v1`, refuses annotated input. An annotated bundle wraps the unchanged v1 projection: `AnnotatedBundle::base()` and `projected()` feed the existing intake unchanged.
 
-A live `git ls-remote` against the Radicle seed returned `c3577352ee1e39391f5204ee234d991c7dbeb151` as `main`, matching the pin. No newer producer revision or annotation cohort was substituted for the exact pinned dependency.
+`admit_annotated_projection` takes the annotated bundle, the transported producer receipt (body and packed bytes), the annotated complete local set, and a Lattice `PreferenceProfile`. It performs these steps:
+
+1. It admits `base()` and `projected()` through the unchanged `admit_projection`.
+2. It verifies the receipt with `preference::linkage::verify_receipt` and the annotated local set with `verify_local_set`. A receipt or local set from another cohort, or one with a changed byte, fails with `protocol.identity-mismatch`.
+3. It checks that the receipt names the annotated profile, the `identity-linkage-only-no-claim-promotion` claim, a `not-formalized` game mapping, and the producer's nine annotation non-claims. It also checks that the receipt binds the admitted v1 receipt, global artifact, ordered local artifacts and complete local set.
+4. It returns the cohort and a `PreferenceReport`.
+
+The session profile is explicit and off by default:
+
+- `exact-label-baseline` (the default) returns exactly the cohort that `admit_projection` returns. The report says `factors-ignored-profile-off`. No factor data enters the session, so its plan, session and evidence identities are byte-identical to the unannotated path.
+- `record-declared-factors` adds a `PreferenceRecord` to the cohort. The report says `factors-recorded`.
+
+Every report also states `game_mapping = not-formalized`. Pact's solver and game semantics are unpublished author claims; Lattice does not use them as a session admission check.
+
+The record keeps, for every role in normalized order, its local artifact identity and decider choices. Each choice has its global and local paths, its exact projected labels, its declared factors (id, owning role and name) and its optional world variable (id and name). The record also binds the producer profile, the annotated receipt, the v1 receipt, the complete local set, and the annotation and annotated-local-set identities. Spans are dropped.
+
+The record is part of the cohort, so it is bound into the session-plan identity. `plan_session`, which `create_session` repeats, also rejects a record in these cases:
+
+- it names another profile or drops a non-claim;
+- it names another v1 receipt or complete local set;
+- it is missing a role, or a role is reordered;
+- a choice's local path does not reach that role's `InternalChoice`, or the choice does not list exactly that node's labels in order;
+- a choice has no factors, or a factor is owned by another role.
+
+Unknown record fields, such as a selected label, weight, utility or authority field, fail deserialization.
+
+Factors are metadata only. Action planning, envelope binding, observation admission, cursor commits, ownership and the authority binding never read them. The exact-label rules above are unchanged: an undeclared, stale, reordered, wrong-step or wrong-role label, or a factor or world identifier used as a label, still cannot advance a cursor. Both labels of a recorded choice remain plannable, so factors do not pick a branch or turn a label set into a Boolean. Recorded factors are not credentials, approvals, authority or workflow-revision merge semantics.
+
+Session inspection gains a `preference` block only when a record exists. The block holds `factors-recorded`, `not-formalized`, the producer profile, the annotated receipt and local-set identities, the per-role choices with factor and world names, and the non-claims. Names are the producer's validated lowercase kebab identifiers of at most 64 bytes. The block is absent for unannotated and `exact-label-baseline` sessions.
+
+The standalone CLI is unchanged. Its create input accepts only the v1 choreography and rejects an annotated source before a session exists. It still dispatches no effects and has unavailable authority. Recording factors is a Rust library surface that the embedding caller selects. `tests/test_role_protocol_preference.rs` covers the recorded, ignored, comparison, crossed-cohort and forged-record cases.
 
 ## Safe evidence
 

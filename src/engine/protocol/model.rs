@@ -9,9 +9,11 @@
     reason = "public protocol DTO names keep domain meaning at external call sites"
 )]
 
+mod annotation;
 mod artifact;
 mod session;
 
+pub use annotation::*;
 pub use artifact::*;
 use serde::Deserialize;
 use serde::Serialize;
@@ -21,7 +23,7 @@ pub const SESSION_SCHEMA: &str = "lattice.role-protocol-session.v1";
 pub const ENVELOPE_SCHEMA: &str = "lattice.role-protocol-envelope.v1";
 pub const OBSERVATION_SCHEMA: &str = "lattice.role-protocol-observation.v1";
 pub const EVIDENCE_SCHEMA: &str = "lattice.role-protocol-evidence.v1";
-pub const FROZEN_CHOREGRAPH_REVISION: &str = "c3577352ee1e39391f5204ee234d991c7dbeb151";
+pub const FROZEN_CHOREGRAPH_REVISION: &str = "fcbae0aa17bc0eab1345529adb9ff104a46540ef";
 pub const FROZEN_ADAPTER_IDENTITY: &str = "blake3:0afe63826d52e531da3924bb9a07945b93088a5636d2f35ae4141f297ea3c20c";
 pub const FROZEN_TRELLIS_REVISION: &str = "d65974b14978e1a44b0f5067beb9ef6d83317dc8";
 pub const CLAIM_BOUNDARY: &str = concat!(

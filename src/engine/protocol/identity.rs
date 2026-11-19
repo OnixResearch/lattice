@@ -42,3 +42,10 @@ pub fn serialized_reference<T: serde::Serialize>(
     let digest = blake3::hash(&bytes).to_hex().to_string();
     reference(domain, &[digest.as_str()])
 }
+
+/// Converts a Choregraph producer identity into the prefixed Lattice reference form.
+pub fn from_producer(
+    identity: &choregraph_choreography::linkage::digest::Identity,
+) -> Result<super::model::Identity, super::model::Error> {
+    super::model::Identity::new(choregraph_choreography::linkage::digest::prefixed_identity(identity))
+}

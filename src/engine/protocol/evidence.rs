@@ -39,6 +39,20 @@ pub struct AttemptInspection {
     pub outcome: Option<Identity>,
 }
 
+/// Declared factors recorded on an annotated session. Present only when the
+/// session's cohort was admitted under `PreferenceProfile::RecordDeclaredFactors`.
+#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct PreferenceInspection {
+    pub disposition: super::model::FactorDisposition,
+    pub game_mapping: super::model::GameMapping,
+    pub producer_profile: String,
+    pub annotated_receipt: Identity,
+    pub annotated_local_set: Identity,
+    pub roles: Vec<super::model::RoleChoices>,
+    pub non_claims: Vec<String>,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SessionInspection {
@@ -56,6 +70,8 @@ pub struct SessionInspection {
     pub attempts: Vec<AttemptInspection>,
     pub issue_codes: Vec<String>,
     pub claim_boundary: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preference: Option<PreferenceInspection>,
 }
 
 pub fn inspect(session: &SessionRecord, issues: &[Issue]) -> Result<SessionInspection, Error> {
@@ -85,6 +101,15 @@ pub fn inspect(session: &SessionRecord, issues: &[Issue]) -> Result<SessionInspe
             .collect(),
         issue_codes: issues.iter().map(|issue| issue.code().to_owned()).collect(),
         claim_boundary: super::model::CLAIM_BOUNDARY.to_owned(),
+        preference: session.plan.cohort.preference.as_ref().map(|record| PreferenceInspection {
+            disposition: super::model::FactorDisposition::FactorsRecorded,
+            game_mapping: record.game_mapping,
+            producer_profile: record.producer_profile.clone(),
+            annotated_receipt: record.annotated_receipt.clone(),
+            annotated_local_set: record.annotated_local_set.clone(),
+            roles: record.roles.clone(),
+            non_claims: record.non_claims.clone(),
+        }),
     })
 }
 

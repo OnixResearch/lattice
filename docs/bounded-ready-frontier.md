@@ -7,7 +7,7 @@ Lattice dispatches ready workflow nodes without a dependency-level barrier. Chor
 
 ## Source and proof boundary
 
-Lattice pins Choregraph runtime revision `c3577352ee1e39391f5204ee234d991c7dbeb151` from its canonical Radicle repository. Its production readiness routes through the verified kernel, and its readiness-completeness evidence is accepted at that same revision.
+Lattice pins Choregraph runtime revision `fcbae0aa17bc0eab1345529adb9ff104a46540ef` from its canonical Radicle repository. Its production readiness routes through the verified kernel, and its readiness-completeness evidence is accepted at that same revision.
 
 The runtime and readiness-proof revisions therefore coincide. Lattice still compares the Choregraph runtime frontier with the compatibility runner projection and claims bounded frontier compatibility, not whole-product correctness.
 

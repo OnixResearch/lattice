@@ -1,0 +1,61 @@
+{
+  "schema": "lattice.role-protocol-preference-comparison.v1",
+  "issue": "https://github.com/OnixResearch/lattice/issues/16",
+  "producer": {
+    "repository": "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git",
+    "revision": "fcbae0aa17bc0eab1345529adb9ff104a46540ef",
+    "issue": "https://github.com/OnixResearch/choregraph/issues/4",
+    "profile": "choregraph.role-choreography.profile.preference-annotations.v1"
+  },
+  "related_filing": "https://github.com/OnixResearch/noble-lang/issues/67#issuecomment-6796434640",
+  "fixtures": [
+    {
+      "name": "common::protocol::choice()",
+      "shape": "decider role 1 InternalChoice over labels 30 and 31; role 2 Offer",
+      "annotation": "factors cost and latency owned by role 1, world market, path []",
+      "test": "exact_label_decisions_ownership_and_authority_match_the_baseline"
+    },
+    {
+      "name": "transfer(1, 2, 30, choice())",
+      "shape": "owned transfer of value 10 before the same choice",
+      "annotation": "same factors and world, path [next]",
+      "test": "owned_transfer_before_the_choice_moves_ownership_identically_under_both_profiles"
+    }
+  ],
+  "profiles": {
+    "baseline": {
+      "profile": "exact-label-baseline",
+      "disposition": "factors-ignored-profile-off",
+      "game_mapping": "not-formalized",
+      "cohort_equals_unannotated_intake": true,
+      "inspection_exposes_factors": false
+    },
+    "selected": {
+      "profile": "record-declared-factors",
+      "disposition": "factors-recorded",
+      "game_mapping": "not-formalized",
+      "inspection_exposes_factors": true
+    }
+  },
+  "changed": {
+    "chosen_label": false,
+    "label_rejections": false,
+    "cursor_commits": false,
+    "ownership_transfer": false,
+    "authority_boundary": false,
+    "envelope_semantics": false
+  },
+  "comparison_method": "Both sessions run the same undeclared, factor-identifier, world-identifier and wrong-role requests, both declared labels, the committed choice and send or owned transfer, and a denied-authority Runtime dispatch. The status, cursors, owners, attempt states and envelope semantic fields are serialized and compared byte for byte. Session, step, action, message and attempt identities differ only because the recorded factor set is bound into the session-plan identity.",
+  "observation": "The comparison assertions in tests/test_role_protocol_preference.rs passed in the run recorded in tasks.md.",
+  "non_claims": [
+    "no-branch-selection",
+    "no-equilibrium-analysis",
+    "no-game-semantics",
+    "no-label-boolean-conversion",
+    "no-preference-authority",
+    "no-self-interested-projection-soundness",
+    "no-solver",
+    "no-utility-function",
+    "no-world-distribution"
+  ]
+}

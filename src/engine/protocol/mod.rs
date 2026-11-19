@@ -6,6 +6,7 @@ pub mod evidence;
 mod identity;
 pub mod intake;
 pub mod model;
+pub mod preference;
 pub mod shell;
 
 pub use core::abandon_unknown;
@@ -21,6 +22,7 @@ pub use core::retry_unknown;
 pub use core::settle_attempt;
 pub use core::validate_dispatch_envelope;
 
+pub use evidence::PreferenceInspection;
 pub use evidence::SessionInspection;
 pub use evidence::identity;
 pub use evidence::inspect;
@@ -31,6 +33,9 @@ pub use intake::admit_projection;
 pub use intake::plan_session;
 pub use intake::reviewed_limits;
 pub use model::*;
+pub use preference::AnnotatedIntake;
+pub use preference::AnnotatedProjection;
+pub use preference::admit_annotated_projection;
 pub use shell::authority::EffectAuthority;
 pub use shell::transport::ExternalProfile;
 pub use shell::transport::HttpAdapter;

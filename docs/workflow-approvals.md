@@ -8,7 +8,7 @@ The process does not wait for an operator. Lattice writes the checkpoint before 
 
 Choregraph owns the graph suspension and resume-signal transitions. Lattice owns approval requests, authority, expiry, decisions, values, credential references, persistence, and operator actions.
 
-Lattice pins Choregraph runtime revision `c3577352ee1e39391f5204ee234d991c7dbeb151`. The exact lifecycle profile is `choregraph.lifecycle.durable-suspension.v1`.
+Lattice pins Choregraph runtime revision `fcbae0aa17bc0eab1345529adb9ff104a46540ef`. The exact lifecycle profile is `choregraph.lifecycle.durable-suspension.v1`.
 
 A Choregraph transition proves only the selected graph-state transition. It does not prove operator identity, approval authority, persistence correctness, or downstream effect success.
 

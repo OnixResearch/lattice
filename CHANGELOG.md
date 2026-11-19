@@ -9,6 +9,14 @@ interfaces.
 
 ### Added
 
+- Default-off declared preference factors on projected role-protocol choices
+  (#16). `admit_annotated_projection` admits a published Choregraph
+  preference-annotation cohort, verifies its receipt and annotated local set, and
+  records factors and world variables only under `record-declared-factors`.
+  Exact-label admission, cursors, ownership and authority are unchanged. The
+  default profile reports `factors-ignored-profile-off` and leaves the cohort and
+  session bytes identical to the unannotated intake. The game mapping is reported
+  as not formalized.
 - A topological DAG rows view with bounded fork/join lanes, synchronized graph
   selection, live result metadata, and linear/fork-join/diamond snapshots.
 - A bounded local planner/generator/evaluator example that runs real Rust builds
@@ -71,6 +79,11 @@ interfaces.
 
 ### Changed
 
+- Re-pinned Choregraph to `fcbae0aa` (Choregraph #4, default-off preference
+  annotations). Its v1 receipts are byte-identical to `c3577352`; the source
+  admission receipt, flake assertions and frozen role-protocol revision name the
+  new revision. As with earlier re-pins, the frozen revision is part of every
+  role-protocol cohort, so new session-plan identities differ from `c3577352` ones.
 - Adopted published Choregraph `c3577352` and nickel-eval `f0ea0d2a` from their
   canonical Radicle seeds. The producer carries the imported-JSON merge repair, so
   the vendored `nickel-lang-core` snapshot and root patch are removed, along with

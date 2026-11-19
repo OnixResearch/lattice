@@ -9,15 +9,15 @@ const FLAKE_SOURCE: &str = include_str!("../flake.nix");
 const FLAKE_LOCK_SOURCE: &str = include_str!("../flake.lock");
 
 const RID: &str = "rad:zL2ncTUeASVYwcoGkEXv9JKgGbAF";
-const REVISION: &str = "c3577352ee1e39391f5204ee234d991c7dbeb151";
-const READINESS_PROOF_REVISION: &str = "c3577352ee1e39391f5204ee234d991c7dbeb151";
-const ARCHIVE_BLAKE3: &str = "da3c399ef60b65a7b2067f7e3105cb25f35c5c4110a3910365f42f2ace72f2d1";
+const REVISION: &str = "fcbae0aa17bc0eab1345529adb9ff104a46540ef";
+const READINESS_PROOF_REVISION: &str = "fcbae0aa17bc0eab1345529adb9ff104a46540ef";
+const ARCHIVE_BLAKE3: &str = "715d11b6e73ae618f778aaf0a951fb003b5745f54356b6d60e393f0cb20627fc";
 const LICENSE: &str = "AGPL-3.0-or-later";
 const HTTPS_URL: &str = "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git";
-const NAR_HASH: &str = "sha256-3ct+0RK3oCsSqNZlxXpbgdw6EJYJf+e+YmvPS7HgAzw=";
-const CARGO_PIN: &str = "seaglass-execution-graph = { package = \"choregraph-seaglass\", git = \"https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git\", rev = \"c3577352ee1e39391f5204ee234d991c7dbeb151\" }";
-const LOCK_SOURCE: &str = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=c3577352ee1e39391f5204ee234d991c7dbeb151#c3577352ee1e39391f5204ee234d991c7dbeb151";
-const FLAKE_PIN: &str = "url = \"git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=c3577352ee1e39391f5204ee234d991c7dbeb151\";";
+const NAR_HASH: &str = "sha256-ZByP+RlUb2Gj2M6K28mNXUDdk/ukmjEBSCs8boJn9i0=";
+const CARGO_PIN: &str = "seaglass-execution-graph = { package = \"choregraph-seaglass\", git = \"https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git\", rev = \"fcbae0aa17bc0eab1345529adb9ff104a46540ef\" }";
+const LOCK_SOURCE: &str = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=fcbae0aa17bc0eab1345529adb9ff104a46540ef#fcbae0aa17bc0eab1345529adb9ff104a46540ef";
+const FLAKE_PIN: &str = "url = \"git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=fcbae0aa17bc0eab1345529adb9ff104a46540ef\";";
 const CARGO_LOCK_PACKAGE_COUNT: usize = 5;
 const HISTORICAL_PUBLICATION_REVISION: &str = "fc47c5f4ecbb7b4341af690fa42199f25d57f54c";
 
@@ -117,6 +117,7 @@ fn replace_once(source: &str, old: &str, new: &str) -> String {
 }
 
 // r[verify lattice.execution_graph_external_adoption.source.scenario.accepted]
+// r[verify lattice.role_protocol.preference_factors.producer]
 #[test]
 fn exact_source_is_accepted() {
     let issues = validate(current_inputs());

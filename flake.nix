@@ -41,7 +41,7 @@
       flake = false;
     };
     choregraph = {
-      url = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=c3577352ee1e39391f5204ee234d991c7dbeb151";
+      url = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=fcbae0aa17bc0eab1345529adb9ff104a46540ef";
       flake = false;
     };
     cap-root = {
@@ -341,7 +341,7 @@
             );
         };
 
-        choregraphCargoSource = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=c3577352ee1e39391f5204ee234d991c7dbeb151#c3577352ee1e39391f5204ee234d991c7dbeb151";
+        choregraphCargoSource = "git+https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=fcbae0aa17bc0eab1345529adb9ff104a46540ef#fcbae0aa17bc0eab1345529adb9ff104a46540ef";
         nickelEvalCargoSource = "git+https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=f0ea0d2a31d3482ddf4e575482f6ddf7a7e7d4e9#f0ea0d2a31d3482ddf4e575482f6ddf7a7e7d4e9";
         contentIdentityCoreCargoSource = "git+https://seed.radicle.garden/zA14jhTdwST4PxPBdsryc4zS7Kpq.git?rev=7f55597b5dc879b7601856e8d7fd0dbacaa2a498#7f55597b5dc879b7601856e8d7fd0dbacaa2a498";
         transactionalReconciliationCoreCargoSource = "git+https://seed.radicle.garden/z4Tky6zvC8w4Y6c4YBzNxVbq5n752.git?rev=eb2bd3441753af97bfcb247cef7cc22d72675b62#eb2bd3441753af97bfcb247cef7cc22d72675b62";
@@ -689,10 +689,10 @@
                 .admission.schema == "lattice.choregraph-source-admission.v1"
                 and .admission.status == "accepted"
                 and .admission.rid == "rad:zL2ncTUeASVYwcoGkEXv9JKgGbAF"
-                and .admission.revision == "c3577352ee1e39391f5204ee234d991c7dbeb151"
+                and .admission.revision == "fcbae0aa17bc0eab1345529adb9ff104a46540ef"
                 and .admission.cargo_revision == .admission.revision
                 and .admission.nix_revision == .admission.revision
-                and .admission.source_archive_blake3 == "da3c399ef60b65a7b2067f7e3105cb25f35c5c4110a3910365f42f2ace72f2d1"
+                and .admission.source_archive_blake3 == "715d11b6e73ae618f778aaf0a951fb003b5745f54356b6d60e393f0cb20627fc"
                 and .admission.release_bundle_blake3 == "a2ac1336679542fa9573b356daddc18266fdda8147ddbe28f85aa37d135030d9"
                 and .admission.candidate_blake3 == "e4b5cd7bd77d78c20cf8b96cd0c038144028d2287000757c8ab68f5f5dfdff1a"
                 and ([.admission.prerequisites[]] | all(. == true))
@@ -713,15 +713,15 @@
 
               grep --fixed-strings 'package = "choregraph-seaglass"' ${self}/Cargo.toml > /dev/null
               grep --fixed-strings 'git = "https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git"' ${self}/Cargo.toml > /dev/null
-              grep --fixed-strings 'rev = "c3577352ee1e39391f5204ee234d991c7dbeb151"' ${self}/Cargo.toml > /dev/null
+              grep --fixed-strings 'rev = "fcbae0aa17bc0eab1345529adb9ff104a46540ef"' ${self}/Cargo.toml > /dev/null
               test "$(grep --count '^name = "choregraph-choreography"$' ${self}/Cargo.lock)" -eq 1
               test "$(grep --count '^name = "choregraph-core"$' ${self}/Cargo.lock)" -eq 1
               test "$(grep --count '^name = "choregraph-nickel"$' ${self}/Cargo.lock)" -eq 1
               test "$(grep --count '^name = "choregraph-seaglass"$' ${self}/Cargo.lock)" -eq 1
               grep --fixed-strings '${choregraphCargoSource}' ${self}/Cargo.lock > /dev/null
               jq --exit-status '
-                .nodes.choregraph.locked.rev == "c3577352ee1e39391f5204ee234d991c7dbeb151"
-                and .nodes.choregraph.original.rev == "c3577352ee1e39391f5204ee234d991c7dbeb151"
+                .nodes.choregraph.locked.rev == "fcbae0aa17bc0eab1345529adb9ff104a46540ef"
+                and .nodes.choregraph.original.rev == "fcbae0aa17bc0eab1345529adb9ff104a46540ef"
               ' ${self}/flake.lock > /dev/null
 
               test -f ${choregraph}/crates/choregraph-choreography/Cargo.toml

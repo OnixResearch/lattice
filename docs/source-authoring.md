@@ -9,7 +9,7 @@ durable admission; the producer APIs own native evaluation/elaboration.
 
 Cargo and Nix pin the published producer cohorts that provide these APIs:
 nickel-eval `f0ea0d2a31d3482ddf4e575482f6ddf7a7e7d4e9` (captured-module
-evaluator) and Choregraph `c3577352ee1e39391f5204ee234d991c7dbeb151`
+evaluator) and Choregraph `fcbae0aa17bc0eab1345529adb9ff104a46540ef`
 (construction/v3 projection), both acquired anonymously from their canonical
 Radicle seeds. No sibling path, private override or runtime fallback selects them.
 

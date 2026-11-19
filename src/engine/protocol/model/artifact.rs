@@ -5,6 +5,7 @@ use serde::Serialize;
 
 use super::Identity;
 use super::OwnedValue;
+use super::PreferenceRecord;
 use super::RoleId;
 use super::RoleProgram;
 
@@ -40,6 +41,11 @@ pub struct Cohort {
     pub proof_reference: Identity,
     pub roles: Vec<RoleDefinition>,
     pub initial_owners: Vec<OwnedValue>,
+    /// Declared preference factors from an explicitly selected annotated cohort.
+    /// Absent for unannotated cohorts, so their serialized identity bytes are unchanged;
+    /// serde decodes a missing optional field as `None`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preference: Option<PreferenceRecord>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

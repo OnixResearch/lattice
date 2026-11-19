@@ -74,7 +74,7 @@ pub fn admit_projection(input: FrozenProjection<'_>) -> Result<Cohort, Error> {
             Ok(RoleDefinition {
                 role: RoleId(local.role.0),
                 kind: role_kind(&local.role_kind)?,
-                local_artifact: producer_identity(&artifact.artifact.identity)?,
+                local_artifact: super::identity::from_producer(&artifact.artifact.identity)?,
                 protocol: convert_local(&local.protocol)?,
             })
         })
@@ -94,13 +94,14 @@ pub fn admit_projection(input: FrozenProjection<'_>) -> Result<Cohort, Error> {
     Ok(Cohort {
         source_revision: super::model::FROZEN_CHOREGRAPH_REVISION.to_owned(),
         adapter_identity: Identity::new(super::model::FROZEN_ADAPTER_IDENTITY)?,
-        global_artifact: producer_identity(&input.bundle.global().identity)?,
-        complete_local_set: producer_identity(&input.bundle.local_set().identity)?,
-        projection_receipt: producer_identity(&input.bundle.receipt().identity)?,
-        schema_set: producer_identity(&receipt.schema_set)?,
-        proof_reference: producer_identity(&receipt.trellis_proof_set)?,
+        global_artifact: super::identity::from_producer(&input.bundle.global().identity)?,
+        complete_local_set: super::identity::from_producer(&input.bundle.local_set().identity)?,
+        projection_receipt: super::identity::from_producer(&input.bundle.receipt().identity)?,
+        schema_set: super::identity::from_producer(&receipt.schema_set)?,
+        proof_reference: super::identity::from_producer(&receipt.trellis_proof_set)?,
         roles,
         initial_owners,
+        preference: None,
     })
 }
 
@@ -111,6 +112,7 @@ pub fn plan_session(cohort: Cohort, placements: Vec<RolePlacement>, nonce: Ident
     {
         return Err(Issue::InvalidPlacement.into());
     }
+    super::preference::validate_record(&cohort)?;
     let mut roles = Vec::with_capacity(cohort.roles.len());
     for (definition, placement) in cohort.roles.iter().zip(placements) {
         validate_placement(definition, &placement)?;
@@ -195,10 +197,6 @@ fn validate_placement(definition: &RoleDefinition, placement: &RolePlacement) ->
         ) if contract == placed_contract && input_schema == placed_input && output_schema == placed_output => Ok(()),
         _ => Err(Issue::InvalidPlacement.into()),
     }
-}
-
-fn producer_identity(identity: &choregraph_choreography::linkage::digest::Identity) -> Result<Identity, Error> {
-    Identity::new(choregraph_choreography::linkage::digest::prefixed_identity(identity))
 }
 
 fn role_kind(kind: &choregraph_choreography::model::participants::RoleKind) -> Result<RoleKind, Error> {
