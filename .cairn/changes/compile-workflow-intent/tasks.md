@@ -9,7 +9,9 @@
 
 ## Producer and composed qualification
 
-- [ ] [serial] Select actual Cairn #12/#14 typed obligations/selected-work schema and consume it through Kiln #83 without interpreting prose as semantic authority. r[lattice.workflow_intent.boundary]
+- [x] [serial] Select actual Cairn #12/#14 typed obligations/selected-work schema and consume it through Kiln #83 without interpreting prose as semantic authority. Cairn `8f6cd0b3` `cairn.selected-work.v1` through Kiln #83 `e30f178b` (unchanged at `70c8f217`): seven leaves bind typed Cairn obligation, guidance and condition identities, and the documented compiler-identity rebinding reproduces every Kiln pin on Lattice `9a74e7ef` (`evidence/producer-consumption.json`). r[lattice.workflow_intent.boundary]
 - [ ] [serial] Bind execution through existing #6/#7 with exact attempt/fence/workspace/current authority and qualify live candidate/effect observations, interruption and owner-admitted repair. r[lattice.workflow_intent.boundary]
 
 The latter tasks are producer/composition prerequisites, not stubs in the finite compiler. Issue #26 is not closed by compile success.
+
+The first producer task is complete. Kiln #83 (`e30f178b`, unchanged at `70c8f217`) normalizes Cairn `8f6cd0b3` `cairn.selected-work.v1` obligations into a complete intent whose seven leaves carry typed Cairn obligation, guidance and condition identities. Lattice `9a74e7ef` refuses the verbatim request only because its compiler artifact identity differs from the `661499d2` executable Kiln pinned, which is the intended stale-compiler refusal. After the documented rebinding it compiles to the same graph identity, node set, intent and disposition, and substituting Kiln's pinned compiler identity reproduces Kiln's plan identities exactly (`evidence/producer-consumption.json`).

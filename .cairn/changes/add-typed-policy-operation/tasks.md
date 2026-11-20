@@ -18,7 +18,7 @@
 - [x] [parallel] 3.2 Add authority, frontier, exact-label protocol and uncertain-effect boundary fixtures. r[lattice.typed_policy.route]
 - [x] [serial] 3.3 Run the pre-declared comparison and retain the actual result, including unavailable arms and a no-go. r[lattice.typed_policy.measurement] `evidence/measurement.json`; verdict `no-improvement-established`; the reasoning-model arm is unavailable.
 - [x] [serial] 3.4 Document the profile, outcomes, replay, accounting boundary and non-claims. r[lattice.typed_policy.profile] r[lattice.typed_policy.measurement] `docs/typed-policy-operations.md`.
-- [ ] [serial] 3.5 Run focused tests, Clippy, fmt, Cairn validation and gates, Octet semantic delta and the Nix `nextest` check. r[lattice.typed_policy.measurement] Local results are in `evidence.md`; the parent's integrated run (Octet re-key, full flake check) remains open.
+- [x] [serial] 3.5 Run focused tests, Clippy, fmt, Cairn validation and gates, Octet semantic delta and the Nix `nextest` check. r[lattice.typed_policy.measurement] Local results are in `evidence.md`. Integrated: `e2de2b4e` re-keyed the Octet baselines with 0 new and 0 resolved findings; at Lattice `9a74e7ef` `test_typed_policy` 15/15 and `test_typed_policy_resume` 3/3 passed, Clippy and fmt exit 0, Octet 0 new and 0 stale (root 1052/1052, core 25/25), and the parent's Nix flake check passed with Nextest 1632 passed and 63 skipped (`evidence/integration-closeout.json`).
 
 ## Evidence Boundary
 

@@ -1,0 +1,162 @@
+{
+  "kind": "measured-closeout-verification",
+  "change": "bind-model-serving-admission",
+  "task": "5.1",
+  "observed_on": "2026-11-20",
+  "candidate": {
+    "repository": "OnixResearch/lattice",
+    "revision": "9a74e7ef1da4e0ca7610dce0db039b3825a7154d",
+    "worktree": "clean clone of GitHub main; no source edits before these runs"
+  },
+  "producer": {
+    "repository": "animus",
+    "revision": "1c370d5029a2667051c46bdfa1919e78e65e2f4b",
+    "published": true,
+    "adopted_by": "e2de2b4eac159139b9caed2c10ef9210c76646f5"
+  },
+  "environment": {
+    "shell": "nix develop (repository dev shell)",
+    "cargo": "cargo 1.99.0-nightly (59800466c 2026-07-07)",
+    "rustc": "rustc 1.99.0-nightly (3d50c25bc 2026-07-16)",
+    "cargo_target_dir": "/home/brittonr/.cargo-target/producer-work/lattice-closeout-target",
+    "cargo_build_jobs": 6,
+    "cairn": "/nix/store/j5mbcqr4xwadmnbxdd0p6h9iic80kcil-cairn-0.1.0/bin/cairn (equal to the dev shell's LATTICE_CAIRN_BIN)",
+    "host": "shared host, load average 35-55 during the runs"
+  },
+  "commands": [
+    {
+      "name": "focused serving tests and existing execution-binding, profile, core-boundary, content-identity, reservation/ledger (orchestration) and typed-policy integration suites",
+      "command": "cargo test --locked -p lattice --test test_execution_binding_serving --test test_execution_binding_admission --test test_execution_binding_contracts --test test_execution_binding_identity --test test_execution_binding_inventory --test test_execution_binding_observation --test test_execution_binding_port --test test_execution_binding_usage --test test_agent_profile_bindings --test test_lattice_core_boundary --test test_content_identity_adoption --test test_orchestration_core --test test_orchestration_shell --test test_orchestration_store --test test_orchestration_identities --test test_typed_policy --test test_typed_policy_resume --test test_workflow_intent",
+      "exit_code": 0,
+      "suites": [
+        {"target": "test_execution_binding_serving", "passed": 22, "failed": 0},
+        {"target": "test_execution_binding_admission", "passed": 9, "failed": 0},
+        {"target": "test_execution_binding_contracts", "passed": 4, "failed": 0},
+        {"target": "test_execution_binding_identity", "passed": 5, "failed": 0},
+        {"target": "test_execution_binding_inventory", "passed": 5, "failed": 0},
+        {"target": "test_execution_binding_observation", "passed": 8, "failed": 0},
+        {"target": "test_execution_binding_port", "passed": 4, "failed": 0},
+        {"target": "test_execution_binding_usage", "passed": 3, "failed": 0},
+        {"target": "test_agent_profile_bindings", "passed": 5, "failed": 0},
+        {"target": "test_lattice_core_boundary", "passed": 3, "failed": 0},
+        {"target": "test_content_identity_adoption", "passed": 3, "failed": 0},
+        {"target": "test_orchestration_core", "passed": 30, "failed": 0},
+        {"target": "test_orchestration_shell", "passed": 13, "failed": 0, "note": "its restart tests re-invoke the test binary; the one child that reports FAILED is the intended unknown-phase negative of restart_child_rejects_unknown_phase_before_creating_store, which asserts the child fails"},
+        {"target": "test_orchestration_store", "passed": 6, "failed": 0},
+        {"target": "test_orchestration_identities", "passed": 5, "failed": 0},
+        {"target": "test_typed_policy", "passed": 15, "failed": 0},
+        {"target": "test_typed_policy_resume", "passed": 3, "failed": 0},
+        {"target": "test_workflow_intent", "passed": 5, "failed": 0}
+      ],
+      "totals": {"targets": 18, "passed": 148, "failed": 0, "ignored": 0}
+    },
+    {
+      "name": "library unit suites: implementation attempt (binding, serving inspect, recovery, cancellation), broker, orchestration usage and settlement, execution binding, workflow, agent runtime",
+      "command": "cargo test --locked -p lattice --lib -- implementation_attempt:: candidate_worker::broker orchestration:: store::implementation execution_binding:: workflow:: agent_node::runtime",
+      "exit_code": 0,
+      "totals": {"passed": 96, "failed": 0, "ignored": 1, "filtered_out": 341},
+      "by_module": {
+        "implementation_attempt::cli": 33,
+        "implementation_attempt::tests": 3,
+        "candidate_worker::broker": 3,
+        "orchestration::shell (includes tests::charging)": 15,
+        "orchestration::usage (includes host_tests)": 11,
+        "engine::workflow": 15,
+        "tui::authoring": 16
+      },
+      "ignored": ["candidate_worker::broker::isolation_tests::bubblewrap_broker_allows_only_the_model_route_and_hides_host_capabilities (requires LATTICE_BWRAP, LATTICE_SOCAT and enabled Linux user/network namespaces)"]
+    },
+    {
+      "name": "full candidate-worker suites (broker, isolation, OMP, execution, cancellation, publication)",
+      "command": "cargo test --locked -p lattice --lib -- candidate_worker::",
+      "exit_code": 0,
+      "totals": {"passed": 29, "failed": 0, "ignored": 7, "filtered_out": 402},
+      "ignored_reason": "no bubblewrap executable on this host; the 7 cases require a reviewed bubblewrap, socat, user namespaces or a pinned OMP build"
+    },
+    {
+      "name": "ledger and pure core crates",
+      "command": "cargo test --locked -p budget-ledger-core -p lattice-core",
+      "exit_code": 0,
+      "suites": [
+        {"target": "budget-ledger-core lib", "passed": 15, "failed": 0},
+        {"target": "lattice-core lib", "passed": 11, "failed": 0},
+        {"target": "lattice-core tests/pure_core", "passed": 4, "failed": 0}
+      ]
+    },
+    {
+      "name": "clippy",
+      "command": "CARGO_INCREMENTAL=0 cargo clippy --workspace --exclude lattice-repository-validation-fixture --all-features --all-targets --no-deps --locked -- -D warnings",
+      "exit_code": 0,
+      "result": "no workspace lint; only warnings are the vendored hardened-wasmtime-shell deprecation and the nix crate future-incompatibility notice",
+      "environment_incident": "two earlier identical runs with incremental compilation exited 101 because the target's debug/incremental directory was removed mid-build (\"failed to move dependency graph ... No such file or directory\"); no source diagnostic was emitted. The rerun with CARGO_INCREMENTAL=0 is the recorded result."
+    },
+    {
+      "name": "fmt",
+      "command": "cargo fmt --check --package lattice --package budget-ledger-core --package lattice-core --package lattice-compose-binding --package lattice-workflow-contract --package lattice-workflow-transport",
+      "exit_code": 0,
+      "result": "no diff"
+    },
+    {
+      "name": "octet semantic delta",
+      "command": "OCTET_ARTIFACT_DIR, OCTET_CARGO_TARGET_DIR, OCTET_CORE_ARTIFACT_DIR and OCTET_CORE_CARGO_TARGET_DIR under the target directory; octet-precommit-check",
+      "exit_code": 0,
+      "scopes": [
+        {"scope": "root", "baseline": "octet-baseline.json", "status": "warning-only", "accepted_total": 1052, "current_total": 1052, "accepted_current": 1052, "new_total": 0, "stale_total": 0},
+        {"scope": "lattice-core", "baseline": "crates/lattice-core/octet-baseline.json", "status": "warning-only", "accepted_total": 25, "current_total": 25, "accepted_current": 25, "new_total": 0, "stale_total": 0}
+      ],
+      "baselines_rewritten": false
+    },
+    {
+      "name": "native Cairn repository validation",
+      "command": "cairn validate --root . --policy cairn-policy/generated/cairn-policy.json",
+      "exit_code": 0,
+      "result": "valid, 27 changes, 0 issues, 0 findings (before the closeout tasks.md edits)"
+    },
+    {
+      "name": "native Cairn gates",
+      "command": "cairn gate proposal|design|tasks bind-model-serving-admission --root . --policy cairn-policy/generated/cairn-policy.json",
+      "exit_code": 0,
+      "results": [
+        {"stage": "proposal", "verdict": "PASS", "issues": 0},
+        {"stage": "design", "verdict": "PASS", "issues": 0},
+        {"stage": "tasks", "verdict": "PASS", "issues": 0}
+      ]
+    },
+    {
+      "name": "native Cairn validation and gates after the closeout tasks.md edits",
+      "command": "cairn validate --root . --policy cairn-policy/generated/cairn-policy.json; cairn gate proposal|design|tasks <change> for bind-model-serving-admission, bind-worker-compute-allocations, project-configured-agent-bindings, compile-workflow-intent and add-typed-policy-operation",
+      "exit_code": 0,
+      "result": "valid, 27 changes, 0 issues, 0 findings; all 15 gates PASS with 0 issues"
+    }
+  ],
+  "parent_observations": [
+    {
+      "observer": "parent integration agent, not rerun here",
+      "candidate": "9a74e7ef1da4e0ca7610dce0db039b3825a7154d",
+      "command": "nix flake check (x86_64-linux)",
+      "result": "passed; nextest 1632 passed, 63 skipped"
+    }
+  ],
+  "compute_binding_invariance": {
+    "purpose": "bind-worker-compute-allocations 6.2: serving readiness, request admission and per-request usage provenance adopted without changing compute bindings",
+    "source_inspection": [
+      "e2de2b4e leaves crates/lattice-core/src/execution_binding/{model,validation,revalidation}.rs, src/orchestration/shell and src/store/implementation/deliveries/accounting.rs unchanged; admission only validates an optional serving declaration before the unchanged admit_compute",
+      "the serving declaration is skip_serializing_if absent, so bindings without it keep their identity: test_execution_binding_identity pins the same lattice-execution-binding-v1 and lattice-model-route-v1 vectors as ../bind-worker-compute-allocations/evidence/fixture-qualification.json",
+      "design: attempt observation top-level counters stay None, so Scope::Attempt validation and settlement arithmetic are unchanged; spec r[lattice.serving_binding.independence]: serving admission never satisfies, replaces or weakens compute admission"
+    ],
+    "passing_tests": [
+      "test_execution_binding_identity (5)",
+      "test_execution_binding_admission (9), including direct_accelerator_needs_own_chip_claims_and_is_never_satisfied_by_cpu_or_serving and revalidation_requires_unchanged_placement_reservation_and_advancing_sequence",
+      "test_execution_binding_serving::gpu_bound_worker_is_never_admitted_from_a_cpu_offer_because_a_service_is_ready",
+      "test_execution_binding_serving::serving_declaration_is_framed_only_when_present",
+      "test_execution_binding_usage (3)",
+      "orchestration::shell::tests::charging::attempt_binding_provenance_never_changes_host_run_settlement",
+      "orchestration::usage::host_tests::attempt_receipts_skip_the_run_index_and_keep_immutable_attempt_replay",
+      "implementation_attempt::cli::binding::tests::pre_spawn_revalidation_refuses_changed_allocations_without_spawn"
+    ]
+  },
+  "non_claims": [
+    "Fixture serving port only; no live serving owner, endpoint, provider or device was exercised (Kiln #49, task 5.2).",
+    "The Nix flake/nextest result is the parent's observation of the same revision, not a run made for this record."
+  ]
+}

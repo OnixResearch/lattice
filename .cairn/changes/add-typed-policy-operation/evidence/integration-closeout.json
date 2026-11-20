@@ -1,0 +1,69 @@
+{
+  "kind": "measured-integration-closeout",
+  "change": "add-typed-policy-operation",
+  "task": "3.5",
+  "issue": "lattice#23 (closed)",
+  "observed_on": "2026-11-20",
+  "candidate": {
+    "repository": "OnixResearch/lattice",
+    "revision": "9a74e7ef1da4e0ca7610dce0db039b3825a7154d"
+  },
+  "producer": {
+    "repository": "animus",
+    "revision": "1c370d5029a2667051c46bdfa1919e78e65e2f4b",
+    "published": true,
+    "note": "evidence.md recorded this revision as a local, unpublished candidate on 2026-11-19; it is now published (Animus #15)"
+  },
+  "integration_commit": {
+    "revision": "e2de2b4eac159139b9caed2c10ef9210c76646f5",
+    "octet_rekey": "commit message: Octet baselines are re-keyed with 0 new and 0 resolved semantic findings (octet-baseline.json and crates/lattice-core/octet-baseline.json)"
+  },
+  "commands": [
+    {
+      "name": "focused typed-policy tests",
+      "command": "cargo test --locked -p lattice --test test_typed_policy --test test_typed_policy_resume (within the 18-target run recorded in ../../bind-model-serving-admission/evidence/verification.json)",
+      "exit_code": 0,
+      "suites": [
+        {"target": "test_typed_policy", "passed": 15, "failed": 0},
+        {"target": "test_typed_policy_resume", "passed": 3, "failed": 0}
+      ]
+    },
+    {
+      "name": "clippy",
+      "command": "CARGO_INCREMENTAL=0 cargo clippy --workspace --exclude lattice-repository-validation-fixture --all-features --all-targets --no-deps --locked -- -D warnings",
+      "exit_code": 0
+    },
+    {
+      "name": "fmt",
+      "command": "cargo fmt --check for the six repository packages",
+      "exit_code": 0
+    },
+    {
+      "name": "octet semantic delta against the re-keyed baselines",
+      "command": "octet-precommit-check",
+      "exit_code": 0,
+      "scopes": [
+        {"scope": "root", "accepted_current": 1052, "current_total": 1052, "new_total": 0, "stale_total": 0},
+        {"scope": "lattice-core", "accepted_current": 25, "current_total": 25, "new_total": 0, "stale_total": 0}
+      ],
+      "baselines_rewritten": false
+    },
+    {
+      "name": "native Cairn validation and gates",
+      "command": "cairn validate --root . --policy cairn-policy/generated/cairn-policy.json; cairn gate proposal|design|tasks add-typed-policy-operation --root . --policy cairn-policy/generated/cairn-policy.json",
+      "exit_code": 0,
+      "result": "valid, 27 changes, 0 issues; proposal, design and tasks PASS with 0 issues (after the 3.5 edit)"
+    }
+  ],
+  "parent_observations": [
+    {
+      "observer": "parent integration agent, not rerun here",
+      "candidate": "9a74e7ef1da4e0ca7610dce0db039b3825a7154d",
+      "command": "nix flake check (x86_64-linux)",
+      "result": "passed; nextest 1632 passed, 63 skipped"
+    }
+  ],
+  "non_claims": [
+    "No model quality, live reasoning-model comparison, production readiness or default adoption is claimed; the measurement verdict stays no-improvement-established."
+  ]
+}

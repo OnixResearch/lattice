@@ -1,0 +1,79 @@
+{
+  "kind": "measured-producer-adoption-closeout",
+  "change": "project-configured-agent-bindings",
+  "task": "Adopt actual producer-owned compute reservation and serving readiness/request-admission schemas when implemented, preserving exact attempt/fence/generation and unknown-effect semantics.",
+  "observed_on": "2026-11-20",
+  "candidate": {
+    "repository": "OnixResearch/lattice",
+    "revision": "9a74e7ef1da4e0ca7610dce0db039b3825a7154d"
+  },
+  "adoptions": [
+    {
+      "capability": "compute reservation",
+      "producer": {"repository": "aspen", "revision": "aac7b5ba974cc9660749dab6d8ef4b7db04e3cb4", "issue": "aspen#42 (closed)"},
+      "consumed_by": "bind-worker-compute-allocations (lattice.compute-allocation-observation.v1 over compute-capacity-allocation-v2 / readback-v1 / offer-v2 through the read-only ComputeAllocationPort)",
+      "landed_in": "b858d85b89af8d1dda4ed0047afafd99ab233d0b"
+    },
+    {
+      "capability": "serving readiness and per-request admission",
+      "producer": {"repository": "animus", "revision": "1c370d5029a2667051c46bdfa1919e78e65e2f4b", "issue": "animus#17", "published": true},
+      "consumed_by": "bind-model-serving-admission (animus_adapters::serving screen_routes, admission_query, gate_dispatch, response_provenance, project_receipt behind the read-only serving::OwnerPort)",
+      "landed_in": "e2de2b4eac159139b9caed2c10ef9210c76646f5"
+    }
+  ],
+  "configured_profile_projection": {
+    "rule": "Configured Pi/Clankers/Animus runtime profiles have no compute or serving-owner port. RuntimeOptions::worker_profile_facts projects compute and model_routes as unavailable and serving_readiness as the adopted ServingReadiness::NoServingPort (replacing the unknown/animus#17 placeholder); no grant, reservation or owned worker observation is invented (r[lattice.agent_runtime.configured_bindings.scenario.boundary]).",
+    "scope_note": "Per-request serving admission runs in the implementation-attempt model broker. Agent-node serving admission is a declared non-goal of bind-model-serving-admission, so configured Agent-node routes stay unavailable rather than admitted."
+  },
+  "preservation_tests": {
+    "attempt_fence_generation": [
+      "test_execution_binding_admission::crossed_released_or_expired_allocations_are_rejected",
+      "test_execution_binding_admission::not_current_or_unknown_allocations_are_blocked_and_never_rebound",
+      "test_execution_binding_admission::revalidation_requires_unchanged_placement_reservation_and_advancing_sequence",
+      "test_execution_binding_identity (pinned vectors unchanged by the serving adoption)",
+      "implementation_attempt::cli::binding::tests::binding_is_durable_before_intent_and_replay_requires_the_same_identity",
+      "implementation_attempt::cli::binding::tests::pre_spawn_revalidation_refuses_changed_allocations_without_spawn",
+      "test_execution_binding_serving::stale_changed_revoked_and_exhausted_facts_never_dispatch (replaced model, configuration, endpoint and deployment generation never dispatch)",
+      "test_execution_binding_serving::out_of_order_snapshot_after_a_newer_accepted_one_is_excluded",
+      "test_execution_binding_usage::attempt_receipts_replay_idempotently_and_refuse_conflicting_bindings",
+      "test_execution_binding_serving::settled_attempt_usage_cannot_be_reset_by_reconnect_or_recovery",
+      "orchestration::usage::host_tests::configured_runtime_provenance_survives_restart_and_cannot_be_rebound"
+    ],
+    "unknown_effect": [
+      "test_execution_binding_serving::timeout_and_lost_acknowledgement_never_retry_or_reroute",
+      "test_execution_binding_serving::cancellation_is_recorded_uncertain_and_requested_not_observed",
+      "test_execution_binding_serving::partial_telemetry_after_interruption_keeps_known_usage_and_unknown_remainder",
+      "test_execution_binding_serving::unknown_usage_is_never_headroom_and_never_an_exact_ceiling",
+      "test_execution_binding_serving::unavailable_owner_blocks_served_routes_and_unserved_bindings_stay_unknown",
+      "implementation_attempt::cli::binding::tests::lost_acknowledgement_reconciles_without_rebinding_or_port_calls",
+      "implementation_attempt::cli::binding::tests::cancellation_is_requested_not_observed_and_releases_nothing",
+      "implementation_attempt::cli::binding::tests::attempt_usage_keeps_reserved_claims_and_unknown_dimensions",
+      "orchestration::shell::tests::charging::partial_provider_reports_preserve_unknown_remainder_and_overrun",
+      "orchestration::usage::host_tests::host_receipt_validation_preserves_every_unknown_binding_and_charge_boundary"
+    ],
+    "configured_profiles": [
+      "test_agent_profile_bindings::configured_routes_project_worker_facts_without_compute_service_or_qualification",
+      "test_agent_profile_bindings::configured_profiles_are_bounded_material_free_and_never_capacity",
+      "test_agent_profile_bindings::production_metadata_reuses_admitted_identity_without_dynamic_input_or_service_claims"
+    ]
+  },
+  "runs": [
+    {
+      "command": "cargo test --locked -p lattice --test test_execution_binding_serving --test test_execution_binding_admission --test test_execution_binding_identity --test test_execution_binding_usage --test test_agent_profile_bindings (part of the 18-target run in ../bind-model-serving-admission/evidence/verification.json)",
+      "exit_code": 0,
+      "passed": {"test_execution_binding_serving": 22, "test_execution_binding_admission": 9, "test_execution_binding_identity": 5, "test_execution_binding_usage": 3, "test_agent_profile_bindings": 5},
+      "failed": 0
+    },
+    {
+      "command": "cargo test --locked -p lattice --lib -- implementation_attempt:: candidate_worker::broker orchestration:: store::implementation execution_binding:: workflow:: agent_node::runtime",
+      "exit_code": 0,
+      "passed": 96,
+      "failed": 0,
+      "ignored": 1,
+      "note": "every lib test named above passed; the ignored case is the bubblewrap broker isolation test"
+    }
+  ],
+  "non_claims": [
+    "Fixture compute and serving ports only. No live provider, worker, serving owner, endpoint or host action was run; the live qualification task stays open (Kiln #49, Aspen #15)."
+  ]
+}

@@ -1,0 +1,119 @@
+{
+  "kind": "measured-producer-consumption-comparison",
+  "change": "compile-workflow-intent",
+  "task": "Select actual Cairn #12/#14 typed obligations/selected-work schema and consume it through Kiln #83 without interpreting prose as semantic authority.",
+  "observed_on": "2026-11-20",
+  "decision": "checked by the parent: Kiln #83 consumes Cairn cairn.selected-work.v1 typed obligations without prose authority, and the documented operator procedure (docs/workflow-intent.md: rebind facts.compiler_artifact_identity to the deployed executable's measured identity) reproduces every Kiln pin, including the plan identities under Kiln's pinned compiler identity. The verbatim request is refused only by the per-executable compiler binding, which is the intended stale-compiler refusal, not a consumption gap.",
+  "provenance": {
+    "cairn": {
+      "revision": "8f6cd0b373962ca8c370e00ef20dfbf0c398e0d0",
+      "schema": "cairn.selected-work.v1",
+      "imported_by_kiln_as": "vendor/cairn-verifier.source.json (archive BLAKE3 867504a36da1ba047bdaef11f5b9dfb58b2abfb9d728a6d64b59be477aec56c0)"
+    },
+    "kiln": {
+      "repository": "https://github.com/OnixResearch/kiln.git (anonymous clone, read-only)",
+      "producer_change_revision": "e30f178bf20ee720b0611aca021982c9c93176c9",
+      "producer_change": "#83 consume-selected-work-snapshots",
+      "main_revision": "70c8f217433bb24010d4f48a1abdc55ce8e44e03",
+      "fixture_drift_e30f178b_to_70c8f217": "none (git diff over fixtures/lattice/workflow-intent, fixtures/cairn/selected-work and kiln-adapter-lattice workflow_intent is empty)",
+      "pinned_lattice_compiler": {
+        "revision": "661499d282c2e79ebefbd0f9b35beb5f8d7795cd",
+        "compiler_artifact_identity": "b3:64f13f4cbd904356ade47d7d1c8b4daefe9ceb1217cdb37127f1cfe5aab44865"
+      }
+    },
+    "lattice": {
+      "revision": "9a74e7ef1da4e0ca7610dce0db039b3825a7154d",
+      "executable": "release lattice built in the dev shell with cargo build --release --locked -p lattice --bin lattice (exit 0)",
+      "executable_file_blake3": "9e83d2f67c91f5c89c120bb842e8c1df9342a97ccefa5059ee00da55737ce840",
+      "compiler_identity_command": "lattice workflow-intent compiler-identity",
+      "compiler_revision": "lattice.workflow-intent-compiler.v1",
+      "compiler_artifact_identity": "b3:41f4e261498fb0ddc1ef59adc05a02e17aa5bb7ee0259738de44d725cc25cc62",
+      "workflow_intent_source_changes_since_661499d2": "none (git log 661499d2..9a74e7ef -- src/workflow/intent is empty)"
+    }
+  },
+  "inputs_blake3": {
+    "kiln:fixtures/lattice/workflow-intent/verify.request.json": "41895a08314bca6335dbf87a4d2cb32dfdde8d6c9e8fd81bd0964f689d104c24",
+    "kiln:fixtures/lattice/workflow-intent/verify.intent.json": "6a19343bf9036d1a912d0afa2137ad9d548470b51a849b7dfca6dcc864d35a72",
+    "kiln:fixtures/lattice/workflow-intent/verify.plan.json": "24bbaf719cea89c1592e2f8e21bd0fad7ba44dc4d9c34c14dba8c952aa9d5ef2",
+    "kiln:fixtures/lattice/workflow-intent/verify.compare-dropped.json": "671c6a58f148cab25be9b254ad5f698396cbd528341174a0bcbcdf0848f1c25c",
+    "kiln:fixtures/cairn/selected-work/planning.contract.json": "a903af61c018725150e885b8929b54aea6bde2fa3b48c04c73250994609d90a2",
+    "kiln:fixtures/cairn/selected-work/planning.producer.json": "f9105397b422f8ed51519d83f1525b91617255ae7908daf077c9c2d5862bc648"
+  },
+  "typed_obligation_check": {
+    "contract_schema": "kiln.selected-work-contract.v1 with snapshot.producer_schema cairn.selected-work.v1",
+    "intent_equals_request_intent": true,
+    "coverage": "complete",
+    "unsupported_fields": [],
+    "obligations": 8,
+    "leaf_obligations_bound_to_typed_cairn_nodes": 7,
+    "binding_rule": "for each leaf, obligation_identity, guidance_identity and remaining_condition_identity equal b3: + the Cairn node's obligation, guidance and condition hashes in planning.contract.json; every leaf node has kind evidence",
+    "leaf_ids": [
+      "verify.conditional.claim.revision",
+      "verify.evidence.authority",
+      "verify.evidence.contract",
+      "verify.evidence.freshness",
+      "verify.evidence.pass-only",
+      "verify.traceability.contract",
+      "verify.traceability.freshness"
+    ],
+    "leaf_matches": 7,
+    "kiln_owned_node": "kiln.authoritative-completion (completion_only; depends on every leaf; observation schema cairn.authoritative-completion.v1 bound to the producer predicate identity)",
+    "prose_fields_in_intent": "none; the lattice.workflow-intent.v1 shape carries identifiers, b3 identities, operation classes and observation contracts only"
+  },
+  "runs": [
+    {
+      "command": "lattice workflow-intent compile kiln/fixtures/lattice/workflow-intent/verify.request.json",
+      "exit_code": 1,
+      "stderr": "configuration error: compiler artifact differs from frozen input",
+      "meaning": "the request freezes the 661499d2 executable's identity; the 9a74e7ef executable refuses rather than rebinding"
+    },
+    {
+      "command": "lattice workflow-intent compile rebound.request.json (verify.request.json with only facts.compiler_artifact_identity replaced by the measured identity, as docs/workflow-intent.md prescribes)",
+      "rebound_request_blake3": "d615f6cc6fc07f029fa3f9de22de6151bdd29f5b739ebb8efcda7ac0b914c21d",
+      "exit_code": 0,
+      "output_blake3": "342fc4380a7f01a9de5c8965eb5c9c9d90b7a0559d9119802f4c8734854e4902"
+    },
+    {
+      "command": "lattice workflow-intent compare rebound.request.json <rebound request without kiln.authoritative-completion>",
+      "exit_code": 0,
+      "result": {
+        "added_obligations": [],
+        "removed_obligations": ["kiln.authoritative-completion"],
+        "changed_obligations": [],
+        "disposition": "owner_readmission_required",
+        "base_plan_identity": "b3:243c08bfa0e265d824c94db469eee4d5dea98d582906c13879aea723b330aa0e",
+        "proposed_plan_identity": "b3:2cb2204decb3aa0594fcd5b995fb2bf5d6d10a654ded478267eaeec24843f92e"
+      }
+    }
+  ],
+  "comparison_with_kiln_pins": {
+    "compiler_revision": {"kiln": "lattice.workflow-intent-compiler.v1", "lattice_9a74e7ef": "lattice.workflow-intent-compiler.v1", "match": true},
+    "compiler_artifact_identity": {"kiln": "b3:64f13f4cbd904356ade47d7d1c8b4daefe9ceb1217cdb37127f1cfe5aab44865", "lattice_9a74e7ef": "b3:41f4e261498fb0ddc1ef59adc05a02e17aa5bb7ee0259738de44d725cc25cc62", "match": false},
+    "plan_identity": {"kiln": "b3:ef734317f2d8e2f5c799ec99f7b8cf794fdd04d07615de01d8e86afd56e98370", "lattice_9a74e7ef": "b3:243c08bfa0e265d824c94db469eee4d5dea98d582906c13879aea723b330aa0e", "match": false},
+    "graph_identity": {"kiln": "blake3/machine 12c977a024b6972d96063ba9652b683c47c1405cca903cb3c9617a5f8b574016", "lattice_9a74e7ef": "blake3/machine 12c977a024b6972d96063ba9652b683c47c1405cca903cb3c9617a5f8b574016", "match": true},
+    "graph_descriptor_equal": true,
+    "nodes_equal": true,
+    "nodes": [
+      "kiln.authoritative-completion",
+      "verify.conditional.claim.revision",
+      "verify.evidence.authority",
+      "verify.evidence.contract",
+      "verify.evidence.freshness",
+      "verify.evidence.pass-only",
+      "verify.traceability.contract",
+      "verify.traceability.freshness"
+    ],
+    "intent_echo_equal": true,
+    "facts_equal_except_compiler_artifact_identity": true,
+    "disposition": {"kiln": "planning_only_requires_separate_execution_admission", "lattice_9a74e7ef": "planning_only_requires_separate_execution_admission", "match": true},
+    "whole_plan_equal_except_identity_and_compiler_artifact_identity": true,
+    "plan_identity_attribution": "Recomputing compiler::plan_identity (BLAKE3 of lattice.workflow-intent-plan.v1 NUL + JSON of compiler revision, plan schema, normalized request and graph identity) over the 9a74e7ef output reproduces b3:243c08bf...; substituting only Kiln's compiler artifact identity yields Kiln's b3:ef734317..., and for the dropped-obligation proposal yields Kiln's proposed b3:ba422d11.... The plan identity difference is therefore the compiler artifact identity alone.",
+    "compare_dropped": {"removed_obligations_match": true, "disposition_match": true, "proposed_plan_identity_match": false, "note": "differs only through the compiler artifact identity, per the attribution above"}
+  },
+  "residual": "No retained 661499d2 executable reproduces Kiln's pinned compiler identity (the 9 stored lattice binaries were measured on 2026-11-20; none match). A byte-exact rerun of Kiln's verbatim request needs that executable or Kiln fixtures regenerated against a newer Lattice executable; the compiler-artifact binding deliberately refuses any other executable.",
+  "non_claims": [
+    "Kiln's selected-work and Lattice intent fixtures are deterministic producer/consumer fixtures, not a native cairn selected-work run, a live Kiln campaign or live Lattice execution.",
+    "The compile request's runtime_profile_identity is Kiln's synthetic fixture value.",
+    "Plan compilation does not execute nodes, grant effects or discharge Cairn obligations; issue #26 is not closed by compile success."
+  ]
+}

@@ -25,7 +25,7 @@
 
 ## Phase 5: Verification and remaining qualification
 
-- [ ] [serial] 5.1 Run the focused tests, the existing reservation, ledger, execution-binding and broker suites, clippy, fmt, Cairn validation and gates, the Octet semantic delta and the Nix nextest check, and record actual results. r[lattice.serving_binding.non_claims.scenario.fixture]
+- [x] [serial] 5.1 Run the focused tests, the existing reservation, ledger, execution-binding and broker suites, clippy, fmt, Cairn validation and gates, the Octet semantic delta and the Nix nextest check, and record actual results. At Lattice `9a74e7ef`: 18 integration targets 148/148 passed, library binding/broker/orchestration suites 96 passed (1 bubblewrap case ignored), ledger and core crates 30/30, Clippy `-D warnings` and fmt exit 0, Octet 0 new and 0 stale (root 1052/1052, core 25/25), native Cairn validation 0 issues and all three gates PASS; the parent's Nix flake check on the same revision passed with Nextest 1632 passed and 63 skipped (`evidence/verification.json`). r[lattice.serving_binding.non_claims.scenario.fixture]
 - [ ] [serial] 5.2 Blocked on Kiln #49: qualify a live serving-owner port, a live endpoint and cross-host CPU worker plus serving deployment. r[lattice.serving_binding.non_claims]
 
 Only checked tasks are complete.
