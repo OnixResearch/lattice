@@ -1,0 +1,22 @@
+## Phase 1: Pure core
+
+- [x] [serial] 1.1 Add `crates/lattice-core/src/execution_binding/capability.rs` with `Declaration`, `NameSet`, `Defect`, `validate` and `canonical`, plus the `lattice-worker-definition-v1` identity role in `content_identity`. Tests: `tests/test_worker_inventory.rs` (malformed declarations, 32/33-name and 64/65-byte bounds) and the pinned vector in `tests/test_execution_binding_identity.rs`. r[lattice.worker_inventory.capability] r[lattice.worker_inventory.capability.scenario.malformed] r[lattice.worker_inventory.definition]
+- [x] [serial] 1.2 Move `projection/inventory.rs` to `lattice.worker-profile-facts.v2`: definition (`projection/lineage.rs`), `task_families` and `tools` facts, owned-unknown #25 revision slots and profile wait reasons through the new `projection/wait.rs`. Tests: `tests/test_worker_inventory.rs` (undeclared is unknown, declared is sorted, unavailable, definition stable across revisions and distinct across bases, slots unknown, reasons sorted and from published routes). r[lattice.worker_inventory.schema] r[lattice.worker_inventory.definition.scenario.stable] r[lattice.worker_inventory.definition.scenario.basis] r[lattice.worker_inventory.capability.scenario.declared] r[lattice.worker_inventory.revisions] r[lattice.worker_inventory.revisions.scenario.unpublished] r[lattice.worker_inventory.wait_reasons]
+- [x] [serial] 1.3 Move `projection/retained.rs` to `lattice.worker-instance-observation.v2` with `definition_identity`, single-shot `liveness` and instance wait reasons. Tests: `tests/test_worker_inventory.rs` (each lifecycle, unobserved and stale, generation growth, no idle or live, terminal without reasons, serving causes). r[lattice.worker_inventory.liveness] r[lattice.worker_inventory.liveness.scenario.unknown] r[lattice.worker_inventory.liveness.scenario.single_shot] r[lattice.worker_inventory.wait_reasons.scenario.causes]
+
+## Phase 2: Configuration and shell
+
+- [x] [serial] 2.1 Add the optional `worker_capability` to `contracts/worker-execution-binding.ncl` and `format::WorkerConfiguration`, with a positive fixture and negative fixtures for each malformed shape. Tests: `tests/test_execution_binding_contracts.rs`. r[lattice.worker_inventory.capability.scenario.malformed] r[lattice.worker_inventory.capability.scenario.undeclared]
+- [x] [serial] 2.2 Add the optional `worker_capability` to the implementation-attempt `Request`, framed into `worker_profile_identity` only when present and validated in `validate_binding`. Tests: `src/implementation_attempt/cli/tests.rs` (revision unchanged without, changed with, order-insensitive, malformed refused before effects). r[lattice.worker_inventory.capability] r[lattice.worker_inventory.capability.scenario.undeclared] r[lattice.worker_inventory.capability.scenario.declared]
+- [x] [serial] 2.3 Emit `lattice.worker-inventory.v2` from `inspect`, passing the capability, owner default, definition identity and admitted window. Move `RuntimeOptions::worker_profile_facts` to v2 with target-label definitions. Tests: `src/implementation_attempt/cli/inspect/tests.rs` (v2 only, no leakage, malformed refused, deterministic reasons) and `tests/test_agent_profile_bindings.rs`. r[lattice.worker_inventory.schema.scenario.cutover] r[lattice.worker_inventory.capability.scenario.redacted] r[lattice.worker_inventory.wait_reasons.scenario.disclosure]
+
+## Phase 3: Captures, documentation and evidence
+
+- [x] [serial] 3.1 Add the `LATTICE_INVENTORY_CAPTURE_DIR`-gated capture tests and write the v2 captures and their README to the producer-work capture directory. r[lattice.worker_inventory.captures] r[lattice.worker_inventory.captures.scenario.fixture]
+- [x] [serial] 3.2 Write `docs/worker-inventory.md`, update `docs/worker-compute-binding.md`, `docs/worker-serving-binding.md`, `docs/candidate-worker.md` and the changelog, and retain `evidence/fixture-qualification.json` with actual check results. r[lattice.worker_inventory.schema] r[lattice.worker_inventory.captures]
+
+## Phase 4: Verification
+
+- [x] [serial] 4.1 Run the focused tests, `cargo test -p lattice --lib -- implementation_attempt`, the execution-binding suites, clippy `-D warnings`, fmt, `cairn validate` and the change gates, the Octet semantic delta and `scripts/check.rs`, and record the actual results in `evidence/fixture-qualification.json`. r[lattice.worker_inventory.schema] r[lattice.worker_inventory.captures.scenario.fixture]
+
+Only checked tasks are complete.

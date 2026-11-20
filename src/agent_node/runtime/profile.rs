@@ -133,11 +133,13 @@ impl super::super::RuntimeOptions {
 }
 
 impl super::super::RuntimeOptions {
-    /// `lattice.worker-profile-facts.v1` for the configured routes. Compute
+    /// `lattice.worker-profile-facts.v2` for the configured routes. Compute
     /// reservations and model-service bindings stay unavailable, executable
     /// bytes stay unknown, and appearing in configuration never qualifies a
-    /// route.
+    /// route. Each target is its own owner-default definition, and its task
+    /// families and tools stay undeclared.
     // r[impl lattice.execution_binding.profile_facts.scenario.compatibility]
+    // r[impl lattice.worker_inventory.definition]
     pub fn worker_profile_facts(
         &self,
     ) -> Result<Vec<lattice_core::execution_binding::projection::inventory::WorkerProfileFacts>, super::super::Error>
@@ -165,6 +167,8 @@ fn configured_facts(
         &lattice_core::execution_binding::projection::inventory::ProfileInput {
             owner: lattice_core::execution_binding::projection::inventory::ProfileOwner::ConfiguredRuntime,
             revision: &profile.binding.revision,
+            default_definition: super::super::target_label(profile.binding.target),
+            capability: None,
             qualification_ref: None,
             adapter: lattice_core::execution_binding::projection::Offered::Declared(profile.adapter),
             protocol_revision: lattice_core::execution_binding::projection::Offered::Declared(profile.protocol),

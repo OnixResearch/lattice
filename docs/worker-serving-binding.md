@@ -266,8 +266,9 @@ budgets across attempts stay with
 ## Inventory readiness
 
 `implementation-attempt inspect` prints the profile's `serving_readiness`
-and the instance's `model_readiness`, plus the attempt's `model_requests`
-summary. Readiness reports the actual cause rather than an owner placeholder:
+and the instance's `model_readiness` in its `lattice.worker-inventory.v2`
+document, plus the attempt's `model_requests` summary. Readiness reports the
+actual cause rather than an owner placeholder:
 
 | State | When |
 |---|---|
@@ -279,6 +280,14 @@ Inspection calls only `observe_snapshot`, once per served route, and never
 admission or recheck. A snapshot read is not a reservation, and a draining or
 stale observation is reported as such, never as ready. Freshness has no
 accepted-position history here, so `out-of-order` cannot be reported.
+
+Each readiness cause also becomes at most one wait reason in the profile's and
+a non-terminal instance's `wait_reasons` ([worker inventory](worker-inventory.md#wait-reasons)):
+`serving_port_absent` without a port; `serving_snapshot_unavailable` or
+`serving_port_issue` per route; and, for an observed snapshot,
+`serving_snapshot_not_current` when its freshness is not `current`, otherwise
+`serving_not_ready` when the service is not `ready`. A route reason names the
+route by its published route name; the service id stays in readiness.
 
 ## Compatibility: reservation-only versus serving-bound usage
 

@@ -1,19 +1,23 @@
-//! `implementation-attempt inspect`: separate profile and instance facts.
+//! `implementation-attempt inspect`: `lattice.worker-inventory.v2` with
+//! separate profile and instance facts.
 //!
 //! The command reads one attempt directory without creating it, takes no
 //! claim, schedules nothing and never calls the compute port. It reads only
 //! the latest snapshots of an injected serving-owner port, never admission or
 //! recheck; without one, serving readiness names that cause. Paths, endpoints,
-//! prompts, backend handles and grant references are not printed. An
-//! unreadable or contradictory artifact is an error, never a guessed state.
+//! prompts, commands, credential and grant references and backend handles are
+//! not printed. An unreadable or contradictory artifact or a malformed
+//! capability declaration is an error, never a guessed state.
 
 // r[impl lattice.execution_binding.instances.scenario.projection]
 // r[impl lattice.execution_binding.instances.scenario.unknown]
+// r[impl lattice.worker_inventory.schema.scenario.cutover]
+// r[impl lattice.worker_inventory.capability.scenario.redacted]
 
 #[cfg(test)]
 mod tests;
 
-const INVENTORY_SCHEMA: &str = "lattice.worker-inventory.v1";
+const INVENTORY_SCHEMA: &str = "lattice.worker-inventory.v2";
 const MAX_SMALL_ARTIFACT_BYTES: usize = 262_144;
 
 pub(super) fn run(
@@ -44,7 +48,7 @@ pub(super) fn project(
     debug_assert!(readiness.is_bounded(), "readiness comes from validated producer values");
     debug_assert_eq!(profile.serving_readiness, readiness, "profile and instance share one port read");
     let directory = super::artifacts::directory(state, &request);
-    let instance = instance(&request, &identity, &readiness, &directory)?;
+    let instance = instance(&request, &identity, &profile, &directory)?;
     let model_requests = model_requests(&request, &directory)?;
     Ok(serde_json::json!({
         "schema": INVENTORY_SCHEMA,
@@ -82,6 +86,8 @@ pub(super) fn profile_facts(
         &lattice_core::execution_binding::projection::inventory::ProfileInput {
             owner: lattice_core::execution_binding::projection::inventory::ProfileOwner::ImplementationAttempt,
             revision: &request.envelope.worker_profile,
+            default_definition: lattice_core::execution_binding::projection::inventory::ATTEMPT_DEFINITION,
+            capability: request.worker_capability.as_ref(),
             qualification_ref: None,
             adapter: declared("omp-jsonl"),
             protocol_revision: declared(&request.omp.revision),
@@ -119,7 +125,7 @@ const NAMED_ARTIFACTS: [&str; 6] = [
 fn instance(
     request: &super::Request,
     request_identity: &str,
-    serving_readiness: &lattice_core::execution_binding::projection::ServingReadiness,
+    profile: &lattice_core::execution_binding::projection::inventory::WorkerProfileFacts,
     directory: &std::path::Path,
 ) -> Result<Option<lattice_core::execution_binding::projection::retained::WorkerInstanceObservation>, String> {
     if !is_present(directory)? {
@@ -139,12 +145,14 @@ fn instance(
     let state = lattice_core::execution_binding::projection::retained::AttemptState {
         admitted: admitted.as_ref(),
         request_identity,
+        definition_identity: &profile.definition.identity,
+        admitted_until_epoch_ms: request.expires_at_ms,
         has_intent: intent.is_some(),
         has_refusal: present(super::binding::REFUSAL_FILE),
         terminal_disposition: disposition.as_deref(),
         has_cancel_request: present("cancel.request"),
         artifacts: &pairs,
-        serving_readiness,
+        serving_readiness: &profile.serving_readiness,
     };
     let observed_at_epoch_ms = i64::try_from(super::now_ms()?).map_err(|error| error.to_string())?;
     lattice_core::execution_binding::projection::retained::project_instance(&state, observed_at_epoch_ms)

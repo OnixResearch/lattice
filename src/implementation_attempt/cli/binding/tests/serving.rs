@@ -147,8 +147,56 @@ fn inspect_reports_the_injected_ports_latest_snapshot_readiness_and_freshness() 
         calls.iter().all(|call| matches!(call, crate::execution_binding::serving::Call::Snapshot(_))),
         "inspect never admits or rechecks a request"
     );
+    let route_reasons = |section: &serde_json::Value| {
+        section["wait_reasons"]
+            .as_array()
+            .expect("reasons")
+            .iter()
+            .filter(|reason| reason["subject"]["kind"] == "route")
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(route_reasons(&output["profile"]), Vec::<serde_json::Value>::new(), "a ready, current route waits");
     let mut silent = crate::execution_binding::serving::FixtureOwner::default();
     let output =
         super::super::super::inspect::project(&served.request_path, &served.state, &mut silent).expect("inventory");
     assert_eq!(output["instance"]["model_readiness"]["routes"][0]["snapshot"]["reading"], "unavailable");
+    let expected = serde_json::json!([{
+        "code": "serving_snapshot_unavailable",
+        "subject": {"kind": "route", "name": "primary"},
+        "owner": "animus#17",
+    }]);
+    assert_eq!(serde_json::Value::from(route_reasons(&output["instance"])), expected);
+    assert_eq!(serde_json::Value::from(route_reasons(&output["profile"])), expected);
+    assert!(
+        !output["instance"]["wait_reasons"].to_string().contains("svc-shared"),
+        "service ids stay in readiness"
+    );
+}
+
+/// Writes the served v2 captures Kiln uses as fixtures, only when
+/// `LATTICE_INVENTORY_CAPTURE_DIR` names an existing directory.
+// r[verify lattice.worker_inventory.captures.scenario.fixture]
+// r[verify lattice.worker_inventory.wait_reasons.scenario.causes]
+#[test]
+fn capture_served_worker_inventory_v2() {
+    let Some(dir) = std::env::var_os("LATTICE_INVENTORY_CAPTURE_DIR") else {
+        return;
+    };
+    let dir = std::path::PathBuf::from(dir);
+    let served = served();
+    let mut port = crate::execution_binding::serving::FixtureOwner::new(
+        vec![ready_snapshot(&served.request.omp.model_broker.model)],
+        vec![],
+        vec![],
+    );
+    let output =
+        super::super::super::inspect::project(&served.request_path, &served.state, &mut port).expect("inventory");
+    std::fs::write(dir.join("host-local-served-ready.json"), serde_json::to_vec_pretty(&output).expect("json"))
+        .expect("write capture");
+    let mut silent = crate::execution_binding::serving::FixtureOwner::default();
+    let output =
+        super::super::super::inspect::project(&served.request_path, &served.state, &mut silent).expect("inventory");
+    std::fs::write(dir.join("host-local-served-unavailable.json"), serde_json::to_vec_pretty(&output).expect("json"))
+        .expect("write capture");
 }

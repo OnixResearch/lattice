@@ -89,11 +89,23 @@ pub struct Request {
     pub worker_compute: lattice_core::execution_binding::request::ComputeRequirement,
     /// Per-attempt expected compute allocation and model routes.
     pub execution_binding: lattice_core::execution_binding::request::Declaration,
+    /// Optional declared definition, task families and tools; part of the
+    /// profile revision only when present.
+    #[serde(
+        default = "lattice_core::execution_binding::capability::absent",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub worker_capability: Option<lattice_core::execution_binding::capability::Declaration>,
 }
 
 impl Request {
+    /// The profile revision. A capability declaration is framed in its
+    /// canonical form only when present, so requests without one keep their
+    /// revision; a malformed declaration is refused here, before any effect.
+    // r[impl lattice.worker_inventory.capability.scenario.undeclared]
+    // r[impl lattice.worker_inventory.capability.scenario.declared]
     pub fn worker_profile_identity(&self) -> Result<String, String> {
-        let bytes = serde_json::to_vec(&(
+        let profile = (
             &self.program,
             &self.sandbox_program,
             &self.omp,
@@ -102,7 +114,16 @@ impl Request {
             self.output_limit_bytes,
             self.allow_unchanged,
             &self.worker_compute,
-        ))
+        );
+        let bytes = match &self.worker_capability {
+            None => serde_json::to_vec(&profile),
+            Some(declared) => {
+                let canonical = declared
+                    .canonical()
+                    .map_err(|defect| format!("worker capability declaration is unsupported: {defect:?}"))?;
+                serde_json::to_vec(&(profile, canonical))
+            }
+        }
         .map_err(|error| error.to_string())?;
         Ok(blake3::hash(&bytes).to_hex().to_string())
     }

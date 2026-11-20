@@ -12,6 +12,7 @@
 //! Preserves or recompute them.
 
 pub mod admission;
+pub mod capability;
 pub mod model;
 pub mod projection;
 pub mod request;

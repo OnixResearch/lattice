@@ -144,7 +144,7 @@ fn configured_routes_project_worker_facts_without_compute_service_or_qualificati
         assert_eq!(fact.adapter.value.as_deref(), Some("command"));
     }
     let text = serde_json::to_string(&facts).expect("facts json");
-    assert!(!text.contains("qualified"), "configuration never qualifies an executable");
+    assert!(!text.contains("\"support\":\"qualified\""), "configuration never qualifies an executable");
     assert!(!text.contains("/private/"));
     for (label, target) in [
         ("pi", Target::Pi),
@@ -164,4 +164,28 @@ fn configured_routes_project_worker_facts_without_compute_service_or_qualificati
         assert!(!text.contains("fixture.invalid"));
         assert!(!text.contains("fixture-model"));
     }
+}
+
+// r[verify lattice.worker_inventory.definition]
+// r[verify lattice.worker_inventory.schema]
+#[test]
+fn configured_routes_are_owner_default_definitions_with_undeclared_capability() {
+    use lattice::execution_binding::core::projection::SupportLevel;
+    use lattice::execution_binding::core::projection::inventory::PROFILE_FACTS_SCHEMA;
+    use lattice::execution_binding::core::projection::lineage::DefinitionBasis;
+    let facts = direct_config("pi").worker_profile_facts().expect("direct facts");
+    let fact = &facts[0];
+    assert_eq!(fact.schema, PROFILE_FACTS_SCHEMA);
+    assert_eq!(PROFILE_FACTS_SCHEMA, "lattice.worker-profile-facts.v2");
+    assert_eq!((fact.definition.name.as_str(), fact.definition.basis), ("pi", DefinitionBasis::OwnerDefault));
+    for names in [&fact.task_families, &fact.tools] {
+        assert_eq!((names.support, names.value.as_ref()), (SupportLevel::Unknown, None));
+    }
+    let mut changed = direct_config("pi");
+    changed.openai_compatible.get_mut("pi").expect("route").model = "changed-model".to_string();
+    let changed = changed.worker_profile_facts().expect("changed facts");
+    assert_ne!(changed[0].revision, fact.revision, "a changed route is a new revision");
+    assert_eq!(changed[0].definition, fact.definition, "of the same definition");
+    let clankers = direct_config("clankers").worker_profile_facts().expect("clankers facts");
+    assert_ne!(clankers[0].definition.identity, fact.definition.identity, "targets are distinct definitions");
 }

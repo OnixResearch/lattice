@@ -1,5 +1,9 @@
 // r[verify lattice.execution_binding.profile_facts.scenario.unsupported]
 // r[verify lattice.execution_binding.persistence.scenario.changed_binding]
+// r[verify lattice.worker_inventory.capability]
+// r[verify lattice.worker_inventory.capability.scenario.undeclared]
+// r[verify lattice.worker_inventory.capability.scenario.declared]
+// r[verify lattice.worker_inventory.capability.scenario.malformed]
 
 /// A valid v3 request with one brokered `primary` route.
 pub(super) fn request(
@@ -72,6 +76,7 @@ pub(super) fn request(
             compute: declared,
             model_routes: lattice_core::execution_binding::request::RouteDeclaration::NoModel {},
         },
+        worker_capability: None,
     };
     request.execution_binding.model_routes = lattice_core::execution_binding::request::RouteDeclaration::Routes {
         routes: vec![super::binding::primary_route(&request).expect("primary route identity")],
@@ -163,6 +168,78 @@ fn compute_requirement_is_part_of_the_profile_revision() {
     };
     assert_ne!(changed.worker_profile_identity().expect("identity"), changed.envelope.worker_profile);
     assert!(changed.validate(1).expect_err("stale profile revision").contains("stale, crossed"));
+}
+
+/// `request` re-admitted with `capability`, as a dispatcher would export it.
+pub(super) fn with_capability(
+    mut request: super::Request,
+    capability: lattice_core::execution_binding::capability::Declaration,
+) -> super::Request {
+    request.worker_capability = Some(capability);
+    request.envelope.worker_profile = request.worker_profile_identity().expect("profile identity");
+    request.admitted_envelope = request.envelope.identity();
+    request
+}
+
+pub(super) fn capability(tools: &[&str]) -> lattice_core::execution_binding::capability::Declaration {
+    lattice_core::execution_binding::capability::Declaration {
+        schema: lattice_core::execution_binding::capability::CAPABILITY_SCHEMA.into(),
+        definition: "rust-implementer".into(),
+        task_families: Some(lattice_core::execution_binding::capability::NameSet::Declared {
+            names: vec!["rust-implementation".into(), "cairn-task".into()],
+        }),
+        tools: Some(lattice_core::execution_binding::capability::NameSet::Declared {
+            names: tools.iter().map(|tool| (*tool).to_owned()).collect(),
+        }),
+    }
+}
+
+#[test]
+fn capability_is_framed_into_the_revision_only_when_declared() {
+    let undeclared = host_local();
+    let legacy_tuple = serde_json::to_vec(&(
+        &undeclared.program,
+        &undeclared.sandbox_program,
+        &undeclared.omp,
+        &undeclared.read_paths,
+        &undeclared.write_paths,
+        undeclared.output_limit_bytes,
+        undeclared.allow_unchanged,
+        &undeclared.worker_compute,
+    ))
+    .expect("legacy tuple");
+    assert_eq!(
+        undeclared.envelope.worker_profile,
+        blake3::hash(&legacy_tuple).to_hex().to_string(),
+        "requests without a declaration keep their revision bytes"
+    );
+    let bytes = serde_json::to_value(&undeclared).expect("request json");
+    assert!(bytes.get("worker_capability").is_none(), "an absent declaration is not serialized");
+    let declared = with_capability(host_local(), capability(&["read", "edit"]));
+    declared.validate(1).expect("declared capability validates");
+    assert_ne!(declared.envelope.worker_profile, undeclared.envelope.worker_profile);
+    let reordered = with_capability(host_local(), capability(&["edit", "read"]));
+    assert_eq!(reordered.envelope.worker_profile, declared.envelope.worker_profile, "order-insensitive");
+    let widened = with_capability(host_local(), capability(&["read", "edit", "bash"]));
+    assert_ne!(widened.envelope.worker_profile, declared.envelope.worker_profile, "new tools are a new revision");
+    let mut swapped = declared.clone();
+    swapped.worker_capability = Some(capability(&["read", "bash"]));
+    assert!(swapped.validate(1).expect_err("changed tools").contains("stale, crossed"));
+}
+
+#[test]
+fn malformed_capability_is_refused_before_effects() {
+    let mut malformed = host_local();
+    malformed.worker_capability = Some(capability(&["/usr/bin/bash"]));
+    let error = malformed.validate(1).expect_err("path tool");
+    assert!(error.contains("worker capability declaration is unsupported"), "{error}");
+    assert!(!error.contains("/usr/bin/bash"), "{error}");
+    let mut empty = host_local();
+    empty.worker_capability = Some(capability(&[]));
+    assert!(empty.validate(1).expect_err("empty set").contains("Empty"));
+    let mut value = serde_json::to_value(with_capability(host_local(), capability(&["read"]))).expect("value");
+    value["worker_capability"]["prompt"] = serde_json::Value::from("make the candidate");
+    assert!(serde_json::from_value::<super::Request>(value).is_err(), "unknown capability fields are refused");
 }
 
 #[test]

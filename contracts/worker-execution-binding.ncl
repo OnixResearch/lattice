@@ -1,8 +1,12 @@
-# Operator-authored worker compute and model requirements and the per-attempt
-# execution-binding declaration. The export decodes into the strict Rust shapes
-# in `lattice_core::execution_binding::request` and is revalidated there.
-# A declaration expects a provider allocation; it never reserves one.
+# Operator-authored worker compute and model requirements, the per-attempt
+# execution-binding declaration and an optional declared definition, task
+# families and tools. The export decodes into the strict Rust shapes in
+# `lattice_core::execution_binding::{request, capability}` and is revalidated
+# there. A declaration expects a provider allocation; it never reserves one.
+# A capability declaration states support; it grants no tool or authority.
 # r[impl lattice.execution_binding.profile_facts.scenario.unsupported]
+# r[impl lattice.worker_inventory.capability]
+# r[impl lattice.worker_inventory.capability.scenario.malformed]
 let granularities = ["chip", "mmio-bundle", "tray", "mesh", "partition", "alias"] in
 let enforcements = ["logical-fence-only", "backend-acknowledged", "backend-fenced"] in
 
@@ -114,18 +118,55 @@ let is_consistent = fun value =>
   && std.array.all (fun name => std.array.elem name declared_names) required_names
 in
 
+# A short lowercase identifier: no path, whitespace, command line, prompt or URL.
+let is_name = fun value =>
+  std.is_string value
+  && std.string.is_match "^[a-z0-9][a-z0-9._:-]*$" value
+  && std.string.length value <= 64
+in
+
+# A declared set is nonempty, bounded and distinct; `unavailable` offers none.
+let is_name_set = fun value =>
+  is_variant value
+  && (
+    (value.kind == "unavailable" && is_shape ["kind"] value)
+    || (
+      value.kind == "declared"
+      && is_shape ["kind", "names"] value
+      && is_bounded 32 value.names
+      && std.array.all is_name value.names
+      && is_distinct value.names
+    )
+  )
+in
+
+# An absent set stays undeclared, which inventory reports as unknown.
+let is_capability = fun value =>
+  std.is_record value
+  && has_only ["schema", "definition", "task_families", "tools"] value
+  && has_all ["schema", "definition"] value
+  && value.schema == "lattice.worker-capability.v1"
+  && is_name value.definition
+  && (!(std.record.has_field "task_families" value) || is_name_set value.task_families)
+  && (!(std.record.has_field "tools" value) || is_name_set value.tools)
+in
+
 let is_configuration = fun value =>
-  is_shape ["schema", "worker_compute", "worker_model", "execution_binding"] value
+  std.is_record value
+  && has_only ["schema", "worker_compute", "worker_model", "execution_binding", "worker_capability"] value
+  && has_all ["schema", "worker_compute", "worker_model", "execution_binding"] value
   && value.schema == "lattice.worker-execution-binding.v1"
   && is_compute_requirement value.worker_compute
   && is_model_requirement value.worker_model
   && is_declaration value.execution_binding
   && is_consistent value
+  && (!(std.record.has_field "worker_capability" value) || is_capability value.worker_capability)
 in
 
 {
   WorkerComputeRequirement = std.contract.from_predicate is_compute_requirement,
   WorkerModelRequirement = std.contract.from_predicate is_model_requirement,
   ExecutionBindingDeclaration = std.contract.from_predicate is_declaration,
+  WorkerCapability = std.contract.from_predicate is_capability,
   WorkerExecutionBinding = std.contract.from_predicate is_configuration,
 }

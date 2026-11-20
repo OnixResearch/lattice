@@ -1,4 +1,5 @@
-//! Fixed vectors for `lattice-execution-binding-v1` and `lattice-model-route-v1`.
+//! Fixed vectors for `lattice-execution-binding-v1`, `lattice-model-route-v1`
+//! and `lattice-worker-definition-v1`.
 
 // r[verify lattice.execution_binding.identity]
 // r[verify lattice.execution_binding.identity.scenario.stable]
@@ -13,6 +14,7 @@ const HOST_LOCAL_VECTOR: &str = "blake3:8b10b32df47976538796d8f83e99bf8c7fea5e9b
 const PROVIDER_VECTOR: &str = "blake3:cbe086cec074dfec82032a440374eb804c8ffd2028981cc74dda52a2fb8cad94";
 const DEVICE_FIXTURE_VECTOR: &str = "blake3:0ce7ce5decc45b238a33e81a5beab7463b59cd90ec437926e07a180b8590d98b";
 const MODEL_ROUTE_VECTOR: &str = "blake3:de3129027952ff48140d442f8ddde339fe681735501958ce08665b3d5c748ec5";
+const WORKER_DEFINITION_VECTOR: &str = "blake3:367783379a41fd2e834f26af4e7504906c1f3967bd9f21bba979441a1f0789c1";
 const ROUTE: &str = "blake3:9999999999999999999999999999999999999999999999999999999999999999";
 
 const CLAIMS: [ClaimInput<'static>; 2] = [
@@ -196,4 +198,24 @@ fn semantic_drift_in_any_covered_field_changes_the_identity() {
     assert_ne!(identity(input(Some(&provider), Some(&other_route))), PROVIDER_VECTOR);
     assert_ne!(identity(input(Some(&provider), None)), PROVIDER_VECTOR);
     assert_ne!(identity(input(None, Some(&ROUTES))), identity(input(None, None)));
+}
+
+// r[verify lattice.worker_inventory.definition]
+#[test]
+fn worker_definition_identity_is_pinned_and_framed_by_basis() {
+    let declared = worker_definition(WorkerDefinitionInput {
+        owner: "implementation_attempt",
+        basis: "declared",
+        name: "rust-implementer",
+    })
+    .expect("definition identity");
+    assert_eq!(declared, WORKER_DEFINITION_VECTOR);
+    let default = worker_definition(WorkerDefinitionInput {
+        owner: "implementation_attempt",
+        basis: "owner_default",
+        name: "rust-implementer",
+    })
+    .expect("default identity");
+    assert_ne!(default, declared, "the basis is framed");
+    assert_eq!(WORKER_DEFINITION_DOMAIN, "lattice-worker-definition-v1");
 }

@@ -1,0 +1,69 @@
+{
+  "schema": "lattice.fixture-qualification.v1",
+  "change": "publish-worker-inventory-v2",
+  "kind": "synthetic-fixture-qualification",
+  "live_qualification": false,
+  "live_worker_exercised": false,
+  "evidence_label": "fixture",
+  "base_revision": "1bdacb354ec183e8485e3ed702150d0323bd8c25",
+  "consumer": {
+    "repository": "kiln",
+    "revision": "4371dec083d446106bcc03ef01d6fe2d41850164",
+    "contract": ["docs/inventory-producers.md", "crates/kiln-adapter-lattice/src/worker_inventory.rs"],
+    "reader_updated": false
+  },
+  "producer_schemas": [
+    "lattice.worker-inventory.v2",
+    "lattice.worker-profile-facts.v2",
+    "lattice.worker-instance-observation.v2",
+    "lattice.worker-capability.v1"
+  ],
+  "identity_roles": {
+    "lattice-worker-definition-v1": "blake3:367783379a41fd2e834f26af4e7504906c1f3967bd9f21bba979441a1f0789c1"
+  },
+  "tests": {
+    "positive": [
+      "tests/test_worker_inventory.rs::undeclared_capability_is_unknown_never_empty_and_explained",
+      "tests/test_worker_inventory.rs::declared_capability_is_sorted_canonical_and_unavailable_stays_distinct",
+      "tests/test_worker_inventory.rs::definition_identity_is_stable_across_revisions_and_distinct_across_bases",
+      "tests/test_worker_inventory.rs::revision_slots_are_owned_unknowns",
+      "tests/test_worker_inventory.rs::retained_lifecycle_maps_to_single_shot_liveness_and_reasons",
+      "tests/test_worker_inventory.rs::serving_causes_name_published_routes_once_and_deterministically",
+      "tests/test_execution_binding_identity.rs::worker_definition_identity_is_pinned_and_framed_by_basis",
+      "tests/test_agent_profile_bindings.rs::configured_routes_are_owner_default_definitions_with_undeclared_capability",
+      "src/implementation_attempt/cli/tests.rs::capability_is_framed_into_the_revision_only_when_declared",
+      "src/implementation_attempt/cli/inspect/tests.rs::declared_capability_reaches_inventory_under_a_definition_stable_across_revisions",
+      "src/implementation_attempt/cli/inspect/tests.rs::inventory_separates_profile_and_terminal_instance_without_material"
+    ],
+    "negative": [
+      "tests/test_worker_inventory.rs::malformed_declarations_are_refused_with_typed_defects",
+      "tests/test_worker_inventory.rs::single_shot_liveness_is_unknown_when_missing_or_stale_and_never_idle_or_live",
+      "tests/test_worker_inventory.rs::wait_reasons_are_sorted_deduplicated_and_bounded",
+      "tests/test_execution_binding_contracts.rs::unsupported_configurations_fail_in_nickel (11 capability fixtures)",
+      "tests/test_execution_binding_contracts.rs::the_strict_decoder_refuses_capability_declarations_that_bypass_the_contract",
+      "src/implementation_attempt/cli/tests.rs::malformed_capability_is_refused_before_effects",
+      "src/implementation_attempt/cli/inspect/tests.rs::malformed_capability_is_refused_without_naming_it",
+      "src/implementation_attempt/cli/inspect/tests.rs::a_dispatch_past_its_admitted_window_is_stale_never_live"
+    ]
+  },
+  "captures": {
+    "directory": "/home/brittonr/.cargo-target/producer-work/lattice-inventory-v2-captures",
+    "readme": "README.md",
+    "nondeterministic_fields": ["instance.observed_at_epoch_ms", "instance.liveness.observed_at_epoch_ms"]
+  },
+  "checks_2026_11_20": {
+    "focused_and_execution_binding_suites": "pass",
+    "lib_implementation_attempt": "36 passed",
+    "clippy_deny_warnings": "exit 0",
+    "fmt_check": "exit 0",
+    "cairn_validate_and_gates": "valid; proposal, design and tasks PASS",
+    "octet_semantic_delta": {"root": "0 new", "lattice_core": "0 new", "baseline_written": false, "cargo_toml_changed": false},
+    "scripts_check_rs": "exit 0 (nix develop; 406 passing test-result lines)"
+  },
+  "non_claims": [
+    "No live worker, provider, host or serving owner was observed.",
+    "Declared capability is an operator statement, not qualification or authority.",
+    "Lattice #25 revision lifecycle is not implemented; its slots are owned unknowns.",
+    "Kiln's reader is not updated by this change."
+  ]
+}

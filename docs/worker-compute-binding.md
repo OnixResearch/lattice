@@ -177,30 +177,36 @@ no release method.
 
 ## Profile and instance facts
 
-`lattice.worker-profile-facts.v1` reuses the existing profile owners: the
+`lattice.worker-profile-facts.v2` reuses the existing profile owners: the
 `ConfiguredBinding.revision` of configured Pi, Clankers and Animus routes
 (`RuntimeOptions::worker_profile_facts`), and the attempt's
 `worker_profile_identity` for the OMP worker. Each fact has exactly one support
 level: `declared`, `qualified`, `unavailable` or `unknown`. `qualified` needs
 bound qualification evidence, and nothing supplies it yet. CPU, memory and
 storage bounds are `unknown`. Configured routes report compute and model-service
-bindings as `unavailable` and executable bytes as `unknown`.
+bindings as `unavailable` and executable bytes as `unknown`. Each profile also
+carries a definition identity that is stable across revisions, declared
+`task_families` and `tools` (`unknown` when undeclared), Lattice #25's revision
+slots as owned unknowns, and wait reasons; see [worker inventory](worker-inventory.md).
 
 `lattice implementation-attempt inspect --request REQUEST --state STATE`
-prints separate `profile` and `instance` sections. The
-`lattice.worker-instance-observation.v1` instance carries the profile revision,
-work, attempt, incarnation (the request identity), fence, binding identity,
-compute provenance without backend handles or grant references, model route
-identities, and one lifecycle: `admitted_not_dispatched`,
-`binding_rejected_before_dispatch`, `dispatch_recorded_outcome_unknown` or
-`terminal_observed`. Cancellation is `not_requested`, `requested_unobserved` or
-`observed_terminated`. Host reachability and allocation liveness are always
-`unknown`. Model readiness names its actual cause (`no_serving_port` when no
-serving-owner port is injected) or carries the injected port's latest
-snapshot readiness and freshness; see
+prints one `lattice.worker-inventory.v2` document with separate `profile` and
+`instance` sections. The `lattice.worker-instance-observation.v2` instance
+carries the definition identity, profile revision, work, attempt, incarnation
+(the request identity), fence, binding identity, compute provenance without
+backend handles or grant references, model route identities, and one
+lifecycle: `admitted_not_dispatched`, `binding_rejected_before_dispatch`,
+`dispatch_recorded_outcome_unknown` or `terminal_observed`. Cancellation is
+`not_requested`, `requested_unobserved` or `observed_terminated`. Single-shot
+liveness is `not_started`, `exited` or `unknown` (`unobserved`, or `stale` past
+the admitted window), never idle or live. Host reachability and allocation
+liveness are always `unknown`. Model readiness names its actual cause
+(`no_serving_port` when no serving-owner port is injected) or carries the
+injected port's latest snapshot readiness and freshness; see
 [inventory readiness](worker-serving-binding.md#inventory-readiness). A
-missing intent binding or an unreadable artifact is an error, never a guessed
-state. Inspection takes no claim and schedules nothing.
+missing intent binding, an unreadable artifact or a malformed capability
+declaration is an error, never a guessed state. Inspection takes no claim and
+schedules nothing.
 
 ## Usage coverage
 
@@ -228,8 +234,8 @@ settlement is unchanged.
 | Live host, device and cross-host qualification; a live provider port | [Kiln #49](https://github.com/OnixResearch/kiln/issues/49) with Aspen #15/#20 | not claimed |
 | Qualification evidence that promotes `declared` to `qualified` | [Animus #18](https://github.com/OnixResearch/animus/issues/18) | `declared` only |
 | Aggregate budgets and shared-deployment apportionment | [Kiln #45](https://github.com/OnixResearch/kiln/issues/45) | not computed |
-| Joined inventory presentation | [Kiln #60](https://github.com/OnixResearch/kiln/issues/60) | separate profile and instance only |
-| Revision promotion and pinning | [Lattice #25](https://github.com/OnixResearch/lattice/issues/25) | not claimed |
+| Joined inventory presentation | [Kiln #60](https://github.com/OnixResearch/kiln/issues/60) | `lattice.worker-inventory.v2` profile and instance facts with wait reasons ([worker inventory](worker-inventory.md)) |
+| Revision promotion and pinning | [Lattice #25](https://github.com/OnixResearch/lattice/issues/25) | revision slots `unknown`, owner `lattice#25` |
 | Checkpoint and restore authority | [Lattice #12](https://github.com/OnixResearch/lattice/issues/12) | `unavailable` |
 | Pricing and currency identity | [Lattice #13](https://github.com/OnixResearch/lattice/issues/13) | none; no producer contract |
 

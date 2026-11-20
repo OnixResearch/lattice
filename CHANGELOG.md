@@ -9,6 +9,20 @@ interfaces.
 
 ### Added
 
+- Worker inventory v2 facts for Kiln #60 (#24, #25 slots only). Each profile
+  carries a definition identity that is stable across revisions
+  (`lattice-worker-definition-v1`). It also carries declared `task_families`
+  and `tools`, which stay `unknown` when undeclared and are never empty.
+  Lattice #25's desired, prepared, qualified, selected and pinned revisions
+  appear as owned unknowns. Profiles and non-terminal instances carry bounded
+  closed-vocabulary wait reasons that name only published routes. Instances
+  carry their definition identity and single-shot liveness (`not_started`,
+  `exited` or `unknown` with `unobserved`/`stale`), never idle or live. An
+  optional typed `lattice.worker-capability.v1` declaration in
+  `contracts/worker-execution-binding.ncl` and the implementation-attempt
+  request supplies the definition name and capability sets. It is part of the
+  profile revision only when present, and malformed declarations are refused
+  before any effect. See `docs/worker-inventory.md`.
 - Default-off declared preference factors on projected role-protocol choices
   (#16). `admit_annotated_projection` admits a published Choregraph
   preference-annotation cohort, verifies its receipt and annotated local set, and
@@ -108,6 +122,13 @@ interfaces.
 
 ### Changed
 
+- Breaking: `implementation-attempt inspect` prints `lattice.worker-inventory.v2`
+  with `lattice.worker-profile-facts.v2` and
+  `lattice.worker-instance-observation.v2`, and
+  `RuntimeOptions::worker_profile_facts` returns profile facts v2. No v1
+  inventory is emitted. Readers that deny unknown fields, such as Kiln's
+  `worker_inventory` adapter, must move to v2. Existing requests and worker
+  configurations without `worker_capability` keep their profile revision.
 - Re-pinned Choregraph to `fcbae0aa` (Choregraph #4, default-off preference
   annotations). Its v1 receipts are byte-identical to `c3577352`; the source
   admission receipt, flake assertions and frozen role-protocol revision name the

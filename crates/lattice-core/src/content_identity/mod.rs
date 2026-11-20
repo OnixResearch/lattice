@@ -33,6 +33,7 @@ pub fn schedule_occurrence(input: ScheduleOccurrenceInput<'_>) -> Result<String,
 pub const EXECUTION_BINDING_DOMAIN: &str = "lattice-execution-binding-v1";
 pub const MODEL_ROUTE_DOMAIN: &str = "lattice-model-route-v1";
 pub const WORKER_INSTANCE_STATE_DOMAIN: &str = "lattice-worker-instance-state-v1";
+pub const WORKER_DEFINITION_DOMAIN: &str = "lattice-worker-definition-v1";
 /// Spelling shared with `ConfiguredBinding` and producer references.
 const BLAKE3_REFERENCE_PREFIX: &str = "blake3:";
 
@@ -197,5 +198,27 @@ pub fn worker_instance_state(artifacts: &[(&str, &str)]) -> Result<String, conte
     let mut hasher =
         content_identity_core::IdentityHasher::new(content_identity_core::Domain::new(WORKER_INSTANCE_STATE_DOMAIN)?);
     hasher.update_sorted_map(b"artifacts", artifacts)?;
+    Ok(format!("{BLAKE3_REFERENCE_PREFIX}{}", hasher.finish().to_hex()))
+}
+
+/// Canonical inputs of one worker definition. The profile revision is
+/// deliberately absent so a new revision keeps its definition identity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WorkerDefinitionInput<'a> {
+    pub owner: &'a str,
+    /// `declared` or `owner_default`; a declared name never equals a default.
+    pub basis: &'a str,
+    pub name: &'a str,
+}
+
+/// Build the `lattice-worker-definition-v1` identity, spelled `blake3:<hex>`.
+// r[impl lattice.worker_inventory.definition]
+pub fn worker_definition(input: WorkerDefinitionInput<'_>) -> Result<String, content_identity_core::IdentityError> {
+    let mut hasher =
+        content_identity_core::IdentityHasher::new(content_identity_core::Domain::new(WORKER_DEFINITION_DOMAIN)?);
+    hasher
+        .update_tagged_str(b"owner", input.owner)?
+        .update_tagged_str(b"basis", input.basis)?
+        .update_tagged_str(b"name", input.name)?;
     Ok(format!("{BLAKE3_REFERENCE_PREFIX}{}", hasher.finish().to_hex()))
 }

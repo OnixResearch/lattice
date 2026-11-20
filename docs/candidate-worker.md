@@ -294,6 +294,12 @@ frozen binding provenance and per-request serving coverage is stored before the
 attempt result. See [worker compute binding](worker-compute-binding.md) and
 [worker serving binding](worker-serving-binding.md).
 
+An optional `worker_capability` (`lattice.worker-capability.v1`) names the
+agent definition and declares bounded task families and tools. It is part of
+`worker_profile_identity` only when present, so existing requests keep their
+revision. A malformed declaration is refused before any effect. `inspect`
+prints `lattice.worker-inventory.v2`; see [worker inventory](worker-inventory.md).
+
 Re-entry with the exact request only reconciles retained results and reports the
 persisted binding identity; it never calls the compute port, rebinds or
 releases compute. Changed requests and missing/incomplete evidence never

@@ -16,6 +16,7 @@ use lattice::execution_binding::core::projection::retained::*;
 use lattice::execution_binding::core::projection::*;
 use lattice::execution_binding::core::request::*;
 
+const DEFINITION: &str = "blake3:8888888888888888888888888888888888888888888888888888888888888888";
 const ROUTE: &str = "blake3:9999999999999999999999999999999999999999999999999999999999999999";
 /// The standalone CLI's cause: no serving-owner port was injected.
 static NO_PORT: ServingReadiness = ServingReadiness::NoServingPort {};
@@ -33,6 +34,8 @@ fn profile_input<'a>(routes: &'a RouteDeclaration, compute: &'a ComputeRequireme
     ProfileInput {
         owner: ProfileOwner::ImplementationAttempt,
         revision: "4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f",
+        default_definition: ATTEMPT_DEFINITION,
+        capability: None,
         qualification_ref: None,
         adapter: Offered::Declared("omp-jsonl"),
         protocol_revision: Offered::Declared("e325ffc73ab86e03bdd20a91b77d8e2b3964c906"),
@@ -70,7 +73,7 @@ fn attempt_profile_projects_declared_facts_and_unknown_bounds() {
     }
     assert_eq!(facts.serving_readiness, ServingReadiness::NoServingPort {}, "the actual cause, not an owner");
     let text = serde_json::to_string(&facts).expect("facts json");
-    assert!(!text.contains("qualified"), "declared facts are never qualified without evidence");
+    assert!(!text.contains("\"support\":\"qualified\""), "declared facts are never qualified without evidence");
 }
 
 #[test]
@@ -131,6 +134,8 @@ fn state(admitted: Option<&Admitted>) -> AttemptState<'_> {
     AttemptState {
         admitted,
         request_identity: "request-24",
+        definition_identity: DEFINITION,
+        admitted_until_epoch_ms: u64::MAX,
         has_intent: false,
         has_refusal: false,
         terminal_disposition: None,

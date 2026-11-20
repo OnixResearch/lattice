@@ -8,7 +8,9 @@
 
 pub mod accounting;
 pub mod inventory;
+pub mod lineage;
 pub mod retained;
+pub mod wait;
 
 /// Exactly one support level per fact.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
