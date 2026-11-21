@@ -98,6 +98,25 @@
     ],
     "gates": "the closure gates recorded in fence-intent-creation-atomically/evidence/verification.json (closure.gates), run on the same tree; cairn gate proposal|design|tasks bind-workflow-agent-revisions: PASS"
   },
+  "final_review": {
+    "trigger": "final review LatticeFinal25 at ba6ed91d (findings 2 and 3: agent-revision admit-session pinned an attempt's own session without the fence lock, the intent store, the fence and run's workspace-boundary and bounded-step preflight)",
+    "base_revision": "ba6ed91d0464474b65105c05587e118452750623",
+    "recorded_on": "2026-11-21",
+    "rule": "admit-session for a request's own session (its envelope identity) requires --state and runs cli::execution::admission::admit_session, which is run's Context::admit_first stopped after the session is admitted; a refusal is settled exactly as run settles it and pins nothing. --state for any other session, or no --state for the attempt's own session, is an error. Any other session is pinned after Request::validate.",
+    "tasks": {
+      "8.1": [
+        "src/implementation_attempt/cli/tests/workflow_agent.rs::admit_session_refuses_where_run_would_and_pins_nothing",
+        "src/implementation_attempt/cli/tests/workflow_agent.rs::a_pinned_session_keys_on_the_pair",
+        "src/implementation_attempt/cli/tests/workflow_agent.rs::a_request_naming_another_revision_never_acts_on_the_pinned_session",
+        "src/implementation_attempt/cli/tests/revisions.rs::capture_managed_worker_inventory_v3"
+      ],
+      "8.2": [
+        "docs/agent-revisions.md (attempt seam: attempt-bound admit-session)",
+        "CHANGELOG.md (Added: workflow-agent revisions)"
+      ]
+    },
+    "gates": "the final_review gates recorded in fence-intent-creation-atomically/evidence/verification.json, run on the same tree; cairn gate proposal|design|tasks bind-workflow-agent-revisions: PASS"
+  },
   "non_claims": [
     "No workflow-agent revision was prepared, qualified or run live; the plans, attachments and workers are fixtures.",
     "The fixture worker is blocked at broker admission and never reaches a model.",

@@ -97,14 +97,13 @@ pub(in super::super) fn encode(subject: Subject<'_>, recorded: Option<&Recorded>
 
 /// Classify retained intent bytes for this request and session.
 pub(in super::super) fn classify(bytes: &[u8], subject: Subject<'_>) -> Record {
-    let marker = super::super::recovery::closed_marker(subject.request_identity);
-    // The bare identity and the closure marker never collide, so neither
-    // check below can shadow the other.
-    debug_assert_ne!(marker.as_bytes(), subject.request_identity.as_bytes());
+    // The bare identity and a closure marker never collide, so neither check
+    // below can shadow the other.
+    debug_assert!(!super::super::recovery::is_closed_marker(subject.request_identity.as_bytes()));
     if bytes == subject.request_identity.as_bytes() {
         return Record::Owned(Recorded::UNMANAGED);
     }
-    if bytes == marker.as_bytes() {
+    if super::super::recovery::is_closed_by(bytes, subject.request_identity) {
         return Record::Closed;
     }
     let Ok(stored) = serde_json::from_slice::<Stored>(bytes) else {
@@ -129,15 +128,18 @@ pub(in super::super) fn classify(bytes: &[u8], subject: Subject<'_>) -> Record {
 
 /// Read the retained intent; `None` when no intent exists.
 pub(in super::super) fn read(directory: &std::path::Path, subject: Subject<'_>) -> Result<Option<Record>, String> {
-    let bytes = super::super::artifacts::read_optional(&directory.join(FILE), MAX_INTENT_BYTES)?;
-    Ok(bytes.map(|bytes| classify(&bytes, subject)))
+    Ok(retained_bytes(directory)?.map(|bytes| classify(&bytes, subject)))
+}
+
+/// The retained intent bytes, of any request; `None` when no intent exists.
+pub(in super::super) fn retained_bytes(directory: &std::path::Path) -> Result<Option<Vec<u8>>, String> {
+    super::super::artifacts::read_optional(&directory.join(FILE), MAX_INTENT_BYTES)
 }
 
 /// Whether `directory` retains an execution intent: any intent other than a
-/// recovery closure marker, including one of other request bytes.
+/// closure marker, including one of other request bytes.
 pub(in super::super) fn is_execution_retained(directory: &std::path::Path) -> Result<bool, String> {
-    let bytes = super::super::artifacts::read_optional(&directory.join(FILE), MAX_INTENT_BYTES)?;
-    Ok(bytes.is_some_and(|bytes| !super::super::recovery::is_closed_marker(&bytes)))
+    Ok(retained_bytes(directory)?.is_some_and(|bytes| !super::super::recovery::is_closed_marker(&bytes)))
 }
 
 #[cfg(test)]
@@ -176,8 +178,15 @@ mod tests {
             let bytes = super::encode(SUBJECT, Some(&recorded)).expect("record");
             assert_eq!(super::classify(&bytes, SUBJECT), Record::Owned(recorded));
         }
-        let marker = super::super::super::recovery::closed_marker(IDENTITY);
+        let envelope = super::super::super::tests::host_local().envelope;
+        let marker = super::super::super::recovery::closed_marker(IDENTITY, &envelope);
         assert_eq!(super::classify(marker.as_bytes(), SUBJECT), Record::Closed);
+        // A marker written before markers named their work stays readable.
+        let legacy_marker = format!("closed-before-execution:{IDENTITY}");
+        assert_eq!(super::classify(legacy_marker.as_bytes(), SUBJECT), Record::Closed);
+        let other = super::super::super::recovery::closed_marker(&"9".repeat(64), &envelope);
+        assert_eq!(super::classify(other.as_bytes(), SUBJECT), Record::Foreign, "another request's marker");
+        assert!(!super::super::super::recovery::is_closed_by(format!("{marker}x").as_bytes(), IDENTITY));
     }
 
     #[test]

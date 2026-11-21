@@ -2,7 +2,7 @@
 mod artifacts;
 mod binding;
 mod cancellation;
-mod execution;
+pub(crate) mod execution;
 mod export;
 mod inspect;
 mod recovery;

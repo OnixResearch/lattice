@@ -372,14 +372,22 @@ coordinator fields, neither of which is part of the profile revision:
 - `dispatch_plan` is the coordinator's dispatch-plan identity (64 lowercase
   hex). The exact request bytes bind it, and every observation echoes it.
 
+Attempt ids must be unique across the work items of one state root: the
+attempt directory is keyed by attempt id and fence only. Kiln's attempt id is
+the BLAKE3 of the work's canonical key, ordinal and fence, so its ids never
+collide. A request that finds another work's closure marker or intent in its
+attempt directory is refused as `crossed_attempt` with `dispatched:false`: it
+can never create its intent at that path.
+
 Before the binding and intent, a run records its attempt at
 `works/<blake3(work_id)>/<fence>`. A request whose fence is lower than one
 already recorded for its work, or that names a different attempt at a
 recorded fence, is refused. A request whose bytes differ from an existing
-intent is refused as substituted, and one whose attempt-fence was closed by a
-refusal or recovery of other request bytes as `attempt_closed`. Each refusal
-prints one `lattice.implementation-attempt-refusal.v1` record and the command
-exits non-zero:
+intent of its work is refused as substituted, and one whose attempt-fence was
+closed by a refusal or recovery of other request bytes of its work as
+`attempt_closed`. Each refusal prints one
+`lattice.implementation-attempt-refusal.v1` record and the command exits
+non-zero:
 
 ```json
 {"schema":"lattice.implementation-attempt-refusal.v1","reason":"stale_fence","work_id":"...","attempt_id":"...","fence":7,"dispatched":false}
@@ -403,30 +411,56 @@ takes an exclusive `flock(2)` lock on that directory (`std::fs::File::lock`).
 Waiters block. The lock never expires, and the kernel releases it when the
 holder closes it or exits. While holding it, a first run:
 
-1. reads the attempt directory's intent store: an execution intent of the
+1. closes a session pin that an earlier admission of the attempt-fence left
+   without an intent (below);
+2. reads the attempt directory's intent store: an execution intent of the
    same request bytes is reconciled as a duplicate `run`, one of other bytes is
    `substituted_request` (`dispatched:true`), and a closure marker is the
-   closed attempt (`attempt_closed`, or `recover`'s report for its own marker),
-   all without admitting anything;
-2. checks the lineage gate and the repair ports, which write nothing;
-3. checks its fence and records its attempt;
-4. admits its agent revision session, pinning it when managed;
-5. persists its execution binding and candidate store;
-6. rechecks that the record at its fence still names its attempt and that no
-   higher fence is recorded, and creates its execution intent.
+   closed attempt (`attempt_closed`, or `recover`'s report for its own marker);
+   another work's marker or intent is `crossed_attempt`; nothing is admitted;
+3. checks the lineage gate and the repair ports, which write nothing;
+4. checks its fence and records its attempt;
+5. with `--revision-store`, writes its write-ahead admission record, then
+   admits its agent revision session, pinning it when managed;
+6. persists its execution binding and candidate store;
+7. rechecks that the record at its fence still names its attempt and that no
+   higher fence is recorded, creates its execution intent and removes the
+   write-ahead record, which the intent supersedes.
 
-A typed refusal at steps 2 to 6 (`lineage_blocked`, `lineage_exhausted`,
+Before the lock and before step 1, a run checks the request, the workspace
+boundary and the bounded-step timeout. `agent-revision admit-session --state`
+for the attempt's own session runs exactly steps 1 to 5 with the standalone
+CLI's ports and stops there; see
+[agent revisions](agent-revisions.md#attempt-seam).
+
+A typed refusal at steps 3 to 7 (`lineage_blocked`, `lineage_exhausted`,
 `repair_ports_unavailable`, `stale_fence`, `crossed_attempt`,
 `revision_not_admitted`) is settled before the lock is released: the run
-exclusively creates the attempt-fence's closure marker, the same
-`closed-before-execution:<request identity>` content recovery writes, then
-prints the refusal with `dispatched:false`. Such a refusal writes the state
-root, the per-work lock directory, the attempt directory and the closure
-marker, plus anything the earlier steps wrote (the fence record for
-`revision_not_admitted`), and nothing else. A session the run pinned is
-closed on every path that ends before its intent; a session another run
-pinned is never closed. The lock is taken before the agent revision store is
-opened and never the other way round.
+exclusively creates the attempt-fence's closure marker,
+`closed-before-execution:<request identity>:<blake3(work_id)>`, the same
+content recovery writes, then prints the refusal with `dispatched:false`.
+Markers written before markers named their work
+(`closed-before-execution:<request identity>`) still read as closed and are
+treated as this work's. Such a refusal writes the state root, the per-work
+lock directory, the attempt directory and the closure marker, plus anything
+the earlier steps wrote (the fence record for `revision_not_admitted`), and
+nothing else. A session the run pinned is closed on every path that ends
+before its intent; a session another run pinned is never closed. The lock is
+taken before the agent revision store is opened and never the other way
+round.
+
+The write-ahead admission record, `admission-pending.json`
+(`lattice.implementation-attempt-pending-admission.v1`), holds the request
+identity, the session and the lifecycle subject (`definition`, `revision`)
+about to be pinned, and is created once before `seam::admit` runs. It is
+removed when the admission is refused, when the pin predates it, when the run
+abandons its pin, and once the intent exists. A process lost after the pin
+and before the intent leaves it behind; the next run or recovery of that
+attempt-fence finds it without an intent and, under the lock and before
+anything else, closes the session of exactly that subject through the seam,
+leaving a session pinned to another revision untouched, then removes it.
+Recovery then closes the attempt as before; a run proceeds or refuses as
+before. A record without its `--revision-store` is an error.
 
 It releases the lock before any worker effect. A repair step takes the same
 lock to recheck the fence before it writes `repair/step-N.intent`. Recovery
@@ -439,9 +473,9 @@ remains the fence authority across them.
 | `reason` | `dispatched` | When |
 |---|---|---|
 | `stale_fence` | `true` when the refused attempt's directory holds an execution intent; otherwise `false`, after a first run writes its closure marker; read under the fence lock | A higher fence of the work is already recorded |
-| `crossed_attempt` | Same as `stale_fence` | Another attempt is recorded at this work and fence |
-| `substituted_request` | `true` | The attempt directory holds the intent of other request bytes, which may have executed; this request dispatched nothing and admitted nothing |
-| `attempt_closed` | `false` | A refusal or recovery of other request bytes closed this attempt-fence before any execution; no intent can be created for it |
+| `crossed_attempt` | Same as `stale_fence`; `false` when the attempt directory holds another work's closure marker, or the intent of another work that records this attempt at this fence while this work does not | Another attempt is recorded at this work and fence, or the attempt id and fence belong to another work in this state root |
+| `substituted_request` | `true` | The attempt directory holds the intent of other request bytes not shown to be another work's, which may have executed; this request dispatched nothing and admitted nothing |
+| `attempt_closed` | `false` | A refusal or recovery of other request bytes of this work closed this attempt-fence before any execution; no intent can be created for it |
 | `profile_revision_superseded` | `true` when the attempt directory holds an intent other than a closure marker; otherwise `false`, after the closure marker is written | The envelope's revision is not the current framing; the attempt is never executed or recovered |
 | `revision_not_admitted` | `false` | With `--revision-store`, the managed definition admits no new session of this revision, or the named `workflow_agent` is unknown, binds another profile revision or is a plain agent bundle; after the fence record only the closure marker is written ([agent revisions](agent-revisions.md#integration)) |
 | `revision_blocked` | `false` | With `--revision-store`, the managed session was blocked right before spawn; the worker never started |
@@ -464,7 +498,7 @@ Changed requests and missing/incomplete evidence never authorize another
 execution. When `recover` finds no intent, the worker cannot have started,
 because the intent precedes every worker effect. Recovery then closes the
 attempt by exclusively creating its intent path with a
-`closed-before-execution:` marker and prints
+`closed-before-execution:<request identity>:<blake3(work_id)>` marker and prints
 `status:"not_started_closed_by_recovery"` with `result:null`. A racing or later
 `run` of that attempt can no longer create its intent, so it never dispatches.
 Cancelling a closed attempt reports `not_started:true`, and `inspect` reports

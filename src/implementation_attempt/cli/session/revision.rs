@@ -69,14 +69,18 @@ impl Store<'_> {
 }
 
 mod inspection;
+pub(in super::super) mod reservation;
 
 type Stop = super::super::refusal::deferred::Stop;
+type Decision = crate::agent_revision::seam::Decision;
 
 /// One run's admission before its intent.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(in super::super) struct Admitted {
     /// `None` without a store: the legacy intent, unmanaged by construction.
     pub recorded: Option<Recorded>,
+    /// The seam's answer, as `admit-session` prints it.
+    pub decision: Decision,
     /// This run pinned the session; another run did not pin it before.
     is_fresh: bool,
 }
@@ -91,21 +95,32 @@ pub(in super::super) fn require_named(store: Store<'_>, request: &Request) -> Re
 }
 
 /// Admit the attempt's session under the per-work lock, after the fence
-/// record and before the intent. A refusal is returned typed for the caller
-/// to settle; nothing is pinned then.
-pub(in super::super) fn admit(store: Store<'_>, request: &Request) -> Result<Admitted, Stop> {
+/// record and before the intent, behind the write-ahead record in
+/// `directory` (`reservation`). A refusal is returned typed for the caller
+/// to settle; nothing is pinned then and the record is removed.
+pub(in super::super) fn admit(
+    store: Store<'_>,
+    request: &Request,
+    directory: &std::path::Path,
+    request_identity: &str,
+) -> Result<Admitted, Stop> {
     let Some(path) = store.0 else {
         // `require_named` refused a named pair without a store.
         debug_assert!(request.workflow_agent.is_none());
         return Ok(Admitted {
             recorded: None,
+            decision: Decision::Unmanaged,
             is_fresh: false,
         });
     };
+    // A crash after the pin and before the intent leaves this record, so the
+    // next run or recovery of the attempt-fence closes exactly that pin. An
+    // error of the seam keeps it: the pin may exist.
+    reservation::reserve(directory, request, request_identity)?;
     let decision = crate::agent_revision::seam::admit(&Store::open(path)?, request, &identifier(request))?;
-    let (pin, is_fresh) = match decision {
-        crate::agent_revision::seam::Decision::Unmanaged => (None, false),
-        crate::agent_revision::seam::Decision::Admitted { admitted } => match admitted {
+    let (pin, is_fresh) = match decision.clone() {
+        Decision::Unmanaged => (None, false),
+        Decision::Admitted { admitted } => match admitted {
             lattice_core::agent_revision::ops::sessions::Admitted::Pinned { pin, pin_identity } => {
                 (Some(recorded_pin(pin, pin_identity)), true)
             }
@@ -113,10 +128,15 @@ pub(in super::super) fn admit(store: Store<'_>, request: &Request) -> Result<Adm
                 (Some(recorded_pin(pin, pin_identity)), false)
             }
         },
-        crate::agent_revision::seam::Decision::Refused { refusal } => {
+        Decision::Refused { refusal } => {
+            reservation::release(directory)?;
             return Err(Stop::Refused(super::super::refusal::deferred::Pending::revision(&refusal)));
         }
     };
+    if !is_fresh {
+        // A pin that predates the record is not this admission's to close.
+        reservation::release(directory)?;
+    }
     // Only a session this run pinned is fresh, and the lifecycle pins bare
     // profile revisions only.
     debug_assert!(!is_fresh || pin.is_some());
@@ -128,6 +148,7 @@ pub(in super::super) fn admit(store: Store<'_>, request: &Request) -> Result<Adm
     };
     Ok(Admitted {
         recorded: Some(Recorded { admission, pin }),
+        decision,
         is_fresh,
     })
 }
@@ -142,13 +163,20 @@ fn recorded_pin(pin: lattice_core::agent_revision::state::Pin, pin_identity: Str
 }
 
 /// Close a session this run pinned when the attempt ends before its intent,
-/// so a refused fence, binding or intent never leaves a live pin behind. A
-/// session another run pinned is never closed here.
-pub(in super::super) fn abandon(store: Store<'_>, request: &Request, admitted: &Admitted) -> Result<(), String> {
+/// so a refused fence, binding or intent never leaves a live pin behind,
+/// then remove the write-ahead record. A session another run pinned is
+/// never closed here.
+pub(in super::super) fn abandon(
+    store: Store<'_>,
+    request: &Request,
+    admitted: &Admitted,
+    directory: &std::path::Path,
+) -> Result<(), String> {
     match &admitted.recorded {
-        Some(recorded) if admitted.is_fresh => close(store, request, recorded),
-        Some(_) | None => Ok(()),
+        Some(recorded) if admitted.is_fresh => close(store, request, recorded)?,
+        Some(_) | None => {}
     }
+    reservation::release(directory)
 }
 
 /// `seam::effect` immediately before the worker spawns. A blocked managed

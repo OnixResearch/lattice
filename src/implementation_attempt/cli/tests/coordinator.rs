@@ -83,7 +83,7 @@ async fn recovery_without_intent_closes_the_attempt_so_no_run_can_dispatch() {
     let (path, identity) = fixture.write("request.json", &request);
     recover(&path, &fixture.state).await.expect("controller loss before intent reconciles");
     let directory = fixture.directory(&request);
-    let marker = super::super::recovery::closed_marker(&identity);
+    let marker = super::super::recovery::closed_marker(&identity, &request.envelope);
     assert_eq!(std::fs::read(directory.join("intent.json")).expect("closed intent"), marker.as_bytes());
     recover(&path, &fixture.state).await.expect("exact replay reports the same closure");
     run(&path, &fixture.state).await.expect("a duplicate dispatch reconciles instead of running");
@@ -184,4 +184,50 @@ fn a_worker_blocked_before_any_event_stays_recoverable_without_an_invented_termi
         super::super::artifacts::verify_events(other.path(), 4096, &digest).is_err(),
         "a blocker cannot replace the normalization of actual events"
     );
+}
+
+/// `request` of another work item, readmitted under its own envelope.
+fn of_work(mut request: super::super::Request, work_id: &str) -> super::super::Request {
+    request.envelope.work_id = work_id.into();
+    request.admitted_envelope = request.envelope.identity();
+    request
+}
+
+#[tokio::test]
+// r[verify lattice.implementation_attempt.consumer.scenario.closure]
+async fn another_works_marker_or_intent_at_the_same_attempt_fence_is_crossed() {
+    let fixture = Fixture::new();
+    let crossed = || Err(super::super::refusal::Reason::CrossedAttempt.message().to_owned());
+    // Work A's recovery closed the attempt-fence; its marker names work A.
+    let closed = of_work(fixture.request("attempt-shared", 7), "work-a");
+    let (closed_path, _) = fixture.write("closed.json", &closed);
+    recover(&closed_path, &fixture.state).await.expect("recovery closes work A's attempt");
+    let other_work = of_work(fixture.request("attempt-shared", 7), "work-b");
+    assert_eq!(fixture.directory(&other_work), fixture.directory(&closed), "one attempt-fence directory");
+    let (other_path, _) = fixture.write("other-work.json", &other_work);
+    assert_eq!(run(&other_path, &fixture.state).await, crossed(), "another work's marker");
+    assert_eq!(recover(&other_path, &fixture.state).await, crossed());
+    let mut same_work = closed.clone();
+    same_work.omp.prompt = "another task of work A".into();
+    let (same_path, _) = fixture.write("same-work.json", &same_work);
+    let closed_reason = super::super::refusal::Reason::AttemptClosed.message().to_owned();
+    assert_eq!(run(&same_path, &fixture.state).await, Err(closed_reason), "this work's marker");
+    let identity = blake3::hash(&serde_json::to_vec(&closed).expect("bytes")).to_hex();
+    let marker = super::super::recovery::closed_marker(identity.as_str(), &closed.envelope);
+    let retained = std::fs::read(fixture.directory(&closed).join("intent.json")).expect("marker");
+    assert_eq!(retained, marker.as_bytes(), "neither refusal touched work A's marker");
+
+    // Work C ran its attempt; its intent is another work's for work D.
+    let ran = of_work(fixture.request("attempt-shared-ran", 7), "work-c");
+    let (ran_path, ran_identity) = fixture.write("ran.json", &ran);
+    run(&ran_path, &fixture.state).await.expect("work C runs its attempt");
+    let foreign = of_work(fixture.request("attempt-shared-ran", 7), "work-d");
+    let (foreign_path, _) = fixture.write("foreign.json", &foreign);
+    assert_eq!(run(&foreign_path, &fixture.state).await, crossed(), "another work's intent");
+    let mut substituted = ran.clone();
+    substituted.omp.prompt = "another task of work C".into();
+    let (substituted_path, _) = fixture.write("substituted.json", &substituted);
+    let substituted_reason = super::super::refusal::Reason::SubstitutedRequest.message().to_owned();
+    assert_eq!(run(&substituted_path, &fixture.state).await, Err(substituted_reason), "this work's intent");
+    assert_eq!(std::fs::read(fixture.directory(&ran).join("intent.json")).expect("intent"), ran_identity.as_bytes());
 }

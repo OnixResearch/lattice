@@ -256,12 +256,24 @@ pub fn close(
     if admission == Admission::Unmanaged {
         return Ok(Closure::Unmanaged);
     }
-    let subject = subject(request)?;
     debug_assert_eq!(admission, Admission::Managed);
+    close_subject(store, &subject(request)?, session, checkpoints)
+}
+
+/// Close `session` pinned to exactly `subject`, holding its checkpoints. A
+/// session pinned to another revision is refused as `session_conflict`
+/// without closing it. Recovery of an admission whose intent was never
+/// written closes the subject its write-ahead record names this way.
+pub fn close_subject(
+    store: &crate::store::Store,
+    subject: &Subject,
+    session: &str,
+    checkpoints: &[String],
+) -> Result<Closure, String> {
     let definition = subject.definition.as_str();
-    // The request names exactly one subject; its session is keyed in that
-    // definition's lifecycle only.
+    // The session is keyed in this one definition's lifecycle only.
     debug_assert!(!definition.is_empty() && !subject.revision.is_empty());
+    debug_assert!(!session.is_empty());
     if store.load_lifecycle(definition).map_err(|error| error.to_string())?.is_none() {
         return Ok(Closure::Refused {
             refusal: Refusal::UnknownSession,

@@ -133,7 +133,7 @@ fn a_stale_refusal_reports_whether_its_attempt_holds_an_intent() {
     assert!(!other_directory.join(super::super::intent::FILE).exists());
 
     // Recovery's closure marker is not an execution intent.
-    let marker = super::super::super::recovery::closed_marker(&"1".repeat(64));
+    let marker = super::super::super::recovery::closed_marker(&"1".repeat(64), &other);
     std::fs::write(other_directory.join(super::super::intent::FILE), marker).expect("closure marker");
     let guard = super::Guard::acquire(&root.state, &other.work_id).expect("lock");
     assert_eq!(guard.record(&other, &other_directory), stale(false));

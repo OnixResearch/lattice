@@ -78,9 +78,13 @@ interfaces.
   `dispatched:false` after the fence record and before any binding or intent.
   `seam::effect`, `retained` and `close` also compare the revision, so a
   request naming another revision of the same definition never acts on a
-  pinned session (`session_conflict`), and `admit-session` applies `run`'s
-  request validation before any pin. `inspect` reads the attempt's pin from
-  the workflow-agent lifecycle. See `docs/agent-revisions.md`.
+  pinned session (`session_conflict`). `agent-revision admit-session` for an
+  attempt's own session (its envelope identity) now needs `--state` and goes
+  through `run`'s first admission under the attempt's fence lock, including
+  the workspace-boundary and bounded-step preflight, so it refuses exactly
+  where `run` would and pins nothing then; any other session is pinned after
+  `run`'s request validation. `inspect` reads the attempt's pin from the
+  workflow-agent lifecycle. See `docs/agent-revisions.md`.
 - An inert draft-schema comparison of the NVIDIA agent-package proposal
   (`697872570744c8cfc1cf6b1d72e04db66e1a2c83`) with Lattice bundle
   identities: a reviewed skill, a plugin that bundles that skill's whole file
@@ -388,7 +392,15 @@ interfaces.
   fence record it follows) instead of leaving the state root untouched. A
   request of other bytes for a closed attempt-fence is refused as the new
   `attempt_closed` (`dispatched:false`), and `inspect` reports a closed
-  attempt as `instance: null`.
+  attempt as `instance: null`. Closure markers now name their work
+  (`closed-before-execution:<request identity>:<blake3(work_id)>`; markers
+  without it stay readable), and another work's marker or intent at the same
+  attempt id and fence is `crossed_attempt` (`dispatched:false`): attempt ids
+  must be unique across the work items of one state root. Before it pins, an
+  admission with a revision store writes `admission-pending.json` with the
+  subject it is about to pin; a run or recovery that later finds it without an
+  intent closes exactly that pin before anything else, so a process lost
+  between pin and intent no longer leaves a live pin.
 
 - Bounded local processes whose cancellation flag is already set return the
   existing `Cancelled` outcome without spawning. The pinned bounded-exec runner

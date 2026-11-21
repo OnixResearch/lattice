@@ -99,6 +99,22 @@ impl Fixture {
         })
     }
 
+    /// `lattice agent-revision admit-session` of `request`'s own attempt
+    /// session, under its fence in this state root.
+    pub fn admit_session(&self, request: &std::path::Path) -> Result<(), String> {
+        let session = crate::agent_revision::bundle::load(request)?.envelope.identity();
+        let (request, state) = (Self::text(request), Self::text(&self.state));
+        self.revision(&[
+            "admit-session",
+            "--request",
+            request,
+            "--session",
+            &session,
+            "--state",
+            state,
+        ])
+    }
+
     /// `lattice implementation-attempt COMMAND --request REQUEST --state STATE [--revision-store
     /// STORE]` with the standalone compute and serving ports.
     pub async fn attempt(&self, command: &str, request: &std::path::Path, is_managed: bool) -> Result<(), String> {
@@ -614,7 +630,8 @@ async fn capture_managed_worker_inventory_v3() {
     let fixture = Fixture::new();
     let run = fixture.request("attempt-managed-run", 7);
     let (run_path, _) = fixture.write("run.json", &run);
-    let admitted = fixture.request("attempt-managed-admitted", 8);
+    // Admitted under its fence before the run's higher fence is recorded.
+    let admitted = fixture.request("attempt-managed-admitted", 6);
     let (admitted_path, _) = fixture.write("admitted.json", &admitted);
     let resolved = crate::agent_revision::bundle::resolve(&run).expect("resolves");
     let (definition, revision) = (resolved.definition.identity, resolved.revision);
@@ -628,16 +645,7 @@ async fn capture_managed_worker_inventory_v3() {
     write("managed-3-promoted.json", &fixture.inventory(&run_path, true).expect("inventory"));
 
     // A session admitted and bound, before its intent (a controller lost after binding).
-    let session = super::super::session::revision::identifier(&admitted);
-    fixture
-        .revision(&[
-            "admit-session",
-            "--request",
-            Fixture::text(&admitted_path),
-            "--session",
-            &session,
-        ])
-        .expect("admit the session");
+    fixture.admit_session(&admitted_path).expect("admit the session");
     let directory = fixture.directory(&admitted);
     super::super::artifacts::private_directory(&fixture.state).expect("state");
     super::super::artifacts::private_directory(&directory).expect("attempt directory");

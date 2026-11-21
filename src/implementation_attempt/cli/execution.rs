@@ -52,10 +52,12 @@ pub(super) fn recover_existing(
     revisions: super::session::revision::Store<'_>,
 ) -> Result<(), String> {
     // The crossed check and the closure marker share the fence lock with
-    // every fence record and intent of this work in the state root.
+    // every fence record and intent of this work in the state root. A pin an
+    // admission left without its intent is closed before anything else.
     let guard = super::session::fencing::Guard::acquire(state, &request.envelope.work_id)?;
+    super::session::revision::reservation::reconcile(revisions, directory)?;
     guard.check_crossed(&request.envelope, directory).map_err(|error| error.report(&request.envelope))?;
-    let reconciled = super::recovery::reconcile_intent(request, directory, identity);
+    let reconciled = super::recovery::reconcile_intent(&guard, state, request, directory, identity);
     drop(guard);
     let Some(recorded) = reconciled? else {
         println!("{}", super::recovery::not_started(request));
@@ -108,8 +110,6 @@ struct Context {
     is_superseded: bool,
 }
 
-type Pending = super::refusal::deferred::Pending;
-
 impl Context {
     /// Read and validate the request without writing anything.
     fn load(request_path: &std::path::Path, state: &std::path::Path) -> Result<Self, String> {
@@ -144,10 +144,8 @@ impl Context {
         ports: Option<super::Ports<'_>>,
         revisions: super::session::revision::Store<'_>,
     ) -> Result<(), String> {
-        if self.is_superseded {
-            let guard = self.lock()?;
-            let pending = Pending::new(super::refusal::Reason::ProfileRevisionSuperseded);
-            return Err(self.settle(&guard, pending));
+        if let Some(refused) = self.superseded() {
+            return Err(refused);
         }
         let intent = self.directory.join(super::session::intent::FILE);
         let Some(ports) = ports.filter(|_| !intent.exists()) else {
@@ -157,41 +155,43 @@ impl Context {
         self.first_run(ports, revisions).await
     }
 
-    /// A first run, once no intent was seen. Everything up to the intent
-    /// happens under the per-work lock, in this order: the intent store is
-    /// read again, the lineage and repair-port gates run, the fence is checked
-    /// and recorded, the revision session is admitted, the execution binding
-    /// is admitted and persisted, and the intent is created. An intent that
-    /// appeared meanwhile is reconciled like any retained one and nothing is
-    /// admitted; a typed refusal is settled; a session this run pinned is
-    /// abandoned on every path that ends before its intent.
+    /// A first run, once no intent was seen: the first admission it shares
+    /// with `admit-session` (`admission::Context::admit_first`), then, still
+    /// under the per-work lock, the execution binding, the candidate store and
+    /// the intent. An intent or closure marker that appeared meanwhile is
+    /// reconciled like any retained one and nothing is admitted; a session
+    /// this run pinned is abandoned on every path that ends before its intent.
     // r[impl lattice.implementation_attempt.consumer.scenario.fence_lock]
     async fn first_run(
         self,
         ports: super::Ports<'_>,
         revisions: super::session::revision::Store<'_>,
     ) -> Result<(), String> {
-        let worker = worker_request(&self.request)?;
-        super::session::revision::require_named(revisions, &self.request)?;
         let super::Ports {
             compute,
             serving,
             repair,
         } = ports;
-        let guard = self.lock()?;
-        if self.directory.join(super::session::intent::FILE).exists() {
-            drop(guard);
-            return recover_existing(&self.request, &self.state, &self.directory, &self.identity, revisions);
-        }
-        let (repair, session) = match self.gate(&guard, repair, revisions) {
-            Ok(gated) => gated,
-            Err(stop) => return Err(self.stop(&guard, stop)),
+        let (guard, worker, repair, session) = match self.admit_first(repair, revisions)? {
+            admission::First::Retained(guard) => {
+                drop(guard);
+                return recover_existing(&self.request, &self.state, &self.directory, &self.identity, revisions);
+            }
+            admission::First::Admitted(ready) => {
+                let admission::Ready {
+                    guard,
+                    worker,
+                    repair,
+                    session,
+                } = *ready;
+                (guard, worker, repair, session)
+            }
         };
         let (admitted, store) = match self.prepare(&guard, &mut *compute, &session) {
             Ok(prepared) => prepared,
             Err(stop) => {
                 let error = self.stop(&guard, stop);
-                super::session::revision::abandon(revisions, &self.request, &session)
+                super::session::revision::abandon(revisions, &self.request, &session, &self.directory)
                     .map_err(|close| format!("{error}; {close}"))?;
                 return Err(error);
             }
@@ -260,7 +260,7 @@ impl Context {
     }
 }
 
-pub(super) mod admission;
+pub(crate) mod admission;
 
 /// `None` reconciles retained evidence only; ports are used only to admit,
 /// revalidate and gate a first dispatch. `revisions` names the optional

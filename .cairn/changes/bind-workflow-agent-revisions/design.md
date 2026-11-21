@@ -44,6 +44,8 @@ The implementation-attempt request gains an optional `workflow_agent` `{definiti
 
 Rejected: putting the subject choice in `cli/session/revision.rs`. The operator command `admit-session --request` also admits a request's session, and a second selection there could disagree; the seam is the one place both callers share.
 
+`admit-session` for an attempt's own session (its envelope identity) is attempt-bound (final review at `ba6ed91d`): it needs `--state` and calls `cli::execution::admission::admit_session`, which runs the same `Context::admit_first` that `run` runs (preflight with the workspace boundary and bounded-step timeout, lock, orphaned-pin reconciliation, intent store, gates with the standalone CLI's ports, fence, write-ahead record and session) and stops after admission, so its refusals are `run`'s and it pins nothing on any of them. Any other session id is no attempt's and keeps `run`'s request validation before `seam::admit`. Rejected: a separate operator path with its own fence checks, which could drift from `run`'s.
+
 ## Decision 6: the package comparison is a test harness
 
 The comparison of the agent-package draft lives in `tests/test_agent_package_comparison.rs` over inert fixtures. The fixtures carry the draft's manifest and Package Config plus the facts a materialization owner would report; the harness compares them and derives the BLAKE3 inventory, materialized, closure and evidence-subject identities, keeping `sha256:` digests as provider-native fields. It never reads an archive. The decision is "useful mapping, adoption deferred", so no production code is added for it.

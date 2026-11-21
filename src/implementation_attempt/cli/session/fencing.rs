@@ -30,6 +30,7 @@
 const DIRECTORY: &str = "works";
 const FENCE_DIGITS: usize = 20;
 const MAX_FENCES: usize = 4_096;
+const MAX_WORKS: usize = 65_536;
 
 type Envelope = crate::implementation_attempt::ImplementationAttemptEnvelope;
 type Reason = super::super::refusal::Reason;
@@ -175,6 +176,29 @@ impl Guard {
         }
         Ok(())
     }
+
+    /// Whether this work records `envelope`'s attempt at its fence.
+    pub(in super::super) fn records_attempt(&self, envelope: &Envelope) -> Result<bool, String> {
+        Ok(recorded_at(&self.directory, envelope.fence)?.as_deref() == Some(envelope.attempt_id.as_str()))
+    }
+}
+
+/// Whether a work other than `envelope`'s records `envelope`'s attempt at its
+/// fence in `state`. Read without that work's lock: fence records are
+/// created once and never removed.
+pub(in super::super) fn is_recorded_elsewhere(state: &std::path::Path, envelope: &Envelope) -> Result<bool, String> {
+    let own = work_directory(state, &envelope.work_id);
+    let entries = std::fs::read_dir(state.join(DIRECTORY)).map_err(|_| "retained fence records are unreadable")?;
+    for (count, entry) in entries.enumerate() {
+        if count >= MAX_WORKS {
+            return Err("retained work records exceed their bound".into());
+        }
+        let path = entry.map_err(|_| "retained fence records are unreadable")?.path();
+        if path != own && recorded_at(&path, envelope.fence)?.as_deref() == Some(envelope.attempt_id.as_str()) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 /// Take the lock and record this attempt at its fence, or print a stale or

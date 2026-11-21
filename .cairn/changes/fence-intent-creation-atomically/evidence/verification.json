@@ -81,6 +81,39 @@
       {"command": "gitleaks dir --no-banner over every changed and new path", "exit": 0, "result": "no leaks found"}
     ]
   },
+  "final_review": {
+    "trigger": "final reviews LatticeFinal6 and LatticeFinal25 at ba6ed91d (attempt directories keyed by attempt id and fence only, so another work reusing both read this work's closure marker as attempt_closed; a process lost between seam::admit's pin and the intent left a live pin no recovery closed)",
+    "base_revision": "ba6ed91d0464474b65105c05587e118452750623",
+    "recorded_on": "2026-11-21",
+    "rule": "Closure markers read closed-before-execution:<request identity>:<blake3(work_id)>; a marker without the work stays readable as this work's. Another work's marker, or the intent of another work that records the attempt at that fence while this work does not, is crossed_attempt with dispatched:false. Before seam::admit pins, admission-pending.json records the request identity, session and lifecycle subject; a later run or recovery that finds it without an intent closes exactly that subject's session through seam::close_subject under the per-work lock before anything else.",
+    "tasks": {
+      "4.1": [
+        "src/implementation_attempt/cli/tests/coordinator.rs::another_works_marker_or_intent_at_the_same_attempt_fence_is_crossed",
+        "tests/test_implementation_attempt_refusals.rs::another_works_marker_or_intent_at_the_same_attempt_fence_is_crossed_and_not_dispatched",
+        "src/implementation_attempt/cli/session/intent.rs::intents_record_and_read_back_their_admission_mode"
+      ],
+      "4.2": [
+        "src/implementation_attempt/cli/tests/workflow_agent.rs::a_pin_left_without_its_intent_is_closed_before_anything_else"
+      ],
+      "4.3": [
+        "docs/candidate-worker.md (attempt-id uniqueness, marker format, write-ahead record, admission order)",
+        "CHANGELOG.md (Fixed)"
+      ]
+    },
+    "gates": [
+      {"command": "cargo test -p lattice --lib -- implementation_attempt", "exit": 0, "result": "115 passed, 0 failed, 402 filtered out"},
+      {"command": "LATTICE_INVENTORY_CAPTURE_DIR=<scratch> cargo test -p lattice --lib -- capture_managed_worker_inventory_v3", "exit": 0, "result": "1 passed"},
+      {"command": "cargo test -p lattice --test test_agent_revision_workflow --test test_agent_revision_shell --test test_agent_revision_core --test test_implementation_attempt_refusals --test test_agent_revision_attachments", "exit": 0, "result": "17 + 20 + 9 + 11 + 4 passed"},
+      {"command": "cargo test -p lattice-core agent_revision", "exit": 0, "result": "0 passed: the filter matches no lattice-core test; the core's lifecycle tests run in tests/test_agent_revision_core.rs above"},
+      {"command": "cargo clippy -p lattice -p lattice-core --all-targets --no-deps -- -D warnings", "exit": 0},
+      {"command": "cargo fmt -p lattice -p lattice-core --check", "exit": 0},
+      {"command": "octet_semantic_delta.py against ba6ed91d baselines", "exit": 0, "result": "root new_semantic=0 resolved_semantic=0; lattice-core new_semantic=0 resolved_semantic=0; root raw multiplicities equal a clean ba6ed91d observation (1353 each)"},
+      {"command": "cairn validate --root . --policy cairn-policy/generated/cairn-policy.json", "exit": 0},
+      {"command": "cairn gate proposal|design|tasks fence-intent-creation-atomically and bind-workflow-agent-revisions", "exit": 0, "result": "PASS"},
+      {"command": "gitleaks dir --no-banner --redact over every changed and new path", "exit": 0, "result": "25 paths, no leaks found"}
+    ],
+    "octet": "root crate: blocked by the manifest config change from ba6ed91d. Its Cargo.toml (sha2 dev-dependency) changed the Octet config and profile hashes, so octet-precommit-check exits 1 with every root identity moved (1052 new, 1052 stale) on this tree and on a clean ba6ed91d tree alike. Semantic delta against ba6ed91d: new_semantic=0, resolved_semantic=0, raw multiplicities equal to the clean ba6ed91d reference (1353 each). The migration policy requires matching metadata, so octet-baseline.json is left unchanged. lattice-core: 25 accepted, 25 current, 0 new, 0 stale."
+  },
   "not_run": [
     "scripts/check.rs and nix flake check (parent runs them at integration)"
   ]

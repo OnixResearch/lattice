@@ -181,7 +181,12 @@ fn a_superseded_attempt_closed_before_execution_never_dispatched() {
     let directory = fixture.state.join(blake3::hash(key.as_os_str().as_encoded_bytes()).to_hex().as_str());
     let marker = std::fs::read(directory.join("intent.json")).expect("closure marker");
     let identity = blake3::hash(&serde_json::to_vec(&fresh).expect("request bytes")).to_hex().to_string();
-    assert_eq!(marker, format!("closed-before-execution:{identity}").into_bytes());
+    let work = blake3::hash(fresh.envelope.work_id.as_bytes()).to_hex();
+    assert_eq!(
+        marker,
+        format!("closed-before-execution:{identity}:{work}").into_bytes(),
+        "the marker names its work"
+    );
 }
 
 #[test]
@@ -200,4 +205,32 @@ fn a_substituted_request_reports_that_the_retained_intent_may_have_executed() {
         assert_eq!(record["dispatched"], true, "{command}: another request's intent may have executed");
         assert_eq!(record["attempt_id"], "attempt-substituted");
     }
+}
+
+#[test]
+fn another_works_marker_or_intent_at_the_same_attempt_fence_is_crossed_and_not_dispatched() {
+    let fixture = Fixture::new();
+    let mut request = request("attempt-shared");
+    request.envelope.work_id = "work-b".into();
+    request.admitted_envelope = request.envelope.identity();
+    let work_a = blake3::hash(b"work-a").to_hex().to_string();
+    let marker = |_: &str| format!("closed-before-execution:{}:{work_a}", "1".repeat(64));
+    let path = fixture.retained("marker.json", &request, marker);
+    for command in ["run", "recover"] {
+        let (is_success, record) = fixture.refusal(command, &path);
+        assert!(!is_success, "{command} exits non-zero");
+        assert_eq!(record["reason"], "crossed_attempt", "{command}: work A's closure marker");
+        assert_eq!(record["dispatched"], false, "{command}: this request can never create its intent there");
+    }
+
+    // Work A records the attempt at this fence and holds its intent.
+    let other = Fixture::new();
+    let fence = other.state.join("works").join(work_a.as_str());
+    std::fs::DirBuilder::new().recursive(true).mode(0o700).create(&fence).expect("work A fence records");
+    std::fs::write(fence.join(format!("{:020}", request.envelope.fence)), "attempt-shared").expect("work A record");
+    let path = other.retained("intent.json", &request, |_| "2".repeat(64));
+    let (is_success, record) = other.refusal("run", &path);
+    assert!(!is_success);
+    assert_eq!(record["reason"], "crossed_attempt", "work A's intent");
+    assert_eq!(record["dispatched"], false);
 }

@@ -33,6 +33,16 @@ r[lattice.implementation_attempt.consumer.scenario.closure]
 - AND a lineage or repair-port refusal MUST write only the state root, the lock directory, the attempt directory and the closure marker
 - AND the resumed run MUST read the intent store under the lock before any gate and be refused as `substituted_request` with `dispatched: true`, admitting and pinning nothing
 - AND a session a run pinned MUST be closed on every path that ends before its intent, a session another run pinned MUST NOT be closed, and the lock MUST be taken before the agent revision store is opened, never while holding it
+- AND a closure marker MUST name its request identity and the BLAKE3 of its work, a marker without the work MUST stay readable as this work's, and a request that finds another work's closure marker, or the intent of another work that records the attempt at that fence while its own work does not, MUST be refused as `crossed_attempt` with `dispatched: false`, creating no intent, marker or pin; attempt ids MUST be unique across the work items of one state root
+
+#### Scenario: A pin left without its intent is closed before anything else
+
+r[lattice.implementation_attempt.consumer.scenario.reservation]
+- GIVEN an admission with a revision store that pinned its session and was lost before its intent, or an operator admission that stopped after pinning
+- WHEN a later run of the same attempt-fence, naming the same or another workflow-agent pair, or a recovery of it, takes the work's lock
+- THEN before `seam::admit` pins, the admission MUST have created a write-ahead record of its request identity, session and lifecycle subject in the attempt directory, removed when the admission is refused, its pin predates the record, the pin is abandoned or the intent exists
+- AND the later run or recovery MUST, under the lock and before anything else, close the session of exactly the recorded subject through the seam and remove the record, never touching a session pinned to another revision; recovery MUST then close the attempt as before, and a run MUST then admit and proceed or refuse as before
+- AND a record found without the revision store MUST be an error that closes nothing
 
 #### Scenario: Fence check, record and intent are one critical section
 

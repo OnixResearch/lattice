@@ -107,12 +107,17 @@ pub(super) fn revision_blocked(
 }
 
 const CLOSED_PREFIX: &str = "closed-before-execution:";
+const DIGEST_HEX: usize = 64;
 
-/// The exclusive intent content of an attempt that recovery closed before any
-/// execution. It never equals a request identity, so a later run of the same
-/// request cannot create its intent.
-pub(super) fn closed_marker(request_identity: &str) -> String {
-    format!("{CLOSED_PREFIX}{request_identity}")
+/// The exclusive intent content of an attempt closed before any execution, by
+/// recovery or by a refusal before its intent: the request identity and the
+/// BLAKE3 of the envelope's work. It never equals a request identity, so a
+/// later run of the same request cannot create its intent.
+pub(super) fn closed_marker(
+    request_identity: &str,
+    envelope: &crate::implementation_attempt::ImplementationAttemptEnvelope,
+) -> String {
+    format!("{CLOSED_PREFIX}{request_identity}:{}", blake3::hash(envelope.work_id.as_bytes()).to_hex())
 }
 
 /// Whether retained intent bytes are a closure marker of any request.
@@ -120,16 +125,67 @@ pub(super) fn is_closed_marker(bytes: &[u8]) -> bool {
     bytes.starts_with(CLOSED_PREFIX.as_bytes())
 }
 
+/// Whether `bytes` are the closure marker of the request `request_identity`,
+/// naming its work or, as written before markers named their work, not.
+pub(super) fn is_closed_by(bytes: &[u8], request_identity: &str) -> bool {
+    let rest = bytes
+        .strip_prefix(CLOSED_PREFIX.as_bytes())
+        .and_then(|rest| rest.strip_prefix(request_identity.as_bytes()));
+    rest.is_some_and(|rest| rest.is_empty() || closed_work(bytes).is_some())
+}
+
+/// The work digest a closure marker names; `None` for a marker written
+/// before markers named their work, or for other bytes.
+fn closed_work(bytes: &[u8]) -> Option<&[u8]> {
+    let rest = bytes.strip_prefix(CLOSED_PREFIX.as_bytes())?;
+    let (identity, named) = rest.split_at_checked(DIGEST_HEX)?;
+    let work = named.strip_prefix(b":")?;
+    (identity.len() == DIGEST_HEX && work.len() == DIGEST_HEX).then_some(work)
+}
+
+/// The refusal of a request whose attempt directory holds another request's
+/// intent or closure marker, decided under its work's lock. Attempt ids must
+/// be unique across the work items of one state root; one that is not finds
+/// another work's marker or intent there, which is `crossed_attempt` with
+/// `dispatched:false`: this request can never create its intent at that path.
+/// Another marker of this work, or one that names no work, is
+/// `attempt_closed`; another intent of this work is `substituted_request`.
+pub(super) fn refuse_retained(
+    guard: &super::session::fencing::Guard,
+    state: &std::path::Path,
+    request: &super::Request,
+    directory: &std::path::Path,
+) -> Result<String, String> {
+    let envelope = &request.envelope;
+    let bytes = super::session::intent::retained_bytes(directory)?.ok_or("retained intent disappeared")?;
+    let work = blake3::hash(envelope.work_id.as_bytes()).to_hex();
+    let reason = if is_closed_marker(&bytes) {
+        match closed_work(&bytes) {
+            Some(named) if named != work.as_bytes() => super::refusal::Reason::CrossedAttempt,
+            Some(_) | None => super::refusal::Reason::AttemptClosed,
+        }
+    } else if !guard.records_attempt(envelope)? && super::session::fencing::is_recorded_elsewhere(state, envelope)? {
+        super::refusal::Reason::CrossedAttempt
+    } else {
+        super::refusal::Reason::SubstitutedRequest
+    };
+    Ok(match reason {
+        super::refusal::Reason::CrossedAttempt => super::refusal::refuse_fence(envelope, reason, false),
+        _ => super::refusal::refuse(envelope, reason),
+    })
+}
+
 /// Recovery with no intent closes the attempt by exclusively creating its
 /// intent path, so a racing or later run of the same request can never create
 /// its own intent. The caller holds the per-work fence lock. Another
-/// request's closure marker is an `attempt_closed` refusal (nothing was
-/// dispatched); another request's execution intent is a typed substitution
-/// refusal. `None` means the attempt was closed before execution; otherwise
-/// the admission recorded with the intent is returned, never re-derived.
+/// request's intent or closure marker is refused (`refuse_retained`). `None`
+/// means the attempt was closed before execution; otherwise the admission
+/// recorded with the intent is returned, never re-derived.
 // r[impl lattice.implementation_attempt.consumer.scenario.recovery]
 // r[impl lattice.implementation_attempt.consumer.scenario.fence_lock]
 pub(super) fn reconcile_intent(
+    guard: &super::session::fencing::Guard,
+    state: &std::path::Path,
     request: &super::Request,
     directory: &std::path::Path,
     identity: &str,
@@ -139,8 +195,8 @@ pub(super) fn reconcile_intent(
         request_identity: identity,
         session: &session,
     };
-    let marker = closed_marker(identity);
-    debug_assert_eq!(identity.len(), 64, "the request identity is one BLAKE3 digest");
+    let marker = closed_marker(identity, &request.envelope);
+    debug_assert_eq!(identity.len(), DIGEST_HEX, "the request identity is one BLAKE3 digest");
     // The marker this recovery may write reads back as a closed attempt.
     debug_assert_eq!(
         super::session::intent::classify(marker.as_bytes(), subject),
@@ -156,14 +212,7 @@ pub(super) fn reconcile_intent(
     match retained {
         Some(super::session::intent::Record::Owned(recorded)) => Ok(Some(recorded)),
         Some(super::session::intent::Record::Closed) => Ok(None),
-        Some(super::session::intent::Record::Foreign) | None => {
-            let reason = if super::session::intent::is_execution_retained(directory)? {
-                super::refusal::Reason::SubstitutedRequest
-            } else {
-                super::refusal::Reason::AttemptClosed
-            };
-            Err(super::refusal::refuse(&request.envelope, reason))
-        }
+        Some(super::session::intent::Record::Foreign) | None => Err(refuse_retained(guard, state, request, directory)?),
     }
 }
 
