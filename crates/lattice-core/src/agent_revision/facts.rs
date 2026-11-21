@@ -30,6 +30,12 @@ pub struct Bundle {
     pub task_families: Option<Vec<String>>,
     pub tools: Option<Vec<String>>,
     pub routes: Vec<HostedRoute>,
+    /// The workflow-intent plan this bundle pairs with its worker, present
+    /// only under `lattice.workflow-agent-bundle.v1`. Omitted when absent, so
+    /// every plain agent bundle keeps its bytes and identity; serde reads a
+    /// missing `Option` field as `None`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub workflow: Option<super::workflow::Binding>,
 }
 
 /// A brokered hosted model route.
@@ -53,7 +59,8 @@ pub enum Unexposed {
     Unknown,
 }
 
-/// Check the schema, identities and bounded names.
+/// Check the schema, identities and bounded names, and a workflow-agent
+/// bundle against its binding.
 pub fn validate(bundle: &Bundle) -> Result<(), super::Refusal> {
     let mut names = bundle.task_families.iter().chain(bundle.tools.iter()).flatten();
     let mut routes = bundle.routes.iter();
@@ -64,7 +71,7 @@ pub fn validate(bundle: &Bundle) -> Result<(), super::Refusal> {
         &bundle.executable_identity,
     ];
     let checks = [
-        bundle.schema == BUNDLE_SCHEMA,
+        bundle.workflow.is_some() || bundle.schema == BUNDLE_SCHEMA,
         super::is_reference(&bundle.definition),
         super::is_bare_digest(&bundle.revision),
         texts.iter().all(|value| super::is_token(value)),
@@ -75,7 +82,7 @@ pub fn validate(bundle: &Bundle) -> Result<(), super::Refusal> {
     if checks.iter().all(|check| *check) {
         debug_assert!(super::is_reference(&bundle.definition));
         debug_assert!(super::is_bare_digest(&bundle.revision));
-        Ok(())
+        bundle.workflow.as_ref().map_or(Ok(()), |binding| super::workflow::validate(bundle, binding))
     } else {
         Err(super::Refusal::Malformed)
     }

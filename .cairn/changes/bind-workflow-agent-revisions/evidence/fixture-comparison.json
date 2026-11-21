@@ -1,0 +1,85 @@
+{
+  "schema": "lattice.fixture-qualification.v1",
+  "change": "bind-workflow-agent-revisions",
+  "kind": "synthetic-fixture-comparison",
+  "live_qualification": false,
+  "live_preparation_exercised": false,
+  "live_oci_interoperability": false,
+  "evidence_label": "fixture",
+  "base_revision": "db64cd654e52cf6579643e6e96ad92bda2b3d61a",
+  "producer_schemas": [
+    "lattice.workflow-agent-bundle.v1",
+    "lattice.workflow-agent-proposal.v1",
+    "lattice.workflow-agent-revision-slots.v1"
+  ],
+  "identity_domains": [
+    "lattice-workflow-agent-definition-v1",
+    "lattice-workflow-agent-revision-v1"
+  ],
+  "comparison_identity_domains": [
+    "lattice-agent-package-inventory-v1",
+    "lattice-agent-package-materialized-v1",
+    "lattice-agent-package-closure-v1",
+    "lattice-agent-package-subject-v1",
+    "lattice-agent-package-definition-v1"
+  ],
+  "comparison_identity_domains_note": "Used only by the test harness to state the mapping; not adopted Lattice identities.",
+  "workflow_agent_fixture": "tests/fixtures/agent-revisions/workflow-agent-identities.json",
+  "workflow_agent_identities": {
+    "schema": "lattice.workflow-agent-bundle.v1",
+    "definition": "blake3:5973722cad74ee8eb2a5d32b8de4522416ac94af44107f55219130ea3bd84682",
+    "R1": {
+      "revision": "7925abd324156eb0b9966a1ee75ecc072145a5d71d705af95d62ffd459c0c31f",
+      "bundle_identity": "blake3:20154d595888b0df2bb35427e0a163f16429058f99571f2b2e5a05b4c47327fe",
+      "plan_identity": "b3:2ce1fbd2a15572c223129c469eb6c1d088c4b83070a8f53607609a608bb4b2cc",
+      "worker_revision": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "R2": {
+      "revision": "da7adb2fa430f0001f2f05116a44b001521b4e169c9d93c767644ad8bb2f8d9e",
+      "bundle_identity": "blake3:b84d9d59a9b6a6db5ecdd232b5c1ecbd9983ea762f4dca05765c35802f5724f6",
+      "plan_identity": "b3:f852d6e4b8cb486202d35cd9be8e96012bf290ec391726052773d7cc08ce9a7d",
+      "worker_revision": "1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "R3": {
+      "revision": "89d8dc37b0a3bed9351ae3ea1ac2f3eccd8442fcb60f02b8a867e1fa494932f2",
+      "bundle_identity": "blake3:c6a9156b8e51d9ada59d54490b789b18b4c98a978a17aa407b26db0a2d5d10a4",
+      "plan_identity": "b3:2ce1fbd2a15572c223129c469eb6c1d088c4b83070a8f53607609a608bb4b2cc",
+      "worker_revision": "3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    "live_qualification": false
+  },
+  "package_comparison": {
+    "draft": "https://github.com/NVIDIA/agent-package-spec/blob/697872570744c8cfc1cf6b1d72e04db66e1a2c83/spec/agent-package.md",
+    "claim": "draft_schema_fixture_comparison_not_materialization",
+    "report": "tests/fixtures/agent-package/comparison-report.json",
+    "decision": "useful_mapping_adoption_deferred",
+    "decision_document": "docs/agent-package-comparison.md",
+    "skill_revision": "f47812209c50f0d5187d70e02d760717a1f2a17701508a7564e480f862ecf591",
+    "plugin_revision": "fcbd229bbc84a7f81873ce3de335fa638e99d1fe8e4694fea9792ed473b7094a",
+    "negative_cases": 31
+  },
+  "tests": {
+    "files": [
+      "tests/test_agent_revision_workflow.rs",
+      "tests/test_agent_package_comparison.rs",
+      "tests/test_agent_revision_shell.rs",
+      "tests/test_agent_revision_core.rs"
+    ]
+  },
+  "checks": {
+    "environment": "RUSTC_WRAPPER and CARGO_BUILD_RUSTC_WRAPPER empty, CARGO_BUILD_JOBS=6, TMPDIR on the root filesystem (/tmp was full; a long TMPDIR under the cargo-target pool exceeded the Unix socket path limit for two unrelated socket tests, so those runs are not counted)",
+    "focused_tests": "cargo test --test test_agent_revision_workflow --test test_agent_package_comparison --test test_agent_revision_shell --test test_agent_revision_core: exit 0; 11 + 4 + 9 + 20 passed",
+    "fmt": "cargo fmt -p lattice -p lattice-core -- --check reported only the new files; cargo fmt applied; the format step of scripts/check.rs: exit 0",
+    "scripts_check": "scripts/check.rs: exit 0, all 40 steps including all-features tests, tests, clippy and cairn specs; in its test steps test_agent_revision_workflow 11, test_agent_package_comparison 4, test_agent_revision_shell 9, test_agent_revision_core 20, test_agent_revision_attachments 17 and test_workflow_intent 5 passed",
+    "octet": "octet-precommit-check: exit 0; root 1052 accepted, 1052 current, 0 new, 0 stale; lattice-core 25 accepted, 25 current, 0 new, 0 stale; no re-key",
+    "cairn": "cairn validate --root . --policy cairn-policy/generated/cairn-policy.json: exit 0, valid, 62 specs, 0 issues; proposal, design and tasks gates of bind-workflow-agent-revisions: PASS",
+    "gitleaks": "gitleaks dir on every changed and new path: no leaks found",
+    "nix_flake_check": "not run in this slice"
+  },
+  "non_claims": [
+    "No workflow-agent revision was prepared, qualified or run live; the plans and workers are fixtures.",
+    "Cairn #14 supplies no producer cohort yet, and nothing is published to Kiln #84.",
+    "The package comparison read no archive, contacted no registry, verified no signature and installed nothing; the OCI manifest, config and layer digests are fixture values.",
+    "implementation-attempt does not name a workflow-agent bundle yet."
+  ]
+}

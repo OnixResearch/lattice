@@ -35,6 +35,33 @@ interfaces.
   attributed per phase with the existing provenance and unknown counts stay
   unknown. `cli::Ports` gains the `repair` field. See
   `docs/candidate-worker.md`.
+- Workflow-agent revisions (Lattice #25, fixture level). A
+  `lattice.workflow-agent-bundle.v1` bundle binds a compiled workflow-intent
+  plan (compiler revision and artifact, plan, graph, runtime profile, Cairn
+  cohort and per-obligation identities) to one worker bundle. Its definition
+  is `lattice-workflow-agent-definition-v1` over the pairing name and the
+  worker definition, and its revision the bare-hex
+  `lattice-workflow-agent-revision-v1` digest of the binding, so the existing
+  lifecycle prepares, qualifies, promotes, pins, revokes and rolls it back
+  unchanged, and an evaluation of another plan or of the worker alone is
+  `subject_mismatch`. `lattice agent-revision resolve-workflow` and
+  `desire-workflow` compose it from an implementation-attempt request and a
+  typed intent naming this compiler executable; `inspect` adds
+  `workflow_slots` (`lattice.workflow-agent-revision-slots.v1`), the
+  projection Kiln #84 would read with workflow and worker revisions apart.
+  `workflow::adaptation::propose` describes a changed plan, prompt, tool,
+  requirement or policy as a new revision with an applicability decision
+  fixed to `unknown` (owners Cairn #14 and Kiln #83) and changes no
+  lifecycle. Plain agent bundles keep their bytes and identities. The attempt
+  seam `workflow::check_attempt` is not wired into `implementation-attempt`
+  yet. See `docs/agent-revisions.md`.
+- An inert draft-schema comparison of the NVIDIA agent-package proposal
+  (`697872570744c8cfc1cf6b1d72e04db66e1a2c83`) with Lattice bundle
+  identities: a reviewed skill, a plugin with bundled skills, 31 negative
+  cases and the payload-change, relocation, revocation and rollback cases
+  through the existing lifecycle. Decision: useful mapping, adoption
+  deferred. No archive, registry, installer or activation controller is
+  involved. See `docs/agent-package-comparison.md`.
 - Qualification attachments for agent revisions (Animus #18, Lattice #25).
   `lattice agent-revision promote` and `rollback` accept a repeatable
   `--qualification-attachment PATH`. Each file must be a regular,

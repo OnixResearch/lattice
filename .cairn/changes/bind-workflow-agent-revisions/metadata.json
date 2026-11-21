@@ -1,0 +1,12 @@
+{
+  "depends_on": [
+    "manage-agent-revisions",
+    "compile-workflow-intent",
+    "publish-worker-inventory-v3"
+  ],
+  "workflow_profile": {
+    "id": "spec-driven",
+    "source": "change_create",
+    "version": 1
+  }
+}

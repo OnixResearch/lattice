@@ -644,3 +644,171 @@ fn an_interleaved_stale_write_is_reloaded_and_reapplied() {
     assert_eq!(version, 7);
     assert!(!stored.revoked.revisions.contains(&"c".repeat(64)));
 }
+
+fn intent_digest(value: &str) -> String {
+    format!("b3:{}", blake3::hash(value.as_bytes()).to_hex())
+}
+
+/// A synthetic two-obligation workflow intent naming `compiler`.
+fn intent(compiler: &str, guidance: &str) -> lattice::workflow::intent::CompileRequest {
+    use lattice::workflow::intent as wi;
+    let cohort = wi::SourceCohort {
+        producer_identity: intent_digest("producer"),
+        selection_identity: intent_digest("selection"),
+        obligations_identity: intent_digest("obligations"),
+        profile_identity: intent_digest("profile"),
+        context_identity: intent_digest("context"),
+        source_identity: intent_digest("source"),
+        policy_identity: intent_digest("policy"),
+        dependency_identity: intent_digest("dependencies"),
+    };
+    let obligation = |id: &str, class: &str, prerequisites: Vec<String>| wi::Obligation {
+        id: id.into(),
+        obligation_identity: intent_digest(&format!("obligation:{id}")),
+        guidance_identity: intent_digest(&format!("{guidance}:{id}")),
+        remaining_condition_identity: intent_digest(&format!("remaining:{id}")),
+        precondition_identity: intent_digest(&format!("precondition:{id}")),
+        operation_class: class.into(),
+        action_identity: intent_digest(&format!("action:{id}")),
+        prerequisites,
+        required_observations: vec![wi::ObservationContract {
+            id: format!("evidence-{id}"),
+            schema: "lattice.workflow-intent-fixture-result.v1".into(),
+            predicate_identity: intent_digest(&format!("predicate:{id}")),
+        }],
+        required_capabilities: std::collections::BTreeSet::from(["native-cairn".into()]),
+    };
+    wi::CompileRequest {
+        intent: wi::Definition {
+            schema: wi::INTENT_SCHEMA.into(),
+            cohort: cohort.clone(),
+            coverage: wi::ContextCoverage::Complete,
+            unsupported_fields: vec![],
+            obligations: vec![
+                obligation("B", "review_wait", vec!["A".into()]),
+                obligation("A", "cairn_validate", vec![]),
+            ],
+            alternatives: vec![],
+            selected_alternative: None,
+        },
+        facts: wi::CompilerFacts {
+            expected_cohort: cohort,
+            compiler_artifact_identity: compiler.into(),
+            runtime_profile_identity: intent_digest("runtime-profile"),
+            available_capabilities: std::collections::BTreeSet::from(["native-cairn".into()]),
+            available_implementations: std::collections::BTreeSet::new(),
+        },
+    }
+}
+
+#[test]
+// r[verify lattice.agent_revisions.workflow]
+// r[verify lattice.agent_revisions.workflow.inspect]
+fn a_compiled_plan_and_a_request_compose_an_inspectable_workflow_agent_bundle() {
+    let worker = lattice::agent_revision::bundle::resolve(&request("make the candidate")).expect("resolves");
+    let compiled =
+        lattice::workflow::intent::compile(intent(&intent_digest("compiler"), "guidance")).expect("compiles");
+    let composed =
+        lattice::agent_revision::composite::compose("verify-change", &compiled, worker.clone()).expect("composes");
+    let binding = composed.bundle.workflow.as_ref().expect("binding");
+    assert_eq!(binding.plan.identity, compiled.identity());
+    assert!(binding.plan.graph_identity.starts_with("blake3:"));
+    assert_eq!(binding.plan.obligations.iter().map(|obligation| obligation.id.as_str()).collect::<Vec<_>>(), [
+        "A", "B"
+    ]);
+    assert_eq!(binding.worker.revision, worker.revision);
+    assert_eq!(composed.revision, composed.bundle.revision);
+    assert_ne!(composed.revision, worker.revision);
+    let encoded = serde_json::to_string(&composed).expect("encodes");
+    for material in [
+        "model.invalid",
+        "MODEL_TOKEN",
+        "/usr/bin/worker",
+        "make the candidate",
+        "/workspace",
+    ] {
+        assert!(!encoded.contains(material), "bundle leaks {material}");
+    }
+    let per_attempt = lattice::agent_revision::bundle::resolve(&request("another prompt")).expect("resolves");
+    let same = lattice::agent_revision::composite::compose("verify-change", &compiled, per_attempt).expect("composes");
+    assert_eq!(same.revision, composed.revision, "a task prompt is per-attempt");
+    let guided =
+        lattice::workflow::intent::compile(intent(&intent_digest("compiler"), "guidance-2")).expect("compiles");
+    let adapted = lattice::agent_revision::composite::compose("verify-change", &guided, worker).expect("composes");
+    assert_ne!(adapted.revision, composed.revision, "obligation guidance is part of the plan");
+    assert_eq!(adapted.definition, composed.definition);
+
+    let root = tempfile::tempdir().expect("scratch");
+    let store_path = root.path().join("revisions.db");
+    let store = Store::new(&store_path).expect("store");
+    lattice::agent_revision::transact(
+        &store,
+        &composed.definition,
+        lattice::agent_revision::Seed::Create,
+        |lifecycle| lattice_core::agent_revision::ops::prepare::desire(lifecycle, &composed.bundle),
+    )
+    .expect("commits")
+    .expect("desired");
+    drop(store);
+    let (is_success, printed) = cli(&[
+        "inspect".as_ref(),
+        "--store".as_ref(),
+        store_path.as_os_str(),
+        "--definition".as_ref(),
+        composed.definition.as_ref(),
+    ]);
+    assert!(is_success, "inspect succeeds: {printed}");
+    let slots = &printed["outcome"]["workflow_slots"];
+    assert_eq!(slots["schema"], "lattice.workflow-agent-revision-slots.v1");
+    assert_eq!(slots["desired"]["revision"], composed.revision.as_str());
+    assert_eq!(slots["desired"]["workflow"]["plan_identity"], compiled.identity());
+    assert_eq!(slots["desired"]["worker"]["revision"], binding.worker.revision.as_str());
+    assert!(slots["selected_for_new_sessions"].is_null());
+
+    let plain_store = root.path().join("plain.db");
+    let plain = write_request(root.path(), "plain.json", &request("make the candidate"));
+    let resolved = lattice::agent_revision::bundle::resolve(&request("make the candidate")).expect("resolves");
+    let desire = Command::Desire {
+        request: plain,
+        store: plain_store.clone(),
+    };
+    run(desire, &mut FixturePreparation::default(), &mut FixtureQualification::default()).expect("desire");
+    let (is_success, printed) = cli(&[
+        "inspect".as_ref(),
+        "--store".as_ref(),
+        plain_store.as_os_str(),
+        "--definition".as_ref(),
+        resolved.definition.identity.as_ref(),
+    ]);
+    assert!(is_success);
+    assert!(printed["outcome"].get("workflow_slots").is_none(), "a plain lifecycle has no workflow slots");
+}
+
+#[test]
+// r[verify lattice.agent_revisions.workflow.inspect]
+fn workflow_commands_refuse_an_intent_for_another_compiler_and_write_nothing() {
+    let root = tempfile::tempdir().expect("scratch");
+    let request = write_request(root.path(), "request.json", &request("make the candidate"));
+    let intent_path = root.path().join("intent.json");
+    let stale = intent(&intent_digest("another-compiler"), "guidance");
+    std::fs::write(&intent_path, serde_json::to_vec(&stale).expect("encodes")).expect("intent written");
+    let store = root.path().join("revisions.db");
+    let pairing: [&std::ffi::OsStr; 6] = [
+        "--request".as_ref(),
+        request.as_os_str(),
+        "--intent".as_ref(),
+        intent_path.as_os_str(),
+        "--name".as_ref(),
+        "verify-change".as_ref(),
+    ];
+    let mut resolve: Vec<&std::ffi::OsStr> = vec!["resolve-workflow".as_ref()];
+    resolve.extend(pairing);
+    let (is_success, _) = cli(&resolve);
+    assert!(!is_success, "a different compiler is refused, never rebound");
+    let mut desire: Vec<&std::ffi::OsStr> = vec!["desire-workflow".as_ref()];
+    desire.extend(pairing);
+    desire.extend(["--store".as_ref(), store.as_os_str()]);
+    let (is_success, _) = cli(&desire);
+    assert!(!is_success);
+    assert!(!store.exists(), "a refused intent creates no store");
+}

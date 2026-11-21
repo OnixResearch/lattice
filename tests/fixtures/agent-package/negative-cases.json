@@ -1,0 +1,42 @@
+{
+  "schema": "lattice.agent-package-comparison-cases.v1",
+  "claim": "draft_schema_fixture_comparison_not_materialization",
+  "bounds": {
+    "max_entries": 64,
+    "max_expanded_bytes": 65536,
+    "max_expansion_ratio": 64
+  },
+  "cases": [
+    { "name": "missing_file", "base": "skill", "mutations": [{ "op": "remove_entry", "path": "payload/references/policy.md" }], "expected": ["missing_file"] },
+    { "name": "extra_file", "base": "skill", "mutations": [{ "op": "add_entry", "entry": { "path": "payload/notes.md", "kind": "regular", "executable": false, "sha256": "sha256:16ab2ccfb4b5a7d0e7db3e8bfa5d769807ae95616c2853271be2aedcbbb11ba3", "content": "# Policy\n\nEscalate unknown cases.\n" } }], "expected": ["extra_file"] },
+    { "name": "changed_file", "base": "skill", "mutations": [{ "op": "replace_content", "path": "payload/SKILL.md", "sha256": "sha256:232b309b1901de211e290cf532b1f0b8ca93e8368a97f7dc7b147f92b749637e", "content": "---\nname: case-triage\ndescription: Triage support cases using the reviewed procedure.\n---\n\n# Case triage\n\nSkip references/policy.md.\n" }], "expected": ["changed_file"] },
+    { "name": "changed_bundled_skill", "base": "plugin", "mutations": [{ "op": "replace_content", "path": "payload/skills/case-triage/SKILL.md", "sha256": "sha256:232b309b1901de211e290cf532b1f0b8ca93e8368a97f7dc7b147f92b749637e", "content": "---\nname: case-triage\ndescription: Triage support cases using the reviewed procedure.\n---\n\n# Case triage\n\nSkip references/policy.md.\n" }], "expected": ["changed_file"] },
+    { "name": "duplicate_archive_entry", "base": "skill", "mutations": [{ "op": "duplicate_entry", "path": "payload/SKILL.md" }], "expected": ["duplicate_entry"] },
+    { "name": "duplicate_inventory_path", "base": "skill", "mutations": [{ "op": "duplicate_inventory", "path": "payload/SKILL.md" }], "expected": ["duplicate_inventory_path"] },
+    { "name": "case_folding_collision", "base": "skill", "mutations": [{ "op": "add_entry", "entry": { "path": "payload/skill.md", "kind": "regular", "executable": false, "sha256": "sha256:2630b3e6646cf6d7fbaba9e032db715b195899975227517f998b32235dca1f4c", "content": "print('fixture only; never executed')\n" } }], "expected": ["extra_file", "path_collision"] },
+    { "name": "parent_traversal", "base": "skill", "mutations": [{ "op": "rename", "path": "payload/references/policy.md", "to": "payload/../escape.md" }], "expected": ["unsafe_path"] },
+    { "name": "absolute_path", "base": "skill", "mutations": [{ "op": "rename", "path": "payload/references/policy.md", "to": "/etc/escape.md" }], "expected": ["unsafe_path"] },
+    { "name": "empty_component", "base": "skill", "mutations": [{ "op": "rename", "path": "payload/references/policy.md", "to": "payload//policy.md" }], "expected": ["unsafe_path"] },
+    { "name": "dot_component", "base": "skill", "mutations": [{ "op": "rename", "path": "payload/references/policy.md", "to": "payload/./policy.md" }], "expected": ["unsafe_path"] },
+    { "name": "backslash", "base": "skill", "mutations": [{ "op": "rename", "path": "payload/references/policy.md", "to": "payload\\policy.md" }], "expected": ["unsafe_path"] },
+    { "name": "drive_prefix", "base": "skill", "mutations": [{ "op": "rename", "path": "payload/references/policy.md", "to": "C:/policy.md" }], "expected": ["unsafe_path"] },
+    { "name": "outside_payload_root", "base": "skill", "mutations": [{ "op": "rename", "path": "payload/references/policy.md", "to": "outside/policy.md" }], "expected": ["unsafe_path"] },
+    { "name": "nul_byte", "base": "skill", "mutations": [{ "op": "rename", "path": "payload/references/policy.md", "to": "payload/policy\u0000.md" }], "expected": ["unsafe_path"] },
+    { "name": "symlink", "base": "skill", "mutations": [{ "op": "add_entry", "entry": { "path": "payload/link.md", "kind": "symlink" } }], "expected": ["symlink"] },
+    { "name": "hard_link", "base": "plugin", "mutations": [{ "op": "add_entry", "entry": { "path": "payload/hard.md", "kind": "hard_link" } }], "expected": ["hard_link"] },
+    { "name": "fifo", "base": "skill", "mutations": [{ "op": "add_entry", "entry": { "path": "payload/pipe", "kind": "fifo" } }], "expected": ["special_file"] },
+    { "name": "character_device", "base": "skill", "mutations": [{ "op": "add_entry", "entry": { "path": "payload/tty", "kind": "character_device" } }], "expected": ["special_file"] },
+    { "name": "block_device", "base": "skill", "mutations": [{ "op": "add_entry", "entry": { "path": "payload/disk", "kind": "block_device" } }], "expected": ["special_file"] },
+    { "name": "socket", "base": "plugin", "mutations": [{ "op": "add_entry", "entry": { "path": "payload/socket", "kind": "socket" } }], "expected": ["special_file"] },
+    { "name": "expansion_ratio", "base": "skill", "mutations": [{ "op": "set_expanded_bytes", "bytes": 40000 }], "expected": ["expansion_ratio_exceeded"] },
+    { "name": "expanded_bytes", "base": "skill", "mutations": [{ "op": "set_expanded_bytes", "bytes": 1000000 }], "expected": ["expanded_bytes_exceeded", "expansion_ratio_exceeded"] },
+    { "name": "entry_count", "base": "skill", "mutations": [{ "op": "add_directories", "count": 64 }], "expected": ["entry_count_exceeded"] },
+    { "name": "artifact_type_kind_mismatch", "base": "skill", "mutations": [{ "op": "set_artifact_type", "value": "application/vnd.agentpackage.plugin.v1" }], "expected": ["kind_mismatch", "layer_media_type_mismatch"] },
+    { "name": "layer_media_type", "base": "plugin", "mutations": [{ "op": "set_layer_media_type", "value": "application/vnd.agentpackage.skill.payload.v1.tar+gzip" }], "expected": ["layer_media_type_mismatch"] },
+    { "name": "second_layer", "base": "skill", "mutations": [{ "op": "add_layer" }], "expected": ["layer_count"] },
+    { "name": "layer_digest", "base": "skill", "mutations": [{ "op": "set_observed_layer_digest", "digest": "sha256:9f80f7280d9860a21a5eef115a2c0fe21e6a0b08c69e67479843dc1a4738bb87" }], "expected": ["layer_digest_mismatch"] },
+    { "name": "config_digest", "base": "plugin", "mutations": [{ "op": "set_observed_config_digest", "digest": "sha256:612ee4cf7d307b30504a782d9e4f66c50471958dc1dc2fcbd55946c6a2ef230c" }], "expected": ["config_digest_mismatch"] },
+    { "name": "manifest_digest", "base": "skill", "mutations": [{ "op": "set_observed_manifest_digest", "digest": "sha256:6628a483486226e5eefc4dec56db352291d24dfcaf11573a842b6e502ac84e95" }], "expected": ["manifest_digest_mismatch"] },
+    { "name": "executable_mode", "base": "skill", "mutations": [{ "op": "set_executable", "path": "payload/scripts/analyze.py", "value": true }], "expected": ["executable_mismatch"] }
+  ]
+}

@@ -1,0 +1,82 @@
+{
+  "schema": "lattice.agent-package-comparison-fixture.v1",
+  "claim": "draft_schema_fixture_comparison_not_materialization",
+  "draft": {
+    "source": "https://github.com/NVIDIA/agent-package-spec",
+    "revision": "697872570744c8cfc1cf6b1d72e04db66e1a2c83",
+    "status": "community_review_draft"
+  },
+  "location": {
+    "registry": "registry.invalid",
+    "repository": "agents/case-triage",
+    "tag": "1.2.3"
+  },
+  "resolved_manifest_digest": "sha256:952a2129f192925a5b5c741837895767f2bcc06a56dd2d4247a3cad648b52a21",
+  "manifest": {
+    "schemaVersion": 2,
+    "mediaType": "application/vnd.oci.image.manifest.v1+json",
+    "artifactType": "application/vnd.agentpackage.skill.v1",
+    "config": {
+      "mediaType": "application/vnd.agentpackage.config.v1+json",
+      "digest": "sha256:d0ed99a81d070f9df4342f85d08631ab6d5eb30cc7449016a7a49033da06fcf6",
+      "size": 612
+    },
+    "layers": [
+      {
+        "mediaType": "application/vnd.agentpackage.skill.payload.v1.tar+gzip",
+        "digest": "sha256:cf60a2eac81585bd6ddcae6bf856c4be993e514e46c922fa48e45297e869ce07",
+        "size": 512
+      }
+    ],
+    "annotations": {
+      "org.opencontainers.image.title": "Case Triage",
+      "org.opencontainers.image.version": "1.2.3",
+      "org.opencontainers.image.source": "https://example.invalid/team/case-triage",
+      "org.opencontainers.image.revision": "4b1d0c2e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c",
+      "org.opencontainers.image.licenses": "Apache-2.0"
+    }
+  },
+  "config": {
+    "schemaVersion": "agent.package/v1",
+    "payload": {
+      "id": "case-triage",
+      "kind": "agent-skill",
+      "spec": "https://agentskills.io/specification",
+      "specVersion": "unversioned",
+      "root": "payload"
+    },
+    "files": [
+      {
+        "path": "payload/SKILL.md",
+        "digest": "sha256:f5cb7e484111c9feb098f38d08e469c866a51fdf436d018120f2a034a897c347"
+      },
+      {
+        "path": "payload/references/policy.md",
+        "digest": "sha256:16ab2ccfb4b5a7d0e7db3e8bfa5d769807ae95616c2853271be2aedcbbb11ba3"
+      },
+      {
+        "path": "payload/scripts/analyze.py",
+        "digest": "sha256:2630b3e6646cf6d7fbaba9e032db715b195899975227517f998b32235dca1f4c",
+        "executable": false
+      }
+    ],
+    "annotations": {},
+    "extensions": {}
+  },
+  "observation": {
+    "note": "Facts a materialization owner would report; no archive was read or extracted.",
+    "manifest_digest": "sha256:952a2129f192925a5b5c741837895767f2bcc06a56dd2d4247a3cad648b52a21",
+    "config_digest": "sha256:d0ed99a81d070f9df4342f85d08631ab6d5eb30cc7449016a7a49033da06fcf6",
+    "layer_digest": "sha256:cf60a2eac81585bd6ddcae6bf856c4be993e514e46c922fa48e45297e869ce07",
+    "layer_bytes": 512,
+    "expanded_bytes": 222,
+    "entries": [
+      { "path": "payload", "kind": "directory" },
+      { "path": "payload/SKILL.md", "kind": "regular", "executable": false, "sha256": "sha256:f5cb7e484111c9feb098f38d08e469c866a51fdf436d018120f2a034a897c347", "content": "---\nname: case-triage\ndescription: Triage support cases using the reviewed procedure.\n---\n\n# Case triage\n\nRead references/policy.md before answering.\n" },
+      { "path": "payload/references", "kind": "directory" },
+      { "path": "payload/references/policy.md", "kind": "regular", "executable": false, "sha256": "sha256:16ab2ccfb4b5a7d0e7db3e8bfa5d769807ae95616c2853271be2aedcbbb11ba3", "content": "# Policy\n\nEscalate unknown cases.\n" },
+      { "path": "payload/scripts", "kind": "directory" },
+      { "path": "payload/scripts/analyze.py", "kind": "regular", "executable": false, "sha256": "sha256:2630b3e6646cf6d7fbaba9e032db715b195899975227517f998b32235dca1f4c", "content": "print('fixture only; never executed')\n" }
+    ]
+  }
+}

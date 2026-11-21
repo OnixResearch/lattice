@@ -10,6 +10,9 @@ session seam into `implementation-attempt` and publishes the lifecycle in
 [worker inventory v3](worker-inventory.md#revision-slots) (section 6). The
 change package is `.cairn/changes/manage-agent-revisions/`; inventory
 publication is `.cairn/changes/publish-worker-inventory-v3/`.
+[Workflow-agent revisions](#workflow-agent-revisions) bind a compiled
+workflow-intent plan and an agent revision into one lifecycle revision
+(`.cairn/changes/bind-workflow-agent-revisions/`).
 
 ## Identities
 
@@ -398,6 +401,127 @@ The seam contract the shell follows, for other embedders:
 - `seam::retained(store, request, session, admission, permit)` decides
   whether a closed session's retained output may still be published, from
   the pin the embedder recorded.
+
+## Workflow-agent revisions
+
+A Cairn campaign runs a compiled workflow-intent plan with an agent profile.
+A `lattice.workflow-agent-bundle.v1` bundle binds the two into one immutable
+revision, so the plan and the worker are prepared, qualified, promoted,
+pinned and rolled back together. This is the fixture-level part of the
+issue's "Pin compiled workflow and agent revisions to Cairn campaigns"; the
+change package is `.cairn/changes/bind-workflow-agent-revisions/`.
+
+### Bundle
+
+The bundle is an ordinary lifecycle bundle whose `workflow` field holds the
+binding. A plain agent bundle omits the field, so its bytes and identity are
+unchanged.
+
+| Field | Source |
+|---|---|
+| `name` | The operator's name for the pairing |
+| `plan.schema`, `plan.compiler_revision` | `lattice.workflow-intent-plan.v1`, `lattice.workflow-intent-compiler.v1` |
+| `plan.compiler_artifact_identity` | The measured compiler executable named by the intent |
+| `plan.identity` | The `b3:` plan identity |
+| `plan.graph_identity` | The Choregraph machine identity, spelled `blake3:<hex>` |
+| `plan.runtime_profile_identity` | The intent's default runtime profile |
+| `plan.cohort` | Producer, selection, obligations, profile, context, source, policy and dependency identities, as the intent carries them |
+| `plan.obligations` | Per obligation, sorted by identifier: obligation, guidance and remaining-condition identities |
+| `worker` | The worker bundle's definition, name, bare profile revision and `lattice-agent-bundle-v1` identity |
+
+| Identity | Spelling | Framing |
+|---|---|---|
+| Definition | `blake3:<hex>` | `lattice-workflow-agent-definition-v1` over the name and the worker definition; never a worker definition |
+| Revision | bare 64 lowercase hex | `lattice-workflow-agent-revision-v1` over the canonical binding |
+
+The worker's own fields (adapter, protocol, executable, compute, task
+families, tools, routes) stay in the bundle. Validation rebuilds the worker
+bundle and compares its identity with the binding's, and checks the
+definition, name and revision the binding frames. Any disagreement is
+`malformed`. A changed plan, prompt (obligation guidance), requirement,
+policy, compiler, tool, executable or route is a new revision of the same
+definition; a new task prompt is per-attempt and changes nothing.
+
+```console
+lattice agent-revision resolve-workflow --request REQUEST --intent INTENT --name verify-change
+lattice agent-revision desire-workflow --request REQUEST --intent INTENT --name verify-change --store DB
+```
+
+`INTENT` is a `lattice.workflow-intent.v1` compile request whose compiler
+artifact is the running executable (see
+[workflow intent](workflow-intent.md)); another executable is refused, never
+rebound. `resolve-workflow` writes nothing. `desire-workflow` opens the store
+only after composition succeeds. `prepare`, `promote`, `rollback`, `revoke`,
+`cleanup` and `inspect` take the workflow-agent definition and revision like
+any other.
+
+### Lifecycle
+
+The existing transitions apply unchanged: a failed R2 leaves R1 last usable
+and selected, a late R2 result is recorded as superseded and never replaces
+R3 or the rollout generation, promotion is explicit, pins never move, and
+rollback changes only the selection for new sessions. The qualification
+query names the bundle's own definition and revision, so an attachment for
+another plan with the same worker, or for the worker alone, is
+`not_qualified` / `subject_mismatch`. A positive prior evaluation never
+approves a different workflow intent.
+
+### Adaptations
+
+`workflow::adaptation::propose(active, proposed)` describes a proposed
+adaptation of one definition as `lattice.workflow-agent-proposal.v1`:
+
+```json
+{"outcome":"adaptation","schema":"lattice.workflow-agent-proposal.v1","definition":"blake3:<hex>","active_revision":"<64 hex>","proposed_revision":"<64 hex>","changes":["plan","prompt"],"applicability":{"decision":"unknown","owners":["cairn#14","kiln#83"]}}
+```
+
+Changes are `compiler`, `plan`, `graph`, `selection`, `requirements`,
+`prompt`, `context`, `policy`, `runtime_profile`, `worker_revision`,
+`executable`, `tools`, `model_route`, `compute`, `task_families` and
+`protocol`. Cairn #14 and Kiln #83 own the applicability decision; the type
+admits only `unknown`, and decoding any other decision fails. An identical
+bundle is `unchanged`, another definition `definition_mismatch`. A proposal
+changes no lifecycle; it reaches new sessions only through desire,
+preparation, qualification and promotion under its own revision.
+
+### Inspection and the Kiln #84 projection
+
+`inspect` adds `workflow_slots` (`lattice.workflow-agent-revision-slots.v1`)
+for a workflow-agent lifecycle and omits it otherwise. The pure function is
+`lattice_core::agent_revision::workflow::publication::slots(lifecycle)`.
+Kiln #84 would read, for `desired`, `last_usable`,
+`selected_for_new_sessions.bundle` and each `pinned[].bundle`:
+
+| Field | Meaning |
+|---|---|
+| `revision` | The workflow-agent revision |
+| `workflow.compiler_revision`, `workflow.compiler_artifact_identity` | The compiler |
+| `workflow.plan_identity`, `workflow.graph_identity` | The compiled plan and its graph |
+| `workflow.selection_identity`, `workflow.obligations_identity`, `workflow.policy_identity` | The Cairn cohort |
+| `worker.definition`, `worker.definition_name`, `worker.revision`, `worker.bundle_identity` | The worker revision |
+
+plus `selected_for_new_sessions.{rollout_generation, kind, qualification_ref}`
+and `pinned[].{session, status, is_blocked}`. Guidance, context, source and
+per-obligation identities are not projected. A referenced revision that is
+missing or not a workflow-agent bundle refuses the projection. Publication to
+Kiln is later work; nothing is sent.
+
+### Attempt seam
+
+`implementation-attempt` does not name a workflow-agent bundle yet. The
+pure check an attempt will use is
+`workflow::check_attempt(bundle, profile_revision)`: the attempt's profile
+revision must be the worker revision the bundle binds
+(`revision_not_selected` otherwise). Wiring it needs an optional request
+field naming the workflow-agent definition and revision, so `seam::admit`
+pins that revision after the check.
+
+Non-claims: the plans and workers are fixtures, Cairn #14 supplies no
+producer cohort yet, and no workflow-agent revision has been prepared,
+qualified or run live.
+
+An inert comparison of the NVIDIA agent-package draft with these identities
+is in [agent-package-comparison.md](agent-package-comparison.md).
 
 ## Owners and non-claims
 

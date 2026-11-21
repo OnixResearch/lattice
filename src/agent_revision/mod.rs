@@ -19,6 +19,7 @@
 
 pub mod bundle;
 mod commands;
+pub mod composite;
 mod decisions;
 mod port;
 pub mod seam;
@@ -142,6 +143,32 @@ pub enum Command {
         #[arg(long)]
         definition: String,
     },
+    /// Print the inert workflow-agent bundle that pairs a compiled workflow
+    /// intent with a request's worker revision.
+    ResolveWorkflow(WorkflowArgs),
+    /// Record a workflow-agent bundle as its definition's desired revision.
+    DesireWorkflow {
+        #[command(flatten)]
+        workflow: WorkflowArgs,
+        #[arg(long)]
+        store: std::path::PathBuf,
+    },
+}
+
+/// One workflow-agent pairing: an exported implementation-attempt request
+/// for the worker and a typed workflow intent naming this compiler.
+#[derive(clap::Args, Debug)]
+pub struct WorkflowArgs {
+    #[arg(long)]
+    pub request: std::path::PathBuf,
+    /// A `lattice.workflow-intent.v1` compile request whose compiler artifact
+    /// is this executable.
+    #[arg(long)]
+    pub intent: std::path::PathBuf,
+    /// The pairing's name; with the worker definition it names the
+    /// workflow-agent definition.
+    #[arg(long)]
+    pub name: String,
 }
 
 #[derive(clap::Args, Debug)]

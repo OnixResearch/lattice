@@ -1,0 +1,22 @@
+## Phase 1: Workflow-agent bundle core
+
+- [x] [serial] 1.1 Add `crates/lattice-core/src/agent_revision/workflow/mod.rs` with the binding, the `lattice-workflow-agent-definition-v1` and `lattice-workflow-agent-revision-v1` identities in `identity.rs`, `compose`, `validate` (rebuilding the worker bundle), `binding` and `check_attempt`, and the optional `workflow` field in `facts.rs` that plain bundles omit. Tests: `tests/test_agent_revision_workflow.rs` (`the_bundle_binds_the_plan_and_the_worker_revision`, `a_bundle_that_disagrees_with_its_binding_is_refused`, `an_attempt_runs_only_the_bound_worker_revision`, `fixture_identities_are_stable_and_recorded`). r[lattice.agent_revisions.workflow] r[lattice.agent_revisions.workflow.scenario.identity] r[lattice.agent_revisions.workflow.attempt]
+- [x] [serial] 1.2 Exercise the existing lifecycle with workflow-agent bundles: failed R2, promoted R3, late R2, rollback, and qualification for another intent or the worker alone. Tests: `tests/test_agent_revision_workflow.rs` (`a_failed_r2_leaves_r1_usable_and_promoted_r3_serves_new_sessions`, `a_late_r2_result_cannot_override_r3`, `a_positive_prior_evaluation_does_not_approve_another_intent`). r[lattice.agent_revisions.workflow.scenario.lifecycle] r[lattice.agent_revisions.workflow.scenario.evaluation]
+- [x] [serial] 1.3 Add `workflow/adaptation.rs` (`propose`, closed `Change` list, applicability fixed to `unknown` with owners `cairn#14` and `kiln#83`). Tests: `an_adaptation_gets_a_new_identity_and_never_mutates_an_active_pin`, `a_proposal_is_refused_or_unchanged_outside_one_definition`. r[lattice.agent_revisions.workflow.adaptation] r[lattice.agent_revisions.workflow.adaptation.scenario.pinned]
+- [x] [serial] 1.4 Add `workflow/publication.rs` (`lattice.workflow-agent-revision-slots.v1` for Kiln #84). Tests: `the_kiln_projection_keeps_workflow_and_worker_revisions_apart`, `the_projection_is_absent_for_plain_lifecycles_and_refuses_inconsistency`. r[lattice.agent_revisions.workflow.projection]
+
+## Phase 2: Shell
+
+- [x] [serial] 2.1 Add `src/agent_revision/composite.rs` with `resolve-workflow`, `desire-workflow` (store opened only after composition) and `workflow_slots` in `inspect`; expose the compiled plan's schema, compiler revision, graph identity and facts, and make the intent loader visible in the crate. Tests: `tests/test_agent_revision_shell.rs` (`a_compiled_plan_and_a_request_compose_an_inspectable_workflow_agent_bundle`, `workflow_commands_refuse_an_intent_for_another_compiler_and_write_nothing`). r[lattice.agent_revisions.workflow.inspect]
+
+## Phase 3: OCI package comparison
+
+- [x] [serial] 3.1 Add the inert fixtures `tests/fixtures/agent-package/{skill,plugin,negative-cases}.json` and the harness `tests/test_agent_package_comparison.rs`: comparison findings, identity mapping, 31 negative cases, and the payload-change, relocation, revocation and rollback cases through the existing lifecycle, with the golden report `comparison-report.json`. r[lattice.agent_revisions.package_comparison] r[lattice.agent_revisions.package_comparison.scenario.mapping] r[lattice.agent_revisions.package_comparison.scenario.mismatch] r[lattice.agent_revisions.package_comparison.scenario.lifecycle]
+- [x] [serial] 3.2 Publish the decision `docs/agent-package-comparison.md`: useful mapping, adoption deferred. r[lattice.agent_revisions.package_comparison]
+
+## Phase 4: Documentation and evidence
+
+- [x] [serial] 4.1 Document workflow-agent revisions, the adaptation proposal, the Kiln #84 fields and the attempt seam in `docs/agent-revisions.md`, and add the changelog entries. r[lattice.agent_revisions.workflow]
+- [x] [serial] 4.2 Run the focused tests, fmt, `scripts/check.rs` (including clippy), `octet-precommit-check` and `cairn validate` with the change gates, and record the results in `evidence/fixture-comparison.json`. r[lattice.agent_revisions.workflow]
+
+Only checked tasks are complete.

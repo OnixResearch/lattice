@@ -110,6 +110,18 @@ impl CompiledPlan {
     pub fn graph(&self) -> &choregraph_kamacite::concrete::record::ConcreteMachineDescriptorV2 {
         &self.graph
     }
+    pub fn schema(&self) -> &'static str {
+        self.schema
+    }
+    pub fn compiler_revision(&self) -> &'static str {
+        self.compiler_revision
+    }
+    pub fn graph_identity(&self) -> &choregraph_kamacite::identity::ArtifactIdentity {
+        &self.graph_identity
+    }
+    pub fn facts(&self) -> &CompilerFacts {
+        &self.facts
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]

@@ -106,6 +106,8 @@ pub(super) fn execute(command: &super::Command, ports: super::Ports<'_>) -> Resu
         } => admit(request, &open(store)?, session),
         super::Command::Cleanup { store, definition } => cleanup(&open(store)?, definition, ports.preparation),
         super::Command::Inspect { store, definition } => inspect(store, definition),
+        super::Command::ResolveWorkflow(workflow) => super::composite::resolve_command(workflow),
+        super::Command::DesireWorkflow { workflow, store } => super::composite::desire_command(workflow, store),
     }?;
     debug_assert_eq!(document["schema"], OUTCOME_SCHEMA);
     debug_assert!(document.get("command").is_some());
@@ -267,7 +269,8 @@ fn inspect(path: &std::path::Path, definition: &str) -> Result<Value, String> {
             (revision.clone(), reasons)
         })
         .collect::<std::collections::BTreeMap<_, _>>();
-    let outcome = serde_json::json!({
+    let workflow_slots = super::composite::slots(&lifecycle)?;
+    let mut outcome = serde_json::json!({
         "managed": true,
         "version": version,
         "slots": lattice_core::agent_revision::projection::slots(&lifecycle),
@@ -275,5 +278,8 @@ fn inspect(path: &std::path::Path, definition: &str) -> Result<Value, String> {
         "cleanup_plan": lattice_core::agent_revision::ops::retention::plan(&lifecycle),
         "lifecycle": lifecycle,
     });
+    if let Some(slots) = workflow_slots {
+        outcome["workflow_slots"] = slots;
+    }
     Ok(document(header, Ok(outcome)))
 }

@@ -25,6 +25,7 @@ pub mod ops;
 pub mod ports;
 pub mod projection;
 pub mod state;
+pub mod workflow;
 
 /// Owner of qualification attachments.
 pub const QUALIFICATION_OWNER: &str = "animus#18";

@@ -1,0 +1,87 @@
+{
+  "schema": "lattice.agent-package-comparison-fixture.v1",
+  "claim": "draft_schema_fixture_comparison_not_materialization",
+  "draft": {
+    "source": "https://github.com/NVIDIA/agent-package-spec",
+    "revision": "697872570744c8cfc1cf6b1d72e04db66e1a2c83",
+    "status": "community_review_draft"
+  },
+  "location": {
+    "registry": "registry.invalid",
+    "repository": "agents/support-operations",
+    "tag": "0.3.0"
+  },
+  "resolved_manifest_digest": "sha256:ba189f3269e406aa69242635af6055b988067689fec2329911f0528c0a7099f3",
+  "manifest": {
+    "schemaVersion": 2,
+    "mediaType": "application/vnd.oci.image.manifest.v1+json",
+    "artifactType": "application/vnd.agentpackage.plugin.v1",
+    "config": {
+      "mediaType": "application/vnd.agentpackage.config.v1+json",
+      "digest": "sha256:0001fd34fd1f1ced2fe5ead7c62cd8305c5459d7573e400085be6902e31a4c6a",
+      "size": 884
+    },
+    "layers": [
+      {
+        "mediaType": "application/vnd.agentpackage.plugin.payload.v1.tar+gzip",
+        "digest": "sha256:543b0326265b2554e1e9e5c6be63aab43663b6ac1c3eb35b2817adae18ff3529",
+        "size": 640
+      }
+    ],
+    "annotations": {
+      "org.opencontainers.image.title": "Support Operations",
+      "org.opencontainers.image.version": "0.3.0",
+      "org.opencontainers.image.source": "https://example.invalid/team/support-operations",
+      "org.opencontainers.image.revision": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d",
+      "org.opencontainers.image.licenses": "Apache-2.0"
+    }
+  },
+  "config": {
+    "schemaVersion": "agent.package/v1",
+    "payload": {
+      "id": "support-operations",
+      "kind": "agent-plugin",
+      "spec": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+      "specVersion": "1.0.0",
+      "root": "payload"
+    },
+    "files": [
+      {
+        "path": "payload/mcp.json",
+        "digest": "sha256:e93fc8db2b1bd77107fe6c758bca9545fa864cf7cce8ab93a7b2b93a1d566a7b"
+      },
+      {
+        "path": "payload/plugin.json",
+        "digest": "sha256:6aef2813d74ca519bf62628af512f48148144a49edb97c247df0f3da2670f0d3"
+      },
+      {
+        "path": "payload/skills/case-triage/SKILL.md",
+        "digest": "sha256:f5cb7e484111c9feb098f38d08e469c866a51fdf436d018120f2a034a897c347"
+      },
+      {
+        "path": "payload/skills/customer-summary/SKILL.md",
+        "digest": "sha256:2794f8f2a2a24e74943a46fb7b25babfee72909cd94623d42113c5dccd9e1088"
+      }
+    ],
+    "annotations": {},
+    "extensions": {}
+  },
+  "observation": {
+    "note": "Facts a materialization owner would report; no archive was read or extracted.",
+    "manifest_digest": "sha256:ba189f3269e406aa69242635af6055b988067689fec2329911f0528c0a7099f3",
+    "config_digest": "sha256:0001fd34fd1f1ced2fe5ead7c62cd8305c5459d7573e400085be6902e31a4c6a",
+    "layer_digest": "sha256:543b0326265b2554e1e9e5c6be63aab43663b6ac1c3eb35b2817adae18ff3529",
+    "layer_bytes": 640,
+    "expanded_bytes": 326,
+    "entries": [
+      { "path": "payload", "kind": "directory" },
+      { "path": "payload/mcp.json", "kind": "regular", "executable": false, "sha256": "sha256:e93fc8db2b1bd77107fe6c758bca9545fa864cf7cce8ab93a7b2b93a1d566a7b", "content": "{\"mcpServers\":{}}\n" },
+      { "path": "payload/plugin.json", "kind": "regular", "executable": false, "sha256": "sha256:6aef2813d74ca519bf62628af512f48148144a49edb97c247df0f3da2670f0d3", "content": "{\"name\":\"support-operations\",\"version\":\"0.3.0\",\"skills\":\"skills/\"}\n" },
+      { "path": "payload/skills", "kind": "directory" },
+      { "path": "payload/skills/case-triage", "kind": "directory" },
+      { "path": "payload/skills/case-triage/SKILL.md", "kind": "regular", "executable": false, "sha256": "sha256:f5cb7e484111c9feb098f38d08e469c866a51fdf436d018120f2a034a897c347", "content": "---\nname: case-triage\ndescription: Triage support cases using the reviewed procedure.\n---\n\n# Case triage\n\nRead references/policy.md before answering.\n" },
+      { "path": "payload/skills/customer-summary", "kind": "directory" },
+      { "path": "payload/skills/customer-summary/SKILL.md", "kind": "regular", "executable": false, "sha256": "sha256:2794f8f2a2a24e74943a46fb7b25babfee72909cd94623d42113c5dccd9e1088", "content": "---\nname: customer-summary\ndescription: Summarize a customer case.\n---\n\n# Customer summary\n" }
+    ]
+  }
+}

@@ -1,0 +1,232 @@
+{
+  "claim": "draft_schema_fixture_comparison_not_materialization",
+  "decision": "useful_mapping_adoption_deferred",
+  "draft": {
+    "revision": "697872570744c8cfc1cf6b1d72e04db66e1a2c83",
+    "source": "https://github.com/NVIDIA/agent-package-spec",
+    "status": "community_review_draft"
+  },
+  "live_interoperability": false,
+  "negative_cases": {
+    "absolute_path": [
+      "unsafe_path"
+    ],
+    "artifact_type_kind_mismatch": [
+      "kind_mismatch",
+      "layer_media_type_mismatch"
+    ],
+    "backslash": [
+      "unsafe_path"
+    ],
+    "block_device": [
+      "special_file"
+    ],
+    "case_folding_collision": [
+      "extra_file",
+      "path_collision"
+    ],
+    "changed_bundled_skill": [
+      "changed_file"
+    ],
+    "changed_file": [
+      "changed_file"
+    ],
+    "character_device": [
+      "special_file"
+    ],
+    "config_digest": [
+      "config_digest_mismatch"
+    ],
+    "dot_component": [
+      "unsafe_path"
+    ],
+    "drive_prefix": [
+      "unsafe_path"
+    ],
+    "duplicate_archive_entry": [
+      "duplicate_entry"
+    ],
+    "duplicate_inventory_path": [
+      "duplicate_inventory_path"
+    ],
+    "empty_component": [
+      "unsafe_path"
+    ],
+    "entry_count": [
+      "entry_count_exceeded"
+    ],
+    "executable_mode": [
+      "executable_mismatch"
+    ],
+    "expanded_bytes": [
+      "expanded_bytes_exceeded",
+      "expansion_ratio_exceeded"
+    ],
+    "expansion_ratio": [
+      "expansion_ratio_exceeded"
+    ],
+    "extra_file": [
+      "extra_file"
+    ],
+    "fifo": [
+      "special_file"
+    ],
+    "hard_link": [
+      "hard_link"
+    ],
+    "layer_digest": [
+      "layer_digest_mismatch"
+    ],
+    "layer_media_type": [
+      "layer_media_type_mismatch"
+    ],
+    "manifest_digest": [
+      "manifest_digest_mismatch"
+    ],
+    "missing_file": [
+      "missing_file"
+    ],
+    "nul_byte": [
+      "unsafe_path"
+    ],
+    "outside_payload_root": [
+      "unsafe_path"
+    ],
+    "parent_traversal": [
+      "unsafe_path"
+    ],
+    "second_layer": [
+      "layer_count"
+    ],
+    "socket": [
+      "special_file"
+    ],
+    "symlink": [
+      "symlink"
+    ]
+  },
+  "packages": {
+    "plugin": {
+      "findings": [],
+      "lifecycle": {
+        "bundle_identity": "blake3:bb3356a35b38aab4ca11bc21342183393ea890a673c206899b4c9e019e5763bd",
+        "definition": "blake3:bbe083a376aa514909d313bfb0c0278f0c1a65d3a25639e2263bab7317ee5dc1",
+        "revision": "fcbd229bbc84a7f81873ce3de335fa638e99d1fe8e4694fea9792ed473b7094a"
+      },
+      "mapping": {
+        "dependency_closure": {
+          "closure": {
+            "bundled_skills": [
+              {
+                "id": "case-triage",
+                "skill_md": "blake3:e745476aafc72a42586dbcbb55b1a083b4fbb91f5964d3ff5631f6226f3a76aa"
+              },
+              {
+                "id": "customer-summary",
+                "skill_md": "blake3:8a70117e63a8e641e16e47b057f7fe71740d4996114865fbc9db4503e84a1bf0"
+              }
+            ],
+            "external": []
+          },
+          "composition_by_reference": "unsupported",
+          "identity": "blake3:ff9dd531f44a5d070ce14b53f7d095cf88534ca8a9c4dc58f55cbdd0e51764ab"
+        },
+        "evidence_subject": "blake3:fcbd229bbc84a7f81873ce3de335fa638e99d1fe8e4694fea9792ed473b7094a",
+        "excluded_from_identity": [
+          "registry",
+          "repository",
+          "tag",
+          "org.opencontainers.image.version"
+        ],
+        "file_identities": [
+          {
+            "blake3": "blake3:de76b5fc5d4e29af273ca139d6475480e30d398da7da5040f936aad0988b2ab3",
+            "executable": false,
+            "path": "mcp.json"
+          },
+          {
+            "blake3": "blake3:1be5920717eb02ce35c5254f7ba05f5f7c8a797b8d982a10876b936c00487101",
+            "executable": false,
+            "path": "plugin.json"
+          },
+          {
+            "blake3": "blake3:e745476aafc72a42586dbcbb55b1a083b4fbb91f5964d3ff5631f6226f3a76aa",
+            "executable": false,
+            "path": "skills/case-triage/SKILL.md"
+          },
+          {
+            "blake3": "blake3:8a70117e63a8e641e16e47b057f7fe71740d4996114865fbc9db4503e84a1bf0",
+            "executable": false,
+            "path": "skills/customer-summary/SKILL.md"
+          }
+        ],
+        "inventory_identity": "blake3:b7654d8e39d59808fb035afff9da5ce4208948802e6752a27637095d1fe2dd0a",
+        "materialized_identity": "blake3:74529d75db896a09c2c127f657adde1b0944fd57b9c54eabc01807d3ce99e014",
+        "provider_native": {
+          "algorithm": "sha256",
+          "config_digest": "sha256:0001fd34fd1f1ced2fe5ead7c62cd8305c5459d7573e400085be6902e31a4c6a",
+          "file_digests": 4,
+          "layer_bytes": 640,
+          "layer_digest": "sha256:543b0326265b2554e1e9e5c6be63aab43663b6ac1c3eb35b2817adae18ff3529",
+          "manifest_digest": "sha256:ba189f3269e406aa69242635af6055b988067689fec2329911f0528c0a7099f3"
+        },
+        "source_revision": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d"
+      }
+    },
+    "skill": {
+      "findings": [],
+      "lifecycle": {
+        "bundle_identity": "blake3:b63cf36cfc85ca069a9eff63d23dffabc550eea229d1cebbaa02a373a4f9eafc",
+        "definition": "blake3:929467ff23e4857a6bdf297b25bfe66dcb48a2a689cbc0aa94d2212ab7f0bfdf",
+        "revision": "f47812209c50f0d5187d70e02d760717a1f2a17701508a7564e480f862ecf591"
+      },
+      "mapping": {
+        "dependency_closure": {
+          "closure": {
+            "bundled_skills": [],
+            "external": []
+          },
+          "composition_by_reference": "unsupported",
+          "identity": "blake3:7ff296d2950c38ca5a841a5b71553c758e496718a0cc2939fb5d1dc83d5e342a"
+        },
+        "evidence_subject": "blake3:f47812209c50f0d5187d70e02d760717a1f2a17701508a7564e480f862ecf591",
+        "excluded_from_identity": [
+          "registry",
+          "repository",
+          "tag",
+          "org.opencontainers.image.version"
+        ],
+        "file_identities": [
+          {
+            "blake3": "blake3:e745476aafc72a42586dbcbb55b1a083b4fbb91f5964d3ff5631f6226f3a76aa",
+            "executable": false,
+            "path": "SKILL.md"
+          },
+          {
+            "blake3": "blake3:675e5725a7308191557706b02a0b1e8056ae729332c04ac72e8ddfa79d254706",
+            "executable": false,
+            "path": "references/policy.md"
+          },
+          {
+            "blake3": "blake3:81ce90e1c3ab9132685e97c6a6e89c1971170461aeb88665281b9f0613a5a766",
+            "executable": false,
+            "path": "scripts/analyze.py"
+          }
+        ],
+        "inventory_identity": "blake3:4136b99ec8b16f625f249e92138a6d27c2491a479a7f2c5b36a32398cace2cf7",
+        "materialized_identity": "blake3:b0ca59034fe64ad88137dc8dc8a303cb4b1146b3699b74e886638fe1bd26e295",
+        "provider_native": {
+          "algorithm": "sha256",
+          "config_digest": "sha256:d0ed99a81d070f9df4342f85d08631ab6d5eb30cc7449016a7a49033da06fcf6",
+          "file_digests": 3,
+          "layer_bytes": 512,
+          "layer_digest": "sha256:cf60a2eac81585bd6ddcae6bf856c4be993e514e46c922fa48e45297e869ce07",
+          "manifest_digest": "sha256:952a2129f192925a5b5c741837895767f2bcc06a56dd2d4247a3cad648b52a21"
+        },
+        "source_revision": "4b1d0c2e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c"
+      }
+    }
+  },
+  "republished_skill_revision": "62dc80cabc624e5bc51e90f54e9bd5212f9d377477e82c6187d8e6b1e94ade3a",
+  "schema": "lattice.agent-package-comparison-report.v1"
+}

@@ -8,6 +8,8 @@ pub const PREPARATION_DOMAIN: &str = "lattice-agent-revision-preparation-v1";
 pub const POLICY_DOMAIN: &str = "lattice-agent-revision-promotion-policy-v1";
 pub const PROMOTION_DOMAIN: &str = "lattice-agent-revision-promotion-v1";
 pub const PIN_DOMAIN: &str = "lattice-agent-revision-session-pin-v1";
+pub const PAIRING_DOMAIN: &str = "lattice-workflow-agent-definition-v1";
+pub const COMPOSITE_DOMAIN: &str = "lattice-workflow-agent-revision-v1";
 
 /// Framing failed; only a malformed domain or oversized part can cause it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,6 +29,26 @@ pub fn bundle(canonical: &[u8]) -> Result<String, Unframed> {
     let mut hasher = hasher(BUNDLE_DOMAIN)?;
     hasher.update_hashed_part(b"bundle", canonical);
     Ok(finish(hasher))
+}
+
+/// Definition identity of one workflow and worker pairing: its name and the
+/// worker definition. Stable across plan and worker revisions.
+pub fn pairing(binding: &super::workflow::Binding) -> Result<String, Unframed> {
+    let mut hasher = hasher(PAIRING_DOMAIN)?;
+    hasher
+        .update_tagged_str(b"name", &binding.name)
+        .map_err(|_| Unframed)?
+        .update_tagged_str(b"worker-definition", &binding.worker.definition)
+        .map_err(|_| Unframed)?;
+    Ok(finish(hasher))
+}
+
+/// Bare-hex revision of one workflow-agent binding over its canonical JSON
+/// bytes, spelled like a profile revision so the lifecycle keys it the same.
+pub fn composite(canonical: &[u8]) -> Result<String, Unframed> {
+    let mut hasher = hasher(COMPOSITE_DOMAIN)?;
+    hasher.update_hashed_part(b"binding", canonical);
+    Ok(hasher.finish().to_hex().to_string())
 }
 
 /// Identity of one preparation attempt: definition, revision and the

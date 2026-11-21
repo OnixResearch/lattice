@@ -39,7 +39,9 @@ pub fn run(args: &Args) -> Result<(), String> {
     serde_json::to_writer_pretty(std::io::stdout().lock(), &value).map_err(|_| "output unavailable".to_string())
 }
 
-fn load(path: &std::path::Path) -> Result<super::CompileRequest, String> {
+/// Read a bounded typed intent and refuse it unless it names this exact
+/// compiler executable.
+pub(crate) fn load(path: &std::path::Path) -> Result<super::CompileRequest, String> {
     let file = std::fs::File::open(path).map_err(|_| "intent input unavailable")?;
     let mut bytes = Vec::new();
     let read_limit_bytes = super::MAX_INPUT_BYTES

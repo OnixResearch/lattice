@@ -44,6 +44,7 @@ fn bundle(revision: &str) -> lattice_core::agent_revision::facts::Bundle {
             weight_identity: lattice_core::agent_revision::facts::Unexposed::Unknown,
             model_version: lattice_core::agent_revision::facts::Unexposed::Unknown,
         }],
+        workflow: None,
     }
 }
 
