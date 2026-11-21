@@ -15,6 +15,6 @@
 
 ## Phase 4: Verification
 
-- [x] [serial] 4.1 Run the focused tests, `cargo test -p lattice --lib -- implementation_attempt`, the execution-binding and agent-revision suites, clippy `-D warnings`, fmt, `cairn validate` and the change gates, `octet-precommit-check` and `scripts/check.rs`, and record the actual results in `evidence/fixture-qualification.json` (`checks`; `nix flake check` of the integration commit is recorded there as pending, with an earlier unpublished candidate's passing run as history). r[lattice.worker_inventory.schema] r[lattice.worker_inventory.captures.scenario.fixture]
+- [x] [serial] 4.1 Run the focused tests, `cargo test -p lattice --lib -- implementation_attempt`, the execution-binding and agent-revision suites, clippy `-D warnings`, fmt, `cairn validate` and the change gates, `octet-precommit-check` and `scripts/check.rs`, and record the actual results in `evidence/fixture-qualification.json` (`checks`; `nix flake check` passed on the integration commit `ed51aee2` with nextest 1701 passed and 63 skipped, and an earlier unpublished candidate's runs are kept as history). r[lattice.worker_inventory.schema] r[lattice.worker_inventory.captures.scenario.fixture]
 
 Only checked tasks are complete.

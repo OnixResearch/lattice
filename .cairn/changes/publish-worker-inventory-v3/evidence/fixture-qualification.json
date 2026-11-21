@@ -6,7 +6,7 @@
   "live_worker_exercised": false,
   "evidence_label": "fixture",
   "base_revision": "9a74e7ef1da4e0ca7610dce0db039b3825a7154d",
-  "integration_head": "the integration commit on lattice-rewrite, on top of 4f9b76da",
+  "integration_head": "ed51aee274d7f4ffe8cb390fbcb313bb0c91e6d1",
   "consumer": {
     "repository": "kiln",
     "issue": "OnixResearch/kiln#60",
@@ -111,7 +111,7 @@
     "cairn": "cairn validate --root . --policy cairn-policy/generated/cairn-policy.json: exit 0, valid, 61 specs, no issues; proposal, design and tasks gates of publish-worker-inventory-v3, manage-agent-revisions, execute-admitted-implementation-attempt and adopt-animus-qualification-attachments: all 12 PASS",
     "octet": "octet-precommit-check after the parent's re-key: exit 0; root 1052 accepted, 1052 current, 0 new, 0 stale; lattice-core 25/25, 0 new, 0 stale; the re-key replaced only b3:2f535dc7c9bf4d11 with b3:b166871c68ee32c8 (underscore_in_module_filename on src/implementation_attempt.rs)",
     "octet_semantic_delta": "against the 9a74e7ef baselines: root and lattice-core new_semantic=0 resolved_semantic=0",
-    "nix_flake_check": {"status": "pending", "revision": "the integration commit on lattice-rewrite (on top of 4f9b76da)"},
+    "nix_flake_check": {"status": "passed", "revision": "ed51aee274d7f4ffe8cb390fbcb313bb0c91e6d1", "command": "nix flake check git+file://<clone>?rev=ed51aee274d7f4ffe8cb390fbcb313bb0c91e6d1 -L --keep-going --builders '' --option secret-key-files '' --option min-free 0", "exit_code": 0, "nextest": {"run": 1701, "passed": 1701, "skipped": 63}},
     "nix_flake_check_history": [
       {"revision": "earlier unpublished integration candidate", "status": "passed", "exit_code": 0, "nextest": {"run": 1701, "passed": 1701, "skipped": 63}, "note": "full nix flake check passed before the vendored Animus test literal was replaced"},
       {"revision": "earlier unpublished integration candidate", "status": "failed", "failure": "nextest only, on the sandbox-source gap: fixture_identities_are_stable_and_recorded read .cairn/changes, which the Nix check source excludes, and the flake source filter did not admit vendor-cargo-deps/animus/source.ncl; both were fixed before the passing run"}
