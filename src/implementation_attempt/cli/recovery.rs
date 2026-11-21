@@ -106,11 +106,59 @@ pub(super) fn revision_blocked(
     Ok(observation)
 }
 
+const CLOSED_PREFIX: &str = "closed-before-execution:";
+
 /// The exclusive intent content of an attempt that recovery closed before any
 /// execution. It never equals a request identity, so a later run of the same
 /// request cannot create its intent.
 pub(super) fn closed_marker(request_identity: &str) -> String {
-    format!("closed-before-execution:{request_identity}")
+    format!("{CLOSED_PREFIX}{request_identity}")
+}
+
+/// Whether retained intent bytes are a closure marker of any request.
+pub(super) fn is_closed_marker(bytes: &[u8]) -> bool {
+    bytes.starts_with(CLOSED_PREFIX.as_bytes())
+}
+
+/// Recovery with no intent closes the attempt by exclusively creating its
+/// intent path, so a racing or later run of the same request can never create
+/// its own intent. The caller holds the per-work fence lock. Different request
+/// bytes are a typed substitution refusal. `None` means the attempt was
+/// closed before execution; otherwise the admission recorded with the intent
+/// is returned, never re-derived.
+// r[impl lattice.implementation_attempt.consumer.scenario.recovery]
+// r[impl lattice.implementation_attempt.consumer.scenario.fence_lock]
+pub(super) fn reconcile_intent(
+    request: &super::Request,
+    directory: &std::path::Path,
+    identity: &str,
+) -> Result<Option<super::session::intent::Recorded>, String> {
+    let session = super::session::revision::identifier(request);
+    let subject = super::session::intent::Subject {
+        request_identity: identity,
+        session: &session,
+    };
+    let marker = closed_marker(identity);
+    debug_assert_eq!(identity.len(), 64, "the request identity is one BLAKE3 digest");
+    // The marker this recovery may write reads back as a closed attempt.
+    debug_assert_eq!(
+        super::session::intent::classify(marker.as_bytes(), subject),
+        super::session::intent::Record::Closed
+    );
+    let mut retained = super::session::intent::read(directory, subject)?;
+    if retained.is_none() {
+        if super::artifacts::create_new(&directory.join(super::session::intent::FILE), marker.as_bytes())? {
+            return Ok(None);
+        }
+        retained = super::session::intent::read(directory, subject)?;
+    }
+    match retained {
+        Some(super::session::intent::Record::Owned(recorded)) => Ok(Some(recorded)),
+        Some(super::session::intent::Record::Closed) => Ok(None),
+        Some(super::session::intent::Record::Foreign) | None => {
+            Err(super::refusal::refuse(&request.envelope, super::refusal::Reason::SubstitutedRequest))
+        }
+    }
 }
 
 /// Recovery found no intent and closed the attempt: the worker never started

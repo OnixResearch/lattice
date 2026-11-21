@@ -133,6 +133,13 @@ pub(in super::super) fn read(directory: &std::path::Path, subject: Subject<'_>) 
     Ok(bytes.map(|bytes| classify(&bytes, subject)))
 }
 
+/// Whether `directory` retains an execution intent: any intent other than a
+/// recovery closure marker, including one of other request bytes.
+pub(in super::super) fn is_execution_retained(directory: &std::path::Path) -> Result<bool, String> {
+    let bytes = super::super::artifacts::read_optional(&directory.join(FILE), MAX_INTENT_BYTES)?;
+    Ok(bytes.is_some_and(|bytes| !super::super::recovery::is_closed_marker(&bytes)))
+}
+
 #[cfg(test)]
 mod tests {
     // r[verify lattice.implementation_attempt.consumer.scenario.admission_mode]

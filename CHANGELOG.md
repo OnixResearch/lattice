@@ -304,6 +304,18 @@ interfaces.
 
 ### Fixed
 
+- `implementation-attempt run` no longer lets a superseded fence start a worker
+  (Lattice #6, #7). Previously a run checked and recorded its fence, then wrote its
+  execution intent without rechecking. A run that had passed its check could
+  therefore start after a higher fence was recorded, while a later invocation
+  at the lower fence was told `stale_fence` with `dispatched:false`. Now one
+  exclusive per-work `flock` lock inside the state root covers the fence check,
+  the fence record and the intent, which is created only after the fence is
+  rechecked under that lock. The same lock covers each repair step intent,
+  where a superseded fence ends the loop as `fence_superseded`, and recovery's
+  closure marker. `stale_fence` and `crossed_attempt` refusals now read
+  `dispatched` from the attempt's intent store under that lock.
+
 - Bounded local processes whose cancellation flag is already set return the
   existing `Cancelled` outcome without spawning. The pinned bounded-exec runner
   checked the flag only after spawn, so a pre-cancelled command could briefly run.

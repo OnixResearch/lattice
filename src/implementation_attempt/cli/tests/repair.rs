@@ -338,6 +338,53 @@ async fn exhausted_iterations_and_lineage_stop_before_another_spawn() {
 }
 
 #[tokio::test]
+// r[verify lattice.implementation_attempt.consumer.scenario.fence_lock]
+async fn a_newer_fence_stops_the_loop_before_its_next_step_intent() {
+    let fixture = Fixture::new();
+    let request = fixture.request("attempt-superseded", Some(policy()), None);
+    let state = fixture.state.clone();
+    let mut successor = request.envelope.clone();
+    successor.attempt_id = "attempt-successor".into();
+    successor.fence += 1;
+    // The first step fails a repairable check while Kiln's next fence of the
+    // same work is recorded in this state root.
+    let first: Script = Box::new(move |_, workspace, _| {
+        std::fs::write(workspace.join("src/lib.txt"), "still broken").expect("edit");
+        let directory = state.join("successor");
+        drop(super::super::session::fencing::admit(&state, &successor, &directory).expect("fence 8 recorded"));
+        exited()
+    });
+    let (observation, requests, invocations) =
+        scenario(&fixture, &request, vec![first], FixtureChecks::admitted()).await;
+    // A post-dispatch outcome: the retained repair observation of a step that
+    // ran, never a refusal record and never `dispatched:false`.
+    assert_eq!(observation["schema"], "lattice.implementation-attempt-repair-observation.v1");
+    assert_eq!(observation["disposition"], serde_json::json!({"kind": "fence_superseded"}));
+    assert!(observation.get("dispatched").is_none() && observation.get("reason").is_none());
+    assert_eq!((observation["steps"].clone(), requests.len()), (1.into(), 1), "the repair never spawned");
+    assert_eq!(observation["revisions"].as_array().map(Vec::len), Some(1), "the first step's candidate");
+    assert_eq!(invocations.len(), 1);
+    let directory = fixture.directory(&request);
+    assert!(directory.join("repair/step-1.json").exists());
+    assert!(!directory.join("repair/step-2.intent").exists(), "no intent for the superseded step");
+    let path = fixture.write(&request);
+    recover(&path, &fixture.state)
+        .await
+        .expect("recovery reports the retained post-dispatch disposition");
+    // A later fence-7 refusal of this attempt reports that it may have run.
+    let guard =
+        super::super::session::fencing::Guard::acquire(&fixture.state, &request.envelope.work_id).expect("fence lock");
+    let refused = super::super::session::fencing::Refused {
+        reason: super::super::refusal::Reason::StaleFence,
+        dispatched: true,
+    };
+    assert_eq!(
+        guard.record(&request.envelope, &directory),
+        Err(super::super::session::fencing::Error::Refused(refused))
+    );
+}
+
+#[tokio::test]
 async fn cancellation_during_and_between_steps_is_its_own_disposition() {
     let fixture = Fixture::new();
     let request = fixture.request("attempt-cancelled", Some(policy()), None);

@@ -6,7 +6,10 @@
 //! can have started; whenever the attempt directory holds an execution intent
 //! (a substituted or superseded request, or an export refused after the worker
 //! ran) it is `true`, so a coordinator never settles a possibly executed
-//! attempt as refused before any effect.
+//! attempt as refused before any effect. A `stale_fence` or `crossed_attempt`
+//! refusal reads it from the attempt directory under the per-work fence lock
+//! (`session::fencing`), where no run of a superseded attempt can create an
+//! intent afterwards.
 
 // r[impl lattice.implementation_attempt.consumer.scenario.refusal]
 
@@ -83,7 +86,9 @@ impl Reason {
         }
     }
 
-    /// Whether a worker effect of the refused attempt can have started.
+    /// Whether a worker effect of the refused attempt can have started. A
+    /// fence refusal reads it from the intent store instead
+    /// ([`refuse_fence`]).
     const fn could_have_dispatched(self) -> bool {
         match self {
             Self::SubstitutedRequest | Self::ExportRevoked => true,
@@ -107,7 +112,7 @@ pub(super) fn record(
     record_with(envelope, reason, reason.could_have_dispatched())
 }
 
-fn record_with(
+pub(super) fn record_with(
     envelope: &crate::implementation_attempt::ImplementationAttemptEnvelope,
     reason: Reason,
     dispatched: bool,
@@ -127,7 +132,24 @@ pub(super) fn refuse(
     envelope: &crate::implementation_attempt::ImplementationAttemptEnvelope,
     reason: Reason,
 ) -> String {
+    debug_assert!(
+        !matches!(reason, Reason::StaleFence | Reason::CrossedAttempt),
+        "fence refusals read `dispatched` under the fence lock"
+    );
     println!("{}", record(envelope, reason));
+    reason.message().to_owned()
+}
+
+/// Print a `stale_fence` or `crossed_attempt` refusal whose `dispatched` was
+/// read from the refused attempt's intent store under the fence lock, and
+/// return its diagnostic.
+pub(super) fn refuse_fence(
+    envelope: &crate::implementation_attempt::ImplementationAttemptEnvelope,
+    reason: Reason,
+    dispatched: bool,
+) -> String {
+    debug_assert!(matches!(reason, Reason::StaleFence | Reason::CrossedAttempt));
+    println!("{}", record_with(envelope, reason, dispatched));
     reason.message().to_owned()
 }
 

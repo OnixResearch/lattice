@@ -359,10 +359,10 @@ coordinator fields, neither of which is part of the profile revision:
   hex). The exact request bytes bind it, and every observation echoes it.
 
 Before the binding and intent, a run records its attempt at
-`works/<blake3(work_id)>/<fence>` under an exclusive lock. A request whose fence
-is lower than one already recorded for its work, or that names a different
-attempt at a recorded fence, is refused. A request whose bytes differ from an
-existing intent is refused as substituted. Each refusal prints one
+`works/<blake3(work_id)>/<fence>`. A request whose fence is lower than one
+already recorded for its work, or that names a different attempt at a
+recorded fence, is refused. A request whose bytes differ from an existing
+intent is refused as substituted. Each refusal prints one
 `lattice.implementation-attempt-refusal.v1` record and the command exits
 non-zero:
 
@@ -374,12 +374,36 @@ non-zero:
 started, not whether this request dispatched anything. It is `true` whenever
 the attempt directory holds an execution intent other than recovery's closure
 marker, so a coordinator must never settle such an attempt as refused before
-any effect or run it again:
+any effect or run it again.
+
+Fencing is atomic per work item within one state root. Each work's fence
+records live in the directory `works/<blake3(work_id)>` inside the state root,
+and every process that writes there, or writes an intent of that work, first
+takes an exclusive `flock(2)` lock on that directory (`std::fs::File::lock`).
+Waiters block. The lock never expires, and the kernel releases it when the
+holder closes it or exits. While holding it, a run:
+
+1. checks its fence and records its attempt;
+2. persists its execution binding and candidate store;
+3. rechecks that the record at its fence still names its attempt and that no
+   higher fence is recorded;
+4. creates its execution intent.
+
+It releases the lock before any worker effect. A repair step takes the same
+lock to recheck the fence before it writes `repair/step-N.intent`. Recovery
+takes it to check for a crossed attempt and to create its closure marker. A
+`stale_fence` or `crossed_attempt` refusal reads `dispatched` from the refused
+attempt's directory under the lock. So in one state root, a `stale_fence`
+refusal with `dispatched:false` means that attempt has no execution intent
+and no run of it can create one there. A run that had passed its check before
+the higher fence was recorded is refused at step 3 and starts no worker. Two
+state roots share no lock and no records, so this guarantee does not span
+them; Kiln remains the fence authority across them.
 
 | `reason` | `dispatched` | When |
 |---|---|---|
-| `stale_fence` | `false` | A higher fence of the work is already recorded |
-| `crossed_attempt` | `false` | Another attempt is recorded at this work and fence |
+| `stale_fence` | `true` when the refused attempt's directory holds an execution intent, else `false`; read under the fence lock | A higher fence of the work is already recorded |
+| `crossed_attempt` | Same as `stale_fence` | Another attempt is recorded at this work and fence |
 | `substituted_request` | `true` | The attempt directory holds the intent of other request bytes, which may have executed; this request dispatched nothing |
 | `profile_revision_superseded` | `true` when the attempt directory holds an intent other than the closure marker, else `false` | The envelope's revision is not the current framing; the attempt is never executed or recovered |
 | `revision_not_admitted` | `false` | With `--revision-store`, the managed definition admits no new session of this revision; nothing is written ([agent revisions](agent-revisions.md#integration)) |
@@ -502,7 +526,13 @@ fence, binding, intent, revalidation and revision permit, the shell:
 2. asks the pure loop before every spawn, which stops on cancellation, an
    unreadable clock, the elapsed bound, the iteration bound, the aggregate
    budgets and the lineage, in that order;
-3. writes `repair/step-N.intent` once before the worker effect;
+3. under the fence lock, rechecks that the attempt is still recorded at its
+   fence and that no higher fence is recorded, then writes
+   `repair/step-N.intent` once before the worker effect. If the check fails,
+   that step never spawns and the loop ends as `fence_superseded`. This is a
+   post-dispatch outcome, retained and printed like any other disposition,
+   because the attempt's intent exists and earlier steps may have had effects.
+   It is never a refusal and never reports `dispatched:false`;
 4. captures the workspace after an exited step. A tree equal to the parent or
    the base is no candidate; otherwise a native receipt against the admitted
    base and a candidate revision binding envelope, attempt, fence, iteration
@@ -520,11 +550,12 @@ The disposition is one of `correct_candidate`, `repaired_candidate` (with
 `model_requests`, `tool_invocations` or `lineage` and its dimension),
 `cancelled`, `uncertain` (`worker_outcome`, `check_outcome` or `clock`),
 `not_repairable` (with the classes), `checks_rejected` (with the defect),
-`lineage_blocked` or `kiln_owned`. A worker that proposes `changed_work` or a
-`new_semantic_attempt` ends the loop as `kiln_owned`; a step whose binding
-names other work, version or task, or another attempt, fence or envelope, is
-refused before it is recorded. Repair steps receive the parent revision and
-the admitted failure classes only, never a transcript or check output. The
+`lineage_blocked`, `kiln_owned` or `fence_superseded`. A worker that proposes
+`changed_work` or a `new_semantic_attempt` ends the loop as `kiln_owned`; a
+step whose binding names other work, version or task, or another attempt,
+fence or envelope, is refused before it is recorded. Repair steps receive the
+parent revision and the admitted failure classes only, never a transcript or
+check output. The
 `lattice.implementation-attempt-repair-observation.v1` record (envelope,
 request and worker-request identities, execution binding, policy and lineage
 identities, disposition, revisions with their receipts, usage, draws and

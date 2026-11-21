@@ -133,6 +133,8 @@ pub(super) fn single_shot_draw(request: &super::Request) -> Option<serde_json::V
 /// The frozen inputs of one repair run after its intent.
 pub(super) struct Run<'a> {
     pub(super) request: &'a super::Request,
+    /// The state root whose fence lock guards every step intent.
+    pub(super) state: &'a std::path::Path,
     pub(super) directory: &'a std::path::Path,
     pub(super) identity: &'a str,
     pub(super) receipt: super::binding::usage::WorkerReceipt,
@@ -147,7 +149,7 @@ pub(super) fn execute(run: Run<'_>, ports: Ports<'_>) -> Result<serde_json::Valu
     };
     let records = records::Retained::open(run.directory, run.identity)?;
     let started_epoch_ms = observe(ports.clock);
-    let mut driver = steps::Driver::prepare(run.request, &records, policy)?;
+    let mut driver = steps::Driver::prepare(run.request, run.state, &records, policy)?;
     let disposition = driver.drive(ports, started_epoch_ms)?;
     let window = super::binding::usage::WorkerWindow {
         started_epoch_ms,

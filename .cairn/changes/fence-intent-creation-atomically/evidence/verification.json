@@ -1,0 +1,49 @@
+{
+  "schema": "lattice.fixture-qualification.v1",
+  "change": "fence-intent-creation-atomically",
+  "kind": "local-verification",
+  "live_qualification": false,
+  "base_revision": "647bc59d1640a09eccec1e29327c0214758f6065",
+  "integration_head": null,
+  "recorded_on": "2026-11-21",
+  "lock": {
+    "mechanism": "std::fs::File::lock (flock(2), exclusive, blocking, no timeout) on the directory works/<blake3(work_id)> inside the state root",
+    "scope": "one work item in one state root",
+    "dependency_added": false
+  },
+  "tasks": {
+    "1.1": [
+      "src/implementation_attempt/cli/session/fencing/tests.rs::a_run_that_passed_its_check_creates_no_intent_once_a_higher_fence_is_recorded",
+      "src/implementation_attempt/cli/session/fencing/tests.rs::records_are_bounded_named_and_checked_in_a_state_root",
+      "src/implementation_attempt/cli/session/fencing/tests.rs::the_lock_excludes_other_handles_until_its_guard_drops",
+      "src/implementation_attempt/cli/session/fencing/tests.rs::the_lock_is_released_when_its_holder_process_exits"
+    ],
+    "1.2": [
+      "src/implementation_attempt/cli/session/fencing/tests.rs::a_stale_refusal_reports_whether_its_attempt_holds_an_intent",
+      "src/implementation_attempt/cli/tests/coordinator.rs::stale_fences_and_crossed_attempts_are_refused_before_any_effect",
+      "tests/test_implementation_attempt_refusals.rs (3 tests)"
+    ],
+    "1.3": [
+      "src/implementation_attempt/cli/tests/repair.rs::a_newer_fence_stops_the_loop_before_its_next_step_intent",
+      "src/implementation_attempt/cli/tests/coordinator.rs::recovery_without_intent_closes_the_attempt_so_no_run_can_dispatch"
+    ],
+    "2.1": [
+      "docs/candidate-worker.md (coordinator transport fencing paragraph, refusal table, repair step 3 and dispositions)",
+      "CHANGELOG.md (Fixed)"
+    ]
+  },
+  "gates": [
+    {"command": "cargo test -p lattice --lib -- implementation_attempt", "exit": 0, "result": "92 passed, 0 failed, 402 filtered out"},
+    {"command": "cargo test -p lattice --test test_implementation_attempt_refusals", "exit": 0, "result": "3 passed, 0 failed"},
+    {"command": "cargo clippy -p lattice --all-targets --no-deps -- -D warnings", "exit": 0, "note": "--no-deps skips the intentionally failing tests/fixtures/repository-validation path dependency, as scripts/check.rs excludes it; three pre-existing type_complexity errors in src/implementation_attempt/{repair,lineage}/tests.rs were fixed with local test-only aliases"},
+    {"command": "cargo fmt -p lattice --check", "exit": 0},
+    {"command": "octet-precommit-check", "exit": 0, "result": "root 1052 accepted, 1052 current, 0 new, 0 stale; lattice-core 25/25, 0 new, 0 stale; baselines unchanged"},
+    {"command": "octet_semantic_delta.py against 647bc59d baselines", "exit": 0, "result": "root new_semantic=0 resolved_semantic=0; lattice-core new_semantic=0 resolved_semantic=0"},
+    {"command": "cairn validate --root . --policy cairn-policy/generated/cairn-policy.json", "exit": 0, "result": "valid, no issues"},
+    {"command": "cairn gate proposal|design|tasks fence-intent-creation-atomically", "exit": 0, "result": "PASS before tasks were checked; rerun after"},
+    {"command": "gitleaks dir --redact on each changed path", "exit": 0}
+  ],
+  "not_run": [
+    "scripts/check.rs and nix flake check (parent runs them at integration)"
+  ]
+}

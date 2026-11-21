@@ -31,6 +31,8 @@ struct StepRecord<'a> {
 /// The loop over one attempt's ports.
 pub(super) struct Driver<'a> {
     request: &'a super::super::Request,
+    /// The state root whose fence lock guards every step intent.
+    state_root: &'a std::path::Path,
     records: &'a super::records::Retained,
     policy: crate::implementation_attempt::repair::Policy,
     state: crate::implementation_attempt::repair::state::Loop,
@@ -46,6 +48,7 @@ impl<'a> Driver<'a> {
     /// a host step without model or tool use.
     pub(super) fn prepare(
         request: &'a super::super::Request,
+        state_root: &'a std::path::Path,
         records: &'a super::records::Retained,
         policy: crate::implementation_attempt::repair::Policy,
     ) -> Result<Self, String> {
@@ -75,6 +78,7 @@ impl<'a> Driver<'a> {
         });
         Ok(Self {
             request,
+            state_root,
             records,
             policy,
             state,
@@ -122,7 +126,18 @@ impl<'a> Driver<'a> {
         ports: &mut super::Ports<'_>,
         step: &crate::implementation_attempt::repair::step::Request,
     ) -> Result<crate::implementation_attempt::repair::state::Next, String> {
+        // r[impl lattice.implementation_attempt.consumer.scenario.fence_lock]
+        // The step intent is created under the fence lock after a recheck; a
+        // newer fence, or another attempt at this one, ends the loop before
+        // this spawn.
+        let envelope = &self.request.envelope;
+        let guard = super::super::session::fencing::Guard::acquire(self.state_root, &envelope.work_id)?;
+        if !guard.is_current(envelope)? {
+            let disposition = crate::implementation_attempt::repair::state::Disposition::FenceSuperseded;
+            return Ok(crate::implementation_attempt::repair::state::Next::Stop(disposition));
+        }
         self.records.intend(step)?;
+        drop(guard);
         let records = self.records;
         let workspace = self.request.workspace_root.as_path();
         let report = ports.worker.step(step, workspace, &|| records.is_cancel_requested());

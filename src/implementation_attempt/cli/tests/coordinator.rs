@@ -122,7 +122,9 @@ async fn stale_fences_and_crossed_attempts_are_refused_before_any_effect() {
     let fixture = Fixture::new();
     super::super::artifacts::private_directory(&fixture.state).expect("state");
     let successor = fixture.request("attempt-successor", 8);
-    super::super::session::fencing::admit(&fixture.state, &successor.envelope).expect("successor recorded");
+    let successor_directory = fixture.directory(&successor);
+    super::super::session::fencing::admit(&fixture.state, &successor.envelope, &successor_directory)
+        .expect("successor recorded");
     let stale = fixture.request("attempt-stale", 7);
     let (path, _) = fixture.write("stale.json", &stale);
     let error = run(&path, &fixture.state).await;
@@ -131,7 +133,8 @@ async fn stale_fences_and_crossed_attempts_are_refused_before_any_effect() {
     assert!(!fixture.directory(&stale).join("intent.json").exists());
 
     let recorded = fixture.request("attempt-recorded", 9);
-    super::super::session::fencing::admit(&fixture.state, &recorded.envelope).expect("recorded");
+    super::super::session::fencing::admit(&fixture.state, &recorded.envelope, &fixture.directory(&recorded))
+        .expect("recorded");
     let crossed = fixture.request("attempt-crossed", 9);
     let (path, _) = fixture.write("crossed.json", &crossed);
     let error = run(&path, &fixture.state).await;

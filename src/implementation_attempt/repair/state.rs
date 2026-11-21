@@ -66,6 +66,11 @@ pub enum Disposition {
     KilnOwned {
         continuation: super::KilnOwned,
     },
+    /// The shell found a higher fence of the work, or another attempt at
+    /// this fence, recorded in its state root before the next step's intent;
+    /// that step never spawned. A post-dispatch outcome: the attempt's intent
+    /// exists and earlier steps may have had effects.
+    FenceSuperseded,
 }
 
 /// The loop's next action.

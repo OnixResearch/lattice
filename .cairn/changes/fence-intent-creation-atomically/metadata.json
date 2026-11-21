@@ -1,0 +1,11 @@
+{
+  "depends_on": [
+    "execute-admitted-implementation-attempt",
+    "bound-same-attempt-repair"
+  ],
+  "workflow_profile": {
+    "id": "spec-driven",
+    "source": "change_create",
+    "version": 1
+  }
+}

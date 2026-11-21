@@ -42,45 +42,6 @@ fn build_worker(
     }
 }
 
-/// Recovery with no intent closes the attempt by exclusively creating its
-/// intent path, so a racing or later run of the same request can never create
-/// its own intent. Different request bytes are a typed substitution refusal.
-/// `None` means the attempt was closed before execution; otherwise the
-/// admission recorded with the intent is returned, never re-derived.
-// r[impl lattice.implementation_attempt.consumer.scenario.recovery]
-fn reconcile_intent(
-    request: &super::Request,
-    directory: &std::path::Path,
-    identity: &str,
-) -> Result<Option<super::session::intent::Recorded>, String> {
-    let session = super::session::revision::identifier(request);
-    let subject = super::session::intent::Subject {
-        request_identity: identity,
-        session: &session,
-    };
-    let marker = super::recovery::closed_marker(identity);
-    debug_assert_eq!(identity.len(), 64, "the request identity is one BLAKE3 digest");
-    // The marker this recovery may write reads back as a closed attempt.
-    debug_assert_eq!(
-        super::session::intent::classify(marker.as_bytes(), subject),
-        super::session::intent::Record::Closed
-    );
-    let mut retained = super::session::intent::read(directory, subject)?;
-    if retained.is_none() {
-        if super::artifacts::create_new(&directory.join(super::session::intent::FILE), marker.as_bytes())? {
-            return Ok(None);
-        }
-        retained = super::session::intent::read(directory, subject)?;
-    }
-    match retained {
-        Some(super::session::intent::Record::Owned(recorded)) => Ok(Some(recorded)),
-        Some(super::session::intent::Record::Closed) => Ok(None),
-        Some(super::session::intent::Record::Foreign) | None => {
-            Err(super::refusal::refuse(&request.envelope, super::refusal::Reason::SubstitutedRequest))
-        }
-    }
-}
-
 // r[impl lattice.execution_binding.recovery]
 // r[impl lattice.execution_binding.recovery.scenario.lost_acknowledgement]
 pub(super) fn recover_existing(
@@ -90,8 +51,13 @@ pub(super) fn recover_existing(
     identity: &str,
     revisions: super::session::revision::Store<'_>,
 ) -> Result<(), String> {
-    super::session::fencing::check(state, &request.envelope)?;
-    let Some(recorded) = reconcile_intent(request, directory, identity)? else {
+    // The crossed check and the closure marker share the fence lock with
+    // every fence record and intent of this work in the state root.
+    let guard = super::session::fencing::Guard::acquire(state, &request.envelope.work_id)?;
+    guard.check_crossed(&request.envelope, directory).map_err(|error| error.report(&request.envelope))?;
+    let reconciled = super::recovery::reconcile_intent(request, directory, identity);
+    drop(guard);
+    let Some(recorded) = reconciled? else {
         println!("{}", super::recovery::not_started(request));
         return Ok(());
     };
@@ -193,7 +159,7 @@ impl Context {
         // The session is admitted before anything is written; a refusal starts nothing.
         let session = super::session::revision::admit(revisions, &self.request)?;
         let prepared = self.prepare(compute);
-        let (admitted, store) = match prepared {
+        let (guard, admitted, store) = match prepared {
             Ok(prepared) => prepared,
             Err(error) => {
                 super::session::revision::abandon(revisions, &self.request, &session)
@@ -207,7 +173,22 @@ impl Context {
             session: &identifier,
         };
         let bytes = super::session::intent::encode(subject, session.recorded.as_ref())?;
-        if !super::artifacts::write_once(&intent, &bytes)? {
+        // r[impl lattice.implementation_attempt.consumer.scenario.fence_lock]
+        // Still under the lock that recorded the fence: recheck it, then
+        // create the intent. The lock is released before any worker effect.
+        let created = guard.create_intent(&self.request.envelope, &self.directory, &bytes);
+        drop(guard);
+        let is_created = match created {
+            Ok(is_created) => is_created,
+            Err(refused @ super::session::fencing::Error::Refused(_)) => {
+                let error = refused.report(&self.request.envelope);
+                super::session::revision::abandon(revisions, &self.request, &session)
+                    .map_err(|close| format!("{error}; {close}"))?;
+                return Err(error);
+            }
+            Err(error) => return Err(error.report(&self.request.envelope)),
+        };
+        if !is_created {
             return Err("concurrent execution intent requires reconciliation".into());
         }
         let recorded = session.recorded.unwrap_or(super::session::intent::Recorded::UNMANAGED);
@@ -232,6 +213,7 @@ impl Context {
         };
         let run = super::repair::Run {
             request: &self.request,
+            state: &self.state,
             directory: &self.directory,
             identity: &self.identity,
             receipt,
@@ -264,17 +246,25 @@ impl Context {
     }
 
     /// The fence record, persisted binding and candidate store, all before
-    /// the intent.
+    /// the intent. The returned guard still holds the fence lock, so the
+    /// fence check, its record and the intent are one critical section.
     fn prepare(
         &self,
         compute: &mut dyn crate::execution_binding::ComputeAllocationPort,
-    ) -> Result<(lattice_core::execution_binding::admission::bound::Admitted, crate::store::Store), String> {
+    ) -> Result<
+        (
+            super::session::fencing::Guard,
+            lattice_core::execution_binding::admission::bound::Admitted,
+            crate::store::Store,
+        ),
+        String,
+    > {
         // r[impl lattice.implementation_attempt.consumer.scenario.refusal]
-        super::session::fencing::admit(&self.state, &self.request.envelope)?;
+        let guard = super::session::fencing::admit(&self.state, &self.request.envelope, &self.directory)?;
         let admitted = super::binding::admit_and_persist(&self.request, &self.directory, compute)?;
         let store =
             crate::store::Store::new(self.directory.join("candidate.redb")).map_err(|error| error.to_string())?;
-        Ok((admitted, store))
+        Ok((guard, admitted, store))
     }
 }
 
