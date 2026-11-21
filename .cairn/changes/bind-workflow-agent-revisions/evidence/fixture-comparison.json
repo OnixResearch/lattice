@@ -76,7 +76,7 @@
         "severity": "medium",
         "location": "tests/test_agent_package_comparison.rs:391",
         "finding": "Changing only an entry's bytes kept its reported SHA-256 matching the inventory, so compare reported nothing while the materialized identity changed.",
-        "resolution": "The harness recomputes each regular file's SHA-256 from its supplied bytes (dev-dependency sha2 0.10.9, already locked) and compares that with the inventory; a reported digest that disagrees with the bytes is reported_digest_mismatch. Case content_only_change: [changed_file, reported_digest_mismatch]."
+        "resolution": "The harness recomputes each regular file's SHA-256 from its supplied bytes, with the hash provider of the ring TLS 1.3 suite TLS13_AES_128_GCM_SHA256 in the existing rustls dev-dependency (checked against the standard vectors and every recorded fixture digest), and compares that with the inventory; a reported digest that disagrees with the bytes is reported_digest_mismatch. Case content_only_change: [changed_file, reported_digest_mismatch]. A first fix used a new sha2 dev-dependency; it was removed because it changed Octet's root configuration and profile hashes and re-keyed every root finding."
       },
       {
         "severity": "medium",
@@ -126,7 +126,16 @@
       "octet": "octet-precommit-check in the saved environment: exit 1 because every stable identity changed (root 1052 new and 1052 stale; lattice-core 25 new and 25 stale) under a different config and profile hash than the baseline, which is not attributable to this change; octet_semantic_delta.py against the committed baselines: root old=1052 current_unique=1052 new_semantic=0 resolved_semantic=0; lattice-core old=25 current_unique=25 new_semantic=0 resolved_semantic=0. No baseline was re-keyed. Rerun octet-precommit-check in nix develop at integration.",
       "cairn": "cairn validate: exit 0, valid, 62 specs, 0 issues; proposal, design and tasks gates: PASS",
       "gitleaks": "gitleaks dir on every changed path: no leaks found",
-      "cargo_lock": "Cargo.lock gains one line, sha2 in the lattice package's dependency list; sha2 0.10.9 was already locked"
+      "cargo_lock": "superseded: the sha2 dev-dependency this run used was removed afterwards; Cargo.toml and Cargo.lock equal 562d03cd (see after_dependency_removal)"
+    },
+    "after_dependency_removal": {
+      "environment": "nix develop --builders '', TMPDIR=/var/tmp/l25, RUSTC_WRAPPER empty",
+      "sha256_route": "the hash provider of rustls::crypto::ring::cipher_suite::TLS13_AES_128_GCM_SHA256 (rustls =0.23.42, an existing dev-dependency built with its ring feature); the_sha256_provider_matches_the_standard_vectors checks the empty, abc and 448-bit vectors and every recorded fixture digest",
+      "manifest": "git diff 562d03cd -- Cargo.toml Cargo.lock: empty",
+      "tests": "cargo test -p lattice --locked --test test_agent_package_comparison --test test_agent_revision_workflow: exit 0; 5 + 11 passed, all 34 negative cases included",
+      "clippy": "cargo clippy -p lattice --no-deps --locked on those two test targets -- -D warnings: exit 0",
+      "fmt": "cargo fmt -p lattice --check: exit 0 after cargo fmt rewrapped one statement of the new test",
+      "octet": "octet-precommit-check: exit 0; root config hash b3:373a4583… as in the baseline, 1052 accepted, 1052 current accepted, 1052 current, 0 new, 0 stale; lattice-core 25 accepted, 25 current, 0 new, 0 stale; no re-key"
     }
   },
   "non_claims": [

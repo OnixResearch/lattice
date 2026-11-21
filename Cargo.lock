@@ -2684,7 +2684,6 @@ dependencies = [
  "rustls",
  "serde",
  "serde_json",
- "sha2",
  "snafu 0.9.0",
  "tempfile",
  "thiserror 2.0.18",

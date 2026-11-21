@@ -98,7 +98,8 @@ interfaces.
   annotation is not a direct identity input, but changing it changes the
   manifest digest and so the evidence subject and revision. Decision: useful
   mapping, adoption deferred. No archive, registry, installer or activation
-  controller is involved; the test-only dev-dependency `sha2` is added. See
+  controller is involved, and no Cargo dependency is added: SHA-256 comes
+  from the *ring* provider of the existing `rustls` dev-dependency. See
   `docs/agent-package-comparison.md`.
 - Qualification attachments for agent revisions (Animus #18, Lattice #25).
   `lattice agent-revision promote` and `rollback` accept a repeatable

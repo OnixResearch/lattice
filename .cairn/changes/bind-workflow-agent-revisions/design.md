@@ -48,7 +48,7 @@ Rejected: putting the subject choice in `cli/session/revision.rs`. The operator 
 
 ## Decision 6: the package comparison is a test harness
 
-The comparison of the agent-package draft lives in `tests/test_agent_package_comparison.rs` over inert fixtures. The fixtures carry the draft's manifest and Package Config plus the facts a materialization owner would report; the harness compares them and derives the BLAKE3 inventory, materialized, closure and evidence-subject identities, keeping `sha256:` digests as provider-native fields. It never reads an archive. The decision is "useful mapping, adoption deferred", so no production code is added for it.
+The comparison of the agent-package draft lives in `tests/test_agent_package_comparison.rs` over inert fixtures. The fixtures carry the draft's manifest and Package Config plus the facts a materialization owner would report; the harness compares them and derives the BLAKE3 inventory, materialized, closure and evidence-subject identities, keeping `sha256:` digests as provider-native fields. It never reads an archive. The decision is "useful mapping, adoption deferred", so no production code is added for it. The harness recomputes per-file SHA-256 with the hash provider of the *ring* suite `TLS13_AES_128_GCM_SHA256` in the existing `rustls` dev-dependency, checked against the standard vectors. A new dev-dependency would change Octet's root configuration and profile hashes and re-key every root finding, which the baseline migration cannot follow, so the manifest stays unchanged.
 
 ## Risks
 

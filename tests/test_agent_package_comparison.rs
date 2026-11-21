@@ -302,10 +302,44 @@ fn is_sha256(value: &str) -> bool {
         .is_some_and(|hex| hex.len() == 64 && hex.bytes().all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f')))
 }
 
-/// The `sha256:` digest of supplied bytes, as the draft spells it.
+/// The `sha256:` digest of supplied bytes, as the draft spells it. SHA-256
+/// comes from the hash provider of the *ring* TLS 1.3 suite
+/// `TLS13_AES_128_GCM_SHA256` of `rustls`, an existing dev-dependency built
+/// with its `ring` feature, so the harness adds no dependency.
 fn sha256(content: &str) -> String {
-    use sha2::Digest as _;
-    format!("sha256:{:x}", sha2::Sha256::digest(content.as_bytes()))
+    let suite = rustls::crypto::ring::cipher_suite::TLS13_AES_128_GCM_SHA256.tls13().expect("a TLS 1.3 suite");
+    let hash = suite.common.hash_provider;
+    assert_eq!(hash.algorithm(), rustls::crypto::hash::HashAlgorithm::SHA256);
+    format!("sha256:{}", hex::encode(hash.hash(content.as_bytes()).as_ref()))
+}
+
+#[test]
+fn the_sha256_provider_matches_the_standard_vectors() {
+    let vectors = [
+        ("", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+        ("abc", "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"),
+        (
+            "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq",
+            "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1",
+        ),
+    ];
+    for (input, expected) in vectors {
+        assert_eq!(sha256(input), format!("sha256:{expected}"), "{input:?}");
+    }
+    for name in ["skill.json", "plugin.json"] {
+        let fixture = load(name);
+        let inventory = fixture
+            .config
+            .files
+            .iter()
+            .map(|file| (file.path.as_str(), file.digest.as_str()))
+            .collect::<BTreeMap<_, _>>();
+        for entry in fixture.observation.entries.iter().filter(|entry| entry.kind == Kind::Regular) {
+            let computed = sha256(entry.content.as_deref().expect("regular content"));
+            assert_eq!(entry.sha256.as_deref(), Some(computed.as_str()), "{name}: {}", entry.path);
+            assert_eq!(inventory.get(entry.path.as_str()).copied(), Some(computed.as_str()), "{name}: {}", entry.path);
+        }
+    }
 }
 
 /// One skill's file tree under `prefix`: payload-relative paths with the

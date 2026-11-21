@@ -37,7 +37,11 @@ about the payload (entry kinds, paths, file bytes with their reported SHA-256,
 layer and expanded sizes). The harness compares those supplied facts; it does
 not produce them. It recomputes each regular file's SHA-256 from the supplied
 bytes and compares that, not the reported digest, with the inventory; a
-reported digest that disagrees with the bytes is a finding of its own. The
+reported digest that disagrees with the bytes is a finding of its own.
+SHA-256 comes from the hash provider of the *ring* TLS 1.3 suite
+`TLS13_AES_128_GCM_SHA256` in the existing `rustls` dev-dependency, checked
+against the standard empty, `abc` and 448-bit vectors; no dependency is
+added. The
 per-file SHA-256 values in the fixtures are the real digests of their
 contents. The manifest, config and layer digests are fixed, well-formed
 values that stand for an artifact; no OCI bytes back them.

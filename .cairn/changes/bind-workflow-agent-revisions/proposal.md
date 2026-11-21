@@ -24,7 +24,7 @@ Separately, the issue asks for a bounded comparison of the NVIDIA agent-package 
 - **Shell:** new `src/agent_revision/composite.rs`; `src/agent_revision/{mod,commands,bundle,seam}.rs`; `src/workflow/intent/{model,cli}.rs` (plan accessors, `load` visible in the crate); `src/implementation_attempt.rs` (`WorkflowAgent`), the `workflow_agent` request field in `src/implementation_attempt/cli.rs`, `cli/session/revision.rs` and the pin read in `cli/inspect/mod.rs`.
 - **Tests and fixtures:** `tests/test_agent_revision_workflow.rs`, `tests/test_agent_package_comparison.rs`, two tests in `tests/test_agent_revision_shell.rs`, `src/implementation_attempt/cli/tests/workflow_agent.rs`, `tests/fixtures/agent-package/`, `tests/fixtures/agent-revisions/workflow-agent-identities.json`.
 - **Docs:** `docs/agent-revisions.md`, `docs/candidate-worker.md`, new `docs/agent-package-comparison.md`, changelog.
-- **Compatibility:** every existing bundle, revision, lifecycle row, inventory, request without `workflow_agent` and CLI command keeps its bytes and behavior. No runtime Cargo dependency is added; the comparison harness adds the dev-dependency `sha2 = "0.10.9"`, already in `Cargo.lock`, to recompute per-file SHA-256.
+- **Compatibility:** every existing bundle, revision, lifecycle row, inventory, request without `workflow_agent` and CLI command keeps its bytes and behavior. No Cargo dependency is added and `Cargo.toml` and `Cargo.lock` are unchanged; the comparison harness takes SHA-256 from the *ring* provider of the existing `rustls` dev-dependency.
 
 ## Out of Scope
 
