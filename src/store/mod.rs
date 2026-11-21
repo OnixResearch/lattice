@@ -14,6 +14,7 @@ mod admission;
 mod exchange;
 mod occurrences;
 mod quarantine;
+mod revisions;
 
 mod implementation;
 

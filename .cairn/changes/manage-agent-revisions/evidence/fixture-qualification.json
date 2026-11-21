@@ -1,0 +1,79 @@
+{
+  "schema": "lattice.fixture-qualification.v1",
+  "change": "manage-agent-revisions",
+  "kind": "synthetic-fixture-qualification",
+  "live_qualification": false,
+  "live_preparation_exercised": false,
+  "evidence_label": "fixture",
+  "base_revision": "9a74e7ef1da4e0ca7610dce0db039b3825a7154d",
+  "producer_schemas": [
+    "lattice.agent-revision-lifecycle.v1",
+    "lattice.agent-bundle.v1",
+    "lattice.agent-revision-components.v1",
+    "lattice.agent-revision-slots.v1",
+    "lattice.agent-revision-outcome.v1"
+  ],
+  "identity_domains": [
+    "lattice-agent-bundle-v1",
+    "lattice-agent-revision-components-v1",
+    "lattice-agent-revision-preparation-v1",
+    "lattice-agent-revision-promotion-policy-v1",
+    "lattice-agent-revision-promotion-v1",
+    "lattice-agent-revision-session-pin-v1"
+  ],
+  "capture": "LATTICE_AGENT_REVISION_CAPTURE=<path> tests/test_agent_revision_core.rs::fixture_identities_are_stable_and_recorded",
+  "fixture": {
+    "definition": "blake3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "revisions": {
+      "R1": "1111111111111111111111111111111111111111111111111111111111111111",
+      "R2": "2222222222222222222222222222222222222222222222222222222222222222",
+      "R3": "3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    "bundles": {
+      "R1": "blake3:2bd8eae03a9015db7b698419dac0690bb042c8e3b0981d4bbe5b573d423b8587",
+      "R2": "blake3:7761a4e9865022268aff434368b6be859f6c49e128d42c33fa88118b487b7551",
+      "R3": "blake3:fffe8cb11976c20df517cd7942a5f9c557bd98a52800aa2022ccd23b06cd736e"
+    },
+    "policy": {
+      "task_family": "rust-implementation",
+      "required_class": "task_family_evaluation",
+      "identity": "blake3:d4e9509948c43c34fde6c245c6faea442b4637be0211cefc79cfa87ceedbb185"
+    },
+    "preparations": {
+      "R1": { "generation": 1, "observation": "prepared", "identity": "blake3:5da335813ba187f6c751ed8c0c07bdd30dd27f7fff876f08909faee50b4c8f89" },
+      "R2": { "generation": 2, "observation": "failed", "identity": "blake3:85371721a65f19082d772c805435dfd6d2f8e7ee9f4e705ae776fade50406b79" },
+      "R3": { "generation": 3, "observation": "prepared", "identity": "blake3:a1ddc04b9c083f8c79a1ef63b03db8623d10b9c19fd198848db35f567eed9dcb" }
+    },
+    "qualifications": {
+      "R1": "blake3:f003db3c8fddc3611cd75cdcb05108606923e0bc137e99f53a83bfdd5c8fd6d6",
+      "R3": "blake3:3d1d92230feb6db469532f26d9e2d7ab2b9a7982924c2706ac5a89679756e6bf"
+    },
+    "promotions": {
+      "R1": "blake3:102e2ecc85d398fde8ab9eed4c860ca5206b15b6c96776bebc608c5dd1a52c60",
+      "R3": "blake3:bb39027f579f9ef6148a5abbc7ecfd8aa3013bdca46b516ba6124859b73867a9"
+    },
+    "sessions": {
+      "A": { "revision": "1111111111111111111111111111111111111111111111111111111111111111", "pin": "blake3:782f9d7a13ff1f16f73d3d7b1c9f1261a810720fad5ecc005298430c5da98890" },
+      "B": { "revision": "1111111111111111111111111111111111111111111111111111111111111111", "pin": "blake3:82cedcbca3861b2ca8e07545cc31a470593bc48d5381b381e7cd88e65fd50ecd" },
+      "C": { "revision": "3333333333333333333333333333333333333333333333333333333333333333", "pin": "blake3:9fa64b913c697ef1ad2e7584fdd947ec2a71c225660223888ae3227f494f5136" }
+    }
+  },
+  "tests": {
+    "files": ["tests/test_agent_revision_core.rs", "tests/test_agent_revision_shell.rs"],
+    "counts": { "core": 13, "shell": 4 },
+    "negative": "every Refusal variant is asserted at least once in tests/test_agent_revision_core.rs; framing defects in components_frame_only_when_declared_and_every_change_alters_the_digest"
+  },
+  "checks": {
+    "focused_tests": "cargo test --locked --test test_agent_revision_core --test test_agent_revision_shell: exit 0, 13 + 4 passed",
+    "fmt": "cargo fmt --check -p lattice -p lattice-core: exit 0",
+    "clippy": "cargo clippy --workspace --exclude lattice-repository-validation-fixture --all-features --all-targets --no-deps --locked -- -D warnings: exit 0",
+    "octet": "octet-precommit-check: exit 0; root 1052 accepted, 0 new, 0 stale; lattice-core 25 accepted, 0 new, 0 stale",
+    "cairn": "cairn validate --root . and gate proposal/design/tasks manage-agent-revisions: exit 0, verdict PASS",
+    "scripts_check": "not run"
+  },
+  "non_claims": [
+    "No live preparation, qualification, canary or rollout was exercised.",
+    "Fixture ports are not Kiln #49 or Animus #18 producers.",
+    "The fixture revisions are synthetic; live session admission needs the stabilized profile revision."
+  ]
+}

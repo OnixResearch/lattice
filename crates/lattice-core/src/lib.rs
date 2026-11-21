@@ -8,6 +8,7 @@
 
 // r[impl lattice.architecture.core_crate]
 // r[impl lattice.architecture.core_crate.pure]
+pub mod agent_revision;
 pub mod content_identity;
 #[path = "control/flow.rs"]
 pub mod control_flow;

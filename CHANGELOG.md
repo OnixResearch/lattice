@@ -9,6 +9,20 @@ interfaces.
 
 ### Added
 
+- Immutable agent revision lifecycle (#25, sections 1 to 5). `lattice
+  agent-revision` resolves an inert bundle from an exported
+  implementation-attempt request, records the desired revision, prepares it
+  through an injected preparation port, promotes or rolls back the revision
+  selected for new sessions with an exact `qualification_ref`, an expected
+  rollout generation and an idempotent request identifier, revokes revisions,
+  attachments and sessions, pins sessions and cleans up unretained artifacts.
+  The revision is the existing profile revision, used verbatim; the pure core
+  is `lattice_core::agent_revision`, and lifecycles persist in a
+  version-checked `agent_revision_lifecycles_v1` table. The standalone CLI
+  reports preparation as `unknown` and refuses promotion as
+  `qualification_unavailable` (owner `animus#18`). Implementation attempts,
+  their revisions and the inventory are unchanged. See
+  `docs/agent-revisions.md`.
 - Worker inventory v2 facts for Kiln #60 (#24, #25 slots only). Each profile
   carries a definition identity that is stable across revisions
   (`lattice-worker-definition-v1`). It also carries declared `task_families`
