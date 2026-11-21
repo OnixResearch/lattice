@@ -620,7 +620,12 @@ the shell:
    never refusals, never report `dispatched:false` and write neither
    `binding-revalidation.json` nor `revision-block.json`; the observation's
    `authority_withdrawn` field names the step and carries the binding's
-   revalidation record or the seam's refusal;
+   revalidation record or the seam's refusal. The worker's deadline is read
+   from the clock only after the lock is released, immediately before the
+   worker is called: if waiting for the lock reached the elapsed bound the
+   loop ends as `budget_exhausted` (`elapsed`), and if the clock was lost as
+   `uncertain` (`clock`), with the step's intent retained and its worker
+   never called;
 4. re-reads the clock after the worker returns and charges the step. A
    cancelled or unknown worker outcome ends the loop before any proposal is
    considered; a step that returned at or past the elapsed bound is
@@ -636,14 +641,18 @@ the shell:
 6. invokes every declared check against that exact revision. Each check runs
    against its own copy of the captured candidate under
    `repair/check-N-<check>/`, written from the host snapshot with every write
-   permission removed, never against the worker workspace. After the check
-   the copy is captured again: if it no longer matches the candidate, the
-   evidence is rejected as `candidate_drift` and no further check runs. The
-   copy is then removed. The observations are classified: a skipped, missing,
-   duplicated, undeclared, reconfigured, crossed or self-approved (run by the
-   worker profile itself) check, or one from any executor other than
-   `check_executor`, rejects the evidence. Each check is bounded by the time
-   left; a reached bound or an unreadable clock before a check stops the loop;
+   permission removed, never against the worker workspace. The copy records
+   the type and permission bits it sealed for every file and directory. After
+   the check the copy is captured again: if its bytes no longer match the
+   candidate, or any sealed path changed type or mode (a newly executable
+   script, a writable directory), the evidence is rejected as
+   `candidate_drift` and no further check runs. The copy is then removed. The
+   observations are classified: a skipped, missing, duplicated, undeclared,
+   reconfigured, crossed or self-approved (run by the worker profile itself)
+   check, or one from any executor other than `check_executor`, rejects the
+   evidence. Each check's deadline is read from the clock after its copy is
+   written, immediately before the check is called; a reached bound or an
+   unreadable clock then stops the loop without calling it;
 7. before `correct_candidate` or `repaired_candidate`, re-reads the clock and
    compares the charged totals, checks included, with every policy budget and
    the lineage remainder; a pass past the elapsed bound or over any of them is

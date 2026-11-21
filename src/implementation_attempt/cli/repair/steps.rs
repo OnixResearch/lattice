@@ -155,11 +155,6 @@ impl<'a, 'p> Driver<'a, 'p> {
     }
 
     fn spawn(&mut self, ports: &mut super::Ports<'_>, step: &StepRequest) -> Result<Next, String> {
-        // The worker is bounded by the time left before the elapsed bound.
-        let remaining_ms = match self.state.remaining_ms(self.elapsed_ms(ports.clock)) {
-            Ok(remaining_ms) => remaining_ms,
-            Err(disposition) => return Ok(Next::Stop(disposition)),
-        };
         // r[impl lattice.implementation_attempt.consumer.scenario.fence_lock]
         // The step intent is created under the fence lock after a recheck; a
         // newer fence, or another attempt at this one, ends the loop before
@@ -180,6 +175,14 @@ impl<'a, 'p> Driver<'a, 'p> {
         }
         records.intend(step)?;
         drop(guard);
+        // The worker is bounded by the time left now, after the possibly
+        // blocking lock and the intent: a bound reached or a clock lost by
+        // then ends the loop with this step's intent retained and its worker
+        // never called.
+        let remaining_ms = match self.state.remaining_ms(self.elapsed_ms(ports.clock)) {
+            Ok(remaining_ms) => remaining_ms,
+            Err(disposition) => return Ok(Next::Stop(disposition)),
+        };
         let workspace = request.workspace_root.as_path();
         let deadline = std::time::Duration::from_millis(remaining_ms);
         let report = ports.worker.step(step, workspace, deadline, &|| records.is_cancel_requested());

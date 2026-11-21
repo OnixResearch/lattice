@@ -25,12 +25,15 @@ interfaces.
   check is rebound to it and run against its own read-only copy of that
   revision; exit status, worker claims and skipped, missing, reconfigured,
   crossed or self-approved checks cannot pass it, and a check whose copy
-  changed is rejected as `candidate_drift`. Each repair step after the first
-  rechecks its fence, execution binding and managed revision under the fence
-  lock, and a lost binding or revision ends the loop as the post-dispatch
+  changed bytes, file type or permission bits is rejected as
+  `candidate_drift`. Each repair step after the first rechecks its fence,
+  execution binding and managed revision under the fence lock, and a lost
+  binding or revision ends the loop as the post-dispatch
   `authority_withdrawn`. The worker and check ports are given the time left
-  before the elapsed bound, and the clock and the charged totals are checked
-  again after each step and before a passing disposition, so a step or check
+  before the elapsed bound, read immediately before each call (after the
+  step lock and after the check's copy is written), and the clock and the
+  charged totals are checked again after each step and before a passing
+  disposition, so a step or check
   that overruns the elapsed bound, a policy budget or the lineage remainder
   ends as `budget_exhausted` and an unreadable clock as `uncertain`. A
   cancelled or unknown worker outcome outranks any proposal of changed work.

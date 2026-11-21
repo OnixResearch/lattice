@@ -71,6 +71,8 @@ struct FixtureChecks {
     is_rewriting: bool,
     /// A slow check that advances the clock by this much.
     slow: Option<(FixtureClock, i64)>,
+    /// A check that only changes the mode of this path of its copy.
+    chmod: Option<(&'static str, u32)>,
     invocations: Vec<Invocation>,
     seen: Vec<Seen>,
 }
@@ -82,6 +84,7 @@ impl FixtureChecks {
             forced: None,
             is_rewriting: false,
             slow: None,
+            chmod: None,
             invocations: Vec::new(),
             seen: Vec::new(),
         }
@@ -106,6 +109,11 @@ impl super::super::repair::CheckPort for FixtureChecks {
         if self.is_rewriting && invocation.check == "fmt" {
             make_writable(candidate);
             std::fs::write(&source_path, b"fixed").expect("the formatter rewrites the candidate");
+        }
+        if let Some((path, mode)) = self.chmod {
+            use std::os::unix::fs::PermissionsExt;
+            let target = candidate.join(path);
+            std::fs::set_permissions(&target, std::fs::Permissions::from_mode(mode)).expect("chmod the copy");
         }
         if let Some((clock, delay_ms)) = &self.slow {
             clock.advance(*delay_ms);
@@ -139,31 +147,70 @@ fn make_writable(candidate: &std::path::Path) {
     }
 }
 
-/// Advances one second per observation; scripts may move it further or
-/// make it unreadable.
+/// What happens to a fixture clock at one point of a run.
+#[derive(Debug, Clone, Copy)]
+enum Shift {
+    /// The clock jumps this far ahead.
+    Advance(i64),
+    /// The clock becomes unreadable.
+    Fail,
+}
+
+/// Advances one second per observation and counts them; scripts may move it
+/// further or make it unreadable. With `on_copy`, every observation while a
+/// check copy exists in that records directory applies the shift first.
 #[derive(Clone)]
-struct FixtureClock(std::rc::Rc<std::cell::Cell<i64>>);
+struct FixtureClock {
+    now: std::sync::Arc<std::sync::atomic::AtomicI64>,
+    observations: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    on_copy: Option<(std::path::PathBuf, Shift)>,
+}
 
 impl FixtureClock {
     fn new() -> Self {
-        Self(std::rc::Rc::new(std::cell::Cell::new(START_EPOCH_MS)))
+        Self {
+            now: std::sync::Arc::new(std::sync::atomic::AtomicI64::new(START_EPOCH_MS)),
+            observations: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            on_copy: None,
+        }
     }
 
     fn advance(&self, delay_ms: i64) {
-        self.0.set(self.0.get() + delay_ms);
+        self.now.fetch_add(delay_ms, std::sync::atomic::Ordering::SeqCst);
     }
 
     /// Every later observation is before the epoch, which the shell cannot read.
     fn fail(&self) {
-        self.0.set(-START_EPOCH_MS);
+        self.now.store(-START_EPOCH_MS, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    fn shift(&self, shift: Shift) {
+        match shift {
+            Shift::Advance(delay_ms) => self.advance(delay_ms),
+            Shift::Fail => self.fail(),
+        }
+    }
+
+    fn observations(&self) -> u64 {
+        self.observations.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    fn is_copy_present(records: &std::path::Path) -> bool {
+        std::fs::read_dir(records).is_ok_and(|entries| {
+            entries.flatten().any(|entry| entry.file_name().to_string_lossy().starts_with("check-"))
+        })
     }
 }
 
 impl crate::operation::shell::Clock for FixtureClock {
     fn observe_epoch_millis(&self) -> i64 {
-        let now = self.0.get();
-        self.0.set(now + 1_000);
-        now
+        if let Some((records, shift)) = &self.on_copy
+            && Self::is_copy_present(records)
+        {
+            self.shift(*shift);
+        }
+        self.observations.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.now.fetch_add(1_000, std::sync::atomic::Ordering::SeqCst)
     }
 }
 
@@ -1136,5 +1183,127 @@ async fn a_revoked_or_unreadable_managed_revision_ends_the_loop_after_dispatch()
         assert!(!block.exists(), "no pre-dispatch revision block");
         fixture.attempt("recover", &path, true).await.expect("recovery reports the retained disposition");
         assert!(fixture.lifecycle(&definition).sessions.is_empty(), "the session is closed");
+    }
+}
+
+#[tokio::test]
+// r[verify lattice.implementation_attempt.repair.scenario.bypass]
+async fn a_check_that_only_changes_a_mode_of_its_copy_drifts() {
+    let rejected = |check: &str| serde_json::json!({"kind": "checks_rejected", "defect": {"code": "candidate_drift", "check": check}});
+    // A newly executable source file, a writable directory and a writable
+    // copy root leave every byte unchanged.
+    for (index, (path, mode)) in [("src/lib.txt", 0o555), ("src", 0o755), ("", 0o755)].into_iter().enumerate() {
+        let fixture = Fixture::new();
+        let request = fixture.request(&format!("attempt-chmod-{index}"), Some(formatted_policy()), None);
+        let path_file = fixture.write(&request);
+        let mut worker = FixtureWorker::new(vec![write("fixed")]);
+        let mut checks = FixtureChecks {
+            chmod: Some((path, mode)),
+            ..FixtureChecks::admitted()
+        };
+        run(&path_file, &fixture.state, &mut worker, &mut checks).await.expect("a disposition");
+        assert_eq!(fixture.disposition(&request)["disposition"], rejected("fmt"), "{path:?}");
+        assert_eq!(checks.invocations.len(), 1, "no check runs after drift");
+        assert!(!checks.seen[0].candidate.exists(), "the drifted copy is removed");
+    }
+    // The sealed modes themselves pass.
+    let fixture = Fixture::new();
+    let request = fixture.request("attempt-chmod-unchanged", Some(formatted_policy()), None);
+    let path_file = fixture.write(&request);
+    let mut worker = FixtureWorker::new(vec![write("fixed")]);
+    let mut checks = FixtureChecks {
+        chmod: Some(("src/lib.txt", 0o444)),
+        ..FixtureChecks::admitted()
+    };
+    run(&path_file, &fixture.state, &mut worker, &mut checks).await.expect("a disposition");
+    assert_eq!(fixture.disposition(&request)["disposition"]["kind"], "correct_candidate");
+    assert_eq!(checks.invocations.len(), 2);
+}
+
+#[tokio::test]
+// r[verify lattice.implementation_attempt.repair.scenario.dispositions]
+async fn time_spent_materializing_a_copy_is_charged_before_its_check_is_called() {
+    let elapsed = serde_json::json!({"kind": "budget_exhausted", "bound": {"kind": "elapsed"}});
+    let clock_lost = serde_json::json!({"kind": "uncertain", "cause": "clock"});
+    for (shift, expected) in [(Shift::Advance(120_000), elapsed), (Shift::Fail, clock_lost)] {
+        let fixture = Fixture::new();
+        let request = fixture.request("attempt-slow-copy", Some(policy()), None);
+        let path = fixture.write(&request);
+        let records = fixture.directory(&request).join("repair");
+        // The bound passes, or the clock is lost, while the copy is written:
+        // the clock reads past it only once the copy exists.
+        let clock = FixtureClock {
+            on_copy: Some((records.clone(), shift)),
+            ..FixtureClock::new()
+        };
+        let mut worker = FixtureWorker::new(vec![write("fixed")]);
+        let mut checks = FixtureChecks::admitted();
+        let host = Host {
+            clock,
+            compute: &mut crate::execution_binding::UnavailableComputePort,
+            revisions: super::super::session::revision::Store(None),
+        };
+        run_with(&path, &fixture.state, &mut worker, &mut checks, host).await.expect("a disposition");
+        assert_eq!(fixture.disposition(&request)["disposition"], expected, "{shift:?}");
+        assert!(checks.invocations.is_empty(), "the check port is never called: {shift:?}");
+        assert!(!FixtureClock::is_copy_present(&records), "the unused copy is removed");
+    }
+}
+
+#[tokio::test]
+// r[verify lattice.implementation_attempt.repair.scenario.dispositions]
+async fn time_spent_waiting_for_the_step_lock_is_charged_before_the_worker_is_called() {
+    let elapsed = serde_json::json!({"kind": "budget_exhausted", "bound": {"kind": "elapsed"}});
+    let clock_lost = serde_json::json!({"kind": "uncertain", "cause": "clock"});
+    for (shift, expected) in [(Shift::Advance(120_000), elapsed), (Shift::Fail, clock_lost)] {
+        let fixture = Fixture::new();
+        let request = fixture.request("attempt-slow-lock", Some(policy()), None);
+        let path = fixture.write(&request);
+        let clock = FixtureClock::new();
+        let holder = std::cell::RefCell::new(None);
+        let (state, work_id, holder_clock) = (fixture.state.clone(), request.envelope.work_id.clone(), clock.clone());
+        // During the first step another holder takes the work's fence lock.
+        // It keeps it until the run has asked for the repair step (four
+        // more clock readings: after the step, before the check, after the
+        // check and before the repair), so the run waits on the lock; then
+        // the time passes, or the clock is lost, and the lock is released.
+        let first: Script<'_> = Box::new(|_, workspace, _| {
+            let (acquired, is_acquired) = std::sync::mpsc::channel();
+            let (state, work_id, clock) = (state.clone(), work_id.clone(), holder_clock.clone());
+            let start = clock.observations();
+            *holder.borrow_mut() = Some(std::thread::spawn(move || {
+                let guard =
+                    super::super::session::fencing::Guard::acquire(&state, &work_id).expect("hold the fence lock");
+                acquired.send(()).expect("signal");
+                let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+                while clock.observations() < start + 4 {
+                    assert!(std::time::Instant::now() < deadline, "the run never reached the repair step");
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+                clock.shift(shift);
+                drop(guard);
+            }));
+            is_acquired.recv().expect("the lock is held");
+            std::fs::write(workspace.join("src/lib.txt"), "still broken").expect("edit");
+            exited()
+        });
+        let mut worker = FixtureWorker::new(vec![first]);
+        let mut checks = FixtureChecks::admitted();
+        let host = Host {
+            clock,
+            compute: &mut crate::execution_binding::UnavailableComputePort,
+            revisions: super::super::session::revision::Store(None),
+        };
+        run_with(&path, &fixture.state, &mut worker, &mut checks, host).await.expect("a disposition");
+        holder.borrow_mut().take().expect("the holder ran").join().expect("the holder finished");
+        let observation = fixture.disposition(&request);
+        assert_eq!(observation["disposition"], expected, "{shift:?}");
+        assert_eq!((observation["steps"].clone(), worker.requests.len()), (1.into(), 1), "the worker is never called");
+        // The repair step got past the lock: its intent exists, its worker
+        // was never called.
+        let directory = fixture.directory(&request);
+        assert!(directory.join("repair/step-2.intent").exists(), "{shift:?}");
+        assert!(!directory.join("repair/step-2.json").exists());
     }
 }

@@ -17,15 +17,19 @@ impl super::Driver<'_, '_> {
         let mut drifted = None;
         let mut stopped = None;
         for invocation in &invocations {
+            let path = self.frame.records.check_copy(iteration, &invocation.check);
+            let copy = super::super::materialized::Copy::create(&path, tree)?;
+            // The check is bounded by the time left now, after its copy is
+            // materialized; a bound reached or a clock lost by then stops
+            // before the check is called.
             let remaining_ms = match self.state.remaining_ms(self.elapsed_ms(ports.clock)) {
                 Ok(remaining_ms) => remaining_ms,
                 Err(disposition) => {
+                    copy.remove()?;
                     stopped = Some(disposition);
                     break;
                 }
             };
-            let path = self.frame.records.check_copy(iteration, &invocation.check);
-            let copy = super::super::materialized::Copy::create(&path, tree)?;
             let deadline = std::time::Duration::from_millis(remaining_ms);
             let observation = ports.checks.run(invocation, copy.path(), deadline);
             let is_intact = copy.is_intact(&tree.identity);

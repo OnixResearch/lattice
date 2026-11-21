@@ -84,6 +84,43 @@
       ]
     }
   ],
+  "final_review": {
+    "reviewed_revision": "ba6ed91d",
+    "source": "final review of the combined Lattice head (LatticeFinal6), two medium findings in the repair code",
+    "recorded_on": "2026-11-21",
+    "findings": [
+      {
+        "severity": "medium",
+        "finding": "Copy::is_intact compared bytes but not modes, so a check could make a copied script executable, pass a permission-dependent check and leave the bytes unchanged.",
+        "resolution": "Copy::create records the file type and the sealed permission bits of every file, every directory and the copy root. is_intact re-reads each one without following symlinks and requires the same type and exactly the same mode as well as the same captured bytes; any difference is candidate_drift.",
+        "tests": [
+          "src/implementation_attempt/cli/tests/repair.rs::a_check_that_only_changes_a_mode_of_its_copy_drifts (an executable source file, a writable directory and a writable copy root drift; re-applying the sealed mode passes)",
+          "src/implementation_attempt/cli/tests/repair.rs::every_check_runs_against_its_own_read_only_copy_and_drift_is_rejected"
+        ]
+      },
+      {
+        "severity": "medium",
+        "finding": "The worker deadline was computed before the possibly blocking per-work lock, and a check deadline before its copy was materialized, so a port could receive a stale positive deadline.",
+        "resolution": "The worker deadline is read from the clock after the step's lock is released and its intent written, immediately before WorkerPort::step; a check's deadline after its copy is written, immediately before CheckPort::run. A reached bound ends the loop as budget_exhausted (elapsed) and a lost clock as uncertain (clock) without calling the port; the step's intent is retained, the unused copy removed.",
+        "tests": [
+          "src/implementation_attempt/cli/tests/repair.rs::time_spent_waiting_for_the_step_lock_is_charged_before_the_worker_is_called (another thread holds the work's fence lock until the run waits for it, then advances the clock or makes it unreadable; the repair step's intent exists and its worker is never called)",
+          "src/implementation_attempt/cli/tests/repair.rs::time_spent_materializing_a_copy_is_charged_before_its_check_is_called (the clock reads past the bound, or unreadable, once the copy exists; the check port is never called)",
+          "src/implementation_attempt/cli/tests/repair.rs::the_elapsed_bound_and_the_clock_hold_through_the_terminal_decision (in-time control passes)"
+        ]
+      }
+    ],
+    "gates": [
+      {"command": "cargo test -p lattice --lib -- implementation_attempt", "exit": 0, "result": "116 passed, 0 failed, 402 filtered out; the three new tests also passed in 5 repeated runs"},
+      {"command": "cargo clippy -p lattice --all-targets --no-deps -- -D warnings", "exit": 0},
+      {"command": "cargo fmt -p lattice --check", "exit": 0},
+      {"command": "octet-precommit-check", "exit": 1, "result": "root 1052 accepted, 0 current, 1052 new, 1052 stale (the root check failing stops the script before lattice-core; run directly with the same cargo-octet command, lattice-core is 25 accepted, 0 current, 25 new, 25 stale). Identical on a clean git archive of ba6ed91d: the head's config hashes (root b3:172daed0..., core b3:6d17329f...) differ from the baselines' (root b3:373a4583..., core b3:c6c36ad0...), so every stable identity moved before this change. The baselines are outside this change's paths and were not re-keyed"},
+      {"command": "finding comparison against the clean ba6ed91d run (lint, file, message multiset)", "exit": 0, "result": "root 1353 vs 1353, 0 new, 0 gone; lattice-core 33 vs 33, 0 new, 0 gone"},
+      {"command": "octet_semantic_delta.py against the ba6ed91d baselines", "exit": 0, "result": "root new_semantic=0; lattice-core new_semantic=0 resolved_semantic=0"},
+      {"command": "cairn validate --root . --policy cairn-policy/generated/cairn-policy.json", "exit": 0, "result": "valid, no issues"},
+      {"command": "cairn gate proposal|design|tasks bound-same-attempt-repair", "exit": 0, "result": "PASS"},
+      {"command": "gitleaks dir --no-banner --redact on each changed path", "exit": 0}
+    ]
+  },
   "gates": [
     {"command": "cargo test -p lattice --lib -- implementation_attempt", "exit": 0, "result": "103 passed, 0 failed, 402 filtered out"},
     {"command": "cargo test -p lattice --test test_implementation_attempt_refusals", "exit": 0, "result": "3 passed, 0 failed"},

@@ -2,9 +2,11 @@
 //!
 //! Each check runs against its own copy, written from the host-captured
 //! snapshot with every write permission removed, so no check sees the worker
-//! workspace or another check's changes. After the check the copy is
-//! captured again and compared with the candidate's identity; any difference
-//! is drift. The copy is removed afterwards.
+//! workspace or another check's changes. The copy records the type and mode
+//! it sealed for every file and directory. After the check the copy is
+//! captured again and compared with the candidate's identity, and every
+//! sealed type and mode is read again; any difference is drift. The copy is
+//! removed afterwards.
 
 // r[impl lattice.implementation_attempt.repair.scenario.bypass]
 
@@ -18,17 +20,51 @@ pub(super) struct Tree {
     pub(super) identity: String,
 }
 
+/// The type and permission bits one path of a copy was sealed with.
+struct Sealed {
+    path: std::path::PathBuf,
+    mode: u32,
+    is_directory: bool,
+}
+
+impl Sealed {
+    /// Whether `path` is still, without following a symlink, the sealed
+    /// type with exactly the sealed permission bits.
+    fn is_unchanged(&self) -> bool {
+        let Ok(metadata) = std::fs::symlink_metadata(&self.path) else {
+            return false;
+        };
+        let file_type = metadata.file_type();
+        let is_same_type = if self.is_directory {
+            file_type.is_dir()
+        } else {
+            file_type.is_file()
+        };
+        #[cfg(unix)]
+        let is_same_mode = {
+            use std::os::unix::fs::PermissionsExt;
+            metadata.permissions().mode() & 0o7777 == self.mode
+        };
+        #[cfg(not(unix))]
+        let is_same_mode = metadata.permissions().readonly();
+        is_same_type && is_same_mode
+    }
+}
+
 /// One check's copy of a candidate tree.
 pub(super) struct Copy {
     root: std::path::PathBuf,
+    /// Every file, every directory and the root, as sealed.
+    sealed: Vec<Sealed>,
 }
 
 impl Copy {
     /// Write `tree` under the new directory `root`, then seal it read-only.
     pub(super) fn create(root: &std::path::Path, tree: &Tree) -> Result<Self, String> {
         std::fs::create_dir(root).map_err(|error| format!("candidate copy cannot be created: {error}"))?;
-        let copy = Self {
+        let mut copy = Self {
             root: root.to_path_buf(),
+            sealed: Vec::with_capacity(tree.files.len().saturating_add(1)),
         };
         let mut directories = std::collections::BTreeSet::new();
         for (path, bytes) in &tree.files {
@@ -43,30 +79,46 @@ impl Copy {
                 ancestor = directory.parent();
             }
             write_new(&target, bytes)?;
-            seal(&target, tree.modes.get(path).copied().unwrap_or(0o444))?;
+            copy.seal(target, tree.modes.get(path).copied().unwrap_or(0o444), false)?;
         }
         // Deepest first, so every directory is still writable while its
         // children are sealed.
         let mut ordered: Vec<_> = directories.into_iter().collect();
         ordered.sort_by_key(|directory| std::cmp::Reverse(directory.components().count()));
         for directory in ordered {
-            seal(&root.join(directory), 0o555)?;
+            copy.seal(root.join(directory), 0o555, true)?;
         }
-        seal(root, 0o555)?;
+        copy.seal(root.to_path_buf(), 0o555, true)?;
         Ok(copy)
+    }
+
+    /// Keep only the read and execute bits of `mode` on `path` and record
+    /// them with its type.
+    fn seal(&mut self, path: std::path::PathBuf, mode: u32, is_directory: bool) -> Result<(), String> {
+        let mode = mode & 0o555;
+        set_mode(&path, mode)?;
+        self.sealed.push(Sealed {
+            path,
+            mode,
+            is_directory,
+        });
+        Ok(())
     }
 
     pub(super) fn path(&self) -> &std::path::Path {
         &self.root
     }
 
-    /// Whether the copy still captures to `identity`. A copy that can no
-    /// longer be captured has drifted.
+    /// Whether the copy still captures to `identity` and every sealed path
+    /// keeps its type and mode. A copy that can no longer be captured, or a
+    /// permission-only change such as a newly executable script, has
+    /// drifted.
     pub(super) fn is_intact(&self, identity: &str) -> bool {
-        crate::candidate_capture::workspace(&self.root)
+        let is_same_bytes = crate::candidate_capture::workspace(&self.root)
             .ok()
             .and_then(|snapshot| crate::candidate::snapshot_identity(&snapshot).ok())
-            .is_some_and(|captured| captured == identity)
+            .is_some_and(|captured| captured == identity);
+        is_same_bytes && self.sealed.iter().all(Sealed::is_unchanged)
     }
 
     /// Make every directory writable again and remove the copy.
@@ -85,11 +137,6 @@ fn write_new(path: &std::path::Path, bytes: &[u8]) -> Result<(), String> {
         .map_err(|error| error.to_string())?;
     file.write_all(bytes).map_err(|error| error.to_string())?;
     file.sync_all().map_err(|error| error.to_string())
-}
-
-/// Keep only the read and execute bits of `mode`.
-fn seal(path: &std::path::Path, mode: u32) -> Result<(), String> {
-    set_mode(path, mode & 0o555)
 }
 
 fn set_mode(path: &std::path::Path, mode: u32) -> Result<(), String> {
