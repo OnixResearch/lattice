@@ -170,7 +170,7 @@ impl Fixture {
     }
 }
 
-fn capability() -> lattice_core::execution_binding::capability::Declaration {
+pub(super) fn capability() -> lattice_core::execution_binding::capability::Declaration {
     lattice_core::execution_binding::capability::Declaration {
         schema: lattice_core::execution_binding::capability::CAPABILITY_SCHEMA.into(),
         definition: "rust-implementer".into(),
@@ -281,7 +281,7 @@ pub(super) fn recorded(
         .expect("intent exists")
 }
 
-fn assert_not_started(directory: &std::path::Path) {
+pub(super) fn assert_not_started(directory: &std::path::Path) {
     for name in [
         super::super::binding::ADMITTED_FILE,
         super::super::session::intent::FILE,
@@ -482,12 +482,12 @@ async fn recovery_of_a_managed_attempt_requires_its_store_and_never_re_derives_t
 
 /// Answers the provider allocation and, on revalidation (the call right
 /// before spawn), revokes the attempt's session.
-struct RevokingPort<'a> {
-    fixture: &'a Fixture,
-    definition: String,
-    session: String,
-    replies: crate::execution_binding::FixtureComputePort,
-    calls: u32,
+pub(super) struct RevokingPort<'a> {
+    pub fixture: &'a Fixture,
+    pub definition: String,
+    pub session: String,
+    pub replies: crate::execution_binding::FixtureComputePort,
+    pub calls: u32,
 }
 
 impl crate::execution_binding::ComputeAllocationPort for RevokingPort<'_> {

@@ -49,15 +49,15 @@ pub(super) fn project(
         &request.envelope.attempt_id,
         serving,
     )?;
-    let lifecycle = revisions.lifecycle(&request)?;
-    let profile = profile_facts(&request, &readiness, lifecycle.as_ref())?;
+    let lifecycles = revisions.lifecycles(&request)?;
+    let profile = profile_facts(&request, &readiness, lifecycles.profile())?;
     let identity = blake3::hash(&bytes).to_hex().to_string();
     debug_assert!(readiness.is_bounded(), "readiness comes from validated producer values");
     debug_assert_eq!(profile.serving_readiness, readiness, "profile and instance share one port read");
     let directory = super::artifacts::directory(state, &request);
     let instance = instance(&request, &identity, &profile, &directory, Retained {
         revisions,
-        lifecycle: lifecycle.as_ref(),
+        lifecycle: lifecycles.session(),
     })?;
     let model_requests = model_requests(&request, &directory)?;
     Ok(serde_json::json!({
@@ -135,8 +135,9 @@ const NAMED_ARTIFACTS: [&str; 7] = [
     "omp-observation.json",
 ];
 
-/// The revision store and the definition's lifecycle read once for both
-/// profile and instance.
+/// The revision store and the session subject's lifecycle: the worker
+/// definition's, read once for both profile and instance, or the named
+/// workflow-agent definition's.
 struct Retained<'a> {
     revisions: super::session::revision::Store<'a>,
     lifecycle: Option<&'a lattice_core::agent_revision::state::Lifecycle>,

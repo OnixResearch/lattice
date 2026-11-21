@@ -30,9 +30,17 @@ The qualification query names the bundle's own definition and revision. An attac
 
 `lattice.workflow-agent-revision-slots.v1` projects desired, last usable, selected and pinned revisions, each with the compiled identities (compiler revision and artifact, plan, graph, selection, obligations, policy) and the worker (definition, name, revision, bundle identity) apart. Guidance, context, source and per-obligation identities stay out. A lifecycle of plain agent bundles has no slots, and a referenced revision that is missing or not a workflow-agent bundle is refused. Publication to Kiln #84 is later work.
 
-## Decision 5: the attempt seam is documented, not wired
+## Decision 5: an attempt names its workflow-agent revision; one function selects the subject
 
-`implementation-attempt` is owned elsewhere this round. `workflow::check_attempt(bundle, profile_revision)` refuses an attempt whose worker revision is not the one the bundle binds (`revision_not_selected`). The request change for the parent is an optional field naming the workflow-agent definition and revision; `seam::admit` would then pin that revision after `check_attempt`.
+`workflow::check_attempt(bundle, profile_revision)` refuses an attempt whose worker revision is not the one the bundle binds (`revision_not_selected`) and a plain agent bundle (`malformed`).
+
+The implementation-attempt request gains an optional `workflow_agent` `{definition, revision}`. It is per-attempt, bound by the exact request bytes like `lineage`, and not framed into the profile revision: the bundle already binds that revision, so framing the pair into it would be circular. Absent, it is not serialized, so requests keep their bytes, identity and profile revision.
+
+`seam::subject(request)` is the only subject selection: the named pair, else the worker's definition and profile revision. `seam::admit`, `effect`, `retained` and `close` each call it, so the implementation-attempt shell (`revision::{admit, permit, close, exportable}`), recovery and any later per-step recheck that goes through the seam all key on the same subject without passing it around. `admit-session --request` uses it too. With a named pair, `seam::admit` refuses a malformed pair as `malformed`, a definition without a lifecycle as `unknown_revision` (a named pair is never `unmanaged`), and, inside the lifecycle transaction that pins the session, a missing candidate as `unknown_revision` and a failing `check_attempt` with its refusal. `run` reports these as `revision_not_admitted` with `dispatched: false`; admission precedes the fence lock and the intent, so no step of the attempt can have started. A named pair without `--revision-store` is an error before any write.
+
+`effect`, `retained` and `close` key on the pair's definition only: the bundle is immutable per revision and the request's profile revision is fixed by its bytes, so the check is not repeated and closure does not depend on the candidate still being stored. `inspect` keeps the worker profile facts on the worker definition's lifecycle, which the projection requires, and reads the attempt's pin from the session subject's lifecycle.
+
+Rejected: putting the subject choice in `cli/session/revision.rs`. The operator command `admit-session --request` also admits a request's session, and a second selection there could disagree; the seam is the one place both callers share.
 
 ## Decision 6: the package comparison is a test harness
 

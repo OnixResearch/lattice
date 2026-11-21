@@ -301,6 +301,19 @@ refused before any effect. `inspect` prints `lattice.worker-inventory.v3`,
 with the agent revision lifecycle's slots when `--revision-store` is given;
 see [worker inventory](worker-inventory.md).
 
+An optional `workflow_agent` names a workflow-agent revision (Lattice #25) as
+`{"definition": "blake3:<64 hex>", "revision": "<64 hex>"}`. It is
+per-attempt, bound by the exact request bytes and not framed into
+`worker_profile_identity`; absent, the request keeps its bytes, request
+identity and profile revision. A malformed pair is refused before any effect.
+When present, the attempt needs `--revision-store`, and its session is
+admitted, permitted, closed and its export checked in the workflow-agent
+definition's lifecycle instead of the worker's, only when the stored bundle
+binds this request's exact profile revision. An unknown, mismatched or
+revoked pair, or a plain agent bundle named as one, is
+`revision_not_admitted` with `dispatched:false`, before any fence record,
+binding or intent; see [attempt seam](agent-revisions.md#attempt-seam).
+
 ### Profile revision framing (breaking)
 
 `worker_profile_identity` is the `lattice-worker-profile-revision-v2` content
@@ -406,7 +419,7 @@ them; Kiln remains the fence authority across them.
 | `crossed_attempt` | Same as `stale_fence` | Another attempt is recorded at this work and fence |
 | `substituted_request` | `true` | The attempt directory holds the intent of other request bytes, which may have executed; this request dispatched nothing |
 | `profile_revision_superseded` | `true` when the attempt directory holds an intent other than the closure marker, else `false` | The envelope's revision is not the current framing; the attempt is never executed or recovered |
-| `revision_not_admitted` | `false` | With `--revision-store`, the managed definition admits no new session of this revision; nothing is written ([agent revisions](agent-revisions.md#integration)) |
+| `revision_not_admitted` | `false` | With `--revision-store`, the managed definition admits no new session of this revision, or the named `workflow_agent` is unknown, binds another profile revision or is a plain agent bundle; nothing is written ([agent revisions](agent-revisions.md#integration)) |
 | `revision_blocked` | `false` | With `--revision-store`, the managed session was blocked right before spawn; the worker never started |
 | `export_revoked` | `true` | `export-candidate` of a managed attempt that executed, after its session, pinned revision or qualification was revoked; nothing is exported |
 | `lineage_blocked` | `false` | The request's Kiln budget lineage reports a blocker or serving backpressure; nothing is written ([repair and lineage](#bounded-same-attempt-repair-and-budget-lineage)) |

@@ -102,6 +102,7 @@ fn request(prompt: &str) -> Request {
         dispatch_plan: None,
         repair: None,
         lineage: None,
+        workflow_agent: None,
     }
 }
 

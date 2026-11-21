@@ -10,6 +10,10 @@
 //! the recorded mode back. Without a store the attempt is unmanaged and
 //! behaves exactly as before. The store is opened only around each seam call,
 //! so operator commands such as `revoke` are never locked out during a run.
+//!
+//! Every seam call keys on `seam::subject`: the workflow-agent definition and
+//! revision the request names, else the worker's own. A request naming a
+//! workflow-agent revision is never unmanaged, so it needs a store.
 
 // r[impl lattice.agent_revisions.seam.scenario.attempt]
 // r[impl lattice.implementation_attempt.consumer.scenario.admission_mode]
@@ -61,17 +65,56 @@ impl Store<'_> {
         Ok(())
     }
 
-    /// The definition's lifecycle, or `None` without a store or lifecycle.
-    pub(in super::super) fn lifecycle(
-        self,
-        request: &Request,
-    ) -> Result<Option<lattice_core::agent_revision::state::Lifecycle>, String> {
+    /// The worker definition's lifecycle for profile facts and the session
+    /// subject's lifecycle for its pin, both `None` without a store. They
+    /// are one read unless the request names a workflow-agent revision.
+    pub(in super::super) fn lifecycles(self, request: &Request) -> Result<Lifecycles, String> {
         let Some(path) = self.0 else {
-            return Ok(None);
+            return Ok(Lifecycles {
+                profile: None,
+                workflow: None,
+            });
         };
-        let definition = crate::agent_revision::bundle::resolve(request)?.definition.identity;
-        let stored = Self::open(path)?.load_lifecycle(&definition).map_err(|error| error.to_string())?;
-        Ok(stored.map(|(_, lifecycle)| lifecycle))
+        let store = Self::open(path)?;
+        let load = |definition: &str| {
+            store
+                .load_lifecycle(definition)
+                .map(|stored| stored.map(|(_, lifecycle)| lifecycle))
+                .map_err(|error| error.to_string())
+        };
+        let worker = crate::agent_revision::bundle::resolve(request)?.definition.identity;
+        let subject = crate::agent_revision::seam::subject(request)?.definition;
+        let workflow = (subject != worker).then(|| load(&subject)).transpose()?;
+        Ok(Lifecycles {
+            profile: load(&worker)?,
+            workflow,
+        })
+    }
+}
+
+type Lifecycle = lattice_core::agent_revision::state::Lifecycle;
+
+/// The lifecycles one inspection reads.
+pub(in super::super) struct Lifecycles {
+    /// The worker definition's.
+    profile: Option<Lifecycle>,
+    /// The workflow-agent definition's, read only when the session subject
+    /// is not the worker definition.
+    workflow: Option<Option<Lifecycle>>,
+}
+
+impl Lifecycles {
+    /// The worker definition's lifecycle, for the worker profile facts.
+    pub(in super::super) fn profile(&self) -> Option<&Lifecycle> {
+        self.profile.as_ref()
+    }
+
+    /// The session subject's lifecycle, for the attempt's pin.
+    pub(in super::super) fn session(&self) -> Option<&Lifecycle> {
+        match &self.workflow {
+            Some(workflow) => workflow.as_ref(),
+            None => self.profile.as_ref(),
+        }
     }
 }
 
@@ -88,6 +131,9 @@ pub(in super::super) struct Admitted {
 /// the typed refusal and starts nothing.
 pub(in super::super) fn admit(store: Store<'_>, request: &Request) -> Result<Admitted, String> {
     let Some(path) = store.0 else {
+        if request.workflow_agent.is_some() {
+            return Err("a workflow-agent attempt requires its --revision-store; nothing was dispatched".into());
+        }
         return Ok(Admitted {
             recorded: None,
             is_fresh: false,

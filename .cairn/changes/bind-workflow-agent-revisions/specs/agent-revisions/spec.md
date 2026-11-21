@@ -38,8 +38,26 @@ r[lattice.agent_revisions.workflow.projection] `workflow::publication::slots` MU
 ### Requirement: Inert composition and inspection
 r[lattice.agent_revisions.workflow.inspect] `agent-revision resolve-workflow` MUST compose a workflow-agent bundle from an exported implementation-attempt request and a typed workflow intent whose compiler artifact is the running executable, without admitting, preparing or writing anything. `desire-workflow` MUST record it as desired and MUST open no store before composition succeeds. An intent naming another compiler MUST be refused. `agent-revision inspect` MUST add `workflow_slots` for a workflow-agent lifecycle and omit it otherwise. The bundle MUST carry no path, endpoint, credential key or prompt.
 
-### Requirement: The attempt seam binds the exact worker revision
-r[lattice.agent_revisions.workflow.attempt] `workflow::check_attempt` MUST accept an attempt for a workflow-agent bundle only when the attempt's profile revision is the worker revision the bundle binds, refusing another revision as `revision_not_selected` and a malformed revision or a plain agent bundle as `malformed`.
+### Requirement: An attempt that names a workflow-agent revision runs under it
+r[lattice.agent_revisions.workflow.attempt] `workflow::check_attempt` MUST accept an attempt for a workflow-agent bundle only when the attempt's profile revision is the worker revision the bundle binds, refusing another revision as `revision_not_selected` and a malformed revision or a plain agent bundle as `malformed`. An implementation-attempt request MAY carry an optional `workflow_agent` `{definition, revision}`; it MUST be bound by the exact request bytes and MUST NOT be framed into the profile revision. `seam::subject` MUST be the seam's only subject selection: the named workflow-agent definition and revision, else the worker's own definition and profile revision, and `seam::admit`, `seam::effect`, `seam::retained`, `seam::close` and the attempt's lifecycle reads MUST all key on it. With the field, admission MUST load the named bundle from the agent-revision store and run `check_attempt` with the request's profile revision before pinning, and before any fence record, binding or intent.
+
+#### Scenario: A matching bundle admits and pins under the pair
+r[lattice.agent_revisions.workflow.attempt.scenario.subject]
+- GIVEN a promoted workflow-agent revision binding the attempt's exact worker revision, while the worker's own definition is managed with nothing selected
+- WHEN the attempt runs with `--revision-store`, the session is admitted through `admit-session`, and then the pair's session or revision is revoked
+- THEN the attempt MUST be admitted, record and close its pin in the workflow-agent lifecycle while the worker lifecycle stays untouched, `inspect` MUST read that pin from the workflow-agent lifecycle and the profile facts from the worker's, a session revoked after admission MUST be refused before spawn as `revision_blocked`, and a revoked revision MUST refuse new attempts as `revision_not_admitted` (`revision_revoked`) and the executed attempt's export as `export_revoked`
+
+#### Scenario: A mismatched, unknown or malformed pair is refused before any intent
+r[lattice.agent_revisions.workflow.attempt.scenario.refused]
+- GIVEN a request naming a bundle for another worker profile revision, a plain agent bundle, an unknown definition, an unknown revision, a malformed pair, or a pair without `--revision-store`
+- WHEN the attempt runs
+- THEN it MUST be refused with no fence record, binding, intent or pin: `revision_not_admitted` with `revision_not_selected`, `malformed`, `unknown_revision` and `unknown_revision` respectively, a validation error for the malformed pair, and an error naming `--revision-store` without a store
+
+#### Scenario: An absent field changes nothing
+r[lattice.agent_revisions.workflow.attempt.scenario.absent]
+- GIVEN a request without `workflow_agent` and the same request naming a pair
+- WHEN each is encoded, decoded and its subject selected
+- THEN the absent field MUST NOT be serialized and the request MUST round-trip byte for byte with the worker's subject, and the named pair MUST keep the profile revision and envelope identity, change the request bytes, select the pair and refuse unknown fields inside it
 
 ### Requirement: A draft-schema OCI package comparison
 r[lattice.agent_revisions.package_comparison] The comparison of the agent-package draft at `NVIDIA/agent-package-spec` `697872570744c8cfc1cf6b1d72e04db66e1a2c83` MUST be an inert fixture comparison labelled `draft_schema_fixture_comparison_not_materialization`: it MUST NOT read an archive, contact a registry, install or activate anything. Provider-native `sha256:` digests MUST stay separate from the BLAKE3 identities, and registry, repository, tag and version annotation MUST NOT enter any identity. `docs/agent-package-comparison.md` MUST record the decision.

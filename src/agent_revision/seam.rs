@@ -14,12 +14,58 @@
 //!   becomes managed later: [`effect`] and [`close`] answer `unmanaged` without reading the store.
 //! - An [`Admission::Managed`] session fails closed: an effect is blocked unless the lifecycle
 //!   still holds its live, unrevoked pin.
+//!
+//! Every call keys on one lifecycle [`Subject`], chosen only by [`subject`]:
+//! the workflow-agent definition and revision a request names, else the
+//! worker's own definition and profile revision. A named workflow-agent
+//! revision is admitted only when its lifecycle holds that bundle and the
+//! bundle binds the request's exact worker profile revision; it is never
+//! `unmanaged`.
 
 // r[impl lattice.agent_revisions.seam]
 // r[impl lattice.agent_revisions.seam.scenario.unmanaged]
 // r[impl lattice.agent_revisions.seam.scenario.admission_mode]
 
 type Refusal = lattice_core::agent_revision::Refusal;
+type Request = crate::implementation_attempt::cli::Request;
+
+/// The lifecycle definition and revision one session is admitted under.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct Subject {
+    pub definition: String,
+    pub revision: String,
+}
+
+// r[impl lattice.agent_revisions.workflow.attempt.scenario.subject]
+/// The seam's only subject selection: the workflow-agent definition and
+/// revision `request` names, else its worker definition and profile
+/// revision. Admission, effects, retained output, closure and every
+/// embedder's lifecycle read use it, so one session never changes subject.
+pub fn subject(request: &Request) -> Result<Subject, String> {
+    if let Some(pair) = &request.workflow_agent {
+        return Ok(Subject {
+            definition: pair.definition.clone(),
+            revision: pair.revision.clone(),
+        });
+    }
+    let resolved = super::bundle::resolve(request)?;
+    Ok(Subject {
+        definition: resolved.definition.identity,
+        revision: resolved.revision,
+    })
+}
+
+// r[impl lattice.agent_revisions.workflow.attempt.scenario.refused]
+/// A named workflow-agent `subject` admits only when `lifecycle` holds its
+/// bundle and that bundle binds `profile_revision`, the request's own.
+fn check_workflow(
+    lifecycle: &lattice_core::agent_revision::state::Lifecycle,
+    subject: &Subject,
+    profile_revision: &str,
+) -> Result<(), Refusal> {
+    let candidate = lifecycle.candidates.get(&subject.revision).ok_or(Refusal::UnknownRevision)?;
+    lattice_core::agent_revision::workflow::check_attempt(&candidate.bundle, profile_revision)
+}
 
 /// How a session was admitted. The caller records it durably with the
 /// session at admission and passes it back for every later seam call.
@@ -36,7 +82,8 @@ pub enum Admission {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 #[serde(tag = "decision", rename_all = "snake_case")]
 pub enum Decision {
-    /// No lifecycle exists for the definition; behave exactly as before.
+    /// No lifecycle exists for the worker's definition and the request names
+    /// no workflow-agent revision; behave exactly as before.
     Unmanaged,
     Admitted {
         admitted: lattice_core::agent_revision::ops::sessions::Admitted,
@@ -84,22 +131,43 @@ pub enum Closure {
     },
 }
 
-/// Pin `session` to `request`'s revision when its definition is managed.
-pub fn admit(
-    store: &crate::store::Store,
-    request: &crate::implementation_attempt::cli::Request,
-    session: &str,
-) -> Result<Decision, String> {
-    let resolved = super::bundle::resolve(request)?;
-    let definition = resolved.definition.identity.as_str();
+/// Pin `session` to `request`'s [`subject`] revision when its definition is
+/// managed. A named workflow-agent revision without a lifecycle, with no
+/// such bundle, or whose bundle binds another worker profile revision is
+/// refused before anything is pinned.
+pub fn admit(store: &crate::store::Store, request: &Request, session: &str) -> Result<Decision, String> {
+    let subject = subject(request)?;
+    let definition = subject.definition.as_str();
+    if request.workflow_agent.as_ref().is_some_and(|pair| !pair.is_well_formed()) {
+        return Ok(Decision::Refused {
+            refusal: Refusal::Malformed,
+        });
+    }
+    debug_assert!(
+        request
+            .workflow_agent
+            .as_ref()
+            .is_none_or(crate::implementation_attempt::WorkflowAgent::is_well_formed)
+    );
     if store.load_lifecycle(definition).map_err(|error| error.to_string())?.is_none() {
+        if request.workflow_agent.is_some() {
+            return Ok(Decision::Refused {
+                refusal: Refusal::UnknownRevision,
+            });
+        }
         return Ok(Decision::Unmanaged);
     }
+    let profile_revision = request.workflow_agent.as_ref().map(|_| request.worker_profile_identity()).transpose()?;
+    // Only a named workflow-agent revision is checked against its bundle.
+    debug_assert_eq!(profile_revision.is_some(), request.workflow_agent.is_some());
     let entry = lattice_core::agent_revision::ops::sessions::Entry {
         session,
-        revision: &resolved.revision,
+        revision: &subject.revision,
     };
     let result = super::commands::transact(store, definition, super::commands::Seed::Existing, |lifecycle| {
+        if let Some(profile_revision) = &profile_revision {
+            check_workflow(lifecycle, &subject, profile_revision)?;
+        }
         lattice_core::agent_revision::ops::sessions::admit(lifecycle, entry)
     })?;
     Ok(match result {
@@ -112,14 +180,14 @@ pub fn admit(
 /// protected effect. A managed session unknown to the lifecycle is blocked.
 pub fn effect(
     store: &crate::store::Store,
-    request: &crate::implementation_attempt::cli::Request,
+    request: &Request,
     session: &str,
     admission: Admission,
 ) -> Result<Effect, String> {
     if admission == Admission::Unmanaged {
         return Ok(Effect::Unmanaged);
     }
-    let definition = super::bundle::resolve(request)?.definition.identity;
+    let definition = subject(request)?.definition;
     let Some((_, lifecycle)) = store.load_lifecycle(&definition).map_err(|error| error.to_string())? else {
         return Ok(Effect::Blocked {
             refusal: Refusal::UnknownSession,
@@ -138,7 +206,7 @@ pub fn effect(
 /// one is blocked once its session, revision or qualification is revoked.
 pub fn retained(
     store: &crate::store::Store,
-    request: &crate::implementation_attempt::cli::Request,
+    request: &Request,
     session: &str,
     admission: Admission,
     permit: lattice_core::agent_revision::ops::sessions::Permit,
@@ -146,7 +214,7 @@ pub fn retained(
     if admission == Admission::Unmanaged {
         return Ok(Effect::Unmanaged);
     }
-    let definition = super::bundle::resolve(request)?.definition.identity;
+    let definition = subject(request)?.definition;
     let Some((_, lifecycle)) = store.load_lifecycle(&definition).map_err(|error| error.to_string())? else {
         return Ok(Effect::Blocked {
             refusal: Refusal::UnknownSession,
@@ -164,7 +232,7 @@ pub fn retained(
 /// pinned revision. An unmanaged session is left untouched.
 pub fn close(
     store: &crate::store::Store,
-    request: &crate::implementation_attempt::cli::Request,
+    request: &Request,
     session: &str,
     admission: Admission,
     checkpoints: &[String],
@@ -172,7 +240,7 @@ pub fn close(
     if admission == Admission::Unmanaged {
         return Ok(Closure::Unmanaged);
     }
-    let definition = super::bundle::resolve(request)?.definition.identity;
+    let definition = subject(request)?.definition;
     if store.load_lifecycle(&definition).map_err(|error| error.to_string())?.is_none() {
         return Ok(Closure::Refused {
             refusal: Refusal::UnknownSession,

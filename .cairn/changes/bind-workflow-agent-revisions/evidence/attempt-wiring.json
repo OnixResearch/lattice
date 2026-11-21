@@ -1,0 +1,60 @@
+{
+  "schema": "lattice.fixture-qualification.v1",
+  "change": "bind-workflow-agent-revisions",
+  "task": "5.3",
+  "kind": "synthetic-fixture-attempt-wiring",
+  "live_qualification": false,
+  "live_preparation_exercised": false,
+  "evidence_label": "fixture",
+  "base_revision": "6846d53e6d9570b85357fbc395036d972961b285",
+  "request_field": {
+    "name": "workflow_agent",
+    "shape": {"definition": "blake3:<64 hex>", "revision": "<64 hex>"},
+    "framed_into_profile_revision": false,
+    "bound_by": "the exact request bytes",
+    "absent": "not serialized; request bytes, request identity and profile revision unchanged"
+  },
+  "subject_selection": "lattice::agent_revision::seam::subject, called by seam::admit, seam::effect, seam::retained, seam::close, admit-session and the attempt's lifecycle reads",
+  "refusals": {
+    "malformed_pair": "request validation error before any effect; seam::admit answers malformed",
+    "unknown_definition": "revision_not_admitted / unknown_revision",
+    "unknown_revision": "revision_not_admitted / unknown_revision",
+    "bundle_for_another_worker_profile": "revision_not_admitted / revision_not_selected",
+    "plain_agent_bundle_named": "revision_not_admitted / malformed",
+    "revoked_pair_revision": "revision_not_admitted / revision_revoked; export of an executed attempt export_revoked",
+    "pair_session_revoked_after_admission": "revision_blocked / session_revoked, before spawn",
+    "no_revision_store": "error naming --revision-store before any write"
+  },
+  "tests": {
+    "file": "src/implementation_attempt/cli/tests/workflow_agent.rs",
+    "names": [
+      "an_absent_workflow_agent_keeps_request_bytes_identity_and_revision",
+      "a_matching_bundle_admits_the_attempt_under_the_pair_not_the_worker",
+      "a_pinned_session_keys_on_the_pair",
+      "revoking_the_pair_refuses_new_attempts_and_the_retained_export",
+      "revoking_the_pairs_session_after_admission_blocks_the_attempt_before_spawn",
+      "a_bundle_for_another_worker_profile_is_refused_before_any_intent",
+      "an_unknown_definition_or_revision_or_a_missing_store_is_refused_before_any_intent"
+    ]
+  },
+  "checks": {
+    "environment": "RUSTC_WRAPPER empty, CARGO_BUILD_JOBS=6, TMPDIR=/var/tmp/lw, the session's pinned rust 1.99.0-nightly-2026-07-17 toolchain",
+    "lib_tests": "cargo test -p lattice --lib -- implementation_attempt: exit 0; 99 passed, 0 failed, including the 7 workflow_agent tests",
+    "integration_tests": "cargo test -p lattice --test test_agent_revision_workflow --test test_agent_revision_shell --test test_agent_revision_core --test test_implementation_attempt_refusals --test test_agent_revision_attachments: exit 0; 11 + 9 + 20 + 3 + 17 passed",
+    "lattice_core_filter": "cargo test -p lattice-core agent_revision: exit 0; 0 tests match the filter in lattice-core itself (its agent_revision coverage runs in the lattice integration tests above)",
+    "clippy": "cargo clippy -p lattice -p lattice-core --all-targets --no-deps -- -D warnings: exit 0",
+    "fmt": "cargo fmt -p lattice -p lattice-core --check: exit 0",
+    "octet": "octet-precommit-check: exit 0; root 1052 accepted, 1052 current, 0 new, 0 stale; lattice-core 25 accepted, 25 current, 0 new, 0 stale. One root finding identity moved (underscore_in_module_filename on src/implementation_attempt.rs) and was re-keyed with scripts/octet-baseline-migrate.rs in identity-only mode against a reference run of 6846d53e (old=1052 candidate=1052, 0 unmatched)",
+    "octet_semantic_delta": "octet_semantic_delta.py against the 6846d53e baselines: root new_semantic=0 resolved_semantic=0; lattice-core new_semantic=0 resolved_semantic=0",
+    "cairn": "cairn validate --root . --policy cairn-policy/generated/cairn-policy.json: exit 0, valid, 64 specs validated, 0 issues; proposal, design and tasks gates of bind-workflow-agent-revisions: PASS",
+    "gitleaks": "gitleaks dir over every changed and new path: no leaks found",
+    "scripts_check": "not run in this slice",
+    "nix_flake_check": "not run in this slice"
+  },
+  "non_claims": [
+    "No workflow-agent revision was prepared, qualified or run live; the plans, attachments and workers are fixtures.",
+    "The fixture worker is blocked at broker admission and never reaches a model.",
+    "A revoked qualification of the pair and an unselected pair were not exercised separately; they reach the same session admission and effect checks as a worker definition.",
+    "No per-step seam recheck exists yet; a repair step does not call the seam."
+  ]
+}

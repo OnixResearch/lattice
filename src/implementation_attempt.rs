@@ -55,6 +55,29 @@ pub struct ImplementationAttemptEnvelope {
     pub policy_digest: String,
 }
 
+/// The workflow-agent revision (Lattice #25) one attempt names: the
+/// definition and revision of a `lattice.workflow-agent-bundle.v1` in the
+/// agent-revision store. Per-attempt: bound by the exact request bytes, never
+/// by the worker profile revision, which the bundle itself binds.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorkflowAgent {
+    /// The `blake3:` workflow-agent definition identity.
+    pub definition: String,
+    /// The bare-hex workflow-agent revision.
+    pub revision: String,
+}
+
+impl WorkflowAgent {
+    /// Whether both identities are well formed. Only the agent-revision
+    /// store decides whether they name a bundle.
+    #[must_use]
+    pub fn is_well_formed(&self) -> bool {
+        lattice_core::agent_revision::is_reference(&self.definition)
+            && lattice_core::agent_revision::is_bare_digest(&self.revision)
+    }
+}
+
 /// Admit the envelope and return the canonical identity of its exact inputs.
 pub fn admit_implementation_attempt(
     envelope: &ImplementationAttemptEnvelope,

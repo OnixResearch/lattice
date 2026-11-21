@@ -10,7 +10,7 @@
     "tool_version": "0.1.0",
     "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu"
   },
-  "baseline_hash": "b3:cc4a4c5336b3c74bb67fda6fee22ae355fca97d61673e4abda8d7a8ff663bddb",
+  "baseline_hash": "b3:e00f581246abb2d941ca0fae854f15cfaaf0b7d76783e37676fecc8214a5c10b",
   "findings": [
     {
       "stable_id": "b3:00078fe172707ba0",
@@ -712,19 +712,6 @@
       "line": 7,
       "column": 1,
       "message": "non-trait import `Artifact` hides the owner path; prefer the qualified path at the use site",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:0b746056461b81e1",
-      "semantic_id": "b3:0b746056461b81e1",
-      "identity_status": "computed",
-      "lint": "underscore_in_module_filename",
-      "group": "tigerstyle::naming",
-      "severity": "warning",
-      "file": "src/implementation_attempt.rs",
-      "line": 1,
-      "column": 1,
-      "message": "module filename `implementation_attempt.rs` contains an underscore; prefer `implementation/attempt.rs`",
       "crate_name": "lattice"
     },
     {
@@ -3257,7 +3244,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/implementation_attempt.rs",
-      "line": 170,
+      "line": 193,
       "column": 1,
       "message": "parameter uses `&Vec<u8>`; accept `&[u8]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "lattice"
@@ -3309,7 +3296,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/implementation_attempt.rs",
-      "line": 176,
+      "line": 199,
       "column": 1,
       "message": "item name `ImplementationAttemptError` repeats `implementation` from ancestor path segment `implementation_attempt`",
       "crate_name": "lattice"
@@ -4037,7 +4024,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/implementation_attempt.rs",
-      "line": 59,
+      "line": 82,
       "column": 1,
       "message": "item name `admit_implementation_attempt` repeats `implementation` from ancestor path segment `implementation_attempt`",
       "crate_name": "lattice"
@@ -8223,7 +8210,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/implementation_attempt.rs",
-      "line": 95,
+      "line": 118,
       "column": 12,
       "message": "condition has 4 boolean operators",
       "crate_name": "lattice"
@@ -12867,6 +12854,19 @@
       "line": 305,
       "column": 1,
       "message": "parameter uses `&Vec<Field>`; accept `&[Field]` unless ownership, capacity, or exact owned type identity is required",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:ef29b888abe8d024",
+      "semantic_id": "b3:ef29b888abe8d024",
+      "identity_status": "computed",
+      "lint": "underscore_in_module_filename",
+      "group": "tigerstyle::naming",
+      "severity": "warning",
+      "file": "src/implementation_attempt.rs",
+      "line": 1,
+      "column": 1,
+      "message": "module filename `implementation_attempt.rs` contains an underscore; prefer `implementation/attempt.rs`",
       "crate_name": "lattice"
     },
     {

@@ -52,9 +52,19 @@ interfaces.
   `workflow::adaptation::propose` describes a changed plan, prompt, tool,
   requirement or policy as a new revision with an applicability decision
   fixed to `unknown` (owners Cairn #14 and Kiln #83) and changes no
-  lifecycle. Plain agent bundles keep their bytes and identities. The attempt
-  seam `workflow::check_attempt` is not wired into `implementation-attempt`
-  yet. See `docs/agent-revisions.md`.
+  lifecycle. Plain agent bundles keep their bytes and identities. An
+  implementation-attempt request may name one in the optional
+  `workflow_agent` field (`{definition, revision}`), which is per-attempt
+  and not part of the profile revision; absent, a request keeps its bytes,
+  identity and profile revision. `seam::subject` is the one subject
+  selection: with the field, `seam::admit`, `effect`, `retained` and `close`
+  key on the workflow-agent definition and revision, and admission requires
+  `--revision-store`, a stored bundle and `workflow::check_attempt` against
+  the request's profile revision. An unknown, mismatched or revoked pair, or
+  a plain agent bundle named as one, is `revision_not_admitted` with
+  `dispatched:false` before any fence record or intent. `inspect` reads the
+  attempt's pin from the workflow-agent lifecycle. See
+  `docs/agent-revisions.md`.
 - An inert draft-schema comparison of the NVIDIA agent-package proposal
   (`697872570744c8cfc1cf6b1d72e04db66e1a2c83`) with Lattice bundle
   identities: a reviewed skill, a plugin with bundled skills, 31 negative

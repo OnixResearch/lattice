@@ -80,6 +80,6 @@
     "No workflow-agent revision was prepared, qualified or run live; the plans and workers are fixtures.",
     "Cairn #14 supplies no producer cohort yet, and nothing is published to Kiln #84.",
     "The package comparison read no archive, contacted no registry, verified no signature and installed nothing; the OCI manifest, config and layer digests are fixture values.",
-    "implementation-attempt does not name a workflow-agent bundle yet."
+    "At the time of this evidence implementation-attempt did not name a workflow-agent bundle; task 5.1 wires it, recorded in evidence/attempt-wiring.json."
   ]
 }

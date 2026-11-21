@@ -313,7 +313,11 @@ operator commands such as `revoke` are never locked out during a run.
 
 Without `--revision-store` an attempt is unmanaged and behaves exactly as
 before: `intent.json` holds the request identity's bytes and no seam is
-called. The session identifier of an attempt is its envelope identity.
+called. A request that names a workflow-agent revision is the exception: it
+needs the store. The session identifier of an attempt is its envelope
+identity, and its lifecycle subject is the worker's definition and profile
+revision, or the named workflow-agent definition and revision (see
+[attempt seam](#attempt-seam)).
 
 1. `run` calls `seam::admit` before writing anything for the attempt: before
    its fence record, execution binding, candidate store or intent.
@@ -508,17 +512,54 @@ Kiln is later work; nothing is sent.
 
 ### Attempt seam
 
-`implementation-attempt` does not name a workflow-agent bundle yet. The
-pure check an attempt will use is
-`workflow::check_attempt(bundle, profile_revision)`: the attempt's profile
-revision must be the worker revision the bundle binds
-(`revision_not_selected` otherwise). Wiring it needs an optional request
-field naming the workflow-agent definition and revision, so `seam::admit`
-pins that revision after the check.
+An implementation-attempt request may name a workflow-agent revision in the
+optional `workflow_agent` field:
+
+```json
+"workflow_agent": {"definition": "blake3:<64 hex>", "revision": "<64 hex>"}
+```
+
+The field is per-attempt: it is bound by the exact request bytes and is not
+framed into the worker profile revision, which the bundle itself binds.
+Absent, the request keeps its bytes, request identity and profile revision
+and behaves as before. Unknown fields inside it are refused, and a definition
+that is not `blake3:` plus 64 lowercase hex or a revision that is not 64
+lowercase hex is refused by request validation before any effect.
+
+`seam::subject(request)` is the only place the seam chooses a lifecycle
+subject: the named workflow-agent definition and revision, else the worker's
+own definition and profile revision. `seam::admit`, `seam::effect`,
+`seam::retained`, `seam::close` and `admit-session --request` all key on it,
+so an attempt's session is pinned, permitted, closed and its retained
+candidate checked in the workflow-agent lifecycle, never the worker's. With
+a named pair, `seam::admit` does the following under the same lifecycle
+transaction that pins the session:
+
+- No lifecycle for the named definition: `unknown_revision` (a named pair is
+  never `unmanaged`).
+- No candidate for the named revision: `unknown_revision`.
+- `workflow::check_attempt(bundle, profile_revision)` with the request's own
+  worker profile revision: a bundle binding another worker revision is
+  `revision_not_selected`; a plain agent bundle is `malformed`.
+- Then the usual session admission: only the revision selected for new
+  sessions, unrevoked, is pinned.
+
+`implementation-attempt run` reports each of these refusals as
+`revision_not_admitted` with `dispatched: false` and the lifecycle refusal in
+`revision_refusal`, before any fence record, binding, intent or worker
+effect. Revoking the pair's session after admission blocks the attempt right
+before spawn as `revision_blocked`; revoking the pair's revision refuses new
+attempts (the `revision_refusal` code is `revision_revoked`) and an executed
+attempt's export as `export_revoked`, exactly as for a worker definition. A
+request naming a pair without `--revision-store` is an error before any
+write. `inspect` keeps projecting the worker profile facts from the worker
+definition's lifecycle and reads the attempt's pin from the workflow-agent
+lifecycle.
 
 Non-claims: the plans and workers are fixtures, Cairn #14 supplies no
 producer cohort yet, and no workflow-agent revision has been prepared,
-qualified or run live.
+qualified or run live. The attempt tests run the fixture worker, which is
+blocked at broker admission and never reaches a model.
 
 An inert comparison of the NVIDIA agent-package draft with these identities
 is in [agent-package-comparison.md](agent-package-comparison.md).

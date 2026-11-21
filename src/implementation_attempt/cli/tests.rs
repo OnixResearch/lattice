@@ -8,6 +8,7 @@
 mod coordinator;
 mod repair;
 pub(super) mod revisions;
+mod workflow_agent;
 
 /// A valid v3 request with one brokered `primary` route.
 pub(super) fn request(
@@ -85,6 +86,7 @@ pub(super) fn request(
         dispatch_plan: None,
         repair: None,
         lineage: None,
+        workflow_agent: None,
     };
     request.execution_binding.model_routes = lattice_core::execution_binding::request::RouteDeclaration::Routes {
         routes: vec![super::binding::primary_route(&request).expect("primary route identity")],

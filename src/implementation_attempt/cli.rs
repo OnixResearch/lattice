@@ -129,6 +129,15 @@ pub struct Request {
     /// Per-attempt: bound by the exact request bytes, not the profile revision.
     #[serde(default = "absent", skip_serializing_if = "Option::is_none")]
     pub lineage: Option<super::lineage::Binding>,
+    /// Optional workflow-agent revision (Lattice #25). When present, the
+    /// attempt's session is admitted under this definition and revision
+    /// instead of the worker's own, and only when the stored bundle binds
+    /// this request's exact worker profile revision. Per-attempt: bound by the
+    /// exact request bytes, not the profile revision; absent, the request
+    /// decodes and behaves exactly as before.
+    // r[impl lattice.agent_revisions.workflow.attempt.scenario.absent]
+    #[serde(default = "absent", skip_serializing_if = "Option::is_none")]
+    pub workflow_agent: Option<super::WorkflowAgent>,
 }
 
 /// An absent optional coordinator field.
@@ -172,6 +181,9 @@ impl Request {
             return Err(refusal::Reason::ProfileRevisionSuperseded.message().into());
         }
         refusal::validate_coordinator(self)?;
+        if self.workflow_agent.as_ref().is_some_and(|pair| !pair.is_well_formed()) {
+            return Err("workflow-agent definition or revision is malformed".into());
+        }
         repair::validate(self)?;
         binding::validate_request(self)
     }

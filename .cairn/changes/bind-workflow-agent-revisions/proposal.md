@@ -15,19 +15,18 @@ Separately, the issue asks for a bounded comparison of the NVIDIA agent-package 
 - `workflow::adaptation::propose` describes a proposed adaptation as a new revision with its changes and an applicability slot fixed to `unknown`, owned by Cairn #14 and Kiln #83. It changes no lifecycle. r[lattice.agent_revisions.workflow.adaptation]
 - `workflow::publication::slots` projects `lattice.workflow-agent-revision-slots.v1` for Kiln #84 with the workflow and worker revisions apart; `agent-revision inspect` adds it as `workflow_slots`. r[lattice.agent_revisions.workflow.projection]
 - `agent-revision resolve-workflow` and `desire-workflow` compose a bundle from an implementation-attempt request and a typed intent naming this compiler executable. r[lattice.agent_revisions.workflow.inspect]
-- `workflow::check_attempt` is the documented seam for an attempt that names a workflow-agent bundle. r[lattice.agent_revisions.workflow.attempt]
+- `workflow::check_attempt` checks an attempt against the workflow-agent bundle it names. An implementation-attempt request may carry an optional, per-attempt `workflow_agent` `{definition, revision}`; `seam::subject` is the seam's one subject selection, so admission, effects, retained output and closure key on the named pair, and admission loads the bundle and runs `check_attempt` before any intent. Absent, requests keep their bytes, identity and profile revision. r[lattice.agent_revisions.workflow.attempt]
 - A draft-schema fixture comparison of one reviewed skill and one plugin with bundled skills, 31 negative cases, the payload-change, relocation, revocation and rollback cases, and the decision `docs/agent-package-comparison.md` (useful mapping, adoption deferred). r[lattice.agent_revisions.package_comparison]
 
 ## Impact
 
 - **Pure core:** new `crates/lattice-core/src/agent_revision/workflow/{mod,adaptation,publication}.rs`; `facts.rs` (optional `workflow`), `identity.rs` (two domains), one module line in `agent_revision/mod.rs`.
-- **Shell:** new `src/agent_revision/composite.rs`; `src/agent_revision/{mod,commands,bundle}.rs`; `src/workflow/intent/{model,cli}.rs` (plan accessors, `load` visible in the crate).
-- **Tests and fixtures:** `tests/test_agent_revision_workflow.rs`, `tests/test_agent_package_comparison.rs`, two tests in `tests/test_agent_revision_shell.rs`, `tests/fixtures/agent-package/`, `tests/fixtures/agent-revisions/workflow-agent-identities.json`.
-- **Docs:** `docs/agent-revisions.md`, new `docs/agent-package-comparison.md`, changelog.
-- **Compatibility:** every existing bundle, revision, lifecycle row, inventory and CLI command keeps its bytes and behavior. No Cargo dependency is added.
+- **Shell:** new `src/agent_revision/composite.rs`; `src/agent_revision/{mod,commands,bundle,seam}.rs`; `src/workflow/intent/{model,cli}.rs` (plan accessors, `load` visible in the crate); `src/implementation_attempt.rs` (`WorkflowAgent`), the `workflow_agent` request field in `src/implementation_attempt/cli.rs`, `cli/session/revision.rs` and the pin read in `cli/inspect/mod.rs`.
+- **Tests and fixtures:** `tests/test_agent_revision_workflow.rs`, `tests/test_agent_package_comparison.rs`, two tests in `tests/test_agent_revision_shell.rs`, `src/implementation_attempt/cli/tests/workflow_agent.rs`, `tests/fixtures/agent-package/`, `tests/fixtures/agent-revisions/workflow-agent-identities.json`.
+- **Docs:** `docs/agent-revisions.md`, `docs/candidate-worker.md`, new `docs/agent-package-comparison.md`, changelog.
+- **Compatibility:** every existing bundle, revision, lifecycle row, inventory, request without `workflow_agent` and CLI command keeps its bytes and behavior. No Cargo dependency is added.
 
 ## Out of Scope
 
-- Wiring workflow-agent bundles into `implementation-attempt` (the attempt request does not name a bundle yet; the seam is documented).
 - Publication to Kiln #84 and any Kiln reader; live preparation, qualification or canary (Kiln #49); a Cairn #14 producer cohort.
 - Any OCI registry, installer, materialization or activation controller.

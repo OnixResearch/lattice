@@ -249,10 +249,10 @@ pub fn binding(bundle: &Bundle) -> Result<&Binding, Refusal> {
 }
 
 // r[impl lattice.agent_revisions.workflow.attempt]
-/// The seam an attempt request will use once it names a workflow-agent
-/// bundle: a session of `bundle` may run only the exact worker revision the
-/// bundle binds. Admission then pins the bundle's own definition and
-/// revision; the worker's profile revision alone never admits it.
+/// The check `seam::admit` runs for an attempt request that names a
+/// workflow-agent bundle: a session of `bundle` may run only the exact worker
+/// revision the bundle binds. Admission then pins the bundle's own definition
+/// and revision; the worker's profile revision alone never admits it.
 pub fn check_attempt(bundle: &Bundle, profile_revision: &str) -> Result<(), Refusal> {
     let binding = binding(bundle)?;
     if !crate::agent_revision::is_bare_digest(profile_revision) {

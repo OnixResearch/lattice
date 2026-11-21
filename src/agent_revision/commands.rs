@@ -204,7 +204,7 @@ fn prepare(
 fn admit(request: &std::path::Path, store: &crate::store::Store, session: &str) -> Result<Value, String> {
     let request = super::bundle::load(request)?;
     let decision = super::seam::admit(store, &request, session)?;
-    let definition = super::bundle::resolve(&request)?.definition.identity;
+    let definition = super::seam::subject(&request)?.definition;
     let result = match decision {
         super::seam::Decision::Refused { refusal } => Err(refusal),
         admitted @ (super::seam::Decision::Unmanaged | super::seam::Decision::Admitted { .. }) => Ok(admitted),
