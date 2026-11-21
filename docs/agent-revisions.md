@@ -154,12 +154,14 @@ same rollout generation, one is selected and the rest are
 
 `admit-session --request REQUEST --session ID` pins the session to the
 selected revision when the request's revision equals it, and exits non-zero
-when admission is refused. When `ID` is the request's own attempt session,
-its envelope identity, the session is attempt-bound and needs `--state
-STATE`, the implementation-attempt state root: it is admitted through the
-same first admission `implementation-attempt run` uses, under the attempt's
-fence lock (see [attempt seam](#attempt-seam)). Any other session is pinned
-after `run`'s request validation. Re-admitting a pinned session returns its pin only
+when admission is refused. It refuses the request's own attempt session, its
+envelope identity, before any state change with `attempt_session`: only
+`implementation-attempt run` admits an attempt's session, under the
+attempt's fence lock (see [attempt seam](#attempt-seam)). This narrows
+`admit-session` relative to `db64cd65`, which pinned that session outside
+the attempt's fence. Any other session is pinned after `run`'s request
+validation, and the session check and the admission read one parse of the
+request. Re-admitting a pinned session returns its pin only
 while the session is live and neither its revision nor its qualification is
 revoked; a closed session is `session_closed`. `effect_permitted` refuses
 further effects when the session is closed or revoked, or its pinned revision
@@ -552,21 +554,14 @@ session's pin or the recorded permit names another revision than the
 request's, so a request naming one revision never acts on a session pinned
 to another revision of the same definition.
 
-`admit-session --state` for the attempt's own session runs the first
-admission `implementation-attempt run` runs, in `run`'s order, and stops once
-the session is admitted: request validation, the workspace boundary and the
-bounded-step timeout; then, under the attempt's fence lock, the closing of a
-pin an earlier admission left without an intent, the intent store, the
-lineage and repair-port gates with the standalone CLI's ports, the fence, and
-the session behind its write-ahead record. It refuses exactly where `run`
-refuses (a closed attempt, another request's intent, a stale or crossed
-fence, a failed preflight) and pins nothing then; a typed refusal at the
-gates, the fence or the session closes the attempt-fence as `run`'s does. The pin and its
-write-ahead record stay until a run of the attempt-fence creates its intent
-or a later run or recovery closes the pin
-([candidate worker](candidate-worker.md#coordinator-transport)). Without
-`--state` the attempt's own session is refused; any other session is pinned
-after the same request validation. With a named pair, `seam::admit` does the following under
+`admit-session` never admits an attempt's own session (its envelope
+identity): it refuses it as `attempt_session` before opening the store,
+taking a lock or writing a fence record, pin or closure marker, so only
+`implementation-attempt run` pins it, under the attempt's fence lock and
+behind its write-ahead record
+([candidate worker](candidate-worker.md#coordinator-transport)). Any other
+session is pinned after `run`'s request validation, from the same single
+read of the request. With a named pair, `seam::admit` does the following under
 the same lifecycle transaction that pins the session:
 
 - No lifecycle for the named definition: `unknown_revision` (a named pair is

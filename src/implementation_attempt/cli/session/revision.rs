@@ -79,8 +79,6 @@ type Decision = crate::agent_revision::seam::Decision;
 pub(in super::super) struct Admitted {
     /// `None` without a store: the legacy intent, unmanaged by construction.
     pub recorded: Option<Recorded>,
-    /// The seam's answer, as `admit-session` prints it.
-    pub decision: Decision,
     /// This run pinned the session; another run did not pin it before.
     is_fresh: bool,
 }
@@ -109,7 +107,6 @@ pub(in super::super) fn admit(
         debug_assert!(request.workflow_agent.is_none());
         return Ok(Admitted {
             recorded: None,
-            decision: Decision::Unmanaged,
             is_fresh: false,
         });
     };
@@ -118,7 +115,7 @@ pub(in super::super) fn admit(
     // error of the seam keeps it: the pin may exist.
     reservation::reserve(directory, request, request_identity)?;
     let decision = crate::agent_revision::seam::admit(&Store::open(path)?, request, &identifier(request))?;
-    let (pin, is_fresh) = match decision.clone() {
+    let (pin, is_fresh) = match decision {
         Decision::Unmanaged => (None, false),
         Decision::Admitted { admitted } => match admitted {
             lattice_core::agent_revision::ops::sessions::Admitted::Pinned { pin, pin_identity } => {
@@ -148,7 +145,6 @@ pub(in super::super) fn admit(
     };
     Ok(Admitted {
         recorded: Some(Recorded { admission, pin }),
-        decision,
         is_fresh,
     })
 }

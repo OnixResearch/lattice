@@ -117,6 +117,31 @@
     },
     "gates": "the final_review gates recorded in fence-intent-creation-atomically/evidence/verification.json, run on the same tree; cairn gate proposal|design|tasks bind-workflow-agent-revisions: PASS"
   },
+  "final_review_2": {
+    "trigger": "verification review of 0a3e0c63: attempt-bound admit-session pinned a revision that a later run of the same request closed and could not re-admit once another revision was selected (P2); portless admit-session of a valid repair request settled repair_ports_unavailable and closed the attempt-fence for good (P2); --session was checked against one read of the request file and admit_session read it again (P2)",
+    "base_revision": "cdb9c96c",
+    "recorded_on": "2026-11-21",
+    "rule": "agent-revision admit-session refuses a request's own attempt session (its envelope identity) with the typed AdmitRefusal::AttemptSession, naming lattice implementation-attempt run, before opening the store or writing anything; --state, cli::execution::admission::admit_session and the stop-after-admission mode are gone, so only run admits an attempt session. Any other session is pinned by operator::admit after Request::validate, from the one parsed request. This narrows admit-session relative to published db64cd65.",
+    "tasks": {
+      "9.1": [
+        "src/implementation_attempt/cli/tests/workflow_agent.rs::admit_session_refuses_the_attempt_session_before_any_state_change",
+        "tests/test_agent_revision_shell.rs::the_cli_exits_non_zero_on_every_refusal",
+        "src/implementation_attempt/cli/tests/workflow_agent.rs::a_pinned_session_keys_on_the_pair",
+        "src/implementation_attempt/cli/tests/workflow_agent.rs::a_request_naming_another_revision_never_acts_on_the_pinned_session",
+        "src/implementation_attempt/cli/tests/revisions.rs::capture_managed_worker_inventory_v3"
+      ],
+      "9.2": [
+        "src/implementation_attempt/cli/tests/workflow_agent.rs::the_operator_check_and_admission_read_one_parse"
+      ],
+      "9.3": [
+        "docs/agent-revisions.md (sessions and effects; attempt seam)",
+        "CHANGELOG.md (Changed: Breaking narrowing of admit-session)",
+        "specs/agent-revisions/spec.md (operator and subject scenarios)"
+      ]
+    },
+    "capture": "capture_managed_worker_inventory_v3 now pins managed-4's session through run's own admission lost before its intent (execution::admission::lost_after_pin) instead of attempt-bound admit-session. All eight captures stay lattice.worker-inventory.v3 and equal the cdb9c96c captures except observed_at_epoch_ms, incarnation and state_digest, which also differ between two runs of the same tree.",
+    "gates": "the final_review_2 gates recorded in fence-intent-creation-atomically/evidence/verification.json, run on the same tree"
+  },
   "non_claims": [
     "No workflow-agent revision was prepared, qualified or run live; the plans, attachments and workers are fixtures.",
     "The fixture worker is blocked at broker admission and never reaches a model.",

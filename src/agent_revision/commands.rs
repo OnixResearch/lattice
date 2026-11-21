@@ -6,7 +6,8 @@ type Refusal = lattice_core::agent_revision::Refusal;
 type Applied<T> = lattice_core::agent_revision::ops::Applied<T>;
 type Kind = lattice_core::agent_revision::state::SelectionKind;
 type Value = serde_json::Value;
-type Path = std::path::Path;
+
+pub mod operator;
 
 pub const OUTCOME_SCHEMA: &str = "lattice.agent-revision-outcome.v1";
 /// Commits attempted before a contended lifecycle is reported.
@@ -104,8 +105,7 @@ pub(super) fn execute(command: &super::Command, ports: super::Ports<'_>) -> Resu
             request,
             store,
             session,
-            state,
-        } => admit(request, store, session, state.as_deref()),
+        } => operator::admit_command(request, store, session),
         super::Command::Cleanup { store, definition } => cleanup(&open(store)?, definition, ports.preparation),
         super::Command::Inspect { store, definition } => inspect(store, definition),
         super::Command::ResolveWorkflow(workflow) => super::composite::resolve_command(workflow),
@@ -201,36 +201,6 @@ fn prepare(
     debug_assert_eq!(ticket.revision, subject.revision);
     debug_assert_eq!(ticket.definition, subject.definition);
     Ok(output)
-}
-
-/// Pin `session`: the attempt's own session (its envelope identity) through `run`'s first
-/// admission with `--state`; any other session after `run`'s request validation.
-fn admit(request: &Path, store: &Path, session: &str, state: Option<&Path>) -> Result<Value, String> {
-    let loaded = super::bundle::load(request)?;
-    if (session == loaded.envelope.identity()) != state.is_some() {
-        return Err("--state is given exactly for the attempt's own session, its envelope identity".into());
-    }
-    debug_assert_eq!(state.is_some(), session == loaded.envelope.identity());
-    let decision = match state {
-        Some(state) => crate::implementation_attempt::cli::execution::admission::admit_session(request, state, store)?,
-        None => {
-            loaded.validate(crate::implementation_attempt::cli::now_ms()?)?;
-            super::seam::admit(&open(store)?, &loaded, session)?
-        }
-    };
-    debug_assert!(state.is_none() || !matches!(decision, super::seam::Decision::Refused { .. }));
-    let definition = super::seam::subject(&loaded)?.definition;
-    let result = match decision {
-        super::seam::Decision::Refused { refusal } => Err(refusal),
-        admitted @ (super::seam::Decision::Unmanaged | super::seam::Decision::Admitted { .. }) => Ok(admitted),
-    };
-    Ok(document(
-        Header {
-            command: "admit-session",
-            definition: &definition,
-        },
-        result,
-    ))
 }
 
 /// Release every unretained revision's artifacts through the port.

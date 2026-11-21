@@ -38,11 +38,12 @@ r[lattice.implementation_attempt.consumer.scenario.closure]
 #### Scenario: A pin left without its intent is closed before anything else
 
 r[lattice.implementation_attempt.consumer.scenario.reservation]
-- GIVEN an admission with a revision store that pinned its session and was lost before its intent, or an operator admission that stopped after pinning
-- WHEN a later run of the same attempt-fence, naming the same or another workflow-agent pair, or a recovery of it, takes the work's lock
-- THEN before `seam::admit` pins, the admission MUST have created a write-ahead record of its request identity, session and lifecycle subject in the attempt directory, removed when the admission is refused, its pin predates the record, the pin is abandoned or the intent exists
-- AND the later run or recovery MUST, under the lock and before anything else, close the session of exactly the recorded subject through the seam and remove the record, never touching a session pinned to another revision; recovery MUST then close the attempt as before, and a run MUST then admit and proceed or refuse as before
-- AND a record found without the revision store MUST be an error that closes nothing
+- GIVEN an admission with a revision store that pinned its session and was lost before its intent
+- WHEN a later run, recovery, pre-intent refusal or superseded request's refusal of the same attempt-fence takes its work's lock, naming the same or another workflow-agent pair, or a request of another work with the same attempt id and fence takes its own
+- THEN before `seam::admit` pins, the admission MUST have created a write-ahead record of the BLAKE3 of its work, its request identity, session and lifecycle subject in the attempt directory, removed when the admission is refused, its pin predates the record, the pin is abandoned or the intent exists
+- AND every path of the same work that may write a closure marker MUST, under the lock and before anything else, close the session of exactly the recorded subject through the seam and only then remove the record, never touching a session pinned to another revision; it MUST remove the record without closing only when the record's own request owns the execution intent, never because of a closure marker; recovery MUST then close the attempt as before, and a run MUST then admit and proceed or refuse as before
+- AND a request of another work MUST leave the record and the pin untouched and be refused as `crossed_attempt` with `dispatched: false`, creating no intent, marker or pin
+- AND a record of the same work found without the revision store MUST be an error that closes nothing
 
 #### Scenario: Fence check, record and intent are one critical section
 

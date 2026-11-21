@@ -411,8 +411,8 @@ takes an exclusive `flock(2)` lock on that directory (`std::fs::File::lock`).
 Waiters block. The lock never expires, and the kernel releases it when the
 holder closes it or exits. While holding it, a first run:
 
-1. closes a session pin that an earlier admission of the attempt-fence left
-   without an intent (below);
+1. closes a session pin that an earlier admission of the same work left
+   without its intent (below); another work's record is `crossed_attempt`;
 2. reads the attempt directory's intent store: an execution intent of the
    same request bytes is reconciled as a duplicate `run`, one of other bytes is
    `substituted_request` (`dispatched:true`), and a closure marker is the
@@ -428,10 +428,9 @@ holder closes it or exits. While holding it, a first run:
    write-ahead record, which the intent supersedes.
 
 Before the lock and before step 1, a run checks the request, the workspace
-boundary and the bounded-step timeout. `agent-revision admit-session --state`
-for the attempt's own session runs exactly steps 1 to 5 with the standalone
-CLI's ports and stops there; see
-[agent revisions](agent-revisions.md#attempt-seam).
+boundary and the bounded-step timeout. Only `run` admits an attempt's own
+session: `agent-revision admit-session` refuses it before any state change
+(see [agent revisions](agent-revisions.md#attempt-seam)).
 
 A typed refusal at steps 3 to 7 (`lineage_blocked`, `lineage_exhausted`,
 `repair_ports_unavailable`, `stale_fence`, `crossed_attempt`,
@@ -445,22 +444,28 @@ treated as this work's. Such a refusal writes the state root, the per-work
 lock directory, the attempt directory and the closure marker, plus anything
 the earlier steps wrote (the fence record for `revision_not_admitted`), and
 nothing else. A session the run pinned is closed on every path that ends
-before its intent; a session another run pinned is never closed. The lock is
-taken before the agent revision store is opened and never the other way
-round.
+before its intent, before the refusal closes the attempt-fence; a session
+another run pinned is never closed. The lock is taken before the agent
+revision store is opened and never the other way round.
 
 The write-ahead admission record, `admission-pending.json`
-(`lattice.implementation-attempt-pending-admission.v1`), holds the request
-identity, the session and the lifecycle subject (`definition`, `revision`)
-about to be pinned, and is created once before `seam::admit` runs. It is
-removed when the admission is refused, when the pin predates it, when the run
-abandons its pin, and once the intent exists. A process lost after the pin
-and before the intent leaves it behind; the next run or recovery of that
-attempt-fence finds it without an intent and, under the lock and before
-anything else, closes the session of exactly that subject through the seam,
-leaving a session pinned to another revision untouched, then removes it.
-Recovery then closes the attempt as before; a run proceeds or refuses as
-before. A record without its `--revision-store` is an error.
+(`lattice.implementation-attempt-pending-admission.v1`), holds the BLAKE3 of
+the work id (`work`), the request identity, the session and the lifecycle
+subject (`definition`, `revision`) about to be pinned, and is created once
+before `seam::admit` runs. It is removed when the admission is refused, when
+the pin predates it, when the run abandons its pin, and once the intent
+exists. A process lost after the pin and before the intent leaves it behind.
+Every path that may write a closure marker reconciles it first, under the
+work's lock and before anything else: a later run, recovery, pre-intent
+refusal or superseded request's refusal of the same work closes the session
+of exactly the recorded subject through the seam, leaving a session pinned to
+another revision untouched, and only then removes the record. The record is
+removed without closing only when its own request's execution intent exists,
+which then owns the pin; a closure marker or another request's intent does
+not. A request of another work leaves the record untouched and is refused as
+`crossed_attempt` with `dispatched:false`, creating no intent, marker or pin. Recovery then
+closes the attempt as before; a run proceeds or refuses as before. A record of
+this work without its `--revision-store` is an error.
 
 It releases the lock before any worker effect. A repair step takes the same
 lock to recheck the fence before it writes `repair/step-N.intent`. Recovery

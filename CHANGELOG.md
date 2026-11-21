@@ -81,13 +81,8 @@ interfaces.
   `dispatched:false` after the fence record and before any binding or intent.
   `seam::effect`, `retained` and `close` also compare the revision, so a
   request naming another revision of the same definition never acts on a
-  pinned session (`session_conflict`). `agent-revision admit-session` for an
-  attempt's own session (its envelope identity) now needs `--state` and goes
-  through `run`'s first admission under the attempt's fence lock, including
-  the workspace-boundary and bounded-step preflight, so it refuses exactly
-  where `run` would and pins nothing then; any other session is pinned after
-  `run`'s request validation. `inspect` reads the attempt's pin from the
-  workflow-agent lifecycle. See `docs/agent-revisions.md`.
+  pinned session (`session_conflict`). `inspect` reads the attempt's pin
+  from the workflow-agent lifecycle. See `docs/agent-revisions.md`.
 - An inert draft-schema comparison of the NVIDIA agent-package proposal
   (`697872570744c8cfc1cf6b1d72e04db66e1a2c83`) with Lattice bundle
   identities: a reviewed skill, a plugin that bundles that skill's whole file
@@ -285,6 +280,14 @@ interfaces.
 
 ### Changed
 
+- Breaking: `agent-revision admit-session` refuses a request's own attempt
+  session (its envelope identity) before any state change, with
+  `attempt_session: … admitted only by lattice implementation-attempt run`,
+  a narrowing relative to `db64cd65`, where it pinned that session outside
+  the attempt's fence. Only `implementation-attempt run` admits an attempt's
+  session, under the attempt's fence lock and behind its write-ahead record.
+  Any other session is still pinned, after `run`'s request validation and
+  from the same single read of the request (#6, Lattice #25).
 - Breaking: the implementation-attempt profile revision is now the
   `lattice-worker-profile-revision-v2` identity, still spelled as bare hex,
   over profile-level configuration and the reviewed harness template: the OMP
@@ -401,10 +404,14 @@ interfaces.
   without it stay readable), and another work's marker or intent at the same
   attempt id and fence is `crossed_attempt` (`dispatched:false`): attempt ids
   must be unique across the work items of one state root. Before it pins, an
-  admission with a revision store writes `admission-pending.json` with the
-  subject it is about to pin; a run or recovery that later finds it without an
-  intent closes exactly that pin before anything else, so a process lost
-  between pin and intent no longer leaves a live pin.
+  admission with a revision store writes `admission-pending.json` naming its
+  work, request and the subject it is about to pin. A run, recovery or
+  pre-intent refusal of the same work, including a superseded request's,
+  that later finds it without the record's own intent closes exactly that pin
+  under the work's lock before anything else, and only then removes the
+  record, so a process lost between pin and intent no longer leaves a live
+  pin. A request of another work leaves the record untouched and is
+  `crossed_attempt` (`dispatched:false`).
 
 - Bounded local processes whose cancellation flag is already set return the
   existing `Cancelled` outcome without spawning. The pinned bounded-exec runner

@@ -114,6 +114,41 @@
     ],
     "octet": "root crate: blocked by the manifest config change from ba6ed91d. Its Cargo.toml (sha2 dev-dependency) changed the Octet config and profile hashes, so octet-precommit-check exits 1 with every root identity moved (1052 new, 1052 stale) on this tree and on a clean ba6ed91d tree alike. Semantic delta against ba6ed91d: new_semantic=0, resolved_semantic=0, raw multiplicities equal to the clean ba6ed91d reference (1353 each). The migration policy requires matching metadata, so octet-baseline.json is left unchanged. lattice-core: 25 accepted, 25 current, 0 new, 0 stale."
   },
+  "final_review_2": {
+    "trigger": "verification review of 0a3e0c63: a request of another work with the same attempt id and fence closed work A's live pin before checking ownership (P1); a superseded request wrote its closure marker without reconciling the pending record, and a later recovery took the marker for an intent and deleted the record without closing the pin (P2)",
+    "base_revision": "cdb9c96c",
+    "recorded_on": "2026-11-21",
+    "rule": "admission-pending.json names its work (BLAKE3 of the work id) and request identity. A reader of another work leaves it untouched and is refused crossed_attempt with dispatched:false, creating no intent, marker or pin. Every path of the same work that may write a closure marker (admit_first, Context::close under every pre-intent and superseded refusal, recovery) reconciles it first under the work's lock: unless the record's own request owns the execution intent, it closes exactly the recorded subject's pin, then removes the record. A record with an empty field or another schema is malformed and kept. A first run that fails after its pin abandons it before its refusal closes the attempt-fence.",
+    "tasks": {
+      "5.1": [
+        "src/implementation_attempt/cli/tests/workflow_agent.rs::another_works_pending_admission_is_left_untouched_and_crossed",
+        "tests/test_implementation_attempt_refusals.rs::another_works_pending_admission_is_crossed_not_dispatched_and_left_untouched",
+        "src/implementation_attempt/cli/session/revision/reservation.rs::a_record_is_read_only_by_its_own_work_and_only_when_complete"
+      ],
+      "5.2": [
+        "src/implementation_attempt/cli/tests/workflow_agent.rs::a_superseded_closure_closes_a_pin_left_without_its_intent_first",
+        "src/implementation_attempt/cli/tests/workflow_agent.rs::a_pin_left_without_its_intent_is_closed_before_anything_else"
+      ],
+      "5.3": [
+        "docs/candidate-worker.md (admission order, write-ahead record)",
+        "CHANGELOG.md (Fixed)",
+        "specs/implementation-attempt/spec.md (reservation scenario)"
+      ]
+    },
+    "gates": [
+      {"command": "cargo test -p lattice --lib -- implementation_attempt", "exit": 0, "result": "122 passed, 0 failed, 402 filtered out"},
+      {"command": "LATTICE_INVENTORY_CAPTURE_DIR=<scratch> cargo test -p lattice --lib -- capture_managed_worker_inventory_v3", "exit": 0, "result": "1 passed; 8 lattice.worker-inventory.v3 captures, equal to cdb9c96c's except per-run fields"},
+      {"command": "cargo test -p lattice --test test_agent_package_comparison --test test_agent_revision_attachments --test test_agent_revision_core --test test_agent_revision_shell --test test_agent_revision_workflow --test test_implementation_attempt_refusals", "exit": 0, "result": "5 + 17 + 20 + 9 + 11 + 5 passed"},
+      {"command": "cargo test -p lattice-core agent_revision", "exit": 0, "result": "0 passed: the filter matches no lattice-core test"},
+      {"command": "cargo clippy -p lattice -p lattice-core --all-targets --no-deps -- -D warnings", "exit": 0},
+      {"command": "cargo fmt -p lattice -p lattice-core --check", "exit": 0},
+      {"command": "octet-precommit-check", "exit": 0, "result": "root warning-only 1052 accepted, 1052 current, 0 new, 0 stale; lattice-core 25/25, 0 new, 0 stale; baselines unchanged"},
+      {"command": "octet_semantic_delta.py against cdb9c96c baselines", "exit": 0, "result": "root new_semantic=0 resolved_semantic=0; lattice-core new_semantic=0 resolved_semantic=0"},
+      {"command": "cairn validate --root . --policy cairn-policy/generated/cairn-policy.json", "exit": 0, "result": "valid, 0 issues"},
+      {"command": "cairn gate proposal|design|tasks fence-intent-creation-atomically and bind-workflow-agent-revisions", "exit": 0, "result": "PASS"},
+      {"command": "gitleaks dir --no-banner --redact over every changed and new path", "exit": 0, "result": "23 paths, no leaks found"}
+    ]
+  },
   "not_run": [
     "scripts/check.rs and nix flake check (parent runs them at integration)"
   ]

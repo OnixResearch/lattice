@@ -51,6 +51,14 @@ Baseline: Lattice `647bc59d` (published `db64cd65` plus the bounded same-attempt
 
 **Rationale:** Naming the work in the marker keeps old markers readable and needs no layout change. The write-ahead record is written before the only step that can pin, under the lock every later admission and recovery of the attempt-fence takes first, so a lost pin is always attributable and closed before anything else. A crash between an `already_pinned` admission and the record's removal leaves a record whose subject matches a pin it did not create; only an admission outside Lattice's attempt path can create such a pin.
 
+### Decision: Work-owned pending records, reconciled before every closure (verification review of `0a3e0c63`)
+
+**Context:** The pending record named no work, so a request of another work with the same attempt id and fence, holding only its own work's lock, closed work A's live pin. And a superseded request of the attempt wrote its closure marker without reconciling the record; a later recovery then took the marker for an intent and deleted the record without closing the pin.
+
+**Choice:** The record carries `work`, the BLAKE3 of the work id, like the closure marker. `reservation::reconcile` takes the envelope and answers `Reconciled::OtherWork` for another work's record, untouched; `admit_first`, `recover_existing` and the pre-intent `settle` then refuse `crossed_attempt` with `dispatched:false` and create no intent, marker or pin. Every path that may write a closure marker (`admit_first` before its intent store, `Context::close` under `settle` for pre-intent refusals and the superseded refusal, and recovery before `reconcile_intent`) reconciles first under the work's lock. A record is removed without closing its pin only when its own request owns the execution intent (`intent::classify` with the record's request identity and session); a closure marker or another request's intent does not count. A first run that fails after its pin abandons the pin before its refusal closes the attempt-fence.
+
+**Rationale:** The lock is per work, so ownership must be read from the record itself: a reader of another work cannot know whether the writer is alive. Reconciling inside the one closure function covers every refusal path at once, including ones added later.
+
 ## Tests
 
 - `cli/session/fencing/tests.rs`: a fence-7 run that passed its check is refused `stale_fence` (`dispatched:false`) by `create_intent` after fence 8 is recorded, and no intent exists. A fence-7 invocation after a fence-7 intent exists gets `stale_fence` with `dispatched:true`. A fence-7 invocation with no intent gets `dispatched:false`, after which neither `create_intent` nor `admit` can create the fence-7 intent. A closure marker reads as not dispatched. Crossed refusals compute `dispatched`. The lock excludes other handles until the guard drops. A child process holds the lock, and it is released when the child exits.

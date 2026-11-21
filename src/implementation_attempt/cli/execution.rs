@@ -53,9 +53,13 @@ pub(super) fn recover_existing(
 ) -> Result<(), String> {
     // The crossed check and the closure marker share the fence lock with
     // every fence record and intent of this work in the state root. A pin an
-    // admission left without its intent is closed before anything else.
+    // admission of this work left without its intent is closed before
+    // anything else; another work's pending admission is never touched.
     let guard = super::session::fencing::Guard::acquire(state, &request.envelope.work_id)?;
-    super::session::revision::reservation::reconcile(revisions, directory)?;
+    let pending = super::session::revision::reservation::reconcile(revisions, directory, &request.envelope)?;
+    if pending == super::session::revision::reservation::Reconciled::OtherWork {
+        return Err(super::refusal::refuse_fence(&request.envelope, super::refusal::Reason::CrossedAttempt, false));
+    }
     guard.check_crossed(&request.envelope, directory).map_err(|error| error.report(&request.envelope))?;
     let reconciled = super::recovery::reconcile_intent(&guard, state, request, directory, identity);
     drop(guard);
@@ -144,7 +148,7 @@ impl Context {
         ports: Option<super::Ports<'_>>,
         revisions: super::session::revision::Store<'_>,
     ) -> Result<(), String> {
-        if let Some(refused) = self.superseded() {
+        if let Some(refused) = self.superseded(revisions) {
             return Err(refused);
         }
         let intent = self.directory.join(super::session::intent::FILE);
@@ -155,12 +159,12 @@ impl Context {
         self.first_run(ports, revisions).await
     }
 
-    /// A first run, once no intent was seen: the first admission it shares
-    /// with `admit-session` (`admission::Context::admit_first`), then, still
-    /// under the per-work lock, the execution binding, the candidate store and
-    /// the intent. An intent or closure marker that appeared meanwhile is
-    /// reconciled like any retained one and nothing is admitted; a session
-    /// this run pinned is abandoned on every path that ends before its intent.
+    /// A first run, once no intent was seen: its admission
+    /// (`admission::Context::admit_first`), then, still under the per-work
+    /// lock, the execution binding, the candidate store and the intent. An
+    /// intent or closure marker that appeared meanwhile is reconciled like any
+    /// retained one and nothing is admitted; a session this run pinned is
+    /// abandoned on every path that ends before its intent.
     // r[impl lattice.implementation_attempt.consumer.scenario.fence_lock]
     async fn first_run(
         self,
@@ -190,9 +194,10 @@ impl Context {
         let (admitted, store) = match self.prepare(&guard, &mut *compute, &session) {
             Ok(prepared) => prepared,
             Err(stop) => {
-                let error = self.stop(&guard, stop);
-                super::session::revision::abandon(revisions, &self.request, &session, &self.directory)
-                    .map_err(|close| format!("{error}; {close}"))?;
+                // The pin is closed before the refusal closes the attempt.
+                let abandoned = super::session::revision::abandon(revisions, &self.request, &session, &self.directory);
+                let error = self.stop(&guard, revisions, stop);
+                abandoned.map_err(|close| format!("{error}; {close}"))?;
                 return Err(error);
             }
         };
@@ -260,7 +265,7 @@ impl Context {
     }
 }
 
-pub(crate) mod admission;
+pub(super) mod admission;
 
 /// `None` reconciles retained evidence only; ports are used only to admit,
 /// revalidate and gate a first dispatch. `revisions` names the optional

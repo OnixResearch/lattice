@@ -234,3 +234,36 @@ fn another_works_marker_or_intent_at_the_same_attempt_fence_is_crossed_and_not_d
     assert_eq!(record["reason"], "crossed_attempt", "work A's intent");
     assert_eq!(record["dispatched"], false);
 }
+
+// r[verify lattice.implementation_attempt.consumer.scenario.reservation]
+#[test]
+fn another_works_pending_admission_is_crossed_not_dispatched_and_left_untouched() {
+    let fixture = Fixture::new();
+    let mut request = request("attempt-pending");
+    request.envelope.work_id = "work-b".into();
+    request.admitted_envelope = request.envelope.identity();
+    let bytes = serde_json::to_vec(&request).expect("request bytes");
+    let path = fixture.root.join("pending.json");
+    std::fs::write(&path, &bytes).expect("request");
+    let key = fixture.state.join(format!("{}-{}", request.envelope.attempt_id, request.envelope.fence));
+    let directory = fixture.state.join(blake3::hash(key.as_os_str().as_encoded_bytes()).to_hex().as_str());
+    std::fs::DirBuilder::new().mode(0o700).create(&directory).expect("attempt directory");
+    // Work A pinned its session at this attempt id and fence, then was lost.
+    let pending = serde_json::json!({
+        "schema": "lattice.implementation-attempt-pending-admission.v1",
+        "work": blake3::hash(b"work-a").to_hex().as_str(),
+        "request_identity": "1".repeat(64),
+        "session": "2".repeat(64),
+        "definition": "3".repeat(64),
+        "revision": "4".repeat(64),
+    });
+    let record = serde_json::to_vec(&pending).expect("record bytes");
+    std::fs::write(directory.join("admission-pending.json"), &record).expect("work A's record");
+    let (is_success, refusal) = fixture.refusal("recover", &path);
+    assert!(!is_success);
+    assert_eq!(refusal["reason"], "crossed_attempt", "work A's pending admission");
+    assert_eq!(refusal["dispatched"], false);
+    let retained = std::fs::read(directory.join("admission-pending.json")).expect("record");
+    assert_eq!(retained, record, "work A's record is untouched, even without a revision store");
+    assert!(!directory.join("intent.json").exists(), "no closure marker");
+}

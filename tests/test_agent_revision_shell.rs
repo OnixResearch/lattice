@@ -574,6 +574,13 @@ fn the_cli_exits_non_zero_on_every_refusal() {
     let (admitted, printed) = admit(&request_path, "session-a");
     assert!(admitted, "{printed}");
     assert_eq!(printed["outcome"]["decision"], "admitted");
+    // The request's own attempt session is admitted only by `implementation-attempt run`.
+    let attempt_session = base.envelope.identity();
+    let (attempt_bound, _) = admit(&request_path, &attempt_session);
+    assert!(!attempt_bound, "the attempt session is refused");
+    let pinned = lattice::store::Store::new(&store_path).expect("store").load_lifecycle(&definition).expect("load");
+    let (_, lifecycle) = pinned.expect("managed");
+    assert!(!lifecycle.sessions.contains_key(&attempt_session), "nothing was pinned");
     let (not_selected, printed) = admit(&changed_path, "session-b");
     assert!(!not_selected);
     assert_eq!(printed["refusal"]["code"], "revision_not_selected");

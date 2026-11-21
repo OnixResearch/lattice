@@ -272,7 +272,7 @@ async fn a_pinned_session_keys_on_the_pair() {
     let request = named(worker.clone(), &definition, &revision);
     let (request_path, _) = fixture.write("pair.json", &request);
     let session = super::super::session::revision::identifier(&request);
-    fixture.admit_session(&request_path).expect("admit-session pins the pair under the attempt's fence");
+    fixture.lost_after_pin(&request_path).expect("run pins the pair under the attempt's fence");
     let pinned = fixture.lifecycle(&definition).sessions.get(&session).cloned().expect("pinned in the pair");
     assert_eq!(pinned.revision, revision);
     let worker_definition = crate::agent_revision::bundle::resolve(&worker).expect("resolves").definition.identity;
@@ -607,7 +607,7 @@ async fn a_request_naming_another_revision_never_acts_on_the_pinned_session() {
     let (pinned_path, _) = fixture.write("pinned.json", &pinned);
     let session = super::super::session::revision::identifier(&pinned);
     assert_eq!(session, super::super::session::revision::identifier(&other), "one envelope");
-    fixture.admit_session(&pinned_path).expect("admit-session pins the selected revision");
+    fixture.lost_after_pin(&pinned_path).expect("run pins the selected revision");
     let crate::agent_revision::seam::Effect::Permitted { permit } = effect(&fixture, &pinned, &session) else {
         panic!("the pinned revision permits its effect");
     };
@@ -645,66 +645,66 @@ fn attempt(fixture: &Fixture, attempt_id: &str, fence: u64, definition: &str, re
 #[tokio::test]
 // r[verify lattice.agent_revisions.workflow.attempt.scenario.refused]
 // r[verify lattice.agent_revisions.workflow.attempt.scenario.operator]
-async fn admit_session_refuses_where_run_would_and_pins_nothing() {
+async fn admit_session_refuses_the_attempt_session_before_any_state_change() {
     let fixture = Fixture::new();
     let worker = fixture.request("attempt-admit-template", 7);
     let (definition, revision) = desired(&fixture, &worker);
     fixture.promoted(&definition, &revision);
-    let unpinned = |fixture: &Fixture| fixture.lifecycle(&definition).sessions.is_empty();
+    let request = attempt(&fixture, "attempt-admit", 7, &definition, &revision);
+    let (request_path, _) = fixture.write("request.json", &request);
+    let session = super::super::session::revision::identifier(&request);
+    assert_eq!(session, request.envelope.identity(), "the attempt session is the envelope identity");
 
-    // Preflight: an absolute workspace root that does not exist.
-    let mut missing = attempt(&fixture, "attempt-admit-preflight", 7, &definition, &revision);
-    missing.workspace_root = fixture.root.join("missing-workspace");
-    missing.validate(1).expect("request validation alone accepts it");
-    let (missing_path, _) = fixture.write("missing.json", &missing);
-    assert!(fixture.admit_session(&missing_path).is_err(), "run's workspace boundary refuses it");
-    assert!(unpinned(&fixture) && !fixture.directory(&missing).exists(), "nothing is pinned or written");
+    let refused = fixture.admit_session(&request_path, &session);
+    let attempt_session = crate::agent_revision::operator::AdmitRefusal::AttemptSession;
+    assert_eq!(refused, Err(attempt_session.to_string()));
+    assert!(
+        attempt_session.to_string().contains("implementation-attempt run"),
+        "it names the command that admits it"
+    );
+    // No state root: no lock file, fence record, attempt directory or marker.
+    assert!(!fixture.state.exists(), "nothing was written");
+    assert!(fixture.lifecycle(&definition).sessions.is_empty(), "nothing was pinned");
 
-    // An envelope of the superseded profile framing.
-    let mut superseded = attempt(&fixture, "attempt-admit-superseded", 8, &definition, &revision);
+    // Any other session is pinned after run's request validation.
+    fixture.admit_session(&request_path, "operator-session").expect("a non-attempt session pins");
+    let pinned = fixture.lifecycle(&definition).sessions.get("operator-session").cloned().expect("pinned");
+    assert_eq!(pinned.revision, revision);
+    let mut expired = request.clone();
+    expired.expires_at_ms = 1;
+    let (expired_path, _) = fixture.write("expired.json", &expired);
+    assert!(fixture.admit_session(&expired_path, "operator-expired").is_err(), "run's validation refuses it");
+    assert!(!fixture.lifecycle(&definition).sessions.contains_key("operator-expired"));
+    let mut superseded = request.clone();
     superseded.envelope.worker_profile = "e".repeat(64);
     superseded.admitted_envelope = superseded.envelope.identity();
     let (superseded_path, _) = fixture.write("superseded.json", &superseded);
-    let refused = fixture.admit_session(&superseded_path);
-    assert_eq!(refused, Err(Reason::ProfileRevisionSuperseded.message().to_owned()));
-    assert!(unpinned(&fixture));
+    let refused = fixture.admit_session(&superseded_path, "operator-superseded");
+    assert!(refused.is_err(), "a superseded profile revision is refused before any pin");
+    assert!(!fixture.lifecycle(&definition).sessions.contains_key("operator-superseded"));
+    assert!(!fixture.state.exists());
+}
 
-    // An attempt recovery already closed.
-    let closed = attempt(&fixture, "attempt-admit-closed", 9, &definition, &revision);
-    let (closed_path, _) = fixture.write("closed.json", &closed);
-    fixture.attempt("recover", &closed_path, true).await.expect("recovery closes the attempt");
-    assert_eq!(fixture.admit_session(&closed_path), Err(Reason::AttemptClosed.message().to_owned()));
-    assert!(unpinned(&fixture));
-
-    // Another request's intent at the attempt-fence.
-    let ran = attempt(&fixture, "attempt-admit-ran", 10, &definition, &revision);
-    let (ran_path, _) = fixture.write("ran.json", &ran);
-    fixture.attempt("run", &ran_path, true).await.expect("the first request runs");
-    let mut other = ran.clone();
-    other.omp.prompt = "another task under the same attempt".into();
-    let (other_path, _) = fixture.write("other.json", &other);
-    assert_eq!(fixture.admit_session(&other_path), Err(Reason::SubstitutedRequest.message().to_owned()));
-    assert!(unpinned(&fixture));
-
-    // A fence lower than one recorded for the work.
-    let stale = attempt(&fixture, "attempt-admit-stale", 9, &definition, &revision);
-    let (stale_path, _) = fixture.write("stale.json", &stale);
-    assert_eq!(fixture.admit_session(&stale_path), Err(Reason::StaleFence.message().to_owned()));
-    assert!(unpinned(&fixture));
-    super::revisions::assert_not_started(&fixture.directory(&stale));
-
-    // A request run would admit is pinned behind its write-ahead record.
-    let valid = attempt(&fixture, "attempt-admit-valid", 11, &definition, &revision);
-    let (valid_path, _) = fixture.write("valid.json", &valid);
-    fixture.admit_session(&valid_path).expect("a request run would admit is pinned");
-    let session = super::super::session::revision::identifier(&valid);
-    assert_eq!(fixture.lifecycle(&definition).sessions.get(&session).expect("pinned").revision, revision);
-    let directory = fixture.directory(&valid);
-    assert!(directory.join(super::super::session::revision::reservation::FILE).is_file());
-    assert!(
-        !directory.join(super::super::session::intent::FILE).exists(),
-        "admit-session stops before the intent"
-    );
+#[tokio::test]
+// r[verify lattice.agent_revisions.workflow.attempt.scenario.operator]
+async fn the_operator_check_and_admission_read_one_parse() {
+    let fixture = Fixture::new();
+    let worker = fixture.request("attempt-admit-parse", 7);
+    let (definition, revision) = desired(&fixture, &worker);
+    fixture.promoted(&definition, &revision);
+    let request = attempt(&fixture, "attempt-admit-parse", 7, &definition, &revision);
+    let session = request.envelope.identity();
+    let operator = crate::agent_revision::operator::AdmitRefusal::AttemptSession;
+    assert_eq!(crate::agent_revision::operator::check(&request, &session), Err(operator));
+    assert_eq!(crate::agent_revision::operator::check(&request, "operator-session"), Ok(()));
+    // The admission takes the parsed request, never a path: no request file
+    // exists, so nothing can be read a second time.
+    let refused = crate::agent_revision::operator::admit(&request, &fixture.store, &session);
+    assert_eq!(refused, Err(operator.to_string()));
+    let admitted = crate::agent_revision::operator::admit(&request, &fixture.store, "operator-session");
+    assert!(matches!(admitted, Ok(crate::agent_revision::seam::Decision::Admitted { .. })), "{admitted:?}");
+    assert!(fixture.lifecycle(&definition).sessions.contains_key("operator-session"));
+    assert!(!fixture.lifecycle(&definition).sessions.contains_key(&session));
 }
 
 #[tokio::test]
@@ -721,7 +721,7 @@ async fn a_pin_left_without_its_intent_is_closed_before_anything_else() {
     // R1 pins its pair and stops before its intent, as a crash would leave it.
     let first = named(worker.clone(), &first_definition, &first_revision);
     let (first_path, _) = fixture.write("first.json", &first);
-    fixture.admit_session(&first_path).expect("R1 pins");
+    fixture.lost_after_pin(&first_path).expect("R1 pins");
     let session = super::super::session::revision::identifier(&first);
     let directory = fixture.directory(&first);
     assert!(fixture.lifecycle(&first_definition).sessions.contains_key(&session));
@@ -743,7 +743,7 @@ async fn a_pin_left_without_its_intent_is_closed_before_anything_else() {
     // Recovery of an orphaned pin closes it and the attempt.
     let orphan = attempt(&fixture, "attempt-orphan-recovered", 8, &first_definition, &first_revision);
     let (orphan_path, _) = fixture.write("orphan.json", &orphan);
-    fixture.admit_session(&orphan_path).expect("pinned, then lost before its intent");
+    fixture.lost_after_pin(&orphan_path).expect("pinned, then lost before its intent");
     let error = fixture.attempt("recover", &orphan_path, false).await.expect_err("the record needs its store");
     assert!(error.contains("--revision-store"), "{error}");
     assert!(!fixture.lifecycle(&first_definition).sessions.is_empty(), "nothing was closed without the store");
@@ -759,7 +759,7 @@ async fn a_pin_left_without_its_intent_is_closed_before_anything_else() {
     // A record that cannot be attributed to the live pin leaves it alone.
     let foreign = attempt(&fixture, "attempt-orphan-foreign", 9, &first_definition, &first_revision);
     let (foreign_path, _) = fixture.write("foreign.json", &foreign);
-    fixture.admit_session(&foreign_path).expect("pinned");
+    fixture.lost_after_pin(&foreign_path).expect("pinned");
     let foreign_directory = fixture.directory(&foreign);
     let bytes = std::fs::read(foreign_directory.join(record)).expect("record");
     let mut value: serde_json::Value = serde_json::from_slice(&bytes).expect("json");
@@ -770,4 +770,81 @@ async fn a_pin_left_without_its_intent_is_closed_before_anything_else() {
     let session = super::super::session::revision::identifier(&foreign);
     let live = fixture.lifecycle(&first_definition).sessions.get(&session).cloned().expect("still pinned");
     assert_eq!(live.revision, first_revision, "a pin of another revision is never touched");
+}
+
+/// `request` as work `work_id` would present it.
+fn of_work(mut request: Request, work_id: &str) -> Request {
+    request.envelope.work_id = work_id.into();
+    request.admitted_envelope = request.envelope.identity();
+    request
+}
+
+#[tokio::test]
+// r[verify lattice.implementation_attempt.consumer.scenario.reservation]
+async fn another_works_pending_admission_is_left_untouched_and_crossed() {
+    let fixture = Fixture::new();
+    let worker = fixture.request("attempt-pending-crossed", 7);
+    let (definition, revision) = desired(&fixture, &worker);
+    fixture.promoted(&definition, &revision);
+    let record = super::super::session::revision::reservation::FILE;
+
+    // Work A is pinned and lost before its intent.
+    let first = named(worker, &definition, &revision);
+    let (first_path, _) = fixture.write("work-a.json", &first);
+    fixture.lost_after_pin(&first_path).expect("A pins");
+    let directory = fixture.directory(&first);
+    let first_session = super::super::session::revision::identifier(&first);
+    let recorded = std::fs::read(directory.join(record)).expect("A's write-ahead record");
+
+    // Work B reuses A's attempt id and fence.
+    let second = of_work(first.clone(), "work-b");
+    assert_eq!(fixture.directory(&second), directory, "one attempt directory");
+    let (second_path, _) = fixture.write("work-b.json", &second);
+    let crossed = Err(Reason::CrossedAttempt.message().to_owned());
+    assert_eq!(fixture.attempt("recover", &second_path, true).await, crossed, "B's recovery");
+    assert_eq!(fixture.attempt("run", &second_path, true).await, crossed, "B's run");
+    assert_eq!(std::fs::read(directory.join(record)).expect("record"), recorded, "A's record is untouched");
+    assert!(!directory.join(super::super::session::intent::FILE).exists(), "no intent or marker");
+    let live = fixture.lifecycle(&definition).sessions.get(&first_session).cloned().expect("A's pin");
+    assert_eq!(live.status, lattice_core::agent_revision::state::SessionStatus::Live);
+
+    // A's own recovery still closes its pin and its attempt.
+    fixture.attempt("recover", &first_path, true).await.expect("A's recovery");
+    assert!(fixture.lifecycle(&definition).sessions.is_empty(), "A's pin was closed");
+    assert!(!directory.join(record).exists());
+    super::revisions::assert_not_started(&directory);
+}
+
+#[tokio::test]
+// r[verify lattice.implementation_attempt.consumer.scenario.reservation]
+// r[verify lattice.implementation_attempt.consumer.scenario.closure]
+async fn a_superseded_closure_closes_a_pin_left_without_its_intent_first() {
+    let fixture = Fixture::new();
+    let worker = fixture.request("attempt-pending-superseded", 7);
+    let (definition, revision) = desired(&fixture, &worker);
+    fixture.promoted(&definition, &revision);
+    let record = super::super::session::revision::reservation::FILE;
+    let first = named(worker, &definition, &revision);
+    let (first_path, _) = fixture.write("first.json", &first);
+    fixture.lost_after_pin(&first_path).expect("pinned, then lost before its intent");
+    let directory = fixture.directory(&first);
+    assert!(directory.join(record).is_file() && !fixture.lifecycle(&definition).sessions.is_empty());
+
+    // The same attempt under a superseded profile framing closes the attempt.
+    let mut superseded = first.clone();
+    superseded.envelope.worker_profile = "e".repeat(64);
+    superseded.admitted_envelope = superseded.envelope.identity();
+    let (superseded_path, _) = fixture.write("superseded.json", &superseded);
+    let refused = fixture.attempt("run", &superseded_path, true).await;
+    assert_eq!(refused, Err(Reason::ProfileRevisionSuperseded.message().to_owned()));
+    assert!(fixture.lifecycle(&definition).sessions.is_empty(), "the pin was closed before the marker");
+    assert!(!directory.join(record).exists(), "the record was removed after its pin");
+    let marker = std::fs::read(directory.join(super::super::session::intent::FILE)).expect("closure marker");
+    assert!(super::super::recovery::is_closed_marker(&marker));
+
+    // Recovery afterwards finds nothing to reconcile, even without the store.
+    let error = fixture.attempt("recover", &first_path, false).await;
+    assert_eq!(error, Err(Reason::AttemptClosed.message().to_owned()));
+    assert!(!directory.join(record).exists());
+    assert!(fixture.lifecycle(&definition).sessions.is_empty());
 }

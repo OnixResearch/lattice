@@ -25,6 +25,7 @@ mod port;
 pub mod seam;
 
 pub use commands::Seed;
+pub use commands::operator;
 pub use commands::transact;
 
 type Ticket = lattice_core::agent_revision::ops::prepare::Ticket;
@@ -120,10 +121,9 @@ pub enum Command {
     Rollback(SelectArgs),
     /// Revoke a revision, a qualification attachment or a session.
     Revoke(RevokeArgs),
-    /// Pin a session to the revision selected for new sessions. The
-    /// attempt's own session (its envelope identity) needs `--state` and is
-    /// admitted under the attempt's fence exactly as `implementation-attempt
-    /// run` admits it.
+    /// Pin a session to the revision selected for new sessions. A request's
+    /// own attempt session (its envelope identity) is refused: only
+    /// `implementation-attempt run` admits it.
     AdmitSession {
         #[arg(long)]
         request: std::path::PathBuf,
@@ -131,9 +131,6 @@ pub enum Command {
         store: std::path::PathBuf,
         #[arg(long)]
         session: String,
-        /// The implementation-attempt state root of an attempt-bound session.
-        #[arg(long)]
-        state: Option<std::path::PathBuf>,
     },
     /// Release unretained artifacts through the preparation port.
     Cleanup {

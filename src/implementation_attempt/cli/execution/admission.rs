@@ -1,11 +1,11 @@
-//! A first run's pre-intent section under the per-work lock, shared with an
-//! attempt-bound `agent-revision admit-session`, and the settling of every
-//! refusal decided before a request's own intent.
+//! A first run's pre-intent section under the per-work lock, and the
+//! settling of every refusal decided before a request's own intent.
 
 type Guard = super::super::session::fencing::Guard;
 type Pending = super::super::refusal::deferred::Pending;
 type Stop = super::super::refusal::deferred::Stop;
 type Revisions<'a> = super::super::session::revision::Store<'a>;
+type Reconciled = super::super::session::revision::reservation::Reconciled;
 
 /// What a first admission found or did; the per-work lock is still held.
 pub(super) enum First<'a> {
@@ -34,7 +34,7 @@ impl super::Context {
 
     /// The refusal of a request retained under an earlier profile framing,
     /// settled under the lock; `None` for a current request.
-    pub(super) fn superseded(&self) -> Option<String> {
+    pub(super) fn superseded(&self, revisions: Revisions<'_>) -> Option<String> {
         if !self.is_superseded {
             return None;
         }
@@ -42,16 +42,16 @@ impl super::Context {
             Ok(guard) => guard,
             Err(message) => return Some(message),
         };
-        Some(self.settle(&guard, Pending::new(super::super::refusal::Reason::ProfileRevisionSuperseded)))
+        let pending = Pending::new(super::super::refusal::Reason::ProfileRevisionSuperseded);
+        Some(self.settle(&guard, revisions, pending))
     }
 
-    /// The first-run admission that `run` and attempt-bound `admit-session`
-    /// share, in this order: `run`'s preflight (request validation, the
-    /// workspace boundary and the bounded-step timeout), the per-work lock,
-    /// the closing of a pin an earlier admission left without an intent, the
-    /// intent store, the lineage and repair-port gates, the fence, and the
-    /// session behind its write-ahead record. Every refusal is settled before
-    /// it returns, and nothing is pinned then.
+    /// A first run's admission, in this order: `run`'s preflight (request
+    /// validation, the workspace boundary and the bounded-step timeout), the
+    /// per-work lock, the closing of a pin an earlier admission of this work
+    /// left without its intent, the intent store, the lineage and repair-port
+    /// gates, the fence, and the session behind its write-ahead record. Every
+    /// refusal is settled before it returns, and nothing is pinned then.
     // r[impl lattice.implementation_attempt.consumer.scenario.reservation]
     pub(super) fn admit_first<'a>(
         &self,
@@ -61,7 +61,9 @@ impl super::Context {
         let worker = super::worker_request(&self.request)?;
         super::super::session::revision::require_named(revisions, &self.request)?;
         let guard = self.lock()?;
-        super::super::session::revision::reservation::reconcile(revisions, &self.directory)?;
+        if self.reconcile(revisions)? == Reconciled::OtherWork {
+            return Err(self.crossed());
+        }
         if self.directory.join(super::super::session::intent::FILE).exists() {
             return Ok(First::Retained(guard));
         }
@@ -72,41 +74,64 @@ impl super::Context {
                 repair,
                 session,
             }))),
-            Err(stop) => Err(self.stop(&guard, stop)),
+            Err(stop) => Err(self.stop(&guard, revisions, stop)),
         }
+    }
+
+    /// Settle the write-ahead record an earlier admission of this work left;
+    /// the caller holds the per-work lock.
+    fn reconcile(&self, revisions: Revisions<'_>) -> Result<Reconciled, String> {
+        super::super::session::revision::reservation::reconcile(revisions, &self.directory, &self.request.envelope)
+    }
+
+    /// The refusal of a request whose attempt directory holds another work's
+    /// pending admission: no intent, marker or pin is written, and no step of
+    /// this request can have started there.
+    fn crossed(&self) -> String {
+        let reason = super::super::refusal::Reason::CrossedAttempt;
+        super::super::refusal::refuse_fence(&self.request.envelope, reason, false)
     }
 
     /// Settle, under `_guard`, a refusal decided before this request's own
     /// intent exists: `dispatched` is whether the attempt directory retains an
-    /// execution intent. When it does not, the attempt-fence is first closed
-    /// with this request's closure marker (a closure marker of any request
-    /// already closes it), so no later request for it can create an intent in
-    /// this state root. When closing fails nothing is printed.
+    /// execution intent. When it does not, a pin an earlier admission of this
+    /// work left is closed first, then the attempt-fence is closed with this
+    /// request's closure marker (a closure marker of any request already
+    /// closes it), so no later request for it can create an intent in this
+    /// state root. Another work's pending admission makes the request
+    /// `crossed_attempt` and creates no intent, marker or pin. When closing
+    /// fails nothing is printed.
     // r[impl lattice.implementation_attempt.consumer.scenario.closure]
-    pub(super) fn settle(&self, _guard: &Guard, pending: Pending) -> String {
-        match self.close() {
-            Ok(dispatched) => pending.print(&self.request.envelope, dispatched),
+    pub(super) fn settle(&self, _guard: &Guard, revisions: Revisions<'_>, pending: Pending) -> String {
+        match self.close(revisions) {
+            Ok(Some(dispatched)) => pending.print(&self.request.envelope, dispatched),
+            Ok(None) => self.crossed(),
             Err(message) => format!("{} could not close its attempt: {message}", pending.reason().message()),
         }
     }
 
-    /// Whether an execution intent is retained, after closing the
-    /// attempt-fence when none is. The caller holds the per-work lock.
-    fn close(&self) -> Result<bool, String> {
+    /// Whether an execution intent is retained, after reconciling this work's
+    /// pending admission and closing the attempt-fence when no intent is;
+    /// `None` when another work's pending admission is recorded there. The
+    /// caller holds the per-work lock.
+    fn close(&self, revisions: Revisions<'_>) -> Result<Option<bool>, String> {
+        if self.reconcile(revisions)? == Reconciled::OtherWork {
+            return Ok(None);
+        }
         let intent = self.directory.join(super::super::session::intent::FILE);
         if super::super::session::intent::is_execution_retained(&self.directory)? {
-            return Ok(true);
+            return Ok(Some(true));
         }
         let marker = super::super::recovery::closed_marker(&self.identity, &self.request.envelope);
         super::super::artifacts::create_new(&intent, marker.as_bytes())?;
         debug_assert!(matches!(super::super::session::intent::is_execution_retained(&self.directory), Ok(false)));
         debug_assert!(intent.is_file(), "the attempt-fence is closed");
-        Ok(false)
+        Ok(Some(false))
     }
 
-    pub(super) fn stop(&self, guard: &Guard, stop: Stop) -> String {
+    pub(super) fn stop(&self, guard: &Guard, revisions: Revisions<'_>, stop: Stop) -> String {
         match stop {
-            Stop::Refused(pending) => self.settle(guard, pending),
+            Stop::Refused(pending) => self.settle(guard, revisions, pending),
             Stop::Error(message) => message,
         }
     }
@@ -157,50 +182,20 @@ impl super::Context {
         let _superseded = super::super::session::revision::reservation::release(&self.directory);
         Ok((admitted, store))
     }
-
-    /// `admit-session`'s refusal when the attempt directory already holds an
-    /// intent or closure marker: like `run`'s reconciliation, but never
-    /// recovering or pinning.
-    fn refuse_retained(&self, guard: &Guard) -> String {
-        let session = super::super::session::revision::identifier(&self.request);
-        let subject = super::super::session::intent::Subject {
-            request_identity: &self.identity,
-            session: &session,
-        };
-        let retained = super::super::session::intent::read(&self.directory, subject);
-        match retained {
-            Ok(Some(super::super::session::intent::Record::Owned(_))) => {
-                "the attempt already holds its execution intent; nothing was pinned".into()
-            }
-            Ok(Some(super::super::session::intent::Record::Closed)) => {
-                super::super::refusal::refuse(&self.request.envelope, super::super::refusal::Reason::AttemptClosed)
-            }
-            Ok(Some(super::super::session::intent::Record::Foreign) | None) => {
-                super::super::recovery::refuse_retained(guard, &self.state, &self.request, &self.directory)
-                    .unwrap_or_else(|message| message)
-            }
-            Err(message) => message,
-        }
-    }
 }
 
-/// `agent-revision admit-session --state`: `run`'s first-run admission of the
-/// request's attempt session, stopping once the session is admitted. A
-/// refusal is settled exactly as `run` settles it and pins nothing. The pin
-/// and its write-ahead record stay until a run of the attempt-fence creates
-/// its intent or a run or recovery closes the pin.
-pub(crate) fn admit_session(
+/// A first run lost right after its session was admitted, before its binding
+/// and intent: the pin and its write-ahead record stay as a crash leaves them.
+#[cfg(test)]
+pub(in super::super) fn lost_after_pin(
     request_path: &std::path::Path,
     state: &std::path::Path,
     store: &std::path::Path,
-) -> Result<crate::agent_revision::seam::Decision, String> {
+) -> Result<(), String> {
     let context = super::Context::load(request_path, state)?;
-    if let Some(refused) = context.superseded() {
-        return Err(refused);
-    }
     match context.admit_first(None, super::super::session::revision::Store(Some(store)))? {
-        First::Retained(guard) => Err(context.refuse_retained(&guard)),
-        First::Admitted(ready) => Ok(ready.session.decision),
+        First::Retained(_) => Err("the attempt directory already holds an intent".into()),
+        First::Admitted(_) => Ok(()),
     }
 }
 

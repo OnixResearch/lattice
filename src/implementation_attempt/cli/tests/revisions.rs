@@ -99,20 +99,15 @@ impl Fixture {
         })
     }
 
-    /// `lattice agent-revision admit-session` of `request`'s own attempt
-    /// session, under its fence in this state root.
-    pub fn admit_session(&self, request: &std::path::Path) -> Result<(), String> {
-        let session = crate::agent_revision::bundle::load(request)?.envelope.identity();
-        let (request, state) = (Self::text(request), Self::text(&self.state));
-        self.revision(&[
-            "admit-session",
-            "--request",
-            request,
-            "--session",
-            &session,
-            "--state",
-            state,
-        ])
+    /// `lattice agent-revision admit-session` of `session` for `request`.
+    pub fn admit_session(&self, request: &std::path::Path, session: &str) -> Result<(), String> {
+        self.revision(&["admit-session", "--request", Self::text(request), "--session", session])
+    }
+
+    /// A first `implementation-attempt run` of `request` lost right after
+    /// its session was pinned, before its binding and intent.
+    pub fn lost_after_pin(&self, request: &std::path::Path) -> Result<(), String> {
+        super::super::execution::admission::lost_after_pin(request, &self.state, &self.store)
     }
 
     /// `lattice implementation-attempt COMMAND --request REQUEST --state STATE [--revision-store
@@ -644,8 +639,8 @@ async fn capture_managed_worker_inventory_v3() {
     fixture.promoted(&definition, &revision);
     write("managed-3-promoted.json", &fixture.inventory(&run_path, true).expect("inventory"));
 
-    // A session admitted and bound, before its intent (a controller lost after binding).
-    fixture.admit_session(&admitted_path).expect("admit the session");
+    // A session admitted by `run` and bound, before its intent (a controller lost after binding).
+    fixture.lost_after_pin(&admitted_path).expect("run admits the session");
     let directory = fixture.directory(&admitted);
     super::super::artifacts::private_directory(&fixture.state).expect("state");
     super::super::artifacts::private_directory(&directory).expect("attempt directory");

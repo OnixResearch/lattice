@@ -44,7 +44,7 @@ r[lattice.agent_revisions.workflow.attempt] `workflow::check_attempt` MUST accep
 #### Scenario: A matching bundle admits and pins under the pair
 r[lattice.agent_revisions.workflow.attempt.scenario.subject]
 - GIVEN a promoted workflow-agent revision binding the attempt's exact worker revision, while the worker's own definition is managed with nothing selected
-- WHEN the attempt runs with `--revision-store`, the session is admitted through `admit-session`, and then the pair's session or revision is revoked
+- WHEN the attempt runs with `--revision-store`, a run's admission pins the session and is lost before its intent, and then the pair's session or revision is revoked
 - THEN the attempt MUST be admitted, record and close its pin in the workflow-agent lifecycle while the worker lifecycle stays untouched, `inspect` MUST read that pin from the workflow-agent lifecycle and the profile facts from the worker's, a session revoked after admission MUST be refused before spawn as `revision_blocked`, and a revoked revision MUST refuse new attempts as `revision_not_admitted` (`revision_revoked`) and the executed attempt's export as `export_revoked`
 
 #### Scenario: A mismatched, unknown or malformed pair is refused before any intent
@@ -60,12 +60,12 @@ r[lattice.agent_revisions.workflow.attempt.scenario.single_flight]
 - WHEN one request is admitted and creates its intent while the other is paused after finding no intent, then resumes; and when `seam::effect`, `seam::retained` and `seam::close` are called for the other revision while the first is pinned
 - THEN the resumed request MUST be refused as `substituted_request` with `dispatched: true` without pinning or closing anything, exactly the first request's pin MUST be live, and the seam calls for the other revision MUST be blocked or refused as `session_conflict` while the first pin stays live
 
-#### Scenario: Operator admission of an attempt's session is fenced like a run
+#### Scenario: Operator admission never admits an attempt's own session
 r[lattice.agent_revisions.workflow.attempt.scenario.operator]
-- GIVEN `agent-revision admit-session` naming a request's own attempt session, with the attempt's state root, for an absolute but missing workspace root, a superseded profile framing, an attempt recovery closed, an attempt-fence holding another request's intent, a fence lower than one recorded for the work, and a request `run` would admit
+- GIVEN `agent-revision admit-session` for a request runnable under a selected pair, naming the request's own attempt session (its envelope identity), another session, or another session of a request `run` would refuse at request validation
 - WHEN each is admitted
-- THEN it MUST run `run`'s first admission in `run`'s order (request validation, workspace boundary and bounded-step timeout, then under the attempt's fence lock the closing of an orphaned pin, the intent store, the lineage and repair-port gates, the fence and the session behind its write-ahead record) and stop after the session is admitted
-- AND it MUST refuse the first five without any pin, exactly as `run` refuses them, and pin the last, leaving its write-ahead record and no intent; without `--state` the attempt's own session MUST be refused
+- THEN the attempt session MUST be refused as `attempt_session`, naming `lattice implementation-attempt run` as the only command that admits it, before any state change: no state root, lock file, fence record, attempt directory, closure marker or pin
+- AND the other session MUST be pinned after `run`'s request validation and the third refused without a pin, and the session check, the validation and `seam::admit` MUST read one parse of the request; this narrows `admit-session` relative to `db64cd65`, which pinned the attempt session outside its fence
 
 #### Scenario: An absent field changes nothing
 r[lattice.agent_revisions.workflow.attempt.scenario.absent]
