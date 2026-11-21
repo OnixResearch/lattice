@@ -148,7 +148,8 @@ fn an_admitted_policy_validates_and_frames_a_distinct_revision() {
 #[test]
 fn malformed_or_unbounded_policies_are_refused() {
     let budget = budget();
-    let cases: [(fn(&mut super::Policy), super::PolicyError); 12] = [
+    type Case = (fn(&mut super::Policy), super::PolicyError);
+    let cases: [Case; 12] = [
         (|value| value.schema = "v0".into(), super::PolicyError::Schema),
         (|value| value.failure_classes.clear(), super::PolicyError::FailureClasses),
         (|value| value.failure_classes.reverse(), super::PolicyError::FailureClasses),
@@ -373,7 +374,8 @@ fn an_exit_zero_step_without_a_candidate_is_a_failure_never_a_pass() {
 // r[verify lattice.implementation_attempt.repair.scenario.kiln_owned]
 fn changed_work_and_new_semantic_attempts_stay_with_kiln() {
     let frozen = binding();
-    let changes: [(fn(&mut super::StepBinding), super::KilnOwned); 6] = [
+    type Change = (fn(&mut super::StepBinding), super::KilnOwned);
+    let changes: [Change; 6] = [
         (|value| value.work_id = "work-7".into(), super::KilnOwned::ChangedWork),
         (|value| value.work_version = 2, super::KilnOwned::ChangedWork),
         (|value| value.task_spec_digest = hex('0'), super::KilnOwned::ChangedWork),

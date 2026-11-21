@@ -69,7 +69,8 @@ fn a_well_formed_snapshot_validates_and_every_field_moves_its_identity() {
 
 #[test]
 fn malformed_snapshots_are_refused() {
-    let cases: [(fn(&mut Binding), BindingError); 8] = [
+    type Case = (fn(&mut Binding), BindingError);
+    let cases: [Case; 8] = [
         (|value| value.schema = "kiln.lineage".into(), BindingError::Schema),
         (|value| value.root = "ABC".into(), BindingError::Identity),
         (|value| value.account = hex('A'), BindingError::Identity),
