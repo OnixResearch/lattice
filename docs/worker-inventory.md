@@ -282,6 +282,16 @@ would refuse a new session of this profile's revision: nothing or another
 revision is selected, or this revision or the selection's qualification is
 revoked. An unmanaged profile never carries it.
 
+A Kiln budget lineage blocker, serving backpressure or exhaustion and a
+missing repair port are not wait reasons. Lattice refuses such a request
+before any write (`lineage_blocked`, `lineage_exhausted`,
+`repair_ports_unavailable`), and Kiln owns waiting for its lineage. A repair
+loop's exhausted bound is a terminal disposition, not a wait. Inventory v3
+does not read repair records yet: an attempt run with a repair policy has no
+native attempt result, so its instance stays `dispatch_recorded_outcome_unknown`
+with the `dispatch_outcome_unknown` reason even after its disposition is
+retained ([candidate worker](candidate-worker.md#bounded-same-attempt-repair-and-budget-lineage)).
+
 - Reasons are sorted by code in the order of the table above (not
   alphabetically), then by subject. They are deduplicated and bounded to 32,
   and a route gives at most one reason.

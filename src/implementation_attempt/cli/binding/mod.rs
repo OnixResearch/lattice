@@ -15,7 +15,7 @@
 
 pub(super) mod requests;
 #[cfg(test)]
-mod tests;
+pub(super) mod tests;
 pub(super) mod usage;
 
 pub(super) const ADMITTED_FILE: &str = "execution-binding.json";

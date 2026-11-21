@@ -170,6 +170,7 @@ async fn standalone_port_blocks_provider_allocation_before_any_effect() {
         Some(super::super::Ports {
             compute: &mut crate::execution_binding::UnavailableComputePort,
             serving: Box::new(crate::execution_binding::serving::UnavailableOwner),
+            repair: None,
         }),
         super::super::session::revision::Store(None),
     )
@@ -338,7 +339,7 @@ fn retained_request_files_feed_attempt_usage_and_refuse_rewrites() {
     assert!(super::validate_request(&wrong_model).is_err(), "served model must equal the broker model");
 }
 
-pub(super) fn serving_declaration(model: &str) -> lattice_core::execution_binding::serving::Declaration {
+pub(in super::super) fn serving_declaration(model: &str) -> lattice_core::execution_binding::serving::Declaration {
     lattice_core::execution_binding::serving::Declaration {
         schema: lattice_core::execution_binding::serving::DECLARATION_SCHEMA.into(),
         profile: lattice_core::execution_binding::serving::Profile {

@@ -190,6 +190,12 @@ pub enum ImplementationAttemptError {
     InvalidBudget,
 }
 
+/// Bounded same-attempt repair: the admitted policy and its pure loop.
+pub mod repair;
+
+/// Consumer of Kiln #61's admitted budget lineage.
+pub mod lineage;
+
 #[cfg(test)]
 mod tests {
     use super::*;

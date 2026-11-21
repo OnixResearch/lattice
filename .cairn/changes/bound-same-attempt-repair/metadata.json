@@ -1,0 +1,11 @@
+{
+  "depends_on": [
+    "execute-admitted-implementation-attempt",
+    "manage-agent-revisions"
+  ],
+  "workflow_profile": {
+    "id": "spec-driven",
+    "source": "change_create",
+    "version": 1
+  }
+}

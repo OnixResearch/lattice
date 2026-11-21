@@ -7,6 +7,7 @@ mod export;
 mod inspect;
 mod recovery;
 mod refusal;
+pub mod repair;
 mod session;
 #[cfg(test)]
 mod tests;
@@ -119,6 +120,15 @@ pub struct Request {
     /// exact request bytes and echoed in every observation when present.
     #[serde(default = "absent", skip_serializing_if = "Option::is_none")]
     pub dispatch_plan: Option<String>,
+    /// Optional admitted bounded same-attempt repair policy. When present it
+    /// is part of the profile revision; absent, the request decodes and
+    /// behaves exactly as before.
+    #[serde(default = "absent", skip_serializing_if = "Option::is_none")]
+    pub repair: Option<super::repair::Policy>,
+    /// Optional Kiln #61 budget lineage snapshot of this attempt's account.
+    /// Per-attempt: bound by the exact request bytes, not the profile revision.
+    #[serde(default = "absent", skip_serializing_if = "Option::is_none")]
+    pub lineage: Option<super::lineage::Binding>,
 }
 
 /// An absent optional coordinator field.
@@ -162,6 +172,7 @@ impl Request {
             return Err(refusal::Reason::ProfileRevisionSuperseded.message().into());
         }
         refusal::validate_coordinator(self)?;
+        repair::validate(self)?;
         binding::validate_request(self)
     }
 
@@ -204,6 +215,7 @@ pub async fn run_command(args: &CommandArgs) -> Result<(), String> {
     let ports = Ports {
         compute: &mut crate::execution_binding::UnavailableComputePort,
         serving: Box::new(crate::execution_binding::serving::UnavailableOwner),
+        repair: None,
     };
     run_command_with_ports(args, ports).await
 }
@@ -212,6 +224,9 @@ pub async fn run_command(args: &CommandArgs) -> Result<(), String> {
 pub struct Ports<'a> {
     pub compute: &'a mut dyn crate::execution_binding::ComputeAllocationPort,
     pub serving: Box<dyn crate::execution_binding::serving::OwnerPort>,
+    /// Worker, check and clock ports of a repair-policy request; the
+    /// standalone CLI supplies none, so such a request is refused there.
+    pub repair: Option<repair::Ports<'a>>,
 }
 
 /// Run with embedder-supplied compute and serving-owner ports. `inspect`

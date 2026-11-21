@@ -33,6 +33,14 @@ pub(super) enum Reason {
     /// qualification has since been revoked, so its retained candidate is not
     /// exported.
     ExportRevoked,
+    /// Kiln's budget lineage reports a blocker or serving backpressure;
+    /// refused before any write.
+    LineageBlocked,
+    /// Kiln's budget lineage cannot cover the first step; refused before any
+    /// write.
+    LineageExhausted,
+    /// A repair policy needs embedder-supplied worker and check ports.
+    RepairPortsUnavailable,
 }
 
 impl Reason {
@@ -60,6 +68,18 @@ impl Reason {
                 "implementation attempt executed, but its agent revision session, revision or qualification \
                  is revoked; its retained candidate is not exported"
             }
+            Self::LineageBlocked => {
+                "implementation request is refused: its Kiln budget lineage is blocked or under backpressure; \
+                 nothing was dispatched"
+            }
+            Self::LineageExhausted => {
+                "implementation request is refused: its Kiln budget lineage cannot cover the first step; \
+                 nothing was dispatched"
+            }
+            Self::RepairPortsUnavailable => {
+                "implementation request is refused: its repair policy needs embedder-supplied worker and check \
+                 ports; nothing was dispatched"
+            }
         }
     }
 
@@ -71,7 +91,10 @@ impl Reason {
             | Self::CrossedAttempt
             | Self::ProfileRevisionSuperseded
             | Self::RevisionNotAdmitted
-            | Self::RevisionBlocked => false,
+            | Self::RevisionBlocked
+            | Self::LineageBlocked
+            | Self::LineageExhausted
+            | Self::RepairPortsUnavailable => false,
         }
     }
 }
@@ -131,6 +154,23 @@ pub(super) fn refuse_revision(
     let mut printed = record(envelope, reason);
     if let Some(fields) = printed.as_object_mut() {
         fields.insert("revision_refusal".to_owned(), serde_json::json!(refusal));
+    }
+    println!("{printed}");
+    reason.message().to_owned()
+}
+
+/// Print the typed lineage refusal with Kiln's lineage reason and return
+/// its diagnostic.
+// r[impl lattice.implementation_attempt.lineage.scenario.exhausted]
+pub(super) fn refuse_lineage(
+    envelope: &crate::implementation_attempt::ImplementationAttemptEnvelope,
+    reason: Reason,
+    refusal: &crate::implementation_attempt::lineage::Refusal,
+) -> String {
+    debug_assert!(matches!(reason, Reason::LineageBlocked | Reason::LineageExhausted));
+    let mut printed = record(envelope, reason);
+    if let Some(fields) = printed.as_object_mut() {
+        fields.insert("lineage_refusal".to_owned(), serde_json::json!(refusal));
     }
     println!("{printed}");
     reason.message().to_owned()

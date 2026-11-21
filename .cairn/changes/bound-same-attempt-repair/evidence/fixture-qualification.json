@@ -1,0 +1,70 @@
+{
+  "schema": "lattice.fixture-qualification.v1",
+  "change": "bound-same-attempt-repair",
+  "kind": "synthetic-fixture-qualification",
+  "live_qualification": false,
+  "live_worker_exercised": false,
+  "evidence_label": "fixture",
+  "base_revision": "db64cd654e52cf6579643e6e96ad92bda2b3d61a",
+  "integration_head": null,
+  "producer": {
+    "repository": "kiln",
+    "issue": "OnixResearch/kiln#61",
+    "revision": "339116f68e762e4caf0d05a9ac73a6e97a74b67d",
+    "contract": [
+      "crates/kiln-core/src/fair_admission/lineage.rs",
+      "crates/kiln-core/src/fair_admission/serving.rs",
+      "docs/fair-admission.md"
+    ],
+    "vendored": false
+  },
+  "producer_schemas": [
+    "lattice.implementation-attempt-repair-policy.v1",
+    "lattice.kiln-budget-lineage.v1",
+    "lattice.implementation-attempt-repair-step.v1",
+    "lattice.implementation-attempt-repair-observation.v1"
+  ],
+  "refusal_reasons_added": [
+    "lineage_blocked",
+    "lineage_exhausted",
+    "repair_ports_unavailable"
+  ],
+  "dispositions": [
+    "correct_candidate",
+    "repaired_candidate",
+    "budget_exhausted",
+    "cancelled",
+    "uncertain",
+    "not_repairable",
+    "checks_rejected",
+    "lineage_blocked",
+    "kiln_owned"
+  ],
+  "tests": {
+    "core": [
+      "src/implementation_attempt/lineage/tests.rs (6 tests)",
+      "src/implementation_attempt/repair/tests.rs (11 tests)"
+    ],
+    "shell": [
+      "src/implementation_attempt/cli/tests/repair.rs (12 tests: correct, repaired, iteration and lineage exhaustion, cancellation during and between steps, uncertain worker and check, exit-zero/fabricated/reconfigured/skipped/self-approved bypasses, Kiln-owned proposal, lineage and missing-port refusals before any write, lost controller, base drift, absent-field byte identity, single-shot lineage draw)"
+    ],
+    "fixture_ports": "fixture WorkerPort, CheckPort and clock; no OMP process, sandbox, model endpoint, check executor or Kiln ledger"
+  },
+  "checks": {
+    "implementation_attempt_lib": "cargo test --locked -p lattice --lib -- implementation_attempt (RUSTC_WRAPPER empty): exit 0, 86 passed, 0 failed",
+    "fmt": "cargo fmt -p lattice --check: exit 0",
+    "scripts_check": "PENDING",
+    "cairn": "PENDING",
+    "octet": "octet-precommit-check: exit 0; root warning-only, 1052 accepted, 1052 current, 0 new, 0 stale; lattice-core warning-only, 25 accepted, 25 current, 0 new, 0 stale. The baseline re-key replaced only b3:b166871c68ee32c8 with b3:0b746056461b81e1 (underscore_in_module_filename on src/implementation_attempt.rs, whose content gained the two module declarations), through scripts/octet-baseline-migrate.rs in identity-only mode against a reference run at db64cd65 (old=1052 candidate=1052 unmatched 0/0)",
+    "octet_semantic_delta": "octet_semantic_delta.py against the db64cd65 root baseline: new_semantic=0 resolved_semantic=0",
+    "scripts_check": "scripts/check.rs (RUSTC_WRAPPER empty): incomplete, stopped by the worker for its request budget during step 37 of about 40 ('all features tests'); every step through 36 passed and 96 test binaries had reported ok with no real failure. The one FAILED line is the intentional invalid-phase child of tests/test_orchestration_shell.rs (restart_child_rejects_unknown_phase_before_creating_store passed, and restart_duplicate_trigger_reuses_original_admission_across_processes passed in its own run). Clippy and the later steps did not run",
+    "cairn": "cairn validate and the proposal, design and tasks gates of bound-same-attempt-repair: see the worker report"
+  },
+  "non_claims": [
+    "No OMP-backed WorkerPort exists; the standalone CLI refuses repair-policy requests and the pinned OMP route stays single-shot.",
+    "No live model, check executor or Kiln lineage was exercised; the lineage is a frozen snapshot, not Kiln's current ledger.",
+    "export-candidate and inventory v3 do not read repair records; a repaired candidate is not exported and its instance stays dispatch_recorded_outcome_unknown.",
+    "No disposition is acceptance; independent verification stays with Kiln #46.",
+    "Kiln does not yet emit lattice.kiln-budget-lineage.v1; its field mapping is documented in docs/candidate-worker.md."
+  ]
+}

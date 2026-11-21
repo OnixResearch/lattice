@@ -2,15 +2,15 @@
   "schema_version": 1,
   "finding_schema_version": 2,
   "metadata": {
+    "config_hash": "b3:373a458321454dae9fcfee8b696e906f8dd0e978769601ea777ddfcd080ad018",
+    "profile_hash": "b3:d2ff43855d70abf076f3597c441f3c90718857d7ce696b2f7aa11a3d7f570959",
+    "profile_name": "workspace-metadata",
+    "rustc_version": "rustc 1.96.0-nightly (ac7f9ec7d 2026-03-20)",
     "tool_name": "cargo-octet",
     "tool_version": "0.1.0",
-    "rustc_version": "rustc 1.96.0-nightly (ac7f9ec7d 2026-03-20)",
-    "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu",
-    "profile_name": "workspace-metadata",
-    "profile_hash": "b3:d2ff43855d70abf076f3597c441f3c90718857d7ce696b2f7aa11a3d7f570959",
-    "config_hash": "b3:373a458321454dae9fcfee8b696e906f8dd0e978769601ea777ddfcd080ad018"
+    "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu"
   },
-  "baseline_hash": "b3:d688fe72b6c56d391d8acd5c3ffe84851a9c30b17b12a14dd014eb38b6d3c3e9",
+  "baseline_hash": "b3:cc4a4c5336b3c74bb67fda6fee22ae355fca97d61673e4abda8d7a8ff663bddb",
   "findings": [
     {
       "stable_id": "b3:00078fe172707ba0",
@@ -712,6 +712,19 @@
       "line": 7,
       "column": 1,
       "message": "non-trait import `Artifact` hides the owner path; prefer the qualified path at the use site",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:0b746056461b81e1",
+      "semantic_id": "b3:0b746056461b81e1",
+      "identity_status": "computed",
+      "lint": "underscore_in_module_filename",
+      "group": "tigerstyle::naming",
+      "severity": "warning",
+      "file": "src/implementation_attempt.rs",
+      "line": 1,
+      "column": 1,
+      "message": "module filename `implementation_attempt.rs` contains an underscore; prefer `implementation/attempt.rs`",
       "crate_name": "lattice"
     },
     {
@@ -9409,19 +9422,6 @@
       "line": 1,
       "column": 1,
       "message": "source file is 364 lines (limit: 300)",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:b166871c68ee32c8",
-      "semantic_id": "b3:b166871c68ee32c8",
-      "identity_status": "computed",
-      "lint": "underscore_in_module_filename",
-      "group": "tigerstyle::naming",
-      "severity": "warning",
-      "file": "src/implementation_attempt.rs",
-      "line": 1,
-      "column": 1,
-      "message": "module filename `implementation_attempt.rs` contains an underscore; prefer `implementation/attempt.rs`",
       "crate_name": "lattice"
     },
     {

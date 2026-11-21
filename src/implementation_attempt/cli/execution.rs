@@ -110,6 +110,13 @@ pub(super) fn recover_existing(
         println!("{observation}");
         return Ok(());
     }
+    // r[impl lattice.implementation_attempt.repair.scenario.dispositions]
+    if request.repair.is_some() {
+        let observation = super::repair::recover(request, directory, identity)?;
+        super::session::revision::close(revisions, request, &recorded)?;
+        println!("{observation}");
+        return Ok(());
+    }
     let store_path = directory.join("candidate.redb");
     if !store_path.exists() {
         return Err(format!(
@@ -176,9 +183,16 @@ impl Context {
             return recover_existing(&self.request, &self.state, &self.directory, &self.identity, revisions);
         };
         let worker = worker_request(&self.request)?;
+        let super::Ports {
+            compute,
+            serving,
+            repair,
+        } = ports;
+        // The lineage gate and repair ports are checked before any write.
+        let repair = super::repair::admit(&self.request, repair)?;
         // The session is admitted before anything is written; a refusal starts nothing.
         let session = super::session::revision::admit(revisions, &self.request)?;
-        let prepared = self.prepare(ports.compute);
+        let prepared = self.prepare(compute);
         let (admitted, store) = match prepared {
             Ok(prepared) => prepared,
             Err(error) => {
@@ -199,29 +213,54 @@ impl Context {
         let recorded = session.recorded.unwrap_or(super::session::intent::Recorded::UNMANAGED);
         // No worker ever spawns for this attempt once a pre-spawn step fails,
         // so its session is closed.
-        let before_spawn = super::binding::revalidate(&self.directory, &admitted, ports.compute)
+        let before_spawn = super::binding::revalidate(&self.directory, &admitted, compute)
             .and_then(|()| super::session::revision::permit(revisions, &self.request, &recorded, &self.directory));
         if let Err(error) = before_spawn {
             super::session::revision::close(revisions, &self.request, &recorded)
                 .map_err(|close| format!("{error}; {close}"))?;
             return Err(error);
         }
-        let binding_identity = admitted.binding_identity.clone();
+        let receipt = super::binding::usage::WorkerReceipt::new(admitted, self.identity.clone());
+        let Some(repair) = repair else {
+            let binding_identity = receipt.admitted().binding_identity.clone();
+            self.single_shot(worker, store, receipt, serving).await?;
+            super::session::revision::close(revisions, &self.request, &recorded)?;
+            let store =
+                crate::store::Store::new(self.directory.join("candidate.redb")).map_err(|error| error.to_string())?;
+            println!("{}", super::recovery::recover(&store, &self.request, &self.directory, &binding_identity)?);
+            return Ok(());
+        };
+        let run = super::repair::Run {
+            request: &self.request,
+            directory: &self.directory,
+            identity: &self.identity,
+            receipt,
+            store,
+        };
+        let observation = super::repair::execute(run, repair)?;
+        super::session::revision::close(revisions, &self.request, &recorded)?;
+        println!("{observation}");
+        Ok(())
+    }
+
+    /// The one bounded OMP worker step of an attempt without a repair policy.
+    async fn single_shot(
+        &self,
+        worker: crate::candidate_worker::Request,
+        store: crate::store::Store,
+        receipt: super::binding::usage::WorkerReceipt,
+        serving: Box<dyn crate::execution_binding::serving::OwnerPort>,
+    ) -> Result<(), String> {
         let execution = super::session::launch::WorkerStep {
             worker,
             store,
             profile: self.request.omp.clone(),
             output_dir: self.directory.clone(),
             is_unchanged_allowed: self.request.allow_unchanged,
-            receipt: super::binding::usage::WorkerReceipt::new(admitted, self.identity),
-            serving: ports.serving,
+            receipt,
+            serving,
         };
-        super::session::launch::execute(execution, &self.directory).await?;
-        super::session::revision::close(revisions, &self.request, &recorded)?;
-        let store =
-            crate::store::Store::new(self.directory.join("candidate.redb")).map_err(|error| error.to_string())?;
-        println!("{}", super::recovery::recover(&store, &self.request, &self.directory, &binding_identity)?);
-        Ok(())
+        super::session::launch::execute(execution, &self.directory).await
     }
 
     /// The fence record, persisted binding and candidate store, all before

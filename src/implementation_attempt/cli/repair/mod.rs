@@ -1,0 +1,175 @@
+//! Shell of the bounded same-attempt repair loop.
+//!
+//! The embedder supplies a [`WorkerPort`] that runs one bounded worker step in
+//! the attempt workspace, a [`CheckPort`] that runs one declared check, and a
+//! clock. The shell owns everything else: the frozen policy and lineage, the
+//! host-derived candidate of every step, the check invocations, the charges
+//! and the retained records. The standalone CLI supplies no ports, so a
+//! request with a repair policy is refused there before any effect.
+
+// r[impl lattice.implementation_attempt.repair.scenario.absent]
+// r[impl lattice.implementation_attempt.lineage.scenario.exhausted]
+
+mod records;
+mod steps;
+
+/// One bounded worker step of the attempt.
+pub trait WorkerPort {
+    /// Run `request` in `workspace`. `is_cancel_requested` reports a
+    /// persisted cancellation request; a failed observation reports `true`.
+    fn step(
+        &mut self,
+        request: &crate::implementation_attempt::repair::step::Request,
+        workspace: &std::path::Path,
+        is_cancel_requested: &dyn Fn() -> bool,
+    ) -> crate::implementation_attempt::repair::step::Report;
+}
+
+/// The admitted host check executor.
+pub trait CheckPort {
+    /// Run one declared check against the candidate in `workspace`.
+    fn run(
+        &mut self,
+        invocation: &crate::implementation_attempt::repair::checks::Invocation,
+        workspace: &std::path::Path,
+    ) -> crate::implementation_attempt::repair::checks::Observation;
+}
+
+/// Embedder-supplied repair ports.
+pub struct Ports<'a> {
+    pub worker: &'a mut dyn WorkerPort,
+    pub checks: &'a mut dyn CheckPort,
+    pub clock: &'a dyn crate::operation::shell::Clock,
+}
+
+/// Refuse a malformed policy or lineage, or a policy over served routes.
+pub(super) fn validate(request: &super::Request) -> Result<(), String> {
+    if let Some(lineage) = &request.lineage {
+        lineage.validate().map_err(|error| error.to_string())?;
+    }
+    let Some(policy) = &request.repair else {
+        return Ok(());
+    };
+    policy.validate(frame(request)).map_err(|error| error.to_string())?;
+    if request.execution_binding.serving.is_some() {
+        return Err("repair iterations over served model routes are unsupported".into());
+    }
+    Ok(())
+}
+
+fn frame(request: &super::Request) -> crate::implementation_attempt::repair::Frame<'_> {
+    crate::implementation_attempt::repair::Frame {
+        budget: &request.envelope.budget,
+        step_model_requests: u64::from(request.omp.model_broker.max_requests),
+        is_unchanged_allowed: request.allow_unchanged,
+    }
+}
+
+/// The reservation of the first worker step: one broker ceiling of model
+/// requests and, with a policy, its step and check tool invocations.
+fn first_reservation(request: &super::Request) -> Result<crate::implementation_attempt::lineage::Draws, String> {
+    let step_model_requests = u64::from(request.omp.model_broker.max_requests);
+    match &request.repair {
+        Some(policy) => policy.reservation(step_model_requests).map_err(|error| error.to_string()),
+        None => Ok(crate::implementation_attempt::lineage::Draws {
+            model_requests: step_model_requests,
+            tool_invocations: 0,
+        }),
+    }
+}
+
+/// Before any write: the lineage must admit the first step, and a repair
+/// policy needs embedder ports. Each refusal is typed and dispatches nothing.
+pub(super) fn admit<'a>(request: &super::Request, ports: Option<Ports<'a>>) -> Result<Option<Ports<'a>>, String> {
+    debug_assert!(request.validate_binding().is_ok(), "admission follows request validation");
+    if let Some(lineage) = &request.lineage {
+        let next = first_reservation(request)?;
+        debug_assert!(next.model_requests > 0, "a step reserves at least one model request");
+        let drawn = crate::implementation_attempt::lineage::Draws::default();
+        if let Err(refusal) = lineage.gate(&drawn, &next) {
+            let reason = match refusal {
+                crate::implementation_attempt::lineage::Refusal::Exhausted { .. } => {
+                    super::refusal::Reason::LineageExhausted
+                }
+                _ => super::refusal::Reason::LineageBlocked,
+            };
+            return Err(super::refusal::refuse_lineage(&request.envelope, reason, &refusal));
+        }
+    }
+    match (&request.repair, ports) {
+        (None, _) => Ok(None),
+        (Some(_), Some(ports)) => Ok(Some(ports)),
+        (Some(_), None) => {
+            Err(super::refusal::refuse(&request.envelope, super::refusal::Reason::RepairPortsUnavailable))
+        }
+    }
+}
+
+/// The single-shot attempt's conservative lineage draw, when it has one.
+pub(super) fn single_shot_draw(request: &super::Request) -> Option<serde_json::Value> {
+    let lineage = request.lineage.as_ref()?;
+    debug_assert!(request.repair.is_none(), "a repair attempt reports its own draws");
+    let charged = first_reservation(request).ok()?;
+    debug_assert_eq!(charged.tool_invocations, 0, "a single shot reserves no tool invocations");
+    let usage = crate::implementation_attempt::repair::step::Usage {
+        phase: crate::implementation_attempt::repair::step::Phase::Edit,
+        iteration: 1,
+        model_requests: None,
+        tool_invocations: None,
+        provenance: crate::orchestration::UsageProvenance::Unknown,
+        charged,
+    };
+    let mut unaccounted = lineage.unaccounted();
+    if lineage.remaining.contains_key(crate::implementation_attempt::lineage::TOOL_INVOCATIONS) {
+        unaccounted.push(crate::implementation_attempt::lineage::TOOL_INVOCATIONS.to_owned());
+    }
+    Some(serde_json::json!({
+        "binding": lineage.identity(),
+        "usage": [usage],
+        "unaccounted_dimensions": unaccounted,
+    }))
+}
+
+/// The frozen inputs of one repair run after its intent.
+pub(super) struct Run<'a> {
+    pub(super) request: &'a super::Request,
+    pub(super) directory: &'a std::path::Path,
+    pub(super) identity: &'a str,
+    pub(super) receipt: super::binding::usage::WorkerReceipt,
+    pub(super) store: crate::store::Store,
+}
+
+/// Drive the loop to a disposition and retain it; returns the observation.
+// r[impl lattice.implementation_attempt.repair]
+pub(super) fn execute(run: Run<'_>, ports: Ports<'_>) -> Result<serde_json::Value, String> {
+    let Some(policy) = run.request.repair.clone() else {
+        return Err("repair execution requires an admitted repair policy".into());
+    };
+    let records = records::Retained::open(run.directory, run.identity)?;
+    let started_epoch_ms = observe(ports.clock);
+    let mut driver = steps::Driver::prepare(run.request, &records, policy)?;
+    let disposition = driver.drive(ports, started_epoch_ms)?;
+    let window = super::binding::usage::WorkerWindow {
+        started_epoch_ms,
+        finished_epoch_ms: driver.finished_epoch_ms,
+    };
+    // The attempt usage observation precedes the retained disposition.
+    run.receipt.persist(&run.store, window, run.directory)?;
+    let observation = driver.observation(run.request, run.identity, &run.receipt, &disposition);
+    records.retain_disposition(&observation)?;
+    Ok(observation)
+}
+
+/// Reconcile a repair attempt from its retained disposition only; it never
+/// spawns, checks or charges again.
+pub(super) fn recover(
+    request: &super::Request,
+    directory: &std::path::Path,
+    identity: &str,
+) -> Result<serde_json::Value, String> {
+    records::Retained::at(directory, identity).disposition(request)
+}
+
+fn observe(clock: &dyn crate::operation::shell::Clock) -> Option<u64> {
+    u64::try_from(clock.observe_epoch_millis()).ok()
+}

@@ -547,6 +547,7 @@ async fn revocation_after_admission_blocks_the_attempt_before_spawn() {
         Some(super::super::Ports {
             compute: &mut port,
             serving: Box::new(crate::execution_binding::serving::UnavailableOwner),
+            repair: None,
         }),
         super::super::session::revision::Store(Some(&fixture.store)),
     )

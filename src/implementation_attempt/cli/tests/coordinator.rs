@@ -54,6 +54,7 @@ async fn run(path: &std::path::Path, state: &std::path::Path) -> Result<(), Stri
         Some(super::super::Ports {
             compute: &mut crate::execution_binding::UnavailableComputePort,
             serving: Box::new(crate::execution_binding::serving::UnavailableOwner),
+            repair: None,
         }),
         super::super::session::revision::Store(None),
     )

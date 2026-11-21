@@ -100,6 +100,8 @@ fn request(prompt: &str) -> Request {
         }),
         network: None,
         dispatch_plan: None,
+        repair: None,
+        lineage: None,
     }
 }
 

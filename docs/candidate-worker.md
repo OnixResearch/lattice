@@ -385,9 +385,13 @@ any effect or run it again:
 | `revision_not_admitted` | `false` | With `--revision-store`, the managed definition admits no new session of this revision; nothing is written ([agent revisions](agent-revisions.md#integration)) |
 | `revision_blocked` | `false` | With `--revision-store`, the managed session was blocked right before spawn; the worker never started |
 | `export_revoked` | `true` | `export-candidate` of a managed attempt that executed, after its session, pinned revision or qualification was revoked; nothing is exported |
+| `lineage_blocked` | `false` | The request's Kiln budget lineage reports a blocker or serving backpressure; nothing is written ([repair and lineage](#bounded-same-attempt-repair-and-budget-lineage)) |
+| `lineage_exhausted` | `false` | The request's Kiln budget lineage cannot cover the first step; nothing is written |
+| `repair_ports_unavailable` | `false` | The request has a repair policy but the embedder supplied no worker and check ports, as the standalone CLI never does; nothing is written |
 
 The three agent-revision reasons also carry `revision_refusal`, the
-lifecycle's own refusal (its `code` is, for example, `session_revoked`). Kiln remains the
+lifecycle's own refusal (its `code` is, for example, `session_revoked`), and
+the two lineage reasons carry `lineage_refusal`. Kiln remains the
 fence authority; these records only stop one state root from executing a
 superseded or crossed request.
 
@@ -454,6 +458,127 @@ link count, and mode without recursively traversing unexpected subtrees. Missing
 additional, substituted, symbolic-link, or hard-linked members fail closed.
 The summary always reports `accepted:false` and `integrated:false`; exporting
 never starts a worker or grants publication authority.
+
+### Bounded same-attempt repair and budget lineage
+
+Two optional request fields extend the v3 request. Like `worker_capability`,
+`network` and `dispatch_plan`, an absent field is not serialized, so a request
+without them keeps its bytes, request identity and profile revision and runs
+exactly as before.
+
+`repair` (`lattice.implementation-attempt-repair-policy.v1`) is the admitted
+repair policy:
+
+```json
+{"schema":"lattice.implementation-attempt-repair-policy.v1",
+ "failure_classes":["test"],"max_iterations":2,"max_elapsed_ms":60000,
+ "max_model_requests":3,"max_tool_invocations":6,"step_tool_invocations":1,
+ "check_executor":"<64 hex>",
+ "checks":[{"name":"unit","configuration":"<64 hex>"}]}
+```
+
+Failure classes and checks are strictly sorted, at most 16 each; class and
+check names are lowercase ASCII letters, digits, `_` and `-`, at most 64
+bytes. The reserved class `no_candidate` admits repairing a step that
+produced no new candidate. `max_iterations` (1 to 8) counts repairs after the
+first step, and every step is one envelope turn, so `max_iterations + 1` must
+not exceed `budget.max_turns`. `max_elapsed_ms` must fit `budget.max_seconds`.
+One step reserves the broker's `max_requests` model requests and
+`step_tool_invocations` plus one tool invocation per declared check; the
+aggregate budgets must cover one such step. A policy cannot be combined with
+`allow_unchanged` or served model routes. The profile revision of a request
+with a policy is a domain-separated BLAKE3 of its single-shot revision and the
+policy identity, so a changed policy is a new revision of the same definition.
+
+The standalone CLI has no ports for repair and refuses such a request as
+`repair_ports_unavailable`. An embedder passes `Ports::repair` to
+`run_command_with_ports` with a `WorkerPort` (one bounded step in the attempt
+workspace), a `CheckPort` (one declared check of one candidate revision) and
+a clock; the loop runs synchronously on the calling task. After the usual
+fence, binding, intent, revalidation and revision permit, the shell:
+
+1. re-observes the workspace and refuses it unless it equals the admitted
+   `base_identity`;
+2. asks the pure loop before every spawn, which stops on cancellation, an
+   unreadable clock, the elapsed bound, the iteration bound, the aggregate
+   budgets and the lineage, in that order;
+3. writes `repair/step-N.intent` once before the worker effect;
+4. captures the workspace after an exited step. A tree equal to the parent or
+   the base is no candidate; otherwise a native receipt against the admitted
+   base and a candidate revision binding envelope, attempt, fence, iteration
+   and parent are derived on the host. The worker's exit status, files and
+   claims are never check results;
+5. invokes every declared check against that exact revision and classifies the
+   observations: a skipped, missing, duplicated, undeclared, reconfigured,
+   crossed or self-approved (run by the worker profile itself) check, or one
+   from any executor other than `check_executor`, rejects the evidence;
+6. writes `repair/step-N.json` once and repeats only for failures inside the
+   admitted classes.
+
+The disposition is one of `correct_candidate`, `repaired_candidate` (with
+`repairs`), `budget_exhausted` (with its `bound`: `iterations`, `elapsed`,
+`model_requests`, `tool_invocations` or `lineage` and its dimension),
+`cancelled`, `uncertain` (`worker_outcome`, `check_outcome` or `clock`),
+`not_repairable` (with the classes), `checks_rejected` (with the defect),
+`lineage_blocked` or `kiln_owned`. A worker that proposes `changed_work` or a
+`new_semantic_attempt` ends the loop as `kiln_owned`; a step whose binding
+names other work, version or task, or another attempt, fence or envelope, is
+refused before it is recorded. Repair steps receive the parent revision and
+the admitted failure classes only, never a transcript or check output. The
+`lattice.implementation-attempt-repair-observation.v1` record (envelope,
+request and worker-request identities, execution binding, policy and lineage
+identities, disposition, revisions with their receipts, usage, draws and
+unaccounted dimensions, `accepted:false`, `integrated:false` and the
+dispatch plan when present) is written once to `repair/disposition.json` after
+the attempt's `Scope::Attempt` usage observation, and printed. Recovery and a
+duplicate `run` print the retained disposition; without one the outcome is
+unknown and nothing runs again. No disposition is acceptance: Kiln #46 keeps
+independent verification. `export-candidate` and `inspect` do not yet read
+repair records, so a repaired candidate is not exported and its instance is not
+projected from its disposition.
+
+Usage is attributed per phase (`preparation`, `edit`, `check`, `repair`) with
+the existing `UsageProvenance`. A worker step is charged the larger of its
+reservation and its reported count per dimension, or the reservation when the
+count is unknown (`provenance:"unknown"`, counts `null`). Checks are host
+executions with a known count and no model requests. Failed, cancelled and
+uncertain steps are charged like any other.
+
+`lineage` (`lattice.kiln-budget-lineage.v1`) maps Kiln #61's admitted
+recursive budget lineage at Kiln
+[`339116f68e762e4caf0d05a9ac73a6e97a74b67d`](https://github.com/OnixResearch/kiln/tree/339116f68e762e4caf0d05a9ac73a6e97a74b67d/crates/kiln-core/src/fair_admission).
+Kiln code is not vendored:
+
+| Lattice field | Kiln source |
+|---|---|
+| `root` | `LineageExplanation.root` |
+| `account` | `LineageExplanation.account` |
+| `parent` | the account record's `parent` (`null` exactly for the root) |
+| `depth` | `LineageExplanation.depth`, at most `MAX_LINEAGE_DEPTH` (8) |
+| `remaining` | the account's `available` `Amounts`, at most `MAX_DIMENSIONS` (16) |
+| `blocker` | `LineageExplanation.blocker`: `denied`, `expired`, `cancelled` or `budget_exhausted` |
+| `backpressure` | `ServingExplanation.gate`: `eligible`, `waiting`, `overloaded`, `stale`, `incomplete` or `incompatible`, or `none` without a serving owner |
+
+Identities are 64 lowercase hex digits. Lattice charges the dimensions
+`model_requests` and `tool_invocations`; a Kiln dispatcher maps its accounting
+aliases to these names. Before any write, and before every later step, a
+blocker, a gate other than `none` or `eligible`, a zero remainder in any
+dimension, or a remainder below the next step's reservation in a charged
+dimension refuses the spawn. Every step and check of the attempt draws from
+this one account; nothing is minted, refunded or reset. A child account is
+admitted only as this account's direct child in the same root with a ceiling
+within the remainder in every one of its dimensions. Other dimensions are
+never drawn and are listed in `unaccounted_dimensions`: their usage stays
+unknown to Kiln. A single-shot attempt with a lineage reports
+`budget_lineage` in its observation with a conservative draw of one broker
+ceiling and `tool_invocations` unaccounted. The lineage is a frozen snapshot:
+Lattice does not observe Kiln's current ledger.
+
+Qualification is fixture-level: the tests in
+`src/implementation_attempt/cli/tests/repair.rs` drive the real `run` and
+`recover` shell with a fixture worker, check port and clock. No OMP process,
+check executor, model endpoint or Kiln lineage has been exercised, and the
+pinned OMP route remains single-shot.
 
 
 The scoped broker extends the previously published Lattice worker route at

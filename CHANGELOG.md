@@ -9,6 +9,32 @@ interfaces.
 
 ### Added
 
+- Bounded same-attempt repair and the Kiln #61 budget lineage for
+  implementation attempts (Lattice #6). The v3 request accepts two optional
+  fields; without them a request keeps its bytes, identity and profile
+  revision and runs as before. `repair`
+  (`lattice.implementation-attempt-repair-policy.v1`) admits failure classes,
+  1 to 8 repair iterations within the envelope's turns, an elapsed bound,
+  aggregate model and tool budgets, one check executor and the required
+  checks with their configuration identities, and is framed into the profile
+  revision. A pure loop decides every spawn and ends in `correct_candidate`,
+  `repaired_candidate`, `budget_exhausted`, `cancelled`, `uncertain`,
+  `not_repairable`, `checks_rejected`, `lineage_blocked` or `kiln_owned`.
+  Every candidate is captured on the host as a new revision of the same
+  attempt and fence and every declared check is rebound to it; exit status,
+  worker claims and skipped, missing, reconfigured, crossed or self-approved
+  checks cannot pass it. Embedders supply `Ports::repair` (worker, check and
+  clock ports); the standalone CLI refuses a repair request as
+  `repair_ports_unavailable`. Step intents, step records and the disposition
+  are retained write-once under `repair/`, and recovery only reports the
+  retained disposition. `lineage` (`lattice.kiln-budget-lineage.v1`) maps
+  Kiln `339116f6`'s lineage explanation, account remainder and serving gate;
+  a blocker, backpressure or exhausted remainder is refused before any write
+  (`lineage_blocked`, `lineage_exhausted`), every step draws from the one
+  account, and a child is admitted only within the remainder. Usage is
+  attributed per phase with the existing provenance and unknown counts stay
+  unknown. `cli::Ports` gains the `repair` field. See
+  `docs/candidate-worker.md`.
 - Qualification attachments for agent revisions (Animus #18, Lattice #25).
   `lattice agent-revision promote` and `rollback` accept a repeatable
   `--qualification-attachment PATH`. Each file must be a regular,

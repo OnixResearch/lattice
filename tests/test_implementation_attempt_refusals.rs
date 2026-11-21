@@ -78,6 +78,8 @@ fn request(attempt_id: &str) -> Request {
         worker_capability: None,
         network: None,
         dispatch_plan: None,
+        repair: None,
+        lineage: None,
     };
     request.envelope.worker_profile = request.worker_profile_identity().expect("revision");
     request.admitted_envelope = request.envelope.identity();
