@@ -26,29 +26,23 @@ r[lattice.agent_revisions.facts.scenario.coexist]
 - WHEN session C is admitted
 - THEN C MUST pin R3, A MUST stay pinned to R1, and the lifecycle MUST hold R1, R2 and R3 with their own preparation states
 
-### Requirement: Unframed section 1 components frame only when declared
-r[lattice.agent_revisions.framing] `lattice.agent-revision-components.v1` MAY declare a memory policy, checkpoint semantics, a tool executor protocol with tool names, per-route model requirement references and producer/consumer compatibility. `framing::digest` MUST return `None` for an absent declaration and a `lattice-agent-revision-components-v1` digest, spelled `blake3:<hex>`, for a valid one. Names MUST follow the capability name grammar, references MUST be canonical, and lists MUST hold 1 to 32 distinct entries.
+### Requirement: The revision frames the reviewed harness template
+r[lattice.agent_revisions.framing] The profile revision MUST be the `lattice-worker-profile-revision-v2` identity over profile-level configuration and the reviewed harness template: the request schema, the OMP launch prefix `launch --cwd /workspace` and the OMP print options, each in argv order. The template MUST be read from the constants the shell passes to the worker, never restated or declared separately, so changing any reviewed flag (the exposed tools, the output mode, `--no-session`, the approval mode or flag order), the launch prefix or the request schema MUST change the revision. Per-attempt values (task prompt, base snapshot, workspace root, broker expiry) MUST NOT change it. No separate components declaration MUST exist.
 
-#### Scenario: Undeclared components keep existing revisions
-r[lattice.agent_revisions.framing.scenario.undeclared]
-- GIVEN no components declaration
-- WHEN the digest is computed
-- THEN it MUST be `None`, so a revision that frames the digest only when present keeps its existing bytes
-
-#### Scenario: Declared components are canonical and change identity
-r[lattice.agent_revisions.framing.scenario.declared]
-- GIVEN a declaration, the same declaration with tool names reordered, and declarations that change the memory policy, the tools or a model requirement, or drop a component
-- WHEN their digests are computed
-- THEN reordering MUST NOT change the digest, every other change MUST change it, and a wrong schema, an invalid name, a missing reference, an empty list or a duplicate MUST be refused with a typed defect
+#### Scenario: Every reviewed harness flag is part of the revision
+r[lattice.agent_revisions.framing.scenario.harness_template]
+- GIVEN a request and the effective harness template, and templates that each change the exposed tools, the output mode, `--no-session`, the approval mode, the flag order, the launch prefix or the request schema
+- WHEN the revision is framed under each
+- THEN the effective template MUST give the request's `worker_profile_identity`, and every changed template MUST give a distinct revision
 
 ### Requirement: An inert, material-free bundle per revision
 r[lattice.agent_revisions.bundle] `agent-revision resolve` MUST resolve an exported implementation-attempt request into a `lattice.agent-bundle.v1` bundle without admitting, preparing or writing anything. The revision MUST be `Request::worker_profile_identity()` used verbatim, and the definition MUST be the inventory's `lattice-worker-definition-v1` identity. The bundle MUST carry identities and declared names only, never paths, prompts, endpoints, credential values or commands, and its identity MUST be the `lattice-agent-bundle-v1` digest of its canonical bytes.
 
 #### Scenario: Resolution is opaque and redacted
 r[lattice.agent_revisions.bundle.scenario.inert]
-- GIVEN requests that differ only in prompt, declared tools, executable pin or broker model
+- GIVEN requests that differ only in prompt, and requests that differ in declared tools, executable pin or broker model
 - WHEN each is resolved
-- THEN each revision MUST equal its `worker_profile_identity`, the revisions MUST differ, the definition MUST stay the same, and no path, endpoint, credential key or prompt MUST appear in the bundle
+- THEN each revision MUST equal its `worker_profile_identity`, the prompt-only change MUST keep the revision because the task prompt is per-attempt, every other change MUST change it, the definition MUST stay the same, and no path, endpoint, credential key or prompt MUST appear in the bundle
 
 #### Scenario: Hosted routes keep unknown weight identity
 r[lattice.agent_revisions.bundle.scenario.hosted]
@@ -150,7 +144,7 @@ r[lattice.agent_revisions.sessions.scenario.readmitted]
 - THEN A MUST be refused as `session_closed`, C as `revision_revoked` or `qualification_revoked`, and an unrevoked live C MUST get its existing pin
 
 ### Requirement: Pinning preserves configuration, not privileges
-r[lattice.agent_revisions.revocation] Revocation of a revision, a qualification reference or a session MUST be recorded monotonically and idempotently. Revocation of a target the lifecycle references (a retained revision, a recorded or pinned qualification reference, a pinned session) MUST never be refused; the per-kind bound MUST apply only to targets it does not reference. `effect_permitted` MUST refuse any further effect of a session that is closed, revoked, or pinned to a revoked revision or qualification, and admission MUST refuse a revoked selection. A revoked last usable revision MUST stop being last usable. Revocation MUST NOT rewrite pins.
+r[lattice.agent_revisions.revocation] Revocation of a revision, a qualification reference or a session MUST be recorded monotonically and idempotently. Revocation of a target the lifecycle references (a retained revision, a recorded or pinned qualification reference, a pinned session) MUST never be refused; the per-kind bound MUST apply only to targets it does not reference. `effect_permitted` MUST refuse any further effect of a session that is closed, revoked, or pinned to a revoked revision or qualification, and admission MUST refuse a revoked selection. `sessions::retained_permitted` MUST refuse publishing the retained output of a session that is revoked or was pinned to a now revoked revision or qualification, from the pin the embedder recorded, even after closing forgot the pin. A revoked last usable revision MUST stop being last usable. Revocation MUST NOT rewrite pins.
 
 #### Scenario: Revocation blocks old and new sessions
 r[lattice.agent_revisions.revocation.scenario.effects]
@@ -163,6 +157,12 @@ r[lattice.agent_revisions.revocation.scenario.capacity]
 - GIVEN 1024 recorded revocations of each kind
 - WHEN an unreferenced target, then a pinned session, the selected revision and a pinned qualification are revoked
 - THEN the unreferenced target MUST be refused as `capacity_exhausted`, and each referenced target MUST be recorded and then block the effects it covers
+
+#### Scenario: Revocation reaches retained output after close
+r[lattice.agent_revisions.revocation.scenario.retained]
+- GIVEN a managed implementation attempt that reached its terminal result and closed its session, so the lifecycle forgot its pin
+- WHEN its pinned revision is revoked and its retained candidate is exported with the revision store
+- THEN the export MUST be refused with one `lattice.implementation-attempt-refusal.v1` record with reason `export_revoked`, `dispatched: true` because the worker ran, and the lifecycle's refusal as `revision_refusal`; nothing MUST be exported, and the inventory MUST show the released pin as blocked
 
 ### Requirement: Retention and uncertain cleanup
 r[lattice.agent_revisions.retention] A revision's artifacts MUST be retained while it is desired (unless its preparation failed), selected or last usable, while a live session pins it, while a checkpoint or recovery evidence holds it, or while its preparation is pending or unknown. Cleanup MUST be planned only for unretained revisions with recorded artifacts, MUST be refused for a retained revision, and MUST release artifacts only on an observed `released` cleanup. Releasing a prepared revision's artifacts MUST make it unprepared.
@@ -180,7 +180,7 @@ r[lattice.agent_revisions.retention.scenario.holds]
 - THEN each MUST retain its revision with the matching reason, and cleanup of a retained revision MUST be refused as `retained`
 
 ### Requirement: Bounded slots projection for inventory
-r[lattice.agent_revisions.projection] `projection::slots` MUST project `lattice.agent-revision-slots.v1` with the desired revision and generation, sorted prepared revisions, qualified scopes with class and revocation, the last usable revision, the selection for new sessions with its rollout generation, and each pinned session with its revision, status and whether its effects are blocked. It MUST NOT project bundles, artifacts, holds or receipts.
+r[lattice.agent_revisions.projection] `projection::slots` MUST project `lattice.agent-revision-slots.v1` with the desired revision and generation, sorted prepared revisions, qualified scopes with class, provenance and revocation, the last usable revision, the selection for new sessions with its rollout generation, and each pinned session with its revision, status and whether its effects are blocked. It MUST NOT project bundles, artifacts, holds or receipts.
 
 #### Scenario: Slots reflect the lifecycle
 r[lattice.agent_revisions.projection.scenario.slots]
@@ -228,7 +228,7 @@ r[lattice.agent_revisions.shell.scenario.exit_status]
 - THEN every outcome MUST exit zero and every refusal or error MUST exit non-zero, with `admit-session` refusing `no_selection` and `revision_not_selected`, and `rollback` refusing `qualification_unavailable` and `request_conflict`
 
 ### Requirement: A session-admission seam that leaves unmanaged definitions unchanged
-r[lattice.agent_revisions.seam] `agent_revision::seam::admit` MUST return `unmanaged` and write nothing when the request's definition has no lifecycle, and otherwise MUST pin the session or return the refusal; a managed definition MUST admit a new session only for its selection. The caller MUST record the session's admission mode durably at admission: `managed` for `admitted`, `unmanaged` for `unmanaged`; a `refused` session MUST NOT start. `seam::effect` and `seam::close` MUST take that recorded mode. For an `unmanaged` session they MUST answer `unmanaged` without reading or writing the store, even after its definition becomes managed. For a `managed` session `seam::effect` MUST answer `permitted` with the pin or `blocked` with the refusal, and MUST block a session the lifecycle does not know, and `seam::close` MUST close the pin or return the refusal. Implementation attempts MUST keep their current behavior until an embedder wires the seam.
+r[lattice.agent_revisions.seam] `agent_revision::seam::admit` MUST return `unmanaged` and write nothing when the request's definition has no lifecycle, and otherwise MUST pin the session or return the refusal; a managed definition MUST admit a new session only for its selection. The caller MUST record the session's admission mode durably at admission: `managed` for `admitted`, `unmanaged` for `unmanaged`; a `refused` session MUST NOT start. `seam::effect` and `seam::close` MUST take that recorded mode. For an `unmanaged` session they MUST answer `unmanaged` without reading or writing the store, even after its definition becomes managed. For a `managed` session `seam::effect` MUST answer `permitted` with the pin or `blocked` with the refusal, and MUST block a session the lifecycle does not know, and `seam::close` MUST close the pin or return the refusal. `implementation-attempt run`, `recover`, `export-candidate` and `inspect` MUST wire the seam through an optional `--revision-store`, with the attempt's envelope identity as the session: `run` MUST admit before writing any fence, binding, candidate store or intent, MUST refuse a `refused` session with a typed `revision_not_admitted` record that writes nothing, MUST check the effect with the recorded mode immediately before the worker spawns and refuse a `blocked` session as `revision_blocked` without spawning, and `run` and `recover` MUST close the session without checkpoints after the terminal result, counting `unknown_session` as already closed. A session this run pinned MUST be closed when the attempt ends before its intent or is blocked before spawn. Without `--revision-store` an attempt MUST behave exactly as before.
 
 #### Scenario: Unmanaged definitions behave as before
 r[lattice.agent_revisions.seam.scenario.unmanaged]
@@ -241,3 +241,9 @@ r[lattice.agent_revisions.seam.scenario.admission_mode]
 - GIVEN a session admitted `unmanaged` before its definition became managed, and a definition that is then desired, prepared and promoted
 - WHEN the unmanaged session acts and closes, a session claimed `managed` but unknown acts, a new session is admitted before and after promotion, and a managed session closes
 - THEN the unmanaged session MUST answer `unmanaged` and write nothing, the unknown managed session MUST be blocked as `unknown_session`, admission before promotion MUST be refused as `no_selection`, and the closed managed session MUST be blocked and refused re-admission as `session_closed`
+
+#### Scenario: An implementation attempt is admitted, pinned, closed and refused
+r[lattice.agent_revisions.seam.scenario.attempt]
+- GIVEN a definition desired, prepared through the fixture preparation port and promoted with an Animus #18 attachment, a managed definition without a selection, and a session revoked between admission and spawn
+- WHEN implementation attempts run with the revision store and a fixture worker, then a later attempt runs after the revision is revoked
+- THEN the first attempt MUST be admitted `managed`, record its pin in `intent.json`, run its worker after the permit and close its session; an attempt without a selection and the attempt after revocation MUST be refused as `revision_not_admitted` with no fence, binding, intent or pin; the revoked session MUST be refused as `revision_blocked` with a retained revision block, no worker artifacts and a closed session; and an attempt run without the store MUST keep its bare intent bytes and stay unmanaged when its definition later becomes managed

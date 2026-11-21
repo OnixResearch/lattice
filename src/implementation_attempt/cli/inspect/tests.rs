@@ -94,9 +94,15 @@ fn publish(retained: &Retained, disposition: crate::candidate::CandidateDisposit
     store.save_candidate_attempt_result("attempt-agent-a-1", &result).expect("terminal result");
 }
 
-/// Inventory as the standalone CLI projects it: no serving-owner port injected.
+/// Inventory as the standalone CLI projects it: no serving-owner port and no
+/// revision store.
 fn project(request_path: &std::path::Path, state: &std::path::Path) -> Result<serde_json::Value, String> {
-    super::project(request_path, state, &mut crate::execution_binding::serving::UnavailableOwner)
+    super::project(
+        request_path,
+        state,
+        &mut crate::execution_binding::serving::UnavailableOwner,
+        super::super::session::revision::Store(None),
+    )
 }
 
 #[test]
@@ -106,18 +112,26 @@ fn inventory_separates_profile_and_terminal_instance_without_material() {
     let output = project(&retained.request_path, &retained.state).expect("inventory");
     let profile = &output["profile"];
     let instance = &output["instance"];
-    assert_eq!(output["schema"], "lattice.worker-inventory.v2");
-    assert_eq!(profile["schema"], "lattice.worker-profile-facts.v2");
+    assert_eq!(output["schema"], "lattice.worker-inventory.v3");
+    assert_eq!(profile["schema"], "lattice.worker-profile-facts.v3");
     assert_eq!(profile["definition"]["name"], "omp-attempt-worker");
     assert_eq!(profile["definition"]["basis"], "owner_default");
     assert_eq!(profile["task_families"], serde_json::json!({"support": "unknown", "value": null}));
     assert_eq!(profile["tools"], serde_json::json!({"support": "unknown", "value": null}));
-    assert_eq!(profile["revisions"]["selected_for_new_sessions"]["owner"], "lattice#25");
+    for slot in ["desired", "prepared", "qualified", "selected_for_new_sessions"] {
+        assert_eq!(profile["revisions"][slot], serde_json::json!({"support": "unmanaged"}), "{slot}");
+    }
+    assert_eq!(profile["capability_qualifications"], serde_json::json!([]));
+    assert!(
+        !profile["wait_reasons"].to_string().contains("revision"),
+        "an unmanaged profile waits on no revision"
+    );
     assert_eq!(profile["wait_reasons"][0]["code"], "capability_undeclared");
     assert_eq!(profile["compute"]["support"], "declared");
     assert_eq!(profile["cpu_millis"]["support"], "unknown");
     assert_eq!(profile["model_routes"]["value"]["routes"][0]["name"], "primary");
-    assert_eq!(instance["schema"], "lattice.worker-instance-observation.v2");
+    assert_eq!(instance["schema"], "lattice.worker-instance-observation.v3");
+    assert_eq!(instance["pinned"], serde_json::json!({"support": "unmanaged"}));
     assert_eq!(instance["definition_identity"], profile["definition"]["identity"]);
     assert_eq!(instance["liveness"]["state"], "exited");
     assert_eq!(instance["liveness"]["runtime"], "single_shot");
@@ -147,6 +161,9 @@ fn inventory_separates_profile_and_terminal_instance_without_material() {
         "worker-inventory.v1",
         "profile-facts.v1",
         "instance-observation.v1",
+        "worker-inventory.v2",
+        "profile-facts.v2",
+        "instance-observation.v2",
         "\"idle\"",
         "\"running\"",
     ] {
@@ -263,10 +280,10 @@ fn a_dispatch_past_its_admitted_window_is_stale_never_live() {
     assert!(output["instance"]["wait_reasons"].to_string().contains("admission_expired"));
 }
 
-/// Writes the v2 captures Kiln uses as fixtures, only when
+/// Writes the unmanaged v3 captures Kiln uses as fixtures, only when
 /// `LATTICE_INVENTORY_CAPTURE_DIR` names an existing directory.
 #[test]
-fn capture_worker_inventory_v2() {
+fn capture_worker_inventory_v3() {
     let Some(dir) = std::env::var_os("LATTICE_INVENTORY_CAPTURE_DIR") else {
         return;
     };

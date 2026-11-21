@@ -111,6 +111,7 @@ fn inspect_names_the_missing_port_and_shows_the_budget_refusal_once() {
         &served.request_path,
         &served.state,
         &mut crate::execution_binding::serving::UnavailableOwner,
+        unmanaged(),
     )
     .expect("inventory");
     assert_eq!(output["profile"]["serving_readiness"]["state"], "no_serving_port");
@@ -130,8 +131,8 @@ fn inspect_reports_the_injected_ports_latest_snapshot_readiness_and_freshness() 
         vec![],
         vec![],
     );
-    let output =
-        super::super::super::inspect::project(&served.request_path, &served.state, &mut port).expect("inventory");
+    let output = super::super::super::inspect::project(&served.request_path, &served.state, &mut port, unmanaged())
+        .expect("inventory");
     let readiness = &output["instance"]["model_readiness"];
     assert_eq!(readiness["state"], "observed");
     assert_eq!(output["profile"]["serving_readiness"], *readiness);
@@ -158,8 +159,8 @@ fn inspect_reports_the_injected_ports_latest_snapshot_readiness_and_freshness() 
     };
     assert_eq!(route_reasons(&output["profile"]), Vec::<serde_json::Value>::new(), "a ready, current route waits");
     let mut silent = crate::execution_binding::serving::FixtureOwner::default();
-    let output =
-        super::super::super::inspect::project(&served.request_path, &served.state, &mut silent).expect("inventory");
+    let output = super::super::super::inspect::project(&served.request_path, &served.state, &mut silent, unmanaged())
+        .expect("inventory");
     assert_eq!(output["instance"]["model_readiness"]["routes"][0]["snapshot"]["reading"], "unavailable");
     let expected = serde_json::json!([{
         "code": "serving_snapshot_unavailable",
@@ -174,12 +175,17 @@ fn inspect_reports_the_injected_ports_latest_snapshot_readiness_and_freshness() 
     );
 }
 
-/// Writes the served v2 captures Kiln uses as fixtures, only when
+/// Inspection without a revision store.
+const fn unmanaged() -> super::super::super::session::revision::Store<'static> {
+    super::super::super::session::revision::Store(None)
+}
+
+/// Writes the served v3 captures Kiln uses as fixtures, only when
 /// `LATTICE_INVENTORY_CAPTURE_DIR` names an existing directory.
 // r[verify lattice.worker_inventory.captures.scenario.fixture]
 // r[verify lattice.worker_inventory.wait_reasons.scenario.causes]
 #[test]
-fn capture_served_worker_inventory_v2() {
+fn capture_served_worker_inventory_v3() {
     let Some(dir) = std::env::var_os("LATTICE_INVENTORY_CAPTURE_DIR") else {
         return;
     };
@@ -190,13 +196,13 @@ fn capture_served_worker_inventory_v2() {
         vec![],
         vec![],
     );
-    let output =
-        super::super::super::inspect::project(&served.request_path, &served.state, &mut port).expect("inventory");
+    let output = super::super::super::inspect::project(&served.request_path, &served.state, &mut port, unmanaged())
+        .expect("inventory");
     std::fs::write(dir.join("host-local-served-ready.json"), serde_json::to_vec_pretty(&output).expect("json"))
         .expect("write capture");
     let mut silent = crate::execution_binding::serving::FixtureOwner::default();
-    let output =
-        super::super::super::inspect::project(&served.request_path, &served.state, &mut silent).expect("inventory");
+    let output = super::super::super::inspect::project(&served.request_path, &served.state, &mut silent, unmanaged())
+        .expect("inventory");
     std::fs::write(dir.join("host-local-served-unavailable.json"), serde_json::to_vec_pretty(&output).expect("json"))
         .expect("write capture");
 }

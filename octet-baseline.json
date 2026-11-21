@@ -10,7 +10,7 @@
     "profile_hash": "b3:d2ff43855d70abf076f3597c441f3c90718857d7ce696b2f7aa11a3d7f570959",
     "config_hash": "b3:373a458321454dae9fcfee8b696e906f8dd0e978769601ea777ddfcd080ad018"
   },
-  "baseline_hash": "b3:d75e420aee4bea41339ec19f5a37753d3de738d5f2e26b80ee896fa6f74b6fee",
+  "baseline_hash": "b3:d688fe72b6c56d391d8acd5c3ffe84851a9c30b17b12a14dd014eb38b6d3c3e9",
   "findings": [
     {
       "stable_id": "b3:00078fe172707ba0",
@@ -2074,7 +2074,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/store/mod.rs",
-      "line": 52,
+      "line": 53,
       "column": 1,
       "message": "non-trait import `ReplayEventRecord` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -2610,19 +2610,6 @@
       "line": 498,
       "column": 1,
       "message": "item name `export_node_to_n8n_json` repeats `n8n` from ancestor path segment `n8n_json`",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:2f535dc7c9bf4d11",
-      "semantic_id": "b3:2f535dc7c9bf4d11",
-      "identity_status": "computed",
-      "lint": "underscore_in_module_filename",
-      "group": "tigerstyle::naming",
-      "severity": "warning",
-      "file": "src/implementation_attempt.rs",
-      "line": 1,
-      "column": 1,
-      "message": "module filename `implementation_attempt.rs` contains an underscore; prefer `implementation/attempt.rs`",
       "crate_name": "lattice"
     },
     {
@@ -3257,7 +3244,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/implementation_attempt.rs",
-      "line": 168,
+      "line": 170,
       "column": 1,
       "message": "parameter uses `&Vec<u8>`; accept `&[u8]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "lattice"
@@ -3309,7 +3296,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/implementation_attempt.rs",
-      "line": 174,
+      "line": 176,
       "column": 1,
       "message": "item name `ImplementationAttemptError` repeats `implementation` from ancestor path segment `implementation_attempt`",
       "crate_name": "lattice"
@@ -3595,7 +3582,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/store/mod.rs",
-      "line": 167,
+      "line": 168,
       "column": 1,
       "message": "item name `Store` repeats `store` from ancestor path segment `store`",
       "crate_name": "lattice"
@@ -3790,7 +3777,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/implementation_attempt.rs",
-      "line": 37,
+      "line": 39,
       "column": 1,
       "message": "item name `ImplementationAttemptEnvelope` repeats `implementation` from ancestor path segment `implementation_attempt`",
       "crate_name": "lattice"
@@ -4037,7 +4024,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/implementation_attempt.rs",
-      "line": 57,
+      "line": 59,
       "column": 1,
       "message": "item name `admit_implementation_attempt` repeats `implementation` from ancestor path segment `implementation_attempt`",
       "crate_name": "lattice"
@@ -7040,7 +7027,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/store/mod.rs",
-      "line": 235,
+      "line": 236,
       "column": 1,
       "message": "item name `StoreError` repeats `store` from ancestor path segment `store`",
       "crate_name": "lattice"
@@ -7196,7 +7183,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/store/mod.rs",
-      "line": 45,
+      "line": 46,
       "column": 1,
       "message": "non-trait import `Database` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -8223,7 +8210,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/implementation_attempt.rs",
-      "line": 93,
+      "line": 95,
       "column": 12,
       "message": "condition has 4 boolean operators",
       "crate_name": "lattice"
@@ -9425,6 +9412,19 @@
       "crate_name": "lattice"
     },
     {
+      "stable_id": "b3:b166871c68ee32c8",
+      "semantic_id": "b3:b166871c68ee32c8",
+      "identity_status": "computed",
+      "lint": "underscore_in_module_filename",
+      "group": "tigerstyle::naming",
+      "severity": "warning",
+      "file": "src/implementation_attempt.rs",
+      "line": 1,
+      "column": 1,
+      "message": "module filename `implementation_attempt.rs` contains an underscore; prefer `implementation/attempt.rs`",
+      "crate_name": "lattice"
+    },
+    {
       "stable_id": "b3:b1f308374b26b0dc",
       "semantic_id": "b3:b1f308374b26b0dc",
       "identity_status": "computed",
@@ -9497,7 +9497,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/store/mod.rs",
-      "line": 123,
+      "line": 124,
       "column": 1,
       "message": "trait has 11 methods (limit: 7) — split it into cohesive role interfaces",
       "crate_name": "lattice"
@@ -9978,7 +9978,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/store/mod.rs",
-      "line": 264,
+      "line": 265,
       "column": 5,
       "message": "`usize` in public API — use `u32` or `u64` for cross-platform consistency",
       "crate_name": "lattice"
@@ -11018,7 +11018,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/implementation_attempt.rs",
-      "line": 29,
+      "line": 31,
       "column": 1,
       "message": "item name `AttemptBudget` repeats `attempt` from ancestor path segment `implementation_attempt`",
       "crate_name": "lattice"
@@ -11291,7 +11291,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/store/mod.rs",
-      "line": 48,
+      "line": 49,
       "column": 1,
       "message": "non-trait import `TableDefinition` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
@@ -12539,7 +12539,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/store/mod.rs",
-      "line": 105,
+      "line": 106,
       "column": 1,
       "message": "trait has 8 methods (limit: 7) — split it into cohesive role interfaces",
       "crate_name": "lattice"

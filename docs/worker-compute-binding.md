@@ -177,25 +177,31 @@ no release method.
 
 ## Profile and instance facts
 
-`lattice.worker-profile-facts.v2` reuses the existing profile owners: the
+`lattice.worker-profile-facts.v3` reuses the existing profile owners: the
 `ConfiguredBinding.revision` of configured Pi, Clankers and Animus routes
 (`RuntimeOptions::worker_profile_facts`), and the attempt's
 `worker_profile_identity` for the OMP worker. Each fact has exactly one support
-level: `declared`, `qualified`, `unavailable` or `unknown`. `qualified` needs
-bound qualification evidence, and nothing supplies it yet. CPU, memory and
-storage bounds are `unknown`. Configured routes report compute and model-service
-bindings as `unavailable` and executable bytes as `unknown`. Each profile also
-carries a definition identity that is stable across revisions, declared
-`task_families` and `tools` (`unknown` when undeclared), Lattice #25's revision
-slots as owned unknowns, and wait reasons; see [worker inventory](worker-inventory.md).
+level: `declared`, `qualified`, `unavailable` or `unknown`. Only
+`task_families` can be `qualified`, and only when every declared family has a
+current lifecycle qualification of the profile's revision, listed in
+`capability_qualifications`. CPU, memory and storage bounds are `unknown`.
+Configured routes report compute and model-service bindings as `unavailable`
+and executable bytes as `unknown`. Each profile also carries a definition
+identity that is stable across revisions, declared `task_families` and `tools`
+(`unknown` when undeclared), Lattice #25's revision slots (`unmanaged` without
+a revision store or lifecycle, otherwise `recorded` or `unknown` with an
+owner; always `unmanaged` for configured routes), and wait reasons; see
+[worker inventory](worker-inventory.md).
 
-`lattice implementation-attempt inspect --request REQUEST --state STATE`
-prints one `lattice.worker-inventory.v2` document with separate `profile` and
-`instance` sections. The `lattice.worker-instance-observation.v2` instance
-carries the definition identity, profile revision, work, attempt, incarnation
-(the request identity), fence, binding identity, compute provenance without
-backend handles or grant references, model route identities, and one
-lifecycle: `admitted_not_dispatched`, `binding_rejected_before_dispatch`,
+`lattice implementation-attempt inspect --request REQUEST --state STATE
+[--revision-store DB]` prints one `lattice.worker-inventory.v3` document with
+separate `profile` and `instance` sections. The
+`lattice.worker-instance-observation.v3` instance carries the definition
+identity, profile revision, work, attempt, incarnation (the request identity),
+fence, binding identity, compute provenance without backend handles or grant
+references, model route identities, the `pinned` revision slot of its session,
+and one lifecycle: `admitted_not_dispatched`,
+`binding_rejected_before_dispatch`, `revision_blocked_before_dispatch`,
 `dispatch_recorded_outcome_unknown` or `terminal_observed`. Cancellation is
 `not_requested`, `requested_unobserved` or `observed_terminated`. Single-shot
 liveness is `not_started`, `exited` or `unknown` (`unobserved`, or `stale` past
@@ -204,9 +210,11 @@ liveness are always `unknown`. Model readiness names its actual cause
 (`no_serving_port` when no serving-owner port is injected) or carries the
 injected port's latest snapshot readiness and freshness; see
 [inventory readiness](worker-serving-binding.md#inventory-readiness). A
-missing intent binding, an unreadable artifact or a malformed capability
-declaration is an error, never a guessed state. Inspection takes no claim and
-schedules nothing.
+missing intent binding, an unreadable artifact, a malformed capability
+declaration, a named revision store that does not exist, or a
+lifecycle-managed attempt inspected without its revision store is an error,
+never a guessed state. Inspection takes no claim, schedules nothing and writes
+no revision store.
 
 ## Usage coverage
 
@@ -232,10 +240,10 @@ settlement is unchanged.
 |---|---|---|
 | Serving readiness, request admission and per-request model-service usage | [Animus #17](https://github.com/OnixResearch/animus/issues/17), consumed in [worker serving binding](worker-serving-binding.md) | gated and recorded for declared served routes; `unknown` otherwise; no live serving owner qualified |
 | Live host, device and cross-host qualification; a live provider port | [Kiln #49](https://github.com/OnixResearch/kiln/issues/49) with Aspen #15/#20 | not claimed |
-| Qualification evidence that promotes `declared` to `qualified` | [Animus #18](https://github.com/OnixResearch/animus/issues/18) | `declared` only |
+| Qualification evidence that promotes `declared` to `qualified` | [Animus #18](https://github.com/OnixResearch/animus/issues/18) attachments, admitted at promotion ([agent revisions](agent-revisions.md#qualification-attachments)) | `task_families` `qualified` with `capability_qualifications`, including `fixture` provenance; no live producer exercised |
 | Aggregate budgets and shared-deployment apportionment | [Kiln #45](https://github.com/OnixResearch/kiln/issues/45) | not computed |
-| Joined inventory presentation | [Kiln #60](https://github.com/OnixResearch/kiln/issues/60) | `lattice.worker-inventory.v2` profile and instance facts with wait reasons ([worker inventory](worker-inventory.md)) |
-| Revision promotion and pinning | [Lattice #25](https://github.com/OnixResearch/lattice/issues/25) | revision slots `unknown`, owner `lattice#25` |
+| Joined inventory presentation | [Kiln #60](https://github.com/OnixResearch/kiln/issues/60) | `lattice.worker-inventory.v3` profile and instance facts with revision slots and wait reasons ([worker inventory](worker-inventory.md)) |
+| Revision promotion and pinning | [Lattice #25](https://github.com/OnixResearch/lattice/issues/25), [agent revisions](agent-revisions.md) | revision slots from the lifecycle with `--revision-store`, `unmanaged` without it |
 | Checkpoint and restore authority | [Lattice #12](https://github.com/OnixResearch/lattice/issues/12) | `unavailable` |
 | Pricing and currency identity | [Lattice #13](https://github.com/OnixResearch/lattice/issues/13) | none; no producer contract |
 

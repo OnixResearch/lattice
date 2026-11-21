@@ -1,11 +1,12 @@
-//! `lattice.worker-profile-facts.v2`: bounded, material-free profile facts.
+//! `lattice.worker-profile-facts.v3`: bounded, material-free profile facts.
 //!
 //! Profile owners stay where they are: `ConfiguredBinding.revision` for
 //! configured routes and the implementation-attempt `worker_profile_identity`
 //! for the OMP attempt worker. Commands, argv, prompts, endpoints, credential
 //! values and physical paths are never inputs here. The definition identity,
-//! declared capability, #25 revision slots and wait reasons are projected
-//! here from owner-supplied facts only.
+//! declared capability, revision slots, capability qualifications and wait
+//! reasons are projected here from owner-supplied facts and the definition's
+//! revision lifecycle only.
 
 // r[impl lattice.execution_binding.profile_facts]
 // r[impl lattice.execution_binding.profile_facts.scenario.projection]
@@ -16,9 +17,11 @@
 // r[impl lattice.worker_inventory.capability.scenario.declared]
 // r[impl lattice.worker_inventory.capability.scenario.undeclared]
 // r[impl lattice.worker_inventory.revisions]
-// r[impl lattice.worker_inventory.revisions.scenario.unpublished]
+// r[impl lattice.worker_inventory.qualification]
+// r[impl lattice.worker_inventory.qualification.scenario.qualified]
+// r[impl lattice.worker_inventory.qualification.scenario.unbound]
 
-pub const PROFILE_FACTS_SCHEMA: &str = "lattice.worker-profile-facts.v2";
+pub const PROFILE_FACTS_SCHEMA: &str = "lattice.worker-profile-facts.v3";
 /// Owner-default definition name of the OMP implementation-attempt worker.
 pub const ATTEMPT_DEFINITION: &str = "omp-attempt-worker";
 
@@ -55,8 +58,9 @@ pub struct ProfileInput<'a> {
     pub default_definition: &'a str,
     /// The worker configuration's optional capability declaration.
     pub capability: Option<&'a super::super::capability::Declaration>,
-    /// Bound qualification evidence; nothing supplies it yet (Animus #18).
-    pub qualification_ref: Option<&'a str>,
+    /// The definition's revision lifecycle; `None` when no revision store was
+    /// supplied or the definition is not lifecycle-managed.
+    pub lifecycle: Option<&'a crate::agent_revision::state::Lifecycle>,
     pub adapter: super::Offered<&'a str>,
     pub protocol_revision: super::Offered<&'a str>,
     pub executable_identity: super::Offered<&'a str>,
@@ -82,7 +86,6 @@ pub struct WorkerProfileFacts {
     pub owner: ProfileOwner,
     pub definition: super::lineage::Definition,
     pub revision: String,
-    pub qualification_ref: Option<String>,
     pub adapter: super::Fact<String>,
     pub protocol_revision: super::Fact<String>,
     pub executable_identity: super::Fact<String>,
@@ -99,14 +102,30 @@ pub struct WorkerProfileFacts {
     pub cpu_millis: super::Fact<u64>,
     pub memory_bytes: super::Fact<u64>,
     pub storage_bytes: super::Fact<u64>,
-    /// Sorted declared names; `unknown` when undeclared, never empty.
+    /// Sorted declared names; `unknown` when undeclared, never empty;
+    /// `qualified` when every declared family has a current qualification.
     pub task_families: super::Fact<Vec<String>>,
     pub tools: super::Fact<Vec<String>>,
+    /// Current lifecycle qualifications of this revision, by task family.
+    pub capability_qualifications: Vec<CapabilityQualification>,
     pub model_routes: super::Fact<super::super::request::RouteDeclaration>,
     pub compute: super::Fact<super::super::request::ComputeRequirement>,
     pub serving_readiness: super::ServingReadiness,
     pub revisions: super::lineage::RevisionSlots,
     pub wait_reasons: Vec<Reason>,
+}
+
+/// Qualified support for one task family: a current (unrevoked) lifecycle
+/// qualification of the profile's own revision for that family.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CapabilityQualification {
+    pub task_family: String,
+    /// The Animus #18 attachment identity, verbatim.
+    pub qualification_ref: String,
+    pub evidence_class: crate::agent_revision::ports::EvidenceClass,
+    /// `fixture` or `live`, as the producer labelled the attachment.
+    pub provenance: crate::agent_revision::ports::Provenance,
 }
 
 /// A fact the projection refuses to publish.
@@ -119,13 +138,16 @@ pub enum FactsDefect {
     },
     Routes,
     Definition,
+    /// The lifecycle belongs to another definition.
+    Lifecycle,
     Capability {
         capability: super::super::capability::Defect,
     },
     WaitReasons,
 }
 
-/// Project one profile. `qualified` appears only with canonical evidence.
+/// Project one profile. `qualified` appears only with a current lifecycle
+/// qualification of this revision.
 pub fn project_profile(input: &ProfileInput<'_>) -> Result<WorkerProfileFacts, FactsDefect> {
     if !super::super::is_token(input.revision) {
         return Err(FactsDefect::Revision);
@@ -138,22 +160,30 @@ pub fn project_profile(input: &ProfileInput<'_>) -> Result<WorkerProfileFacts, F
         .map(super::super::capability::Declaration::canonical)
         .transpose()
         .map_err(|capability| FactsDefect::Capability { capability })?;
-    let qualification_ref = input.qualification_ref.filter(|value| super::super::is_reference(value));
-    let is_qualified = qualification_ref.is_some();
-    let text = |offered: super::Offered<&str>, field| text_fact(offered, is_qualified, field);
-    let number = |offered: super::Offered<u64>| offered.project(is_qualified, std::convert::identity);
-    let names = |set: Option<&super::super::capability::NameSet>| names_fact(set, is_qualified);
+    let definition = super::lineage::definition(
+        input.owner,
+        input.default_definition,
+        capability.as_ref().map(|declared| declared.definition.as_str()),
+    )
+    .map_err(|_| FactsDefect::Definition)?;
+    if input.lifecycle.is_some_and(|lifecycle| lifecycle.definition != definition.identity) {
+        return Err(FactsDefect::Lifecycle);
+    }
+    let qualifications = super::lineage::capability_qualifications(input.lifecycle, input.revision);
+    let declared_families = capability.as_ref().and_then(|declared| declared.task_families.as_ref());
+    let is_family_qualified = match declared_families {
+        Some(super::super::capability::NameSet::Declared { names }) => {
+            names.iter().all(|name| qualifications.iter().any(|qualified| qualified.task_family == *name))
+        }
+        Some(super::super::capability::NameSet::Unavailable {}) | None => false,
+    };
+    let text = |offered: super::Offered<&str>, field| text_fact(offered, field);
+    let number = |offered: super::Offered<u64>| offered.project(false, std::convert::identity);
     let facts = WorkerProfileFacts {
         schema: PROFILE_FACTS_SCHEMA.to_owned(),
         owner: input.owner,
-        definition: super::lineage::definition(
-            input.owner,
-            input.default_definition,
-            capability.as_ref().map(|declared| declared.definition.as_str()),
-        )
-        .map_err(|_| FactsDefect::Definition)?,
+        definition,
         revision: input.revision.to_owned(),
-        qualification_ref: qualification_ref.map(str::to_owned),
         adapter: text(input.adapter, "adapter")?,
         protocol_revision: text(input.protocol_revision, "protocol_revision")?,
         executable_identity: text(input.executable_identity, "executable_identity")?,
@@ -169,18 +199,21 @@ pub fn project_profile(input: &ProfileInput<'_>) -> Result<WorkerProfileFacts, F
         cpu_millis: super::Offered::Unknown.project(false, std::convert::identity),
         memory_bytes: super::Offered::Unknown.project(false, std::convert::identity),
         storage_bytes: super::Offered::Unknown.project(false, std::convert::identity),
-        task_families: names(capability.as_ref().and_then(|declared| declared.task_families.as_ref())),
-        tools: names(capability.as_ref().and_then(|declared| declared.tools.as_ref())),
-        model_routes: routes_fact(input.model_routes, is_qualified)?,
-        compute: input.compute.project(is_qualified, Clone::clone),
+        task_families: names_fact(declared_families, is_family_qualified),
+        tools: names_fact(capability.as_ref().and_then(|declared| declared.tools.as_ref()), false),
+        capability_qualifications: qualifications,
+        model_routes: routes_fact(input.model_routes)?,
+        compute: input.compute.project(false, Clone::clone),
         serving_readiness: input.serving_readiness.clone(),
-        revisions: super::lineage::RevisionSlots::unpublished(),
+        revisions: super::lineage::RevisionSlots::project(input.lifecycle),
         wait_reasons: Vec::new(),
     };
     debug_assert_eq!(facts.cpu_millis.support, super::SupportLevel::Unknown);
-    debug_assert_eq!(facts.qualification_ref.is_some(), is_qualified);
+    debug_assert_eq!(facts.revisions.is_managed(), input.lifecycle.is_some());
+    let is_admitting_new_sessions =
+        input.lifecycle.is_none_or(|lifecycle| super::lineage::admits(lifecycle, input.revision));
     Ok(WorkerProfileFacts {
-        wait_reasons: profile_reasons(&facts)?,
+        wait_reasons: profile_reasons(&facts, is_admitting_new_sessions)?,
         ..facts
     })
 }
@@ -199,7 +232,7 @@ fn names_fact(set: Option<&super::super::capability::NameSet>, is_qualified: boo
 }
 
 /// Why this profile cannot yet be relied on, from its own facts only.
-fn profile_reasons(facts: &WorkerProfileFacts) -> Result<Vec<Reason>, FactsDefect> {
+fn profile_reasons(facts: &WorkerProfileFacts, is_admitting_new_sessions: bool) -> Result<Vec<Reason>, FactsDefect> {
     let mut reasons = Vec::with_capacity(super::wait::MAX_WAIT_REASONS);
     for (fact, field) in [
         (&facts.task_families, Field::TaskFamilies),
@@ -209,37 +242,34 @@ fn profile_reasons(facts: &WorkerProfileFacts) -> Result<Vec<Reason>, FactsDefec
             reasons.push(Reason::fact(Code::CapabilityUndeclared, field));
         }
     }
-    if facts.qualification_ref.is_none() {
-        reasons.push(Reason::fact(Code::QualificationUnbound, Field::QualificationRef));
+    if facts.task_families.support != super::SupportLevel::Qualified {
+        reasons.push(Reason::fact(Code::QualificationUnbound, Field::CapabilityQualifications));
     }
-    reasons.push(Reason::fact(Code::RevisionSelectionUnpublished, Field::Revisions));
+    if !is_admitting_new_sessions {
+        reasons.push(Reason::fact(Code::RevisionNotAdmitted, Field::Revisions));
+    }
     debug_assert!(reasons.len() <= 4, "two capability sets, qualification and revisions");
     debug_assert!(facts.serving_readiness.is_bounded());
     reasons.extend(super::wait::serving(&facts.serving_readiness));
     super::wait::finish(reasons).map_err(|_| FactsDefect::WaitReasons)
 }
 
-fn text_fact(
-    offered: super::Offered<&str>,
-    is_qualified: bool,
-    field: &'static str,
-) -> Result<super::Fact<String>, FactsDefect> {
+fn text_fact(offered: super::Offered<&str>, field: &'static str) -> Result<super::Fact<String>, FactsDefect> {
     if let super::Offered::Declared(value) = offered
         && !super::super::is_token(value)
     {
         return Err(FactsDefect::Token { field });
     }
-    Ok(offered.project(is_qualified, str::to_owned))
+    Ok(offered.project(false, str::to_owned))
 }
 
 fn routes_fact(
     offered: super::Offered<&super::super::request::RouteDeclaration>,
-    is_qualified: bool,
 ) -> Result<super::Fact<super::super::request::RouteDeclaration>, FactsDefect> {
     if let super::Offered::Declared(super::super::request::RouteDeclaration::Routes { routes }) = offered
         && routes.len() > super::super::MAX_ROUTES
     {
         return Err(FactsDefect::Routes);
     }
-    Ok(offered.project(is_qualified, Clone::clone))
+    Ok(offered.project(false, Clone::clone))
 }

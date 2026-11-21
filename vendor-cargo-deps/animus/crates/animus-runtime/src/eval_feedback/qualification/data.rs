@@ -385,6 +385,17 @@ pub enum EvidenceLabel {
     Live,
 }
 
+impl EvidenceLabel {
+    /// Wire spelling.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Fixture => "fixture",
+            Self::Live => "live",
+        }
+    }
+}
+
 /// Provenance and freshness.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Provenance {
@@ -517,7 +528,9 @@ pub struct ExpectedSubject<'a> {
     pub current_components: &'a [CurrentComponent<'a>],
 }
 
-/// Facts of a qualified answer.
+/// Facts of a qualified answer: admissible evidence exists for the exact
+/// subject, task family, and class. It is not a favorable verdict; read the
+/// outcomes from the attachment.
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[expect(
     clippy::struct_field_names,
@@ -534,12 +547,14 @@ pub struct Qualification {
     pub verifier_identity: String,
     /// Observation time, milliseconds since the epoch.
     pub observed_at_ms: u64,
+    /// Provenance label; fixture evidence is not live evidence.
+    pub provenance_label: EvidenceLabel,
 }
 
 /// Port answer for one expected subject over a set of attachments.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum QualificationAnswer {
-    /// One current attachment qualifies the exact subject.
+    /// One current attachment is admissible evidence for the exact subject.
     Qualified(Qualification),
     /// No attachment qualifies; the furthest-stage reason.
     NotQualified(RejectionReason),

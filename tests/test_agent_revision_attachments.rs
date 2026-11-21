@@ -19,8 +19,8 @@ const FAMILY: &str = "rust-implementation";
 const OBSERVED_AT_MS: u64 = 1_700_000_000_000;
 const VALID_UNTIL_MS: u64 = 4_000_000_000_000;
 const PLANNED: u64 = 3;
-const ANIMUS_REVISION: &str = "8d6f67d38509899402df4d62e2d54321ff047f06";
-const ANIMUS_ARCHIVE_BLAKE3: &str = "d0c2389c12cc273b6f4ebe11a15d3e18b69f9b169b4f80a41c412aaa5bac191e";
+const ANIMUS_REVISION: &str = "e6f27948b19ea2e1bcb67428ca2e12f7acb6e558";
+const ANIMUS_ARCHIVE_BLAKE3: &str = "6a231c9738f9634df311b58a97e27bdc16e77eced28d4f73327671dafec7ef10";
 
 fn request(prompt: &str) -> Request {
     let envelope = lattice::implementation_attempt::ImplementationAttemptEnvelope {
@@ -98,7 +98,17 @@ fn request(prompt: &str) -> Request {
                 names: vec!["edit".into(), "read".into(), "write".into()],
             }),
         }),
+        network: None,
+        dispatch_plan: None,
     }
+}
+
+/// A new revision of the same definition: another executable pin. A task
+/// prompt is per-attempt and keeps the revision.
+fn another_revision() -> Request {
+    let mut changed = request("make the candidate");
+    changed.omp.executable_blake3 = "9".repeat(64);
+    changed
 }
 
 fn reference(label: &str) -> String {
@@ -447,7 +457,7 @@ fn rollback_requires_the_attachment_for_the_earlier_revision() {
     let first_path = prepared.attach("first.json", &first);
     standalone(Command::Promote(prepared.args(&first.identity, vec![first_path.clone()]))).expect("promote first");
     let first_revision = prepared.revision.clone();
-    let second_revision = prepared.prepare(&request("another prompt"), "second-request.json");
+    let second_revision = prepared.prepare(&another_revision(), "second-request.json");
     let second = encode(&document(&prepared.definition, &second_revision));
     prepared.revision.clone_from(&second_revision);
     let mut promote = prepared.args(&second.identity, vec![prepared.attach("second.json", &second)]);
@@ -490,8 +500,7 @@ fn without_attachments_promotion_stays_unavailable() {
 // r[verify lattice.agent_revisions.attachments.scenario.reasons]
 fn a_wrong_definition_or_revision_is_subject_mismatch() {
     let prepared = Prepared::new();
-    let other_revision =
-        lattice::agent_revision::bundle::resolve(&request("another prompt")).expect("resolves").revision;
+    let other_revision = lattice::agent_revision::bundle::resolve(&another_revision()).expect("resolves").revision;
     assert_ne!(other_revision, prepared.revision);
     prepared.not_qualified(&[encode(&document(&prepared.definition, &other_revision))], "subject_mismatch");
     prepared
@@ -547,6 +556,19 @@ fn distinct_attachments_from_one_source_are_conflicting() {
     let (first, second) = (encode(&first), encode(&second));
     assert_ne!(first.identity, second.identity);
     prepared.not_qualified(&[first, second], "conflicting");
+}
+
+#[test]
+// r[verify lattice.agent_revisions.attachments.scenario.reasons]
+fn a_stale_member_claiming_the_same_source_keeps_the_set_conflicting() {
+    let prepared = Prepared::new();
+    let current = document(&prepared.definition, &prepared.revision);
+    let mut expired = current.clone();
+    expired.provenance.valid_until_ms = OBSERVED_AT_MS + 1;
+    let (current, expired) = (encode(&current), encode(&expired));
+    assert_ne!(current.identity, expired.identity);
+    prepared.not_qualified(std::slice::from_ref(&expired), "stale");
+    prepared.not_qualified(&[current, expired], "conflicting");
 }
 
 #[test]

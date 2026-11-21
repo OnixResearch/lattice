@@ -4,10 +4,10 @@ mod binding;
 mod cancellation;
 mod execution;
 mod export;
-mod fencing;
 mod inspect;
 mod recovery;
 mod refusal;
+mod session;
 #[cfg(test)]
 mod tests;
 
@@ -31,12 +31,18 @@ pub enum Command {
         request: std::path::PathBuf,
         #[arg(long)]
         state: std::path::PathBuf,
+        /// Agent revision store; without it the attempt is unmanaged.
+        #[arg(long)]
+        revision_store: Option<std::path::PathBuf>,
     },
     Recover {
         #[arg(long)]
         request: std::path::PathBuf,
         #[arg(long)]
         state: std::path::PathBuf,
+        /// Agent revision store; required for a lifecycle-managed attempt.
+        #[arg(long)]
+        revision_store: Option<std::path::PathBuf>,
     },
     /// Normalize canonical identities without executing or granting authority.
     Prepare {
@@ -60,6 +66,9 @@ pub enum Command {
         state: std::path::PathBuf,
         #[arg(long)]
         output_parent: std::path::PathBuf,
+        /// Agent revision store; required for a lifecycle-managed attempt.
+        #[arg(long)]
+        revision_store: Option<std::path::PathBuf>,
     },
     /// Print separate profile and instance facts without executing anything.
     Inspect {
@@ -67,6 +76,9 @@ pub enum Command {
         request: std::path::PathBuf,
         #[arg(long)]
         state: std::path::PathBuf,
+        /// Agent revision store; without it every revision slot is `unmanaged`.
+        #[arg(long)]
+        revision_store: Option<std::path::PathBuf>,
     },
 }
 
@@ -116,62 +128,18 @@ const fn absent<T>() -> Option<T> {
 
 impl Request {
     /// The profile revision: `lattice-worker-profile-revision-v2` over
-    /// profile-level configuration only, spelled as bare lowercase hex. The
-    /// base snapshot, task prompt, broker expiry and workspace root are
-    /// per-attempt values bound by the envelope and the exact request bytes. A
-    /// capability declaration is framed in canonical form only when present;
-    /// a malformed declaration is refused here, before any effect.
+    /// profile-level configuration and the effective harness template,
+    /// spelled as bare lowercase hex. The base snapshot, task prompt, broker
+    /// expiry and workspace root are per-attempt values bound by the envelope
+    /// and the exact request bytes. A capability declaration is framed in
+    /// canonical form only when present; a malformed declaration is refused
+    /// here, before any effect.
     // r[impl lattice.worker_inventory.capability.scenario.undeclared]
     // r[impl lattice.worker_inventory.capability.scenario.declared]
     // r[impl lattice.implementation_attempt.consumer.scenario.profile_revision]
+    // r[impl lattice.agent_revisions.framing.scenario.harness_template]
     pub fn worker_profile_identity(&self) -> Result<String, String> {
-        let capability = match &self.worker_capability {
-            None => None,
-            Some(declared) => {
-                let canonical = declared
-                    .canonical()
-                    .map_err(|defect| format!("worker capability declaration is unsupported: {defect:?}"))?;
-                Some(serde_json::to_string(&canonical).map_err(|error| error.to_string())?)
-            }
-        };
-        let compute = serde_json::to_string(&self.worker_compute).map_err(|error| error.to_string())?;
-        let broker = &self.omp.model_broker;
-        let credential = broker.credential.as_ref();
-        let read_paths: Vec<&str> = self.read_paths.iter().map(String::as_str).collect();
-        let write_paths: Vec<&str> = self.write_paths.iter().map(String::as_str).collect();
-        let non_utf8 = "worker runtime path is not UTF-8";
-        let relay_path = broker.relay.path.to_str().ok_or(non_utf8)?;
-        let shell_path = broker.shell.path.to_str().ok_or(non_utf8)?;
-        crate::content_identity::worker_profile_revision(crate::content_identity::WorkerProfileRevisionInput {
-            program: &self.program,
-            sandbox_program: &self.sandbox_program,
-            harness_revision: &self.omp.revision,
-            harness_executable_blake3: &self.omp.executable_blake3,
-            harness_model: &self.omp.model,
-            broker_schema: &broker.schema,
-            broker_endpoint: &broker.endpoint,
-            broker_model: &broker.model,
-            credential_provider: credential.map(|reference| reference.provider.as_str()),
-            credential_key: credential.map(|reference| reference.key.as_str()),
-            credential_field: credential.and_then(|reference| reference.field.as_deref()),
-            relay: crate::content_identity::RuntimeArtifactInput {
-                path: relay_path,
-                blake3: &broker.relay.blake3,
-            },
-            shell: crate::content_identity::RuntimeArtifactInput {
-                path: shell_path,
-                blake3: &broker.shell.blake3,
-            },
-            sandbox_blake3: &broker.sandbox_blake3,
-            max_requests: u64::from(broker.max_requests),
-            read_paths: &read_paths,
-            write_paths: &write_paths,
-            output_limit_bytes: u64::try_from(self.output_limit_bytes).map_err(|error| error.to_string())?,
-            allow_unchanged: self.allow_unchanged,
-            compute: &compute,
-            capability: capability.as_deref(),
-        })
-        .map_err(|error| error.to_string())
+        self.framed_revision(session::profile::EFFECTIVE_TEMPLATE)
     }
 
     /// Whether the envelope names this request's current-framing revision.
@@ -248,18 +216,33 @@ pub struct Ports<'a> {
 
 /// Run with embedder-supplied compute and serving-owner ports. `inspect`
 /// reads only the serving port's latest snapshots; it never admits a request.
+/// `--revision-store` names the agent revision lifecycle store, opened only
+/// around each session-admission seam call.
 pub async fn run_command_with_ports(args: &CommandArgs, mut ports: Ports<'_>) -> Result<(), String> {
     match &args.command {
         Command::Cancel { request, state } => cancellation::request(request, state),
         Command::Prepare { request, output } => prepare(request, output),
-        Command::Run { request, state } => execution::run(request, state, Some(ports)).await,
-        Command::Recover { request, state } => execution::run(request, state, None).await,
-        Command::Inspect { request, state } => inspect::run(request, state, ports.serving.as_mut()),
+        Command::Run {
+            request,
+            state,
+            revision_store,
+        } => execution::run(request, state, Some(ports), session::revision::Store(revision_store.as_deref())).await,
+        Command::Recover {
+            request,
+            state,
+            revision_store,
+        } => execution::run(request, state, None, session::revision::Store(revision_store.as_deref())).await,
+        Command::Inspect {
+            request,
+            state,
+            revision_store,
+        } => inspect::run(request, state, ports.serving.as_mut(), session::revision::Store(revision_store.as_deref())),
         Command::ExportCandidate {
             request,
             state,
             output_parent,
-        } => export::run(request, state, output_parent),
+            revision_store,
+        } => export::run(request, state, output_parent, session::revision::Store(revision_store.as_deref())),
     }
 }
 

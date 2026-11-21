@@ -6,7 +6,7 @@
 pub const OMP_REVISION: &str = "e325ffc73ab86e03bdd20a91b77d8e2b3964c906";
 pub const OMP_RESULT_SCHEMA: &str = "lattice.omp-jsonl-observation.v1";
 
-mod profile;
+pub(crate) mod profile;
 mod stream;
 
 /// Operator-admitted executable bytes, not an executable-name compatibility claim.

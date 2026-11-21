@@ -16,8 +16,9 @@ pub(crate) const MAX_TOKEN_BYTES: usize = 64;
 /// Most entries one scope list or the reference list may hold.
 pub(crate) const MAX_LIST_ITEMS: usize = 32;
 /// Token segments that indicate credentials rather than metadata. A marker
-/// counts only at the start of a token or right after a `.`, `:` or `-`, so
-/// ordinary words such as `task-family` stay valid.
+/// counts only at the start of a token or right after a `.`, `:`, `-` or `_`,
+/// and `_` matches the marker's `-`, so ordinary words such as `task-family`
+/// stay valid while `db_password` and `sk_live` do not.
 const CREDENTIAL_MARKERS: [&str; 9] = [
     "sk-",
     "xoxb-",
@@ -57,15 +58,30 @@ pub(crate) fn is_token(value: &str) -> bool {
 }
 
 fn looks_like_credential(value: &str) -> bool {
-    CREDENTIAL_MARKERS.iter().any(|marker| {
-        value.match_indices(marker).any(|(index, _)| {
-            index == 0
-                || value
-                    .as_bytes()
-                    .get(index.saturating_sub(1))
-                    .is_some_and(|byte| b".:-".contains(byte))
+    let bytes = value.as_bytes();
+    (0..bytes.len())
+        .filter(|start| {
+            *start == 0
+                || start
+                    .checked_sub(1)
+                    .and_then(|before| bytes.get(before))
+                    .is_some_and(|byte| b".:-_".contains(byte))
         })
-    })
+        .filter_map(|start| bytes.get(start..))
+        .any(|rest| {
+            CREDENTIAL_MARKERS.iter().any(|marker| {
+                rest.len() >= marker.len()
+                    && rest
+                        .iter()
+                        .zip(marker.bytes())
+                        .all(|(byte, expected)| fold_separator(*byte) == expected)
+            })
+        })
+}
+
+/// `_` and `-` are one separator for credential matching.
+const fn fold_separator(byte: u8) -> u8 {
+    if byte == b'_' { b'-' } else { byte }
 }
 
 /// Whether `values` are tokens, strictly ascending (sorted and unique), and bounded.
@@ -249,8 +265,13 @@ fn check_measures(measures: &Measures, outcomes: &Outcomes) -> Result<(), Reject
         measures.repetitions > 0
             && measures.tasks_covered <= measures.tasks_declared
             && planned_trials == Some(outcomes.planned)
-            && (completed == 0) == (measures.tasks_covered == 0),
+            && measures.tasks_covered <= completed
+            && completed <= measures.tasks_covered.saturating_mul(measures.repetitions),
         "measures.task_coverage",
+    )?;
+    require(
+        outcomes.accepted > 0 || measures.time_to_acceptance_ms.is_none(),
+        "measures.time_to_acceptance_ms",
     )?;
     let costs = &measures.costs;
     let all_known = [costs.model, costs.tool, costs.manager, costs.verifier]

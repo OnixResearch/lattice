@@ -6,6 +6,7 @@
 // r[verify lattice.worker_inventory.capability.scenario.malformed]
 
 mod coordinator;
+pub(super) mod revisions;
 
 /// A valid v3 request with one brokered `primary` route.
 pub(super) fn request(
@@ -275,6 +276,52 @@ fn per_attempt_values_keep_the_revision_and_profile_changes_replace_it() {
     let new_prompt = readmitted(base.clone(), |request| request.omp.prompt = "another task".into());
     assert_eq!(definition(&new_executable), definition(&base), "a new revision keeps its definition");
     assert_eq!(definition(&new_prompt), definition(&base));
+}
+
+#[test]
+// r[verify lattice.agent_revisions.framing]
+// r[verify lattice.agent_revisions.framing.scenario.harness_template]
+fn every_reviewed_harness_flag_and_the_request_schema_are_part_of_the_revision() {
+    let request = host_local();
+    let effective = super::session::profile::EFFECTIVE_TEMPLATE;
+    assert_eq!(effective.launch, ["launch", "--cwd", "/workspace"], "the fixed launch prefix");
+    assert_eq!(request.framed_revision(effective).expect("revision"), request.envelope.worker_profile);
+    assert_eq!(
+        request.framed_revision(effective).expect("revision"),
+        request.worker_profile_identity().expect("revision"),
+        "the effective constants are the framed template"
+    );
+    let replace = |from: &str, to: &'static str| -> Vec<&'static str> {
+        effective.print_options.iter().map(|option| if *option == from { to } else { *option }).collect()
+    };
+    let without_session = effective.print_options.iter().copied().filter(|option| *option != "--no-session");
+    let changed_options = [
+        replace("read,edit,write", "read,edit,write,bash"),
+        replace("json", "text"),
+        without_session.collect(),
+        replace("write", "yolo"),
+        effective.print_options.iter().rev().copied().collect(),
+    ];
+    let mut revisions = std::collections::BTreeSet::from([request.envelope.worker_profile.clone()]);
+    for options in &changed_options {
+        assert_ne!(options.as_slice(), effective.print_options, "the fixture changes one reviewed flag");
+        let template = super::session::profile::HarnessTemplate {
+            print_options: options,
+            ..effective
+        };
+        assert!(revisions.insert(request.framed_revision(template).expect("revision")), "{options:?}");
+    }
+    let other_launch = super::session::profile::HarnessTemplate {
+        launch: &["launch", "--cwd", "/tmp"],
+        ..effective
+    };
+    let other_schema = super::session::profile::HarnessTemplate {
+        request_schema: super::LEGACY_REQUEST_SCHEMA,
+        ..effective
+    };
+    for template in [other_launch, other_schema] {
+        assert!(revisions.insert(request.framed_revision(template).expect("revision")), "{template:?}");
+    }
 }
 
 #[test]

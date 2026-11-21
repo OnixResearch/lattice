@@ -1,0 +1,12 @@
+{
+  "depends_on": [
+    "publish-worker-inventory-v2",
+    "manage-agent-revisions",
+    "adopt-animus-qualification-attachments"
+  ],
+  "workflow_profile": {
+    "id": "spec-driven",
+    "source": "change_create",
+    "version": 1
+  }
+}

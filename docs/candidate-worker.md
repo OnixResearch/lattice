@@ -297,29 +297,43 @@ attempt result. See [worker compute binding](worker-compute-binding.md) and
 An optional `worker_capability` (`lattice.worker-capability.v1`) names the
 agent definition and declares bounded task families and tools. It is framed
 into `worker_profile_identity` only when present. A malformed declaration is
-refused before any effect. `inspect` prints `lattice.worker-inventory.v2`; see
-[worker inventory](worker-inventory.md).
+refused before any effect. `inspect` prints `lattice.worker-inventory.v3`,
+with the agent revision lifecycle's slots when `--revision-store` is given;
+see [worker inventory](worker-inventory.md).
 
 ### Profile revision framing (breaking)
 
 `worker_profile_identity` is the `lattice-worker-profile-revision-v2` content
 identity, spelled as bare lowercase hex like every earlier revision. It frames
-only profile-level configuration: the program and sandbox program, the OMP
-source revision, executable BLAKE3 and model, the broker's schema, endpoint,
-model, credential reference, relay and shell artifacts, sandbox BLAKE3 and
-request ceiling, the read and write paths, `output_limit_bytes`,
-`allow_unchanged`, `worker_compute` and, when declared, the canonical
-capability. Attempts of one profile therefore share one revision. A new
-executable, model, route, tool set, compute requirement or capability is a new
-revision of the same definition.
+only profile-level configuration and the reviewed harness template: the
+request schema, the OMP launch prefix `launch --cwd /workspace` and the OMP
+print options in argv order (read from the constants the shell passes to the
+worker, so changing any reviewed flag such as the exposed tools, the output
+mode, `--no-session` or the approval mode is a new revision), the program and
+sandbox program, the OMP source revision, executable BLAKE3 and model, the
+broker's schema, endpoint, model, credential reference, relay and shell
+artifacts, sandbox BLAKE3 and request ceiling, the read and write paths,
+`output_limit_bytes`, `allow_unchanged`, `worker_compute` and, when declared,
+the canonical capability. Attempts of one profile therefore share one
+revision. A new executable, model, route, reviewed harness flag, tool set,
+compute requirement or capability is a new revision of the same definition.
+See [what the revision frames](agent-revisions.md#what-the-revision-frames).
 
 Per-attempt values are not part of the revision. The base snapshot, task
-prompt, broker expiry and workspace root are bound by the exact request bytes:
-their BLAKE3 is the one-shot `intent.json` content, the attempt usage
-observation's `dispatch_id`, and the digest Kiln seals to its dispatch plan.
-The candidate receipt must also match the request's base snapshot. Work,
-attempt, fence, workspace, base commit, source and policy stay in the envelope
-and its `admitted_envelope` identity, which the execution binding frames.
+prompt, broker expiry and workspace root are bound by the exact request bytes.
+Their BLAKE3, the request identity, is the attempt usage observation's
+`dispatch_id` and the digest Kiln seals to its dispatch plan. Without
+`--revision-store` it is also the whole one-shot `intent.json` content, as
+before. With `--revision-store` (see
+[agent revisions](agent-revisions.md#integration)), `intent.json` is instead
+one canonical `lattice.implementation-attempt-intent.v1` record carrying
+`request_identity`, `session` (the envelope identity), `admission`
+(`managed` or `unmanaged`) and `pin` (the managed session's pin, else `null`),
+even when the definition is unmanaged. An intent without an admission field
+reads as `unmanaged`. The candidate receipt must also match the request's base
+snapshot. Work, attempt, fence, workspace, base commit, source and policy stay
+in the envelope and its `admitted_envelope` identity, which the execution
+binding frames.
 
 This changes every profile revision. A request whose envelope names a revision
 of the earlier framing is refused before any effect with a typed
@@ -349,11 +363,33 @@ Before the binding and intent, a run records its attempt at
 is lower than one already recorded for its work, or that names a different
 attempt at a recorded fence, is refused. A request whose bytes differ from an
 existing intent is refused as substituted. Each refusal prints one
-`lattice.implementation-attempt-refusal.v1` record (`stale_fence`,
-`crossed_attempt`, `substituted_request` or `profile_revision_superseded`) with
-`dispatched:false`, and the command exits non-zero. Kiln remains the fence
-authority; these records only stop one state root from executing a superseded
-or crossed request.
+`lattice.implementation-attempt-refusal.v1` record and the command exits
+non-zero:
+
+```json
+{"schema":"lattice.implementation-attempt-refusal.v1","reason":"stale_fence","work_id":"...","attempt_id":"...","fence":7,"dispatched":false}
+```
+
+`dispatched` says whether a worker effect of the refused attempt may have
+started, not whether this request dispatched anything. It is `true` whenever
+the attempt directory holds an execution intent other than recovery's closure
+marker, so a coordinator must never settle such an attempt as refused before
+any effect or run it again:
+
+| `reason` | `dispatched` | When |
+|---|---|---|
+| `stale_fence` | `false` | A higher fence of the work is already recorded |
+| `crossed_attempt` | `false` | Another attempt is recorded at this work and fence |
+| `substituted_request` | `true` | The attempt directory holds the intent of other request bytes, which may have executed; this request dispatched nothing |
+| `profile_revision_superseded` | `true` when the attempt directory holds an intent other than the closure marker, else `false` | The envelope's revision is not the current framing; the attempt is never executed or recovered |
+| `revision_not_admitted` | `false` | With `--revision-store`, the managed definition admits no new session of this revision; nothing is written ([agent revisions](agent-revisions.md#integration)) |
+| `revision_blocked` | `false` | With `--revision-store`, the managed session was blocked right before spawn; the worker never started |
+| `export_revoked` | `true` | `export-candidate` of a managed attempt that executed, after its session, pinned revision or qualification was revoked; nothing is exported |
+
+The three agent-revision reasons also carry `revision_refusal`, the
+lifecycle's own refusal (its `code` is, for example, `session_revoked`). Kiln remains the
+fence authority; these records only stop one state root from executing a
+superseded or crossed request.
 
 Re-entry with the exact request only reconciles retained results and reports the
 persisted binding identity; it never calls the compute port, rebinds or

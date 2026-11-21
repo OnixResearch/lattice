@@ -69,6 +69,39 @@ pub(super) fn not_dispatched(
     Ok(observation)
 }
 
+/// A managed session blocked before spawn, with no worker artifacts, is a
+/// definite non-dispatch.
+// r[impl lattice.agent_revisions.seam.scenario.attempt]
+pub(super) fn revision_blocked(
+    request: &super::Request,
+    directory: &std::path::Path,
+    admitted: &lattice_core::execution_binding::admission::bound::Admitted,
+    block: &serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let has_worker_artifacts = ["raw-events.jsonl", "omp-observation.json"]
+        .iter()
+        .any(|name| std::fs::symlink_metadata(directory.join(name)).is_ok());
+    let is_same_session = block.get("session").and_then(serde_json::Value::as_str)
+        == Some(super::session::revision::identifier(request).as_str());
+    if has_worker_artifacts || !is_same_session {
+        return Err("revision block contradicts the retained session or worker artifacts".into());
+    }
+    debug_assert_eq!(admitted.attempt.attempt_id, request.envelope.attempt_id, "the binding names this attempt");
+    let mut observation = serde_json::json!({
+        "schema": "lattice.implementation-attempt-observation.v1",
+        "envelope": request.envelope,
+        "request_identity": request.admitted_envelope,
+        "envelope_attempt": admitted.attempt.attempt_id,
+        "status": "not_dispatched_revision_blocked",
+        "execution_binding": admitted.binding_identity,
+        "revision_refusal": block.get("refusal"),
+        "accepted": false,
+        "integrated": false,
+    });
+    echo_dispatch_plan(request, &mut observation);
+    Ok(observation)
+}
+
 /// The exclusive intent content of an attempt that recovery closed before any
 /// execution. It never equals a request identity, so a later run of the same
 /// request cannot create its intent.

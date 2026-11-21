@@ -93,7 +93,6 @@ pub fn resolve(request: &crate::implementation_attempt::cli::Request) -> Result<
         task_families: declared(capability.as_ref().and_then(|declared| declared.task_families.as_ref())),
         tools: declared(capability.as_ref().and_then(|declared| declared.tools.as_ref())),
         routes: vec![hosted_route(request)?],
-        components: None,
     };
     let bundle_identity = lattice_core::agent_revision::facts::identity(&bundle)
         .map_err(|refusal| format!("resolved bundle is unsupported: {refusal:?}"))?;

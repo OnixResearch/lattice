@@ -5,8 +5,11 @@ An operator records a desired revision, prepares it, promotes it explicitly
 for new sessions, and can roll back to an earlier one. Existing sessions keep
 the revision they were admitted under, but current revocation still applies
 to them. This implements sections 1 to 5 of
-[Lattice #25](https://github.com/OnixResearch/lattice/issues/25). The change
-package is `.cairn/changes/manage-agent-revisions/`.
+[Lattice #25](https://github.com/OnixResearch/lattice/issues/25), wires the
+session seam into `implementation-attempt` and publishes the lifecycle in
+[worker inventory v3](worker-inventory.md#revision-slots) (section 6). The
+change package is `.cairn/changes/manage-agent-revisions/`; inventory
+publication is `.cairn/changes/publish-worker-inventory-v3/`.
 
 ## Identities
 
@@ -21,47 +24,38 @@ package is `.cairn/changes/manage-agent-revisions/`.
 | Session pin | `blake3:<hex>` | `lattice-agent-revision-session-pin-v1` over definition, session, revision, qualification and rollout generation |
 | `qualification_ref` | `blake3:<64 hex>` | The attachment identity from Animus #18, used verbatim |
 
-A new executable, prompt, tool list or model route keeps the definition and
-changes the revision.
+A new executable, reviewed harness flag, tool list or model route keeps the
+definition and changes the revision. A new task prompt changes neither.
 
 ### What the revision frames
 
-The revision frames the program and sandbox paths, the OMP source revision and
-executable pin, the broker's relay, shell and sandbox pins, the model route
-(schema, endpoint, model, credential reference, request bound), read and write
-paths, the output bound, compute and, when declared, the capability. It does
-not frame the memory policy (single-shot `--no-session`), checkpoint
-semantics, the harness tool list and protocol (code constants), serving model
-requirements or producer/consumer compatibility.
+The revision is `lattice-worker-profile-revision-v2` over profile-level
+configuration and the effective harness constants, so every input that
+changes what a session runs changes it:
 
-An optional `lattice.agent-revision-components.v1` declaration covers those:
+| Input | Source |
+|---|---|
+| Request schema (producer compatibility) | `implementation_attempt::cli::REQUEST_SCHEMA` |
+| Harness launch prefix `launch --cwd /workspace`, in argv order | `candidate_worker::omp::profile::LAUNCH_PREFIX` |
+| Harness print options, in argv order: single-shot `--no-session`, `-p --mode json`, the exposed tools `--tools read,edit,write`, `--approval-mode write` and the disabled extensions, skills, rules, context files, LSP and PTY | `candidate_worker::omp::profile::PRINT_OPTIONS` |
+| Program and sandbox paths, OMP source revision, executable pin and model selector | the request |
+| Broker schema, endpoint, model, credential reference, relay, shell and sandbox pins, request bound | the request |
+| Read and write paths, output bound, `allow_unchanged`, compute and, when declared, the capability | the request |
 
-```json
-{
-  "schema": "lattice.agent-revision-components.v1",
-  "memory": { "kind": "single_shot_no_session" },
-  "checkpoint": { "kind": "unsupported" },
-  "tools": { "protocol": "omp-print-json", "names": ["edit", "read", "write"] },
-  "model_requirements": [ { "route": "primary", "requirement_ref": "blake3:<64 hex>" } ],
-  "compatibility": { "producer": "lattice.implementation-attempt-run.v3", "consumer": "lattice.candidate-worker-compatibility.v1" }
-}
-```
-
-`lattice_core::agent_revision::framing::digest` returns `None` without a
-declaration, so a revision that frames the digest only when present keeps
-every existing value. The implementation-attempt request does not carry the
-declaration yet; see [integration](#integration).
-
-The current revision also frames per-attempt values (workspace snapshot, task
-prompt, broker expiry). Until it is stabilized, a session is admitted only
-when its request reproduces the selected revision exactly.
+The harness template and request schema are read from the constants the
+shell actually passes to the worker, never restated or declared separately,
+so changing any reviewed flag is a new revision. Per-attempt values (task
+prompt, base snapshot, workspace root, broker expiry, deadline) do not change
+it; the exact request bytes bind them. Checkpoint semantics stay
+`unavailable` and serving model requirements stay in the per-attempt
+execution binding; neither is framed.
 
 ### Bundle
 
 `lattice agent-revision resolve --request REQUEST` prints the
 `lattice.agent-bundle.v1` bundle without writing anything: definition and
 name, revision, adapter (`omp`), protocol revision, executable pin, compute,
-declared task families and tools, the hosted route and the components digest.
+declared task families and tools, and the hosted route.
 The hosted route carries its route identity and the provider-exposed model;
 `weight_identity` and `model_version` are always `unknown`, and a bundle that
 claims anything else does not decode. Paths, prompts, endpoints and credential
@@ -232,7 +226,7 @@ qualification port answers only the exact subject it was scripted for.
 [Animus #18 attachments](https://github.com/OnixResearch/animus/issues/18)
 (`animus.qualification-attachment.v1`). The validator is
 `animus_runtime::qualification::qualify` from the vendored Animus snapshot
-(revision `8d6f67d38509899402df4d62e2d54321ff047f06`, recorded in
+(revision `e6f27948b19ea2e1bcb67428ca2e12f7acb6e558`, recorded in
 `vendor-cargo-deps/animus/source.ncl`). Lattice does not parse attachments
 itself.
 
@@ -278,8 +272,9 @@ passes no required or current components. The answer maps as follows:
 | `Unavailable` (no attachment) | `unavailable` | `qualification_unavailable`, owner `animus#18` |
 
 With several files, the producer collapses exact duplicates, refuses distinct
-attachments that claim one source as `conflicting`, and otherwise qualifies
-the most recent valid attachment. Without valid attachments it reports the
+attachments that claim one source for the same subject, task family and class
+as `conflicting` (even when one of them is stale or unusable), and otherwise
+qualifies the most recent current attachment. Without one it reports the
 furthest-stage reason. Without any `--qualification-attachment`, the injected
 port answers, so the standalone CLI still reports `qualification_unavailable`.
 
@@ -306,50 +301,103 @@ create a missing store.
 
 ## Integration
 
-The session-admission seam, `agent_revision::seam`, is not wired into
-`implementation-attempt` yet. Its contract for the integrator:
+`lattice implementation-attempt` wires the seam through an optional
+`--revision-store DB` on `run`, `recover`, `export-candidate` and `inspect`.
+`cancel` and `prepare` do not take it. The store is the agent revision store
+database; it must already exist, and a named store that does not is an error,
+never silently unmanaged. It is opened only around each seam call, so
+operator commands such as `revoke` are never locked out during a run.
 
-1. Before writing `intent.json`, call
-   `seam::admit(store, request, session) -> Result<Decision, String>` once
-   with the attempt's session identifier, which must be unique and never
-   reused.
-   - `Decision::Unmanaged`: the definition has no lifecycle. Nothing was
-     written; proceed exactly as today.
-   - `Decision::Admitted { admitted }`: the session is pinned to the selected
-     revision (`pinned`, or `already_pinned` for a retried admission).
-   - `Decision::Refused { refusal }`: start nothing: no binding, intent or
-     worker effect. A managed definition refuses every new session until a
-     revision is selected (`no_selection`), and refuses a request whose
-     revision is not the selection (`revision_not_selected`).
-   - `Err(String)`: the store or request failed; start nothing.
-2. Record `decision.admission()` durably with the session, in the same write
-   as the intent: `Admission::Managed` (`"managed"`) for `admitted`,
-   `Admission::Unmanaged` (`"unmanaged"`) for `unmanaged`. It is `None` for
-   `refused`. Reconciliation after a restart reads it back; never derive it
-   from whether a lifecycle exists now.
-3. Before each protected effect, call
-   `seam::effect(store, request, session, admission) -> Result<Effect, String>`
-   with the recorded mode and proceed only on `Effect::Unmanaged` or
-   `Effect::Permitted { permit }`.
-   - `Unmanaged` sessions answer `unmanaged` without reading the store, even
-     after their definition becomes managed. They were admitted outside the
-     lifecycle, so lifecycle revocation does not reach them; they finish
-     exactly as they would today.
-   - `Managed` sessions fail closed: `Effect::Blocked { refusal }` for a
-     closed or revoked session, a revoked pinned revision or qualification,
-     and `unknown_session` when the lifecycle or the pin is missing.
-   - `Err(String)` is not a permit.
-4. After the terminal result, call
-   `seam::close(store, request, session, admission, checkpoints) -> Result<Closure, String>`.
-   `Unmanaged` answers `Closure::Unmanaged` and writes nothing. `Managed`
-   answers `Closure::Closed { closed }` and holds the checkpoints on the
-   pinned revision, or `Closure::Refused { refusal }`; a session closed
-   without a held checkpoint is forgotten, so repeating its close answers
-   `unknown_session`.
+Without `--revision-store` an attempt is unmanaged and behaves exactly as
+before: `intent.json` holds the request identity's bytes and no seam is
+called. The session identifier of an attempt is its envelope identity.
 
-`lattice_core::agent_revision::projection::slots` projects
-`lattice.agent-revision-slots.v1` for a later inventory schema. The inventory
-still publishes the five revision slots as unknowns owned by `lattice#25`.
+1. `run` calls `seam::admit` before writing anything for the attempt: before
+   its fence record, execution binding, candidate store or intent.
+   - `Refused` prints one `lattice.implementation-attempt-refusal.v1` record
+     with reason `revision_not_admitted`, `dispatched: false` and the
+     lifecycle's own refusal in `revision_refusal`, exits non-zero and writes
+     nothing: no fence, binding, intent or worker effect.
+   - `Admitted` (a `pinned` or `already_pinned` session) and `Unmanaged`
+     proceed. If the fence or binding step then fails, a session this run
+     pinned is closed so no live pin is left behind.
+2. With a store, `intent.json` is a canonical
+   `lattice.implementation-attempt-intent.v1` record of the request identity,
+   the session and its admission, created in one exclusive write:
+
+   ```json
+   {"schema":"lattice.implementation-attempt-intent.v1","request_identity":"<64 hex>","session":"<64 hex>","admission":"managed","pin":{"revision":"<64 hex>","qualification_ref":"blake3:<64 hex>","rollout_generation":1,"pin_identity":"blake3:<64 hex>"}}
+   ```
+
+   `admission` is `decision.admission()`: `managed` with the pin `seam::admit`
+   returned, or `unmanaged` with `pin: null` when the definition has no
+   lifecycle. Recovery, inspection and export read the mode back from this
+   record and never derive it from whether a lifecycle exists now. An intent
+   without an admission field (the bare request identity, as written without
+   a store or before admission modes were recorded) reads as `unmanaged`: it
+   was admitted unmanaged by construction. A record for another request or
+   session, with an inconsistent pin, unknown fields or non-canonical bytes
+   is a substituted intent and is refused.
+3. Immediately before the worker spawns, after the binding is revalidated,
+   `run` calls `seam::effect` with the recorded mode. `Unmanaged` and
+   `Permitted` proceed. `Blocked` writes the
+   `lattice.implementation-attempt-revision-block.v1` record
+   `revision-block.json` once, closes the session, prints the refusal with
+   reason `revision_blocked` and exits non-zero; the worker never spawns.
+   `recover` reports such an attempt as `not_dispatched_revision_blocked`
+   with the same `revision_refusal`, and inventory shows
+   `revision_blocked_before_dispatch`.
+4. After the terminal result, `run` and `recover` call `seam::close` with the
+   recorded mode and no checkpoints: the worker is single-shot. A managed
+   session closed without a held checkpoint is forgotten, so a repeated close
+   (a duplicate run or a later recovery) answers `unknown_session`; the shell
+   counts that as already closed. Any other close refusal is an error.
+5. `recover`, `inspect` and `export-candidate` of an attempt whose intent
+   records `managed` require `--revision-store` and fail, naming the flag,
+   without it. An attempt recorded `unmanaged` needs no store.
+6. `export-candidate` of a managed attempt is refused with reason
+   `export_revoked` once the session, its pinned revision or its
+   qualification is revoked, even though the session closed and its pin was
+   forgotten: the check (`seam::retained`, `sessions::retained_permitted`)
+   uses the pin recorded in the intent. The refusal record carries
+   `dispatched: true`, because the worker ran, and the lifecycle's code in
+   `revision_refusal`. Nothing is exported. Unmanaged attempts export as
+   before. `dispatched` means a worker effect of the attempt may have
+   started; `revision_not_admitted` and `revision_blocked` are refused before
+   spawn and carry `dispatched: false`. See the
+   [refusal reasons](candidate-worker.md#coordinator-transport).
+7. `inspect` projects the definition's lifecycle into the
+   [revision slots](worker-inventory.md#revision-slots) and the session's
+   recorded pin into the instance's `pinned` slot.
+
+The seam contract the shell follows, for other embedders:
+
+- `seam::admit(store, request, session) -> Result<Decision, String>`, once
+  per session with an identifier that is unique and never reused.
+  `Decision::Unmanaged` means the definition has no lifecycle and nothing was
+  written. `Decision::Admitted { admitted }` pins the session to the selected
+  revision. `Decision::Refused { refusal }` starts nothing: a managed
+  definition refuses every new session until a revision is selected
+  (`no_selection`) and refuses a request whose revision is not the selection
+  (`revision_not_selected`). `Err(String)` starts nothing.
+- Record `decision.admission()` durably with the session:
+  `Admission::Managed` (`"managed"`) or `Admission::Unmanaged`
+  (`"unmanaged"`); it is `None` for `refused`.
+- `seam::effect(store, request, session, admission) -> Result<Effect, String>`
+  before each protected effect; proceed only on `Effect::Unmanaged` or
+  `Effect::Permitted { permit }`. `Unmanaged` sessions answer `unmanaged`
+  without reading the store, even after their definition becomes managed;
+  lifecycle revocation does not reach them. `Managed` sessions fail closed:
+  `Effect::Blocked { refusal }` for a closed or revoked session, a revoked
+  pinned revision or qualification, and `unknown_session` when the lifecycle
+  or the pin is missing. `Err(String)` is not a permit.
+- `seam::close(store, request, session, admission, checkpoints)` after the
+  terminal result. `Unmanaged` answers `Closure::Unmanaged` and writes
+  nothing. `Managed` answers `Closure::Closed { closed }` and holds the
+  checkpoints on the pinned revision, or `Closure::Refused { refusal }`.
+- `seam::retained(store, request, session, admission, permit)` decides
+  whether a closed session's retained output may still be published, from
+  the pin the embedder recorded.
 
 ## Owners and non-claims
 

@@ -176,7 +176,9 @@ fn configured_routes_are_owner_default_definitions_with_undeclared_capability() 
     let facts = direct_config("pi").worker_profile_facts().expect("direct facts");
     let fact = &facts[0];
     assert_eq!(fact.schema, PROFILE_FACTS_SCHEMA);
-    assert_eq!(PROFILE_FACTS_SCHEMA, "lattice.worker-profile-facts.v2");
+    assert_eq!(PROFILE_FACTS_SCHEMA, "lattice.worker-profile-facts.v3");
+    assert_eq!(fact.revisions, lattice::execution_binding::core::projection::lineage::RevisionSlots::unmanaged());
+    assert!(fact.capability_qualifications.is_empty(), "configured routes carry no lifecycle qualification");
     assert_eq!((fact.definition.name.as_str(), fact.definition.basis), ("pi", DefinitionBasis::OwnerDefault));
     for names in [&fact.task_families, &fact.tools] {
         assert_eq!((names.support, names.value.as_ref()), (SupportLevel::Unknown, None));

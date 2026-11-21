@@ -29,6 +29,8 @@ pub struct Qualified {
     pub task_family: String,
     pub qualification_ref: String,
     pub evidence_class: crate::agent_revision::ports::EvidenceClass,
+    /// `fixture` or `live`, as the producer labelled the attachment.
+    pub provenance: crate::agent_revision::ports::Provenance,
     pub is_revoked: bool,
 }
 
@@ -51,6 +53,99 @@ pub struct Pinned {
     pub is_blocked: bool,
 }
 
+/// The pin an embedder recorded with one session at admission. Closing a
+/// session without a held checkpoint forgets its pin, so the embedder's
+/// record is the only remaining source afterwards.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecordedPin {
+    pub revision: String,
+    pub qualification_ref: String,
+    pub rollout_generation: u64,
+    pub pin_identity: String,
+}
+
+/// Where one session's pin stands now.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PinStatus {
+    Live,
+    /// Closed with a held checkpoint, so the lifecycle still keeps the pin.
+    Closed,
+    /// Closed and forgotten by the lifecycle; only the recorded pin remains.
+    Released,
+}
+
+/// One session's pin with its current status.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SessionPin {
+    pub revision: String,
+    pub qualification_ref: String,
+    pub rollout_generation: u64,
+    pub pin_identity: String,
+    pub status: PinStatus,
+    /// A live session may perform no further effect, or a closed session's
+    /// retained output may no longer be published.
+    pub is_blocked: bool,
+}
+
+/// The pin of `session`: from the lifecycle while it keeps the pin, else from
+/// the embedder's recorded pin. `None` when neither knows the session.
+#[must_use]
+pub fn session_pin(
+    lifecycle: &crate::agent_revision::state::Lifecycle,
+    session: &str,
+    recorded: Option<&RecordedPin>,
+) -> Option<SessionPin> {
+    if let Some(pin) = lifecycle.sessions.get(session) {
+        let pin_identity = crate::agent_revision::identity::pin(lifecycle, session, pin).ok()?;
+        let (status, is_blocked) = match pin.status {
+            crate::agent_revision::state::SessionStatus::Live => {
+                (PinStatus::Live, crate::agent_revision::ops::sessions::effect_permitted(lifecycle, session).is_err())
+            }
+            crate::agent_revision::state::SessionStatus::Closed => (
+                PinStatus::Closed,
+                retained_blocked(lifecycle, session, &crate::agent_revision::ops::sessions::Permit {
+                    revision: pin.revision.clone(),
+                    qualification_ref: pin.qualification_ref.clone(),
+                    rollout_generation: pin.rollout_generation,
+                }),
+            ),
+        };
+        debug_assert!(recorded.is_none_or(|recorded| recorded.pin_identity == pin_identity));
+        return Some(SessionPin {
+            revision: pin.revision.clone(),
+            qualification_ref: pin.qualification_ref.clone(),
+            rollout_generation: pin.rollout_generation,
+            pin_identity,
+            status,
+            is_blocked,
+        });
+    }
+    let recorded = recorded?;
+    Some(SessionPin {
+        revision: recorded.revision.clone(),
+        qualification_ref: recorded.qualification_ref.clone(),
+        rollout_generation: recorded.rollout_generation,
+        pin_identity: recorded.pin_identity.clone(),
+        status: PinStatus::Released,
+        is_blocked: retained_blocked(lifecycle, session, &crate::agent_revision::ops::sessions::Permit {
+            revision: recorded.revision.clone(),
+            qualification_ref: recorded.qualification_ref.clone(),
+            rollout_generation: recorded.rollout_generation,
+        }),
+    })
+}
+
+fn retained_blocked(
+    lifecycle: &crate::agent_revision::state::Lifecycle,
+    session: &str,
+    permit: &crate::agent_revision::ops::sessions::Permit,
+) -> bool {
+    crate::agent_revision::ops::sessions::retained_permitted(lifecycle, session, permit).is_err()
+}
+
 /// Project one lifecycle. The output is bounded by the lifecycle's bounds.
 #[must_use]
 pub fn slots(lifecycle: &crate::agent_revision::state::Lifecycle) -> Slots {
@@ -70,6 +165,7 @@ pub fn slots(lifecycle: &crate::agent_revision::state::Lifecycle) -> Slots {
             task_family: admitted.task_family.clone(),
             qualification_ref: admitted.attachment.qualification_ref.clone(),
             evidence_class: admitted.attachment.evidence_class,
+            provenance: admitted.attachment.provenance,
             is_revoked: lifecycle.revoked.qualifications.contains(&admitted.attachment.qualification_ref),
         })
         .collect::<Vec<_>>();

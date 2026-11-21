@@ -16,7 +16,7 @@ pub const MAX_WAIT_REASONS: usize = 32;
 pub const CONFIGURATION_OWNER: &str = "configuration";
 /// Qualification evidence that promotes declared support.
 pub const QUALIFICATION_OWNER: &str = "animus#18";
-/// Desired, prepared, qualified, selected and pinned revisions.
+/// The operator's revision lifecycle: desire, promotion, rollback and pins.
 pub const REVISION_OWNER: &str = "lattice#25";
 /// Global claims, attempts and dispatch.
 pub const DISPATCH_OWNER: &str = "kiln#45";
@@ -39,7 +39,10 @@ pub const ATTEMPT_OWNER: &str = "lattice#6";
 pub enum Code {
     CapabilityUndeclared,
     QualificationUnbound,
-    RevisionSelectionUnpublished,
+    /// A lifecycle-managed definition admits no new session of this revision:
+    /// another revision or none is selected, or it or its qualification is
+    /// revoked.
+    RevisionNotAdmitted,
     ServingPortAbsent,
     ServingSnapshotUnavailable,
     ServingPortIssue,
@@ -62,7 +65,7 @@ impl Code {
         match self {
             Self::CapabilityUndeclared => CONFIGURATION_OWNER,
             Self::QualificationUnbound => QUALIFICATION_OWNER,
-            Self::RevisionSelectionUnpublished => REVISION_OWNER,
+            Self::RevisionNotAdmitted => REVISION_OWNER,
             Self::ServingSnapshotUnavailable
             | Self::ServingPortIssue
             | Self::ServingSnapshotNotCurrent
@@ -94,7 +97,7 @@ impl Code {
 pub enum FactField {
     TaskFamilies,
     Tools,
-    QualificationRef,
+    CapabilityQualifications,
     Revisions,
     ServingReadiness,
     Lifecycle,

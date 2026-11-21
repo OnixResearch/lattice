@@ -131,6 +131,35 @@ pub fn effect(
     })
 }
 
+/// Whether the retained output of `session`, admitted as `admission` under
+/// `permit`, may still be published after the session closed. Closing forgets
+/// the pin, so the caller passes the one it recorded at admission. An
+/// unmanaged session answers `unmanaged` without reading the store; a managed
+/// one is blocked once its session, revision or qualification is revoked.
+pub fn retained(
+    store: &crate::store::Store,
+    request: &crate::implementation_attempt::cli::Request,
+    session: &str,
+    admission: Admission,
+    permit: lattice_core::agent_revision::ops::sessions::Permit,
+) -> Result<Effect, String> {
+    if admission == Admission::Unmanaged {
+        return Ok(Effect::Unmanaged);
+    }
+    let definition = super::bundle::resolve(request)?.definition.identity;
+    let Some((_, lifecycle)) = store.load_lifecycle(&definition).map_err(|error| error.to_string())? else {
+        return Ok(Effect::Blocked {
+            refusal: Refusal::UnknownSession,
+        });
+    };
+    Ok(
+        match lattice_core::agent_revision::ops::sessions::retained_permitted(&lifecycle, session, &permit) {
+            Ok(()) => Effect::Permitted { permit },
+            Err(refusal) => Effect::Blocked { refusal },
+        },
+    )
+}
+
 /// Close `session`, admitted as `admission`, holding its checkpoints on the
 /// pinned revision. An unmanaged session is left untouched.
 pub fn close(

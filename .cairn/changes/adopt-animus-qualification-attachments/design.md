@@ -5,11 +5,11 @@
 Baseline: Lattice `f2d5d8bd` (GitHub `main` `9a74e7ef` plus the lifecycle closeout and the `manage-agent-revisions` core).
 
 - `QualificationPort::answer(&Query) -> Verdict` (`src/agent_revision/mod.rs`) receives the definition identity, the bare revision, the task family, the required class and the shell's `now_ms`. `ops::selection::accept` already refuses an answer that is not canonical, has another class or names another `qualification_ref`.
-- Animus `8d6f67d38509899402df4d62e2d54321ff047f06` exports `animus_runtime::qualification` under every feature set, including Lattice's `default-features = false, features = ["steel"]`. It needs only `blake3`, which the vendored crate already uses.
+- Animus `e6f27948b19ea2e1bcb67428ca2e12f7acb6e558` exports `animus_runtime::qualification` under every feature set, including Lattice's `default-features = false, features = ["steel"]`. It needs only `blake3`, which the vendored crate already uses. Its `QualificationAnswer::Qualified` carries the attachment's `provenance_label`, and its conflict detection also considers stale or unusable members.
 
 ## Decision 1: re-vendor through the sync script
 
-`EXPECTED_REVISION` and `SOURCE_ARCHIVE_BLAKE3` move to the new revision. The BLAKE3 covers `git -c tar.umask=0000 archive --format=tar` at that revision. The method reproduces the previous value `ff16f090…` for `1c370d50…`. The sync changes exactly the Animus files that differ between the two revisions inside the vendored selection, plus `source.ncl`.
+`EXPECTED_REVISION` and `SOURCE_ARCHIVE_BLAKE3` move to the new revision. The BLAKE3 covers `git -c tar.umask=0000 archive --format=tar` at that revision. The method reproduces the previous value `ff16f090…` for `1c370d50…`. The sync changes exactly the Animus files that differ between the two revisions inside the vendored selection, plus `source.ncl`. The sync history is `1c370d50` → `8d6f67d3` (first adoption) → `ed4db4ae` (review fixes; five `qualification/` files and `source.ncl`) → `e6f27948` (workspace-Octet fixes in `qualification/{codec,consume,json,tests}.rs` and `source.ncl`, with no behavior change; the producer commit's two other changed files are Animus lifecycle files outside the vendored selection). `ed4db4ae` and `e6f27948` are the published forms of two earlier unpublished Animus commits, rewritten only to replace a test literal in `qualification/tests.rs` that secret scanning flagged as a live payment key.
 
 ## Decision 2: one port over `qualify`
 

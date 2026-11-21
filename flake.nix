@@ -256,7 +256,8 @@
         isAnimusCompileTimeAssetPath =
           path:
           pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/animus/config/" (toString path)
-          || pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/animus/policy/" (toString path);
+          || pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/animus/policy/" (toString path)
+          || toString path == "${sourceRoot}/vendor-cargo-deps/animus/source.ncl";
         isToonVendorPath =
           path: pkgs.lib.hasPrefix "${sourceRoot}/src/vendor-cargo-deps/toon-format/" (toString path);
         isRatsCompileTimeAssetPath =

@@ -14,8 +14,16 @@ pub struct RuntimeArtifactInput<'a> {
 /// Per-attempt values are deliberately absent: the workspace root, base
 /// snapshot, task prompt, broker expiry, envelope and execution binding. The
 /// attempt binds them through its envelope and exact request bytes instead.
+/// The reviewed harness template and the request schema are the owner's
+/// effective code constants, passed in by reference rather than restated.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct WorkerProfileRevisionInput<'a> {
+    /// The request schema the profile is exported under (compatibility).
+    pub request_schema: &'a str,
+    /// The fixed harness launch prefix, in argv order.
+    pub harness_launch: &'a [&'a str],
+    /// The reviewed harness print options, in argv order.
+    pub harness_print_options: &'a [&'a str],
     pub program: &'a str,
     pub sandbox_program: &'a str,
     pub harness_revision: &'a str,
@@ -44,12 +52,16 @@ pub struct WorkerProfileRevisionInput<'a> {
 /// Build the `lattice-worker-profile-revision-v2` identity, spelled as bare
 /// lowercase hex like every earlier profile revision.
 // r[impl lattice.implementation_attempt.consumer.scenario.profile_revision]
+// r[impl lattice.agent_revisions.framing]
 pub fn worker_profile_revision(
     input: WorkerProfileRevisionInput<'_>,
 ) -> Result<String, content_identity_core::IdentityError> {
     let mut hasher =
         content_identity_core::IdentityHasher::new(content_identity_core::Domain::new(WORKER_PROFILE_REVISION_DOMAIN)?);
     hasher
+        .update_tagged_str(b"request-schema", input.request_schema)?
+        .update_ordered_strs(b"harness-launch", input.harness_launch)?
+        .update_ordered_strs(b"harness-print-options", input.harness_print_options)?
         .update_tagged_str(b"program", input.program)?
         .update_tagged_str(b"sandbox-program", input.sandbox_program)?
         .update_tagged_str(b"harness-revision", input.harness_revision)?

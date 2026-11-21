@@ -1,5 +1,6 @@
-//! Worker inventory v2: definition identity, declared capability, #25 slots,
-//! single-shot liveness and closed wait reasons, projected by the pure core.
+//! Worker inventory v3: definition identity, declared capability, lifecycle
+//! revision slots, capability qualifications, pinned sessions, single-shot
+//! liveness and closed wait reasons, projected by the pure core.
 
 // r[verify lattice.worker_inventory.definition]
 // r[verify lattice.worker_inventory.definition.scenario.stable]
@@ -15,7 +16,12 @@
 // r[verify lattice.worker_inventory.wait_reasons.scenario.causes]
 // r[verify lattice.worker_inventory.wait_reasons.scenario.disclosure]
 // r[verify lattice.worker_inventory.revisions]
-// r[verify lattice.worker_inventory.revisions.scenario.unpublished]
+// r[verify lattice.worker_inventory.revisions.scenario.unmanaged]
+// r[verify lattice.worker_inventory.revisions.scenario.managed]
+// r[verify lattice.worker_inventory.revisions.scenario.pinned]
+// r[verify lattice.worker_inventory.qualification]
+// r[verify lattice.worker_inventory.qualification.scenario.qualified]
+// r[verify lattice.worker_inventory.qualification.scenario.unbound]
 
 use lattice::execution_binding::core::admission::bound::*;
 use lattice::execution_binding::core::admission::*;
@@ -38,10 +44,12 @@ use lattice::execution_binding::core::projection::wait::Unbounded;
 use lattice::execution_binding::core::projection::wait::finish;
 use lattice::execution_binding::core::projection::*;
 use lattice::execution_binding::core::request::*;
+use lattice_core::agent_revision as revisions;
 
 const ROUTE: &str = "blake3:9999999999999999999999999999999999999999999999999999999999999999";
 const DEFINITION: &str = "blake3:8888888888888888888888888888888888888888888888888888888888888888";
 static NO_PORT: ServingReadiness = ServingReadiness::NoServingPort {};
+static UNMANAGED_PIN: Slot<revisions::projection::SessionPin> = Slot::Unmanaged {};
 
 type Capability = lattice::execution_binding::core::capability::Declaration;
 
@@ -60,7 +68,7 @@ fn input<'a>(routes: &'a RouteDeclaration, compute: &'a ComputeRequirement) -> P
         revision: "revision-a",
         default_definition: ATTEMPT_DEFINITION,
         capability: None,
-        qualification_ref: None,
+        lifecycle: None,
         adapter: Offered::Declared("omp-jsonl"),
         protocol_revision: Offered::Declared("omp-revision"),
         executable_identity: Offered::Declared("eeee"),
@@ -113,7 +121,6 @@ fn undeclared_capability_is_unknown_never_empty_and_explained() {
         WaitCode::CapabilityUndeclared,
         WaitCode::CapabilityUndeclared,
         WaitCode::QualificationUnbound,
-        WaitCode::RevisionSelectionUnpublished,
         WaitCode::ServingPortAbsent,
     ]);
     assert_eq!(facts.wait_reasons[0], WaitReason {
@@ -124,10 +131,10 @@ fn undeclared_capability_is_unknown_never_empty_and_explained() {
         owner: "configuration".into(),
     });
     let wire = serde_json::to_value(&facts).expect("facts json");
-    assert_eq!(wire["schema"], "lattice.worker-profile-facts.v2");
+    assert_eq!(wire["schema"], "lattice.worker-profile-facts.v3");
     assert_eq!(wire["task_families"], serde_json::json!({"support": "unknown", "value": null}));
     assert_eq!(
-        wire["wait_reasons"][4],
+        wire["wait_reasons"][3],
         serde_json::json!({
             "code": "serving_port_absent",
             "subject": {"kind": "fact", "field": "serving_readiness"},
@@ -152,10 +159,16 @@ fn declared_capability_is_sorted_canonical_and_unavailable_stays_distinct() {
     assert!(!codes(&facts.wait_reasons).contains(&WaitCode::CapabilityUndeclared));
     let reordered = declaration(declared(&["cairn-task", "rust-implementation"]), Some(NameSet::Unavailable {}));
     assert_eq!(reordered.canonical(), capability.canonical(), "order never changes the canonical form");
-    profile.qualification_ref = Some("blake3:abababababababababababababababababababababababababababababababab");
+    let lifecycle = managed(&facts.definition.identity, "revision-a", true);
+    profile.lifecycle = Some(&lifecycle);
+    let qualified = project_profile(&profile).expect("qualified");
+    assert_eq!(qualified.task_families.support, SupportLevel::Declared, "cairn-task is not qualified");
+    let single = declaration(declared(&["rust-implementation"]), Some(NameSet::Unavailable {}));
+    profile.capability = Some(&single);
     let qualified = project_profile(&profile).expect("qualified");
     assert_eq!(qualified.task_families.support, SupportLevel::Qualified);
     assert_eq!(qualified.tools.support, SupportLevel::Unavailable, "unavailable never becomes qualified");
+    profile.lifecycle = None;
     let only_tools = declaration(None, declared(&["read"]));
     profile.capability = Some(&only_tools);
     let facts = project_profile(&profile).expect("facts");
@@ -240,22 +253,174 @@ fn definition_identity_is_stable_across_revisions_and_distinct_across_bases() {
     assert_eq!(project_profile(&unnamed), Err(FactsDefect::Definition));
 }
 
-#[test]
-fn revision_slots_are_owned_unknowns() {
-    let (routes, compute) = (routes(), ComputeRequirement::HostLocal {});
-    let facts = project_profile(&input(&routes, &compute)).expect("facts");
-    let slots = &facts.revisions;
-    for slot in [
-        &slots.desired,
-        &slots.prepared,
-        &slots.qualified,
-        &slots.selected_for_new_sessions,
-        &slots.pinned,
-    ] {
-        assert_eq!(slot, &OwnedUnknown::unknown("lattice#25"));
+fn managed(definition: &str, revision: &str, is_selected: bool) -> revisions::state::Lifecycle {
+    let mut lifecycle = revisions::state::Lifecycle::new(definition);
+    lifecycle.desired = Some(revisions::state::Desired {
+        revision: revision.into(),
+        generation: 1,
+    });
+    if !is_selected {
+        return lifecycle;
     }
+    let reference = |label: &str| format!("blake3:{}", label.repeat(64));
+    lifecycle.qualifications.push(revisions::state::Qualification {
+        revision: revision.into(),
+        task_family: "rust-implementation".into(),
+        attachment: revisions::ports::Attachment {
+            qualification_ref: reference("a"),
+            subject: revisions::ports::Subject {
+                definition_identity: definition.into(),
+                profile_revision: revision.into(),
+                task_family: "rust-implementation".into(),
+            },
+            evidence_class: revisions::ports::EvidenceClass::TaskFamilyEvaluation,
+            protocol_identity: reference("b"),
+            verifier_identity: reference("c"),
+            observed_at_ms: 1,
+            provenance: revisions::ports::Provenance::Fixture,
+        },
+    });
+    lifecycle.selected = Some(revisions::state::Selection {
+        kind: revisions::state::SelectionKind::Promotion,
+        request_id: "promote-1".into(),
+        revision: revision.into(),
+        qualification_ref: reference("a"),
+        policy: revisions::state::Policy {
+            task_family: "rust-implementation".into(),
+            required_class: revisions::ports::EvidenceClass::TaskFamilyEvaluation,
+        },
+        policy_identity: reference("d"),
+        rollout_generation: 1,
+    });
+    lifecycle.rollout_generation = 1;
+    lifecycle
+}
+
+#[test]
+fn revision_slots_are_unmanaged_without_a_lifecycle_and_unknown_or_recorded_with_one() {
+    let (routes, compute) = (routes(), ComputeRequirement::HostLocal {});
+    let capability = declaration(declared(&["rust-implementation"]), None);
+    let mut profile = input(&routes, &compute);
+    profile.capability = Some(&capability);
+    let unmanaged = project_profile(&profile).expect("facts");
+    assert_eq!(unmanaged.revisions, RevisionSlots::unmanaged());
+    assert!(!unmanaged.revisions.is_managed());
+    let wire = serde_json::to_value(&unmanaged).expect("facts json");
+    for slot in ["desired", "prepared", "qualified", "selected_for_new_sessions"] {
+        assert_eq!(wire["revisions"][slot], serde_json::json!({"support": "unmanaged"}), "{slot}");
+        assert_ne!(wire["revisions"][slot]["support"], "unknown", "unmanaged is never unknown");
+    }
+    assert!(wire.get("qualification_ref").is_none(), "replaced by capability_qualifications");
+    assert!(!codes(&unmanaged.wait_reasons).contains(&WaitCode::RevisionNotAdmitted));
+    assert!(codes(&unmanaged.wait_reasons).contains(&WaitCode::QualificationUnbound));
+
+    let definition = unmanaged.definition.identity.clone();
+    let desired_only = managed(&definition, "revision-a", false);
+    profile.lifecycle = Some(&desired_only);
+    let facts = project_profile(&profile).expect("facts");
+    let slots = &facts.revisions;
+    assert!(matches!(&slots.desired, Slot::Recorded { value } if value.revision == "revision-a"));
+    assert_eq!(slots.prepared, Slot::Unknown {
+        owner: "kiln#49".into()
+    });
+    assert_eq!(slots.qualified, Slot::Unknown {
+        owner: "animus#18".into()
+    });
+    assert_eq!(slots.selected_for_new_sessions, Slot::Unknown {
+        owner: "lattice#25".into()
+    });
     let wire = serde_json::to_value(&facts).expect("facts json");
-    assert_eq!(wire["revisions"]["pinned"], serde_json::json!({"support": "unknown", "owner": "lattice#25"}));
+    assert_eq!(wire["revisions"]["prepared"], serde_json::json!({"support": "unknown", "owner": "kiln#49"}));
+    assert!(codes(&facts.wait_reasons).contains(&WaitCode::RevisionNotAdmitted), "nothing is selected");
+    assert_eq!(facts.task_families.support, SupportLevel::Declared);
+    assert!(facts.capability_qualifications.is_empty());
+
+    let selected = managed(&definition, "revision-a", true);
+    profile.lifecycle = Some(&selected);
+    let facts = project_profile(&profile).expect("facts");
+    let Slot::Recorded { value: qualified } = &facts.revisions.qualified else {
+        panic!("qualified is recorded");
+    };
+    assert_eq!(qualified[0].provenance, revisions::ports::Provenance::Fixture);
+    assert!(
+        matches!(&facts.revisions.selected_for_new_sessions, Slot::Recorded { value } if value.revision == "revision-a")
+    );
+    assert_eq!(facts.capability_qualifications, [CapabilityQualification {
+        task_family: "rust-implementation".into(),
+        qualification_ref: format!("blake3:{}", "a".repeat(64)),
+        evidence_class: revisions::ports::EvidenceClass::TaskFamilyEvaluation,
+        provenance: revisions::ports::Provenance::Fixture,
+    }]);
+    assert_eq!(facts.task_families.support, SupportLevel::Qualified);
+    let reasons = codes(&facts.wait_reasons);
+    assert!(!reasons.contains(&WaitCode::QualificationUnbound) && !reasons.contains(&WaitCode::RevisionNotAdmitted));
+    let wire = serde_json::to_value(&facts).expect("facts json");
+    assert_eq!(wire["capability_qualifications"][0]["provenance"], "fixture");
+    assert_eq!(wire["revisions"]["selected_for_new_sessions"]["support"], "recorded");
+
+    let mut revoked = selected.clone();
+    revoked.revoked.qualifications.insert(format!("blake3:{}", "a".repeat(64)));
+    profile.lifecycle = Some(&revoked);
+    let facts = project_profile(&profile).expect("facts");
+    assert!(facts.capability_qualifications.is_empty(), "a revoked attachment qualifies nothing");
+    assert_eq!(facts.task_families.support, SupportLevel::Declared);
+    assert!(codes(&facts.wait_reasons).contains(&WaitCode::RevisionNotAdmitted));
+
+    profile.lifecycle = Some(&selected);
+    profile.revision = "revision-b";
+    let other = project_profile(&profile).expect("facts");
+    assert!(other.capability_qualifications.is_empty(), "another revision's qualification never counts");
+    assert!(codes(&other.wait_reasons).contains(&WaitCode::RevisionNotAdmitted));
+}
+
+#[test]
+fn pinned_slot_follows_the_recorded_admission_never_the_current_lifecycle() {
+    let lifecycle = managed(DEFINITION, &"1".repeat(64), true);
+    let recorded = revisions::projection::RecordedPin {
+        revision: "1".repeat(64),
+        qualification_ref: format!("blake3:{}", "a".repeat(64)),
+        rollout_generation: 1,
+        pin_identity: format!("blake3:{}", "e".repeat(64)),
+    };
+    assert_eq!(pinned(None, "session-a", RecordedAdmission::Unrecorded), Slot::Unmanaged {});
+    assert_eq!(
+        pinned(Some(&lifecycle), "session-a", RecordedAdmission::Unmanaged),
+        Slot::Unmanaged {},
+        "an unmanaged admission stays unmanaged after the definition becomes managed"
+    );
+    assert_eq!(pinned(Some(&lifecycle), "session-a", RecordedAdmission::Unrecorded), Slot::Unknown {
+        owner: "lattice#25".into()
+    });
+    assert_eq!(pinned(None, "session-a", RecordedAdmission::Managed(&recorded)), Slot::Unknown {
+        owner: "lattice#25".into()
+    });
+    let Slot::Recorded { value: released } =
+        pinned(Some(&lifecycle), "session-a", RecordedAdmission::Managed(&recorded))
+    else {
+        panic!("a recorded pin is published");
+    };
+    assert_eq!(released.status, revisions::projection::PinStatus::Released);
+    assert!(!released.is_blocked);
+    assert_eq!(released.pin_identity, recorded.pin_identity);
+    let mut revoked = lifecycle.clone();
+    revoked.revoked.revisions.insert("1".repeat(64));
+    let Slot::Recorded { value: blocked } = pinned(Some(&revoked), "session-a", RecordedAdmission::Managed(&recorded))
+    else {
+        panic!("a recorded pin is published");
+    };
+    assert!(blocked.is_blocked, "revocation reaches a released pin");
+    let mut live = lifecycle;
+    live.sessions.insert("session-a".into(), revisions::state::Pin {
+        revision: "1".repeat(64),
+        qualification_ref: format!("blake3:{}", "a".repeat(64)),
+        rollout_generation: 1,
+        status: revisions::state::SessionStatus::Live,
+        checkpoints: Vec::new(),
+    });
+    let Slot::Recorded { value: current } = pinned(Some(&live), "session-a", RecordedAdmission::Unrecorded) else {
+        panic!("a live pin is published before its intent");
+    };
+    assert_eq!((current.status, current.is_blocked), (revisions::projection::PinStatus::Live, false));
 }
 
 fn bound() -> Admitted {
@@ -295,10 +460,12 @@ fn state<'a>(admitted: &'a Admitted, artifacts: &'a [(&'a str, &'a str)]) -> Att
         admitted_until_epoch_ms: 2_000,
         has_intent: false,
         has_refusal: false,
+        has_revision_block: false,
         terminal_disposition: None,
         has_cancel_request: false,
         artifacts,
         serving_readiness: &NO_PORT,
+        pinned: &UNMANAGED_PIN,
     }
 }
 
@@ -315,7 +482,8 @@ fn single_shot_liveness_is_unknown_when_missing_or_stale_and_never_idle_or_live(
     };
     let inside = instance(&dispatched, 1_000);
     assert_eq!(inside.definition_identity, DEFINITION);
-    assert_eq!(inside.schema, "lattice.worker-instance-observation.v2");
+    assert_eq!(inside.schema, "lattice.worker-instance-observation.v3");
+    assert_eq!(inside.pinned, Slot::Unmanaged {});
     assert_eq!(inside.liveness, Liveness {
         runtime: RuntimeClass::SingleShot,
         state: LivenessState::Unknown,

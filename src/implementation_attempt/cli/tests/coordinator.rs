@@ -55,12 +55,13 @@ async fn run(path: &std::path::Path, state: &std::path::Path) -> Result<(), Stri
             compute: &mut crate::execution_binding::UnavailableComputePort,
             serving: Box::new(crate::execution_binding::serving::UnavailableOwner),
         }),
+        super::super::session::revision::Store(None),
     )
     .await
 }
 
 async fn recover(path: &std::path::Path, state: &std::path::Path) -> Result<(), String> {
-    super::super::execution::run(path, state, None).await
+    super::super::execution::run(path, state, None, super::super::session::revision::Store(None)).await
 }
 
 fn assert_never_bound(directory: &std::path::Path) {
@@ -120,7 +121,7 @@ async fn stale_fences_and_crossed_attempts_are_refused_before_any_effect() {
     let fixture = Fixture::new();
     super::super::artifacts::private_directory(&fixture.state).expect("state");
     let successor = fixture.request("attempt-successor", 8);
-    super::super::fencing::admit(&fixture.state, &successor.envelope).expect("successor recorded");
+    super::super::session::fencing::admit(&fixture.state, &successor.envelope).expect("successor recorded");
     let stale = fixture.request("attempt-stale", 7);
     let (path, _) = fixture.write("stale.json", &stale);
     let error = run(&path, &fixture.state).await;
@@ -129,7 +130,7 @@ async fn stale_fences_and_crossed_attempts_are_refused_before_any_effect() {
     assert!(!fixture.directory(&stale).join("intent.json").exists());
 
     let recorded = fixture.request("attempt-recorded", 9);
-    super::super::fencing::admit(&fixture.state, &recorded.envelope).expect("recorded");
+    super::super::session::fencing::admit(&fixture.state, &recorded.envelope).expect("recorded");
     let crossed = fixture.request("attempt-crossed", 9);
     let (path, _) = fixture.write("crossed.json", &crossed);
     let error = run(&path, &fixture.state).await;

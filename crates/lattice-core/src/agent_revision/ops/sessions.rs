@@ -125,6 +125,34 @@ pub fn effect_permitted(lifecycle: &Lifecycle, session: &str) -> Result<Permit, 
     })
 }
 
+/// Whether the retained output of a session admitted under `permit` may still
+/// be published after the session closed. Closing forgets an unheld pin, so
+/// the caller passes the pin it recorded at admission. Revocation of the
+/// session, its pinned revision or its qualification still applies.
+// r[impl lattice.agent_revisions.revocation.scenario.retained]
+pub fn retained_permitted(lifecycle: &Lifecycle, session: &str, permit: &Permit) -> Result<(), Refusal> {
+    let checks = [
+        crate::agent_revision::is_token(session),
+        crate::agent_revision::is_bare_digest(&permit.revision),
+        crate::agent_revision::is_reference(&permit.qualification_ref),
+    ];
+    if !checks.iter().all(|check| *check) {
+        return Err(Refusal::Malformed);
+    }
+    let revoked = &lifecycle.revoked;
+    if revoked.sessions.contains(session) {
+        return Err(Refusal::SessionRevoked);
+    }
+    if revoked.revisions.contains(&permit.revision) {
+        return Err(Refusal::RevisionRevoked);
+    }
+    if revoked.qualifications.contains(&permit.qualification_ref) {
+        return Err(Refusal::QualificationRevoked);
+    }
+    debug_assert!(!revoked.sessions.contains(session));
+    Ok(())
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 #[serde(tag = "outcome", rename_all = "snake_case")]
 pub enum Closed {

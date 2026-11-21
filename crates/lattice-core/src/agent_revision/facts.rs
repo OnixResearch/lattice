@@ -30,8 +30,6 @@ pub struct Bundle {
     pub task_families: Option<Vec<String>>,
     pub tools: Option<Vec<String>>,
     pub routes: Vec<HostedRoute>,
-    /// Digest of declared section 1 components, when declared.
-    pub components: Option<String>,
 }
 
 /// A brokered hosted model route.
@@ -72,7 +70,6 @@ pub fn validate(bundle: &Bundle) -> Result<(), super::Refusal> {
         texts.iter().all(|value| super::is_token(value)),
         names.all(|name| crate::execution_binding::capability::is_name(name)),
         routes.all(is_route),
-        bundle.components.as_deref().is_none_or(super::is_reference),
         super::is_within(bundle.routes.len(), super::MAX_REFERENCES),
     ];
     if checks.iter().all(|check| *check) {

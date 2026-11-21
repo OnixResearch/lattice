@@ -1,10 +1,12 @@
-//! Coordinator request checks and typed refusals, decided before any worker
-//! effect.
+//! Coordinator request checks and typed refusals.
 //!
 //! A refusal is printed once as `lattice.implementation-attempt-refusal.v1` on
 //! standard output and the command exits non-zero. It names the attempt it
-//! refused and states that this request dispatched nothing; it never claims
-//! anything about another request's earlier execution.
+//! refused. `dispatched` is `false` only when no worker effect of that attempt
+//! can have started; whenever the attempt directory holds an execution intent
+//! (a substituted or superseded request, or an export refused after the worker
+//! ran) it is `true`, so a coordinator never settles a possibly executed
+//! attempt as refused before any effect.
 
 // r[impl lattice.implementation_attempt.consumer.scenario.refusal]
 
@@ -17,10 +19,20 @@ pub(super) enum Reason {
     StaleFence,
     /// Another attempt is already recorded at this work and fence.
     CrossedAttempt,
-    /// The attempt directory holds the intent of different request bytes.
+    /// The attempt directory holds the intent of different request bytes,
+    /// which may have executed.
     SubstitutedRequest,
     /// The envelope's profile revision is not this request's current framing.
     ProfileRevisionSuperseded,
+    /// The lifecycle-managed definition admits no new session of this revision.
+    RevisionNotAdmitted,
+    /// The session's pinned revision, qualification or session record permits
+    /// no further effect; refused before spawn.
+    RevisionBlocked,
+    /// The managed attempt executed, but its session, pinned revision or
+    /// qualification has since been revoked, so its retained candidate is not
+    /// exported.
+    ExportRevoked,
 }
 
 impl Reason {
@@ -28,11 +40,38 @@ impl Reason {
         match self {
             Self::StaleFence => "implementation request is stale: a higher fence of this work is already recorded",
             Self::CrossedAttempt => "implementation request is crossed: another attempt is recorded at this fence",
-            Self::SubstitutedRequest => "request differs from persisted execution intent; nothing was dispatched",
+            Self::SubstitutedRequest => {
+                "request differs from persisted execution intent; this request dispatched nothing, but the \
+                 persisted intent may have executed"
+            }
             Self::ProfileRevisionSuperseded => {
                 "implementation request is stale, crossed or unsupported: its profile revision is not the \
                  lattice-worker-profile-revision-v2 framing; it is never executed or recovered"
             }
+            Self::RevisionNotAdmitted => {
+                "implementation request is refused: its agent revision is not admitted for new sessions; \
+                 nothing was dispatched"
+            }
+            Self::RevisionBlocked => {
+                "implementation attempt is blocked: its pinned agent revision permits no further effect; \
+                 nothing was dispatched"
+            }
+            Self::ExportRevoked => {
+                "implementation attempt executed, but its agent revision session, revision or qualification \
+                 is revoked; its retained candidate is not exported"
+            }
+        }
+    }
+
+    /// Whether a worker effect of the refused attempt can have started.
+    const fn could_have_dispatched(self) -> bool {
+        match self {
+            Self::SubstitutedRequest | Self::ExportRevoked => true,
+            Self::StaleFence
+            | Self::CrossedAttempt
+            | Self::ProfileRevisionSuperseded
+            | Self::RevisionNotAdmitted
+            | Self::RevisionBlocked => false,
         }
     }
 }
@@ -42,13 +81,21 @@ pub(super) fn record(
     envelope: &crate::implementation_attempt::ImplementationAttemptEnvelope,
     reason: Reason,
 ) -> serde_json::Value {
+    record_with(envelope, reason, reason.could_have_dispatched())
+}
+
+fn record_with(
+    envelope: &crate::implementation_attempt::ImplementationAttemptEnvelope,
+    reason: Reason,
+    dispatched: bool,
+) -> serde_json::Value {
     serde_json::json!({
         "schema": SCHEMA,
         "reason": reason,
         "work_id": envelope.work_id,
         "attempt_id": envelope.attempt_id,
         "fence": envelope.fence,
-        "dispatched": false,
+        "dispatched": dispatched,
     })
 }
 
@@ -58,6 +105,34 @@ pub(super) fn refuse(
     reason: Reason,
 ) -> String {
     println!("{}", record(envelope, reason));
+    reason.message().to_owned()
+}
+
+/// Refuse a request retained under a superseded profile framing. Its attempt
+/// may have executed under that framing when its directory holds an intent.
+pub(super) fn refuse_superseded(
+    envelope: &crate::implementation_attempt::ImplementationAttemptEnvelope,
+    has_retained_intent: bool,
+) -> String {
+    let reason = Reason::ProfileRevisionSuperseded;
+    println!("{}", record_with(envelope, reason, has_retained_intent));
+    reason.message().to_owned()
+}
+
+/// Print the typed refusal with the agent revision lifecycle's own refusal
+/// and return its diagnostic.
+// r[impl lattice.agent_revisions.seam.scenario.attempt]
+pub(super) fn refuse_revision(
+    envelope: &crate::implementation_attempt::ImplementationAttemptEnvelope,
+    reason: Reason,
+    refusal: &lattice_core::agent_revision::Refusal,
+) -> String {
+    debug_assert!(matches!(reason, Reason::RevisionNotAdmitted | Reason::RevisionBlocked | Reason::ExportRevoked));
+    let mut printed = record(envelope, reason);
+    if let Some(fields) = printed.as_object_mut() {
+        fields.insert("revision_refusal".to_owned(), serde_json::json!(refusal));
+    }
+    println!("{printed}");
     reason.message().to_owned()
 }
 

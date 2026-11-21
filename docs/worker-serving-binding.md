@@ -266,7 +266,7 @@ budgets across attempts stay with
 ## Inventory readiness
 
 `implementation-attempt inspect` prints the profile's `serving_readiness`
-and the instance's `model_readiness` in its `lattice.worker-inventory.v2`
+and the instance's `model_readiness` in its `lattice.worker-inventory.v3`
 document, plus the attempt's `model_requests` summary. Readiness reports the
 actual cause rather than an owner placeholder:
 

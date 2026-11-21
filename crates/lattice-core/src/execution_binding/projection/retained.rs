@@ -1,16 +1,19 @@
-//! `lattice.worker-instance-observation.v2`: one owned attempt's retained state.
+//! `lattice.worker-instance-observation.v3`: one owned attempt's retained state.
 //! Lifecycle and single-shot liveness come only from retained artifacts and
 //! the shell's observation time; host reachability and allocation liveness
 //! stay unknown, and model readiness is the injected port's latest snapshot or
-//! why none was observed. Nothing here is a claim; nothing reports idle or live.
+//! why none was observed. The pinned revision of the attempt's session comes
+//! from its recorded admission and the definition's lifecycle. Nothing here is
+//! a claim; nothing reports idle or live.
 
 // r[impl lattice.execution_binding.instances]
 // r[impl lattice.execution_binding.instances.scenario.unknown]
 // r[impl lattice.worker_inventory.liveness]
 // r[impl lattice.worker_inventory.liveness.scenario.unknown]
 // r[impl lattice.worker_inventory.liveness.scenario.single_shot]
+// r[impl lattice.worker_inventory.revisions.scenario.pinned]
 
-pub const INSTANCE_SCHEMA: &str = "lattice.worker-instance-observation.v2";
+pub const INSTANCE_SCHEMA: &str = "lattice.worker-instance-observation.v3";
 pub const STATE_SOURCE: &str = "lattice.implementation-attempt-state.v1";
 
 type Code = super::wait::Code;
@@ -30,12 +33,16 @@ pub struct AttemptState<'a> {
     pub admitted_until_epoch_ms: u64,
     pub has_intent: bool,
     pub has_refusal: bool,
+    /// A managed session was blocked by its revision lifecycle before spawn.
+    pub has_revision_block: bool,
     pub terminal_disposition: Option<&'a str>,
     pub has_cancel_request: bool,
     /// `(artifact name, artifact identity)` for every present artifact.
     pub artifacts: &'a [(&'a str, &'a str)],
     /// Readiness from the injected serving-owner port, or why none was observed.
     pub serving_readiness: &'a super::ServingReadiness,
+    /// The pinned revision of the attempt's session.
+    pub pinned: &'a super::lineage::Slot<crate::agent_revision::projection::SessionPin>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -43,8 +50,12 @@ pub struct AttemptState<'a> {
 pub enum Lifecycle {
     AdmittedNotDispatched,
     BindingRejectedBeforeDispatch,
+    /// The session's pinned revision permitted no effect; nothing spawned.
+    RevisionBlockedBeforeDispatch,
     DispatchRecordedOutcomeUnknown,
-    TerminalObserved { disposition: String },
+    TerminalObserved {
+        disposition: String,
+    },
 }
 
 /// Requested cancellation stays distinct from observed termination.
@@ -105,6 +116,8 @@ pub struct WorkerInstanceObservation {
     /// references or producer record references.
     pub compute: super::super::admission::bound::AdmittedCompute,
     pub model_routes: super::super::request::RouteDeclaration,
+    /// The pinned revision of this attempt's session.
+    pub pinned: super::lineage::Slot<crate::agent_revision::projection::SessionPin>,
     pub lifecycle: Lifecycle,
     pub cancellation: Cancellation,
     pub liveness: Liveness,
@@ -155,10 +168,10 @@ pub fn project_instance(
     if !super::super::is_reference(state.definition_identity) {
         return Err(StateDefect::Definition);
     }
-    let lifecycle = lifecycle(state)?;
+    let lifecycle = super::attempt::lifecycle(state)?;
     let state_digest =
         crate::content_identity::worker_instance_state(state.artifacts).map_err(|_| StateDefect::Digest)?;
-    let liveness = liveness(state, &lifecycle, observed_at_epoch_ms);
+    let liveness = super::attempt::liveness(state, &lifecycle, observed_at_epoch_ms);
     let wait_reasons = instance_reasons(state, &lifecycle, &liveness)?;
     debug_assert!(super::super::admission::bound::is_intact(admitted));
     debug_assert!(super::super::is_token(state.request_identity));
@@ -170,65 +183,6 @@ pub fn project_instance(
     })))
 }
 
-fn lifecycle(state: &AttemptState<'_>) -> Result<Lifecycle, StateDefect> {
-    match (state.has_intent, state.has_refusal, state.terminal_disposition) {
-        (false, false, None) => Ok(Lifecycle::AdmittedNotDispatched),
-        (false, true, None) => Err(StateDefect::RefusalWithoutIntent),
-        (false, _, Some(_)) => Err(StateDefect::TerminalWithoutIntent),
-        (true, true, Some(_)) => Err(StateDefect::RefusalWithTerminal),
-        (true, true, None) => Ok(Lifecycle::BindingRejectedBeforeDispatch),
-        (true, false, None) => Ok(Lifecycle::DispatchRecordedOutcomeUnknown),
-        (true, false, Some(disposition)) => Ok(Lifecycle::TerminalObserved {
-            disposition: disposition.to_owned(),
-        }),
-    }
-}
-
-fn cancellation(state: &AttemptState<'_>) -> Cancellation {
-    if state.terminal_disposition == Some("cancelled") {
-        Cancellation::ObservedTerminated
-    } else if state.has_cancel_request {
-        Cancellation::RequestedUnobserved
-    } else {
-        Cancellation::NotRequested
-    }
-}
-
-/// Whether the observation is past the request's admitted window.
-fn is_past_window(state: &AttemptState<'_>, observed_at_epoch_ms: i64) -> bool {
-    u64::try_from(observed_at_epoch_ms).is_ok_and(|observed| observed > state.admitted_until_epoch_ms)
-}
-
-/// Single-shot liveness: only an observed terminal result is `exited`, and a
-/// dispatched attempt without one is `unknown`, never idle or live.
-fn liveness(state: &AttemptState<'_>, lifecycle: &Lifecycle, observed_at_epoch_ms: i64) -> Liveness {
-    let (liveness_state, unknown_cause) = match lifecycle {
-        Lifecycle::AdmittedNotDispatched | Lifecycle::BindingRejectedBeforeDispatch => {
-            (LivenessState::NotStarted, None)
-        }
-        Lifecycle::TerminalObserved { .. } => (LivenessState::Exited, None),
-        Lifecycle::DispatchRecordedOutcomeUnknown if is_past_window(state, observed_at_epoch_ms) => {
-            (LivenessState::Unknown, Some(UnknownCause::Stale))
-        }
-        Lifecycle::DispatchRecordedOutcomeUnknown => (LivenessState::Unknown, Some(UnknownCause::Unobserved)),
-    };
-    let retained_generation = state
-        .artifacts
-        .iter()
-        .map(|_| 1_u64)
-        .chain(state.terminal_disposition.map(|_| 1_u64))
-        .fold(0_u64, u64::saturating_add);
-    debug_assert!(retained_generation >= u64::from(state.terminal_disposition.is_some()));
-    debug_assert_eq!(unknown_cause.is_some(), liveness_state == LivenessState::Unknown);
-    Liveness {
-        runtime: RuntimeClass::SingleShot,
-        state: liveness_state,
-        unknown_cause,
-        retained_generation,
-        observed_at_epoch_ms,
-    }
-}
-
 /// Why a non-terminal instance is waiting; a finished one waits for nothing.
 fn instance_reasons(
     state: &AttemptState<'_>,
@@ -236,8 +190,10 @@ fn instance_reasons(
     liveness: &Liveness,
 ) -> Result<Vec<Reason>, StateDefect> {
     let lifecycle_code = match lifecycle {
-        Lifecycle::BindingRejectedBeforeDispatch | Lifecycle::TerminalObserved { .. } => return Ok(Vec::new()),
-        Lifecycle::AdmittedNotDispatched if is_past_window(state, liveness.observed_at_epoch_ms) => {
+        Lifecycle::BindingRejectedBeforeDispatch
+        | Lifecycle::RevisionBlockedBeforeDispatch
+        | Lifecycle::TerminalObserved { .. } => return Ok(Vec::new()),
+        Lifecycle::AdmittedNotDispatched if super::attempt::is_past_window(state, liveness.observed_at_epoch_ms) => {
             Code::AdmissionExpired
         }
         Lifecycle::AdmittedNotDispatched => Code::AwaitingDispatch,
@@ -245,7 +201,7 @@ fn instance_reasons(
     };
     let mut reasons = Vec::with_capacity(super::wait::MAX_WAIT_REASONS);
     reasons.push(Reason::fact(lifecycle_code, Field::Lifecycle));
-    if cancellation(state) == Cancellation::RequestedUnobserved {
+    if super::attempt::cancellation(state) == Cancellation::RequestedUnobserved {
         reasons.push(Reason::fact(Code::CancellationUnobserved, Field::Cancellation));
     }
     match liveness.unknown_cause {
@@ -286,8 +242,9 @@ fn observation(
         binding_identity: admitted.binding_identity.clone(),
         compute: admitted.compute.clone(),
         model_routes: admitted.model_routes.clone(),
+        pinned: state.pinned.clone(),
         lifecycle: derived.lifecycle,
-        cancellation: cancellation(state),
+        cancellation: super::attempt::cancellation(state),
         liveness: derived.liveness,
         host_reachability: super::OwnedUnknown::unknown(super::LIVE_HOST_OWNER),
         model_readiness: state.serving_readiness.clone(),

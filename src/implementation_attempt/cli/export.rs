@@ -21,8 +21,9 @@ pub(super) fn run(
     request_path: &std::path::Path,
     state: &std::path::Path,
     output_parent: &std::path::Path,
+    revisions: super::session::revision::Store<'_>,
 ) -> Result<(), String> {
-    println!("{}", execute(request_path, state, output_parent)?);
+    println!("{}", execute(request_path, state, output_parent, revisions)?);
     Ok(())
 }
 
@@ -30,8 +31,9 @@ fn execute(
     request_path: &std::path::Path,
     state: &std::path::Path,
     output_parent: &std::path::Path,
+    revisions: super::session::revision::Store<'_>,
 ) -> Result<serde_json::Value, String> {
-    let inputs = admission::load(request_path, state, output_parent)?;
+    let inputs = admission::load(request_path, state, output_parent, revisions)?;
     let retained = admission::retained(&inputs)?;
     let payload = content::load(&inputs, &retained)?;
     publication::write(&inputs.output, &payload, &retained.observation)?;

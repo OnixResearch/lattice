@@ -30,17 +30,86 @@ pub(crate) enum Value {
     Object(Vec<(String, Value)>),
 }
 
+/// A container whose members are still being parsed.
+enum Open {
+    List(Vec<Value>),
+    Object {
+        entries: Vec<(String, Value)>,
+        /// Key of the member being parsed.
+        key: String,
+    },
+}
+
+impl Open {
+    fn into_value(self) -> Value {
+        match self {
+            Self::List(items) => Value::List(items),
+            Self::Object { entries, .. } => Value::Object(entries),
+        }
+    }
+}
+
+/// What starting a value produced.
+enum Started {
+    /// A scalar or an empty container.
+    Complete(Value),
+    /// A non-empty container was opened; its first member follows.
+    Opened,
+}
+
+/// What attaching a complete value to the innermost open container produced.
+enum Attached {
+    /// The container continues; its next member follows.
+    NextMember,
+    /// The container closed into this value.
+    Closed(Value),
+    /// No container is open; this is the document.
+    Root(Value),
+}
+
 /// Parses `bytes` as exactly one value of the subset.
+///
+/// The parser is iterative: an explicit stack holds the open containers, and
+/// a value nested deeper than [`MAX_DEPTH`] is refused before it is read.
 pub(crate) fn parse(bytes: &[u8]) -> Option<Value> {
     let mut parser = Parser { bytes, at: 0 };
-    let value = parser.value(0)?;
-    (parser.at == bytes.len()).then_some(value)
+    let mut open: Vec<Open> = Vec::new();
+    loop {
+        let mut value = match parser.start(&mut open)? {
+            Started::Complete(value) => value,
+            Started::Opened => continue,
+        };
+        loop {
+            match parser.attach(&mut open, value)? {
+                Attached::NextMember => break,
+                Attached::Closed(closed) => value = closed,
+                Attached::Root(root) => return (parser.at == bytes.len()).then_some(root),
+            }
+        }
+    }
+}
+
+/// One pending piece of canonical output.
+enum Emit<'a> {
+    Value(&'a Value),
+    Byte(u8),
+    Text(&'a str),
 }
 
 /// Encodes `value` canonically, sorting object keys by byte order.
+///
+/// The encoder is iterative: containers schedule their members on an explicit
+/// stack in reverse order.
 pub(crate) fn encode(value: &Value) -> Vec<u8> {
     let mut out = Vec::new();
-    write_value(value, &mut out);
+    let mut pending: Vec<Emit<'_>> = alloc::vec![Emit::Value(value)];
+    while let Some(next) = pending.pop() {
+        match next {
+            Emit::Value(value) => write_value(value, &mut out, &mut pending),
+            Emit::Byte(byte) => out.push(byte),
+            Emit::Text(text) => write_text(text, &mut out),
+        }
+    }
     out
 }
 
@@ -59,20 +128,103 @@ impl Parser<'_> {
         (self.bytes.get(self.at..end)? == literal).then(|| self.at = end)
     }
 
-    fn value(&mut self, depth: usize) -> Option<Value> {
-        if depth > MAX_DEPTH {
+    /// Starts the value at the cursor, nested inside `open`. Scalars and empty
+    /// containers complete at once; a non-empty container is pushed on `open`.
+    fn start(&mut self, open: &mut Vec<Open>) -> Option<Started> {
+        if open.len() > MAX_DEPTH {
             return None;
         }
         match self.peek()? {
-            b'n' => self.expect(b"null").map(|()| Value::Null),
-            b't' => self.expect(b"true").map(|()| Value::Bool(true)),
-            b'f' => self.expect(b"false").map(|()| Value::Bool(false)),
-            b'"' => self.text().map(Value::Text),
-            b'[' => self.list(depth),
-            b'{' => self.object(depth),
-            b'0'..=b'9' => self.number().map(Value::Number),
+            b'n' => self
+                .expect(b"null")
+                .map(|()| Started::Complete(Value::Null)),
+            b't' => self
+                .expect(b"true")
+                .map(|()| Started::Complete(Value::Bool(true))),
+            b'f' => self
+                .expect(b"false")
+                .map(|()| Started::Complete(Value::Bool(false))),
+            b'"' => self.text().map(|text| Started::Complete(Value::Text(text))),
+            b'[' => {
+                self.expect(b"[")?;
+                if self.peek()? == b']' {
+                    self.at += 1;
+                    return Some(Started::Complete(Value::List(Vec::new())));
+                }
+                open.push(Open::List(Vec::new()));
+                Some(Started::Opened)
+            }
+            b'{' => {
+                self.expect(b"{")?;
+                if self.peek()? == b'}' {
+                    self.at += 1;
+                    return Some(Started::Complete(Value::Object(Vec::new())));
+                }
+                let key = self.member_key(&[])?;
+                open.push(Open::Object {
+                    entries: Vec::new(),
+                    key,
+                });
+                Some(Started::Opened)
+            }
+            b'0'..=b'9' => self
+                .number()
+                .map(|number| Started::Complete(Value::Number(number))),
             _ => None,
         }
+    }
+
+    /// Attaches the complete `value` to the innermost open container, then
+    /// reads the separator that continues or closes it.
+    fn attach(&mut self, open: &mut Vec<Open>, value: Value) -> Option<Attached> {
+        match open.last_mut() {
+            None => Some(Attached::Root(value)),
+            Some(Open::List(items)) => {
+                items.push(value);
+                match self.peek()? {
+                    b',' => {
+                        self.at += 1;
+                        (items.len() < MAX_ITEMS).then_some(Attached::NextMember)
+                    }
+                    b']' => {
+                        self.at += 1;
+                        open.pop()
+                            .map(|closed| Attached::Closed(closed.into_value()))
+                    }
+                    _ => None,
+                }
+            }
+            Some(Open::Object { entries, key }) => {
+                entries.push((core::mem::take(key), value));
+                match self.peek()? {
+                    b',' => {
+                        self.at += 1;
+                        *key = self.member_key(entries)?;
+                        Some(Attached::NextMember)
+                    }
+                    b'}' => {
+                        self.at += 1;
+                        open.pop()
+                            .map(|closed| Attached::Closed(closed.into_value()))
+                    }
+                    _ => None,
+                }
+            }
+        }
+    }
+
+    /// Reads one object member's unique key and its `:`, refusing a member
+    /// beyond [`MAX_ITEMS`].
+    fn member_key(&mut self, entries: &[(String, Value)]) -> Option<String> {
+        if entries.len() >= MAX_ITEMS {
+            return None;
+        }
+        let key = self.text()?;
+        if entries.iter().any(|(existing, _)| *existing == key) {
+            return None;
+        }
+        self.expect(b":")?;
+        Some(key)
     }
 
     fn number(&mut self) -> Option<u64> {
@@ -109,61 +261,11 @@ impl Parser<'_> {
         }
         None
     }
-
-    fn list(&mut self, depth: usize) -> Option<Value> {
-        self.expect(b"[")?;
-        let mut items = Vec::new();
-        if self.peek()? == b']' {
-            self.at += 1;
-            return Some(Value::List(items));
-        }
-        loop {
-            if items.len() >= MAX_ITEMS {
-                return None;
-            }
-            items.push(self.value(depth.checked_add(1)?)?);
-            match self.peek()? {
-                b',' => self.at += 1,
-                b']' => {
-                    self.at += 1;
-                    return Some(Value::List(items));
-                }
-                _ => return None,
-            }
-        }
-    }
-
-    fn object(&mut self, depth: usize) -> Option<Value> {
-        self.expect(b"{")?;
-        let mut entries: Vec<(String, Value)> = Vec::new();
-        if self.peek()? == b'}' {
-            self.at += 1;
-            return Some(Value::Object(entries));
-        }
-        loop {
-            if entries.len() >= MAX_ITEMS {
-                return None;
-            }
-            let key = self.text()?;
-            if entries.iter().any(|(existing, _)| *existing == key) {
-                return None;
-            }
-            self.expect(b":")?;
-            let value = self.value(depth.checked_add(1)?)?;
-            entries.push((key, value));
-            match self.peek()? {
-                b',' => self.at += 1,
-                b'}' => {
-                    self.at += 1;
-                    return Some(Value::Object(entries));
-                }
-                _ => return None,
-            }
-        }
-    }
 }
 
-fn write_value(value: &Value, out: &mut Vec<u8>) {
+/// Writes a scalar, or writes a container's opening byte and schedules its
+/// members and closing byte on `pending` in reverse order.
+fn write_value<'a>(value: &'a Value, out: &mut Vec<u8>, pending: &mut Vec<Emit<'a>>) {
     match value {
         Value::Null => out.extend_from_slice(b"null"),
         Value::Bool(true) => out.extend_from_slice(b"true"),
@@ -172,27 +274,27 @@ fn write_value(value: &Value, out: &mut Vec<u8>) {
         Value::Text(text) => write_text(text, out),
         Value::List(items) => {
             out.push(b'[');
-            for (index, item) in items.iter().enumerate() {
+            pending.push(Emit::Byte(b']'));
+            for (index, item) in items.iter().enumerate().rev() {
+                pending.push(Emit::Value(item));
                 if index > 0 {
-                    out.push(b',');
+                    pending.push(Emit::Byte(b','));
                 }
-                write_value(item, out);
             }
-            out.push(b']');
         }
         Value::Object(entries) => {
             let mut sorted: Vec<&(String, Value)> = entries.iter().collect();
             sorted.sort_by(|left, right| left.0.as_bytes().cmp(right.0.as_bytes()));
             out.push(b'{');
-            for (index, (key, item)) in sorted.into_iter().enumerate() {
+            pending.push(Emit::Byte(b'}'));
+            for (index, (key, item)) in sorted.into_iter().enumerate().rev() {
+                pending.push(Emit::Value(item));
+                pending.push(Emit::Byte(b':'));
+                pending.push(Emit::Text(key));
                 if index > 0 {
-                    out.push(b',');
+                    pending.push(Emit::Byte(b','));
                 }
-                write_text(key, out);
-                out.push(b':');
-                write_value(item, out);
             }
-            out.push(b'}');
         }
     }
 }
@@ -212,7 +314,9 @@ impl Fields {
     pub(crate) fn new(value: Value) -> Option<Self> {
         match value {
             Value::Object(entries) => Some(Self { entries }),
-            _ => None,
+            Value::Null | Value::Bool(_) | Value::Number(_) | Value::Text(_) | Value::List(_) => {
+                None
+            }
         }
     }
 

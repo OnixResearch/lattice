@@ -3,7 +3,7 @@
 ## ADDED Requirements
 
 ### Requirement: The vendored producer is the exact Animus #18 revision
-r[lattice.agent_revisions.attachments.vendor] The vendored Animus snapshot MUST come from `scripts/sync_animus.rs` at revision `8d6f67d38509899402df4d62e2d54321ff047f06`, and `source.ncl` MUST record that revision and the BLAKE3 of `git -c tar.umask=0000 archive --format=tar` at it. The `animus-runtime` dependency MUST stay `default-features = false, features = ["steel"]`, and no crate or Cargo dependency MUST be added.
+r[lattice.agent_revisions.attachments.vendor] The vendored Animus snapshot MUST come from `scripts/sync_animus.rs` at revision `e6f27948b19ea2e1bcb67428ca2e12f7acb6e558`, and `source.ncl` MUST record that revision and the BLAKE3 of `git -c tar.umask=0000 archive --format=tar` at it (`6a231c9738f9634df311b58a97e27bdc16e77eced28d4f73327671dafec7ef10`). The `animus-runtime` dependency MUST stay `default-features = false, features = ["steel"]`, and no crate or Cargo dependency MUST be added.
 
 #### Scenario: The snapshot records the adopted revision
 r[lattice.agent_revisions.attachments.vendor.scenario.recorded]
@@ -22,7 +22,7 @@ r[lattice.agent_revisions.attachments.scenario.qualified]
 
 #### Scenario: Every producer reason refuses promotion
 r[lattice.agent_revisions.attachments.scenario.reasons]
-- GIVEN attachments for another revision or definition, another task family, another class than required, an expired window, an observation after the shell clock, two distinct attachments from one source, or bytes that are not canonical
+- GIVEN attachments for another revision or definition, another task family, another class than required, an expired window, an observation after the shell clock, two distinct attachments from one source (even when one of them is stale), or bytes that are not canonical
 - WHEN `promote` names them
 - THEN it MUST be refused as `not_qualified` with `subject_mismatch`, `scope_mismatch`, `insufficient_class`, `stale`, `unusable`, `conflicting` or `malformed` respectively, and the lifecycle MUST stay unchanged
 

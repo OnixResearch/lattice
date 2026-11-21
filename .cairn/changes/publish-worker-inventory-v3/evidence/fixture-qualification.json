@@ -1,0 +1,126 @@
+{
+  "schema": "lattice.fixture-qualification.v1",
+  "change": "publish-worker-inventory-v3",
+  "kind": "synthetic-fixture-qualification",
+  "live_qualification": false,
+  "live_worker_exercised": false,
+  "evidence_label": "fixture",
+  "base_revision": "9a74e7ef1da4e0ca7610dce0db039b3825a7154d",
+  "integration_head": "the integration commit on lattice-rewrite, on top of 4f9b76da",
+  "consumer": {
+    "repository": "kiln",
+    "issue": "OnixResearch/kiln#60",
+    "contract": [
+      "docs/inventory-producers.md",
+      "crates/kiln-adapter-lattice/src/worker_inventory.rs"
+    ],
+    "reader_updated": false
+  },
+  "producer_schemas": [
+    "lattice.worker-inventory.v3",
+    "lattice.worker-profile-facts.v3",
+    "lattice.worker-instance-observation.v3",
+    "lattice.worker-capability.v1",
+    "lattice.implementation-attempt-intent.v1"
+  ],
+  "removed_schemas": [
+    "lattice.worker-inventory.v2",
+    "lattice.worker-profile-facts.v2",
+    "lattice.worker-instance-observation.v2"
+  ],
+  "slot_shapes": [
+    "{\"support\":\"unmanaged\"}",
+    "{\"support\":\"unknown\",\"owner\":OWNER}",
+    "{\"support\":\"recorded\",\"value\":VALUE}"
+  ],
+  "unknown_slot_owners": {
+    "desired": "lattice#25",
+    "prepared": "kiln#49",
+    "qualified": "animus#18",
+    "selected_for_new_sessions": "lattice#25",
+    "pinned": "lattice#25"
+  },
+  "tests": {
+    "positive": [
+      "tests/test_worker_inventory.rs::revision_slots_are_unmanaged_without_a_lifecycle_and_unknown_or_recorded_with_one",
+      "tests/test_worker_inventory.rs::pinned_slot_follows_the_recorded_admission_never_the_current_lifecycle",
+      "tests/test_worker_inventory.rs::retained_lifecycle_maps_to_single_shot_liveness_and_reasons",
+      "tests/test_agent_profile_bindings.rs::configured_routes_are_owner_default_definitions_with_undeclared_capability",
+      "src/implementation_attempt/cli/tests/revisions.rs::a_managed_attempt_is_pinned_closed_and_a_later_one_refused_after_revocation",
+      "src/implementation_attempt/cli/tests/revisions.rs::an_unmanaged_attempt_keeps_todays_intent_and_recovery_keeps_the_recorded_mode",
+      "src/implementation_attempt/cli/inspect/tests.rs::inventory_separates_profile_and_terminal_instance_without_material"
+    ],
+    "negative": [
+      "tests/test_execution_binding_inventory.rs::qualified_requires_a_lifecycle_of_the_same_definition_and_bounds_are_enforced",
+      "tests/test_execution_binding_inventory.rs::missing_or_contradictory_state_is_unknown_or_an_error_never_inferred",
+      "src/implementation_attempt/cli/tests/revisions.rs::recovery_of_a_managed_attempt_requires_its_store_and_never_re_derives_the_mode",
+      "src/implementation_attempt/cli/tests/revisions.rs::revocation_after_admission_blocks_the_attempt_before_spawn",
+      "src/implementation_attempt/cli/inspect/tests.rs::missing_or_unreadable_state_never_becomes_a_guessed_instance"
+    ]
+  },
+  "captures": {
+    "directory": "/home/brittonr/.cargo-target/producer-work/lattice-inventory-v3-captures",
+    "produced": true,
+    "produced_from": "an earlier unpublished integration candidate with the Octet fixes, whose tree differs from the integration commit only in the vendored Animus test literal and the Animus revision pins (captured 2026-11-21); neither affects inventory output",
+    "readme": {
+      "file": "README.md",
+      "blake3": "1326fec52590203f2e33405288b7cf52f824f5974c5fd659d83e79b551878093"
+    },
+    "command": "RUSTC_WRAPPER= CARGO_BUILD_RUSTC_WRAPPER= CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=6 CARGO_TARGET_DIR=/home/brittonr/.cargo-target/producer-work/lattice-closeout-target LATTICE_INVENTORY_CAPTURE_DIR=/home/brittonr/.cargo-target/producer-work/lattice-inventory-v3-captures nix develop -c cargo test --locked -p lattice --lib -- capture_ --test-threads 1",
+    "command_result": "exit 0; 5 passed, 454 filtered out (the three capture tests and two unrelated tests whose names contain capture_), as recorded in the capture README",
+    "previous_capture": "the 2026-11-20 capture on the pre-Octet-fix tree (README f915c5b5…); per the README, managed-1 to managed-3, managed-7 and profile-without-instance.json are byte-identical to it and the other 11 files differ only in the nondeterministic fields below",
+    "tests": [
+      "capture_worker_inventory_v3",
+      "capture_served_worker_inventory_v3",
+      "capture_managed_worker_inventory_v3"
+    ],
+    "unmanaged_files": [
+      { "file": "agent-a-1-admitted-not-dispatched.json", "blake3": "726824c6d2a689a51df5188e2a015d784e2ba3ba134bf9a68865b360a063f873" },
+      { "file": "agent-a-1-declared-capability-dispatched.json", "blake3": "5941c4e08b75bcf6bcf50d77d5524cf1840c6d5a4399ecba414e9e0584f1da74" },
+      { "file": "agent-a-1-dispatched-outcome-unknown.json", "blake3": "03018e0572ee56a54a74dc0a877bb9d2aa58ed10a7b15994d4919ac31b687a2b" },
+      { "file": "agent-a-1-terminal-failed.json", "blake3": "e791839b7e8ab4d8c80ac3369e85157427f9090cedbe40fcca4cbcb9c4e37985" },
+      { "file": "agent-a-2-dispatched-outcome-unknown.json", "blake3": "060b9cdb3e3c5d8fa184fb26ced7fbdbca82aacfd54fc9e5686c17d9cd0c0d10" },
+      { "file": "host-local-served-ready.json", "blake3": "288929fc28d533ac007c215b464806d33c43f4d8a82e45f345528abe581d9d5d" },
+      { "file": "host-local-served-unavailable.json", "blake3": "bd3f9afd9fa40941cc0641e5f018d6fe8dae68b60a3513fffdd966b213864fac" },
+      { "file": "profile-without-instance.json", "blake3": "25d8a903edb3443b8a1c105c3eb29be3c06b328e2384fa069650946d3ee8aae6" }
+    ],
+    "managed_files": [
+      { "file": "managed-1-desired.json", "blake3": "d583a58b3ab6432c777d44be168845ef21ce22979796d2fcb99e10dc03146840" },
+      { "file": "managed-2-prepared.json", "blake3": "d91eb241487dff0a91736d556aa84c6d5a5f09f817e141b038b198ff230136ab" },
+      { "file": "managed-3-promoted.json", "blake3": "68849bc3251d1307d031a89a7af94f82d65caa7e566ccfa5c9e3508b86d96f98" },
+      { "file": "managed-4-admitted-session-live.json", "blake3": "b616cd91fa4c35a9335b78e962ec0d60ceeb6439e8caf64a48fc524c67253207" },
+      { "file": "managed-5-terminal-pin-released.json", "blake3": "5ed1d96299e049efc6dcdd89861d8651a9f516579f3397e6593366527546bd66" },
+      { "file": "managed-6-revoked-live-session.json", "blake3": "18b3b996afed75bb7746f6970ec32aa4fbbf3b39715d6c5f1323302b8c693ac1" },
+      { "file": "managed-6-revoked-terminal.json", "blake3": "d8dde7e519a7b8553246edef6626d0e2c83884d729e677db8aaf2d5193c1c853" },
+      { "file": "managed-7-refused-after-revocation.json", "blake3": "efbb8f5d41ed0881718cf074adaf402488917f7d33bdccccca22678ef75185f6" }
+    ],
+    "nondeterministic_fields": [
+      "instance.observed_at_epoch_ms",
+      "instance.liveness.observed_at_epoch_ms",
+      "instance.incarnation (managed scenarios)",
+      "instance.state_digest (managed scenarios)"
+    ],
+    "hash_note": "A new run changes the time fields, so these digests identify this run only."
+  },
+  "checks": {
+    "revision": "an earlier unpublished integration candidate whose tree differs from the integration commit only in the vendored Animus test literal and the Animus revision pins; test_agent_revision_attachments was re-run on the rewritten tree (see adopt-animus-qualification-attachments evidence)",
+    "implementation_attempt_lib": "cargo test --locked -p lattice --lib -- implementation_attempt: exit 0, 57 passed",
+    "focused_tests": "cargo test --locked -p lattice --test test_implementation_attempt_refusals --test test_agent_revision_core --test test_agent_revision_shell --test test_agent_revision_attachments --test test_worker_inventory --test test_execution_binding_inventory --test test_agent_profile_bindings: exit 0; 3 + 20 + 7 + 17 + 10 + 5 + 5 passed; test_agent_revision_core 20 and test_agent_revision_attachments 17 passed again once the fixture test read the golden copy",
+    "core_tests": "cargo test --locked -p lattice-core: exit 0, 11 + 4 passed",
+    "scripts_check": "scripts/check.rs (RUSTC_WRAPPER empty): exit 0, all 40 steps including format, all-features tests, tests, clippy -D warnings and cairn specs",
+    "cairn": "cairn validate --root . --policy cairn-policy/generated/cairn-policy.json: exit 0, valid, 61 specs, no issues; proposal, design and tasks gates of publish-worker-inventory-v3, manage-agent-revisions, execute-admitted-implementation-attempt and adopt-animus-qualification-attachments: all 12 PASS",
+    "octet": "octet-precommit-check after the parent's re-key: exit 0; root 1052 accepted, 1052 current, 0 new, 0 stale; lattice-core 25/25, 0 new, 0 stale; the re-key replaced only b3:2f535dc7c9bf4d11 with b3:b166871c68ee32c8 (underscore_in_module_filename on src/implementation_attempt.rs)",
+    "octet_semantic_delta": "against the 9a74e7ef baselines: root and lattice-core new_semantic=0 resolved_semantic=0",
+    "nix_flake_check": {"status": "pending", "revision": "the integration commit on lattice-rewrite (on top of 4f9b76da)"},
+    "nix_flake_check_history": [
+      {"revision": "earlier unpublished integration candidate", "status": "passed", "exit_code": 0, "nextest": {"run": 1701, "passed": 1701, "skipped": 63}, "note": "full nix flake check passed before the vendored Animus test literal was replaced"},
+      {"revision": "earlier unpublished integration candidate", "status": "failed", "failure": "nextest only, on the sandbox-source gap: fixture_identities_are_stable_and_recorded read .cairn/changes, which the Nix check source excludes, and the flake source filter did not admit vendor-cargo-deps/animus/source.ncl; both were fixed before the passing run"}
+    ]
+  },
+  "non_claims": [
+    "No live worker, provider, host, preparation owner, qualification producer or serving owner was observed.",
+    "A qualified task family may rest on fixture-provenance attachments; that is not live efficacy.",
+    "Revision slots report the lifecycle; they are not promotion, admission or export authority.",
+    "Kiln's reader is not updated by this change."
+  ]
+}

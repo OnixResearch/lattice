@@ -222,6 +222,8 @@ const fn unqualified(reason: Reason) -> Unqualified {
     }
 }
 
+/// The producer's label (`EvidenceLabel::as_str()` spells `fixture` or
+/// `live`), mapped variant for variant.
 const fn provenance(label: Label) -> Provenance {
     match label {
         Label::Fixture => Provenance::Fixture,
@@ -229,8 +231,9 @@ const fn provenance(label: Label) -> Provenance {
     }
 }
 
-/// Map the producer's answer. A qualified answer carries the subject and
-/// provenance label Animus decoded from the chosen attachment's own bytes.
+/// Map the producer's answer. A qualified answer carries the answer's
+/// provenance label and the subject Animus decoded from the chosen
+/// attachment's own bytes.
 fn verdict(answer: Answer, attachments: &[&[u8]]) -> Verdict {
     match answer {
         Answer::Qualified(qualification) => {
@@ -253,7 +256,7 @@ fn verdict(answer: Answer, attachments: &[&[u8]]) -> Verdict {
                 protocol_identity: qualification.protocol_identity,
                 verifier_identity: qualification.verifier_identity,
                 observed_at_ms: qualification.observed_at_ms,
-                provenance: provenance(document.provenance.label),
+                provenance: provenance(qualification.provenance_label),
             })
         }
         Answer::NotQualified(reason) => Verdict::NotQualified {

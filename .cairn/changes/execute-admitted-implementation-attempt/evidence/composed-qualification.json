@@ -1,4 +1,70 @@
 {
+ "history_note": "Every top-level field except current_run and history_note records the first composed run of 2026-11-20 (OUT=/tmp/k45q, Lattice binary 239833c7…), kept as history. current_run is the re-qualification on the final integrated tree and supersedes it where they differ.",
+ "current_run": {
+  "observed_on": "2026-11-21, Linux 6.18.60 x86_64",
+  "lattice": {
+   "store_path": "/nix/store/8bz7x1acpsrjzbjcdz5kcgak820aq25s-lattice-closeout-integrated",
+   "path": "/nix/store/8bz7x1acpsrjzbjcdz5kcgak820aq25s-lattice-closeout-integrated/bin/lattice",
+   "blake3": "ba97c2089e786c5712dd39961f9583ce44e45bf5b1a98c3160ac781047656b2e",
+   "build": "cargo build --release --locked -p lattice (RUSTC_WRAPPER empty), added to the Nix store",
+   "source": "an earlier unpublished integration candidate with the #6/#25/Animus #18 integration and the Octet module moves, whose tree differs from the integration commit only in a vendored Animus test literal and the Animus revision pins; the release binary does not contain the vendored Animus tests"
+  },
+  "unchanged_pins": "kiln_lattice_dispatch f53f2bb0…, k45_harness 0f2e2286…, omp 7ee769b6…, bubblewrap cd5be448…, socat b8e3a6f9…, shell e2129fd9…, qualify.sh 11fd2e83…, endpoint.py 74f29ad0…, summarize.py 2b68b39d…: each re-hashed on 2026-11-21 and equal to pins below",
+  "commands": {
+   "environment": "LATTICE=/nix/store/8bz7x1acpsrjzbjcdz5kcgak820aq25s-lattice-closeout-integrated/bin/lattice KILN=$W/k45-kiln-target/debug/kiln-lattice-dispatch HARNESS=$W/k45-kiln-target/debug/k45-harness OMP=/nix/store/ii3yn9v4cj6dg87b9kkzycjzxplgf93d-omp-18.18.7/bin/omp BWRAP=/nix/store/gr9l6ql3wg70idpqlqhnfdx81hak22c8-bubblewrap-0.11.0/bin/bwrap SOCAT=/nix/store/k562gy1wa1rwyhlp6ma2cp37zlc0mspl-socat-1.8.1.3/bin/socat1 WORKER_SHELL=/nix/store/v8sa6r6q037ihghxfbwzjj4p59v2x0pv-bash-5.3p9/bin/bash OUT=/tmp/k45r (W=/home/brittonr/.cargo-target/producer-work)",
+   "run": "composed-qualification/qualify.sh run",
+   "rest": "composed-qualification/qualify.sh lost_before_start lost_during_run refusals cancel",
+   "summary": "composed-qualification/summarize.py /tmp/k45r",
+   "exits": {"qualify_run": 0, "qualify_rest": 0, "summarize": 0}
+  },
+  "artifacts": {
+   "directory": "/home/brittonr/.cargo-target/producer-work/k45-requal",
+   "summary.json": "1eaffbdcf2a5875fc938e599a64af1056d0613c8e7eab8c57d9d82a57a3d18f3",
+   "comparison.txt": "6ced1e0d30f39b343c551d91e77620b3bc9148408cacb616a72129605308edaa",
+   "BINARY": "0be99e660cd7ea9f52cd76cfdac9e8959d587df04427a953b2c6158cbe522d21",
+   "out": "copy of /tmp/k45r"
+  },
+  "scenario_exits": {
+   "run": {"dispatch": 0, "duplicate": 0, "kiln-substituted": 2, "lattice-duplicate": 0, "lattice-substituted": 1, "endpoint_requests": 1},
+   "lost-before-start": {"recover": 0, "recover-replay": 0, "endpoint_requests": 0},
+   "lost-during-run": {"dispatch": 137, "recover": 0, "recover-replay": 0, "endpoint_requests": 1},
+   "refusals": {"kiln-crossed-fence": 2, "lattice-higher": 1, "lattice-crossed": 1, "stale-fence": 2, "endpoint_requests": 0},
+   "cancel": {"dispatch": 0, "endpoint_requests": 1}
+  },
+  "worker_profile_revisions": {
+   "run": "5db52faeebb4db0404dc30bef21e8199ad3abfd436777715ac01ca682c5ba101",
+   "lost-before-start": "e1f677ac683c0dcfdc2d9550f0f40dc42b198e030fae786d4b05db393521c398",
+   "lost-during-run": "e6b434dcf85463b83d8b4f4648d37a9deb85721f85379439cb8cf255fae43fe4",
+   "refusals": "2afd8d46e3050b8b365d7ecabe423bf67a1f93d6436148efb5c7d6e794de49eb",
+   "cancel": "84373fabda55a827ac22f385fd5d8446019f8ae845f7c91203f36ece6fa8d254"
+  },
+  "worker_profile_revisions_note": "All differ from the history run because the revision now also frames the reviewed harness template and request schema; per-scenario endpoint ports still make them differ per scenario.",
+  "comparison": {
+   "method": "summary.json against the history observations below, with digests, timestamps and output paths normalized (comparison.txt)",
+   "changed": [
+    {"path": "run.calls.lattice-substituted.stdout[0].dispatched", "history": false, "current": true},
+    {"path": "run.calls.lattice-substituted.stderr", "history": "configuration error: request differs from persisted execution intent; nothing was dispatched", "current": "configuration error: request differs from persisted execution intent; this request dispatched nothing, but the persisted intent may have executed"}
+   ],
+   "per_run_only": "run.omp_observation.Ok.session_id (01a1fba7-6ec9-70e1-acd3-88791666df49 -> 01a1fc89-6677-7517-9437-282715c31b53) and lost-during-run.omp_observation.Ok.session_id (01a1fbad-aaaa-7259-bf91-500be4cb664c -> 01a1fc89-b229-77e4-8859-20afe95f13ab); OMP assigns a session id per run",
+   "unchanged": "every other normalized observation, exit code and endpoint request count in all five scenarios"
+  },
+  "substituted_request_observation": {
+   "exit": 1,
+   "stderr": "configuration error: request differs from persisted execution intent; this request dispatched nothing, but the persisted intent may have executed",
+   "stdout": [{"dispatched": true, "reason": "substituted_request", "schema": "lattice.implementation-attempt-refusal.v1"}],
+   "semantics": "dispatched means a worker effect of the refused attempt may have started; the attempt directory holds another request's intent, which executed in this scenario"
+  },
+  "failed_long_out": {
+   "directory": "/home/brittonr/.cargo-target/producer-work/k45-requal/failed-long-out",
+   "out": "$W/k45-requal/out (the first attempt)",
+   "cause": "the broker's AF_UNIX model.sock path was 120-134 bytes, over Linux's 108-byte sun_path limit, so every worker stopped with \"private model socket is unavailable\" and made no endpoint request",
+   "exits": {"qualify_run": 0, "qualify_rest": 1, "summarize": 0},
+   "doc": "docs/candidate-worker.md already warns that the broker socket lives at <workspace parent>/.lattice-model-<32 hex>/model.sock, so the workspace parent must leave room within the 108-byte Unix socket path limit; the history run and the current run both use a short /tmp root",
+   "retained": true
+  },
+  "external_model_calls": 0,
+  "live_model": false
+ },
  "commands": {
   "environment": "LATTICE=/nix/store/b44qz608maz1g0pi5prdbxf0hnizmz0l-lattice-k45-9a74e7ef-d3b3171c3b03/bin/lattice KILN=$W/k45-kiln-target/debug/kiln-lattice-dispatch HARNESS=$W/k45-kiln-target/debug/k45-harness OMP=/nix/store/ii3yn9v4cj6dg87b9kkzycjzxplgf93d-omp-18.18.7/bin/omp BWRAP=/nix/store/gr9l6ql3wg70idpqlqhnfdx81hak22c8-bubblewrap-0.11.0/bin/bwrap SOCAT=/nix/store/k562gy1wa1rwyhlp6ma2cp37zlc0mspl-socat-1.8.1.3/bin/socat1 WORKER_SHELL=/nix/store/v8sa6r6q037ihghxfbwzjj4p59v2x0pv-bash-5.3p9/bin/bash OUT=/tmp/k45q (W=/home/brittonr/.cargo-target/producer-work)",
   "rest": "composed-qualification/qualify.sh lost_before_start lost_during_run refusals cancel",

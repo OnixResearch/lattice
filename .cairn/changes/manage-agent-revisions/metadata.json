@@ -1,6 +1,7 @@
 {
   "depends_on": [
-    "publish-worker-inventory-v2"
+    "publish-worker-inventory-v2",
+    "execute-admitted-implementation-attempt"
   ],
   "workflow_profile": {
     "id": "spec-driven",

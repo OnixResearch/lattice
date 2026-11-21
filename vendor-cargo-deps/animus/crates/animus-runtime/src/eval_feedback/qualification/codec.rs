@@ -227,12 +227,8 @@ fn measures_value(measures: &Measures) -> Value {
 }
 
 fn provenance_value(provenance: &Provenance) -> Value {
-    let label = match provenance.label {
-        EvidenceLabel::Fixture => "fixture",
-        EvidenceLabel::Live => "live",
-    };
     json::object(alloc::vec![
-        ("label", json::text(label)),
+        ("label", json::text(provenance.label.as_str())),
         ("producer", json::text(&provenance.producer)),
         (
             "producer_revision",
@@ -453,7 +449,7 @@ fn read_reference(value: Value) -> Option<Reference> {
 fn as_text(value: Value) -> Option<String> {
     match value {
         Value::Text(text) => Some(text),
-        _ => None,
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::List(_) | Value::Object(_) => None,
     }
 }
 
@@ -464,7 +460,7 @@ fn take_text(fields: &mut Fields, key: &str) -> Option<String> {
 fn take_number(fields: &mut Fields, key: &str) -> Option<u64> {
     match fields.take(key)? {
         Value::Number(number) => Some(number),
-        _ => None,
+        Value::Null | Value::Bool(_) | Value::Text(_) | Value::List(_) | Value::Object(_) => None,
     }
 }
 
@@ -476,7 +472,7 @@ fn take_optional_number(fields: &mut Fields, key: &str) -> Option<Option<u64>> {
     match fields.take(key)? {
         Value::Null => Some(None),
         Value::Number(number) => Some(Some(number)),
-        _ => None,
+        Value::Bool(_) | Value::Text(_) | Value::List(_) | Value::Object(_) => None,
     }
 }
 
@@ -495,6 +491,6 @@ fn optional<T>(value: Value, read: impl FnOnce(Value) -> Option<T>) -> Option<Op
 fn list<T>(value: Value, read: impl FnMut(Value) -> Option<T>) -> Option<Vec<T>> {
     match value {
         Value::List(items) => items.into_iter().map(read).collect(),
-        _ => None,
+        Value::Null | Value::Bool(_) | Value::Number(_) | Value::Text(_) | Value::Object(_) => None,
     }
 }

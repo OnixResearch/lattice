@@ -171,6 +171,7 @@ async fn standalone_port_blocks_provider_allocation_before_any_effect() {
             compute: &mut crate::execution_binding::UnavailableComputePort,
             serving: Box::new(crate::execution_binding::serving::UnavailableOwner),
         }),
+        super::super::session::revision::Store(None),
     )
     .await
     .expect_err("provider unavailable");
@@ -206,8 +207,14 @@ fn lost_acknowledgement_reconciles_without_rebinding_or_port_calls() {
     let state = root.path().join("state");
     let directory = super::super::artifacts::directory(&state, &request);
     let identity = blake3::hash(&std::fs::read(&request_path).expect("bytes")).to_hex().to_string();
-    let error =
-        super::super::execution::recover_existing(&request, &state, &directory, &identity).expect_err("unknown");
+    let error = super::super::execution::recover_existing(
+        &request,
+        &state,
+        &directory,
+        &identity,
+        super::super::session::revision::Store(None),
+    )
+    .expect_err("unknown");
     assert!(error.contains("outcome unknown"), "{error}");
     assert!(error.contains(&binding_identity), "{error}");
     assert_eq!(

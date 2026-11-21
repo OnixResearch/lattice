@@ -1,6 +1,7 @@
 ## Phase 1: Producer snapshot
 
-- [x] [serial] 1.1 Set `EXPECTED_REVISION` and `SOURCE_ARCHIVE_BLAKE3` in `scripts/sync_animus.rs` for Animus `8d6f67d38509899402df4d62e2d54321ff047f06`, run the script into `vendor-cargo-deps/animus`, and record the diff summary in `evidence/producer-adoption.json`. r[lattice.agent_revisions.attachments.vendor]
+- [x] [serial] 1.1 Set `EXPECTED_REVISION` and `SOURCE_ARCHIVE_BLAKE3` in `scripts/sync_animus.rs` for Animus `ed4db4ae00cfec2c2d39bd4a475205ac369f28e8`, run the script into `vendor-cargo-deps/animus`, and record the diff summary in `evidence/producer-adoption.json`. r[lattice.agent_revisions.attachments.vendor]
+- [x] [serial] 1.2 Re-sync to Animus `e6f27948b19ea2e1bcb67428ca2e12f7acb6e558` (archive BLAKE3 `6a231c9738f9634df311b58a97e27bdc16e77eced28d4f73327671dafec7ef10`), whose qualification codec changes satisfy workspace Octet without changing behavior, and record the sync history `1c370d50` → `8d6f67d3` → `ed4db4ae` → `e6f27948` in `evidence/producer-adoption.json`. r[lattice.agent_revisions.attachments.vendor]
 
 ## Phase 2: Port and CLI
 
@@ -14,6 +15,6 @@
 
 ## Phase 4: Verification
 
-- [ ] [serial] 4.1 Run the focused tests, `cargo test -p lattice --lib -- agent_revision`, the agent revision integration suites, clippy with `scripts/check.rs`'s arguments, `cargo fmt --check`, `cairn validate` and the change gates and `octet-precommit-check`, and record the results in `evidence/producer-adoption.json`. r[lattice.agent_revisions.attachments]
+- [x] [serial] 4.1 Run the focused tests, `cargo test -p lattice --lib -- agent_revision`, the agent revision integration suites, clippy with `scripts/check.rs`'s arguments, `cargo fmt --check`, `cairn validate` and the change gates and `octet-precommit-check` at Animus `e6f27948`, and record the results in `evidence/producer-adoption.json` (`commands_final`). r[lattice.agent_revisions.attachments]
 
 Only checked tasks are complete.

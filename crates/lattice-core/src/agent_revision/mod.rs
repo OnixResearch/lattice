@@ -20,7 +20,6 @@
 // r[impl lattice.agent_revisions.core]
 
 pub mod facts;
-pub mod framing;
 pub mod identity;
 pub mod ops;
 pub mod ports;

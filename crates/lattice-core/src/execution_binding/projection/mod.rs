@@ -7,6 +7,7 @@
 //! available.
 
 pub mod accounting;
+mod attempt;
 pub mod inventory;
 pub mod lineage;
 pub mod retained;

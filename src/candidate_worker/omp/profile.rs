@@ -19,13 +19,8 @@ pub(super) fn admit(request: &super::super::Request, profile: &super::Profile) -
 
 pub(super) fn arguments(request: &super::super::Request, profile: &super::Profile) -> Vec<String> {
     let mut args = Vec::with_capacity(24);
-    args.extend([
-        "launch".into(),
-        "--cwd".into(),
-        "/workspace".into(),
-        "--model".into(),
-        profile.model.clone(),
-    ]);
+    args.extend(LAUNCH_PREFIX.iter().map(|part| (*part).to_string()));
+    args.extend(["--model".into(), profile.model.clone()]);
     args.extend(PRINT_OPTIONS.iter().map(|option| (*option).to_string()));
     args.extend([
         format!("{}s", request.timeout_secs),
@@ -35,8 +30,13 @@ pub(super) fn arguments(request: &super::super::Request, profile: &super::Profil
     args
 }
 
+/// The fixed launch prefix; the workspace is always mounted at `/workspace`.
+/// Part of the worker profile revision.
+pub(crate) const LAUNCH_PREFIX: [&str; 3] = ["launch", "--cwd", "/workspace"];
+
 // Reviewed print-mode flags are fixed; only model, deadline and prompt vary.
-const PRINT_OPTIONS: [&str; 16] = [
+// Part of the worker profile revision, so changing any flag is a new revision.
+pub(crate) const PRINT_OPTIONS: [&str; 16] = [
     "--no-session",
     "--no-title",
     "-p",

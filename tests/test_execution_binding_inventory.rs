@@ -20,6 +20,8 @@ const DEFINITION: &str = "blake3:88888888888888888888888888888888888888888888888
 const ROUTE: &str = "blake3:9999999999999999999999999999999999999999999999999999999999999999";
 /// The standalone CLI's cause: no serving-owner port was injected.
 static NO_PORT: ServingReadiness = ServingReadiness::NoServingPort {};
+/// No revision store, or a definition without a lifecycle.
+static UNMANAGED_PIN: lineage::Slot<lattice_core::agent_revision::projection::SessionPin> = lineage::Slot::Unmanaged {};
 
 fn routes() -> RouteDeclaration {
     RouteDeclaration::Routes {
@@ -36,7 +38,7 @@ fn profile_input<'a>(routes: &'a RouteDeclaration, compute: &'a ComputeRequireme
         revision: "4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f4f",
         default_definition: ATTEMPT_DEFINITION,
         capability: None,
-        qualification_ref: None,
+        lifecycle: None,
         adapter: Offered::Declared("omp-jsonl"),
         protocol_revision: Offered::Declared("e325ffc73ab86e03bdd20a91b77d8e2b3964c906"),
         executable_identity: Offered::Declared("eeee"),
@@ -77,16 +79,21 @@ fn attempt_profile_projects_declared_facts_and_unknown_bounds() {
 }
 
 #[test]
-fn qualified_requires_canonical_evidence_and_bounds_are_enforced() {
+fn qualified_requires_a_lifecycle_of_the_same_definition_and_bounds_are_enforced() {
     let routes = routes();
     let compute = ComputeRequirement::HostLocal {};
+    let unmanaged = project_profile(&profile_input(&routes, &compute)).expect("facts");
+    assert_eq!(unmanaged.adapter.support, SupportLevel::Declared, "no lifecycle, no qualification");
+    assert!(unmanaged.capability_qualifications.is_empty());
+    let foreign = lattice_core::agent_revision::state::Lifecycle::new(DEFINITION);
     let mut input = profile_input(&routes, &compute);
-    input.qualification_ref = Some("not-evidence");
-    assert_eq!(project_profile(&input).expect("facts").adapter.support, SupportLevel::Declared);
-    input.qualification_ref = Some("blake3:abababababababababababababababababababababababababababababababab");
-    let qualified = project_profile(&input).expect("facts");
-    assert_eq!(qualified.adapter.support, SupportLevel::Qualified);
-    assert_eq!(qualified.cpu_millis.support, SupportLevel::Unknown, "unknown never becomes qualified");
+    input.lifecycle = Some(&foreign);
+    assert_eq!(project_profile(&input), Err(FactsDefect::Lifecycle), "a lifecycle of another definition");
+    let own = lattice_core::agent_revision::state::Lifecycle::new(&unmanaged.definition.identity);
+    input.lifecycle = Some(&own);
+    let managed = project_profile(&input).expect("facts");
+    assert_eq!(managed.adapter.support, SupportLevel::Declared, "a lifecycle never qualifies the adapter");
+    assert_eq!(managed.cpu_millis.support, SupportLevel::Unknown, "unknown never becomes qualified");
     let many = RouteDeclaration::Routes {
         routes: (0..9)
             .map(|index| NamedRoute {
@@ -138,10 +145,12 @@ fn state(admitted: Option<&Admitted>) -> AttemptState<'_> {
         admitted_until_epoch_ms: u64::MAX,
         has_intent: false,
         has_refusal: false,
+        has_revision_block: false,
         terminal_disposition: None,
         has_cancel_request: false,
         artifacts: &[],
         serving_readiness: &NO_PORT,
+        pinned: &UNMANAGED_PIN,
     }
 }
 

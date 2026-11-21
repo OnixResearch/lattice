@@ -2,10 +2,14 @@ use std::os::unix::fs::MetadataExt;
 
 const MAX_COMPONENT_BYTES: usize = 255;
 
+/// Admit one export. A lifecycle-managed attempt is exported only with its
+/// revision store and while its session, pinned revision and qualification
+/// are not revoked.
 pub(super) fn load(
     request_path: &std::path::Path,
     state: &std::path::Path,
     output_parent: &std::path::Path,
+    revisions: super::super::session::revision::Store<'_>,
 ) -> Result<super::Admitted, String> {
     let (request, bytes) = request(request_path)?;
     private_directory(state)?;
@@ -14,7 +18,8 @@ pub(super) fn load(
     let output = destination(&request, request_path, &state, &workspace, output_parent)?;
     let directory = super::super::artifacts::directory(&state, &request);
     private_directory(&directory)?;
-    check_intent(&directory, &bytes)?;
+    let recorded = check_intent(&request, &directory, &bytes)?;
+    super::super::session::revision::exportable(revisions, &request, &recorded)?;
     Ok(super::Admitted {
         request,
         workspace,
@@ -96,12 +101,23 @@ fn checked_parent(path: &std::path::Path) -> Result<std::path::PathBuf, String> 
     Ok(canonical)
 }
 
-fn check_intent(directory: &std::path::Path, bytes: &[u8]) -> Result<(), String> {
+fn check_intent(
+    request: &super::super::Request,
+    directory: &std::path::Path,
+    bytes: &[u8],
+) -> Result<super::super::session::intent::Recorded, String> {
     let identity = blake3::hash(bytes).to_hex().to_string();
-    if super::super::artifacts::read_bounded(&directory.join("intent.json"), identity.len())? != identity.as_bytes() {
-        return Err("request differs from persisted execution intent".into());
+    let session = super::super::session::revision::identifier(request);
+    let subject = super::super::session::intent::Subject {
+        request_identity: &identity,
+        session: &session,
+    };
+    match super::super::session::intent::read(directory, subject)? {
+        Some(super::super::session::intent::Record::Owned(recorded)) => Ok(recorded),
+        Some(super::super::session::intent::Record::Closed | super::super::session::intent::Record::Foreign) | None => {
+            Err("request differs from persisted execution intent".into())
+        }
     }
-    Ok(())
 }
 
 pub(super) fn retained(inputs: &super::Admitted) -> Result<super::Retained, String> {

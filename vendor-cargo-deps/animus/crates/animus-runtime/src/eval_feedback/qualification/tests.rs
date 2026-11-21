@@ -154,6 +154,14 @@ fn decode_reason(bytes: &[u8]) -> RejectionReason {
     decode_attachment(bytes).expect_err("rejected").reason
 }
 
+fn decode_field(bytes: &[u8]) -> &'static str {
+    decode_attachment(bytes).expect_err("rejected").field
+}
+
+fn encode_field(document: &AttachmentDocument) -> &'static str {
+    encode_attachment(document).expect_err("rejected").field
+}
+
 #[test]
 // r[verify agent_harness_runtime.qualification_attachment.attachment]
 // r[verify agent_harness_runtime.qualification_attachment.validator]
@@ -179,6 +187,7 @@ fn canonical_attachment_round_trips_and_qualifies_the_exact_subject() {
             protocol_identity: bound(ComponentKind::TaskProtocol),
             verifier_identity: bound(ComponentKind::Verifier),
             observed_at_ms: OBSERVED_AT_MS,
+            provenance_label: EvidenceLabel::Fixture,
         })
     );
     assert_eq!(
@@ -189,6 +198,15 @@ fn canonical_attachment_round_trips_and_qualifies_the_exact_subject() {
         EvidenceClass::DeploymentAdmission.as_str(),
         "deployment_admission"
     );
+    assert_eq!(EvidenceLabel::Fixture.as_str(), "fixture");
+    assert_eq!(EvidenceLabel::Live.as_str(), "live");
+    let mut live = document();
+    live.provenance.label = EvidenceLabel::Live;
+    let live = bytes(&live);
+    let QualificationAnswer::Qualified(live) = qualify(&[live.as_slice()], &expected) else {
+        panic!("live evidence qualifies");
+    };
+    assert_eq!(live.provenance_label, EvidenceLabel::Live);
 }
 
 #[test]
@@ -287,6 +305,20 @@ fn malformed_and_noncanonical_documents_are_rejected() {
     assert!(encode_attachment(&conformance_with_measures).is_err());
     conformance_with_measures.measures = None;
     assert!(encode_attachment(&conformance_with_measures).is_ok());
+
+    let root_schema = "\"schema\":\"animus.qualification-attachment.v1\"";
+    let reordered = alloc::format!(
+        "{{{root_schema},{}",
+        text.replacen(&alloc::format!(",{root_schema}"), "", 1)
+            .trim_start_matches('{')
+    );
+    assert_ne!(reordered, text);
+    assert_eq!(reordered.len(), text.len());
+    assert_eq!(decode_field(reordered.as_bytes()), "attachment.canonical");
+    let mut oversized = encoded.clone();
+    oversized.resize(MAX_ATTACHMENT_BYTES + 1, b' ');
+    assert_eq!(decode_field(&oversized), "attachment.bytes");
+    assert_eq!(decode_field(b"not json"), "attachment.syntax");
 }
 
 #[test]
@@ -302,6 +334,11 @@ fn unsafe_material_cannot_be_represented() {
         "UPPER",
         "../escape",
         oversized.as_str(),
+        "db_password:hunter2",
+        "sk_live_fixture",
+        "private_key:9f86d081",
+        "openai_api-key:0123abcd",
+        "auth_bearer-abc",
     ];
     for value in unsafe_values {
         let mut limitation = document();
@@ -311,7 +348,14 @@ fn unsafe_material_cannot_be_represented() {
         producer.provenance.producer = String::from(value);
         assert!(encode_attachment(&producer).is_err(), "{value}");
     }
-    for ordinary in ["risk-analysis", "task-family.review", "desk-check"] {
+    for ordinary in [
+        "risk-analysis",
+        "task-family.review",
+        "desk-check",
+        "task-family",
+        "risk-assessment",
+        "task_family",
+    ] {
         let mut family = document();
         family.subject.task_family = String::from(ordinary);
         assert!(encode_attachment(&family).is_ok(), "{ordinary}");
@@ -330,7 +374,57 @@ fn unsafe_material_cannot_be_represented() {
         decode_reason(escaped.as_bytes()),
         RejectionReason::Malformed
     );
-    assert!(!text.contains('/') && !text.contains(' '));
+    assert!(!text.contains('/'));
+    assert!(!text.contains(' '));
+}
+
+#[test]
+// r[verify agent_harness_runtime.qualification_attachment.attachment]
+fn the_iterative_parser_keeps_its_depth_item_and_key_bounds() {
+    let nested = |levels: usize| {
+        let mut text = "[".repeat(levels);
+        text.push('1');
+        text.push_str(&"]".repeat(levels));
+        text
+    };
+    // Six containers put the scalar at depth 6, the deepest allowed.
+    let deepest = nested(6);
+    let parsed = super::json::parse(deepest.as_bytes()).expect("depth 6");
+    assert_eq!(super::json::encode(&parsed), deepest.as_bytes());
+    assert!(super::json::parse(nested(7).as_bytes()).is_none());
+    // An empty container counts as a value at its own depth.
+    assert!(super::json::parse(b"[[[[[[[]]]]]]]").is_some());
+    assert!(super::json::parse(b"[[[[[[[[]]]]]]]]").is_none());
+    assert!(super::json::parse(b"[[[[[[[]]]]]]").is_none());
+
+    let items = |count: usize| alloc::format!("[{}]", alloc::vec!["0"; count].join(","));
+    assert!(super::json::parse(items(64).as_bytes()).is_some());
+    assert!(super::json::parse(items(65).as_bytes()).is_none());
+    let members = |count: usize| {
+        let entries: Vec<String> = (0..count)
+            .map(|index| alloc::format!("\"k{index:02}\":0"))
+            .collect();
+        alloc::format!("{{{}}}", entries.join(","))
+    };
+    assert!(super::json::parse(members(64).as_bytes()).is_some());
+    assert!(super::json::parse(members(65).as_bytes()).is_none());
+
+    let object = br#"{"a":[1,{"b":null}],"c":{"d":true,"e":"x"}}"#;
+    let parsed = super::json::parse(object).expect("object");
+    assert_eq!(super::json::encode(&parsed), object);
+    for refused in [
+        br#"{"a":1,"a":2}"#.as_slice(),
+        b"[1,]",
+        b"[1 ]",
+        b"{}x",
+        b"[1",
+        b"{\"a\"1}",
+        b"",
+    ] {
+        assert!(super::json::parse(refused).is_none(), "{refused:?}");
+    }
+    assert!(super::json::parse(b"[]").is_some());
+    assert!(super::json::parse(b"{}").is_some());
 }
 
 #[test]
@@ -499,6 +593,90 @@ fn duplicate_and_conflicting_sets_follow_replay_rules() {
 }
 
 #[test]
+// r[verify agent_harness_runtime.qualification_attachment.replay]
+fn conflicts_survive_a_stale_unusable_or_changed_member() {
+    let first = bytes(&document());
+    let (definition, revision) = (identity(DEFINITION_LABEL), hex(REVISION_LABEL));
+    let conflicting = QualificationAnswer::NotQualified(RejectionReason::Conflicting);
+
+    // Time: the second member expires first; the set stays conflicting.
+    let expires_at = NOW_MS + 1_000;
+    let mut expiring = document();
+    expiring.provenance.valid_until_ms = expires_at;
+    let expiring = bytes(&expiring);
+    let now = expected(&definition, &revision, &[]);
+    let later = ExpectedSubject {
+        now_ms: expires_at,
+        ..now
+    };
+    assert_eq!(reason(&expiring, &later), RejectionReason::Stale);
+    assert!(validate_attachment(&first, &later).is_ok());
+    for at in [now, later] {
+        assert_eq!(
+            qualify(&[first.as_slice(), expiring.as_slice()], &at),
+            conflicting
+        );
+    }
+
+    // Required component: the first member lacks skills evidence.
+    let mut with_skills = document();
+    with_skills.subject.components = with_skills
+        .subject
+        .components
+        .into_iter()
+        .map(|entry| {
+            if entry.kind == ComponentKind::Skills {
+                component(ComponentKind::Skills, "v1")
+            } else {
+                entry
+            }
+        })
+        .collect();
+    let with_skills = bytes(&with_skills);
+    let requires_skills = ExpectedSubject {
+        required_components: &[ComponentKind::Skills],
+        ..now
+    };
+    assert_eq!(reason(&first, &requires_skills), RejectionReason::Unusable);
+    assert!(validate_attachment(&with_skills, &requires_skills).is_ok());
+    assert_eq!(
+        qualify(
+            &[first.as_slice(), with_skills.as_slice()],
+            &requires_skills
+        ),
+        conflicting
+    );
+
+    // Current component: the first member's environment changed.
+    let new_environment = component_identity(ComponentKind::Environment, b"v2");
+    let mut moved = document();
+    moved.subject.components = moved
+        .subject
+        .components
+        .into_iter()
+        .map(|entry| {
+            if entry.kind == ComponentKind::Environment {
+                component(ComponentKind::Environment, "v2")
+            } else {
+                entry
+            }
+        })
+        .collect();
+    let moved = bytes(&moved);
+    let current = [CurrentComponent {
+        kind: ComponentKind::Environment,
+        identity: Some(&new_environment),
+    }];
+    let changed = expected(&definition, &revision, &current);
+    assert_eq!(reason(&first, &changed), RejectionReason::Stale);
+    assert!(validate_attachment(&moved, &changed).is_ok());
+    assert_eq!(
+        qualify(&[moved.as_slice(), first.as_slice()], &changed),
+        conflicting
+    );
+}
+
+#[test]
 // r[verify agent_harness_runtime.qualification_attachment.measures]
 fn denominators_and_costs_keep_failures_and_unknowns() {
     let unknown = encode_attachment(&document()).expect("valid");
@@ -531,6 +709,38 @@ fn denominators_and_costs_keep_failures_and_unknowns() {
         measures.costs.unknown_remainder = false;
     }
     assert!(encode_attachment(&zero_for_unknown).is_err());
+
+    let mut inflated_coverage = document();
+    if let Some(outcomes) = inflated_coverage.outcomes.as_mut() {
+        outcomes.rejected = 0;
+        outcomes.failed = 2;
+    }
+    assert_eq!(encode_field(&inflated_coverage), "measures.task_coverage");
+    let mut uncovered_completion = document();
+    if let Some(measures) = uncovered_completion.measures.as_mut() {
+        measures.tasks_covered = 1;
+    }
+    assert_eq!(
+        encode_field(&uncovered_completion),
+        "measures.task_coverage"
+    );
+    let mut time_without_acceptance = document();
+    if let Some(outcomes) = time_without_acceptance.outcomes.as_mut() {
+        outcomes.accepted = 0;
+        outcomes.rejected = 2;
+    }
+    if let Some(measures) = time_without_acceptance.measures.as_mut() {
+        measures.time_to_acceptance_ms = Some(0);
+    }
+    assert_eq!(
+        encode_field(&time_without_acceptance),
+        "measures.time_to_acceptance_ms"
+    );
+    let mut timed_acceptance = document();
+    if let Some(measures) = timed_acceptance.measures.as_mut() {
+        measures.time_to_acceptance_ms = Some(0);
+    }
+    assert!(encode_attachment(&timed_acceptance).is_ok());
 }
 
 #[test]

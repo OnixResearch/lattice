@@ -1,10 +1,22 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use super::*;
 use crate::implementation_attempt::AttemptBudget;
 use crate::implementation_attempt::ImplementationAttemptEnvelope;
 use crate::implementation_attempt::SourceKind;
+
+/// Export without a revision store: the attempt is unmanaged.
+fn run(request: &std::path::Path, state: &std::path::Path, output: &std::path::Path) -> Result<(), String> {
+    super::run(request, state, output, super::super::session::revision::Store(None))
+}
+
+fn execute(
+    request: &std::path::Path,
+    state: &std::path::Path,
+    output: &std::path::Path,
+) -> Result<serde_json::Value, String> {
+    super::execute(request, state, output, super::super::session::revision::Store(None))
+}
 
 struct Fixture {
     _root: tempfile::TempDir,

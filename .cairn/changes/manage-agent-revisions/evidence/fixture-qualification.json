@@ -9,13 +9,11 @@
   "producer_schemas": [
     "lattice.agent-revision-lifecycle.v1",
     "lattice.agent-bundle.v1",
-    "lattice.agent-revision-components.v1",
     "lattice.agent-revision-slots.v1",
     "lattice.agent-revision-outcome.v1"
   ],
   "identity_domains": [
     "lattice-agent-bundle-v1",
-    "lattice-agent-revision-components-v1",
     "lattice-agent-revision-preparation-v1",
     "lattice-agent-revision-promotion-policy-v1",
     "lattice-agent-revision-promotion-v1",
@@ -30,9 +28,9 @@
       "R3": "3333333333333333333333333333333333333333333333333333333333333333"
     },
     "bundles": {
-      "R1": "blake3:2bd8eae03a9015db7b698419dac0690bb042c8e3b0981d4bbe5b573d423b8587",
-      "R2": "blake3:7761a4e9865022268aff434368b6be859f6c49e128d42c33fa88118b487b7551",
-      "R3": "blake3:fffe8cb11976c20df517cd7942a5f9c557bd98a52800aa2022ccd23b06cd736e"
+      "R1": "blake3:e445a4713a007d2649b4eadec6ad90d937b1461251f325ef44b1f739ae0eed96",
+      "R2": "blake3:66b122d4d2faffc1f0acff1291949aaeabd9a7c8587d22bb50b146a6ff56678e",
+      "R3": "blake3:d9a5b214a4f87292152d14b1a4173589ae47dfe6b50b9048068364a7e893d581"
     },
     "policy": {
       "task_family": "rust-implementation",
@@ -59,21 +57,37 @@
     }
   },
   "tests": {
-    "files": ["tests/test_agent_revision_core.rs", "tests/test_agent_revision_shell.rs"],
-    "counts": { "core": 21, "shell": 7 },
-    "negative": "every Refusal variant is asserted at least once in tests/test_agent_revision_core.rs; framing defects in components_frame_only_when_declared_and_every_change_alters_the_digest; capacity bounds are filled past their size; the lattice binary's exit status is asserted for resolve, admit-session, rollback and cleanup"
+    "files": ["tests/test_agent_revision_core.rs", "tests/test_agent_revision_shell.rs", "tests/test_agent_revision_attachments.rs", "src/implementation_attempt/cli/tests/revisions.rs"],
+    "counts": { "core": 20, "shell": 7, "attachments": 17, "attempt_seam": 6 },
+    "negative": "every Refusal variant is asserted at least once in tests/test_agent_revision_core.rs; the harness template test changes each reviewed flag, the launch prefix and the request schema; capacity bounds are filled past their size; the lattice binary's exit status is asserted for resolve, admit-session, rollback and cleanup; attempt seam tests refuse an unselected or revoked revision before any write, block a session revoked before spawn, refuse a managed attempt without its store and refuse export after revocation with dispatched true"
+  },
+  "fixture_golden_copy": {
+    "path": "tests/fixtures/agent-revisions/fixture-identities.json",
+    "equals": "the fixture object of this file, byte-identical",
+    "reason": "fixture_identities_are_stable_and_recorded compares against the golden copy, because the Nix check source excludes .cairn/changes"
   },
   "checks": {
-    "focused_tests": "cargo test --locked -p lattice --test test_agent_revision_core --test test_agent_revision_shell: exit 0, 21 + 7 passed",
-    "fmt": "cargo fmt --check and cargo fmt --check -p lattice -p lattice-core: exit 0",
-    "clippy": "cargo clippy --workspace --exclude lattice-repository-validation-fixture --all-features --all-targets --no-deps --locked -- -D warnings: exit 0",
-    "octet": "octet-precommit-check: exit 0; root 1052 accepted, 0 new, 0 stale; lattice-core 25 accepted, 0 new, 0 stale",
-    "cairn": "cairn validate --root . and gate proposal/design/tasks manage-agent-revisions: exit 0, verdict PASS",
-    "scripts_check": "not run"
+    "revision": "an earlier unpublished integration candidate whose tree differs from the integration commit only in the vendored Animus test literal and the Animus revision pins; test_agent_revision_attachments was re-run on the rewritten tree (see adopt-animus-qualification-attachments evidence, commands_final.attachments_after_rewrite)",
+    "implementation_attempt_lib": "cargo test --locked -p lattice --lib -- implementation_attempt: exit 0, 57 passed, 402 filtered out",
+    "focused_tests": "cargo test --locked -p lattice --test test_implementation_attempt_refusals --test test_agent_revision_core --test test_agent_revision_shell --test test_agent_revision_attachments --test test_worker_inventory --test test_execution_binding_inventory --test test_agent_profile_bindings: exit 0; 3 + 20 + 7 + 17 + 10 + 5 + 5 passed",
+    "focused_tests_with_golden_copy": "test_agent_revision_core 20 passed and test_agent_revision_attachments 17 passed again once the fixture test read the golden copy",
+    "core_tests": "cargo test --locked -p lattice-core: exit 0, 11 + 4 passed",
+    "fmt": "cargo fmt -p lattice -p lattice-core: exit 0",
+    "clippy": "the clippy step of scripts/check.rs: exit 0",
+    "cairn": "the cairn specs step of scripts/check.rs: exit 0; cairn validate --root . --policy cairn-policy/generated/cairn-policy.json: exit 0, valid, 61 specs, no issues; proposal, design and tasks gates of manage-agent-revisions, execute-admitted-implementation-attempt, publish-worker-inventory-v3 and adopt-animus-qualification-attachments: all 12 PASS",
+    "octet_before_rekey": "octet-precommit-check: exit 1 on the accepted re-key only; root 1052 accepted, 1051 current accepted, 1 new (b3:b166871c68ee32c8, underscore_in_module_filename on src/implementation_attempt.rs), 1 stale (b3:2f535dc7c9bf4d11, the same finding before its content edit); lattice-core 25 accepted, 25 current accepted, 0 new, 0 stale, status warning-only",
+    "octet": "octet-precommit-check after the re-key: exit 0; root 1052 accepted, 1052 current, 0 new, 0 stale; lattice-core 25 accepted, 25 current, 0 new, 0 stale; the re-key replaced only b3:2f535dc7c9bf4d11 with b3:b166871c68ee32c8",
+    "octet_semantic_delta": "octet_semantic_delta.py against the 9a74e7ef baselines: root old=1052 current_unique=1052 new_semantic=0 resolved_semantic=0; lattice-core old=25 current_unique=25 new_semantic=0 resolved_semantic=0",
+    "scripts_check": "scripts/check.rs (RUSTC_WRAPPER empty): exit 0, all 40 steps including format, all-features tests, tests, clippy and cairn specs",
+    "nix_flake_check": {"status": "pending", "revision": "the integration commit on lattice-rewrite (on top of 4f9b76da)"},
+    "nix_flake_check_history": [
+      {"revision": "earlier unpublished integration candidate", "status": "passed", "exit_code": 0, "nextest": {"run": 1701, "passed": 1701, "skipped": 63}, "note": "full nix flake check passed before the vendored Animus test literal was replaced"},
+      {"revision": "earlier unpublished integration candidate", "status": "failed", "failure": "nextest only, on the sandbox-source gap: fixture_identities_are_stable_and_recorded read .cairn/changes, which the Nix check source excludes, and the flake source filter did not admit vendor-cargo-deps/animus/source.ncl; both were fixed before the passing run"}
+    ]
   },
   "non_claims": [
     "No live preparation, qualification, canary or rollout was exercised.",
     "Fixture ports are not Kiln #49 or Animus #18 producers.",
-    "The fixture revisions are synthetic; live session admission needs the stabilized profile revision."
+    "The fixture revisions are synthetic."
   ]
 }

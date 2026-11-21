@@ -4,45 +4,43 @@
 
 Baseline: Lattice `9a74e7ef1da4e0ca7610dce0db039b3825a7154d`.
 
-- `Request::worker_profile_identity()` (`src/implementation_attempt/cli.rs:107-128`) is BLAKE3 over a JSON tuple of program, sandbox program, OMP profile, read and write paths, output bound, `allow_unchanged` and `worker_compute`, plus the canonical capability declaration when one is present. It is published bare (64 hex) as the inventory `revision` and the envelope's `worker_profile`.
-- The inventory (`publish-worker-inventory-v2`) already publishes a definition identity that is stable across revisions and five revision slots as unknowns owned by `lattice#25`.
+- `Request::worker_profile_identity()` (`src/implementation_attempt/cli.rs`) is the `lattice-worker-profile-revision-v2` identity (`content_identity/attempt.rs`) over profile-level configuration, plus the canonical capability declaration when one is present; the `#6` slice removed the base snapshot, task prompt, broker expiry and workspace root from it. It is published bare (64 hex) as the inventory `revision` and the envelope's `worker_profile`.
+- The inventory (`publish-worker-inventory-v2`) publishes a definition identity that is stable across revisions and five revision slots as unknowns owned by `lattice#25`.
 - The store is one redb database with private per-domain modules and version-checked transitions (`commit_orchestration_transition(expected_version, ...)`).
 - Injected ports follow `bind-model-serving-admission`: a trait in the shell, an `Unavailable` implementation installed by the standalone CLI, a `Fixture` implementation for tests, and `run_command_with_ports` for embedders.
 
 ## Goals and non-goals
 
-Goal: issue #25 sections 1 to 5 at fixture level, without changing implementation attempts, the inventory or any existing identity.
+Goal: issue #25 sections 1 to 5 at fixture level, the reviewed harness template in the revision, and the seam wired into implementation attempts so that an attempt without a revision store behaves exactly as before.
 
-Non-goals: inventory publication, live preparation or qualification, canaries, checkpoint and resume, and the OCI and Cairn follow-ups on the issue.
+Non-goals: inventory publication (`publish-worker-inventory-v3`), live preparation or qualification, canaries, checkpoint and resume, and the OCI and Cairn follow-ups on the issue.
 
 ## Decision 1: the profile revision is the revision identity
 
-The lifecycle uses `worker_profile_identity()` verbatim and treats it as opaque, validated only as 64 lowercase hex. The definition is the inventory's `lattice-worker-definition-v1` identity (`blake3:<hex>`), so a new prompt, executable, tool list or route keeps the definition and changes the revision.
+The lifecycle uses `worker_profile_identity()` verbatim and treats it as opaque, validated only as 64 lowercase hex. The definition is the inventory's `lattice-worker-definition-v1` identity (`blake3:<hex>`), so a new executable, reviewed harness flag, tool list or route keeps the definition and changes the revision. A new task prompt changes neither.
 
-What the revision frames today, by section 1 component:
+What the revision frames, by section 1 component:
 
 | Component | Framed | Where |
 |---|---|---|
-| Harness and executable | yes: program and sandbox paths, OMP source revision and executable pin, broker relay, shell and sandbox pins | `cli.rs:109-111`; `candidate_worker/omp.rs:16-17`; `candidate_worker/broker.rs:38-40` |
-| Harness argv | no: print options are Lattice code constants | `candidate_worker/omp/profile.rs:38-55` |
-| Tools and protocol | declared tool names only, through the capability (`cli.rs:120`); the exposed tool list `--tools read,edit,write` and `--mode json` are code constants (`omp/profile.rs:43,51-52`) | |
-| Model route | yes: OMP model selector and the broker's schema, endpoint, model, credential reference and request bound | `omp.rs:19,21`; `broker.rs:34-37,42` |
-| Model requirements | no: serving route requirements live in the per-attempt `execution_binding` (`cli.rs:91`), outside the tuple | `execution_binding/serving/mod.rs:109` |
-| Memory policy | no: single-shot `--no-session` is a code constant | `omp/profile.rs:40` |
-| Checkpoint semantics | no: inventory reports `unavailable` | `cli/inspect/mod.rs:98` |
-| Workspace and isolation | read and write paths framed (`cli.rs:112-113`); isolation and private network are code invariants (`omp/profile.rs:5,11`) | |
-| Compute | yes | `cli.rs:116` |
-| Capability | yes, when declared | `cli.rs:120` |
-| Producer/consumer compatibility | no: the request schema is checked (`cli.rs:137`), not framed; the worker compatibility schema is a run observation (`candidate_worker.rs:171`) | |
-| Per-attempt values | framed today: workspace snapshot `base_identity`, task `prompt`, broker `expires_at_ms` | `omp.rs:18,20`; `broker.rs:41` |
+| Harness and executable | yes: program and sandbox paths, OMP source revision and executable pin, broker relay, shell and sandbox pins | `content_identity/attempt.rs` |
+| Harness argv | yes: the launch prefix `launch --cwd /workspace` and the print options, in argv order | `candidate_worker::omp::profile::{LAUNCH_PREFIX, PRINT_OPTIONS}` through `implementation_attempt::cli::session::profile::EFFECTIVE_TEMPLATE` |
+| Tools and protocol | yes: the exposed tool list `--tools read,edit,write`, `-p --mode json` and `--approval-mode write` are print options; declared tool names through the capability | `omp/profile.rs` |
+| Model route | yes: OMP model selector and the broker's schema, endpoint, model, credential reference and request bound | `content_identity/attempt.rs` |
+| Model requirements | no: serving route requirements live in the per-attempt `execution_binding` | `execution_binding/serving/mod.rs` |
+| Memory policy | yes: single-shot `--no-session` is a print option | `omp/profile.rs` |
+| Checkpoint semantics | no: inventory reports `unavailable` | `cli/inspect/mod.rs` |
+| Workspace and isolation | read and write paths framed; isolation and private network are code invariants | |
+| Compute | yes | `content_identity/attempt.rs` |
+| Capability | yes, when declared | `content_identity/attempt.rs` |
+| Producer/consumer compatibility | yes: the request schema | `implementation_attempt::cli::REQUEST_SCHEMA` through `implementation_attempt::cli::session::profile::EFFECTIVE_TEMPLATE` |
+| Per-attempt values | no: workspace snapshot `base_identity`, task `prompt`, broker `expires_at_ms`, workspace root; the exact request bytes bind them | |
 
-The last row means the current revision changes per attempt. Stabilizing it belongs to the implementation-attempt slice; this change depends only on the value being bare hex and compares it exactly.
+## Decision 2: frame the effective harness template, not a declaration
 
-## Decision 2: an optional components declaration for the unframed components
+`WorkerProfileRevisionInput` takes the request schema, the launch prefix and the print options as ordered strings. `Request::framed_revision(HarnessTemplate)` (`implementation_attempt::cli::session::profile`) builds the revision for any template, and `worker_profile_identity()` passes `EFFECTIVE_TEMPLATE`, which borrows the constants the shell actually passes to the worker (`candidate_worker::omp::profile::{LAUNCH_PREFIX, PRINT_OPTIONS}`, both `pub(crate)` and never restated). Changing a reviewed flag, its order, the launch prefix or the request schema is therefore a new revision. The domain stays `lattice-worker-profile-revision-v2` because the v2 framing was never published.
 
-`lattice.agent-revision-components.v1` (`framing.rs`) declares memory policy (`single_shot_no_session` or `session_scoped` with a schema name), checkpoint semantics (`unsupported` or `supported` with a schema name), a tool protocol with tool names, per-route model requirement references and producer/consumer compatibility names. `framing::digest(None)` is `None`; a valid declaration gives a `lattice-agent-revision-components-v1` digest with sorted tool names and requirements. A revision that frames the digest only when present keeps every existing value, as capability does. The call-site change is in Integration below.
-
-Rejected: framing the code constants unconditionally. That would change every existing revision.
+Rejected: the operator-declared `lattice.agent-revision-components.v1` extension (`framing.rs`), which an earlier revision of this change added. Nothing wired it, and a declaration could disagree with the constants that actually run. It and the bundle's `components` digest are deleted.
 
 ## Decision 3: separate facts in one bounded lifecycle per definition
 
@@ -102,20 +100,26 @@ Rejected: deriving the mode from whether a lifecycle exists at effect time. The 
 
 ## Decision 8: slots for a later inventory
 
-`projection::slots(&Lifecycle) -> Slots` (`lattice.agent-revision-slots.v1`) projects desired, prepared, qualified, last usable, selected and pinned facts, with whether each pinned session is blocked. Bundles, artifacts, holds and receipts are not projected.
+`projection::slots(&Lifecycle) -> Slots` (`lattice.agent-revision-slots.v1`) projects desired, prepared, qualified (with class, provenance and revocation), last usable, selected and pinned facts, with whether each pinned session is blocked. Bundles, artifacts, holds and receipts are not projected. `projection::session_pin` resolves one session's pin from the lifecycle or, once closing forgot it, from the pin the embedder recorded (`RecordedPin`, status `released`).
 
-## Integration
+## Decision 9: the seam in implementation attempts
 
-1. Components digest: add to `Request` `#[serde(default = "lattice_core::agent_revision::framing::absent", skip_serializing_if = "Option::is_none")] pub revision_components: Option<lattice_core::agent_revision::framing::Components>,` and frame `lattice_core::agent_revision::framing::digest(self.revision_components.as_ref())` only when it is `Some`.
-2. Seam: before writing `intent.json`, call `seam::admit` with the attempt's session identifier and refuse on `Refused`; record `decision.admission()` with the intent; before spawn and each protected effect, call `seam::effect` with the recorded mode; after the terminal result, call `seam::close` with the recorded mode. A standalone run without a store stays unmanaged.
-3. Inventory v3: fill the revision slots from `projection::slots`.
+`implementation-attempt run`, `recover`, `export-candidate` and `inspect` take an optional `--revision-store`; `implementation_attempt::cli::session::revision` opens the store only around each seam call, so `revoke` is never locked out during a run. The session is the attempt's envelope identity.
+
+1. `run` calls `seam::admit` before the fence record, binding, candidate store or intent. `Refused` prints a typed `revision_not_admitted` refusal and writes nothing. A session this run pinned is closed if the fence or binding step fails before the intent.
+2. With a store, `intent.json` is the canonical `lattice.implementation-attempt-intent.v1` record of request identity, session, admission and pin (`implementation_attempt::cli::session::intent`). Without one it stays the bare request identity. A legacy intent without an admission field reads as `unmanaged`, since it was admitted unmanaged by construction; the mode is never re-derived.
+3. `seam::effect` runs after binding revalidation, immediately before spawn. `Blocked` retains `revision-block.json`, closes the session and refuses as `revision_blocked`; recovery reports `not_dispatched_revision_blocked`.
+4. `seam::close` runs without checkpoints after the terminal result, in `run` and in `recover`; `unknown_session` (already closed and forgotten) is settled.
+5. Recovery, inspection and export of a managed attempt require the store. Export also requires `sessions::retained_permitted` for the recorded pin, so revocation of the session, its revision or its qualification refuses export after the session closed.
+
+Rejected: a revision store implied by the state directory. An operator who never manages a definition would get a lifecycle database per run, and an unmanaged run would no longer be byte-identical.
 
 ## Tests
 
-`tests/test_agent_revision_core.rs` covers each issue criterion on the pure core, every refusal, each bound filled past its size, reissue of abandoned attempts and the committed fixture identities. `tests/test_agent_revision_shell.rs` covers resolution, persistence with an interleaved writer, the standalone CLI, the `lattice` binary's exit status, fixture ports and the seam's admission modes.
+`tests/test_agent_revision_core.rs` covers each issue criterion on the pure core, every refusal, each bound filled past its size, reissue of abandoned attempts and the committed fixture identities. `tests/test_agent_revision_shell.rs` covers resolution, persistence with an interleaved writer, the standalone CLI, the `lattice` binary's exit status, fixture ports and the seam's admission modes. `src/implementation_attempt/cli/tests.rs` covers every reviewed harness flag and the request schema. `src/implementation_attempt/cli/tests/revisions.rs` runs the CLI with a fixture worker: desire, fixture preparation, promotion with an `encode_attachment` attachment, a managed run, revocation, a refused later run and a refused export; refusal without a selection; revocation between admission and spawn; an unmanaged run with byte-identical intent; and recovery that keeps the recorded mode.
 
 ## Risks and claim boundaries
 
 - Fixture ports are not live preparation or qualification. The evidence states `live_qualification: false`.
-- Until the profile revision is stabilized, live session admission matches only requests that reproduce the exact revision.
+- A managed attempt's session is admitted only when its request reproduces the selected revision exactly; any profile-level change, including a reviewed harness flag, needs a new desire, preparation and promotion.
 - `effect_permitted` covers lifecycle revocation only; cancellation, deadlines, grants and budgets keep their existing owners.

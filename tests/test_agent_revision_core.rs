@@ -44,7 +44,6 @@ fn bundle(revision: &str) -> lattice_core::agent_revision::facts::Bundle {
             weight_identity: lattice_core::agent_revision::facts::Unexposed::Unknown,
             model_version: lattice_core::agent_revision::facts::Unexposed::Unknown,
         }],
-        components: None,
     }
 }
 
@@ -490,88 +489,6 @@ fn hosted_routes_admit_only_unknown_weight_and_version() {
 }
 
 #[test]
-// r[verify lattice.agent_revisions.framing.scenario.undeclared]
-// r[verify lattice.agent_revisions.framing.scenario.declared]
-fn components_frame_only_when_declared_and_every_change_alters_the_digest() {
-    use lattice_core::agent_revision::framing;
-    assert_eq!(framing::digest(None), Ok(None));
-    let base = framing::Components {
-        schema: framing::COMPONENTS_SCHEMA.into(),
-        memory: Some(framing::Memory::SingleShotNoSession {}),
-        checkpoint: Some(framing::Checkpoint::Unsupported {}),
-        tools: Some(framing::Tools {
-            protocol: "omp-print-json".into(),
-            names: vec!["write".into(), "read".into(), "edit".into()],
-        }),
-        model_requirements: Some(vec![framing::Requirement {
-            route: "primary".into(),
-            requirement_ref: reference('1'),
-        }]),
-        compatibility: Some(framing::Compatibility {
-            producer: "lattice.implementation-attempt-run.v3".into(),
-            consumer: "lattice.candidate-worker-compatibility.v1".into(),
-        }),
-    };
-    let digest = framing::digest(Some(&base)).expect("valid").expect("declared");
-    let mut reordered = base.clone();
-    if let Some(tools) = reordered.tools.as_mut() {
-        tools.names.reverse();
-    }
-    assert_eq!(framing::digest(Some(&reordered)).expect("valid"), Some(digest.clone()));
-    let mut memory = base.clone();
-    memory.memory = Some(framing::Memory::SessionScoped {
-        schema: "omp-session.v1".into(),
-    });
-    let mut tools = base.clone();
-    tools.tools = Some(framing::Tools {
-        protocol: "omp-print-json".into(),
-        names: vec!["read".into()],
-    });
-    let mut requirement = base.clone();
-    requirement.model_requirements = Some(vec![framing::Requirement {
-        route: "primary".into(),
-        requirement_ref: reference('2'),
-    }]);
-    let mut empty = base.clone();
-    empty.memory = None;
-    for changed in [memory, tools, requirement, empty] {
-        assert_ne!(framing::digest(Some(&changed)).expect("valid"), Some(digest.clone()));
-    }
-    let mut schema = base.clone();
-    schema.schema = "lattice.agent-revision-components.v2".into();
-    assert_eq!(framing::digest(Some(&schema)), Err(framing::Defect::Schema));
-    let mut duplicate = base.clone();
-    duplicate.tools = Some(framing::Tools {
-        protocol: "omp".into(),
-        names: vec!["read".into(), "read".into()],
-    });
-    assert_eq!(framing::digest(Some(&duplicate)), Err(framing::Defect::Duplicate { field: "tools" }));
-    let mut name = base.clone();
-    name.tools = Some(framing::Tools {
-        protocol: "OMP".into(),
-        names: vec!["read".into()],
-    });
-    assert_eq!(framing::digest(Some(&name)), Err(framing::Defect::Name { field: "tools" }));
-    let mut count = base.clone();
-    count.tools = Some(framing::Tools {
-        protocol: "omp".into(),
-        names: Vec::new(),
-    });
-    assert_eq!(framing::digest(Some(&count)), Err(framing::Defect::Count { field: "tools" }));
-    let mut unreferenced = base;
-    unreferenced.model_requirements = Some(vec![framing::Requirement {
-        route: "primary".into(),
-        requirement_ref: "1".repeat(64),
-    }]);
-    assert_eq!(
-        framing::digest(Some(&unreferenced)),
-        Err(framing::Defect::Reference {
-            field: "model_requirements"
-        })
-    );
-}
-
-#[test]
 // r[verify lattice.agent_revisions.projection.scenario.slots]
 fn slots_project_each_fact_and_blocked_pins() {
     let r3 = promoted(&prepared(&r2_failed(), &revision('3'), 'b'), "promote-r3", &revision('3'), 's');
@@ -684,12 +601,14 @@ fn fixture_identities_are_stable_and_recorded() {
     if let Ok(path) = std::env::var("LATTICE_AGENT_REVISION_CAPTURE") {
         std::fs::write(path, serde_json::to_vec_pretty(&identities).expect("encode")).expect("capture written");
     }
-    let evidence = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join(".cairn/changes/manage-agent-revisions/evidence/fixture-qualification.json");
+    // The same identities are recorded in the change evidence
+    // (`.cairn/changes/manage-agent-revisions/evidence/fixture-qualification.json`);
+    // this golden copy lives under `tests/fixtures` so the sandboxed check sees it.
+    let golden =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/agent-revisions/fixture-identities.json");
     let recorded: serde_json::Value =
-        serde_json::from_slice(&std::fs::read(evidence).expect("evidence read")).expect("evidence decodes");
-    assert_eq!(recorded["live_qualification"], false);
-    assert_eq!(recorded["fixture"], identities);
+        serde_json::from_slice(&std::fs::read(golden).expect("golden identities read")).expect("golden decodes");
+    assert_eq!(recorded, identities);
 }
 
 #[test]

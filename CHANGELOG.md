@@ -25,9 +25,11 @@ interfaces.
   (`scope_mismatch`) even when it names the requested reference. Without
   attachments the CLI still refuses as `qualification_unavailable` (owner
   `animus#18`). The vendored Animus snapshot moves to
-  `8d6f67d38509899402df4d62e2d54321ff047f06`, adding only the qualification
-  module. A favorable attachment is evidence, not promotion authority, and
-  live efficacy is not claimed. See `docs/agent-revisions.md`.
+  `e6f27948b19ea2e1bcb67428ca2e12f7acb6e558` (the qualification module with
+  its review fixes and workspace-Octet fixes that change no behavior), adding
+  only the qualification module. A favorable attachment is evidence, not
+  promotion authority, and live efficacy is not claimed. See
+  `docs/agent-revisions.md`.
 - Immutable agent revision lifecycle (#25, sections 1 to 5). `lattice
   agent-revision` resolves an inert bundle from an exported
   implementation-attempt request, records the desired revision, prepares it
@@ -46,32 +48,49 @@ interfaces.
   admission mode its caller records, so sessions admitted before a
   definition became managed stay unmanaged. The standalone CLI
   reports preparation as `unknown` and refuses promotion as
-  `qualification_unavailable` (owner `animus#18`). Implementation attempts,
-  their revisions and the inventory are unchanged. See
+  `qualification_unavailable` (owner `animus#18`). `implementation-attempt
+  run`, `recover`, `export-candidate` and `inspect` take an optional
+  `--revision-store`: a run admits the attempt's session (its envelope
+  identity) before writing anything, records the admission mode and pin in
+  `intent.json`, checks the effect right before the worker spawns and closes
+  the session after the terminal result, where `unknown_session` counts as
+  already closed. Without a store an attempt is unmanaged and unchanged. See
   `docs/agent-revisions.md`.
 - Coordinator transport for Kiln #45's `kiln-lattice-dispatch --worker-request`
   (#6). Implementation-attempt requests may declare `network:false` and the
   coordinator's `dispatch_plan` identity; `network:true` is refused. A run
   records its attempt per work and fence before any binding or intent, and
   stale fences, crossed attempts and substituted request bytes are refused with
-  a typed `lattice.implementation-attempt-refusal.v1` record before any effect.
+  a typed `lattice.implementation-attempt-refusal.v1` record before any effect
+  of that request. Its `dispatched` field states whether a worker effect of
+  the attempt may have started: `true` for a substituted request, whose
+  attempt directory holds another request's intent, and for a superseded
+  request whose directory holds an intent.
   Recovery that finds no intent closes the attempt, so a late or duplicate run
   can never dispatch. Every observation, including binding refusals and the new
   `not_started_closed_by_recovery` status, carries the exact envelope and
   request identity. A `cairn_artifact` source must name its exact
   `change/stage/artifact`; issue and task identity bytes are unchanged. See
   `docs/candidate-worker.md`.
-- Worker inventory v2 facts for Kiln #60 (#24, #25 slots only). Each profile
-  carries a definition identity that is stable across revisions
+- Worker inventory facts for Kiln #60 (#24, #25). Each profile carries a
+  definition identity that is stable across revisions
   (`lattice-worker-definition-v1`). It also carries declared `task_families`
   and `tools`, which stay `unknown` when undeclared and are never empty.
-  Lattice #25's desired, prepared, qualified, selected and pinned revisions
-  appear as owned unknowns. Profiles and non-terminal instances carry bounded
-  closed-vocabulary wait reasons that name only published routes. Instances
-  carry their definition identity and single-shot liveness (`not_started`,
-  `exited` or `unknown` with `unobserved`/`stale`), never idle or live. An
-  optional typed `lattice.worker-capability.v1` declaration in
-  `contracts/worker-execution-binding.ncl` and the implementation-attempt
+  Lattice #25's desired, prepared, qualified and selected revisions are
+  projected from the definition's lifecycle when `inspect` is given
+  `--revision-store`, and each instance carries its session's pinned
+  revision. Every slot is `unmanaged` (no store or no lifecycle), `unknown`
+  with the owner that can supply it, or `recorded`. `task_families` is
+  `qualified` only when every declared family has a current qualification of
+  the profile's revision, listed in `capability_qualifications` with its
+  Animus #18 attachment identity, evidence class and `fixture`/`live`
+  provenance. Profiles and non-terminal instances carry bounded
+  closed-vocabulary wait reasons that name only published routes, including
+  `revision_not_admitted` for a managed definition that would refuse a new
+  session. Instances carry their definition identity and single-shot liveness
+  (`not_started`, `exited` or `unknown` with `unobserved`/`stale`), never
+  idle or live. An optional typed `lattice.worker-capability.v1` declaration
+  in `contracts/worker-execution-binding.ncl` and the implementation-attempt
   request supplies the definition name and capability sets. It is part of the
   profile revision only when present, and malformed declarations are refused
   before any effect. See `docs/worker-inventory.md`.
@@ -175,22 +194,45 @@ interfaces.
 ### Changed
 
 - Breaking: the implementation-attempt profile revision is now the
-  `lattice-worker-profile-revision-v2` identity over profile-level
-  configuration only, still spelled as bare hex. The base snapshot, task prompt,
-  broker expiry and workspace root no longer change it; the exact request
-  bytes bind them. Every revision value changes. Attempts retained under the
-  earlier framing are refused with `profile_revision_superseded` and are never
-  re-executed or recovered; prepare new work again (#6, Lattice #25).
+  `lattice-worker-profile-revision-v2` identity, still spelled as bare hex,
+  over profile-level configuration and the reviewed harness template: the OMP
+  launch prefix `launch --cwd /workspace` and print options in argv order,
+  read from the constants the shell passes to the worker, and the request
+  schema. Changing any reviewed flag (tools, mode, `--no-session`, approval
+  mode) is a new revision. The base snapshot, task prompt, broker expiry and
+  workspace root no longer change it; the exact request bytes bind them.
+  Every revision value changes, in requests, inventory and agent revision
+  lifecycles. Attempts retained under the earlier framing are refused with
+  `profile_revision_superseded` and are never re-executed or recovered;
+  prepare new work again (#6, Lattice #25).
 - Breaking: the implementation-attempt issue source kind is spelled
   `github_issue`, the name Kiln sends, instead of the derived `git_hub_issue`.
   Its identity tag is unchanged.
-- Breaking: `implementation-attempt inspect` prints `lattice.worker-inventory.v2`
-  with `lattice.worker-profile-facts.v2` and
-  `lattice.worker-instance-observation.v2`, and
-  `RuntimeOptions::worker_profile_facts` returns profile facts v2. No v1
-  inventory is emitted. Readers that deny unknown fields, such as Kiln's
-  `worker_inventory` adapter, must move to v2. The later profile-revision
-  framing change above replaces every revision value.
+- Breaking: `implementation-attempt inspect` prints `lattice.worker-inventory.v3`
+  with `lattice.worker-profile-facts.v3` and
+  `lattice.worker-instance-observation.v3`, and
+  `RuntimeOptions::worker_profile_facts` returns profile facts v3. No v1 or v2
+  inventory is emitted or decoded. Readers that deny unknown fields, such as
+  Kiln's `worker_inventory` adapter, must move to v3. The profile's
+  `qualification_ref` is replaced by `capability_qualifications`, the five
+  owned-unknown revision slots by four profile slots and the instance's
+  `pinned` slot, and the `revision_selection_unpublished` wait reason by
+  `revision_not_admitted`. v2 revisions used the earlier per-attempt framing,
+  which the revision change above replaces.
+- Breaking: with `--revision-store`, an implementation attempt of a
+  lifecycle-managed definition is refused before any write unless its
+  revision is selected for new sessions (`revision_not_admitted`), and is
+  blocked right before spawn once its session, pinned revision or
+  qualification is revoked (`revision_blocked`; recovery reports
+  `not_dispatched_revision_blocked` and inventory
+  `revision_blocked_before_dispatch`). Its `intent.json` becomes a
+  `lattice.implementation-attempt-intent.v1` record of the admission mode and
+  pin instead of the bare request identity. Recovering, inspecting or
+  exporting a managed attempt requires its `--revision-store`, and exporting
+  one is refused as `export_revoked` (`dispatched: true`, since the worker
+  ran) once its session, revision or qualification is revoked.
+  Attempts run without a store keep today's behavior and intent bytes
+  (Lattice #25).
 - Re-pinned Choregraph to `fcbae0aa` (Choregraph #4, default-off preference
   annotations). Its v1 receipts are byte-identical to `c3577352`; the source
   admission receipt, flake assertions and frozen role-protocol revision name the

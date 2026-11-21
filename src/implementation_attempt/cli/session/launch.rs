@@ -1,0 +1,111 @@
+//! The bounded worker step of one admitted attempt, after its intent.
+
+pub(in super::super) struct WorkerStep {
+    pub(in super::super) worker: crate::candidate_worker::Request,
+    pub(in super::super) profile: crate::candidate_worker::omp::Profile,
+    pub(in super::super) store: crate::store::Store,
+    pub(in super::super) output_dir: std::path::PathBuf,
+    pub(in super::super) is_unchanged_allowed: bool,
+    pub(in super::super) receipt: super::super::binding::usage::WorkerReceipt,
+    pub(in super::super) serving: Box<dyn crate::execution_binding::serving::OwnerPort>,
+}
+
+impl WorkerStep {
+    fn retain_events(&self, result: &crate::candidate_worker::omp::RunResult) -> Result<(), String> {
+        super::super::artifacts::write_once(&self.output_dir.join("raw-events.jsonl"), result.raw_events())?;
+        super::super::artifacts::write_once(
+            &self.output_dir.join("omp-observation.json"),
+            &serde_json::to_vec(&result.observation).map_err(|error| error.to_string())?,
+        )?;
+        self.retain_unchanged(result)
+    }
+
+    fn retain_unchanged(&self, result: &crate::candidate_worker::omp::RunResult) -> Result<(), String> {
+        let has_completed = matches!(&result.observation,
+            Ok(observation) if observation.terminal == crate::candidate_worker::omp::Terminal::Completed);
+        if self.is_unchanged_allowed
+            && has_completed
+            && let crate::candidate_worker::Outcome::Unchanged { observation, .. } = &result.outcome
+        {
+            super::super::artifacts::write_once(
+                &self.output_dir.join("unchanged-observation.json"),
+                &serde_json::to_vec(observation).map_err(|error| error.to_string())?,
+            )?;
+        }
+        Ok(())
+    }
+
+    /// Run the worker behind the broker. A served route passes every request
+    /// through the serving-owner gate with request files in the attempt
+    /// directory; any other route keeps the broker's own checks only.
+    // r[impl lattice.serving_binding.request_admission]
+    fn run_worker(
+        &mut self,
+        cancellation: &std::sync::atomic::AtomicBool,
+        credentials: &dyn crate::credentials::CredentialProvider,
+    ) -> Result<crate::candidate_worker::omp::RunResult, String> {
+        let admitted = self.receipt.admitted();
+        let mut direct = crate::candidate_worker::broker::DirectRoute;
+        let mut sink;
+        let mut served;
+        let gate: &mut dyn crate::candidate_worker::broker::ModelRequestGate = if admitted.serving.is_some() {
+            sink = super::super::binding::requests::RequestFiles::new(&self.output_dir)?;
+            let session = crate::execution_binding::serving::gate::Session::new(
+                admitted,
+                self.receipt.request_identity(),
+                self.serving.as_mut(),
+                &mut sink,
+            )?;
+            served = crate::candidate_worker::broker::OwnerGate {
+                session,
+                route_name: super::super::binding::PRIMARY_ROUTE.to_owned(),
+            };
+            &mut served
+        } else {
+            &mut direct
+        };
+        let services = crate::candidate_worker::broker::Services { credentials, gate };
+        crate::candidate_worker::omp::run(
+            &self.worker,
+            &self.profile,
+            &crate::process::core::RuntimeConfig::default(),
+            cancellation,
+            services,
+        )
+        .map_err(|error| error.to_string())
+    }
+
+    fn observe(mut self, cancellation: &std::sync::atomic::AtomicBool) -> Result<(), String> {
+        let reference = self.profile.model_broker.credential.as_ref();
+        if reference.is_some_and(|value| value.provider != "env" || value.field.is_some()) {
+            return Err("standalone model broker requires an explicit env credential reference".into());
+        }
+        let keys: Vec<String> = reference.map(|value| value.key.clone()).into_iter().collect();
+        let credentials = crate::credentials::EnvironmentCredentialProvider::from_current_env(&keys);
+        let started_epoch_ms = super::super::now_ms().ok();
+        let result = self.run_worker(cancellation, &credentials)?;
+        let window = super::super::binding::usage::WorkerWindow {
+            started_epoch_ms,
+            finished_epoch_ms: super::super::now_ms().ok(),
+        };
+        self.retain_events(&result)?;
+        // The attempt usage observation precedes the published attempt result.
+        self.receipt.persist(&self.store, window, &self.output_dir)?;
+        let outcome =
+            crate::candidate_worker::publish_outcome(&self.worker, &self.store, result.outcome, result.compatibility);
+        let retained = crate::candidate_worker::AttemptResult::from_outcome(&outcome);
+        retained.validate().map_err(|error| error.to_string())
+    }
+}
+
+pub(in super::super) async fn execute(execution: WorkerStep, directory: &std::path::Path) -> Result<(), String> {
+    let cancellation = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let identity = execution.receipt.request_identity().to_owned();
+    let signal_task =
+        super::super::cancellation::watch(cancellation.clone(), directory.join("cancel.request"), identity);
+    let observed = tokio::task::spawn_blocking(move || execution.observe(&cancellation)).await;
+    // Always stop and join the watcher, including when the blocking task failed to join.
+    let signal_result = super::super::cancellation::finish(signal_task).await;
+    observed.map_err(|error| error.to_string())??;
+    signal_result
+}

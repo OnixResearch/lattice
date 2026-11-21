@@ -1,0 +1,57 @@
+{
+  "definition": "blake3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "revisions": {
+    "R1": "1111111111111111111111111111111111111111111111111111111111111111",
+    "R2": "2222222222222222222222222222222222222222222222222222222222222222",
+    "R3": "3333333333333333333333333333333333333333333333333333333333333333"
+  },
+  "bundles": {
+    "R1": "blake3:e445a4713a007d2649b4eadec6ad90d937b1461251f325ef44b1f739ae0eed96",
+    "R2": "blake3:66b122d4d2faffc1f0acff1291949aaeabd9a7c8587d22bb50b146a6ff56678e",
+    "R3": "blake3:d9a5b214a4f87292152d14b1a4173589ae47dfe6b50b9048068364a7e893d581"
+  },
+  "policy": {
+    "task_family": "rust-implementation",
+    "required_class": "task_family_evaluation",
+    "identity": "blake3:d4e9509948c43c34fde6c245c6faea442b4637be0211cefc79cfa87ceedbb185"
+  },
+  "preparations": {
+    "R1": {
+      "generation": 1,
+      "observation": "prepared",
+      "identity": "blake3:5da335813ba187f6c751ed8c0c07bdd30dd27f7fff876f08909faee50b4c8f89"
+    },
+    "R2": {
+      "generation": 2,
+      "observation": "failed",
+      "identity": "blake3:85371721a65f19082d772c805435dfd6d2f8e7ee9f4e705ae776fade50406b79"
+    },
+    "R3": {
+      "generation": 3,
+      "observation": "prepared",
+      "identity": "blake3:a1ddc04b9c083f8c79a1ef63b03db8623d10b9c19fd198848db35f567eed9dcb"
+    }
+  },
+  "qualifications": {
+    "R1": "blake3:f003db3c8fddc3611cd75cdcb05108606923e0bc137e99f53a83bfdd5c8fd6d6",
+    "R3": "blake3:3d1d92230feb6db469532f26d9e2d7ab2b9a7982924c2706ac5a89679756e6bf"
+  },
+  "promotions": {
+    "R1": "blake3:102e2ecc85d398fde8ab9eed4c860ca5206b15b6c96776bebc608c5dd1a52c60",
+    "R3": "blake3:bb39027f579f9ef6148a5abbc7ecfd8aa3013bdca46b516ba6124859b73867a9"
+  },
+  "sessions": {
+    "A": {
+      "revision": "1111111111111111111111111111111111111111111111111111111111111111",
+      "pin": "blake3:782f9d7a13ff1f16f73d3d7b1c9f1261a810720fad5ecc005298430c5da98890"
+    },
+    "B": {
+      "revision": "1111111111111111111111111111111111111111111111111111111111111111",
+      "pin": "blake3:82cedcbca3861b2ca8e07545cc31a470593bc48d5381b381e7cd88e65fd50ecd"
+    },
+    "C": {
+      "revision": "3333333333333333333333333333333333333333333333333333333333333333",
+      "pin": "blake3:9fa64b913c697ef1ad2e7584fdd947ec2a71c225660223888ae3227f494f5136"
+    }
+  }
+}

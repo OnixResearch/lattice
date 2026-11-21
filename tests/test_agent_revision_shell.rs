@@ -92,6 +92,8 @@ fn request(prompt: &str) -> Request {
                 names: vec!["edit".into(), "read".into(), "write".into()],
             }),
         }),
+        network: None,
+        dispatch_plan: None,
     }
 }
 
@@ -226,13 +228,15 @@ fn resolution_uses_the_opaque_revision_and_reports_hosted_unknowns() {
     }
     let mut prompt = base.clone();
     prompt.omp.prompt = "another prompt".into();
+    let per_attempt = lattice::agent_revision::bundle::resolve(&prompt).expect("resolves");
+    assert_eq!(per_attempt.revision, resolved.revision, "a task prompt is per-attempt, not a revision");
     let mut tools = base.clone();
     tools.worker_capability.as_mut().expect("capability").tools = None;
     let mut harness = base.clone();
     harness.omp.executable_blake3 = "9".repeat(64);
     let mut model = base.clone();
     model.omp.model_broker.model = "model-2".into();
-    for changed in [prompt, tools, harness, model] {
+    for changed in [tools, harness, model] {
         let other = lattice::agent_revision::bundle::resolve(&changed).expect("resolves");
         assert_ne!(other.revision, resolved.revision);
         assert_eq!(other.definition.identity, resolved.definition.identity);
@@ -382,7 +386,7 @@ fn fixture_ports_drive_the_lifecycle_and_the_seam() {
         seam::Effect::Permitted { .. }
     ));
     let mut changed = base.clone();
-    changed.omp.prompt = "another prompt".into();
+    changed.omp.executable_blake3 = "9".repeat(64);
     let refused = seam::admit(&store, &changed, "session-b").expect("seam");
     assert_eq!(refused, seam::Decision::Refused {
         refusal: lattice_core::agent_revision::Refusal::RevisionNotSelected
@@ -506,7 +510,7 @@ fn the_cli_exits_non_zero_on_every_refusal() {
     let resolved = lattice::agent_revision::bundle::resolve(&base).expect("resolves");
     let definition = resolved.definition.identity.clone();
     let mut changed = base.clone();
-    changed.omp.prompt = "another prompt".into();
+    changed.omp.executable_blake3 = "9".repeat(64);
     let other = lattice::agent_revision::bundle::resolve(&changed).expect("resolves");
     let request_path = write_request(root.path(), "request.json", &base);
     let changed_path = write_request(root.path(), "changed.json", &changed);

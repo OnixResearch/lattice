@@ -22,8 +22,8 @@ let Source = {
 } in
 {
   repository = "ssh://git@github.com/OnixResearch/animus.git",
-  revision = "8d6f67d38509899402df4d62e2d54321ff047f06",
-  source_archive_blake3 = "d0c2389c12cc273b6f4ebe11a15d3e18b69f9b169b4f80a41c412aaa5bac191e",
+  revision = "e6f27948b19ea2e1bcb67428ca2e12f7acb6e558",
+  source_archive_blake3 = "6a231c9738f9634df311b58a97e27bdc16e77eced28d4f73327671dafec7ef10",
   source_archive_format = "git-tar",
   source_archive_tar_umask = "0000",
   host_control_revision = "7735faf3d8895b0bfa89f563184c4321b3b144a1",
