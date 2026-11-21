@@ -55,8 +55,48 @@
     "decision": "useful_mapping_adoption_deferred",
     "decision_document": "docs/agent-package-comparison.md",
     "skill_revision": "f47812209c50f0d5187d70e02d760717a1f2a17701508a7564e480f862ecf591",
-    "plugin_revision": "fcbd229bbc84a7f81873ce3de335fa638e99d1fe8e4694fea9792ed473b7094a",
-    "negative_cases": 31
+    "plugin_revision": "2dd4af5a0194b7af54ad2155174794908971debcc2e97846985f874b6ebb955d",
+    "plugin_revision_before_review": "fcbd229bbc84a7f81873ce3de335fa638e99d1fe8e4694fea9792ed473b7094a",
+    "republished_skill_revision": "62dc80cabc624e5bc51e90f54e9bd5212f9d377477e82c6187d8e6b1e94ade3a",
+    "bundled_case_triage_tree": "blake3:371332aefe8c808ea0a4dde13e9478d685dda64a0ff8718a1615b4638d788e4c",
+    "negative_cases": 34
+  },
+  "review": {
+    "reviewer": "history://Lattice25Review",
+    "reviewed_commit": "562d03cd",
+    "verdict_before_fixes": "hold",
+    "findings": [
+      {
+        "severity": "medium",
+        "location": "crates/lattice-core/src/agent_revision/workflow/adaptation.rs:138",
+        "finding": "A worker definition-name change under the same worker definition and revision changed the bundle identity and revision, but propose classified no change and refused the adaptation as malformed.",
+        "resolution": "New changes worker_bundle (set whenever the recorded worker bundle identity changes) and worker_name; every revision-changing difference is classified. Test: a_proposal_is_refused_or_unchanged_outside_one_definition (name-only change yields [worker_bundle, worker_name]; a worker revision change yields [worker_revision, worker_bundle])."
+      },
+      {
+        "severity": "medium",
+        "location": "tests/test_agent_package_comparison.rs:391",
+        "finding": "Changing only an entry's bytes kept its reported SHA-256 matching the inventory, so compare reported nothing while the materialized identity changed.",
+        "resolution": "The harness recomputes each regular file's SHA-256 from its supplied bytes (dev-dependency sha2 0.10.9, already locked) and compares that with the inventory; a reported digest that disagrees with the bytes is reported_digest_mismatch. Case content_only_change: [changed_file, reported_digest_mismatch]."
+      },
+      {
+        "severity": "medium",
+        "location": "tests/test_agent_package_comparison.rs:431",
+        "finding": "The expansion ratio used the observed layer size without checking it against the manifest descriptor's size.",
+        "resolution": "An observed size that differs from the descriptor's is layer_size_mismatch, and the ratio is then taken over the smaller size. Case layer_size_mismatch (observed 100000, declared 512, expanded 40000): [expansion_ratio_exceeded, layer_size_mismatch]."
+      },
+      {
+        "severity": "medium",
+        "location": "tests/fixtures/agent-package/plugin.json:82",
+        "finding": "The bundled case-triage SKILL.md referenced references/policy.md, which the plugin did not carry, and only SKILL.md was compared.",
+        "resolution": "The plugin bundles the whole case-triage tree (SKILL.md, references/policy.md, scripts/analyze.py); each bundled skill's tree identity (lattice-agent-package-skill-tree-v1) enters the closure and equals the reviewed skill's. Case incomplete_bundled_skill: [missing_file], and the test asserts its tree differs. comparison-report.json regenerated through the_comparison_report_is_recorded; the plugin revision changed accordingly."
+      },
+      {
+        "severity": "low",
+        "location": "docs/agent-package-comparison.md:57",
+        "finding": "The version annotation was described as excluded from every identity, but changing it changes the manifest digest, which feeds the evidence subject and the lifecycle revision.",
+        "resolution": "The decision document, spec, changelog and report state that it is not a direct input but changes the manifest digest and therefore the evidence subject and revision; the lifecycle test shows an annotation-only change under the same declared digest keeps the revision and the new manifest digest changes it."
+      }
+    ]
   },
   "tests": {
     "files": [
@@ -74,7 +114,20 @@
     "octet": "octet-precommit-check: exit 0; root 1052 accepted, 1052 current, 0 new, 0 stale; lattice-core 25 accepted, 25 current, 0 new, 0 stale; no re-key",
     "cairn": "cairn validate --root . --policy cairn-policy/generated/cairn-policy.json: exit 0, valid, 62 specs, 0 issues; proposal, design and tasks gates of bind-workflow-agent-revisions: PASS",
     "gitleaks": "gitleaks dir on every changed and new path: no leaks found",
-    "nix_flake_check": "not run in this slice"
+    "nix_flake_check": "not run in this slice",
+    "after_review": {
+      "environment": "the saved Lattice dev environment /tmp/lattice-devenv2.sh (nix develop was blocked behind a root garbage collection holding the store lock), TMPDIR=/var/tmp/l25, RUSTC_WRAPPER empty",
+      "lattice_core_tests": "cargo test -p lattice-core agent_revision: exit 0; the filter matches no lattice-core unit test (11 + 4 filtered out); the lifecycle tests live in the lattice integration targets below",
+      "focused_tests": "cargo test -p lattice --test test_agent_revision_workflow --test test_agent_package_comparison --test test_agent_revision_shell --test test_agent_revision_core: exit 0; 11 + 4 + 9 + 20 passed",
+      "golden_regeneration": "the_comparison_report_is_recorded failed once on the stale golden, as expected, and comparison-report.json was rewritten from its computed output; the rerun passed",
+      "clippy_core": "cargo clippy -p lattice-core --all-targets --locked -- -D warnings: exit 0",
+      "clippy_tests": "cargo clippy -p lattice --no-deps --locked on the four test targets -- -D warnings: exit 0 (without --no-deps the deliberately lint-violating dev-dependency lattice-repository-validation-fixture fails, as scripts/check.rs also excludes it)",
+      "fmt": "cargo fmt -p lattice -p lattice-core --check: exit 0 after cargo fmt",
+      "octet": "octet-precommit-check in the saved environment: exit 1 because every stable identity changed (root 1052 new and 1052 stale; lattice-core 25 new and 25 stale) under a different config and profile hash than the baseline, which is not attributable to this change; octet_semantic_delta.py against the committed baselines: root old=1052 current_unique=1052 new_semantic=0 resolved_semantic=0; lattice-core old=25 current_unique=25 new_semantic=0 resolved_semantic=0. No baseline was re-keyed. Rerun octet-precommit-check in nix develop at integration.",
+      "cairn": "cairn validate: exit 0, valid, 62 specs, 0 issues; proposal, design and tasks gates: PASS",
+      "gitleaks": "gitleaks dir on every changed path: no leaks found",
+      "cargo_lock": "Cargo.lock gains one line, sha2 in the lattice package's dependency list; sha2 0.10.9 was already locked"
+    }
   },
   "non_claims": [
     "No workflow-agent revision was prepared, qualified or run live; the plans and workers are fixtures.",

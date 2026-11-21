@@ -50,6 +50,10 @@ pub enum Change {
     RuntimeProfile,
     /// The worker's profile revision.
     WorkerRevision,
+    /// The recorded worker bundle identity; set with every worker change.
+    WorkerBundle,
+    /// The worker's definition name.
+    WorkerName,
     Executable,
     Tools,
     ModelRoute,
@@ -137,9 +141,13 @@ fn plan_changes(active: &super::Plan, proposed: &super::Plan) -> Vec<(bool, Chan
 
 fn worker_changes(active: &Bundle, proposed: &Bundle) -> Vec<(bool, Change)> {
     let protocol = |bundle: &Bundle| (bundle.adapter.clone(), bundle.protocol_revision.clone());
-    let worker = |bundle: &Bundle| bundle.workflow.as_ref().map(|binding| binding.worker.revision.clone());
+    let worker = |bundle: &Bundle| bundle.workflow.as_ref().map(|binding| binding.worker.clone());
+    let (before, after) = (worker(active), worker(proposed));
+    let differs = |pick: fn(&super::Worker) -> &str| before.as_ref().map(pick) != after.as_ref().map(pick);
     vec![
-        (worker(active) != worker(proposed), Change::WorkerRevision),
+        (differs(|worker| &worker.revision), Change::WorkerRevision),
+        (differs(|worker| &worker.bundle_identity), Change::WorkerBundle),
+        (differs(|worker| &worker.definition_name), Change::WorkerName),
         (active.executable_identity != proposed.executable_identity, Change::Executable),
         (active.tools != proposed.tools, Change::Tools),
         (active.routes != proposed.routes, Change::ModelRoute),

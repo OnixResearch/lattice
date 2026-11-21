@@ -37,6 +37,10 @@
     "config_digest": [
       "config_digest_mismatch"
     ],
+    "content_only_change": [
+      "changed_file",
+      "reported_digest_mismatch"
+    ],
     "dot_component": [
       "unsafe_path"
     ],
@@ -74,11 +78,18 @@
     "hard_link": [
       "hard_link"
     ],
+    "incomplete_bundled_skill": [
+      "missing_file"
+    ],
     "layer_digest": [
       "layer_digest_mismatch"
     ],
     "layer_media_type": [
       "layer_media_type_mismatch"
+    ],
+    "layer_size_mismatch": [
+      "expansion_ratio_exceeded",
+      "layer_size_mismatch"
     ],
     "manifest_digest": [
       "manifest_digest_mismatch"
@@ -109,9 +120,9 @@
     "plugin": {
       "findings": [],
       "lifecycle": {
-        "bundle_identity": "blake3:bb3356a35b38aab4ca11bc21342183393ea890a673c206899b4c9e019e5763bd",
+        "bundle_identity": "blake3:915219202b6ef645e664f2b37220d3e87e038a3e3d0c245fccfa9d20e4174887",
         "definition": "blake3:bbe083a376aa514909d313bfb0c0278f0c1a65d3a25639e2263bab7317ee5dc1",
-        "revision": "fcbd229bbc84a7f81873ce3de335fa638e99d1fe8e4694fea9792ed473b7094a"
+        "revision": "2dd4af5a0194b7af54ad2155174794908971debcc2e97846985f874b6ebb955d"
       },
       "mapping": {
         "dependency_closure": {
@@ -119,24 +130,29 @@
             "bundled_skills": [
               {
                 "id": "case-triage",
-                "skill_md": "blake3:e745476aafc72a42586dbcbb55b1a083b4fbb91f5964d3ff5631f6226f3a76aa"
+                "tree": {
+                  "files": 3,
+                  "identity": "blake3:371332aefe8c808ea0a4dde13e9478d685dda64a0ff8718a1615b4638d788e4c"
+                }
               },
               {
                 "id": "customer-summary",
-                "skill_md": "blake3:8a70117e63a8e641e16e47b057f7fe71740d4996114865fbc9db4503e84a1bf0"
+                "tree": {
+                  "files": 1,
+                  "identity": "blake3:ed0a6ee147087effc26e656c7288d7fee4ae80b9ef1294348e0e931b0ef42da1"
+                }
               }
             ],
             "external": []
           },
           "composition_by_reference": "unsupported",
-          "identity": "blake3:ff9dd531f44a5d070ce14b53f7d095cf88534ca8a9c4dc58f55cbdd0e51764ab"
+          "identity": "blake3:909b59c4a502470c12e8666764842f31c18d12170fae2572c66a1461c25b0be4"
         },
-        "evidence_subject": "blake3:fcbd229bbc84a7f81873ce3de335fa638e99d1fe8e4694fea9792ed473b7094a",
+        "evidence_subject": "blake3:2dd4af5a0194b7af54ad2155174794908971debcc2e97846985f874b6ebb955d",
         "excluded_from_identity": [
           "registry",
           "repository",
-          "tag",
-          "org.opencontainers.image.version"
+          "tag"
         ],
         "file_identities": [
           {
@@ -155,22 +171,34 @@
             "path": "skills/case-triage/SKILL.md"
           },
           {
+            "blake3": "blake3:675e5725a7308191557706b02a0b1e8056ae729332c04ac72e8ddfa79d254706",
+            "executable": false,
+            "path": "skills/case-triage/references/policy.md"
+          },
+          {
+            "blake3": "blake3:81ce90e1c3ab9132685e97c6a6e89c1971170461aeb88665281b9f0613a5a766",
+            "executable": false,
+            "path": "skills/case-triage/scripts/analyze.py"
+          },
+          {
             "blake3": "blake3:8a70117e63a8e641e16e47b057f7fe71740d4996114865fbc9db4503e84a1bf0",
             "executable": false,
             "path": "skills/customer-summary/SKILL.md"
           }
         ],
-        "inventory_identity": "blake3:b7654d8e39d59808fb035afff9da5ce4208948802e6752a27637095d1fe2dd0a",
-        "materialized_identity": "blake3:74529d75db896a09c2c127f657adde1b0944fd57b9c54eabc01807d3ce99e014",
+        "inventory_identity": "blake3:8e74e23ab18b2279fe54f63434d5d71a00a58897cda4c1fbb15e062c73582938",
+        "materialized_identity": "blake3:4940b13e7489ca3d2c7751519c6bea980ba36d6cc9bb58f71362ba0943e2327a",
         "provider_native": {
           "algorithm": "sha256",
           "config_digest": "sha256:0001fd34fd1f1ced2fe5ead7c62cd8305c5459d7573e400085be6902e31a4c6a",
-          "file_digests": 4,
+          "file_digests": 6,
           "layer_bytes": 640,
           "layer_digest": "sha256:543b0326265b2554e1e9e5c6be63aab43663b6ac1c3eb35b2817adae18ff3529",
           "manifest_digest": "sha256:ba189f3269e406aa69242635af6055b988067689fec2329911f0528c0a7099f3"
         },
-        "source_revision": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d"
+        "skill_tree": null,
+        "source_revision": "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0d",
+        "version_annotation": "not a direct identity input; it is part of the manifest bytes, so changing it changes the manifest digest, the evidence subject and the lifecycle revision"
       }
     },
     "skill": {
@@ -193,8 +221,7 @@
         "excluded_from_identity": [
           "registry",
           "repository",
-          "tag",
-          "org.opencontainers.image.version"
+          "tag"
         ],
         "file_identities": [
           {
@@ -223,7 +250,12 @@
           "layer_digest": "sha256:cf60a2eac81585bd6ddcae6bf856c4be993e514e46c922fa48e45297e869ce07",
           "manifest_digest": "sha256:952a2129f192925a5b5c741837895767f2bcc06a56dd2d4247a3cad648b52a21"
         },
-        "source_revision": "4b1d0c2e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c"
+        "skill_tree": {
+          "files": 3,
+          "identity": "blake3:371332aefe8c808ea0a4dde13e9478d685dda64a0ff8718a1615b4638d788e4c"
+        },
+        "source_revision": "4b1d0c2e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c",
+        "version_annotation": "not a direct identity input; it is part of the manifest bytes, so changing it changes the manifest digest, the evidence subject and the lifecycle revision"
       }
     }
   },

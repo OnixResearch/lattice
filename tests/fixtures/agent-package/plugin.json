@@ -59,6 +59,15 @@
         "digest": "sha256:f5cb7e484111c9feb098f38d08e469c866a51fdf436d018120f2a034a897c347"
       },
       {
+        "path": "payload/skills/case-triage/references/policy.md",
+        "digest": "sha256:16ab2ccfb4b5a7d0e7db3e8bfa5d769807ae95616c2853271be2aedcbbb11ba3"
+      },
+      {
+        "path": "payload/skills/case-triage/scripts/analyze.py",
+        "digest": "sha256:2630b3e6646cf6d7fbaba9e032db715b195899975227517f998b32235dca1f4c",
+        "executable": false
+      },
+      {
         "path": "payload/skills/customer-summary/SKILL.md",
         "digest": "sha256:2794f8f2a2a24e74943a46fb7b25babfee72909cd94623d42113c5dccd9e1088"
       }
@@ -72,7 +81,7 @@
     "config_digest": "sha256:0001fd34fd1f1ced2fe5ead7c62cd8305c5459d7573e400085be6902e31a4c6a",
     "layer_digest": "sha256:543b0326265b2554e1e9e5c6be63aab43663b6ac1c3eb35b2817adae18ff3529",
     "layer_bytes": 640,
-    "expanded_bytes": 326,
+    "expanded_bytes": 398,
     "entries": [
       { "path": "payload", "kind": "directory" },
       { "path": "payload/mcp.json", "kind": "regular", "executable": false, "sha256": "sha256:e93fc8db2b1bd77107fe6c758bca9545fa864cf7cce8ab93a7b2b93a1d566a7b", "content": "{\"mcpServers\":{}}\n" },
@@ -80,6 +89,10 @@
       { "path": "payload/skills", "kind": "directory" },
       { "path": "payload/skills/case-triage", "kind": "directory" },
       { "path": "payload/skills/case-triage/SKILL.md", "kind": "regular", "executable": false, "sha256": "sha256:f5cb7e484111c9feb098f38d08e469c866a51fdf436d018120f2a034a897c347", "content": "---\nname: case-triage\ndescription: Triage support cases using the reviewed procedure.\n---\n\n# Case triage\n\nRead references/policy.md before answering.\n" },
+      { "path": "payload/skills/case-triage/references", "kind": "directory" },
+      { "path": "payload/skills/case-triage/references/policy.md", "kind": "regular", "executable": false, "sha256": "sha256:16ab2ccfb4b5a7d0e7db3e8bfa5d769807ae95616c2853271be2aedcbbb11ba3", "content": "# Policy\n\nEscalate unknown cases.\n" },
+      { "path": "payload/skills/case-triage/scripts", "kind": "directory" },
+      { "path": "payload/skills/case-triage/scripts/analyze.py", "kind": "regular", "executable": false, "sha256": "sha256:2630b3e6646cf6d7fbaba9e032db715b195899975227517f998b32235dca1f4c", "content": "print('fixture only; never executed')\n" },
       { "path": "payload/skills/customer-summary", "kind": "directory" },
       { "path": "payload/skills/customer-summary/SKILL.md", "kind": "regular", "executable": false, "sha256": "sha256:2794f8f2a2a24e74943a46fb7b25babfee72909cd94623d42113c5dccd9e1088", "content": "---\nname: customer-summary\ndescription: Summarize a customer case.\n---\n\n# Customer summary\n" }
     ]

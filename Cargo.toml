@@ -145,6 +145,8 @@ trybuild = "1.0.116"
 nix = { version = "0.31", default-features = false, features = ["user"] }
 rustls = { version = "=0.23.42", default-features = false, features = ["ring", "std", "tls12"] }
 crunch-wasm-component-core = { path = "vendor-cargo-deps/mantle/crates/crunch-wasm-component-core" }
+# Recomputes per-file SHA-256 in the agent-package comparison harness; already in the lockfile.
+sha2 = "0.10.9"
 
 [features]
 default = []

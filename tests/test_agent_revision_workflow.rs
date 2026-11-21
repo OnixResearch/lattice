@@ -405,7 +405,20 @@ fn a_proposal_is_refused_or_unchanged_outside_one_definition() {
     let adaptation::Proposal::Adaptation { changes, .. } = adaptation::propose(&r1, &r3).expect("proposes") else {
         panic!("expected an adaptation");
     };
-    assert_eq!(changes, [adaptation::Change::WorkerRevision]);
+    assert_eq!(changes, [adaptation::Change::WorkerRevision, adaptation::Change::WorkerBundle]);
+    let mut renamed = worker('1');
+    renamed.definition_name = "renamed-implementer".into();
+    let renamed = compose(plan("v1"), &renamed);
+    assert_eq!(renamed.definition, r1.definition, "the worker definition is unchanged");
+    assert_ne!(renamed.revision, r1.revision);
+    let adaptation::Proposal::Adaptation { changes, .. } = adaptation::propose(&r1, &renamed).expect("proposes") else {
+        panic!("expected an adaptation");
+    };
+    assert_eq!(
+        changes,
+        [adaptation::Change::WorkerBundle, adaptation::Change::WorkerName],
+        "a worker name change is classified, never malformed"
+    );
     let decided = serde_json::json!({ "decision": "applicable", "owners": ["kiln#83"] });
     assert!(serde_json::from_value::<adaptation::Applicability>(decided).is_err(), "Lattice records no decision");
 }

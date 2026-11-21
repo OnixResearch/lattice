@@ -24,7 +24,7 @@ r[lattice.agent_revisions.workflow.scenario.evaluation]
 - THEN promotion MUST be refused as `qualification_mismatch`, `not_qualified` / `subject_mismatch` and `not_qualified` / `subject_mismatch`, and MUST succeed only with an attachment for R2
 
 ### Requirement: A proposed adaptation is a new identity with an unknown applicability
-r[lattice.agent_revisions.workflow.adaptation] `workflow::adaptation::propose` MUST compare an active and a proposed workflow-agent bundle of one definition and return `lattice.workflow-agent-proposal.v1` with both revisions, the sorted changes and an applicability slot whose decision is `unknown`, owned by `cairn#14` and `kiln#83`. The applicability type MUST admit no other decision. An identical bundle MUST be `unchanged`, another definition `definition_mismatch`, and a plain agent bundle `malformed`. The proposal MUST NOT change any lifecycle.
+r[lattice.agent_revisions.workflow.adaptation] `workflow::adaptation::propose` MUST compare an active and a proposed workflow-agent bundle of one definition and return `lattice.workflow-agent-proposal.v1` with both revisions, the sorted changes and an applicability slot whose decision is `unknown`, owned by `cairn#14` and `kiln#83`. Every difference that changes the revision MUST be classified, including a change to the recorded worker bundle identity (`worker_bundle`) or the worker's definition name alone (`worker_name`); a valid adaptation MUST NOT be refused as `malformed`. The applicability type MUST admit no other decision. An identical bundle MUST be `unchanged`, another definition `definition_mismatch`, and a plain agent bundle `malformed`. The proposal MUST NOT change any lifecycle.
 
 #### Scenario: An adaptation never mutates an active pin
 r[lattice.agent_revisions.workflow.adaptation.scenario.pinned]
@@ -67,17 +67,17 @@ r[lattice.agent_revisions.workflow.attempt.scenario.absent]
 - THEN the absent field MUST NOT be serialized and the request MUST round-trip byte for byte with the worker's subject, and the named pair MUST keep the profile revision and envelope identity, change the request bytes, select the pair and refuse unknown fields inside it
 
 ### Requirement: A draft-schema OCI package comparison
-r[lattice.agent_revisions.package_comparison] The comparison of the agent-package draft at `NVIDIA/agent-package-spec` `697872570744c8cfc1cf6b1d72e04db66e1a2c83` MUST be an inert fixture comparison labelled `draft_schema_fixture_comparison_not_materialization`: it MUST NOT read an archive, contact a registry, install or activate anything. Provider-native `sha256:` digests MUST stay separate from the BLAKE3 identities, and registry, repository, tag and version annotation MUST NOT enter any identity. `docs/agent-package-comparison.md` MUST record the decision.
+r[lattice.agent_revisions.package_comparison] The comparison of the agent-package draft at `NVIDIA/agent-package-spec` `697872570744c8cfc1cf6b1d72e04db66e1a2c83` MUST be an inert fixture comparison labelled `draft_schema_fixture_comparison_not_materialization`: it MUST NOT read an archive, contact a registry, install or activate anything. Provider-native `sha256:` digests MUST stay separate from the BLAKE3 identities. Each regular file's SHA-256 MUST be recomputed from its supplied bytes and compared with the inventory, and a reported digest that disagrees with the bytes MUST be a finding. The expansion ratio MUST be accepted only when the observed layer size equals the manifest descriptor's; a mismatch MUST be a finding and the ratio MUST then be taken over the smaller size. Registry, repository and tag MUST NOT enter any identity; the version annotation MUST NOT be a direct identity input, and the comparison MUST state that changing it changes the manifest digest and therefore the evidence subject and lifecycle revision. `docs/agent-package-comparison.md` MUST record the decision.
 
 #### Scenario: Reviewed fixtures map onto identities
 r[lattice.agent_revisions.package_comparison.scenario.mapping]
 - GIVEN a reviewed skill and a plugin with bundled skills whose supplied facts agree
 - WHEN they are compared and mapped
-- THEN each MUST report no finding and map its source revision, provider-native digests, inventory, materialized, dependency-closure and evidence-subject identities onto a valid lifecycle bundle, the bundled skill MUST carry the reviewed skill's bytes, and the plugin's evidence subject MUST differ from the skill's
+- THEN each MUST report no finding and map its source revision, provider-native digests, inventory, materialized, dependency-closure and evidence-subject identities onto a valid lifecycle bundle, the bundled `case-triage` skill MUST carry the reviewed skill's whole file tree (`SKILL.md`, `references/policy.md`, `scripts/analyze.py`) with an equal tree identity, a bundle missing `references/policy.md` MUST report `missing_file` and a different tree, and the plugin's evidence subject MUST differ from the skill's
 
 #### Scenario: Every mismatch is reported at the comparison level
 r[lattice.agent_revisions.package_comparison.scenario.mismatch]
-- GIVEN 31 negative cases for missing, extra, changed and duplicate files, case-folding collisions, unsafe paths, symlinks, hard links and special files, decompression bounds, and manifest and inventory mismatches
+- GIVEN 34 negative cases for missing, extra, changed and duplicate files, a content-only change under an unchanged reported digest, an incomplete bundled skill, case-folding collisions, unsafe paths, symlinks, hard links and special files, decompression bounds including a layer size that differs from its descriptor, and manifest and inventory mismatches
 - WHEN each is compared
 - THEN each MUST report exactly its expected findings
 

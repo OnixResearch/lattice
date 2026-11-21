@@ -180,6 +180,8 @@ enum Finding {
     ManifestDigestMismatch,
     ConfigDigestMismatch,
     LayerDigestMismatch,
+    /// The observed layer size differs from the manifest descriptor's.
+    LayerSizeMismatch,
     UnsafePath,
     DuplicateInventoryPath,
     DuplicateEntry,
@@ -190,6 +192,8 @@ enum Finding {
     MissingFile,
     ExtraFile,
     ChangedFile,
+    /// The reported SHA-256 differs from the digest of the supplied bytes.
+    ReportedDigestMismatch,
     ExecutableMismatch,
     EntryCountExceeded,
     ExpandedBytesExceeded,
@@ -239,6 +243,9 @@ enum Mutation {
         to: String,
     },
     SetExpandedBytes {
+        bytes: u64,
+    },
+    SetObservedLayerBytes {
         bytes: u64,
     },
     AddDirectories {
@@ -293,6 +300,27 @@ fn is_sha256(value: &str) -> bool {
     value
         .strip_prefix("sha256:")
         .is_some_and(|hex| hex.len() == 64 && hex.bytes().all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f')))
+}
+
+/// The `sha256:` digest of supplied bytes, as the draft spells it.
+fn sha256(content: &str) -> String {
+    use sha2::Digest as _;
+    format!("sha256:{:x}", sha2::Sha256::digest(content.as_bytes()))
+}
+
+/// One skill's file tree under `prefix`: payload-relative paths with the
+/// BLAKE3 of their bytes and their executable bit.
+fn skill_tree(files: &BTreeSet<(String, String, bool)>, prefix: &str) -> serde_json::Value {
+    let members = files
+        .iter()
+        .filter_map(|(path, digest, executable)| {
+            Some(serde_json::json!([path.strip_prefix(prefix)?, digest, executable]))
+        })
+        .collect::<Vec<_>>();
+    serde_json::json!({
+        "files": members.len(),
+        "identity": blake3_identity("lattice-agent-package-skill-tree-v1", &serde_json::json!(members)),
+    })
 }
 
 /// The draft's path rules: relative, under `payload/`, `/`-separated, no
@@ -383,19 +411,27 @@ fn entry_findings(fixture: &Fixture, findings: &mut BTreeSet<Finding>) {
             findings.insert(Finding::PathCollision);
         }
         match entry.kind {
-            Kind::Regular => match inventory.get(entry.path.as_str()) {
-                None => {
-                    findings.insert(Finding::ExtraFile);
+            Kind::Regular => {
+                // The bytes decide: a reported digest is checked against them,
+                // never trusted in their place. Missing bytes cannot match.
+                let computed = entry.content.as_deref().map(sha256);
+                if computed.is_none() || entry.sha256 != computed {
+                    findings.insert(Finding::ReportedDigestMismatch);
                 }
-                Some(file) => {
-                    if entry.sha256.as_deref() != Some(file.digest.as_str()) {
-                        findings.insert(Finding::ChangedFile);
+                match inventory.get(entry.path.as_str()) {
+                    None => {
+                        findings.insert(Finding::ExtraFile);
                     }
-                    if entry.executable != file.executable {
-                        findings.insert(Finding::ExecutableMismatch);
+                    Some(file) => {
+                        if computed.as_deref() != Some(file.digest.as_str()) {
+                            findings.insert(Finding::ChangedFile);
+                        }
+                        if entry.executable != file.executable {
+                            findings.insert(Finding::ExecutableMismatch);
+                        }
                     }
                 }
-            },
+            }
             Kind::Directory => {}
             Kind::Symlink => {
                 findings.insert(Finding::Symlink);
@@ -420,7 +456,8 @@ fn entry_findings(fixture: &Fixture, findings: &mut BTreeSet<Finding>) {
     }
 }
 
-fn bound_findings(observation: &Observation, bounds: Bounds, findings: &mut BTreeSet<Finding>) {
+fn bound_findings(fixture: &Fixture, bounds: Bounds, findings: &mut BTreeSet<Finding>) {
+    let observation = &fixture.observation;
     let entries = u64::try_from(observation.entries.len()).expect("entry count fits");
     if entries > bounds.max_entries {
         findings.insert(Finding::EntryCountExceeded);
@@ -428,7 +465,15 @@ fn bound_findings(observation: &Observation, bounds: Bounds, findings: &mut BTre
     if observation.expanded_bytes > bounds.max_expanded_bytes {
         findings.insert(Finding::ExpandedBytesExceeded);
     }
-    let ratio_bound = observation.layer_bytes.checked_mul(bounds.max_expansion_ratio);
+    // The ratio is accepted only over a compressed size both sides agree on;
+    // on disagreement the smaller size bounds the expansion.
+    let declared_bytes = fixture.manifest.layers.first().map(|layer| layer.size);
+    if declared_bytes != Some(observation.layer_bytes) {
+        findings.insert(Finding::LayerSizeMismatch);
+    }
+    let compressed_bytes =
+        declared_bytes.map_or(observation.layer_bytes, |declared| declared.min(observation.layer_bytes));
+    let ratio_bound = compressed_bytes.checked_mul(bounds.max_expansion_ratio);
     if ratio_bound.is_none_or(|bound| observation.expanded_bytes > bound) {
         findings.insert(Finding::ExpansionRatioExceeded);
     }
@@ -442,7 +487,7 @@ fn compare(fixture: &Fixture, bounds: Bounds) -> BTreeSet<Finding> {
     envelope_findings(fixture, &mut findings);
     inventory_findings(&fixture.config, &mut findings);
     entry_findings(fixture, &mut findings);
-    bound_findings(&fixture.observation, bounds, &mut findings);
+    bound_findings(fixture, bounds, &mut findings);
     findings
 }
 
@@ -478,6 +523,7 @@ fn apply(fixture: &mut Fixture, mutation: &Mutation) {
             file.path.clone_from(to);
         }
         Mutation::SetExpandedBytes { bytes } => observation.expanded_bytes = *bytes,
+        Mutation::SetObservedLayerBytes { bytes } => observation.layer_bytes = *bytes,
         Mutation::AddDirectories { count } => {
             for index in 0..*count {
                 observation.entries.push(Entry {
@@ -544,9 +590,9 @@ fn mapping(fixture: &Fixture) -> serde_json::Value {
     let materialized_identity = blake3_identity("lattice-agent-package-materialized-v1", &serde_json::json!(files));
     let bundled = files
         .iter()
-        .filter_map(|(path, digest, _)| {
+        .filter_map(|(path, _, _)| {
             let id = path.strip_prefix("skills/")?.strip_suffix("/SKILL.md")?;
-            Some(serde_json::json!({ "id": id, "skill_md": digest }))
+            Some(serde_json::json!({ "id": id, "tree": skill_tree(&files, &format!("skills/{id}/")) }))
         })
         .collect::<Vec<_>>();
     let closure = serde_json::json!({ "external": [], "bundled_skills": bundled });
@@ -571,13 +617,15 @@ fn mapping(fixture: &Fixture) -> serde_json::Value {
             "layer_bytes": fixture.manifest.layers[0].size,
             "file_digests": fixture.config.files.len(),
         },
-        "excluded_from_identity": ["registry", "repository", "tag", "org.opencontainers.image.version"],
+        "excluded_from_identity": ["registry", "repository", "tag"],
+        "version_annotation": "not a direct identity input; it is part of the manifest bytes, so changing it changes the manifest digest, the evidence subject and the lifecycle revision",
         "inventory_identity": inventory_identity,
         "materialized_identity": materialized_identity,
         "file_identities": files.iter().map(|(path, digest, executable)| serde_json::json!({
             "path": path, "blake3": digest, "executable": executable,
         })).collect::<Vec<_>>(),
         "dependency_closure": { "identity": closure_identity, "closure": closure, "composition_by_reference": "unsupported" },
+        "skill_tree": if fixture.config.payload.kind == "agent-skill" { skill_tree(&files, "") } else { serde_json::Value::Null },
         "evidence_subject": evidence_subject,
     })
 }
@@ -625,18 +673,24 @@ fn reviewed_skill_and_plugin_fixtures_agree_and_map_onto_identities() {
         let bundle = lifecycle_bundle(&fixture);
         assert!(lattice_core::agent_revision::facts::identity(&bundle).is_ok(), "{name}: a lifecycle bundle");
     }
-    let plugin = mapping(&load("plugin.json"));
+    let plugin_fixture = load("plugin.json");
+    let plugin = mapping(&plugin_fixture);
     let bundled = &plugin["dependency_closure"]["closure"]["bundled_skills"];
     assert_eq!(bundled.as_array().map(Vec::len), Some(2));
     let skill = mapping(&load("skill.json"));
-    let skill_md = skill["file_identities"]
-        .as_array()
-        .expect("files")
-        .iter()
-        .find(|file| file["path"] == "SKILL.md")
-        .expect("SKILL.md")["blake3"]
-        .clone();
-    assert_eq!(bundled[0]["skill_md"], skill_md, "the bundled skill carries the reviewed bytes");
+    assert_eq!(skill["skill_tree"]["files"], 3, "SKILL.md, references/policy.md and scripts/analyze.py");
+    assert_eq!(bundled[0]["id"], "case-triage");
+    assert_eq!(bundled[0]["tree"], skill["skill_tree"], "the bundled skill carries the reviewed skill's whole tree");
+    let mut incomplete = plugin_fixture.clone();
+    apply(&mut incomplete, &Mutation::RemoveEntry {
+        path: "payload/skills/case-triage/references/policy.md".into(),
+    });
+    assert!(compare(&incomplete, bounds()).contains(&Finding::MissingFile));
+    let partial = mapping(&incomplete);
+    assert_ne!(
+        partial["dependency_closure"]["closure"]["bundled_skills"][0]["tree"], skill["skill_tree"],
+        "a bundled skill missing a referenced file is not the reviewed skill"
+    );
     assert_ne!(plugin["evidence_subject"], skill["evidence_subject"], "the skill's approval is not the plugin's");
 }
 
@@ -659,7 +713,7 @@ fn every_negative_case_reports_exactly_its_findings() {
         let expected = case.expected.iter().cloned().collect::<BTreeSet<_>>();
         assert_eq!(case_findings(case, cases.bounds), expected, "{}", case.name);
     }
-    assert_eq!(cases.cases.len(), 31);
+    assert_eq!(cases.cases.len(), 34);
 }
 
 fn republished(base: &Fixture) -> Fixture {
@@ -774,6 +828,18 @@ fn payload_change_relocation_revocation_and_rollback_use_the_existing_lifecycle(
         tag: "reviewed".into(),
     };
     assert_eq!(lifecycle_bundle(&relocated), r1, "relocation by the same digest keeps the revision");
+    let mut relabelled = reviewed.clone();
+    relabelled.manifest.annotations.insert("org.opencontainers.image.version".into(), "1.2.4".into());
+    assert_eq!(lifecycle_bundle(&relabelled), r1, "the version annotation is not a direct identity input");
+    let republished_manifest = "sha256:6628a483486226e5eefc4dec56db352291d24dfcaf11573a842b6e502ac84e95";
+    relabelled.resolved_manifest_digest = republished_manifest.into();
+    relabelled.observation.manifest_digest = republished_manifest.into();
+    assert_eq!(compare(&relabelled, bounds()), BTreeSet::new());
+    assert_ne!(
+        lifecycle_bundle(&relabelled).revision,
+        r1.revision,
+        "the manifest digest it changes is an identity input"
+    );
 
     let start = admitted(&promoted(&prepared(&Lifecycle::new(&r1.definition), &r1), &r1), "session-a", &r1);
     let (same, outcome) = ok(prepare::desire(&start, &lifecycle_bundle(&relocated)));

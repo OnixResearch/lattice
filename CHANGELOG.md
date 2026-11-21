@@ -83,11 +83,16 @@ interfaces.
   the workflow-agent lifecycle. See `docs/agent-revisions.md`.
 - An inert draft-schema comparison of the NVIDIA agent-package proposal
   (`697872570744c8cfc1cf6b1d72e04db66e1a2c83`) with Lattice bundle
-  identities: a reviewed skill, a plugin with bundled skills, 31 negative
-  cases and the payload-change, relocation, revocation and rollback cases
-  through the existing lifecycle. Decision: useful mapping, adoption
-  deferred. No archive, registry, installer or activation controller is
-  involved. See `docs/agent-package-comparison.md`.
+  identities: a reviewed skill, a plugin that bundles that skill's whole file
+  tree, 34 negative cases and the payload-change, relocation, revocation and
+  rollback cases through the existing lifecycle. The harness recomputes each
+  file's SHA-256 from the supplied bytes and checks the observed layer size
+  against its descriptor before bounding the expansion ratio. The version
+  annotation is not a direct identity input, but changing it changes the
+  manifest digest and so the evidence subject and revision. Decision: useful
+  mapping, adoption deferred. No archive, registry, installer or activation
+  controller is involved; the test-only dev-dependency `sha2` is added. See
+  `docs/agent-package-comparison.md`.
 - Qualification attachments for agent revisions (Animus #18, Lattice #25).
   `lattice agent-revision promote` and `rollback` accept a repeatable
   `--qualification-attachment PATH`. Each file must be a regular,

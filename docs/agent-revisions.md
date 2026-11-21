@@ -487,8 +487,11 @@ adaptation of one definition as `lattice.workflow-agent-proposal.v1`:
 
 Changes are `compiler`, `plan`, `graph`, `selection`, `requirements`,
 `prompt`, `context`, `policy`, `runtime_profile`, `worker_revision`,
-`executable`, `tools`, `model_route`, `compute`, `task_families` and
-`protocol`. Cairn #14 and Kiln #83 own the applicability decision; the type
+`worker_bundle` (the recorded worker bundle identity, set with every worker
+change), `worker_name` (the worker's definition name), `executable`,
+`tools`, `model_route`, `compute`, `task_families` and `protocol`. Every
+difference that changes the revision is classified. Cairn #14 and Kiln #83
+own the applicability decision; the type
 admits only `unknown`, and decoding any other decision fails. An identical
 bundle is `unchanged`, another definition `definition_mismatch`. A proposal
 changes no lifecycle; it reaches new sessions only through desire,

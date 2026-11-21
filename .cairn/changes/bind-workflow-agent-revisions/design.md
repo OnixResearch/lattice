@@ -24,7 +24,7 @@ The qualification query names the bundle's own definition and revision. An attac
 
 ## Decision 3: adaptations are data with an unknown applicability
 
-`propose` compares two bundles of one definition and reports the new revision with its changes (compiler, plan, graph, selection, requirements, prompt, context, policy, runtime profile, worker revision, executable, tools, model route, compute, task families, protocol). The applicability decision belongs to Cairn #14 and Kiln #83; the type admits only `unknown`, so a decoded decision is refused. The proposal changes no lifecycle; it reaches new sessions only through desire, preparation, qualification and promotion.
+`propose` compares two bundles of one definition and reports the new revision with its changes (compiler, plan, graph, selection, requirements, prompt, context, policy, runtime profile, worker revision, worker bundle, worker name, executable, tools, model route, compute, task families, protocol). `worker_bundle` is set whenever the recorded worker bundle identity changes, so every difference that changes the revision is classified and a valid adaptation is never `malformed`; `worker_name` names a worker definition-name change that keeps the worker definition and revision. The applicability decision belongs to Cairn #14 and Kiln #83; the type admits only `unknown`, so a decoded decision is refused. The proposal changes no lifecycle; it reaches new sessions only through desire, preparation, qualification and promotion.
 
 ## Decision 4: identities only in the Kiln projection
 
