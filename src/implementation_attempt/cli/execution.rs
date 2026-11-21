@@ -58,7 +58,7 @@ pub(super) fn recover_existing(
     let guard = super::session::fencing::Guard::acquire(state, &request.envelope.work_id)?;
     let pending = super::session::revision::reservation::reconcile(revisions, directory, &request.envelope)?;
     if pending == super::session::revision::reservation::Reconciled::OtherWork {
-        return Err(super::refusal::refuse_fence(&request.envelope, super::refusal::Reason::CrossedAttempt, false));
+        return Err(super::refusal::refuse_crossed(&request.envelope, directory)?);
     }
     guard.check_crossed(&request.envelope, directory).map_err(|error| error.report(&request.envelope))?;
     let reconciled = super::recovery::reconcile_intent(&guard, state, request, directory, identity);

@@ -207,48 +207,23 @@ fn a_substituted_request_reports_that_the_retained_intent_may_have_executed() {
     }
 }
 
-#[test]
-fn another_works_marker_or_intent_at_the_same_attempt_fence_is_crossed_and_not_dispatched() {
-    let fixture = Fixture::new();
-    let mut request = request("attempt-shared");
+/// `request(attempt_id)` presented by work B.
+fn of_work_b(attempt_id: &str) -> Request {
+    let mut request = request(attempt_id);
     request.envelope.work_id = "work-b".into();
     request.admitted_envelope = request.envelope.identity();
-    let work_a = blake3::hash(b"work-a").to_hex().to_string();
-    let marker = |_: &str| format!("closed-before-execution:{}:{work_a}", "1".repeat(64));
-    let path = fixture.retained("marker.json", &request, marker);
-    for command in ["run", "recover"] {
-        let (is_success, record) = fixture.refusal(command, &path);
-        assert!(!is_success, "{command} exits non-zero");
-        assert_eq!(record["reason"], "crossed_attempt", "{command}: work A's closure marker");
-        assert_eq!(record["dispatched"], false, "{command}: this request can never create its intent there");
-    }
-
-    // Work A records the attempt at this fence and holds its intent.
-    let other = Fixture::new();
-    let fence = other.state.join("works").join(work_a.as_str());
-    std::fs::DirBuilder::new().recursive(true).mode(0o700).create(&fence).expect("work A fence records");
-    std::fs::write(fence.join(format!("{:020}", request.envelope.fence)), "attempt-shared").expect("work A record");
-    let path = other.retained("intent.json", &request, |_| "2".repeat(64));
-    let (is_success, record) = other.refusal("run", &path);
-    assert!(!is_success);
-    assert_eq!(record["reason"], "crossed_attempt", "work A's intent");
-    assert_eq!(record["dispatched"], false);
+    request
 }
 
-// r[verify lattice.implementation_attempt.consumer.scenario.reservation]
-#[test]
-fn another_works_pending_admission_is_crossed_not_dispatched_and_left_untouched() {
-    let fixture = Fixture::new();
-    let mut request = request("attempt-pending");
-    request.envelope.work_id = "work-b".into();
-    request.admitted_envelope = request.envelope.identity();
-    let bytes = serde_json::to_vec(&request).expect("request bytes");
-    let path = fixture.root.join("pending.json");
-    std::fs::write(&path, &bytes).expect("request");
-    let key = fixture.state.join(format!("{}-{}", request.envelope.attempt_id, request.envelope.fence));
-    let directory = fixture.state.join(blake3::hash(key.as_os_str().as_encoded_bytes()).to_hex().as_str());
-    std::fs::DirBuilder::new().mode(0o700).create(&directory).expect("attempt directory");
-    // Work A pinned its session at this attempt id and fence, then was lost.
+/// The attempt directory of `request` in `state`.
+fn attempt_directory(state: &std::path::Path, request: &Request) -> std::path::PathBuf {
+    let key = state.join(format!("{}-{}", request.envelope.attempt_id, request.envelope.fence));
+    state.join(blake3::hash(key.as_os_str().as_encoded_bytes()).to_hex().as_str())
+}
+
+/// Write work A's pending admission, pinned and lost before its intent, into
+/// `directory`; returns its bytes.
+fn work_a_pending(directory: &std::path::Path) -> Vec<u8> {
     let pending = serde_json::json!({
         "schema": "lattice.implementation-attempt-pending-admission.v1",
         "work": blake3::hash(b"work-a").to_hex().as_str(),
@@ -259,11 +234,75 @@ fn another_works_pending_admission_is_crossed_not_dispatched_and_left_untouched(
     });
     let record = serde_json::to_vec(&pending).expect("record bytes");
     std::fs::write(directory.join("admission-pending.json"), &record).expect("work A's record");
+    record
+}
+
+#[test]
+fn another_works_marker_is_crossed_not_dispatched_and_its_intent_crossed_dispatched() {
+    let fixture = Fixture::new();
+    let request = of_work_b("attempt-shared");
+    let work_a = blake3::hash(b"work-a").to_hex().to_string();
+    let marker = |_: &str| format!("closed-before-execution:{}:{work_a}", "1".repeat(64));
+    let path = fixture.retained("marker.json", &request, marker);
+    for command in ["run", "recover"] {
+        let (is_success, record) = fixture.refusal(command, &path);
+        assert!(!is_success, "{command} exits non-zero");
+        assert_eq!(record["reason"], "crossed_attempt", "{command}: work A's closure marker");
+        assert_eq!(record["dispatched"], false, "{command}: no execution intent exists there");
+    }
+
+    // Work A records the attempt at this fence and holds its intent, which may have run.
+    let other = Fixture::new();
+    let fence = other.state.join("works").join(work_a.as_str());
+    std::fs::DirBuilder::new().recursive(true).mode(0o700).create(&fence).expect("work A fence records");
+    std::fs::write(fence.join(format!("{:020}", request.envelope.fence)), "attempt-shared").expect("work A record");
+    let path = other.retained("intent.json", &request, |_| "2".repeat(64));
+    for command in ["run", "recover"] {
+        let (is_success, record) = other.refusal(command, &path);
+        assert!(!is_success);
+        assert_eq!(record["reason"], "crossed_attempt", "{command}: work A's intent");
+        assert_eq!(record["dispatched"], true, "{command}: work A's execution intent may have run");
+    }
+    let intent = std::fs::read(attempt_directory(&other.state, &request).join("intent.json")).expect("intent");
+    assert_eq!(intent, "2".repeat(64).into_bytes(), "work A's intent is untouched");
+}
+
+// r[verify lattice.implementation_attempt.consumer.scenario.reservation]
+#[test]
+fn another_works_pending_admission_is_crossed_not_dispatched_and_left_untouched() {
+    let fixture = Fixture::new();
+    let request = of_work_b("attempt-pending");
+    let path = fixture.root.join("pending.json");
+    std::fs::write(&path, serde_json::to_vec(&request).expect("request bytes")).expect("request");
+    let directory = attempt_directory(&fixture.state, &request);
+    std::fs::DirBuilder::new().mode(0o700).create(&directory).expect("attempt directory");
+    let record = work_a_pending(&directory);
     let (is_success, refusal) = fixture.refusal("recover", &path);
     assert!(!is_success);
     assert_eq!(refusal["reason"], "crossed_attempt", "work A's pending admission");
-    assert_eq!(refusal["dispatched"], false);
+    assert_eq!(refusal["dispatched"], false, "no execution intent exists there");
     let retained = std::fs::read(directory.join("admission-pending.json")).expect("record");
     assert_eq!(retained, record, "work A's record is untouched, even without a revision store");
     assert!(!directory.join("intent.json").exists(), "no closure marker");
+}
+
+// r[verify lattice.implementation_attempt.consumer.scenario.reservation]
+#[test]
+fn work_bs_intent_beside_work_as_pending_admission_is_crossed_and_dispatched() {
+    // B passed its pending-record check before A wrote its record, then wrote
+    // its execution intent: B's worker may be running.
+    let fixture = Fixture::new();
+    let request = of_work_b("attempt-interleaved");
+    let path = fixture.retained("interleaved.json", &request, str::to_owned);
+    let directory = attempt_directory(&fixture.state, &request);
+    let intent = std::fs::read(directory.join("intent.json")).expect("B's intent");
+    let record = work_a_pending(&directory);
+    for command in ["run", "recover"] {
+        let (is_success, refusal) = fixture.refusal(command, &path);
+        assert!(!is_success, "{command} exits non-zero");
+        assert_eq!(refusal["reason"], "crossed_attempt", "{command}: work A's pending admission");
+        assert_eq!(refusal["dispatched"], true, "{command}: B's retained intent may have executed");
+    }
+    assert_eq!(std::fs::read(directory.join("admission-pending.json")).expect("record"), record, "A's record");
+    assert_eq!(std::fs::read(directory.join("intent.json")).expect("intent"), intent, "no marker replaced it");
 }

@@ -375,9 +375,11 @@ coordinator fields, neither of which is part of the profile revision:
 Attempt ids must be unique across the work items of one state root: the
 attempt directory is keyed by attempt id and fence only. Kiln's attempt id is
 the BLAKE3 of the work's canonical key, ordinal and fence, so its ids never
-collide. A request that finds another work's closure marker or intent in its
-attempt directory is refused as `crossed_attempt` with `dispatched:false`: it
-can never create its intent at that path.
+collide. A request that finds another work's closure marker, intent or
+pending admission in its attempt directory is refused as `crossed_attempt`: it
+can never create its intent at that path. Its `dispatched` is `true` exactly
+when that directory holds an execution intent of any request, which may have
+run, and `false` for a closure marker or no intent.
 
 Before the binding and intent, a run records its attempt at
 `works/<blake3(work_id)>/<fence>`. A request whose fence is lower than one
@@ -463,7 +465,8 @@ another revision untouched, and only then removes the record. The record is
 removed without closing only when its own request's execution intent exists,
 which then owns the pin; a closure marker or another request's intent does
 not. A request of another work leaves the record untouched and is refused as
-`crossed_attempt` with `dispatched:false`, creating no intent, marker or pin. Recovery then
+`crossed_attempt`, creating no intent, marker or pin, with `dispatched` read
+from the attempt directory as above. Recovery then
 closes the attempt as before; a run proceeds or refuses as before. A record of
 this work without its `--revision-store` is an error.
 
@@ -478,7 +481,7 @@ remains the fence authority across them.
 | `reason` | `dispatched` | When |
 |---|---|---|
 | `stale_fence` | `true` when the refused attempt's directory holds an execution intent; otherwise `false`, after a first run writes its closure marker; read under the fence lock | A higher fence of the work is already recorded |
-| `crossed_attempt` | Same as `stale_fence`; `false` when the attempt directory holds another work's closure marker, or the intent of another work that records this attempt at this fence while this work does not | Another attempt is recorded at this work and fence, or the attempt id and fence belong to another work in this state root |
+| `crossed_attempt` | Same as `stale_fence`: `true` exactly when the shared attempt directory holds an execution intent of any request, including another work's; `false` for another work's closure marker or for another work's pending admission without an intent; nothing is written | Another attempt is recorded at this work and fence, or the attempt id and fence belong to another work in this state root |
 | `substituted_request` | `true` | The attempt directory holds the intent of other request bytes not shown to be another work's, which may have executed; this request dispatched nothing and admitted nothing |
 | `attempt_closed` | `false` | A refusal or recovery of other request bytes of this work closed this attempt-fence before any execution; no intent can be created for it |
 | `profile_revision_superseded` | `true` when the attempt directory holds an intent other than a closure marker; otherwise `false`, after the closure marker is written | The envelope's revision is not the current framing; the attempt is never executed or recovered |

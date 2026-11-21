@@ -85,11 +85,10 @@ impl super::Context {
     }
 
     /// The refusal of a request whose attempt directory holds another work's
-    /// pending admission: no intent, marker or pin is written, and no step of
-    /// this request can have started there.
+    /// pending admission: no intent, marker or pin is written, and
+    /// `dispatched` is whether that directory holds an execution intent.
     fn crossed(&self) -> String {
-        let reason = super::super::refusal::Reason::CrossedAttempt;
-        super::super::refusal::refuse_fence(&self.request.envelope, reason, false)
+        super::super::refusal::refuse_crossed(&self.request.envelope, &self.directory).unwrap_or_else(|error| error)
     }
 
     /// Settle, under `_guard`, a refusal decided before this request's own

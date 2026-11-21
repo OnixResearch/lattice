@@ -166,6 +166,18 @@ pub(super) fn refuse_fence(
     reason.message().to_owned()
 }
 
+/// Print a `crossed_attempt` refusal under the caller's fence lock, with
+/// `dispatched` read from the shared attempt directory: `true` exactly when it
+/// holds an execution intent of any request, which may have run, and `false`
+/// for a closure marker or no intent. Nothing is written.
+pub(super) fn refuse_crossed(
+    envelope: &crate::implementation_attempt::ImplementationAttemptEnvelope,
+    directory: &std::path::Path,
+) -> Result<String, String> {
+    let is_dispatched = super::session::intent::is_execution_retained(directory)?;
+    Ok(refuse_fence(envelope, Reason::CrossedAttempt, is_dispatched))
+}
+
 /// Print a refusal after this request's intent exists with the agent
 /// revision lifecycle's own refusal and return its diagnostic.
 // r[impl lattice.agent_revisions.seam.scenario.attempt]

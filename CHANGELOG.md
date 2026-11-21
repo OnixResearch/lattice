@@ -401,8 +401,10 @@ interfaces.
   `attempt_closed` (`dispatched:false`), and `inspect` reports a closed
   attempt as `instance: null`. Closure markers now name their work
   (`closed-before-execution:<request identity>:<blake3(work_id)>`; markers
-  without it stay readable), and another work's marker or intent at the same
-  attempt id and fence is `crossed_attempt` (`dispatched:false`): attempt ids
+  without it stay readable), and another work's marker, intent or pending
+  admission at the same attempt id and fence is `crossed_attempt`, with
+  `dispatched:true` exactly when the attempt directory holds an execution
+  intent of any request: attempt ids
   must be unique across the work items of one state root. Before it pins, an
   admission with a revision store writes `admission-pending.json` naming its
   work, request and the subject it is about to pin. A run, recovery or
@@ -411,7 +413,7 @@ interfaces.
   under the work's lock before anything else, and only then removes the
   record, so a process lost between pin and intent no longer leaves a live
   pin. A request of another work leaves the record untouched and is
-  `crossed_attempt` (`dispatched:false`).
+  `crossed_attempt`, creating no intent, marker or pin.
 
 - Bounded local processes whose cancellation flag is already set return the
   existing `Cancelled` outcome without spawning. The pinned bounded-exec runner

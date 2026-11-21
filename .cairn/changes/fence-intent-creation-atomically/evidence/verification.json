@@ -149,6 +149,36 @@
       {"command": "gitleaks dir --no-banner --redact over every changed and new path", "exit": 0, "result": "23 paths, no leaks found"}
     ]
   },
+  "final_review_3": {
+    "trigger": "verification review of b129d7a2 (P1): work B passed its pending-record check and paused at its compute port, work A of the same attempt id and fence wrote its pending record, B resumed and wrote its execution intent; a duplicate run of B then found A's record and printed crossed_attempt with a hard-coded dispatched:false beside B's possibly running worker. refuse_retained hard-coded false for another work's execution intent too.",
+    "base_revision": "b129d7a2",
+    "recorded_on": "2026-11-21",
+    "rule": "Every cross-work crossed_attempt (recovery's Reconciled::OtherWork, admission::Context::crossed at the start of admit_first and under settle, recovery::refuse_retained) prints through refusal::refuse_crossed, which reads session::intent::is_execution_retained under the lock the caller holds: dispatched is true exactly when the shared attempt directory holds an execution intent of any request, false for a closure marker or no intent. Nothing is written; another work's pending record and pin are untouched.",
+    "tasks": {
+      "6.1": [
+        "tests/test_implementation_attempt_refusals.rs::work_bs_intent_beside_work_as_pending_admission_is_crossed_and_dispatched",
+        "tests/test_implementation_attempt_refusals.rs::another_works_pending_admission_is_crossed_not_dispatched_and_left_untouched",
+        "tests/test_implementation_attempt_refusals.rs::another_works_marker_is_crossed_not_dispatched_and_its_intent_crossed_dispatched",
+        "src/implementation_attempt/cli/tests/workflow_agent.rs::work_bs_intent_beside_work_as_pending_admission_leaves_both_untouched"
+      ],
+      "6.2": [
+        "docs/candidate-worker.md (coordinator transport, write-ahead record, refusal table)",
+        "CHANGELOG.md (Fixed)",
+        "specs/implementation-attempt/spec.md (closure and reservation scenarios)"
+      ]
+    },
+    "gates": [
+      {"command": "cargo test -p lattice --lib -- implementation_attempt", "exit": 0, "result": "123 passed, 0 failed, 402 filtered out"},
+      {"command": "cargo test -p lattice --test test_agent_revision_shell --test test_agent_revision_workflow --test test_implementation_attempt_refusals", "exit": 0, "result": "9 + 11 + 6 passed"},
+      {"command": "cargo clippy -p lattice --all-targets --no-deps -- -D warnings", "exit": 0},
+      {"command": "cargo fmt -p lattice --check", "exit": 0},
+      {"command": "octet-precommit-check", "exit": 0, "result": "root warning-only 1052 accepted, 1052 current, 0 new, 0 stale; lattice-core 25/25, 0 new, 0 stale; baselines unchanged"},
+      {"command": "octet_semantic_delta.py against b129d7a2 baselines", "exit": 0, "result": "root new_semantic=0 resolved_semantic=0; lattice-core new_semantic=0 resolved_semantic=0"},
+      {"command": "cairn validate --root . --policy cairn-policy/generated/cairn-policy.json", "exit": 0, "result": "valid, 0 issues"},
+      {"command": "cairn gate proposal|design|tasks fence-intent-creation-atomically", "exit": 0, "result": "PASS"},
+      {"command": "gitleaks dir --no-banner --redact over every changed path", "exit": 0, "result": "12 paths, no leaks found"}
+    ]
+  },
   "not_run": [
     "scripts/check.rs and nix flake check (parent runs them at integration)"
   ]

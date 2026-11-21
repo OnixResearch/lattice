@@ -817,6 +817,38 @@ async fn another_works_pending_admission_is_left_untouched_and_crossed() {
 
 #[tokio::test]
 // r[verify lattice.implementation_attempt.consumer.scenario.reservation]
+async fn work_bs_intent_beside_work_as_pending_admission_leaves_both_untouched() {
+    let fixture = Fixture::new();
+    let worker = fixture.request("attempt-pending-interleaved", 7);
+    let (definition, revision) = desired(&fixture, &worker);
+    fixture.promoted(&definition, &revision);
+    let record = super::super::session::revision::reservation::FILE;
+    let intent_file = super::super::session::intent::FILE;
+
+    // B passed its pending-record check, A pinned and wrote its record, then
+    // B wrote its execution intent (unmanaged here) and may be running.
+    let first = named(worker, &definition, &revision);
+    let (first_path, _) = fixture.write("work-a.json", &first);
+    let second = of_work(first.clone(), "work-b");
+    let (second_path, second_identity) = fixture.write("work-b.json", &second);
+    fixture.lost_after_pin(&first_path).expect("A pins");
+    let directory = fixture.directory(&first);
+    std::fs::write(directory.join(intent_file), &second_identity).expect("B's intent");
+    let recorded = std::fs::read(directory.join(record)).expect("A's record");
+    let session = super::super::session::revision::identifier(&first);
+
+    let crossed = Err(Reason::CrossedAttempt.message().to_owned());
+    assert_eq!(fixture.attempt("run", &second_path, true).await, crossed, "a duplicate run of B");
+    assert_eq!(fixture.attempt("recover", &second_path, true).await, crossed, "B's recovery");
+    assert!(super::super::session::intent::is_execution_retained(&directory).expect("read"), "dispatched");
+    assert_eq!(std::fs::read(directory.join(intent_file)).expect("intent"), second_identity.as_bytes(), "no marker");
+    assert_eq!(std::fs::read(directory.join(record)).expect("record"), recorded, "A's record is untouched");
+    let live = fixture.lifecycle(&definition).sessions.get(&session).cloned().expect("A's pin");
+    assert_eq!(live.status, lattice_core::agent_revision::state::SessionStatus::Live);
+}
+
+#[tokio::test]
+// r[verify lattice.implementation_attempt.consumer.scenario.reservation]
 // r[verify lattice.implementation_attempt.consumer.scenario.closure]
 async fn a_superseded_closure_closes_a_pin_left_without_its_intent_first() {
     let fixture = Fixture::new();

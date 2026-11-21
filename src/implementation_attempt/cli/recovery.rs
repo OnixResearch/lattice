@@ -146,8 +146,8 @@ fn closed_work(bytes: &[u8]) -> Option<&[u8]> {
 /// The refusal of a request whose attempt directory holds another request's
 /// intent or closure marker, decided under its work's lock. Attempt ids must
 /// be unique across the work items of one state root; one that is not finds
-/// another work's marker or intent there, which is `crossed_attempt` with
-/// `dispatched:false`: this request can never create its intent at that path.
+/// another work's marker or intent there, which is `crossed_attempt`, with
+/// `dispatched:true` exactly for an execution intent (`refuse_crossed`).
 /// Another marker of this work, or one that names no work, is
 /// `attempt_closed`; another intent of this work is `substituted_request`.
 pub(super) fn refuse_retained(
@@ -170,7 +170,7 @@ pub(super) fn refuse_retained(
         super::refusal::Reason::SubstitutedRequest
     };
     Ok(match reason {
-        super::refusal::Reason::CrossedAttempt => super::refusal::refuse_fence(envelope, reason, false),
+        super::refusal::Reason::CrossedAttempt => super::refusal::refuse_crossed(envelope, directory)?,
         _ => super::refusal::refuse(envelope, reason),
     })
 }

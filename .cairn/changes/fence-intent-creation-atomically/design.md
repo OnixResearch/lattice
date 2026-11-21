@@ -59,6 +59,14 @@ Baseline: Lattice `647bc59d` (published `db64cd65` plus the bounded same-attempt
 
 **Rationale:** The lock is per work, so ownership must be read from the record itself: a reader of another work cannot know whether the writer is alive. Reconciling inside the one closure function covers every refusal path at once, including ones added later.
 
+### Decision: Cross-work refusals read `dispatched` from the shared directory (verification review of `b129d7a2`)
+
+**Context:** Two works with one attempt id and fence hold different per-work locks but share an attempt directory. Work B can pass its pending-record check, pause at its compute port while work A writes its record, then write its execution intent; a duplicate run of B then found A's record and printed `crossed_attempt` with a hard-coded `dispatched:false` beside B's possibly running worker, which Kiln could settle as never executed. `refuse_retained` likewise printed `false` for another work's execution intent.
+
+**Choice:** `refusal::refuse_crossed` prints every cross-work `crossed_attempt` with `dispatched` read by `session::intent::is_execution_retained` under the lock the caller holds, the rule every other fence refusal follows. It writes nothing; another work's record and pin stay untouched.
+
+**Rationale:** `dispatched` is a fact about the attempt directory, not about the refused request, so a reader of another work must read it like a reader of the same work. A closure marker or an empty directory still reads `false`.
+
 ## Tests
 
 - `cli/session/fencing/tests.rs`: a fence-7 run that passed its check is refused `stale_fence` (`dispatched:false`) by `create_intent` after fence 8 is recorded, and no intent exists. A fence-7 invocation after a fence-7 intent exists gets `stale_fence` with `dispatched:true`. A fence-7 invocation with no intent gets `dispatched:false`, after which neither `create_intent` nor `admit` can create the fence-7 intent. A closure marker reads as not dispatched. Crossed refusals compute `dispatched`. The lock excludes other handles until the guard drops. A child process holds the lock, and it is released when the child exits.
