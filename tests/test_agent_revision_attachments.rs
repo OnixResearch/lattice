@@ -419,6 +419,7 @@ fn a_qualified_attachment_promotes_through_the_cli_and_revocation_blocks_new_ses
     let store = Store::new(&prepared.store).expect("store");
     let admitted = seam::admit(&store, &prepared.base, "session-a").expect("seam");
     assert!(matches!(admitted, seam::Decision::Admitted { .. }), "{admitted:?}");
+    let admission = admitted.admission().expect("an admitted session records its admission mode");
     drop(store);
     let revoke = lattice::agent_revision::RevokeArgs {
         store: prepared.store.clone(),
@@ -432,7 +433,7 @@ fn a_qualified_attachment_promotes_through_the_cli_and_revocation_blocks_new_ses
     assert_eq!(seam::admit(&store, &prepared.base, "session-b").expect("seam"), seam::Decision::Refused {
         refusal: Refusal::QualificationRevoked
     });
-    assert_eq!(seam::effect(&store, &prepared.base, "session-a").expect("seam"), seam::Effect::Blocked {
+    assert_eq!(seam::effect(&store, &prepared.base, "session-a", admission).expect("seam"), seam::Effect::Blocked {
         refusal: Refusal::QualificationRevoked
     });
 }

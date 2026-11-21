@@ -888,7 +888,8 @@ fn receipts_slide_so_selection_never_exhausts_and_forgotten_requests_stay_refuse
             &reference(qualification),
             lifecycle.rollout_generation,
         );
-        lifecycle = ok(select::select(&lifecycle, &rollback, &qualified(&reference(qualification)))).0;
+        let answer = verdict::Verdict::Qualified(attachment_for(&revision(target), &reference(qualification)));
+        lifecycle = ok(select::select(&lifecycle, &rollback, &answer)).0;
     }
     assert_eq!(lifecycle.rollout_generation, u64::from(lifetime) + 2);
     assert_eq!(lifecycle.selected.as_ref().map(|selected| selected.revision.clone()), Some(revision('2')));
