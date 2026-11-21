@@ -4,7 +4,7 @@
   "kind": "local-verification",
   "live_qualification": false,
   "base_revision": "647bc59d1640a09eccec1e29327c0214758f6065",
-  "integration_head": null,
+  "integration_head": "0085b5b55ba6106f6154e71617ccd8888807333b",
   "recorded_on": "2026-11-21",
   "lock": {
     "mechanism": "std::fs::File::lock (flock(2), exclusive, blocking, no timeout) on the directory works/<blake3(work_id)> inside the state root",
@@ -179,7 +179,9 @@
       {"command": "gitleaks dir --no-banner --redact over every changed path", "exit": 0, "result": "12 paths, no leaks found"}
     ]
   },
-  "not_run": [
-    "scripts/check.rs and nix flake check (parent runs them at integration)"
-  ]
+  "integration_gates": {
+    "head": "0085b5b55ba6106f6154e71617ccd8888807333b",
+    "scripts_check": "scripts/check.rs (RUSTC_WRAPPER empty, TMPDIR on /var/tmp): exit 0, all 40 steps; the two 'test result: FAILED' lines are the intentional invalid-phase child of tests/test_orchestration_shell.rs",
+    "nix_flake_check": "nix flake check git+file://<clone>?rev=0085b5b55ba6106f6154e71617ccd8888807333b -L --keep-going --builders '' --option secret-key-files '' --option min-free 0: exit 0; lattice-nextest 1788 passed, 63 skipped; checks.octet warning-only (root 1052/1052 and lattice-core 25/25, 0 new, 0 stale)"
+  }
 }

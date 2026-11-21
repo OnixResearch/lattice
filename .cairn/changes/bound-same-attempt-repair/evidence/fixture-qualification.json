@@ -6,7 +6,7 @@
   "live_worker_exercised": false,
   "evidence_label": "fixture",
   "base_revision": "db64cd654e52cf6579643e6e96ad92bda2b3d61a",
-  "integration_head": null,
+  "integration_head": "0085b5b55ba6106f6154e71617ccd8888807333b",
   "producer": {
     "repository": "kiln",
     "issue": "OnixResearch/kiln#61",
@@ -54,14 +54,13 @@
     "fixture_ports": "fixture WorkerPort, CheckPort and clock; no OMP process, sandbox, model endpoint, check executor or Kiln ledger"
   },
   "checks": {
-    "implementation_attempt_lib": "cargo test --locked -p lattice --lib -- implementation_attempt (RUSTC_WRAPPER empty): exit 0, 86 passed, 0 failed",
+    "implementation_attempt_lib": "cargo test --locked -p lattice --lib -- implementation_attempt (RUSTC_WRAPPER empty) on the integration head's tree: exit 0, 123 passed, 0 failed (86 at 647bc59d before the review fixes)",
     "fmt": "cargo fmt -p lattice --check: exit 0",
-    "scripts_check": "PENDING",
-    "cairn": "PENDING",
-    "octet": "octet-precommit-check: exit 0; root warning-only, 1052 accepted, 1052 current, 0 new, 0 stale; lattice-core warning-only, 25 accepted, 25 current, 0 new, 0 stale. The baseline re-key replaced only b3:b166871c68ee32c8 with b3:0b746056461b81e1 (underscore_in_module_filename on src/implementation_attempt.rs, whose content gained the two module declarations), through scripts/octet-baseline-migrate.rs in identity-only mode against a reference run at db64cd65 (old=1052 candidate=1052 unmatched 0/0)",
+    "octet": "octet-precommit-check on the integration head's tree: exit 0; root warning-only, 1052 accepted, 1052 current, 0 new, 0 stale; lattice-core warning-only, 25 accepted, 25 current, 0 new, 0 stale. Cargo.toml and Cargo.lock equal db64cd65, so the configuration and profile hashes match the baselines. The only re-key in this change replaced b3:b166871c68ee32c8 with b3:0b746056461b81e1 (underscore_in_module_filename on src/implementation_attempt.rs) through scripts/octet-baseline-migrate.rs in identity-only mode against a reference run at db64cd65 (old=1052 candidate=1052 unmatched 0/0)",
     "octet_semantic_delta": "octet_semantic_delta.py against the db64cd65 root baseline: new_semantic=0 resolved_semantic=0",
-    "scripts_check": "scripts/check.rs (RUSTC_WRAPPER empty): incomplete, stopped by the worker for its request budget during step 37 of about 40 ('all features tests'); every step through 36 passed and 96 test binaries had reported ok with no real failure. The one FAILED line is the intentional invalid-phase child of tests/test_orchestration_shell.rs (restart_child_rejects_unknown_phase_before_creating_store passed, and restart_duplicate_trigger_reuses_original_admission_across_processes passed in its own run). Clippy and the later steps did not run",
-    "cairn": "cairn validate and the proposal, design and tasks gates of bound-same-attempt-repair: see the worker report"
+    "scripts_check": "scripts/check.rs (RUSTC_WRAPPER empty, TMPDIR on /var/tmp) on 0085b5b55ba6106f6154e71617ccd8888807333b: exit 0, all 40 steps (2316 s). The two 'test result: FAILED' lines are the intentional invalid-phase child of tests/test_orchestration_shell.rs; restart_child_rejects_unknown_phase_before_creating_store passed after each",
+    "nix_flake_check": "nix flake check git+file://<clone>?rev=0085b5b55ba6106f6154e71617ccd8888807333b -L --keep-going --builders '' --option secret-key-files '' --option min-free 0: exit 0 (2685 s, 33 derivations built); lattice-nextest 1788 run, 1788 passed (2 slow), 63 skipped; checks.octet (octet-consumer-check) warning-only",
+    "cairn": "cairn validate: valid, 0 issues; proposal, design and tasks gates of bound-same-attempt-repair: PASS"
   },
   "non_claims": [
     "No OMP-backed WorkerPort exists; the standalone CLI refuses repair-policy requests and the pinned OMP route stays single-shot.",

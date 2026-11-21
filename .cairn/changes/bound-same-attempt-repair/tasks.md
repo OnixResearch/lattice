@@ -15,7 +15,7 @@
 
 ## Phase 4: Verification
 
-- [ ] [serial] 4.1 Run the focused tests, `cargo test -p lattice --lib -- implementation_attempt`, fmt, `scripts/check.rs`, `octet-precommit-check` and the Cairn validation and gates, and record the results in `evidence/fixture-qualification.json`. r[lattice.implementation_attempt.repair]
+- [x] [serial] 4.1 Run the focused tests, `cargo test -p lattice --lib -- implementation_attempt`, fmt, `scripts/check.rs`, `octet-precommit-check` and the Cairn validation and gates, and record the results in `evidence/fixture-qualification.json`. Evidence: `evidence/fixture-qualification.json` (`checks`, integration head `0085b5b5`). r[lattice.implementation_attempt.repair]
 
 ## Phase 5: Independent review findings at `647bc59d`
 

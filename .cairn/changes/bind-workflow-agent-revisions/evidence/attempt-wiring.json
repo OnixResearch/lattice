@@ -142,6 +142,7 @@
     "capture": "capture_managed_worker_inventory_v3 now pins managed-4's session through run's own admission lost before its intent (execution::admission::lost_after_pin) instead of attempt-bound admit-session. All eight captures stay lattice.worker-inventory.v3 and equal the cdb9c96c captures except observed_at_epoch_ms, incarnation and state_digest, which also differ between two runs of the same tree.",
     "gates": "the final_review_2 gates recorded in fence-intent-creation-atomically/evidence/verification.json, run on the same tree"
   },
+  "integration_gates": "scripts/check.rs (exit 0, all 40 steps) and nix flake check (exit 0; lattice-nextest 1788 passed, 63 skipped; checks.octet warning-only) on integration head 0085b5b55ba6106f6154e71617ccd8888807333b; recorded in fence-intent-creation-atomically/evidence/verification.json (integration_gates)",
   "non_claims": [
     "No workflow-agent revision was prepared, qualified or run live; the plans, attachments and workers are fixtures.",
     "The fixture worker is blocked at broker admission and never reaches a model.",
