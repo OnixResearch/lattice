@@ -9,6 +9,25 @@ interfaces.
 
 ### Added
 
+- Qualification attachments for agent revisions (Animus #18, Lattice #25).
+  `lattice agent-revision promote` and `rollback` accept a repeatable
+  `--qualification-attachment PATH`. Each file must be a regular,
+  non-symlinked file of at most 16 KiB. The attachment port answers through
+  the vendored `animus_runtime::qualification::qualify` for the exact
+  definition, bare revision, task family and required class. `Qualified`
+  keeps its reference, class, protocol, verifier, observation time and
+  `fixture`/`live` provenance label (recorded, never gating), and
+  each producer refusal maps to the same `not_qualified` reason. The named
+  `--qualification-ref` must equal the answer's reference. A qualified answer
+  now carries the subject it was produced for, taken from the decoded
+  attachment, and promotion and rollback refuse an answer for another
+  definition or revision (`subject_mismatch`) or task family
+  (`scope_mismatch`) even when it names the requested reference. Without
+  attachments the CLI still refuses as `qualification_unavailable` (owner
+  `animus#18`). The vendored Animus snapshot moves to
+  `8d6f67d38509899402df4d62e2d54321ff047f06`, adding only the qualification
+  module. A favorable attachment is evidence, not promotion authority, and
+  live efficacy is not claimed. See `docs/agent-revisions.md`.
 - Immutable agent revision lifecycle (#25, sections 1 to 5). `lattice
   agent-revision` resolves an inert bundle from an exported
   implementation-attempt request, records the desired revision, prepares it

@@ -48,14 +48,26 @@ fn bundle(revision: &str) -> lattice_core::agent_revision::facts::Bundle {
     }
 }
 
-fn attachment(qualification_ref: &str) -> verdict::Attachment {
+/// An answer for `revision` under the fixture definition and task family.
+fn attachment_for(revision: &str, qualification_ref: &str) -> verdict::Attachment {
     verdict::Attachment {
         qualification_ref: qualification_ref.into(),
+        subject: verdict::Subject {
+            definition_identity: definition(),
+            profile_revision: revision.into(),
+            task_family: FAMILY.into(),
+        },
         evidence_class: verdict::EvidenceClass::TaskFamilyEvaluation,
         protocol_identity: reference('a'),
         verifier_identity: reference('b'),
         observed_at_ms: 1_795_200_000_000,
+        provenance: verdict::Provenance::Fixture,
     }
+}
+
+/// An answer for R1.
+fn attachment(qualification_ref: &str) -> verdict::Attachment {
+    attachment_for(&revision('1'), qualification_ref)
 }
 
 fn qualified(qualification_ref: &str) -> verdict::Verdict {
@@ -107,7 +119,8 @@ fn promoted(lifecycle: &Lifecycle, request: &str, revision: &str, qualification:
     let qualification_ref = reference(qualification);
     let promotion =
         command(SelectionKind::Promotion, request, revision, &qualification_ref, lifecycle.rollout_generation);
-    ok(select::select(lifecycle, &promotion, &qualified(&qualification_ref))).0
+    let answer = verdict::Verdict::Qualified(attachment_for(revision, &qualification_ref));
+    ok(select::select(lifecycle, &promotion, &answer)).0
 }
 
 fn entry<'a>(session: &'a str, revision: &'a str) -> sessions::Entry<'a> {
@@ -221,7 +234,12 @@ fn duplicate_and_concurrent_promotion_select_once() {
     let (selected, outcome) = ok(select::select(&both, &first, &qualified(&reference('q'))));
     assert!(matches!(outcome, select::Selected::Applied { .. }));
     assert_eq!(
-        select::select(&selected, &rival, &qualified(&reference('t'))).unwrap_err(),
+        select::select(
+            &selected,
+            &rival,
+            &verdict::Verdict::Qualified(attachment_for(&revision('4'), &reference('t')))
+        )
+        .unwrap_err(),
         Refusal::GenerationConflict
     );
     let (unchanged, duplicate) = ok(select::select(&selected, &first, &verdict::Verdict::Unavailable {}));
@@ -619,7 +637,8 @@ fn fixture_identities() -> serde_json::Value {
     }))
     .0;
     let promote_r3 = command(SelectionKind::Promotion, "promote-r3", &revision('3'), &reference('s'), 1);
-    let (r3, promotion_r3) = ok(select::select(&r3_prepared, &promote_r3, &qualified(&reference('s'))));
+    let answer_r3 = verdict::Verdict::Qualified(attachment_for(&revision('3'), &reference('s')));
+    let (r3, promotion_r3) = ok(select::select(&r3_prepared, &promote_r3, &answer_r3));
     let (_, pin_c) = ok(sessions::admit(&r3, entry("session-c", &revision('3'))));
     let promotion = |outcome: &select::Selected| match outcome {
         select::Selected::Applied { promotion_identity, .. }

@@ -27,6 +27,7 @@
 )]
 mod core;
 mod data;
+pub mod qualification;
 
 pub use core::{
     blake3_eval_feedback_fingerprint, classify_eval_feedback_freshness, evaluate_feedback_review,

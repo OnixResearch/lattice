@@ -208,15 +208,91 @@ a ladder) and the shell's `now_ms` for the producer's freshness check.
 `NotQualified` reasons are `subject_mismatch`, `scope_mismatch`, `stale`,
 `unusable`, `insufficient_class`, `conflicting` and `malformed`.
 
+A `Qualified` attachment carries its `subject`: the definition identity, bare
+revision and task family it was produced for. The core does not trust the
+port to have answered the question it was asked. It refuses an answer whose
+subject names another definition or revision as `not_qualified` /
+`subject_mismatch`, and another task family as `not_qualified` /
+`scope_mismatch`, even when the answer names the requested reference. A
+subject that is not spelled canonically is `not_qualified` / `malformed`.
+
 The standalone CLI installs `UnavailablePreparation` and
 `UnavailableQualification`: preparation records `unknown`, and promotion and
-rollback of a prepared revision are refused as `qualification_unavailable`
-with owner `animus#18`. State checks come before evidence, so a revision whose
-preparation is still `unknown` is refused first as `preparation_uncertain`.
-An embedder passes its own ports to `agent_revision::run_command_with_ports`.
-`FixturePreparation` and `FixtureQualification` are deterministic test ports
-only; the fixture qualification port answers only the exact subject it was
-scripted for.
+rollback of a prepared revision without attachment files are refused as
+`qualification_unavailable` with owner `animus#18`. State checks come before
+evidence, so a revision whose preparation is still `unknown` is refused first
+as `preparation_uncertain`. An embedder passes its own ports to
+`agent_revision::run_command_with_ports`. `FixturePreparation` and
+`FixtureQualification` are deterministic test ports only; the fixture
+qualification port answers only the exact subject it was scripted for.
+
+### Qualification attachments
+
+`AttachmentQualification` answers the qualification port from operator-supplied
+[Animus #18 attachments](https://github.com/OnixResearch/animus/issues/18)
+(`animus.qualification-attachment.v1`). The validator is
+`animus_runtime::qualification::qualify` from the vendored Animus snapshot
+(revision `8d6f67d38509899402df4d62e2d54321ff047f06`, recorded in
+`vendor-cargo-deps/animus/source.ncl`). Lattice does not parse attachments
+itself.
+
+Operator procedure:
+
+1. Resolve the definition identity and bare revision with
+   `lattice agent-revision resolve --request REQUEST`, and have the producer
+   write an attachment for exactly that subject and the task family.
+2. Compute the attachment identity, `blake3:` plus the BLAKE3 hex of the
+   canonical bytes (without a trailing newline). This is the
+   `qualification_ref`.
+3. Promote or roll back with that reference and one or more
+   `--qualification-attachment PATH` arguments:
+
+```console
+lattice agent-revision promote --store DB --definition DEF --revision REV \
+  --qualification-ref blake3:... --task-family rust-implementation \
+  --required-class task_family_evaluation --expected-generation 0 \
+  --request-id promote-1 --qualification-attachment attachment.json
+```
+
+Each file must be a regular file, not a symlink, of at most 16,384 bytes. At
+most 16 files may be named. A missing, non-regular or oversized file fails the
+command before any query, and nothing is written. One trailing newline is
+dropped, so the producer's checked files are accepted as written. Any other
+byte difference from the canonical spelling is `malformed`.
+
+The port builds the producer's `ExpectedSubject` from the query: the
+definition identity as published, the bare profile revision, the task family,
+the promotion policy's required class and the shell clock's `now_ms`. It
+passes no required or current components. The answer maps as follows:
+
+| Animus answer | Lattice verdict | Command outcome |
+|---|---|---|
+| `Qualified` | `qualified` with `qualification_ref`, the subject and provenance label (`fixture` or `live`) Animus decoded from that attachment's bytes, class, protocol, verifier and `observed_at_ms` | Selected only when the named `--qualification-ref` equals the answer's reference (else `qualification_mismatch`) and the subject is the queried one. The provenance label is recorded with the admitted qualification and never gates promotion |
+| `NotQualified(subject_mismatch)` | `not_qualified` / `subject_mismatch` | Refused |
+| `NotQualified(scope_mismatch)` | `not_qualified` / `scope_mismatch` | Refused |
+| `NotQualified(insufficient_class)` | `not_qualified` / `insufficient_class` | Refused |
+| `NotQualified(unusable)` | `not_qualified` / `unusable` | Refused |
+| `NotQualified(stale)` | `not_qualified` / `stale` | Refused |
+| `NotQualified(conflicting)` | `not_qualified` / `conflicting` | Refused |
+| `NotQualified(malformed)` | `not_qualified` / `malformed` | Refused |
+| `Unavailable` (no attachment) | `unavailable` | `qualification_unavailable`, owner `animus#18` |
+
+With several files, the producer collapses exact duplicates, refuses distinct
+attachments that claim one source as `conflicting`, and otherwise qualifies
+the most recent valid attachment. Without valid attachments it reports the
+furthest-stage reason. Without any `--qualification-attachment`, the injected
+port answers, so the standalone CLI still reports `qualification_unavailable`.
+
+Non-claims:
+
+- The only exercised producer lane is fixture evidence: Animus's scripted
+  campaign-manager lane and attachments the Lattice tests encode with
+  `encode_attachment`. No live producer has qualified a Lattice revision.
+- A favorable attachment is evidence, not authority. Promotion and rollback
+  remain separate explicit operator commands, and revocation of the reference,
+  the revision or a session still applies afterwards.
+- A qualified answer does not claim live efficacy, deployment readiness or
+  correctness beyond the attachment's own scope and limitations.
 
 ## Persistence
 

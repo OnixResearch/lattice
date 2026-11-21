@@ -68,30 +68,62 @@ pub enum Verdict {
     Unavailable {},
 }
 
+/// The producer's provenance label for the evidence. Recorded with the
+/// admitted qualification; never a promotion condition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Provenance {
+    Fixture,
+    Live,
+}
+
+// r[impl lattice.agent_revisions.attachments.subject]
+/// The subject keys an attachment was produced for, as the producer decoded
+/// them, never copied from the question.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Subject {
+    /// `blake3:<hex>` definition identity.
+    pub definition_identity: String,
+    /// Bare 64 lowercase hex profile revision.
+    pub profile_revision: String,
+    pub task_family: String,
+}
+
 /// The facts a favorable answer carries.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Attachment {
     /// BLAKE3 over the canonical attachment bytes, spelled `blake3:<hex>`.
     pub qualification_ref: String,
+    /// The subject the attachment qualifies.
+    pub subject: Subject,
     pub evidence_class: EvidenceClass,
     pub protocol_identity: String,
     pub verifier_identity: String,
     /// Producer-stated epoch milliseconds; recorded verbatim, never compared
     /// with a clock here.
     pub observed_at_ms: u64,
+    /// `fixture` or `live`, as the producer labelled the evidence.
+    pub provenance: Provenance,
 }
 
 impl Attachment {
-    /// Canonical references.
+    /// Canonical references and subject spellings.
     #[must_use]
     pub fn is_canonical(&self) -> bool {
         let references = [
             &self.qualification_ref,
             &self.protocol_identity,
             &self.verifier_identity,
+            &self.subject.definition_identity,
         ];
-        references.iter().all(|value| super::is_reference(value))
+        let checks = [
+            references.iter().all(|value| super::is_reference(value)),
+            super::is_bare_digest(&self.subject.profile_revision),
+            crate::execution_binding::capability::is_name(&self.subject.task_family),
+        ];
+        checks.iter().all(|check| *check)
     }
 }
 

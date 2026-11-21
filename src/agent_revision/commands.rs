@@ -96,8 +96,8 @@ pub(super) fn execute(command: &super::Command, ports: super::Ports<'_>) -> Resu
             definition,
             revision,
         } => prepare(&open(store)?, Subject { definition, revision }, ports.preparation),
-        super::Command::Promote(args) => super::decisions::select(args, Kind::Promotion, ports.qualification),
-        super::Command::Rollback(args) => super::decisions::select(args, Kind::Rollback, ports.qualification),
+        super::Command::Promote(args) => select(args, Kind::Promotion, ports.qualification),
+        super::Command::Rollback(args) => select(args, Kind::Rollback, ports.qualification),
         super::Command::Revoke(args) => super::decisions::revoke(args),
         super::Command::AdmitSession {
             request,
@@ -110,6 +110,17 @@ pub(super) fn execute(command: &super::Command, ports: super::Ports<'_>) -> Resu
     debug_assert_eq!(document["schema"], OUTCOME_SCHEMA);
     debug_assert!(document.get("command").is_some());
     Ok(document)
+}
+
+/// Named attachment files answer through the attachment port; without them
+/// the injected qualification port answers.
+// r[impl lattice.agent_revisions.attachments.cli]
+fn select(args: &super::SelectArgs, kind: Kind, port: &mut dyn super::QualificationPort) -> Result<Value, String> {
+    if args.qualification_attachments.is_empty() {
+        return super::decisions::select(args, kind, port);
+    }
+    let mut attached = super::AttachmentQualification::load(&args.qualification_attachments)?;
+    super::decisions::select(args, kind, &mut attached)
 }
 
 fn resolve(request: &std::path::Path) -> Result<Value, String> {

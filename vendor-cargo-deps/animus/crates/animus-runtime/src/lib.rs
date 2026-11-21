@@ -128,6 +128,9 @@ pub mod dogfood_shell;
 #[path = "portfolio_search/mod.rs"]
 mod engine;
 mod eval_feedback;
+// r[impl agent_harness_runtime.qualification_attachment.boundary]
+/// Pure task-family qualification attachments over evaluation evidence.
+pub use eval_feedback::qualification;
 #[path = "toolexecutorkit.rs"]
 mod executionkit;
 mod exports;

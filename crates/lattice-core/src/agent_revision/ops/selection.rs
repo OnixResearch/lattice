@@ -150,12 +150,16 @@ fn eligible(lifecycle: &Lifecycle, command: &Command) -> Result<(), Refusal> {
     }
 }
 
+// r[impl lattice.agent_revisions.attachments.subject]
 /// Accept only a current, canonical answer of the required class that names
-/// the requested attachment.
+/// the requested attachment and was produced for this definition, revision
+/// and task family.
 fn accept(
     verdict: &crate::agent_revision::ports::Verdict,
     command: &Command,
+    definition: &str,
 ) -> Result<crate::agent_revision::ports::Attachment, Refusal> {
+    type Unqualified = crate::agent_revision::ports::Unqualified;
     let attachment = match verdict {
         crate::agent_revision::ports::Verdict::Unavailable {} => {
             return Err(Refusal::QualificationUnavailable {
@@ -169,7 +173,7 @@ fn accept(
     };
     if !attachment.is_canonical() {
         return Err(Refusal::NotQualified {
-            reason: crate::agent_revision::ports::Unqualified::Malformed,
+            reason: Unqualified::Malformed,
         });
     }
     if attachment.evidence_class != command.policy.required_class {
@@ -177,6 +181,17 @@ fn accept(
     }
     if attachment.qualification_ref != command.qualification_ref {
         return Err(Refusal::QualificationMismatch);
+    }
+    let subject = &attachment.subject;
+    if subject.definition_identity != definition || subject.profile_revision != command.revision {
+        return Err(Refusal::NotQualified {
+            reason: Unqualified::SubjectMismatch,
+        });
+    }
+    if subject.task_family != command.policy.task_family {
+        return Err(Refusal::NotQualified {
+            reason: Unqualified::ScopeMismatch,
+        });
     }
     debug_assert!(attachment.is_canonical());
     debug_assert_eq!(attachment.evidence_class, command.policy.required_class);
@@ -206,7 +221,7 @@ pub fn select(
         return Ok(super::unchanged(lifecycle, outcome));
     }
     eligible(lifecycle, command)?;
-    let attachment = accept(verdict, command)?;
+    let attachment = accept(verdict, command, &lifecycle.definition)?;
     if command.expected_rollout_generation != lifecycle.rollout_generation {
         return Err(Refusal::GenerationConflict);
     }

@@ -7,7 +7,7 @@ file with the repository and exact revision, while Rats and Animus record their
 revisions below.
 
 - `rats/source/` comes from Rats revision `ef26e13b2e9cbcb4a0c902f9caff641b6d013867`.
-- `animus/` comes from Animus revision `1c370d5029a2667051c46bdfa1919e78e65e2f4b`, as recorded in `animus/source.ncl`.
+- `animus/` comes from Animus revision `8d6f67d38509899402df4d62e2d54321ff047f06`, as recorded in `animus/source.ncl`.
 - `host-control/` comes from Host Control revision `7735faf3d8895b0bfa89f563184c4321b3b144a1`.
 - `basalt/` comes from Basalt revision `b34d6ac27ad396530fb799e79223acf71112ee0f`.
 - `hardened-wasmtime-runtime/` comes from shared runtime revision `1d642fa5cba7ce8a6d8f127f28ec6d8505842378`.

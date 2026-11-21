@@ -9,7 +9,9 @@
 //! attachments, owned by Animus #18). The standalone CLI installs
 //! [`UnavailablePreparation`] and [`UnavailableQualification`]: preparation
 //! then records `unknown`, and promotion and rollback are refused as
-//! `qualification_unavailable` with owner `animus#18`.
+//! `qualification_unavailable` with owner `animus#18`. Promotion and rollback
+//! that name `--qualification-attachment` files answer through
+//! [`AttachmentQualification`] instead.
 
 // r[impl lattice.agent_revisions.shell]
 // r[impl lattice.agent_revisions.ports]
@@ -51,6 +53,14 @@ pub struct UnavailablePreparation;
 /// No qualification producer is installed.
 #[derive(Debug, Clone, Copy)]
 pub struct UnavailableQualification;
+
+/// Operator-supplied Animus #18 qualification attachments, answered by
+/// `animus_runtime::qualification::qualify` for the exact queried subject.
+/// Without attachments the answer stays `unavailable`.
+#[derive(Debug, Default)]
+pub struct AttachmentQualification {
+    attachments: Vec<Vec<u8>>,
+}
 
 /// Scripted preparation and cleanup observations for deterministic tests.
 #[derive(Debug, Default)]
@@ -154,6 +164,10 @@ pub struct SelectArgs {
     pub expected_generation: u64,
     #[arg(long)]
     pub request_id: String,
+    /// An Animus #18 qualification attachment file; repeatable. Without one
+    /// the command's injected qualification port answers.
+    #[arg(long = "qualification-attachment")]
+    pub qualification_attachments: Vec<std::path::PathBuf>,
 }
 
 #[derive(clap::Args, Debug)]

@@ -9,9 +9,10 @@ use std::process::ExitCode;
 const EXPECTED_ARGUMENT_COUNT: usize = 3;
 const SOURCE_ARGUMENT_INDEX: usize = 1;
 const DESTINATION_ARGUMENT_INDEX: usize = 2;
-const EXPECTED_REVISION: &str = "1c370d5029a2667051c46bdfa1919e78e65e2f4b";
+// r[impl lattice.agent_revisions.attachments.vendor]
+const EXPECTED_REVISION: &str = "8d6f67d38509899402df4d62e2d54321ff047f06";
 // BLAKE3 of `git -c tar.umask=0000 archive --format=tar` at the exact revision.
-const SOURCE_ARCHIVE_BLAKE3: &str = "ff16f0903348db1d5164d055b928d2f1f829ca1dffb6f1624e6d26779b11f2ab";
+const SOURCE_ARCHIVE_BLAKE3: &str = "d0c2389c12cc273b6f4ebe11a15d3e18b69f9b169b4f80a41c412aaa5bac191e";
 const HOST_CONTROL_REVISION: &str = "7735faf3d8895b0bfa89f563184c4321b3b144a1";
 const GIT_PROGRAM: &str = "git";
 const FAILURE_EXIT_CODE: u8 = 1;

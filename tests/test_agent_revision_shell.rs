@@ -176,6 +176,7 @@ fn select_args(
         required_class: "task_family_evaluation".into(),
         expected_generation: expected,
         request_id: request_id.into(),
+        qualification_attachments: Vec::new(),
     }
 }
 
@@ -189,10 +190,16 @@ fn answer(definition: &str, revision: &str, qualification: char) -> (verdict::Qu
     };
     let attachment = verdict::Attachment {
         qualification_ref: reference(qualification),
+        subject: verdict::Subject {
+            definition_identity: definition.into(),
+            profile_revision: revision.into(),
+            task_family: FAMILY.into(),
+        },
         evidence_class: verdict::EvidenceClass::TaskFamilyEvaluation,
         protocol_identity: reference('a'),
         verifier_identity: reference('b'),
         observed_at_ms: 1_795_200_000_000,
+        provenance: verdict::Provenance::Fixture,
     };
     (query, verdict::Verdict::Qualified(attachment))
 }

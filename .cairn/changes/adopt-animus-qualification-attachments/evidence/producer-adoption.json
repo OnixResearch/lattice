@@ -1,0 +1,105 @@
+{
+  "kind": "producer-adoption-verification",
+  "change": "adopt-animus-qualification-attachments",
+  "observed_on": "2026-11-20",
+  "evidence_label": "fixture",
+  "live_qualification": false,
+  "candidate": {
+    "repository": "OnixResearch/lattice",
+    "base_revision": "f2d5d8bd",
+    "worktree": "uncommitted changes on a clone of the base revision"
+  },
+  "producer": {
+    "repository": "animus",
+    "issue": "https://github.com/OnixResearch/animus/issues/18",
+    "revision": "8d6f67d38509899402df4d62e2d54321ff047f06",
+    "published": false,
+    "source_archive_blake3": "d0c2389c12cc273b6f4ebe11a15d3e18b69f9b169b4f80a41c412aaa5bac191e",
+    "source_archive_command": "git -c tar.umask=0000 archive --format=tar 8d6f67d38509899402df4d62e2d54321ff047f06 | b3sum",
+    "method_check": "the same command reproduces the previous value ff16f0903348db1d5164d055b928d2f1f829ca1dffb6f1624e6d26779b11f2ab for 1c370d5029a2667051c46bdfa1919e78e65e2f4b",
+    "previous_revision": "1c370d5029a2667051c46bdfa1919e78e65e2f4b"
+  },
+  "sync": {
+    "command": "scripts/sync_animus.rs <animus clone> vendor-cargo-deps/animus",
+    "exit_code": 0,
+    "edited": [
+      "vendor-cargo-deps/animus/README.md",
+      "vendor-cargo-deps/animus/crates/animus-runtime/src/eval_feedback/mod.rs",
+      "vendor-cargo-deps/animus/crates/animus-runtime/src/lib.rs",
+      "vendor-cargo-deps/animus/source.ncl"
+    ],
+    "added": [
+      "vendor-cargo-deps/animus/crates/animus-runtime/src/eval_feedback/qualification/codec.rs",
+      "vendor-cargo-deps/animus/crates/animus-runtime/src/eval_feedback/qualification/consume.rs",
+      "vendor-cargo-deps/animus/crates/animus-runtime/src/eval_feedback/qualification/data.rs",
+      "vendor-cargo-deps/animus/crates/animus-runtime/src/eval_feedback/qualification/json.rs",
+      "vendor-cargo-deps/animus/crates/animus-runtime/src/eval_feedback/qualification/mod.rs",
+      "vendor-cargo-deps/animus/crates/animus-runtime/src/eval_feedback/qualification/rules.rs",
+      "vendor-cargo-deps/animus/crates/animus-runtime/src/eval_feedback/qualification/tests.rs"
+    ],
+    "drift": "none: the changed and added files equal `git diff --name-only 1c370d5 8d6f67d` restricted to the vendored selection, plus source.ncl; the Host Control snapshot is unchanged",
+    "metadata_outside_snapshot": "vendor-cargo-deps/README.md records the new revision",
+    "dependency": "animus-runtime stays default-features = false, features = [\"steel\"] and builds in every command below"
+  },
+  "environment": {
+    "shell": "nix develop (repository dev shell)",
+    "cargo": "cargo 1.99.0-nightly (59800466c 2026-07-07)",
+    "rustc": "rustc 1.99.0-nightly (3d50c25bc 2026-07-16)",
+    "cargo_target_dir": "/home/brittonr/.cargo-target/producer-work/adopt18-target",
+    "cargo_build_jobs": 6,
+    "cairn": "/nix/store/j5mbcqr4xwadmnbxdd0p6h9iic80kcil-cairn-0.1.0/bin/cairn"
+  },
+  "commands": [
+    {
+      "name": "agent revision integration suites",
+      "command": "cargo test --locked -p lattice --test test_agent_revision_core --test test_agent_revision_shell --test test_agent_revision_attachments",
+      "exit_code": 0,
+      "suites": [
+        {"target": "test_agent_revision_attachments", "passed": 16, "failed": 0},
+        {"target": "test_agent_revision_core", "passed": 13, "failed": 0},
+        {"target": "test_agent_revision_shell", "passed": 4, "failed": 0}
+      ]
+    },
+    {
+      "name": "library unit filter",
+      "command": "cargo test --locked -p lattice --lib -- agent_revision",
+      "exit_code": 0,
+      "totals": {"passed": 0, "failed": 0, "filtered_out": 438},
+      "note": "the agent revision shell has no library unit tests; its tests are the integration suites above"
+    },
+    {
+      "name": "clippy with scripts/check.rs arguments",
+      "command": "cargo clippy --workspace --exclude lattice-repository-validation-fixture --all-features --all-targets --no-deps --locked -- -D warnings",
+      "exit_code": 0,
+      "note": "run before two debug assertions were added to the attachment reader; Octet and the test suites ran after them"
+    },
+    {
+      "name": "format",
+      "command": "cargo fmt --check",
+      "exit_code": 0
+    },
+    {
+      "name": "Cairn validation and change gates",
+      "command": "cairn validate --root . ; cairn gate {proposal,design,tasks} adopt-animus-qualification-attachments --root . --policy cairn-policy/generated/cairn-policy.json",
+      "exit_code": 0,
+      "results": {"validate": "valid", "proposal": "PASS", "design": "PASS", "tasks": "PASS"}
+    },
+    {
+      "name": "Octet precommit",
+      "command": "octet-precommit-check",
+      "exit_code": 0,
+      "root": {"status": "warning-only", "accepted": 1052, "current": 1052, "new": 0, "stale": 0},
+      "lattice_core": {"status": "warning-only", "accepted": 25, "current": 25, "new": 0, "stale": 0},
+      "rekey_required": false
+    }
+  ],
+  "not_run": [
+    "nix flake check (excluded by the assignment)",
+    "scripts/check.rs as a whole; its clippy step was run with the same arguments"
+  ],
+  "non_claims": [
+    "fixture producer lane only; no live producer has qualified a Lattice revision",
+    "a favorable attachment is evidence, not promotion authority",
+    "live efficacy is not claimed"
+  ]
+}
