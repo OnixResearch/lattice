@@ -286,13 +286,13 @@ fn qualification_must_match_subject_class_and_reference() {
         Refusal::QualificationMismatch
     );
     let fresh = command(SelectionKind::Promotion, "promote-6", &revision('6'), &reference('u'), 1);
-    let mismatch = verdict::Verdict::NotQualified {
-        reason: verdict::Unqualified::SubjectMismatch,
+    let stale = verdict::Verdict::NotQualified {
+        reason: verdict::Unqualified::Stale,
     };
     let expected = Refusal::NotQualified {
-        reason: verdict::Unqualified::SubjectMismatch,
+        reason: verdict::Unqualified::Stale,
     };
-    assert_eq!(select::select(&changed, &fresh, &mismatch).unwrap_err(), expected);
+    assert_eq!(select::select(&changed, &fresh, &stale).unwrap_err(), expected);
     assert_eq!(
         select::select(&changed, &fresh, &qualified(&reference('v'))).unwrap_err(),
         Refusal::QualificationMismatch
@@ -360,6 +360,11 @@ fn rollback_selects_an_earlier_revision_without_rewriting_sessions() {
         select::select(&rolled, &current, &qualified(&reference('q'))).unwrap_err(),
         Refusal::AlreadySelected
     );
+    let original = command(SelectionKind::Promotion, "promote-r3", &revision('3'), &reference('s'), 1);
+    let (_, receipt) = ok(select::select(&rolled, &original, &verdict::Verdict::Unavailable {}));
+    assert!(matches!(receipt, select::Selected::AlreadyApplied { is_current: false, .. }));
+    let resent = command(SelectionKind::Promotion, "promote-r3", &revision('3'), &reference('s'), 3);
+    assert_eq!(select::select(&rolled, &resent, &qualified(&reference('s'))).unwrap_err(), Refusal::RequestConflict);
 }
 
 #[test]
@@ -438,8 +443,7 @@ fn remaining_refusals_are_typed_and_leave_the_lifecycle_unchanged() {
         Refusal::PreparationInFlight
     );
     let (moved, _) = ok(prepare::desire(&pending, &bundle(&revision('2'))));
-    let (back, _) = ok(prepare::desire(&moved, &bundle(&revision('1'))));
-    assert_eq!(prepare::begin(&back, &revision('1')).unwrap_err(), Refusal::PreparationInFlight);
+    assert_eq!(prepare::begin(&moved, &revision('1')).unwrap_err(), Refusal::NotDesired);
     let unknown = command(SelectionKind::Promotion, "p9", &revision('9'), &reference('q'), 0);
     assert_eq!(
         select::select(&desired, &unknown, &qualified(&reference('q'))).unwrap_err(),
@@ -449,15 +453,9 @@ fn remaining_refusals_are_typed_and_leave_the_lifecycle_unchanged() {
     assert_eq!(select::select(&desired, &bad, &qualified(&reference('q'))).unwrap_err(), Refusal::Malformed);
     assert_eq!(sessions::admit(&desired, entry("session-a", &revision('1'))).unwrap_err(), Refusal::NoSelection);
     assert_eq!(sessions::close(&desired, "session-a", &[]).unwrap_err(), Refusal::UnknownSession);
-    let mut exhausted = empty.clone();
+    let mut exhausted = empty;
     exhausted.change_generation = u64::MAX;
     assert_eq!(prepare::desire(&exhausted, &bundle(&revision('1'))).unwrap_err(), Refusal::GenerationExhausted);
-    let mut full = empty;
-    for index in 0..lattice_core::agent_revision::MAX_CANDIDATES {
-        let digits = format!("{index:064x}");
-        full = ok(prepare::desire(&full, &bundle(&digits))).0;
-    }
-    assert_eq!(prepare::desire(&full, &bundle(&revision('f'))).unwrap_err(), Refusal::CapacityExhausted);
 }
 
 #[test]
@@ -652,7 +650,6 @@ fn fixture_identities() -> serde_json::Value {
             "B": { "revision": revision('1'), "pin": pin(&pin_b) },
             "C": { "revision": revision('3'), "pin": pin(&pin_c) },
         },
-        "live_qualification": false,
     })
 }
 
@@ -668,4 +665,255 @@ fn fixture_identities_are_stable_and_recorded() {
     if let Ok(path) = std::env::var("LATTICE_AGENT_REVISION_CAPTURE") {
         std::fs::write(path, serde_json::to_vec_pretty(&identities).expect("encode")).expect("capture written");
     }
+    let evidence = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join(".cairn/changes/manage-agent-revisions/evidence/fixture-qualification.json");
+    let recorded: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(evidence).expect("evidence read")).expect("evidence decodes");
+    assert_eq!(recorded["live_qualification"], false);
+    assert_eq!(recorded["fixture"], identities);
+}
+
+#[test]
+// r[verify lattice.agent_revisions.preparation.scenario.reissue]
+fn an_abandoned_older_attempt_is_reissued_and_settled() {
+    let empty = Lifecycle::new(&definition());
+    let (desired, _) = ok(prepare::desire(&empty, &bundle(&revision('1'))));
+    let (pending, first) = ticket(&desired, &revision('1'));
+    let (unknown, _) = ok(prepare::record(&pending, &first, &verdict::Prepared::Unknown {}));
+    let (moved, _) = ok(prepare::desire(&unknown, &bundle(&revision('2'))));
+    let (back, _) = ok(prepare::desire(&moved, &bundle(&revision('1'))));
+    assert_eq!(back.desired.as_ref().map(|desired| desired.generation), Some(3));
+    assert_eq!(prepare::begin(&back, &revision('1')).unwrap_err(), Refusal::PreparationInFlight);
+    let reissued = prepare::reissue(&back, &revision('1')).expect("the open attempt is reissued");
+    assert_eq!(reissued, first);
+    let late = verdict::Prepared::Prepared {
+        artifacts: vec![reference('a')],
+    };
+    let (settled, recorded) = ok(prepare::record(&back, &reissued, &late));
+    assert!(matches!(recorded, prepare::Recorded::Applied {
+        preparation: Preparation::Superseded { generation: 1 },
+        last_usable: None,
+    }));
+    assert_eq!(prepare::reissue(&settled, &revision('1')).unwrap_err(), Refusal::StaleTicket);
+    assert_eq!(prepare::begin(&settled, &revision('1')).unwrap_err(), Refusal::PreparationSuperseded);
+    let (again, _) = ok(prepare::desire(&settled, &bundle(&revision('1'))));
+    let (pending_again, current) = ticket(&again, &revision('1'));
+    assert_eq!(current.generation, 4);
+    let (prepared_again, _) = ok(prepare::record(&pending_again, &current, &late));
+    assert!(matches!(prepared_again.candidates[&revision('1')].preparation, Preparation::Prepared {
+        generation: 4
+    }));
+    assert_eq!(prepared_again.last_usable.as_deref(), Some(revision('1').as_str()));
+    let (abandoned, failed_ticket) =
+        ticket(&ok(prepare::desire(&prepared_again, &bundle(&revision('2')))).0, &revision('2'));
+    let (elsewhere, _) = ok(prepare::desire(&abandoned, &bundle(&revision('3'))));
+    assert_eq!(prepare::begin(&elsewhere, &revision('2')).unwrap_err(), Refusal::NotDesired);
+    let reissued = prepare::reissue(&elsewhere, &revision('2')).expect("the pending attempt is reissued");
+    assert_eq!(reissued, failed_ticket);
+    let failure = verdict::Prepared::Failed { artifacts: Vec::new() };
+    let (failed, _) = ok(prepare::record(&elsewhere, &reissued, &failure));
+    assert!(matches!(failed.candidates[&revision('2')].preparation, Preparation::Failed { .. }));
+    assert_eq!(prepare::reissue(&empty, &revision('1')).unwrap_err(), Refusal::UnknownRevision);
+}
+
+#[test]
+// r[verify lattice.agent_revisions.preparation.scenario.revoked]
+fn a_revoked_desired_revision_never_starts_preparation() {
+    let (desired, _) = ok(prepare::desire(&Lifecycle::new(&definition()), &bundle(&revision('2'))));
+    let (revoked, _) = ok(sessions::revoke(&desired, &sessions::Target::Revision(revision('2'))));
+    assert_eq!(prepare::begin(&revoked, &revision('2')).unwrap_err(), Refusal::RevisionRevoked);
+    let (pending, started) = ticket(&desired, &revision('2'));
+    let (revoked_pending, _) = ok(sessions::revoke(&pending, &sessions::Target::Revision(revision('2'))));
+    let (_, reissued) = ok(prepare::begin(&revoked_pending, &revision('2')));
+    assert_eq!(reissued, prepare::Begin::Reissued {
+        ticket: started.clone()
+    });
+    let observation = verdict::Prepared::Prepared {
+        artifacts: vec![reference('c')],
+    };
+    let (recorded, _) = ok(prepare::record(&revoked_pending, &started, &observation));
+    assert_eq!(recorded.last_usable, None);
+    assert_eq!(recorded.candidates[&revision('2')].artifacts, vec![reference('c')]);
+}
+
+#[test]
+// r[verify lattice.agent_revisions.preparation.scenario.redelivered]
+fn a_redelivered_prepared_result_is_recorded_after_its_generation_moves_on() {
+    let start = prepared(&Lifecycle::new(&definition()), &revision('1'), 'a');
+    let (desired, _) = ok(prepare::desire(&start, &bundle(&revision('2'))));
+    let (pending, r2_ticket) = ticket(&desired, &revision('2'));
+    let observation = verdict::Prepared::Prepared {
+        artifacts: vec![reference('c')],
+    };
+    let (recorded, _) = ok(prepare::record(&pending, &r2_ticket, &observation));
+    let (moved, _) = ok(prepare::desire(&recorded, &bundle(&revision('3'))));
+    let (unchanged, again) = ok(prepare::record(&moved, &r2_ticket, &observation));
+    assert_eq!(again, prepare::Recorded::Unchanged {
+        preparation: Preparation::Prepared { generation: 2 }
+    });
+    assert_eq!(unchanged, moved);
+    let failure = verdict::Prepared::Failed { artifacts: Vec::new() };
+    assert_eq!(prepare::record(&moved, &r2_ticket, &failure).unwrap_err(), Refusal::ResultConflict);
+    let unreported = verdict::Prepared::Prepared {
+        artifacts: vec![reference('d')],
+    };
+    assert_eq!(prepare::record(&moved, &r2_ticket, &unreported).unwrap_err(), Refusal::ResultConflict);
+}
+
+#[test]
+// r[verify lattice.agent_revisions.sessions.scenario.readmitted]
+fn readmission_rechecks_closure_and_revocation() {
+    let r3 = promoted(&prepared(&r2_failed(), &revision('3'), 'b'), "promote-r3", &revision('3'), 's');
+    let with_c = admitted(&r3, "session-c", &revision('3'));
+    let (closed, _) = ok(sessions::close(&with_c, "session-a", &[reference('k')]));
+    assert_eq!(sessions::admit(&closed, entry("session-a", &revision('1'))).unwrap_err(), Refusal::SessionClosed);
+    let (revision_revoked, _) = ok(sessions::revoke(&with_c, &sessions::Target::Revision(revision('3'))));
+    assert_eq!(
+        sessions::admit(&revision_revoked, entry("session-c", &revision('3'))).unwrap_err(),
+        Refusal::RevisionRevoked
+    );
+    let (qualification_revoked, _) = ok(sessions::revoke(&with_c, &sessions::Target::Qualification(reference('s'))));
+    assert_eq!(
+        sessions::admit(&qualification_revoked, entry("session-c", &revision('3'))).unwrap_err(),
+        Refusal::QualificationRevoked
+    );
+    let (unchanged, again) = ok(sessions::admit(&with_c, entry("session-c", &revision('3'))));
+    assert!(matches!(again, sessions::Admitted::AlreadyPinned { .. }));
+    assert_eq!(unchanged, with_c);
+}
+
+#[test]
+// r[verify lattice.agent_revisions.revocation.scenario.capacity]
+fn referenced_targets_are_revoked_even_when_revocations_are_full() {
+    let r3 = promoted(&prepared(&r2_failed(), &revision('3'), 'b'), "promote-r3", &revision('3'), 's');
+    let mut full = admitted(&r3, "session-c", &revision('3'));
+    for index in 0..lattice_core::agent_revision::MAX_REVOCATIONS {
+        let digits = format!("{index:064x}");
+        full.revoked.qualifications.insert(format!("blake3:{digits}"));
+        full.revoked.revisions.insert(digits);
+        full.revoked.sessions.insert(format!("unreferenced-{index}"));
+    }
+    for unreferenced in [
+        sessions::Target::Revision(revision('e')),
+        sessions::Target::Qualification(reference('z')),
+        sessions::Target::Session("never-admitted".into()),
+    ] {
+        assert_eq!(sessions::revoke(&full, &unreferenced).unwrap_err(), Refusal::CapacityExhausted);
+    }
+    let (session, _) = ok(sessions::revoke(&full, &sessions::Target::Session("session-c".into())));
+    assert_eq!(sessions::effect_permitted(&session, "session-c").unwrap_err(), Refusal::SessionRevoked);
+    let (revision_revoked, _) = ok(sessions::revoke(&full, &sessions::Target::Revision(revision('3'))));
+    assert_eq!(sessions::effect_permitted(&revision_revoked, "session-c").unwrap_err(), Refusal::RevisionRevoked);
+    assert_eq!(
+        sessions::admit(&revision_revoked, entry("session-d", &revision('3'))).unwrap_err(),
+        Refusal::RevisionRevoked
+    );
+    let (pinned, _) = ok(sessions::revoke(&full, &sessions::Target::Qualification(reference('q'))));
+    assert_eq!(sessions::effect_permitted(&pinned, "session-a").unwrap_err(), Refusal::QualificationRevoked);
+    let (failed, _) = ok(sessions::revoke(&full, &sessions::Target::Revision(revision('2'))));
+    assert!(failed.revoked.revisions.contains(&revision('2')));
+}
+
+#[test]
+// r[verify lattice.agent_revisions.core.scenario.capacity]
+fn sessions_count_live_pins_and_closed_sessions_are_forgotten() {
+    let r1 =
+        promoted(&prepared(&Lifecycle::new(&definition()), &revision('1'), 'a'), "promote-r1", &revision('1'), 'q');
+    let lifetime = lattice_core::agent_revision::MAX_SESSIONS + 64;
+    let mut cycled = r1.clone();
+    for index in 0..lifetime {
+        let session = format!("cycled-{index}");
+        cycled = admitted(&cycled, &session, &revision('1'));
+        cycled = ok(sessions::close(&cycled, &session, &[])).0;
+    }
+    assert!(cycled.sessions.is_empty());
+    assert_eq!(sessions::effect_permitted(&cycled, "cycled-0").unwrap_err(), Refusal::UnknownSession);
+    assert_eq!(sessions::close(&cycled, "cycled-0", &[]).unwrap_err(), Refusal::UnknownSession);
+    let mut full = r1;
+    for index in 0..lattice_core::agent_revision::MAX_SESSIONS {
+        full = admitted(&full, &format!("live-{index}"), &revision('1'));
+    }
+    assert_eq!(sessions::admit(&full, entry("one-more", &revision('1'))).unwrap_err(), Refusal::CapacityExhausted);
+    let (checkpointed, _) = ok(sessions::close(&full, "live-0", &[reference('k')]));
+    assert_eq!(checkpointed.sessions["live-0"].checkpoints, vec![reference('k')]);
+    assert_eq!(sessions::effect_permitted(&checkpointed, "live-0").unwrap_err(), Refusal::SessionClosed);
+    let (_, repeated) = ok(sessions::close(&checkpointed, "live-0", &[reference('k')]));
+    assert!(matches!(repeated, sessions::Closed::AlreadyClosed { .. }));
+    let with_room = admitted(&checkpointed, "one-more", &revision('1'));
+    assert_eq!(
+        sessions::admit(&with_room, entry("two-more", &revision('1'))).unwrap_err(),
+        Refusal::CapacityExhausted
+    );
+    let checkpoint = lattice_core::agent_revision::state::Hold {
+        kind: lattice_core::agent_revision::state::HoldKind::Checkpoint,
+        reference: reference('k'),
+    };
+    let (released, _) = ok(retain::release(&with_room, &revision('1'), &checkpoint));
+    assert!(!released.sessions.contains_key("live-0"));
+}
+
+#[test]
+// r[verify lattice.agent_revisions.core.scenario.capacity]
+// r[verify lattice.agent_revisions.promotion.scenario.idempotent]
+fn receipts_slide_so_selection_never_exhausts_and_forgotten_requests_stay_refused() {
+    let both = prepared(&prepared(&Lifecycle::new(&definition()), &revision('1'), 'a'), &revision('2'), 'b');
+    let mut lifecycle = promoted(&both, "p-0", &revision('1'), 'q');
+    lifecycle = promoted(&lifecycle, "p-1", &revision('2'), 'r');
+    let lifetime = lattice_core::agent_revision::MAX_RECEIPTS + 64;
+    for index in 0..lifetime {
+        let (target, qualification) = if index % 2 == 0 { ('1', 'q') } else { ('2', 'r') };
+        let rollback = command(
+            SelectionKind::Rollback,
+            &format!("rollback-{index}"),
+            &revision(target),
+            &reference(qualification),
+            lifecycle.rollout_generation,
+        );
+        lifecycle = ok(select::select(&lifecycle, &rollback, &qualified(&reference(qualification)))).0;
+    }
+    assert_eq!(lifecycle.rollout_generation, u64::from(lifetime) + 2);
+    assert_eq!(lifecycle.selected.as_ref().map(|selected| selected.revision.clone()), Some(revision('2')));
+    assert_eq!(lifecycle.receipts.len(), usize::try_from(lattice_core::agent_revision::MAX_RECEIPTS).expect("fits"));
+    assert!(!lifecycle.receipts.contains_key("p-0"));
+    let forgotten = command(SelectionKind::Promotion, "p-0", &revision('1'), &reference('q'), 0);
+    assert_eq!(
+        select::select(&lifecycle, &forgotten, &qualified(&reference('q'))).unwrap_err(),
+        Refusal::GenerationConflict
+    );
+    let latest = format!("rollback-{}", lifetime - 1);
+    let repeated =
+        command(SelectionKind::Rollback, &latest, &revision('2'), &reference('r'), lifecycle.rollout_generation - 1);
+    let (_, receipt) = ok(select::select(&lifecycle, &repeated, &verdict::Verdict::Unavailable {}));
+    assert!(matches!(receipt, select::Selected::AlreadyApplied { is_current: true, .. }));
+}
+
+#[test]
+// r[verify lattice.agent_revisions.core.scenario.capacity]
+fn unreferenced_revisions_are_forgotten_so_desire_never_exhausts() {
+    let r1 =
+        promoted(&prepared(&Lifecycle::new(&definition()), &revision('1'), 'a'), "promote-r1", &revision('1'), 'q');
+    let with_a = admitted(&r1, "session-a", &revision('1'));
+    let (desired_nine, _) = ok(prepare::desire(&with_a, &bundle(&revision('9'))));
+    let (mut lifecycle, _) = ok(sessions::revoke(&desired_nine, &sessions::Target::Revision(revision('9'))));
+    let lifetime = lattice_core::agent_revision::MAX_CANDIDATES * 3;
+    for index in 0..lifetime {
+        let digits = format!("{:064x}", u64::from(index) + 0x100);
+        lifecycle = ok(prepare::desire(&lifecycle, &bundle(&digits))).0;
+        assert!(
+            lifecycle.candidates.len() <= usize::try_from(lattice_core::agent_revision::MAX_CANDIDATES).expect("fits")
+        );
+    }
+    assert_eq!(lifecycle.change_generation, u64::from(lifetime) + 2);
+    assert!(lifecycle.candidates.contains_key(&revision('1')));
+    assert!(lifecycle.previously_selected.contains(&revision('1')));
+    assert!(!lifecycle.candidates.contains_key(&revision('9')));
+    assert_eq!(prepare::desire(&lifecycle, &bundle(&revision('9'))).unwrap_err(), Refusal::RevisionRevoked);
+    assert!(sessions::effect_permitted(&lifecycle, "session-a").is_ok());
+    let mut pending = Lifecycle::new(&definition());
+    for index in 0..lattice_core::agent_revision::MAX_CANDIDATES {
+        let digits = format!("{index:064x}");
+        let (desired, _) = ok(prepare::desire(&pending, &bundle(&digits)));
+        pending = ticket(&desired, &digits).0;
+    }
+    assert_eq!(prepare::desire(&pending, &bundle(&revision('f'))).unwrap_err(), Refusal::CapacityExhausted);
 }

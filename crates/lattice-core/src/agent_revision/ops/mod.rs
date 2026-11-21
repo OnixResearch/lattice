@@ -63,3 +63,42 @@ pub(crate) fn room(count: usize, bound: u32) -> Result<(), super::Refusal> {
         Err(super::Refusal::CapacityExhausted)
     }
 }
+
+/// Whether nothing references `revision`: its preparation is settled without
+/// a usable result, it occupies no artifact, nothing holds it, and it is not
+/// desired, selected, last usable or pinned.
+fn is_forgettable(lifecycle: &super::state::Lifecycle, revision: &str, candidate: &super::state::Candidate) -> bool {
+    let is_settled = matches!(
+        candidate.preparation,
+        super::state::Preparation::Unprepared {}
+            | super::state::Preparation::Failed { .. }
+            | super::state::Preparation::Superseded { .. }
+    );
+    let is_named = |value: Option<&String>| value.is_some_and(|value| value == revision);
+    let checks = [
+        is_settled,
+        candidate.artifacts.is_empty(),
+        candidate.holds.is_empty(),
+        !is_named(lifecycle.desired.as_ref().map(|desired| &desired.revision)),
+        !is_named(lifecycle.selected.as_ref().map(|selected| &selected.revision)),
+        !is_named(lifecycle.last_usable.as_ref()),
+        !lifecycle.sessions.values().any(|pin| pin.revision == revision),
+    ];
+    checks.iter().all(|check| *check)
+}
+
+/// Forget every revision nothing references, with its qualifications and
+/// selection history. Revocations are never forgotten, so a forgotten
+/// revoked revision stays refused.
+pub(crate) fn forget_unreferenced(lifecycle: &mut super::state::Lifecycle) {
+    let forgotten = lifecycle
+        .candidates
+        .iter()
+        .filter(|(revision, candidate)| is_forgettable(lifecycle, revision, candidate))
+        .map(|(revision, _)| revision.clone())
+        .collect::<std::collections::BTreeSet<_>>();
+    lifecycle.candidates.retain(|revision, _| !forgotten.contains(revision));
+    lifecycle.qualifications.retain(|admitted| !forgotten.contains(&admitted.revision));
+    lifecycle.previously_selected.retain(|revision| !forgotten.contains(revision));
+    debug_assert!(forgotten.iter().all(|revision| !lifecycle.candidates.contains_key(revision)));
+}

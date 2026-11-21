@@ -46,38 +46,49 @@ Rejected: framing the code constants unconditionally. That would change every ex
 
 ## Decision 3: separate facts in one bounded lifecycle per definition
 
-`state::Lifecycle` keeps `desired` and `change_generation`, `candidates` (bundle, preparation, occupied artifacts, cleanup status, holds), `qualifications` per (revision, task family), `last_usable`, `selected` and `rollout_generation`, `previously_selected`, `sessions` (pins), `receipts` by request identifier and monotonic `revoked` sets. Nothing is derived from anything else. Bounds: 64 revisions, 1024 sessions, 256 receipts and qualifications, 1024 revocations per kind and 128 artifacts or holds per revision.
+`state::Lifecycle` keeps `desired` and `change_generation`, `candidates` (bundle, preparation, occupied artifacts, cleanup status, holds), `qualifications` per (revision, task family), `last_usable`, `selected` and `rollout_generation`, `previously_selected`, `sessions` (pins, with the checkpoints a closed session holds), `receipts` by request identifier and monotonic `revoked` sets. Nothing is derived from anything else.
+
+Bounds count only what is still referenced, so none is a lifetime limit: 64 revisions, 1024 live sessions, the 256 most recent receipts, 256 qualification scopes, 1024 revocations per kind of unreferenced targets, and 128 artifacts or holds per revision. When revisions or qualification scopes are full, `ops::forget_unreferenced` drops every revision that is unprepared, failed or superseded, occupies no artifact, has no hold and is not desired, selected, last usable or pinned, with its qualifications and `previously_selected` entry. A closed session is forgotten once none of its checkpoints is held (`sessions::forget_unheld`, at close and at hold release). The oldest receipt (lowest rollout generation) is forgotten when the window is full; because the receipt binds the expected rollout generation, its request can never match the current generation again and is refused rather than applied twice. Revocations are never forgotten, and revoking a referenced target is never refused, so the revocation bound cannot fail open.
+
+Rejected: keeping closed sessions in a recency window for idempotent close. The pin carries nothing once its checkpoints are released, and session identifiers are unique per attempt.
 
 ## Decision 4: state machine
 
 ```text
 desire(bundle)        -> change_generation+1, desired; new candidate Unprepared (Failed or Superseded reset to Unprepared)
-begin(revision)       -> Unprepared -> Pending{g}: Started(ticket{definition, revision, g})
-                         Pending{g}/Unknown{g} at current g: Reissued(same ticket); older g: preparation_in_flight
+begin(revision)       -> Unprepared, not revoked -> Pending{g}: Started(ticket{definition, revision, g}); revoked: revision_revoked
+                         Pending{g}/Unknown{g} at current g: Reissued(same ticket), even when revoked; older g: preparation_in_flight
                          Prepared: AlreadyPrepared (no re-preparation); Failed / Superseded: refused
+reissue(revision)     -> Pending{g}/Unknown{g} at any g, desired or not: that attempt's own ticket; otherwise stale_ticket
+                         (the shell's `prepare` falls back to it when begin refuses, so old attempts settle)
 record(ticket, obs)   -> only an open attempt (Pending/Unknown) with ticket.g settles:
                          Prepared & ticket is current desired -> Prepared{g}, last_usable
                          Prepared & not current               -> Superseded{g} (late; retained for cleanup only)
                          Failed -> Failed{g}; Unknown -> Unknown{g}; artifacts merged
-                         a settled attempt: same result unchanged, different result_conflict; other g stale_ticket
-select(cmd, verdict)  -> receipt for request_id? same command: AlreadyApplied; else request_conflict
+                         a settled attempt: same result unchanged (prepared matches Prepared{g} or Superseded{g}),
+                         different result_conflict; other g stale_ticket
+select(cmd, verdict)  -> receipt for request_id? same kind, revision, ref, policy and expected generation: AlreadyApplied;
+                         else request_conflict
                          eligible (prepared, not revoked, ref not bound elsewhere, not already selected,
                          rollback: previously selected with the same recorded ref)
                          accept verdict (qualified, canonical, required class, same ref)
                          expected rollout generation == current, else generation_conflict
-                         -> rollout_generation+1, selected, qualification recorded, receipt
-admit(session, rev)   -> rev == selected, not revoked -> pin {rev, ref, rollout generation}; same pin: AlreadyPinned
+                         -> rollout_generation+1, selected, qualification recorded, receipt (oldest forgotten past 256)
+admit(session, rev)   -> existing pin: other rev session_conflict; closed session_closed; revoked revision or ref refused;
+                         else AlreadyPinned
+                         new: rev == selected, not revoked, < 1024 live -> pin {rev, ref, rollout generation}
 effect_permitted      -> live, session/revision/qualification not revoked
-revoke(target)        -> monotonic; a revoked last usable revision stops being last usable
-close(session, ckpts) -> Closed; checkpoints held on the pinned revision
+revoke(target)        -> monotonic; never refused for a referenced target; a revoked last usable revision stops being last usable
+close(session, ckpts) -> Closed; checkpoints held on the pinned revision; the pin is forgotten unless a checkpoint is held
 retain / plan / record cleanup -> released only on observed release; failed or unknown -> uncertain
+release(hold)         -> hold removed; closed pins with no held checkpoint forgotten
 ```
 
 A favorable verdict is an input to `select`, never a trigger for it.
 
 ## Decision 5: idempotency and concurrency through the existing store pattern
 
-`src/store/revisions.rs` adds table `agent_revision_lifecycles_v1`: definition identity to `{version, lifecycle}`. `commit_lifecycle(expected_version, lifecycle)` refuses any other current version. The shell loads, applies the pure transition, skips the write when nothing changed, commits with the version it read and reapplies up to four times after a conflict. Duplicate requests return their receipt; concurrent requests that expect the same rollout generation select once; a lost acknowledgement is reconciled by repeating the same request identifier, which neither prepares nor selects again.
+`src/store/revisions.rs` adds table `agent_revision_lifecycles_v1`: definition identity to `{version, lifecycle}`. `commit_lifecycle(expected_version, lifecycle)` refuses any other current version. The shell (`agent_revision::transact`) loads, applies the pure transition, skips the write when nothing changed, commits with the version it read and reapplies up to four times after a conflict. Duplicate requests return their receipt; concurrent requests that expect the same rollout generation select once; a lost acknowledgement is reconciled by repeating the same request identifier, which neither prepares nor selects again. The receipt binds the expected rollout generation, so a reused identifier with another expectation is `request_conflict`.
 
 ## Decision 6: ports and the standalone CLI
 
@@ -85,7 +96,9 @@ A favorable verdict is an input to `select`, never a trigger for it.
 
 ## Decision 7: the session-admission seam
 
-`seam::admit(store, request, session)` returns `Unmanaged` without writing when no lifecycle exists, `Admitted` with the pin, or `Refused`. `seam::effect(store, definition, session)` returns `Unmanaged`, `Permitted` or `Blocked`. `seam::close` closes a session with checkpoints. Implementation attempts are not wired in this change.
+`seam::admit(store, request, session)` returns `Unmanaged` without writing when no lifecycle exists, `Admitted` with the pin, or `Refused`. `Decision::admission()` gives the mode the caller records durably with the session: `Admission::Managed` for `Admitted`, `Admission::Unmanaged` for `Unmanaged`, none for `Refused`. `seam::effect(store, request, session, admission)` and `seam::close(store, request, session, admission, checkpoints)` take that recorded mode. An `Unmanaged` session answers `Unmanaged` without touching the store for its whole life, even after the first `desire` makes its definition managed, so in-flight sessions behave exactly as before. A `Managed` session fails closed: `Blocked`/`Refused` with `unknown_session` when its lifecycle or pin is missing. New sessions of a managed definition still require a selection. Implementation attempts are not wired in this change.
+
+Rejected: deriving the mode from whether a lifecycle exists at effect time. The first `desire` would then block every in-flight session admitted before management as `unknown_session`.
 
 ## Decision 8: slots for a later inventory
 
@@ -94,12 +107,12 @@ A favorable verdict is an input to `select`, never a trigger for it.
 ## Integration
 
 1. Components digest: add to `Request` `#[serde(default = "lattice_core::agent_revision::framing::absent", skip_serializing_if = "Option::is_none")] pub revision_components: Option<lattice_core::agent_revision::framing::Components>,` and frame `lattice_core::agent_revision::framing::digest(self.revision_components.as_ref())` only when it is `Some`.
-2. Seam: before writing `intent.json`, call `seam::admit` with the attempt's session identifier and refuse on `Refused`; before spawn, call `seam::effect`; after the terminal result, call `seam::close`. A standalone run without a store stays unmanaged.
+2. Seam: before writing `intent.json`, call `seam::admit` with the attempt's session identifier and refuse on `Refused`; record `decision.admission()` with the intent; before spawn and each protected effect, call `seam::effect` with the recorded mode; after the terminal result, call `seam::close` with the recorded mode. A standalone run without a store stays unmanaged.
 3. Inventory v3: fill the revision slots from `projection::slots`.
 
 ## Tests
 
-`tests/test_agent_revision_core.rs` covers each issue criterion on the pure core and every refusal. `tests/test_agent_revision_shell.rs` covers resolution, persistence, the standalone CLI, fixture ports and the seam.
+`tests/test_agent_revision_core.rs` covers each issue criterion on the pure core, every refusal, each bound filled past its size, reissue of abandoned attempts and the committed fixture identities. `tests/test_agent_revision_shell.rs` covers resolution, persistence with an interleaved writer, the standalone CLI, the `lattice` binary's exit status, fixture ports and the seam's admission modes.
 
 ## Risks and claim boundaries
 

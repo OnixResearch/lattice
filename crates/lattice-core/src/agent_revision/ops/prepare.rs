@@ -88,11 +88,14 @@ pub fn desire(
         let generation = desired.generation;
         return Ok(super::unchanged(lifecycle, Desire::Unchanged { revision, generation }));
     }
-    if existing.is_none() {
-        super::room(lifecycle.candidates.len(), crate::agent_revision::MAX_CANDIDATES)?;
-    }
     let generation = super::next(lifecycle.change_generation)?;
     let mut next = lifecycle.clone();
+    if existing.is_none() {
+        if super::room(next.candidates.len(), crate::agent_revision::MAX_CANDIDATES).is_err() {
+            super::forget_unreferenced(&mut next);
+        }
+        super::room(next.candidates.len(), crate::agent_revision::MAX_CANDIDATES)?;
+    }
     next.change_generation = generation;
     next.desired = Some(crate::agent_revision::state::Desired {
         revision: revision.clone(),
@@ -128,7 +131,9 @@ fn ticket(lifecycle: &Lifecycle, desired: &crate::agent_revision::state::Desired
     })
 }
 
-/// Start, or reissue, preparation of the current desired revision.
+/// Start, or reissue, preparation of the current desired revision. A revoked
+/// revision never starts; its pending or unknown attempt is still reissued
+/// so it can be reconciled and cleaned up.
 pub fn begin(lifecycle: &Lifecycle, revision: &str) -> Result<super::Applied<Begin>, Refusal> {
     let desired = lifecycle
         .desired
@@ -138,6 +143,7 @@ pub fn begin(lifecycle: &Lifecycle, revision: &str) -> Result<super::Applied<Beg
     let generation = desired.generation;
     match super::candidate(lifecycle, revision)?.preparation {
         Preparation::Unprepared {} => {
+            super::usable(lifecycle, revision)?;
             let mut next = lifecycle.clone();
             super::candidate_mut(&mut next, revision)?.preparation = Preparation::Pending { generation };
             let ticket = ticket(lifecycle, desired)?;
@@ -161,6 +167,26 @@ pub fn begin(lifecycle: &Lifecycle, revision: &str) -> Result<super::Applied<Beg
     }
 }
 
+/// Reissue the ticket of `revision`'s pending or unknown attempt at the
+/// generation it is bound to, whether or not the revision is still desired or
+/// usable, so a late or abandoned attempt can be settled as superseded,
+/// failed or unknown instead of blocking preparation for good.
+pub fn reissue(lifecycle: &Lifecycle, revision: &str) -> Result<Ticket, Refusal> {
+    match super::candidate(lifecycle, revision)?.preparation {
+        Preparation::Pending { generation } | Preparation::Unknown { generation } => {
+            let bound = crate::agent_revision::state::Desired {
+                revision: revision.to_owned(),
+                generation,
+            };
+            ticket(lifecycle, &bound)
+        }
+        Preparation::Unprepared {}
+        | Preparation::Prepared { .. }
+        | Preparation::Superseded { .. }
+        | Preparation::Failed { .. } => Err(Refusal::StaleTicket),
+    }
+}
+
 /// The ticket generation an attempt in `preparation` is bound to, and
 /// whether it is still open for a result.
 const fn binding(preparation: &Preparation) -> Option<(u64, bool)> {
@@ -181,6 +207,13 @@ fn settled(ticket: &Ticket, observation: &crate::agent_revision::ports::Prepared
         crate::agent_revision::ports::Prepared::Failed { .. } => Preparation::Failed { generation },
         crate::agent_revision::ports::Prepared::Unknown {} => Preparation::Unknown { generation },
     }
+}
+
+/// A `prepared` observation repeats a recorded `prepared` result, including
+/// one recorded at a generation that is no longer desired.
+const fn is_prepared_again(observation: &crate::agent_revision::ports::Prepared, recorded: &Preparation) -> bool {
+    matches!(observation, crate::agent_revision::ports::Prepared::Prepared { .. })
+        && matches!(recorded, Preparation::Prepared { .. } | Preparation::Superseded { .. })
 }
 
 fn artifacts(observation: &crate::agent_revision::ports::Prepared) -> &[String] {
@@ -217,7 +250,10 @@ pub fn record(
     debug_assert_eq!(bound, ticket.generation);
     if !is_open {
         let is_known = reported.iter().all(|artifact| candidate.artifacts.contains(artifact));
-        return if preparation == candidate.preparation && is_known {
+        let is_redelivered =
+            preparation == candidate.preparation || is_prepared_again(observation, &candidate.preparation);
+        return if is_redelivered && is_known {
+            let preparation = candidate.preparation.clone();
             Ok(super::unchanged(lifecycle, Recorded::Unchanged { preparation }))
         } else {
             Err(Refusal::ResultConflict)

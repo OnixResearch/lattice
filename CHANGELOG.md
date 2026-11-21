@@ -18,7 +18,14 @@ interfaces.
   attachments and sessions, pins sessions and cleans up unretained artifacts.
   The revision is the existing profile revision, used verbatim; the pure core
   is `lattice_core::agent_revision`, and lifecycles persist in a
-  version-checked `agent_revision_lifecycles_v1` table. The standalone CLI
+  version-checked `agent_revision_lifecycles_v1` table. Bounds count only
+  what is still referenced (live sessions, a sliding window of receipts,
+  revisions nothing references are forgotten), so admission, desire,
+  promotion and rollback never exhaust for good, and revoking a referenced
+  target is never refused. Every refusal, including a refused
+  `admit-session`, exits non-zero. The session-admission seam takes the
+  admission mode its caller records, so sessions admitted before a
+  definition became managed stay unmanaged. The standalone CLI
   reports preparation as `unknown` and refuses promotion as
   `qualification_unavailable` (owner `animus#18`). Implementation attempts,
   their revisions and the inventory are unchanged. See

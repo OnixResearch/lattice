@@ -17,7 +17,8 @@ pub struct Lifecycle {
     /// Increments each time the desired revision changes.
     pub change_generation: u64,
     pub desired: Option<Desired>,
-    /// Every revision ever desired, keyed by bare-hex revision.
+    /// Desired revisions not yet forgotten, keyed by bare-hex revision. A
+    /// revision is forgotten only when nothing references it.
     pub candidates: Map<Candidate>,
     /// Qualification admitted per `(revision, task family)` scope.
     pub qualifications: Vec<Qualification>,
@@ -27,11 +28,13 @@ pub struct Lifecycle {
     /// Increments each time the selection for new sessions changes.
     pub rollout_generation: u64,
     pub selected: Option<Selection>,
-    /// Revisions that have been selected; rollback targets only these.
+    /// Retained revisions that have been selected; rollback targets only these.
     pub previously_selected: Set,
-    /// Sessions keyed by session identifier.
+    /// Live sessions, and closed sessions whose checkpoints are still held,
+    /// keyed by session identifier.
     pub sessions: Map<Pin>,
-    /// Applied promotion and rollback requests keyed by request identifier.
+    /// The most recent applied promotion and rollback requests keyed by
+    /// request identifier.
     pub receipts: Map<Selection>,
     pub revoked: Revoked,
 }
@@ -189,6 +192,9 @@ pub struct Pin {
     pub qualification_ref: String,
     pub rollout_generation: u64,
     pub status: SessionStatus,
+    /// Sorted checkpoints a closed session holds on its revision; empty
+    /// while the session is live.
+    pub checkpoints: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

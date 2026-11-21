@@ -13,7 +13,7 @@ const MAX_COMMIT_ATTEMPTS: u32 = 4;
 
 /// Whether a missing lifecycle may be created.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum Seed {
+pub enum Seed {
     Create,
     Existing,
 }
@@ -32,9 +32,11 @@ struct Subject<'a> {
     revision: &'a str,
 }
 
-/// Apply `apply` to the stored lifecycle and commit any change, reloading
-/// and reapplying after a concurrent commit.
-pub(super) fn transact<T>(
+/// Apply `apply` to `definition`'s stored lifecycle and commit any change
+/// with the version read, reloading and reapplying the pure transition after
+/// a concurrent commit, at most four times. A refusal or an unchanged
+/// lifecycle writes nothing.
+pub fn transact<T>(
     store: &crate::store::Store,
     definition: &str,
     seed: Seed,
@@ -149,19 +151,27 @@ fn prepare(
     let begin = transact(store, subject.definition, Seed::Existing, |lifecycle| {
         lattice_core::agent_revision::ops::prepare::begin(lifecycle, subject.revision)
     })?;
-    let ticket = match &begin {
+    let started = match &begin {
         Ok(
             lattice_core::agent_revision::ops::prepare::Begin::Started { ticket }
             | lattice_core::agent_revision::ops::prepare::Begin::Reissued { ticket },
-        ) => ticket.clone(),
-        Ok(lattice_core::agent_revision::ops::prepare::Begin::AlreadyPrepared { .. }) | Err(_) => {
+        ) => Some(ticket.clone()),
+        Ok(lattice_core::agent_revision::ops::prepare::Begin::AlreadyPrepared { .. }) => {
             return Ok(document(header, begin));
         }
+        Err(_) => None,
     };
     let (_, lifecycle) = store
         .load_lifecycle(subject.definition)
         .map_err(|error| error.to_string())?
         .ok_or_else(|| "agent revision lifecycle disappeared".to_owned())?;
+    // A refused start may leave a pending or unknown attempt bound to an older
+    // generation; reissue its ticket so the attempt settles instead of
+    // blocking preparation for good.
+    let reissued = || lattice_core::agent_revision::ops::prepare::reissue(&lifecycle, subject.revision).ok();
+    let Some(ticket) = started.or_else(reissued) else {
+        return Ok(document(header, begin));
+    };
     let candidate = lifecycle
         .candidates
         .get(subject.revision)
@@ -182,12 +192,16 @@ fn admit(request: &std::path::Path, store: &crate::store::Store, session: &str) 
     let request = super::bundle::load(request)?;
     let decision = super::seam::admit(store, &request, session)?;
     let definition = super::bundle::resolve(&request)?.definition.identity;
+    let result = match decision {
+        super::seam::Decision::Refused { refusal } => Err(refusal),
+        admitted @ (super::seam::Decision::Unmanaged | super::seam::Decision::Admitted { .. }) => Ok(admitted),
+    };
     Ok(document(
         Header {
             command: "admit-session",
             definition: &definition,
         },
-        Ok(decision),
+        result,
     ))
 }
 

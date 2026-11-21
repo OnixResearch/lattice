@@ -31,13 +31,21 @@ pub mod state;
 pub const QUALIFICATION_OWNER: &str = "animus#18";
 /// Owner of runtime preparation and cleanup.
 pub const PREPARATION_OWNER: &str = "kiln#49";
-/// Revisions one definition retains.
+/// Revisions one definition retains. A new desired revision first forgets
+/// every revision nothing references, so the bound is never exhausted for
+/// good.
 pub const MAX_CANDIDATES: u32 = 64;
-/// Sessions one definition pins at once, live or retained.
+/// Live sessions one definition pins at once. A closed session is forgotten
+/// once none of its checkpoints is held.
 pub const MAX_SESSIONS: u32 = 1024;
-/// Promotion and rollback receipts kept for idempotency.
+/// The most recent promotion and rollback receipts kept for idempotency; the
+/// oldest is forgotten first. A forgotten request can never match the
+/// current rollout generation again, so it is refused, never reapplied.
 pub const MAX_RECEIPTS: u32 = 256;
-/// Revocations of each kind one definition records.
+/// Qualifications admitted per revision and task-family scope.
+pub const MAX_QUALIFICATIONS: u32 = 256;
+/// Revocations of each kind recorded for targets the lifecycle does not
+/// reference. Revoking a referenced target is never refused.
 pub const MAX_REVOCATIONS: u32 = 1024;
 /// Artifacts or holds one revision records.
 pub const MAX_REFERENCES: u32 = 128;
@@ -91,7 +99,8 @@ pub enum Refusal {
     PreparationUncertain,
     /// An earlier attempt must be reconciled first.
     PreparationInFlight,
-    /// The ticket's generation no longer matches the attempt.
+    /// No attempt is bound to the ticket's generation, or no open attempt
+    /// remains to reissue.
     StaleTicket,
     /// A second, different result for one attempt.
     ResultConflict,

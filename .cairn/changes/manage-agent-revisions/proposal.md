@@ -15,7 +15,7 @@ A worker profile revision identifies what an implementation attempt runs, but no
 - The store gains one version-checked table, `agent_revision_lifecycles_v1`, in the existing redb database. r[lattice.agent_revisions.persistence]
 - The shell injects `PreparationPort` (Kiln #49) and `QualificationPort` (Animus #18). The standalone CLI installs unavailable ports, so preparation records `unknown` and promotion is refused as `qualification_unavailable`. r[lattice.agent_revisions.ports]
 - `lattice agent-revision` adds `resolve`, `desire`, `prepare`, `promote`, `rollback`, `revoke`, `admit-session`, `cleanup` and `inspect`, each printing one JSON document. r[lattice.agent_revisions.shell]
-- `agent_revision::seam` exposes session admission and the effect check for lifecycle-managed definitions; unmanaged definitions answer `unmanaged`. r[lattice.agent_revisions.seam]
+- `agent_revision::seam` exposes session admission, the effect check and close for lifecycle-managed definitions; unmanaged definitions answer `unmanaged`. The caller records each session's admission mode (`managed` or `unmanaged`) at admission and passes it back, so sessions admitted before a definition became managed stay unmanaged and a managed session unknown to the lifecycle fails closed. r[lattice.agent_revisions.seam]
 - `projection::slots` projects the bounded slots a later inventory schema can publish. r[lattice.agent_revisions.projection]
 
 ## Impact

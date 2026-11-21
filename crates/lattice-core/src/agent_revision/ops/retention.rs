@@ -100,6 +100,7 @@ pub fn hold(
 }
 
 /// Remove a hold once its checkpoint or evidence no longer needs the revision.
+/// A closed session none of whose checkpoints is still held is forgotten.
 pub fn release(
     lifecycle: &Lifecycle,
     revision: &str,
@@ -111,6 +112,7 @@ pub fn release(
     }
     let mut next = lifecycle.clone();
     super::candidate_mut(&mut next, revision)?.holds.retain(|held| held != hold);
+    super::sessions::forget_unheld(&mut next, revision);
     Ok(super::Applied {
         lifecycle: next,
         outcome: true,

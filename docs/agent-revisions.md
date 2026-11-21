@@ -75,13 +75,30 @@ identity.
 | Fact | Meaning |
 |---|---|
 | `desired`, `change_generation` | The revision to prepare next; the generation increments on each change |
-| `candidates` | Every desired revision with its bundle, preparation, occupied artifacts, cleanup status and holds |
+| `candidates` | Each desired revision not yet forgotten, with its bundle, preparation, occupied artifacts, cleanup status and holds |
 | `qualifications` | The attachment admitted per revision and task-family scope |
 | `last_usable` | The latest revision prepared for its then-current generation and not revoked |
 | `selected`, `rollout_generation` | The revision for new sessions; the generation increments on each selection |
-| `sessions` | Each session's pin: revision, qualification reference, rollout generation, `live` or `closed` |
-| `receipts` | Applied promotions and rollbacks by request identifier |
-| `revoked` | Revoked revisions, qualification references and sessions |
+| `sessions` | Each live session's pin, and each closed session's pin while one of its checkpoints is held: revision, qualification reference, rollout generation, `live` or `closed`, held checkpoints |
+| `receipts` | The 256 most recent applied promotions and rollbacks by request identifier |
+| `revoked` | Revoked revisions, qualification references and sessions; never forgotten |
+
+### Bounds
+
+Every bound counts only what the lifecycle still references, so none is a
+lifetime limit:
+
+| Bound | Frees up when |
+|---|---|
+| 64 revisions | A new desired revision first forgets every revision that is unprepared, failed or superseded, occupies no artifact, has no hold, and is not desired, selected, last usable or pinned, with its qualifications and selection history. A revision that still occupies artifacts frees up after an observed cleanup. |
+| 1024 live sessions | A session closes. A closed session is forgotten at once unless one of its checkpoints is held, and when its last held checkpoint is released. |
+| 256 receipts | The oldest receipt is forgotten. Its request expected an older rollout generation, so repeating it is refused (`generation_conflict` or another state refusal), never applied again. |
+| 256 qualification scopes | As for revisions. |
+| 1024 revocations per kind | Never: the bound applies only to targets the lifecycle does not reference. Revoking a retained revision, a recorded or pinned qualification reference or a pinned session is never refused. |
+| 128 artifacts or holds per revision | Cleanup or release. |
+
+A forgotten closed session or revision is unknown afterwards: repeating its
+close answers `unknown_session`, and session identifiers must not be reused.
 
 ### Preparation
 
@@ -96,8 +113,18 @@ revision and records the preparation port's observation:
 | `unknown` | `unknown`; resources treated as occupied | `unknown` |
 
 A pending or unknown attempt is reissued with the same ticket. A prepared
-revision is never prepared again. Desiring a failed or superseded revision
-again starts a new generation.
+revision is never prepared again, and a revoked one never starts; a pending
+or unknown attempt of a revoked revision is still reissued so it can be
+settled and cleaned up. Desiring a failed or superseded revision again starts
+a new generation.
+
+An attempt bound to an older generation (its revision desired again, or no
+longer desired) blocks a new start as `preparation_in_flight` or
+`not_desired`. `prepare` then reissues that attempt's own ticket
+(`prepare::reissue`) and records its result, which settles it as
+`superseded`, `failed` or `unknown`; desiring the revision again then starts a
+fresh attempt. The same result delivered twice is recorded once, including a
+`prepared` result for a generation that is no longer desired.
 
 ### Promotion and rollback
 
@@ -119,17 +146,22 @@ work.
 
 The request identifier makes both idempotent. Repeating a request returns its
 receipt (`already_applied`) without selecting or preparing again, so a lost
-acknowledgement is reconciled by repeating it. Reusing an identifier for
-another command is `request_conflict`. Of several requests that expect the
+acknowledgement is reconciled by repeating it. The receipt binds the kind,
+revision, reference, policy and expected rollout generation: reusing an
+identifier for any other command, including the same command with another
+expected generation, is `request_conflict`. Of several requests that expect the
 same rollout generation, one is selected and the rest are
 `generation_conflict`. A favorable answer is evidence, never authority.
 
 ### Sessions and effects
 
 `admit-session --request REQUEST --session ID` pins the session to the
-selected revision when the request's revision equals it. `effect_permitted`
-refuses further effects when the session is closed or revoked, or its pinned
-revision or qualification is revoked. Pinning preserves configuration, not
+selected revision when the request's revision equals it, and exits non-zero
+when admission is refused. Re-admitting a pinned session returns its pin only
+while the session is live and neither its revision nor its qualification is
+revoked; a closed session is `session_closed`. `effect_permitted` refuses
+further effects when the session is closed or revoked, or its pinned revision
+or qualification is revoked. Pinning preserves configuration, not
 privileges. Cancellation, deadlines, grants and budgets keep their existing
 owners.
 
@@ -191,23 +223,53 @@ scripted for.
 Lifecycles live in the existing store database, table
 `agent_revision_lifecycles_v1`, one row per definition with a version.
 A commit names the version it read; any other version is a conflict, and the
-shell reloads and reapplies up to four times. Only `desire` creates a row.
-`resolve` and `inspect` write nothing, and `inspect` does not create a missing
-store.
+shell reloads and reapplies up to four times. Embedders apply their own pure
+transition the same way with `agent_revision::transact`. Only `desire`
+creates a row. `resolve` and `inspect` write nothing, and `inspect` does not
+create a missing store.
 
 ## Integration
 
 The session-admission seam, `agent_revision::seam`, is not wired into
-`implementation-attempt` yet:
+`implementation-attempt` yet. Its contract for the integrator:
 
-- `seam::admit(store, request, session)` answers `unmanaged` without writing
-  when the request's definition has no lifecycle, so unmanaged definitions
-  behave exactly as before. Otherwise it answers `admitted` with the pin or
-  `refused`.
-- `seam::effect(store, definition, session)` answers `unmanaged`, `permitted`
-  or `blocked` before a protected effect.
-- `seam::close(store, definition, session, checkpoints)` closes a session and
-  holds its checkpoints.
+1. Before writing `intent.json`, call
+   `seam::admit(store, request, session) -> Result<Decision, String>` once
+   with the attempt's session identifier, which must be unique and never
+   reused.
+   - `Decision::Unmanaged`: the definition has no lifecycle. Nothing was
+     written; proceed exactly as today.
+   - `Decision::Admitted { admitted }`: the session is pinned to the selected
+     revision (`pinned`, or `already_pinned` for a retried admission).
+   - `Decision::Refused { refusal }`: start nothing: no binding, intent or
+     worker effect. A managed definition refuses every new session until a
+     revision is selected (`no_selection`), and refuses a request whose
+     revision is not the selection (`revision_not_selected`).
+   - `Err(String)`: the store or request failed; start nothing.
+2. Record `decision.admission()` durably with the session, in the same write
+   as the intent: `Admission::Managed` (`"managed"`) for `admitted`,
+   `Admission::Unmanaged` (`"unmanaged"`) for `unmanaged`. It is `None` for
+   `refused`. Reconciliation after a restart reads it back; never derive it
+   from whether a lifecycle exists now.
+3. Before each protected effect, call
+   `seam::effect(store, request, session, admission) -> Result<Effect, String>`
+   with the recorded mode and proceed only on `Effect::Unmanaged` or
+   `Effect::Permitted { permit }`.
+   - `Unmanaged` sessions answer `unmanaged` without reading the store, even
+     after their definition becomes managed. They were admitted outside the
+     lifecycle, so lifecycle revocation does not reach them; they finish
+     exactly as they would today.
+   - `Managed` sessions fail closed: `Effect::Blocked { refusal }` for a
+     closed or revoked session, a revoked pinned revision or qualification,
+     and `unknown_session` when the lifecycle or the pin is missing.
+   - `Err(String)` is not a permit.
+4. After the terminal result, call
+   `seam::close(store, request, session, admission, checkpoints) -> Result<Closure, String>`.
+   `Unmanaged` answers `Closure::Unmanaged` and writes nothing. `Managed`
+   answers `Closure::Closed { closed }` and holds the checkpoints on the
+   pinned revision, or `Closure::Refused { refusal }`; a session closed
+   without a held checkpoint is forgotten, so repeating its close answers
+   `unknown_session`.
 
 `lattice_core::agent_revision::projection::slots` projects
 `lattice.agent-revision-slots.v1` for a later inventory schema. The inventory

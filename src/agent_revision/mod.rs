@@ -21,6 +21,9 @@ mod decisions;
 mod port;
 pub mod seam;
 
+pub use commands::Seed;
+pub use commands::transact;
+
 type Ticket = lattice_core::agent_revision::ops::prepare::Ticket;
 type Bundle = lattice_core::agent_revision::facts::Bundle;
 type Sweep = lattice_core::agent_revision::ops::retention::Sweep;

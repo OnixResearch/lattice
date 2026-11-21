@@ -60,12 +60,12 @@
   },
   "tests": {
     "files": ["tests/test_agent_revision_core.rs", "tests/test_agent_revision_shell.rs"],
-    "counts": { "core": 13, "shell": 4 },
-    "negative": "every Refusal variant is asserted at least once in tests/test_agent_revision_core.rs; framing defects in components_frame_only_when_declared_and_every_change_alters_the_digest"
+    "counts": { "core": 21, "shell": 7 },
+    "negative": "every Refusal variant is asserted at least once in tests/test_agent_revision_core.rs; framing defects in components_frame_only_when_declared_and_every_change_alters_the_digest; capacity bounds are filled past their size; the lattice binary's exit status is asserted for resolve, admit-session, rollback and cleanup"
   },
   "checks": {
-    "focused_tests": "cargo test --locked --test test_agent_revision_core --test test_agent_revision_shell: exit 0, 13 + 4 passed",
-    "fmt": "cargo fmt --check -p lattice -p lattice-core: exit 0",
+    "focused_tests": "cargo test --locked -p lattice --test test_agent_revision_core --test test_agent_revision_shell: exit 0, 21 + 7 passed",
+    "fmt": "cargo fmt --check and cargo fmt --check -p lattice -p lattice-core: exit 0",
     "clippy": "cargo clippy --workspace --exclude lattice-repository-validation-fixture --all-features --all-targets --no-deps --locked -- -D warnings: exit 0",
     "octet": "octet-precommit-check: exit 0; root 1052 accepted, 0 new, 0 stale; lattice-core 25 accepted, 0 new, 0 stale",
     "cairn": "cairn validate --root . and gate proposal/design/tasks manage-agent-revisions: exit 0, verdict PASS",

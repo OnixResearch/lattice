@@ -77,14 +77,33 @@ pub fn query(
     })
 }
 
+/// The receipt answers exactly this command: same kind, revision,
+/// qualification, policy and the expected rollout generation it advanced.
 fn is_same_request(selection: &Choice, command: &Command) -> bool {
     let fields = [
         selection.kind == command.kind,
         selection.revision == command.revision,
         selection.qualification_ref == command.qualification_ref,
         selection.policy == command.policy,
+        command.expected_rollout_generation.checked_add(1) == Some(selection.rollout_generation),
     ];
     fields.iter().all(|field| *field)
+}
+
+/// Forget the oldest receipt when the window is full. Its request expected
+/// an older rollout generation, so repeating it is refused, never reapplied.
+fn forget_oldest_receipt(lifecycle: &mut Lifecycle) {
+    if super::room(lifecycle.receipts.len(), crate::agent_revision::MAX_RECEIPTS).is_ok() {
+        return;
+    }
+    let oldest = lifecycle
+        .receipts
+        .iter()
+        .min_by_key(|(_, receipt)| receipt.rollout_generation)
+        .map(|(request_id, _)| request_id.clone());
+    if let Some(request_id) = oldest {
+        lifecycle.receipts.remove(&request_id);
+    }
 }
 
 fn is_in_scope(admitted: &crate::agent_revision::state::Qualification, command: &Command) -> bool {
@@ -191,7 +210,9 @@ pub fn select(
     if command.expected_rollout_generation != lifecycle.rollout_generation {
         return Err(Refusal::GenerationConflict);
     }
-    super::room(lifecycle.receipts.len(), crate::agent_revision::MAX_RECEIPTS)?;
+    let mut next = lifecycle.clone();
+    forget_oldest_receipt(&mut next);
+    super::room(next.receipts.len(), crate::agent_revision::MAX_RECEIPTS)?;
     let selection = Choice {
         kind: command.kind,
         request_id: command.request_id.clone(),
@@ -202,9 +223,11 @@ pub fn select(
         rollout_generation: super::next(lifecycle.rollout_generation)?,
     };
     let promotion_identity = identify(&selection)?;
-    let mut next = lifecycle.clone();
     next.qualifications.retain(|admitted| !is_in_scope(admitted, command));
-    super::room(next.qualifications.len(), crate::agent_revision::MAX_RECEIPTS)?;
+    if super::room(next.qualifications.len(), crate::agent_revision::MAX_QUALIFICATIONS).is_err() {
+        super::forget_unreferenced(&mut next);
+    }
+    super::room(next.qualifications.len(), crate::agent_revision::MAX_QUALIFICATIONS)?;
     next.qualifications.push(crate::agent_revision::state::Qualification {
         revision: command.revision.clone(),
         task_family: command.policy.task_family.clone(),

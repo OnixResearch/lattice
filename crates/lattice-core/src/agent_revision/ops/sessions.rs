@@ -38,7 +38,9 @@ pub enum Admitted {
     },
 }
 
-/// Pin `entry.session` to `entry.revision`, which must be the current selection.
+/// Pin `entry.session` to `entry.revision`, which must be the current
+/// selection. Re-admitting a pinned session returns its pin only while the
+/// session is live and its revision and qualification are not revoked.
 pub fn admit(lifecycle: &Lifecycle, entry: Entry<'_>) -> Result<super::Applied<Admitted>, Refusal> {
     let checks = [
         crate::agent_revision::is_token(entry.session),
@@ -56,6 +58,11 @@ pub fn admit(lifecycle: &Lifecycle, entry: Entry<'_>) -> Result<super::Applied<A
         if pin.revision != entry.revision {
             return Err(Refusal::SessionConflict);
         }
+        if pin.status == crate::agent_revision::state::SessionStatus::Closed {
+            return Err(Refusal::SessionClosed);
+        }
+        super::usable(lifecycle, &pin.revision)?;
+        super::attested(lifecycle, &pin.qualification_ref)?;
         let outcome = Admitted::AlreadyPinned {
             pin: pin.clone(),
             pin_identity: identify(pin)?,
@@ -68,12 +75,18 @@ pub fn admit(lifecycle: &Lifecycle, entry: Entry<'_>) -> Result<super::Applied<A
     }
     super::usable(lifecycle, entry.revision)?;
     super::attested(lifecycle, &selected.qualification_ref)?;
-    super::room(lifecycle.sessions.len(), crate::agent_revision::MAX_SESSIONS)?;
+    let live = lifecycle
+        .sessions
+        .values()
+        .filter(|pin| pin.status == crate::agent_revision::state::SessionStatus::Live)
+        .count();
+    super::room(live, crate::agent_revision::MAX_SESSIONS)?;
     let pin = Pin {
         revision: entry.revision.to_owned(),
         qualification_ref: selected.qualification_ref.clone(),
         rollout_generation: selected.rollout_generation,
         status: crate::agent_revision::state::SessionStatus::Live,
+        checkpoints: Vec::new(),
     };
     let pin_identity = identify(&pin)?;
     let mut next = lifecycle.clone();
@@ -120,12 +133,18 @@ pub enum Closed {
 }
 
 /// Close `session`. Its checkpoints become holds on the pinned revision, so
-/// the revision's artifacts stay retained; the pin itself is never removed.
+/// the revision's artifacts stay retained. The closed pin is kept only while
+/// one of its checkpoints is held; a session closed without a held checkpoint
+/// is forgotten, so repeating its close answers `unknown_session`.
 pub fn close(lifecycle: &Lifecycle, session: &str, checkpoints: &[String]) -> Result<super::Applied<Closed>, Refusal> {
     if !crate::agent_revision::ports::is_reference_set(checkpoints) {
         return Err(Refusal::Malformed);
     }
     let pin = lifecycle.sessions.get(session).ok_or(Refusal::UnknownSession)?;
+    let kept = pin.checkpoints.iter().chain(checkpoints).cloned().collect::<std::collections::BTreeSet<_>>();
+    if !crate::agent_revision::is_within(kept.len(), crate::agent_revision::MAX_REFERENCES) {
+        return Err(Refusal::CapacityExhausted);
+    }
     let mut next = lifecycle.clone();
     let candidate = super::candidate_mut(&mut next, &pin.revision)?;
     let fresh = checkpoints
@@ -140,21 +159,38 @@ pub fn close(lifecycle: &Lifecycle, session: &str, checkpoints: &[String]) -> Re
     if !crate::agent_revision::is_within(count, crate::agent_revision::MAX_REFERENCES) {
         return Err(Refusal::CapacityExhausted);
     }
-    let is_noop = fresh.is_empty() && pin.status == crate::agent_revision::state::SessionStatus::Closed;
-    candidate.holds.extend(fresh);
+    let is_closed = pin.status == crate::agent_revision::state::SessionStatus::Closed;
     let held = checkpoints.to_vec();
-    if is_noop {
+    if fresh.is_empty() && is_closed && kept.len() == pin.checkpoints.len() {
         return Ok(super::unchanged(lifecycle, Closed::AlreadyClosed { held_checkpoints: held }));
     }
+    candidate.holds.extend(fresh);
     if let Some(closing) = next.sessions.get_mut(session) {
         closing.status = crate::agent_revision::state::SessionStatus::Closed;
+        closing.checkpoints = kept.into_iter().collect();
     }
-    debug_assert!(next.sessions.contains_key(session));
+    forget_unheld(&mut next, &pin.revision);
     debug_assert!(held.len() <= count);
+    debug_assert!(next.sessions.get(session).is_none_or(|closed| !closed.checkpoints.is_empty()));
     Ok(super::Applied {
         lifecycle: next,
         outcome: Closed::Closed { held_checkpoints: held },
     })
+}
+
+/// Forget closed sessions pinned to `revision` none of whose checkpoints is
+/// still held there, and drop each released checkpoint from the pins kept.
+pub(crate) fn forget_unheld(lifecycle: &mut Lifecycle, revision: &str) {
+    let held = lifecycle.candidates.get(revision).map_or_else(std::collections::BTreeSet::new, |candidate| {
+        candidate.holds.iter().map(|hold| hold.reference.clone()).collect()
+    });
+    lifecycle.sessions.retain(|_, pin| {
+        if pin.revision != revision || pin.status == crate::agent_revision::state::SessionStatus::Live {
+            return true;
+        }
+        pin.checkpoints.retain(|checkpoint| held.contains(checkpoint));
+        !pin.checkpoints.is_empty()
+    });
 }
 
 /// What one revocation names.
@@ -173,8 +209,24 @@ pub enum Revocation {
     AlreadyRevoked,
 }
 
+/// Whether the lifecycle references `target`: a revision it retains, a
+/// qualification it records or pins, or a session it pins.
+fn is_referenced(lifecycle: &Lifecycle, target: &Target) -> bool {
+    match target {
+        Target::Revision(revision) => lifecycle.candidates.contains_key(revision),
+        Target::Qualification(reference) => {
+            let is_recorded =
+                lifecycle.qualifications.iter().any(|admitted| admitted.attachment.qualification_ref == *reference);
+            is_recorded || lifecycle.sessions.values().any(|pin| pin.qualification_ref == *reference)
+        }
+        Target::Session(session) => lifecycle.sessions.contains_key(session),
+    }
+}
+
 /// Record a revocation. Revocation is monotonic and never rewrites pins or
-/// history; a revoked last usable revision stops being usable.
+/// history; a revoked last usable revision stops being usable. Revoking a
+/// target the lifecycle references is never refused; the per-kind bound
+/// applies only to targets it does not reference.
 pub fn revoke(lifecycle: &Lifecycle, target: &Target) -> Result<super::Applied<Revocation>, Refusal> {
     let (value, is_wellformed) = match target {
         Target::Revision(value) => (value, crate::agent_revision::is_bare_digest(value)),
@@ -184,6 +236,7 @@ pub fn revoke(lifecycle: &Lifecycle, target: &Target) -> Result<super::Applied<R
     if !is_wellformed {
         return Err(Refusal::Malformed);
     }
+    let is_referenced = is_referenced(lifecycle, target);
     let mut next = lifecycle.clone();
     let set = match target {
         Target::Revision(_) => &mut next.revoked.revisions,
@@ -193,7 +246,9 @@ pub fn revoke(lifecycle: &Lifecycle, target: &Target) -> Result<super::Applied<R
     if set.contains(value) {
         return Ok(super::unchanged(lifecycle, Revocation::AlreadyRevoked));
     }
-    super::room(set.len(), crate::agent_revision::MAX_REVOCATIONS)?;
+    if !is_referenced {
+        super::room(set.len(), crate::agent_revision::MAX_REVOCATIONS)?;
+    }
     set.insert(value.clone());
     debug_assert!(set.contains(value));
     if next.last_usable.as_ref() == Some(value) && matches!(target, Target::Revision(_)) {
