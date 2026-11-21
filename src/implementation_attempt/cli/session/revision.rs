@@ -199,16 +199,8 @@ pub(in super::super) fn permit(
     recorded: &Recorded,
     directory: &std::path::Path,
 ) -> Result<(), String> {
-    let Some(opened) = store.for_recorded(recorded)? else {
+    let Some(refusal) = recheck(store, request, recorded)? else {
         return Ok(());
-    };
-    let effect = crate::agent_revision::seam::effect(&opened, request, &identifier(request), recorded.admission)?;
-    drop(opened);
-    let refusal = match effect {
-        crate::agent_revision::seam::Effect::Unmanaged | crate::agent_revision::seam::Effect::Permitted { .. } => {
-            return Ok(());
-        }
-        crate::agent_revision::seam::Effect::Blocked { refusal } => refusal,
     };
     // Only a managed session has a store to block it.
     debug_assert_eq!(recorded.admission, Admission::Managed);
@@ -228,6 +220,28 @@ pub(in super::super) fn permit(
         super::super::refusal::Reason::RevisionBlocked,
         &refusal,
     ))
+}
+
+/// The `seam::effect` check of [`permit`] without writing anything: the
+/// refusal of a blocked managed session, or `None` while it is permitted or
+/// unmanaged. A repair step after the first uses it and retains the refusal
+/// in its post-dispatch disposition rather than as a pre-dispatch block.
+pub(in super::super) fn recheck(
+    store: Store<'_>,
+    request: &Request,
+    recorded: &Recorded,
+) -> Result<Option<lattice_core::agent_revision::Refusal>, String> {
+    let Some(opened) = store.for_recorded(recorded)? else {
+        return Ok(None);
+    };
+    let effect = crate::agent_revision::seam::effect(&opened, request, &identifier(request), recorded.admission)?;
+    drop(opened);
+    match effect {
+        crate::agent_revision::seam::Effect::Unmanaged | crate::agent_revision::seam::Effect::Permitted { .. } => {
+            Ok(None)
+        }
+        crate::agent_revision::seam::Effect::Blocked { refusal } => Ok(Some(refusal)),
+    }
 }
 
 /// `seam::close` with no checkpoints after the attempt ends. A managed

@@ -19,22 +19,34 @@ interfaces.
   checks with their configuration identities, and is framed into the profile
   revision. A pure loop decides every spawn and ends in `correct_candidate`,
   `repaired_candidate`, `budget_exhausted`, `cancelled`, `uncertain`,
-  `not_repairable`, `checks_rejected`, `lineage_blocked` or `kiln_owned`.
-  Every candidate is captured on the host as a new revision of the same
-  attempt and fence and every declared check is rebound to it; exit status,
-  worker claims and skipped, missing, reconfigured, crossed or self-approved
-  checks cannot pass it. Embedders supply `Ports::repair` (worker, check and
-  clock ports); the standalone CLI refuses a repair request as
-  `repair_ports_unavailable`. Step intents, step records and the disposition
-  are retained write-once under `repair/`, and recovery only reports the
-  retained disposition. `lineage` (`lattice.kiln-budget-lineage.v1`) maps
-  Kiln `339116f6`'s lineage explanation, account remainder and serving gate;
-  a blocker, backpressure or exhausted remainder is refused before any write
-  (`lineage_blocked`, `lineage_exhausted`), every step draws from the one
-  account, and a child is admitted only within the remainder. Usage is
-  attributed per phase with the existing provenance and unknown counts stay
-  unknown. `cli::Ports` gains the `repair` field. See
-  `docs/candidate-worker.md`.
+  `not_repairable`, `checks_rejected`, `lineage_blocked`, `kiln_owned`,
+  `fence_superseded` or `authority_withdrawn`. Every candidate is captured on
+  the host as a new revision of the same attempt and fence and every declared
+  check is rebound to it and run against its own read-only copy of that
+  revision; exit status, worker claims and skipped, missing, reconfigured,
+  crossed or self-approved checks cannot pass it, and a check whose copy
+  changed is rejected as `candidate_drift`. Each repair step after the first
+  rechecks its fence, execution binding and managed revision under the fence
+  lock, and a lost binding or revision ends the loop as the post-dispatch
+  `authority_withdrawn`. The worker and check ports are given the time left
+  before the elapsed bound, and the clock and the charged totals are checked
+  again after each step and before a passing disposition, so a step or check
+  that overruns the elapsed bound, a policy budget or the lineage remainder
+  ends as `budget_exhausted` and an unreadable clock as `uncertain`. A
+  cancelled or unknown worker outcome outranks any proposal of changed work.
+  Embedders supply `Ports::repair` (worker, check and clock ports); the
+  standalone CLI refuses a repair request as `repair_ports_unavailable`. Step
+  intents, step records and the disposition are retained write-once under
+  `repair/`, and recovery only reports the retained disposition. `lineage`
+  (`lattice.kiln-budget-lineage.v1`) maps Kiln `339116f6`'s lineage
+  explanation, account remainder and serving gate, and accepts every
+  dimension name Kiln's `Alias` admits, reporting the ones Lattice cannot
+  charge as unaccounted; a blocker, backpressure or exhausted remainder is
+  refused before the state root is touched (`lineage_blocked`,
+  `lineage_exhausted`), every step draws from the one account, and a child is
+  admitted only within the remainder. Usage is attributed per phase with the
+  existing provenance and unknown counts stay unknown. `cli::Ports` gains the
+  `repair` field. See `docs/candidate-worker.md`.
 - Workflow-agent revisions (Lattice #25, fixture level). A
   `lattice.workflow-agent-bundle.v1` bundle binds a compiled workflow-intent
   plan (compiler revision and artifact, plan, graph, runtime profile, Cairn

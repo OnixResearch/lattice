@@ -70,7 +70,7 @@ fn a_well_formed_snapshot_validates_and_every_field_moves_its_identity() {
 #[test]
 fn malformed_snapshots_are_refused() {
     type Case = (fn(&mut Binding), BindingError);
-    let cases: [Case; 8] = [
+    let cases: [Case; 9] = [
         (|value| value.schema = "kiln.lineage".into(), BindingError::Schema),
         (|value| value.root = "ABC".into(), BindingError::Identity),
         (|value| value.account = hex('A'), BindingError::Identity),
@@ -80,7 +80,13 @@ fn malformed_snapshots_are_refused() {
         (|value| value.remaining.clear(), BindingError::Dimensions),
         (
             |value| {
-                value.remaining.insert("Model Requests".into(), 1);
+                value.remaining.insert(String::new(), 1);
+            },
+            BindingError::Dimensions,
+        ),
+        (
+            |value| {
+                value.remaining.insert("a".repeat(super::MAX_DIMENSION_NAME_BYTES + 1), 1);
             },
             BindingError::Dimensions,
         ),
@@ -146,6 +152,33 @@ fn the_gate_refuses_blockers_backpressure_and_exhaustion_before_spawn() {
     let mut ungated = binding(4, 8);
     ungated.backpressure = Backpressure::None;
     ungated.gate(&Draws::default(), &draws(1, 1)).expect("no serving owner");
+}
+
+#[test]
+fn kiln_alias_names_are_admitted_and_unmapped_ones_stay_unaccounted() {
+    // Kiln's `Alias::new` admits any non-empty name of at most 256 bytes.
+    let mut kiln = binding(4, 8);
+    for name in [
+        "gpu-seconds",
+        "Model Requests",
+        &"g".repeat(super::MAX_DIMENSION_NAME_BYTES),
+    ] {
+        kiln.remaining.insert(name.to_owned(), 2);
+    }
+    kiln.validate().expect("every Kiln alias is admitted");
+    let mut unaccounted = kiln.unaccounted();
+    unaccounted.sort();
+    let mut expected = vec![
+        "Model Requests".to_owned(),
+        "g".repeat(super::MAX_DIMENSION_NAME_BYTES),
+        "gpu-seconds".to_owned(),
+    ];
+    expected.sort();
+    assert_eq!(unaccounted, expected, "an unmapped dimension is reported, never rejected or drawn");
+    kiln.gate(&draws(3, 7), &draws(1, 1)).expect("an unmapped dimension is never drawn");
+    assert_eq!(kiln.overdrawn(&draws(4, 8)), None, "a draw equal to the remainder fits");
+    assert_eq!(kiln.overdrawn(&draws(4, 9)), Some(super::TOOL_INVOCATIONS.to_owned()));
+    assert_eq!(kiln.overdrawn(&draws(5, 9)), Some(super::MODEL_REQUESTS.to_owned()));
 }
 
 #[test]

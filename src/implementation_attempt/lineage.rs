@@ -21,7 +21,9 @@ pub const KILN_SOURCE_REVISION: &str = "339116f68e762e4caf0d05a9ac73a6e97a74b67d
 pub const MAX_LINEAGE_DEPTH: u32 = 8;
 /// Kiln's `MAX_DIMENSIONS` for one `Amounts` map.
 pub const MAX_DIMENSIONS: usize = 16;
-const MAX_DIMENSION_NAME_BYTES: usize = 64;
+/// Kiln's `DEFAULT_MAX_ALIAS_BYTES`: the bound of an `Alias`, which keys
+/// `Amounts`. `Alias::new` admits any non-empty string within it.
+pub const MAX_DIMENSION_NAME_BYTES: usize = 256;
 /// The dimension Lattice charges for model requests of a worker step.
 pub const MODEL_REQUESTS: &str = "model_requests";
 /// The dimension Lattice charges for worker tool calls and check executions.
@@ -156,11 +158,9 @@ impl Binding {
         if !self.is_shape_consistent() {
             return Err(BindingError::Shape);
         }
-        let is_dimension_valid = |name: &String| {
-            !name.is_empty()
-                && name.len() <= MAX_DIMENSION_NAME_BYTES
-                && name.bytes().all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
-        };
+        // Kiln's `Alias::new`: non-empty and within the byte bound, with no
+        // narrower grammar. A name Lattice cannot charge stays unaccounted.
+        let is_dimension_valid = |name: &String| !name.is_empty() && name.len() <= MAX_DIMENSION_NAME_BYTES;
         if self.remaining.is_empty()
             || self.remaining.len() > MAX_DIMENSIONS
             || !self.remaining.keys().all(is_dimension_valid)
@@ -258,6 +258,17 @@ impl Binding {
             });
         }
         Ok(())
+    }
+
+    /// The first dimension Lattice charges whose remainder `drawn` already
+    /// exceeds. A charge equal to the remainder fits; a dimension Lattice
+    /// cannot charge is never overdrawn.
+    #[must_use]
+    pub fn overdrawn(&self, drawn: &Draws) -> Option<String> {
+        self.remaining
+            .iter()
+            .find(|(dimension, remaining)| drawn.amount(dimension).is_some_and(|amount| amount > **remaining))
+            .map(|(dimension, _)| dimension.clone())
     }
 
     /// Dimensions Lattice cannot charge; their usage stays unknown to Kiln.

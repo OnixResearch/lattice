@@ -3,35 +3,45 @@
 //! The embedder supplies a [`WorkerPort`] that runs one bounded worker step in
 //! the attempt workspace, a [`CheckPort`] that runs one declared check, and a
 //! clock. The shell owns everything else: the frozen policy and lineage, the
-//! host-derived candidate of every step, the check invocations, the charges
-//! and the retained records. The standalone CLI supplies no ports, so a
-//! request with a repair policy is refused there before any effect.
+//! host-derived candidate of every step, the immutable copy of it each check
+//! runs against, the deadlines, the check invocations, the charges and the
+//! retained records. The standalone CLI supplies no ports, so a request with
+//! a repair policy is refused there before any effect.
 
 // r[impl lattice.implementation_attempt.repair.scenario.absent]
 // r[impl lattice.implementation_attempt.lineage.scenario.exhausted]
 
+mod materialized;
 mod records;
 mod steps;
 
 /// One bounded worker step of the attempt.
 pub trait WorkerPort {
-    /// Run `request` in `workspace`. `is_cancel_requested` reports a
-    /// persisted cancellation request; a failed observation reports `true`.
+    /// Run `request` in `workspace` and stop it within `deadline`, the time
+    /// left before the policy's elapsed bound. `is_cancel_requested` reports
+    /// a persisted cancellation request; a failed observation reports `true`.
+    /// The shell re-reads its clock afterwards: a step that returns past the
+    /// bound is never checked.
     fn step(
         &mut self,
         request: &crate::implementation_attempt::repair::step::Request,
         workspace: &std::path::Path,
+        deadline: std::time::Duration,
         is_cancel_requested: &dyn Fn() -> bool,
     ) -> crate::implementation_attempt::repair::step::Report;
 }
 
 /// The admitted host check executor.
 pub trait CheckPort {
-    /// Run one declared check against the candidate in `workspace`.
+    /// Run one declared check against `candidate`, a read-only copy of the
+    /// captured candidate revision that no other check sees, and stop it
+    /// within `deadline`. The shell re-captures the copy afterwards and
+    /// rejects the evidence as `candidate_drift` if it changed.
     fn run(
         &mut self,
         invocation: &crate::implementation_attempt::repair::checks::Invocation,
-        workspace: &std::path::Path,
+        candidate: &std::path::Path,
+        deadline: std::time::Duration,
     ) -> crate::implementation_attempt::repair::checks::Observation;
 }
 
@@ -40,6 +50,16 @@ pub struct Ports<'a> {
     pub worker: &'a mut dyn WorkerPort,
     pub checks: &'a mut dyn CheckPort,
     pub clock: &'a dyn crate::operation::shell::Clock,
+}
+
+/// The revocable authority every repair step after the first rechecks under
+/// the fence lock, through the same binding and revision-seam checks that
+/// ran before the first step.
+pub(super) struct Authority<'a> {
+    pub(super) compute: &'a mut dyn crate::execution_binding::ComputeAllocationPort,
+    pub(super) admitted: lattice_core::execution_binding::admission::bound::Admitted,
+    pub(super) revisions: super::session::revision::Store<'a>,
+    pub(super) recorded: super::session::intent::Recorded,
 }
 
 /// Refuse a malformed policy or lineage, or a policy over served routes.
@@ -139,6 +159,7 @@ pub(super) struct Run<'a> {
     pub(super) identity: &'a str,
     pub(super) receipt: super::binding::usage::WorkerReceipt,
     pub(super) store: crate::store::Store,
+    pub(super) authority: Authority<'a>,
 }
 
 /// Drive the loop to a disposition and retain it; returns the observation.
@@ -149,15 +170,23 @@ pub(super) fn execute(run: Run<'_>, ports: Ports<'_>) -> Result<serde_json::Valu
     };
     let records = records::Retained::open(run.directory, run.identity)?;
     let started_epoch_ms = observe(ports.clock);
-    let mut driver = steps::Driver::prepare(run.request, run.state, &records, policy)?;
+    let frame = steps::Frame {
+        request: run.request,
+        state_root: run.state,
+        records: &records,
+        authority: run.authority,
+    };
+    let mut driver = steps::Driver::prepare(frame, policy)?;
     let disposition = driver.drive(ports, started_epoch_ms)?;
     let window = super::binding::usage::WorkerWindow {
         started_epoch_ms,
         finished_epoch_ms: driver.finished_epoch_ms,
     };
     // The attempt usage observation precedes the retained disposition.
+    debug_assert_eq!(run.receipt.request_identity(), run.identity, "the receipt binds this request");
     run.receipt.persist(&run.store, window, run.directory)?;
     let observation = driver.observation(run.request, run.identity, &run.receipt, &disposition);
+    debug_assert!(observation.get("disposition").is_some(), "the observation names its disposition");
     records.retain_disposition(&observation)?;
     Ok(observation)
 }

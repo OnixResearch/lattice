@@ -21,14 +21,17 @@ r[lattice.implementation_attempt.repair.scenario.dispositions]
 - GIVEN a repair loop
 - WHEN the first candidate passes, a repaired candidate passes, an iteration, elapsed, model, tool or lineage bound would be exceeded by the next step, cancellation is requested, a worker or check outcome is unknown, or a failure lies outside the admitted classes
 - THEN the disposition MUST be `correct_candidate`, `repaired_candidate`, `budget_exhausted` with its bound, `cancelled`, `uncertain` with its cause, or `not_repairable`, respectively, and no further worker step MUST spawn
+- AND every worker step and every check MUST be given the time left before the elapsed bound, the clock MUST be read again after each step and before any passing disposition, and a step or check that returns at or past the elapsed bound, or whose charged totals exceed a policy budget or the lineage remainder in a dimension Lattice charges, MUST end as `budget_exhausted` naming that bound, and an unreadable clock as `uncertain` with cause `clock`, never as `correct_candidate` or `repaired_candidate`
+- AND before every step after the first, under the fence lock, the shell MUST recheck the fence, the execution binding and the managed revision through the same checks as before the first step; a superseded fence MUST end the loop as `fence_superseded` and a binding that is no longer current, a blocked managed session or an unreadable revision seam as `authority_withdrawn` with its cause, without spawning that step and as a retained post-dispatch disposition, never a refusal or `dispatched:false`
 - AND every step MUST persist its intent before its worker effect, and recovery MUST report only the retained disposition, never spawn, check or charge again, and treat a missing disposition as an unknown outcome
 
 #### Scenario: Checks cannot be bypassed
 
 r[lattice.implementation_attempt.repair.scenario.bypass]
-- GIVEN a step that exits zero, produces no new candidate, writes its own success claims, changes a check's configuration, or whose check is skipped, missing, duplicated, undeclared, run against another revision, run by another executor or run by the implementing worker profile itself
+- GIVEN a step that exits zero, produces no new candidate, writes its own success claims, changes a check's configuration, or whose check is skipped, missing, duplicated, undeclared, run against another revision, run by another executor, run by the implementing worker profile itself, or changes the candidate it checks
 - WHEN its checks are classified
 - THEN the candidate MUST NOT pass: no new candidate is the failure class `no_candidate`, a failing check is its failure class, and every other case MUST reject the evidence as `checks_rejected` with its defect
+- AND every check MUST run against its own read-only copy of the captured candidate revision, never the worker workspace, and a copy that no longer captures to the candidate after its check MUST reject the evidence as `candidate_drift` before any further check runs
 
 #### Scenario: Changed work stays with Kiln
 
@@ -36,6 +39,7 @@ r[lattice.implementation_attempt.repair.scenario.kiln_owned]
 - GIVEN a step whose binding names other work, another work version or task, or another attempt, fence or envelope, or a worker that proposes changed work or a new semantic attempt
 - WHEN the loop records the step or its report
 - THEN it MUST refuse the step as `changed_work` or `new_semantic_attempt`, or end as `kiln_owned` without another step or check
+- AND a cancelled or unknown worker outcome MUST take precedence over its proposal and end the loop as `cancelled` or `uncertain`
 
 #### Scenario: No policy behaves as before
 
@@ -47,14 +51,14 @@ r[lattice.implementation_attempt.repair.scenario.absent]
 
 ### Requirement: Kiln budget lineage consumer
 
-r[lattice.implementation_attempt.lineage] An attempt MAY carry Kiln #61's admitted budget lineage for its account as the `lattice.kiln-budget-lineage.v1` consumer type: root, account, parent, depth, remaining amounts by dimension, lineage blocker and serving gate. Lattice MUST only draw from it: it never mints, refunds or resets quota, and it records the exact Kiln source revision and field mapping.
+r[lattice.implementation_attempt.lineage] An attempt MAY carry Kiln #61's admitted budget lineage for its account as the `lattice.kiln-budget-lineage.v1` consumer type: root, account, parent, depth, remaining amounts by dimension, lineage blocker and serving gate. Dimension names MUST follow Kiln's `Alias` bounds, any non-empty name of at most 256 bytes, and a name Lattice cannot charge MUST be accepted and reported as unaccounted. Lattice MUST only draw from it: it never mints, refunds or resets quota, and it records the exact Kiln source revision and field mapping.
 
 #### Scenario: Exhaustion refuses before spawn
 
 r[lattice.implementation_attempt.lineage.scenario.exhausted]
 - GIVEN a lineage with a blocker, a serving gate other than `none` or `eligible`, a zero remainder in any dimension, or a remainder that cannot cover the next step's reservation in a dimension Lattice charges
 - WHEN an attempt is run, or its loop asks for another step
-- THEN the first step MUST be refused before any write as `lineage_blocked` or `lineage_exhausted` with `dispatched:false`, and a later step MUST NOT spawn and the loop MUST end as `budget_exhausted` with the lineage dimension or `lineage_blocked`
+- THEN the first step MUST be refused before any write, leaving the state root unchanged, as `lineage_blocked` or `lineage_exhausted` with `dispatched:false`, and a later step MUST NOT spawn and the loop MUST end as `budget_exhausted` with the lineage dimension or `lineage_blocked`
 
 #### Scenario: One aggregate budget
 

@@ -4,6 +4,8 @@
 //! its worker effect and `step-N.json` once after its checks; the run ends
 //! with one `disposition.json`. Records are write-once: a replay with other
 //! content is refused, and recovery reads only the retained disposition.
+//! Each check's transient copy of the candidate, `check-N-<check>/`, is
+//! removed after the check.
 
 // r[impl lattice.implementation_attempt.repair.scenario.dispositions]
 
@@ -53,6 +55,12 @@ impl Retained {
 
     pub(super) fn retain_disposition(&self, observation: &serde_json::Value) -> Result<(), String> {
         self.retain(DISPOSITION_FILE, observation)
+    }
+
+    /// Where one check of one step gets its own copy of the candidate; it
+    /// is removed after the check.
+    pub(super) fn check_copy(&self, iteration: u32, check: &str) -> std::path::PathBuf {
+        self.root.join(format!("check-{iteration}-{check}"))
     }
 
     /// The retained disposition of this exact request; a missing one is an

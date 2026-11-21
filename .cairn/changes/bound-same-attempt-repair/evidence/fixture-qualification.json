@@ -38,15 +38,18 @@
     "not_repairable",
     "checks_rejected",
     "lineage_blocked",
-    "kiln_owned"
+    "kiln_owned",
+    "fence_superseded",
+    "authority_withdrawn"
   ],
+  "review_resolution": "evidence/review-647bc59d.json (the seven findings of the 647bc59d review, their resolutions, tests and the gates rerun on top of e3ef038c; the checks below predate it)",
   "tests": {
     "core": [
-      "src/implementation_attempt/lineage/tests.rs (6 tests)",
-      "src/implementation_attempt/repair/tests.rs (11 tests)"
+      "src/implementation_attempt/lineage/tests.rs (7 tests)",
+      "src/implementation_attempt/repair/tests.rs (16 tests)"
     ],
     "shell": [
-      "src/implementation_attempt/cli/tests/repair.rs (12 tests: correct, repaired, iteration and lineage exhaustion, cancellation during and between steps, uncertain worker and check, exit-zero/fabricated/reconfigured/skipped/self-approved bypasses, Kiln-owned proposal, lineage and missing-port refusals before any write, lost controller, base drift, absent-field byte identity, single-shot lineage draw)"
+      "src/implementation_attempt/cli/tests/repair.rs (18 tests: correct, repaired, iteration and lineage exhaustion, newer fence, cancellation during and between steps, uncertain worker and check, exit-zero/fabricated/reconfigured/skipped/self-approved bypasses, Kiln-owned proposal, lineage and missing-port refusals that leave the state root unchanged, lost controller, base drift, absent-field byte identity, single-shot lineage draw, tool overrun whose check would pass, per-check read-only copies and drift, slow and clockless workers and checks, withdrawn execution binding, revoked or unreadable managed revision)"
     ],
     "fixture_ports": "fixture WorkerPort, CheckPort and clock; no OMP process, sandbox, model endpoint, check executor or Kiln ledger"
   },

@@ -529,9 +529,14 @@ policy identity, so a changed policy is a new revision of the same definition.
 
 The standalone CLI has no ports for repair and refuses such a request as
 `repair_ports_unavailable`. An embedder passes `Ports::repair` to
-`run_command_with_ports` with a `WorkerPort` (one bounded step in the attempt
+`run_command_with_ports` with a `WorkerPort` (one step in the attempt
 workspace), a `CheckPort` (one declared check of one candidate revision) and
-a clock; the loop runs synchronously on the calling task. After the usual
+a clock; the loop runs synchronously on the calling task. Both ports receive
+a deadline, the time left before `max_elapsed_ms`, and must stop their work
+by it. The lineage gate, the repair ports and the revision session are
+checked before the state root or the attempt directory is created, so a
+first run refused as `lineage_blocked`, `lineage_exhausted` or
+`repair_ports_unavailable` leaves the state root unchanged. After the usual
 fence, binding, intent, revalidation and revision permit, the shell:
 
 1. re-observes the workspace and refuses it unless it equals the admitted
@@ -540,22 +545,49 @@ fence, binding, intent, revalidation and revision permit, the shell:
    unreadable clock, the elapsed bound, the iteration bound, the aggregate
    budgets and the lineage, in that order;
 3. under the fence lock, rechecks that the attempt is still recorded at its
-   fence and that no higher fence is recorded, then writes
-   `repair/step-N.intent` once before the worker effect. If the check fails,
-   that step never spawns and the loop ends as `fence_superseded`. This is a
-   post-dispatch outcome, retained and printed like any other disposition,
-   because the attempt's intent exists and earlier steps may have had effects.
-   It is never a refusal and never reports `dispatched:false`;
-4. captures the workspace after an exited step. A tree equal to the parent or
+   fence and that no higher fence is recorded and, for every step after the
+   first, re-observes the execution binding and the managed revision through
+   the same checks as the pre-spawn revalidation and revision permit, then
+   writes `repair/step-N.intent` once before the worker effect. A failed fence
+   check ends the loop as `fence_superseded`; a binding that is no longer
+   current, a blocked managed session or a revision seam that cannot answer
+   ends it as `authority_withdrawn` with its `cause` (`execution_binding` or
+   `managed_revision`). That step never spawns. Both are post-dispatch
+   outcomes, retained and printed like any other disposition, because the
+   attempt's intent exists and earlier steps may have had effects. They are
+   never refusals, never report `dispatched:false` and write neither
+   `binding-revalidation.json` nor `revision-block.json`; the observation's
+   `authority_withdrawn` field names the step and carries the binding's
+   revalidation record or the seam's refusal;
+4. re-reads the clock after the worker returns and charges the step. A
+   cancelled or unknown worker outcome ends the loop before any proposal is
+   considered; a step that returned at or past the elapsed bound is
+   `budget_exhausted` (`elapsed`), an unreadable clock is `uncertain`
+   (`clock`), and a step whose charges already exceed a policy budget or the
+   lineage remainder is `budget_exhausted` naming that bound. None of these
+   steps is checked;
+5. captures the workspace after an exited step. A tree equal to the parent or
    the base is no candidate; otherwise a native receipt against the admitted
    base and a candidate revision binding envelope, attempt, fence, iteration
    and parent are derived on the host. The worker's exit status, files and
    claims are never check results;
-5. invokes every declared check against that exact revision and classifies the
-   observations: a skipped, missing, duplicated, undeclared, reconfigured,
-   crossed or self-approved (run by the worker profile itself) check, or one
-   from any executor other than `check_executor`, rejects the evidence;
-6. writes `repair/step-N.json` once and repeats only for failures inside the
+6. invokes every declared check against that exact revision. Each check runs
+   against its own copy of the captured candidate under
+   `repair/check-N-<check>/`, written from the host snapshot with every write
+   permission removed, never against the worker workspace. After the check
+   the copy is captured again: if it no longer matches the candidate, the
+   evidence is rejected as `candidate_drift` and no further check runs. The
+   copy is then removed. The observations are classified: a skipped, missing,
+   duplicated, undeclared, reconfigured, crossed or self-approved (run by the
+   worker profile itself) check, or one from any executor other than
+   `check_executor`, rejects the evidence. Each check is bounded by the time
+   left; a reached bound or an unreadable clock before a check stops the loop;
+7. before `correct_candidate` or `repaired_candidate`, re-reads the clock and
+   compares the charged totals, checks included, with every policy budget and
+   the lineage remainder; a pass past the elapsed bound or over any of them is
+   `budget_exhausted` naming the bound, and an unreadable clock is `uncertain`
+   (`clock`);
+8. writes `repair/step-N.json` once and repeats only for failures inside the
    admitted classes.
 
 The disposition is one of `correct_candidate`, `repaired_candidate` (with
@@ -563,23 +595,26 @@ The disposition is one of `correct_candidate`, `repaired_candidate` (with
 `model_requests`, `tool_invocations` or `lineage` and its dimension),
 `cancelled`, `uncertain` (`worker_outcome`, `check_outcome` or `clock`),
 `not_repairable` (with the classes), `checks_rejected` (with the defect),
-`lineage_blocked`, `kiln_owned` or `fence_superseded`. A worker that proposes
-`changed_work` or a `new_semantic_attempt` ends the loop as `kiln_owned`; a
-step whose binding names other work, version or task, or another attempt,
-fence or envelope, is refused before it is recorded. Repair steps receive the
-parent revision and the admitted failure classes only, never a transcript or
-check output. The
+`lineage_blocked`, `kiln_owned`, `fence_superseded` or `authority_withdrawn`
+(with its `cause`). A worker that exits and proposes `changed_work` or a
+`new_semantic_attempt` ends the loop as `kiln_owned`; with a cancelled or
+unknown outcome the proposal is ignored and the loop ends as `cancelled` or
+`uncertain`. A step whose binding names other work, version or task, or
+another attempt, fence or envelope, is refused before it is recorded. Repair
+steps receive the parent revision and the admitted failure classes only, never
+a transcript or check output. The
 `lattice.implementation-attempt-repair-observation.v1` record (envelope,
 request and worker-request identities, execution binding, policy and lineage
 identities, disposition, revisions with their receipts, usage, draws and
-unaccounted dimensions, `accepted:false`, `integrated:false` and the
-dispatch plan when present) is written once to `repair/disposition.json` after
-the attempt's `Scope::Attempt` usage observation, and printed. Recovery and a
-duplicate `run` print the retained disposition; without one the outcome is
-unknown and nothing runs again. No disposition is acceptance: Kiln #46 keeps
-independent verification. `export-candidate` and `inspect` do not yet read
-repair records, so a repaired candidate is not exported and its instance is not
-projected from its disposition.
+unaccounted dimensions, `accepted:false`, `integrated:false`, the dispatch plan
+when present and `authority_withdrawn` when that is the disposition) is
+written once to `repair/disposition.json` after the attempt's
+`Scope::Attempt` usage observation, and printed. Recovery and a duplicate
+`run` print the retained disposition; without one the outcome is unknown and
+nothing runs again. No disposition is acceptance: Kiln #46 keeps independent
+verification. `export-candidate` and `inspect` do not yet read repair records,
+so a repaired candidate is not exported and its instance is not projected from
+its disposition.
 
 Usage is attributed per phase (`preparation`, `edit`, `check`, `repair`) with
 the existing `UsageProvenance`. A worker step is charged the larger of its
@@ -599,7 +634,7 @@ Kiln code is not vendored:
 | `account` | `LineageExplanation.account` |
 | `parent` | the account record's `parent` (`null` exactly for the root) |
 | `depth` | `LineageExplanation.depth`, at most `MAX_LINEAGE_DEPTH` (8) |
-| `remaining` | the account's `available` `Amounts`, at most `MAX_DIMENSIONS` (16) |
+| `remaining` | the account's `available` `Amounts`, at most `MAX_DIMENSIONS` (16), keyed by Kiln `Alias` names: any non-empty string of at most `DEFAULT_MAX_ALIAS_BYTES` (256) bytes, such as `gpu-seconds` |
 | `blocker` | `LineageExplanation.blocker`: `denied`, `expired`, `cancelled` or `budget_exhausted` |
 | `backpressure` | `ServingExplanation.gate`: `eligible`, `waiting`, `overloaded`, `stale`, `incomplete` or `incompatible`, or `none` without a serving owner |
 
@@ -611,12 +646,13 @@ dimension, or a remainder below the next step's reservation in a charged
 dimension refuses the spawn. Every step and check of the attempt draws from
 this one account; nothing is minted, refunded or reset. A child account is
 admitted only as this account's direct child in the same root with a ceiling
-within the remainder in every one of its dimensions. Other dimensions are
-never drawn and are listed in `unaccounted_dimensions`: their usage stays
-unknown to Kiln. A single-shot attempt with a lineage reports
-`budget_lineage` in its observation with a conservative draw of one broker
-ceiling and `tool_invocations` unaccounted. The lineage is a frozen snapshot:
-Lattice does not observe Kiln's current ledger.
+within the remainder in every one of its dimensions. Other dimensions, any
+name Kiln's `Alias` admits, are accepted, never drawn and listed in
+`unaccounted_dimensions`: their usage stays unknown to Kiln. A single-shot
+attempt with a lineage reports `budget_lineage` in its observation with a
+conservative draw of one broker ceiling and `tool_invocations` unaccounted.
+The lineage is a frozen snapshot: Lattice does not observe Kiln's current
+ledger.
 
 Qualification is fixture-level: the tests in
 `src/implementation_attempt/cli/tests/repair.rs` drive the real `run` and

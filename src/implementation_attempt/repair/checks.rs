@@ -3,7 +3,9 @@
 //! Only observations of every declared check, run by the admitted executor
 //! with the admitted configuration against this exact revision, can pass a
 //! candidate. A skipped, missing, duplicated, undeclared, reconfigured,
-//! crossed or self-approved observation rejects the evidence instead.
+//! crossed or self-approved observation rejects the evidence instead, and so
+//! does a check whose immutable copy of the candidate the host found changed
+//! after it ran.
 
 // r[impl lattice.implementation_attempt.repair.scenario.bypass]
 
@@ -75,6 +77,11 @@ pub enum Defect {
     UnadmittedExecutor {
         check: String,
     },
+    /// The host found the check's copy of the candidate changed after the
+    /// check ran, so the evidence may describe other bytes.
+    CandidateDrift {
+        check: String,
+    },
 }
 
 /// The classification of one revision's checks.
@@ -115,10 +122,19 @@ pub fn invocations(policy: &super::Policy, revision: &str, iteration: u32) -> Ve
         .collect()
 }
 
-/// Classify `observations` of `subject`. Defects take precedence over
-/// unknown outcomes, and unknown outcomes over failures.
+/// Classify `observations` of `subject`. `drifted` names the first check
+/// whose candidate copy the host found changed after it ran; drift takes
+/// precedence over every other defect, defects over unknown outcomes, and
+/// unknown outcomes over failures.
 #[must_use]
-pub fn classify(subject: Subject<'_>, observations: &[Observation]) -> Verdict {
+pub fn classify(subject: Subject<'_>, observations: &[Observation], drifted: Option<&str>) -> Verdict {
+    if let Some(check) = drifted {
+        return Verdict::Rejected {
+            defect: Defect::CandidateDrift {
+                check: check.to_owned(),
+            },
+        };
+    }
     if let Err(defect) = admit_evidence(subject, observations) {
         return Verdict::Rejected { defect };
     }

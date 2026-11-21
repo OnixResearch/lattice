@@ -29,7 +29,7 @@ A worker step is charged `max(reservation, reported)` per dimension, and the res
 
 ## Decision 4: the loop is a pure state machine
 
-`state::Loop` answers `next(elapsed, cancel)` before every spawn, in the order cancellation, clock, elapsed bound, iteration bound, aggregate budgets and lineage. `start` refuses a step whose binding differs from the frozen one (`changed_work` for work, version or task; `new_semantic_attempt` for attempt, fence or envelope) before recording it. `after_step` stops on a Kiln-owned proposal, a cancelled or unknown worker outcome, and maps no new candidate to the reserved class `no_candidate`. `after_checks` maps the verdict. A failure inside the admitted classes returns `Repair`; the shell then asks `next` again, so every bound applies to every repair.
+`state::Loop` answers `next(elapsed, cancel)` before every spawn, in the order cancellation, clock, elapsed bound, iteration bound, aggregate budgets and lineage. `start` refuses a step whose binding differs from the frozen one (`changed_work` for work, version or task; `new_semantic_attempt` for attempt, fence or envelope) before recording it. `after_step` stops first on a cancelled or unknown worker outcome, then on a Kiln-owned proposal, then on an unreadable clock, a reached elapsed bound or charges already over a policy budget or the lineage remainder, and maps no new candidate to the reserved class `no_candidate`. `after_checks` maps the verdict; a pass is re-checked against the clock, the elapsed bound and the charged totals first. A failure inside the admitted classes returns `Repair`; the shell then asks `next` again, so every bound applies to every repair.
 
 ## Decision 5: candidates are host-derived
 
@@ -47,13 +47,28 @@ After an exited step the shell snapshots the workspace (`candidate_capture::work
 
 `lineage::Binding` maps Kiln's types field by field (recorded in `docs/candidate-worker.md`): `root`, `account` and `depth` from `LineageExplanation`, `parent` from the Kiln account record, `remaining` from the account's `available` `Amounts`, `blocker` from `LineageExplanation.blocker` (only `denied`, `expired`, `cancelled`, `budget_exhausted`), and `backpressure` from `ServingExplanation.gate`, or `none` without a serving owner. Identities must be lowercase 64-hex, which Kiln's derived identities are. `gate` refuses a blocker, any gate other than `none` or `eligible`, a zero remainder in any dimension, and a remainder below the next reservation in `model_requests` or `tool_invocations`; other dimensions are never drawn and are reported as unaccounted. `admit_child` requires the same root, this account as parent, depth plus one, and a ceiling within the remainder in every dimension, with none added or omitted. A single-shot attempt with a lineage reports a conservative draw of one broker ceiling and lists `tool_invocations` as unaccounted.
 
+## Decision 9: resolutions of the independent review at `647bc59d`
+
+The review found the loop could pass a candidate after its authority, time or budget ran out, or over bytes its checks did not test. Each resolution keeps the decisions pure and the effects in the shell.
+
+- **Authority before every step.** Under the step's fence lock, every step after the first calls `binding::recheck::current` and `session::revision::recheck`, the non-writing halves that `binding::revalidate` and `session::revision::permit` now share, so the per-step check is the pre-spawn check with the same seam subject. A lost binding, a blocked session or a seam error ends the loop as `authority_withdrawn` with its cause, retained with the evidence in the observation. It writes neither pre-dispatch record, because inventory reads those as `binding_rejected_before_dispatch` and `revision_blocked_before_dispatch`. The first step is covered by the pre-spawn checks that immediately precede the loop.
+- **Checks against the captured candidate.** `cli::repair::materialized` writes each check its own copy of the host snapshot, with write bits removed, and captures it again afterwards. A changed copy is passed to `checks::classify` as the drifted check, which outranks every other defect as `candidate_drift`, and no further check runs. Copies are removed after their check.
+- **Elapsed bound through the terminal decision.** `Loop::remaining_ms` gives the worker and each check the time left; the ports take it as a deadline. The clock is read again after the worker and after the checks, and a reached bound or an unreadable clock ends the loop.
+- **Budgets before a pass.** `Loop::settled` compares the charged totals with every policy budget and `lineage::Binding::overdrawn` before checks run and before any passing disposition.
+- **Unknown outcomes outrank proposals.** `after_step` handles cancelled and unknown outcomes before a proposal.
+- **Lineage before the state root.** `Context::load` only reads; the state root and attempt directory are created after the lineage gate, the repair ports and the session admission, before the fence lock is taken, so the `e3ef038c` lock ordering is unchanged.
+- **Kiln's `Alias` names.** Dimension names follow `Alias::new` at Kiln `339116f6`: non-empty, at most `DEFAULT_MAX_ALIAS_BYTES` (256). Names Lattice cannot charge stay unaccounted.
+
 ## Tests
 
-- `src/implementation_attempt/lineage/tests.rs`: validation, identity, gate, child admission and wire shape.
-- `src/implementation_attempt/repair/tests.rs`: policy admission, check classification, every disposition, step binding, conservative charges.
-- `src/implementation_attempt/cli/tests/repair.rs`: the real `run`/`recover` shell with a fixture worker, check port and clock for every disposition, the bypass cases, Kiln-owned proposals, typed refusals before any write, a lost controller, base drift, absent-field byte identity and the single-shot draw.
+- `src/implementation_attempt/lineage/tests.rs`: validation, Kiln alias names, identity, gate, overdraw, child admission and wire shape.
+- `src/implementation_attempt/repair/tests.rs`: policy admission, check classification and drift, every disposition, step binding, conservative charges, unknown outcomes over proposals, budget and lineage overruns before a pass, and the elapsed bound and clock through the terminal decision.
+- `src/implementation_attempt/cli/tests/repair.rs`: the real `run`/`recover` shell with a fixture worker, check port and clock for every disposition, the bypass cases, Kiln-owned proposals, typed refusals that leave the state root unchanged, a lost controller, base drift, absent-field byte identity, the single-shot draw, a tool overrun whose check would pass, per-check read-only copies and drift, slow and clockless workers and checks, and a withdrawn execution binding and a revoked or unreadable managed revision before the second step.
 
 ## Risks and claim boundaries
+
+- The shell cannot interrupt a port: a worker or check that ignores its deadline is detected when it returns, and its step or check then ends the loop as `budget_exhausted` (`elapsed`), never as a pass.
+- Drift is detected by capturing a check's copy after it returns. A check that changes its copy and restores the same bytes before returning is not detected; it still never touches the worker workspace or another check's copy.
 
 - The fixture ports prove the shell's decisions over supplied observations, not any real worker, check executor or Kiln lineage. No OMP process or model endpoint runs.
 - The lineage is a frozen snapshot; Lattice does not observe Kiln's current ledger, so concurrent siblings are bounded only by Kiln's own transfers.

@@ -19,43 +19,60 @@ use crate::implementation_attempt::repair::step::WorkerOutcome;
 
 const EXECUTOR: &str = "7777777777777777777777777777777777777777777777777777777777777777";
 const UNIT_CONFIG: &[u8] = b"unit-config";
+const START_EPOCH_MS: i64 = 1_000_000;
 
-type Script = Box<dyn FnMut(&StepRequest, &std::path::Path, &dyn Fn() -> bool) -> StepReport>;
+type Script<'a> = Box<dyn FnMut(&StepRequest, &std::path::Path, &dyn Fn() -> bool) -> StepReport + 'a>;
 
-/// Replays one scripted step per call and records every request.
-struct FixtureWorker {
-    script: std::collections::VecDeque<Script>,
+/// Replays one scripted step per call and records every request and deadline.
+struct FixtureWorker<'a> {
+    script: std::collections::VecDeque<Script<'a>>,
     requests: Vec<StepRequest>,
+    deadlines: Vec<std::time::Duration>,
 }
 
-impl FixtureWorker {
-    fn new(script: Vec<Script>) -> Self {
+impl<'a> FixtureWorker<'a> {
+    fn new(script: Vec<Script<'a>>) -> Self {
         Self {
             script: script.into(),
             requests: Vec::new(),
+            deadlines: Vec::new(),
         }
     }
 }
 
-impl super::super::repair::WorkerPort for FixtureWorker {
+impl super::super::repair::WorkerPort for FixtureWorker<'_> {
     fn step(
         &mut self,
         request: &StepRequest,
         workspace: &std::path::Path,
+        deadline: std::time::Duration,
         is_cancel_requested: &dyn Fn() -> bool,
     ) -> StepReport {
         self.requests.push(request.clone());
+        self.deadlines.push(deadline);
         let mut step = self.script.pop_front().expect("a scripted step for every spawn");
         step(request, workspace, is_cancel_requested)
     }
 }
 
-/// Passes `unit` exactly when `src/lib.txt` reads `fixed`, and reports the
+/// One check's view of its candidate copy.
+struct Seen {
+    candidate: std::path::PathBuf,
+    is_read_only: bool,
+    deadline: std::time::Duration,
+}
+
+/// Passes a check exactly when `src/lib.txt` reads `fixed`, and reports the
 /// configuration it actually read from `checks/unit.conf`.
 struct FixtureChecks {
     executor: String,
     forced: Option<Outcome>,
+    /// A formatter-style `fmt` check that rewrites its candidate to `fixed`.
+    is_rewriting: bool,
+    /// A slow check that advances the clock by this much.
+    slow: Option<(FixtureClock, i64)>,
     invocations: Vec<Invocation>,
+    seen: Vec<Seen>,
 }
 
 impl FixtureChecks {
@@ -63,16 +80,38 @@ impl FixtureChecks {
         Self {
             executor: EXECUTOR.into(),
             forced: None,
+            is_rewriting: false,
+            slow: None,
             invocations: Vec::new(),
+            seen: Vec::new(),
         }
     }
 }
 
 impl super::super::repair::CheckPort for FixtureChecks {
-    fn run(&mut self, invocation: &Invocation, workspace: &std::path::Path) -> Observation {
+    fn run(
+        &mut self,
+        invocation: &Invocation,
+        candidate: &std::path::Path,
+        deadline: std::time::Duration,
+    ) -> Observation {
         self.invocations.push(invocation.clone());
-        let source = std::fs::read(workspace.join("src/lib.txt")).expect("candidate source");
-        let configuration = std::fs::read(workspace.join("checks/unit.conf")).expect("check configuration");
+        let source_path = candidate.join("src/lib.txt");
+        let is_read_only = std::fs::metadata(&source_path).expect("candidate source").permissions().readonly();
+        self.seen.push(Seen {
+            candidate: candidate.to_path_buf(),
+            is_read_only,
+            deadline,
+        });
+        if self.is_rewriting && invocation.check == "fmt" {
+            make_writable(candidate);
+            std::fs::write(&source_path, b"fixed").expect("the formatter rewrites the candidate");
+        }
+        if let Some((clock, delay_ms)) = &self.slow {
+            clock.advance(*delay_ms);
+        }
+        let source = std::fs::read(&source_path).expect("candidate source");
+        let configuration = std::fs::read(candidate.join("checks/unit.conf")).expect("check configuration");
         let outcome = self.forced.clone().unwrap_or(if source == b"fixed" {
             Outcome::Passed
         } else {
@@ -88,8 +127,37 @@ impl super::super::repair::CheckPort for FixtureChecks {
     }
 }
 
-/// Advances one second per observation.
-struct FixtureClock(std::cell::Cell<i64>);
+/// What a misbehaving check would do to get write access to its copy.
+fn make_writable(candidate: &std::path::Path) {
+    use std::os::unix::fs::PermissionsExt;
+    for path in [
+        candidate.to_path_buf(),
+        candidate.join("src"),
+        candidate.join("src/lib.txt"),
+    ] {
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700)).expect("chmod");
+    }
+}
+
+/// Advances one second per observation; scripts may move it further or
+/// make it unreadable.
+#[derive(Clone)]
+struct FixtureClock(std::rc::Rc<std::cell::Cell<i64>>);
+
+impl FixtureClock {
+    fn new() -> Self {
+        Self(std::rc::Rc::new(std::cell::Cell::new(START_EPOCH_MS)))
+    }
+
+    fn advance(&self, delay_ms: i64) {
+        self.0.set(self.0.get() + delay_ms);
+    }
+
+    /// Every later observation is before the epoch, which the shell cannot read.
+    fn fail(&self) {
+        self.0.set(-START_EPOCH_MS);
+    }
+}
 
 impl crate::operation::shell::Clock for FixtureClock {
     fn observe_epoch_millis(&self) -> i64 {
@@ -99,7 +167,7 @@ impl crate::operation::shell::Clock for FixtureClock {
     }
 }
 
-fn write(text: &'static str) -> Script {
+fn write(text: &'static str) -> Script<'static> {
     Box::new(move |_, workspace, _| {
         std::fs::write(workspace.join("src/lib.txt"), text).expect("edit");
         exited()
@@ -132,6 +200,43 @@ fn policy() -> crate::implementation_attempt::repair::Policy {
     }
 }
 
+/// [`policy`] with a formatter check before the unit check.
+fn formatted_policy() -> crate::implementation_attempt::repair::Policy {
+    let mut formatted = policy();
+    formatted.checks.insert(0, crate::implementation_attempt::repair::Check {
+        name: "fmt".into(),
+        configuration: blake3::hash(UNIT_CONFIG).to_hex().to_string(),
+    });
+    formatted
+}
+
+/// The broken source and check configuration of every fixture workspace.
+fn seed(workspace: &std::path::Path) {
+    std::fs::create_dir_all(workspace.join("src")).expect("workspace");
+    std::fs::create_dir_all(workspace.join("checks")).expect("checks");
+    std::fs::write(workspace.join("src/lib.txt"), b"broken").expect("source");
+    std::fs::write(workspace.join("checks/unit.conf"), UNIT_CONFIG).expect("check configuration");
+}
+
+/// Bind `request` to `workspace`, `policy` and `lineage` and re-admit it as
+/// a dispatcher would export it.
+fn readmit(
+    mut request: super::super::Request,
+    workspace: &std::path::Path,
+    policy: Option<crate::implementation_attempt::repair::Policy>,
+    lineage: Option<crate::implementation_attempt::lineage::Binding>,
+) -> super::super::Request {
+    request.envelope.budget.max_turns = 4;
+    request.workspace_root = workspace.to_path_buf();
+    let base = crate::candidate_capture::workspace(workspace).expect("base");
+    request.omp.base_identity = crate::candidate::snapshot_identity(&base).expect("base identity");
+    request.repair = policy;
+    request.lineage = lineage;
+    request.envelope.worker_profile = request.worker_profile_identity().expect("revision");
+    request.admitted_envelope = request.envelope.identity();
+    request
+}
+
 struct Fixture {
     _root: tempfile::TempDir,
     root: std::path::PathBuf,
@@ -144,10 +249,7 @@ impl Fixture {
         let root = tempfile::tempdir().expect("scratch");
         let canonical = root.path().canonicalize().expect("canonical scratch");
         let workspace = canonical.join("workspace");
-        std::fs::create_dir_all(workspace.join("src")).expect("workspace");
-        std::fs::create_dir_all(workspace.join("checks")).expect("checks");
-        std::fs::write(workspace.join("src/lib.txt"), b"broken").expect("source");
-        std::fs::write(workspace.join("checks/unit.conf"), UNIT_CONFIG).expect("check configuration");
+        seed(&workspace);
         Self {
             state: canonical.join("state"),
             workspace,
@@ -168,15 +270,7 @@ impl Fixture {
         request.envelope.attempt_id = attempt_id.into();
         // One work item per attempt: attempts of one work share its fence record.
         request.envelope.work_id = format!("work-{attempt_id}");
-        request.envelope.budget.max_turns = 4;
-        request.workspace_root = self.workspace.clone();
-        let base = crate::candidate_capture::workspace(&self.workspace).expect("base");
-        request.omp.base_identity = crate::candidate::snapshot_identity(&base).expect("base identity");
-        request.repair = policy;
-        request.lineage = lineage;
-        request.envelope.worker_profile = request.worker_profile_identity().expect("revision");
-        request.admitted_envelope = request.envelope.identity();
-        request
+        readmit(request, &self.workspace, policy, lineage)
     }
 
     fn write(&self, request: &super::super::Request) -> std::path::PathBuf {
@@ -190,33 +284,58 @@ impl Fixture {
     }
 
     fn disposition(&self, request: &super::super::Request) -> serde_json::Value {
-        let path = self.directory(request).join("repair/disposition.json");
-        serde_json::from_slice(&std::fs::read(path).expect("retained disposition")).expect("disposition json")
+        disposition(&self.directory(request))
     }
+}
+
+fn disposition(directory: &std::path::Path) -> serde_json::Value {
+    let path = directory.join("repair/disposition.json");
+    serde_json::from_slice(&std::fs::read(path).expect("retained disposition")).expect("disposition json")
+}
+
+/// Everything but the repair ports of one run.
+struct Host<'a> {
+    clock: FixtureClock,
+    compute: &'a mut dyn crate::execution_binding::ComputeAllocationPort,
+    revisions: super::super::session::revision::Store<'a>,
+}
+
+async fn run_with(
+    path: &std::path::Path,
+    state: &std::path::Path,
+    worker: &mut FixtureWorker<'_>,
+    checks: &mut FixtureChecks,
+    host: Host<'_>,
+) -> Result<(), String> {
+    super::super::execution::run(
+        path,
+        state,
+        Some(super::super::Ports {
+            compute: host.compute,
+            serving: Box::new(crate::execution_binding::serving::UnavailableOwner),
+            repair: Some(super::super::repair::Ports {
+                worker,
+                checks,
+                clock: &host.clock,
+            }),
+        }),
+        host.revisions,
+    )
+    .await
 }
 
 async fn run(
     path: &std::path::Path,
     state: &std::path::Path,
-    worker: &mut FixtureWorker,
+    worker: &mut FixtureWorker<'_>,
     checks: &mut FixtureChecks,
 ) -> Result<(), String> {
-    let clock = FixtureClock(std::cell::Cell::new(1_000_000));
-    super::super::execution::run(
-        path,
-        state,
-        Some(super::super::Ports {
-            compute: &mut crate::execution_binding::UnavailableComputePort,
-            serving: Box::new(crate::execution_binding::serving::UnavailableOwner),
-            repair: Some(super::super::repair::Ports {
-                worker,
-                checks,
-                clock: &clock,
-            }),
-        }),
-        super::super::session::revision::Store(None),
-    )
-    .await
+    let host = Host {
+        clock: FixtureClock::new(),
+        compute: &mut crate::execution_binding::UnavailableComputePort,
+        revisions: super::super::session::revision::Store(None),
+    };
+    run_with(path, state, worker, checks, host).await
 }
 
 async fn recover(path: &std::path::Path, state: &std::path::Path) -> Result<(), String> {
@@ -228,7 +347,7 @@ async fn recover(path: &std::path::Path, state: &std::path::Path) -> Result<(), 
 async fn scenario(
     fixture: &Fixture,
     request: &super::super::Request,
-    script: Vec<Script>,
+    script: Vec<Script<'_>>,
     checks: FixtureChecks,
 ) -> (serde_json::Value, Vec<StepRequest>, Vec<Invocation>) {
     let path = fixture.write(request);
@@ -348,7 +467,7 @@ async fn a_newer_fence_stops_the_loop_before_its_next_step_intent() {
     successor.fence += 1;
     // The first step fails a repairable check while Kiln's next fence of the
     // same work is recorded in this state root.
-    let first: Script = Box::new(move |_, workspace, _| {
+    let first: Script<'_> = Box::new(move |_, workspace, _| {
         std::fs::write(workspace.join("src/lib.txt"), "still broken").expect("edit");
         let directory = state.join("successor");
         drop(super::super::session::fencing::admit(&state, &successor, &directory).expect("fence 8 recorded"));
@@ -420,7 +539,7 @@ async fn cancellation_during_and_between_steps_is_its_own_disposition() {
 async fn uncertain_worker_and_check_outcomes_are_distinct_from_failure() {
     let fixture = Fixture::new();
     let request = fixture.request("attempt-uncertain-worker", Some(policy()), None);
-    let unknown: Script = Box::new(|_, _, _| StepReport {
+    let unknown: Script<'_> = Box::new(|_, _, _| StepReport {
         outcome: WorkerOutcome::Unknown,
         ..exited()
     });
@@ -440,7 +559,7 @@ async fn uncertain_worker_and_check_outcomes_are_distinct_from_failure() {
 // r[verify lattice.implementation_attempt.repair.scenario.bypass]
 async fn exit_zero_fabricated_success_skips_reconfiguration_and_self_approval_cannot_pass() {
     let fixture = Fixture::new();
-    let unchanged: Script = Box::new(|_, _, _| exited());
+    let unchanged: Script<'_> = Box::new(|_, _, _| exited());
     let request = fixture.request("attempt-exit-zero", Some(policy()), None);
     let (observation, _, invocations) = scenario(&fixture, &request, vec![unchanged], FixtureChecks::admitted()).await;
     assert_eq!(
@@ -457,7 +576,7 @@ async fn exit_zero_fabricated_success_skips_reconfiguration_and_self_approval_ca
         }
     };
     let request = fixture.request("attempt-fabricated", Some(policy()), None);
-    let script: Vec<Script> = vec![Box::new(claim), write("broken 1"), write("broken 2")];
+    let script: Vec<Script<'_>> = vec![Box::new(claim), write("broken 1"), write("broken 2")];
     let (observation, _, _) = scenario(&fixture, &request, script, FixtureChecks::admitted()).await;
     assert_eq!(observation["disposition"]["kind"], "budget_exhausted", "a claimed pass is not a check");
     let reconfigure = |_: &StepRequest, workspace: &std::path::Path, _: &dyn Fn() -> bool| {
@@ -497,7 +616,7 @@ async fn exit_zero_fabricated_success_skips_reconfiguration_and_self_approval_ca
 async fn a_proposed_change_of_work_or_new_attempt_stays_with_kiln() {
     let fixture = Fixture::new();
     let request = fixture.request("attempt-kiln-owned", Some(policy()), None);
-    let propose: Script = Box::new(|_, workspace, _| {
+    let propose: Script<'_> = Box::new(|_, workspace, _| {
         std::fs::write(workspace.join("src/lib.txt"), "a different task").expect("edit");
         StepReport {
             proposal: Some(crate::implementation_attempt::repair::KilnOwned::ChangedWork),
@@ -569,8 +688,40 @@ async fn lineage_and_missing_ports_refuse_before_any_write() {
             .await;
     assert_eq!(refused, Err(super::super::refusal::Reason::RepairPortsUnavailable.message().to_owned()));
     assert_nothing_written(&fixture.directory(&request));
+    // A first run's pre-write refusals never create the state root.
+    assert!(!fixture.state.exists(), "the state root is unchanged after every pre-write refusal");
     let record = super::super::refusal::record(&request.envelope, super::super::refusal::Reason::LineageExhausted);
     assert_eq!((record["reason"].clone(), record["dispatched"].clone()), ("lineage_exhausted".into(), false.into()));
+    // An existing state root keeps exactly its entries.
+    let fixture = Fixture::new();
+    let admitted = fixture.request("attempt-admitted-first", Some(policy()), None);
+    let path = fixture.write(&admitted);
+    let mut worker = FixtureWorker::new(vec![write("fixed")]);
+    let mut checks = FixtureChecks::admitted();
+    run(&path, &fixture.state, &mut worker, &mut checks).await.expect("a first attempt runs");
+    let entries = || {
+        let mut pending = vec![fixture.state.clone()];
+        let mut paths = Vec::new();
+        while let Some(directory) = pending.pop() {
+            for entry in std::fs::read_dir(&directory).expect("state directory") {
+                let path = entry.expect("entry").path();
+                if path.is_dir() {
+                    pending.push(path.clone());
+                }
+                paths.push(path);
+            }
+        }
+        paths.sort();
+        paths
+    };
+    let before = entries();
+    let exhausted = crate::implementation_attempt::lineage::tests::binding(0, 10);
+    let request = fixture.request("attempt-lineage-later", Some(policy()), Some(exhausted));
+    let path = fixture.write(&request);
+    let mut worker = FixtureWorker::new(Vec::new());
+    let refused = run(&path, &fixture.state, &mut worker, &mut checks).await;
+    assert_eq!(refused, Err(super::super::refusal::Reason::LineageExhausted.message().to_owned()));
+    assert_eq!(entries(), before, "no new entry in the state root");
 }
 
 /// A panicking worker step stands in for a controller lost mid-step.
@@ -580,7 +731,7 @@ fn a_lost_controller_without_a_disposition_is_unknown_and_never_reruns() {
     let fixture = Fixture::new();
     let request = fixture.request("attempt-lost", Some(policy()), None);
     let path = fixture.write(&request);
-    let lost: Script = Box::new(|_, _, _| panic!("controller lost during the step"));
+    let lost: Script<'_> = Box::new(|_, _, _| panic!("controller lost during the step"));
     let mut worker = FixtureWorker::new(vec![lost]);
     let mut checks = FixtureChecks::admitted();
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -653,4 +804,306 @@ fn a_single_shot_attempt_with_a_lineage_reports_its_conservative_draw() {
     assert_eq!(draw["usage"][0]["charged"], serde_json::json!({"model_requests": 1, "tool_invocations": 0}));
     assert_eq!(draw["usage"][0]["model_requests"], serde_json::Value::Null, "unknown, never zero");
     assert_eq!(draw["unaccounted_dimensions"], serde_json::json!(["tool_invocations"]));
+}
+
+#[tokio::test]
+// r[verify lattice.implementation_attempt.repair.scenario.dispositions]
+async fn a_step_that_overruns_the_tool_budget_is_exhausted_even_though_its_check_would_pass() {
+    let fixture = Fixture::new();
+    let request = fixture.request("attempt-overrun", Some(policy()), None);
+    // The aggregate tool budget is six; the step reports nine and leaves a
+    // candidate the unit check would pass.
+    let overrun: Script<'_> = Box::new(|_, workspace, _| {
+        std::fs::write(workspace.join("src/lib.txt"), "fixed").expect("edit");
+        StepReport {
+            model_requests: Some(1),
+            tool_invocations: Some(9),
+            ..exited()
+        }
+    });
+    let (observation, _, invocations) = scenario(&fixture, &request, vec![overrun], FixtureChecks::admitted()).await;
+    assert_eq!(
+        observation["disposition"],
+        serde_json::json!({"kind": "budget_exhausted", "bound": {"kind": "tool_invocations"}})
+    );
+    assert!(invocations.is_empty(), "an overrun step is never checked");
+    assert_eq!(observation["drawn"]["tool_invocations"], 9);
+    assert_eq!(observation["revisions"].as_array().map(Vec::len), Some(1), "its candidate is retained, not passed");
+}
+
+#[tokio::test]
+// r[verify lattice.implementation_attempt.repair.scenario.bypass]
+async fn every_check_runs_against_its_own_read_only_copy_and_drift_is_rejected() {
+    let fixture = Fixture::new();
+    let request = fixture.request("attempt-copies", Some(formatted_policy()), None);
+    let path = fixture.write(&request);
+    let mut worker = FixtureWorker::new(vec![write("fixed")]);
+    let mut checks = FixtureChecks::admitted();
+    run(&path, &fixture.state, &mut worker, &mut checks).await.expect("a disposition");
+    assert_eq!(fixture.disposition(&request)["disposition"]["kind"], "correct_candidate");
+    let records = fixture.directory(&request).join("repair");
+    assert_eq!(checks.seen.len(), 2);
+    for seen in &checks.seen {
+        assert!(seen.candidate.starts_with(&records), "a copy under the attempt, never the workspace");
+        assert!(seen.is_read_only, "the copy is read-only");
+        assert!(!seen.candidate.exists(), "the copy is removed after its check");
+        assert!(seen.deadline > std::time::Duration::ZERO, "bounded by the time left");
+        assert!(seen.deadline < std::time::Duration::from_millis(60_000), "never past the elapsed bound");
+    }
+    assert_ne!(checks.seen[0].candidate, checks.seen[1].candidate, "no check shares another's copy");
+    // A formatter that rewrites its copy of a broken candidate to `fixed`.
+    let fixture = Fixture::new();
+    let request = fixture.request("attempt-drift", Some(formatted_policy()), None);
+    let path = fixture.write(&request);
+    let mut worker = FixtureWorker::new(vec![write("still broken")]);
+    let mut checks = FixtureChecks {
+        is_rewriting: true,
+        ..FixtureChecks::admitted()
+    };
+    run(&path, &fixture.state, &mut worker, &mut checks).await.expect("a disposition");
+    let observation = fixture.disposition(&request);
+    assert_eq!(
+        observation["disposition"],
+        serde_json::json!({"kind": "checks_rejected", "defect": {"code": "candidate_drift", "check": "fmt"}})
+    );
+    assert_eq!(checks.invocations.len(), 1, "no check runs after drift");
+    assert!(!checks.seen[0].candidate.exists(), "the drifted copy is removed");
+    let source = std::fs::read(fixture.workspace.join("src/lib.txt")).expect("workspace source");
+    assert_eq!(source, b"still broken", "the worker workspace is untouched");
+    assert_eq!(observation["drawn"]["tool_invocations"], 2, "the step and the one check that ran");
+}
+
+/// Run one scripted step of a fresh workspace under `policy` against
+/// `clock`; returns the disposition, the worker's deadlines and the check port.
+async fn clocked(
+    attempt: &str,
+    policy: crate::implementation_attempt::repair::Policy,
+    step: Script<'_>,
+    mut checks: FixtureChecks,
+    clock: FixtureClock,
+) -> (serde_json::Value, Vec<std::time::Duration>, FixtureChecks) {
+    let fixture = Fixture::new();
+    let request = fixture.request(attempt, Some(policy), None);
+    let path = fixture.write(&request);
+    let mut worker = FixtureWorker::new(vec![step]);
+    let host = Host {
+        clock,
+        compute: &mut crate::execution_binding::UnavailableComputePort,
+        revisions: super::super::session::revision::Store(None),
+    };
+    run_with(&path, &fixture.state, &mut worker, &mut checks, host).await.expect("a disposition");
+    (fixture.disposition(&request)["disposition"].clone(), worker.deadlines, checks)
+}
+
+#[tokio::test]
+// r[verify lattice.implementation_attempt.repair.scenario.dispositions]
+async fn the_elapsed_bound_and_the_clock_hold_through_the_terminal_decision() {
+    let elapsed = serde_json::json!({"kind": "budget_exhausted", "bound": {"kind": "elapsed"}});
+    // A worker that returns past the bound is never checked.
+    let clock = FixtureClock::new();
+    let worker_clock = clock.clone();
+    let slow: Script<'_> = Box::new(move |_, workspace, _| {
+        std::fs::write(workspace.join("src/lib.txt"), "fixed").expect("edit");
+        worker_clock.advance(120_000);
+        exited()
+    });
+    let (disposition, deadlines, checks) =
+        clocked("attempt-slow-worker", policy(), slow, FixtureChecks::admitted(), clock).await;
+    assert_eq!(disposition, elapsed);
+    assert!(checks.invocations.is_empty());
+    assert!(deadlines[0] <= std::time::Duration::from_millis(60_000), "the worker is bounded by the time left");
+    // A clock that becomes unreadable during the step is uncertain.
+    let clock = FixtureClock::new();
+    let worker_clock = clock.clone();
+    let unreadable: Script<'_> = Box::new(move |_, workspace, _| {
+        std::fs::write(workspace.join("src/lib.txt"), "fixed").expect("edit");
+        worker_clock.fail();
+        exited()
+    });
+    let (disposition, _, checks) =
+        clocked("attempt-lost-clock", policy(), unreadable, FixtureChecks::admitted(), clock).await;
+    assert_eq!(disposition, serde_json::json!({"kind": "uncertain", "cause": "clock"}));
+    assert!(checks.invocations.is_empty());
+    // A passing check that returns past the bound does not make a candidate.
+    let clock = FixtureClock::new();
+    let slow_checks = FixtureChecks {
+        slow: Some((clock.clone(), 120_000)),
+        ..FixtureChecks::admitted()
+    };
+    let (disposition, _, checks) = clocked("attempt-slow-check", policy(), write("fixed"), slow_checks, clock).await;
+    assert_eq!(disposition, elapsed);
+    assert_eq!(checks.invocations.len(), 1, "the check ran and passed");
+    // A check that uses up the time left stops the loop before the next one.
+    let clock = FixtureClock::new();
+    let slow_checks = FixtureChecks {
+        slow: Some((clock.clone(), 120_000)),
+        ..FixtureChecks::admitted()
+    };
+    let (disposition, _, checks) =
+        clocked("attempt-slow-first-check", formatted_policy(), write("fixed"), slow_checks, clock).await;
+    assert_eq!(disposition, elapsed);
+    assert_eq!(checks.invocations.len(), 1, "the unit check never ran");
+    // Inside the bound the same candidate passes.
+    let (disposition, _, _) =
+        clocked("attempt-in-time", policy(), write("fixed"), FixtureChecks::admitted(), FixtureClock::new()).await;
+    assert_eq!(disposition["kind"], "correct_candidate");
+}
+
+#[tokio::test]
+// r[verify lattice.implementation_attempt.repair.scenario.dispositions]
+async fn a_withdrawn_execution_binding_ends_the_loop_after_dispatch() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/execution-binding/observations/positive/agent-a-1-active.json");
+    let observation =
+        lattice_core::execution_binding::validation::decode_observation(&std::fs::read(path).expect("fixture"))
+            .expect("valid fixture");
+    let later = |charge_cursor: Option<u64>| {
+        let mut later = observation.clone();
+        later.port.observation_sequence = 2;
+        later.offer = None;
+        if let Some(charge_cursor) = charge_cursor {
+            later.allocation.charge_cursor = charge_cursor;
+        }
+        Ok(crate::execution_binding::AllocationReply::Observed(Box::new(later)))
+    };
+    let admitted = || Ok(crate::execution_binding::AllocationReply::Observed(Box::new(observation.clone())));
+    // The third observation is the recheck before the repair step.
+    let cases = [
+        (later(None), vec![write("still broken"), write("fixed")]),
+        (later(Some(9)), vec![write("still broken")]),
+    ];
+    for (third, script) in cases {
+        let is_withdrawn = script.len() == 1;
+        let fixture = Fixture::new();
+        let request = super::request(
+            &observation.allocation.attempt_id,
+            lattice_core::execution_binding::request::ComputeRequirement::ProviderExecution {
+                direct_accelerator: None,
+            },
+            lattice_core::execution_binding::request::ComputeDeclaration::ProviderAllocation {
+                allocation_id: observation.allocation.id.clone(),
+                host_id: observation.allocation.host_id.clone(),
+                consumer_id: observation.allocation.consumer_id.clone(),
+                owner_generation: observation.allocation.owner_generation,
+            },
+        );
+        let request = readmit(request, &fixture.workspace, Some(policy()), None);
+        let path = fixture.write(&request);
+        let mut port = crate::execution_binding::FixtureComputePort::new(vec![admitted(), later(None), third]);
+        let mut worker = FixtureWorker::new(script);
+        let mut checks = FixtureChecks::admitted();
+        let host = Host {
+            clock: FixtureClock::new(),
+            compute: &mut port,
+            revisions: super::super::session::revision::Store(None),
+        };
+        run_with(&path, &fixture.state, &mut worker, &mut checks, host).await.expect("a disposition");
+        assert!(worker.script.is_empty(), "every scripted step ran");
+        let directory = fixture.directory(&request);
+        let observation = disposition(&directory);
+        if !is_withdrawn {
+            assert_eq!(observation["disposition"]["kind"], "repaired_candidate", "a current binding admits the repair");
+            assert!(observation.get("authority_withdrawn").is_none());
+            continue;
+        }
+        // A post-dispatch outcome: retained like any disposition, never a
+        // pre-spawn refusal record and never `dispatched:false`.
+        assert_eq!(
+            observation["disposition"],
+            serde_json::json!({"kind": "authority_withdrawn", "cause": "execution_binding"})
+        );
+        assert_eq!(observation["authority_withdrawn"]["iteration"], 2);
+        assert_eq!(observation["authority_withdrawn"]["evidence"]["decision"]["reason"], "reservation_replaced");
+        assert!(observation.get("dispatched").is_none() && observation.get("reason").is_none());
+        assert_eq!((observation["steps"].clone(), worker.requests.len()), (1.into(), 1), "the repair never spawned");
+        assert!(!directory.join("repair/step-2.intent").exists(), "no intent for the withdrawn step");
+        assert!(!directory.join(super::super::binding::REFUSAL_FILE).exists(), "no pre-dispatch refusal record");
+        recover(&fixture.write(&request), &fixture.state)
+            .await
+            .expect("recovery reports the retained disposition");
+    }
+}
+
+/// What happens to the managed revision during the first repair step.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Revocation {
+    Kept,
+    Revoked,
+    /// The revision store cannot be opened when the repair step rechecks it.
+    Unreadable,
+}
+
+#[tokio::test]
+// r[verify lattice.implementation_attempt.repair.scenario.dispositions]
+async fn a_revoked_or_unreadable_managed_revision_ends_the_loop_after_dispatch() {
+    for case in [Revocation::Kept, Revocation::Revoked, Revocation::Unreadable] {
+        let fixture = super::revisions::Fixture::new();
+        let workspace = fixture.root.join("workspace");
+        seed(&workspace);
+        let request = readmit(fixture.request("attempt-managed-repair", 7), &workspace, Some(policy()), None);
+        let (path, _) = fixture.write("request.json", &request);
+        let (definition, revision) = fixture.prepared(&request, &path);
+        fixture.promoted(&definition, &revision);
+        let session = super::super::session::revision::identifier(&request);
+        let moved = fixture.root.join("revisions.moved");
+        let first: Script<'_> = Box::new(|_, workspace, _| {
+            std::fs::write(workspace.join("src/lib.txt"), "still broken").expect("edit");
+            match case {
+                Revocation::Kept => {}
+                Revocation::Revoked => fixture
+                    .revision(&["revoke", "--definition", &definition, "--session", &session])
+                    .expect("revoke the session during the first step"),
+                Revocation::Unreadable => std::fs::rename(&fixture.store, &moved).expect("move the store away"),
+            }
+            exited()
+        });
+        let script = if case == Revocation::Kept {
+            vec![first, write("fixed")]
+        } else {
+            vec![first]
+        };
+        let mut worker = FixtureWorker::new(script);
+        let mut checks = FixtureChecks::admitted();
+        let host = Host {
+            clock: FixtureClock::new(),
+            compute: &mut crate::execution_binding::UnavailableComputePort,
+            revisions: super::super::session::revision::Store(Some(&fixture.store)),
+        };
+        let ran = run_with(&path, &fixture.state, &mut worker, &mut checks, host).await;
+        assert!(worker.script.is_empty(), "every scripted step ran");
+        let directory = fixture.directory(&request);
+        let observation = disposition(&directory);
+        if case == Revocation::Unreadable {
+            // The disposition is retained before the session close, which
+            // needs the store back.
+            let error = ran.expect_err("the session cannot be closed without its store");
+            assert!(error.contains("agent revision store is unavailable"), "{error}");
+            assert_eq!(observation["authority_withdrawn"]["evidence"]["error"], "agent revision store is unavailable");
+            std::fs::rename(&moved, &fixture.store).expect("restore the store");
+        } else {
+            ran.expect("a disposition");
+        }
+        if case == Revocation::Kept {
+            assert_eq!(
+                observation["disposition"]["kind"], "repaired_candidate",
+                "a permitted revision admits the repair"
+            );
+            assert!(fixture.lifecycle(&definition).sessions.is_empty(), "the session is closed");
+            continue;
+        }
+        assert_eq!(
+            observation["disposition"],
+            serde_json::json!({"kind": "authority_withdrawn", "cause": "managed_revision"}),
+            "{case:?}"
+        );
+        if case == Revocation::Revoked {
+            assert_eq!(observation["authority_withdrawn"]["evidence"]["refusal"]["code"], "session_revoked");
+        }
+        assert_eq!(worker.requests.len(), 1, "the repair never spawned");
+        assert!(!directory.join("repair/step-2.intent").exists());
+        let block = directory.join(super::super::session::revision::BLOCK_FILE);
+        assert!(!block.exists(), "no pre-dispatch revision block");
+        fixture.attempt("recover", &path, true).await.expect("recovery reports the retained disposition");
+        assert!(fixture.lifecycle(&definition).sessions.is_empty(), "the session is closed");
+    }
 }

@@ -10,6 +10,9 @@
 // r[impl lattice.implementation_attempt.repair.scenario.kiln_owned]
 // r[impl lattice.implementation_attempt.lineage.scenario.usage]
 
+mod bounds;
+mod charges;
+
 /// The bound a stop exhausted.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case", tag = "kind")]
@@ -28,6 +31,17 @@ pub enum Uncertainty {
     WorkerOutcome,
     CheckOutcome,
     Clock,
+}
+
+/// The revocable authority, besides the fence, a later repair step needs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Authority {
+    /// The execution binding failed its revalidation.
+    ExecutionBinding,
+    /// The managed agent revision no longer permits an effect, or its
+    /// lifecycle could not be read.
+    ManagedRevision,
 }
 
 /// The terminal disposition of a repair loop. None of them is acceptance.
@@ -71,6 +85,12 @@ pub enum Disposition {
     /// that step never spawned. A post-dispatch outcome: the attempt's intent
     /// exists and earlier steps may have had effects.
     FenceSuperseded,
+    /// The shell found the execution binding or the managed revision no
+    /// longer current before the next step's intent; that step never
+    /// spawned. A post-dispatch outcome like [`Self::FenceSuperseded`].
+    AuthorityWithdrawn {
+        cause: Authority,
+    },
 }
 
 /// The loop's next action.
@@ -128,12 +148,10 @@ impl Loop {
         if is_cancel_requested {
             return Next::Stop(Disposition::Cancelled);
         }
-        let Some(elapsed_ms) = elapsed_ms else {
-            return Next::Stop(Disposition::Uncertain {
-                cause: Uncertainty::Clock,
-            });
-        };
-        if let Err(bound) = self.within_policy(elapsed_ms) {
+        if let Err(disposition) = self.remaining_ms(elapsed_ms) {
+            return Next::Stop(disposition);
+        }
+        if let Err(bound) = self.within_policy() {
             return Next::Stop(Disposition::BudgetExhausted { bound });
         }
         if let Some(lineage) = &self.lineage
@@ -160,63 +178,18 @@ impl Loop {
         })
     }
 
-    fn within_policy(&self, elapsed_ms: u64) -> Result<(), Bound> {
-        if elapsed_ms >= self.policy.max_elapsed_ms {
-            return Err(Bound::Elapsed);
-        }
-        if self.steps > self.policy.max_iterations {
-            return Err(Bound::Iterations);
-        }
-        let after = self.drawn.saturating_add(&self.reservation);
-        if after.model_requests > self.policy.max_model_requests {
-            return Err(Bound::ModelRequests);
-        }
-        if after.tool_invocations > self.policy.max_tool_invocations {
-            return Err(Bound::ToolInvocations);
-        }
-        Ok(())
-    }
-
-    /// Record a spawned step and charge it: the larger of the reservation
-    /// and the reported count, or the reservation when the count is unknown.
-    pub fn start(
-        &mut self,
-        request: &super::step::Request,
-        report: &super::step::Report,
-    ) -> Result<super::step::Usage, super::KilnOwned> {
-        self.binding.admit_step(&request.binding)?;
-        self.steps = self.steps.saturating_add(1);
-        debug_assert_eq!(request.iteration, self.steps, "steps are recorded in order");
-        let step_tools = self.policy.step_tool_invocations;
-        let charged = super::super::lineage::Draws {
-            model_requests: report
-                .model_requests
-                .map_or(self.reservation.model_requests, |reported| reported.max(self.reservation.model_requests)),
-            tool_invocations: report.tool_invocations.map_or(step_tools, |reported| reported.max(step_tools)),
-        };
-        self.drawn = self.drawn.saturating_add(&charged);
-        let is_reported = report.model_requests.is_some() && report.tool_invocations.is_some();
-        Ok(super::step::Usage {
-            phase: request.phase,
-            iteration: request.iteration,
-            model_requests: report.model_requests,
-            tool_invocations: report.tool_invocations,
-            provenance: if is_reported {
-                crate::orchestration::UsageProvenance::WorkerReported
-            } else {
-                crate::orchestration::UsageProvenance::Unknown
-            },
-            charged,
-        })
-    }
-
     /// Decide after a recorded step. `revision` is the new host-derived
-    /// candidate revision, `None` when the step produced none.
+    /// candidate revision, `None` when the step produced none; `elapsed_ms`
+    /// is re-observed after the worker returned. A cancelled or unknown
+    /// outcome takes precedence over any proposal, and a step that overran
+    /// a bound is never checked.
     #[must_use]
-    pub fn after_step(&mut self, report: &super::step::Report, revision: Option<String>) -> Next {
-        if let Some(continuation) = report.proposal {
-            return Next::Stop(Disposition::KilnOwned { continuation });
-        }
+    pub fn after_step(
+        &mut self,
+        report: &super::step::Report,
+        revision: Option<String>,
+        elapsed_ms: Option<u64>,
+    ) -> Next {
         match report.outcome {
             super::step::WorkerOutcome::Cancelled => return Next::Stop(Disposition::Cancelled),
             super::step::WorkerOutcome::Unknown => {
@@ -225,6 +198,12 @@ impl Loop {
                 });
             }
             super::step::WorkerOutcome::Exited { .. } => {}
+        }
+        if let Some(continuation) = report.proposal {
+            return Next::Stop(Disposition::KilnOwned { continuation });
+        }
+        if let Err(disposition) = self.settled(elapsed_ms) {
+            return Next::Stop(disposition);
         }
         match revision {
             Some(revision) => {
@@ -235,34 +214,27 @@ impl Loop {
         }
     }
 
-    /// Charge the host check executions of one revision.
-    pub fn charge_checks(&mut self, iteration: u32, executions: u64) -> super::step::Usage {
-        let charged = super::super::lineage::Draws {
-            model_requests: 0,
-            tool_invocations: executions,
-        };
-        self.drawn = self.drawn.saturating_add(&charged);
-        super::step::Usage {
-            phase: super::step::Phase::Check,
-            iteration,
-            model_requests: Some(0),
-            tool_invocations: Some(executions),
-            provenance: crate::orchestration::UsageProvenance::HostMeasured,
-            charged,
-        }
-    }
-
-    /// Decide after the checks of the last revision.
+    /// Decide after the checks of the last revision. `elapsed_ms` is
+    /// re-observed after the last check: a pass becomes a candidate only
+    /// while the clock is read, the elapsed bound is not reached and the
+    /// charged totals fit every policy budget and the lineage remainder.
     #[must_use]
-    pub fn after_checks(&mut self, verdict: super::checks::Verdict) -> Next {
+    pub fn after_checks(&mut self, verdict: super::checks::Verdict, elapsed_ms: Option<u64>) -> Next {
         let revision = self.last_revision.clone().unwrap_or_default();
         debug_assert!(!revision.is_empty(), "checks follow a recorded revision");
         match verdict {
-            super::checks::Verdict::Passed if self.steps <= 1 => Next::Stop(Disposition::CorrectCandidate { revision }),
-            super::checks::Verdict::Passed => Next::Stop(Disposition::RepairedCandidate {
-                revision,
-                repairs: self.steps.saturating_sub(1),
-            }),
+            super::checks::Verdict::Passed => {
+                if let Err(disposition) = self.settled(elapsed_ms) {
+                    return Next::Stop(disposition);
+                }
+                if self.steps <= 1 {
+                    return Next::Stop(Disposition::CorrectCandidate { revision });
+                }
+                Next::Stop(Disposition::RepairedCandidate {
+                    revision,
+                    repairs: self.steps.saturating_sub(1),
+                })
+            }
             super::checks::Verdict::Unknown => Next::Stop(Disposition::Uncertain {
                 cause: Uncertainty::CheckOutcome,
             }),

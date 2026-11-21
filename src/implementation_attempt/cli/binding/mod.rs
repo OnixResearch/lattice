@@ -13,6 +13,7 @@
 // r[impl lattice.execution_binding.port_boundary.scenario.unavailable]
 // r[impl lattice.execution_binding.recovery]
 
+pub(super) mod recheck;
 pub(super) mod requests;
 #[cfg(test)]
 pub(super) mod tests;
@@ -254,32 +255,9 @@ pub(super) fn revalidate(
     admitted: &Admitted,
     port: &mut dyn crate::execution_binding::ComputeAllocationPort,
 ) -> Result<(), String> {
-    let reply = match &admitted.compute {
-        lattice_core::execution_binding::admission::bound::AdmittedCompute::HostLocal {} => None,
-        lattice_core::execution_binding::admission::bound::AdmittedCompute::ProviderAllocation(frozen) => {
-            Some(port.observe_allocation(&crate::execution_binding::AllocationQuery {
-                allocation_id: frozen.allocation_id.clone(),
-                host_id: frozen.placement.host_id.clone(),
-                consumer_id: frozen.consumer_id.clone(),
-                attempt_id: admitted.attempt.attempt_id.clone(),
-            }))
-        }
-    };
-    let reading = reply.as_ref().map_or(
-        lattice_core::execution_binding::admission::ProviderReading::NotRead,
-        crate::execution_binding::reading,
-    );
-    let recheck = lattice_core::execution_binding::revalidation::revalidate(admitted, reading);
-    if recheck == lattice_core::execution_binding::revalidation::Recheck::Current {
+    let Err(record) = recheck::current(admitted, port) else {
         return Ok(());
-    }
-    debug_assert_ne!(recheck, lattice_core::execution_binding::revalidation::Recheck::Current);
-    debug_assert!(reply.is_some(), "host-local bindings are always current");
-    let record = serde_json::json!({
-        "schema": REFUSAL_SCHEMA,
-        "binding_identity": admitted.binding_identity,
-        "decision": recheck,
-    });
+    };
     let bytes = serde_json::to_vec(&record).map_err(|error| error.to_string())?;
     super::artifacts::write_once(&directory.join(REFUSAL_FILE), &bytes)?;
     println!("{record}");

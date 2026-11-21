@@ -1,0 +1,106 @@
+{
+  "schema": "lattice.fixture-qualification.v1",
+  "change": "bound-same-attempt-repair",
+  "kind": "review-resolution",
+  "live_qualification": false,
+  "evidence_label": "fixture",
+  "review": {
+    "reviewed_revision": "647bc59d1640a09eccec1e29327c0214758f6065",
+    "base_revision": "e3ef038c",
+    "source": "independent read-only review of 647bc59d (Lattice6Review), 7 findings"
+  },
+  "recorded_on": "2026-11-21",
+  "findings": [
+    {
+      "id": 1,
+      "severity": "high",
+      "finding": "The execution binding and managed revision were permitted only before the loop; a revocation or block between steps did not stop the next spawn.",
+      "resolution": "Every step after the first rechecks the binding (binding::recheck::current) and the managed revision (session::revision::recheck) under the fence lock, after the fence recheck. Both are the non-writing halves that binding::revalidate and session::revision::permit now call, so the seam subject is the same. A lost binding, a blocked session or a seam error ends the loop without spawning as the retained post-dispatch disposition authority_withdrawn {cause: execution_binding | managed_revision}, with the revalidation record, refusal or error under authority_withdrawn.evidence. Neither binding-revalidation.json nor revision-block.json is written, because inventory projects those as before-dispatch states.",
+      "tests": [
+        "src/implementation_attempt/cli/tests/repair.rs::a_withdrawn_execution_binding_ends_the_loop_after_dispatch",
+        "src/implementation_attempt/cli/tests/repair.rs::a_revoked_or_unreadable_managed_revision_ends_the_loop_after_dispatch"
+      ]
+    },
+    {
+      "id": 2,
+      "severity": "high",
+      "finding": "Checks ran against the mutable workspace with no identity check afterwards.",
+      "resolution": "Each check runs against its own copy of the captured candidate snapshot under repair/check-N-<check>/, written with every write bit removed. After the check the copy is captured again; a changed or uncapturable copy is passed to checks::classify as drifted, which outranks every other defect as checks_rejected {defect: candidate_drift}, and no further check runs. The copy is removed after its check. The worker workspace is never given to a check.",
+      "tests": [
+        "src/implementation_attempt/repair/tests.rs::a_check_whose_candidate_copy_drifted_cannot_pass",
+        "src/implementation_attempt/cli/tests/repair.rs::every_check_runs_against_its_own_read_only_copy_and_drift_is_rejected"
+      ]
+    },
+    {
+      "id": 3,
+      "severity": "high",
+      "finding": "Elapsed time was checked before a spawn only, not after its worker or checks, and a clock lost during a step did not produce clock uncertainty.",
+      "resolution": "WorkerPort::step and CheckPort::run take a deadline, Loop::remaining_ms, the time left before max_elapsed_ms. The clock is read again before each check, after the worker and after the checks; a reached bound is budget_exhausted {bound: elapsed} and an unreadable clock uncertain {cause: clock}, never a passing disposition.",
+      "tests": [
+        "src/implementation_attempt/repair/tests.rs::the_elapsed_bound_and_the_clock_hold_through_the_terminal_decision",
+        "src/implementation_attempt/cli/tests/repair.rs::the_elapsed_bound_and_the_clock_hold_through_the_terminal_decision"
+      ]
+    },
+    {
+      "id": 4,
+      "severity": "high",
+      "finding": "Policy and lineage bounds were examined only before another spawn, so a final step that overran a budget could still pass.",
+      "resolution": "Loop::settled compares the charged totals with every policy budget and lineage::Binding::overdrawn after each step's charge (an overrun step is never checked) and again after its checks, before correct_candidate or repaired_candidate. An overrun is budget_exhausted naming the bound.",
+      "tests": [
+        "src/implementation_attempt/repair/tests.rs::a_candidate_whose_charges_overran_a_budget_is_never_passed",
+        "src/implementation_attempt/repair/tests.rs::a_candidate_whose_charges_overran_the_lineage_is_never_passed",
+        "src/implementation_attempt/cli/tests/repair.rs::a_step_that_overruns_the_tool_budget_is_exhausted_even_though_its_check_would_pass"
+      ],
+      "scenario": "tool budget 6; the first step reports 9 and leaves a candidate the unit check would pass; the disposition is budget_exhausted {bound: tool_invocations} and no check runs"
+    },
+    {
+      "id": 5,
+      "severity": "high",
+      "finding": "A Kiln-owned proposal was handled before an unknown worker outcome.",
+      "resolution": "Loop::after_step handles cancelled and unknown outcomes before any proposal; unknown plus changed_work is uncertain {cause: worker_outcome}.",
+      "tests": [
+        "src/implementation_attempt/repair/tests.rs::an_unknown_or_cancelled_outcome_outranks_a_proposal"
+      ]
+    },
+    {
+      "id": 6,
+      "severity": "medium",
+      "finding": "Context::load created the state root and attempt directory before the lineage gate.",
+      "resolution": "Context::load only reads. The state root and attempt directory are created after the lineage gate, the repair ports and the session admission and before fencing::admit takes the lock, so the e3ef038c lock ordering is unchanged. Recovery still creates them before reconciling.",
+      "tests": [
+        "src/implementation_attempt/cli/tests/repair.rs::lineage_and_missing_ports_refuse_before_any_write"
+      ],
+      "scenario": "first-run lineage_exhausted, lineage_blocked and repair_ports_unavailable refusals leave no state root; a lineage_exhausted refusal in an existing state root adds no entry at any depth"
+    },
+    {
+      "id": 7,
+      "severity": "medium",
+      "finding": "Lattice rejected Kiln Alias names such as gpu-seconds.",
+      "resolution": "Dimension names follow Kiln 339116f6 Alias::new (crates/kiln-core/src/types.rs: BoundedText::new with DEFAULT_MAX_ALIAS_BYTES = 256): non-empty and at most 256 bytes, no narrower grammar. Names Lattice cannot charge are accepted and listed in unaccounted_dimensions.",
+      "tests": [
+        "src/implementation_attempt/lineage/tests.rs::kiln_alias_names_are_admitted_and_unmapped_ones_stay_unaccounted",
+        "src/implementation_attempt/lineage/tests.rs::malformed_snapshots_are_refused"
+      ]
+    }
+  ],
+  "gates": [
+    {"command": "cargo test -p lattice --lib -- implementation_attempt", "exit": 0, "result": "103 passed, 0 failed, 402 filtered out"},
+    {"command": "cargo test -p lattice --test test_implementation_attempt_refusals", "exit": 0, "result": "3 passed, 0 failed"},
+    {"command": "cargo clippy -p lattice --all-targets --no-deps -- -D warnings", "exit": 0},
+    {"command": "cargo fmt -p lattice --check", "exit": 0},
+    {"command": "octet-precommit-check", "exit": 0, "result": "root warning-only, 1052 accepted, 1052 current, 0 new, 0 stale; lattice-core warning-only, 25 accepted, 25 current, 0 new, 0 stale; baselines unchanged, no re-key"},
+    {"command": "octet_semantic_delta.py against e3ef038c baselines", "exit": 0, "result": "root new_semantic=0 resolved_semantic=0; lattice-core new_semantic=0 resolved_semantic=0"},
+    {"command": "cairn validate --root . --policy cairn-policy/generated/cairn-policy.json", "exit": 0, "result": "valid, no issues"},
+    {"command": "cairn gate proposal|design|tasks bound-same-attempt-repair", "exit": 0, "result": "PASS"},
+    {"command": "gitleaks dir --no-banner --redact on each changed or new path", "exit": 0}
+  ],
+  "non_claims": [
+    "Fixture ports only: no OMP process, check executor, model endpoint or Kiln lineage was exercised.",
+    "The shell cannot interrupt a port that ignores its deadline; it detects the overrun when the port returns.",
+    "A check that changes its copy and restores the same bytes before returning is not detected as drift.",
+    "Pre-write refusals other than lineage_blocked, lineage_exhausted and repair_ports_unavailable were not tested for an unchanged state root."
+  ],
+  "not_run": [
+    "scripts/check.rs and nix flake check (the parent runs them at integration)"
+  ]
+}

@@ -107,6 +107,9 @@ struct Context {
 }
 
 impl Context {
+    /// Read and validate the request without writing anything: a refusal
+    /// here or in a first run's pre-write gates leaves the state root as it
+    /// was.
     fn load(request_path: &std::path::Path, state: &std::path::Path) -> Result<Self, String> {
         let (request, bytes) = super::artifacts::load_request(request_path)?;
         // Recovery does not restore expired authority; it only reads retained evidence.
@@ -129,14 +132,18 @@ impl Context {
             let has_retained_intent = !matches!(retained, None | Some(super::session::intent::Record::Closed));
             return Err(super::refusal::refuse_superseded(&request.envelope, has_retained_intent));
         }
-        super::artifacts::private_directory(state)?;
-        super::artifacts::private_directory(&directory)?;
         Ok(Self {
             request,
             state: state.to_path_buf(),
             directory,
             identity,
         })
+    }
+
+    /// Create the private state root and attempt directory.
+    fn create_directories(&self) -> Result<(), String> {
+        super::artifacts::private_directory(&self.state)?;
+        super::artifacts::private_directory(&self.directory)
     }
 
     async fn run(
@@ -146,6 +153,7 @@ impl Context {
     ) -> Result<(), String> {
         let intent = self.directory.join(super::session::intent::FILE);
         let Some(ports) = ports.filter(|_| !intent.exists()) else {
+            self.create_directories()?;
             return recover_existing(&self.request, &self.state, &self.directory, &self.identity, revisions);
         };
         let worker = worker_request(&self.request)?;
@@ -158,7 +166,9 @@ impl Context {
         let repair = super::repair::admit(&self.request, repair)?;
         // The session is admitted before anything is written; a refusal starts nothing.
         let session = super::session::revision::admit(revisions, &self.request)?;
-        let prepared = self.prepare(compute);
+        // r[impl lattice.implementation_attempt.lineage.scenario.exhausted]
+        // Only now, after every pre-write refusal, is the state root touched.
+        let prepared = self.create_directories().and_then(|()| self.prepare(&mut *compute));
         let (guard, admitted, store) = match prepared {
             Ok(prepared) => prepared,
             Err(error) => {
@@ -211,6 +221,12 @@ impl Context {
             println!("{}", super::recovery::recover(&store, &self.request, &self.directory, &binding_identity)?);
             return Ok(());
         };
+        let authority = super::repair::Authority {
+            compute,
+            admitted: receipt.admitted().clone(),
+            revisions,
+            recorded: recorded.clone(),
+        };
         let run = super::repair::Run {
             request: &self.request,
             state: &self.state,
@@ -218,6 +234,7 @@ impl Context {
             identity: &self.identity,
             receipt,
             store,
+            authority,
         };
         let observation = super::repair::execute(run, repair)?;
         super::session::revision::close(revisions, &self.request, &recorded)?;

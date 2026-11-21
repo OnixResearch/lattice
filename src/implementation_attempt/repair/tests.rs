@@ -114,17 +114,18 @@ fn spawn(state: &Loop, elapsed_ms: u64) -> super::step::Request {
 fn step(state: &mut Loop, elapsed_ms: u64, revision: &str, outcomes: [Outcome; 2]) -> Next {
     let request = spawn(state, elapsed_ms);
     state.start(&request, &exited()).expect("same attempt");
-    assert_eq!(state.after_step(&exited(), Some(revision.into())), Next::Check {
+    assert_eq!(state.after_step(&exited(), Some(revision.into()), Some(elapsed_ms)), Next::Check {
         revision: revision.into()
     });
     let [fmt, unit] = outcomes;
     let policy = policy();
-    let verdict = super::checks::classify(subject(&policy, revision), &[
-        observation("fmt", revision, fmt),
-        observation("unit", revision, unit),
-    ]);
+    let verdict = super::checks::classify(
+        subject(&policy, revision),
+        &[observation("fmt", revision, fmt), observation("unit", revision, unit)],
+        None,
+    );
     let _ = state.charge_checks(request.iteration, 2);
-    state.after_checks(verdict)
+    state.after_checks(verdict, Some(elapsed_ms))
 }
 
 fn fresh() -> Loop {
@@ -181,16 +182,16 @@ fn checks_pass_only_on_complete_admitted_evidence_for_the_exact_revision() {
         observation("fmt", &revision, Outcome::Passed),
         observation("unit", &revision, Outcome::Passed),
     ];
-    assert_eq!(super::checks::classify(subject(&policy, &revision), &passed), Verdict::Passed);
+    assert_eq!(super::checks::classify(subject(&policy, &revision), &passed, None), Verdict::Passed);
     let failed = [
         observation("unit", &revision, Outcome::Failed { class: "test".into() }),
         observation("fmt", &revision, Outcome::Failed { class: "format".into() }),
     ];
-    assert_eq!(super::checks::classify(subject(&policy, &revision), &failed), Verdict::Failed {
+    assert_eq!(super::checks::classify(subject(&policy, &revision), &failed, None), Verdict::Failed {
         classes: vec!["format".into(), "test".into()]
     });
     let unknown = [observation("fmt", &revision, Outcome::Unknown), failed[0].clone()];
-    assert_eq!(super::checks::classify(subject(&policy, &revision), &unknown), Verdict::Unknown);
+    assert_eq!(super::checks::classify(subject(&policy, &revision), &unknown, None), Verdict::Unknown);
     let invocations = super::checks::invocations(&policy, &revision, 3);
     assert_eq!(invocations.len(), 2);
     assert!(invocations.iter().all(|invocation| invocation.revision == revision && invocation.iteration == 3));
@@ -225,8 +226,39 @@ fn skipped_missing_reconfigured_crossed_and_self_approved_checks_cannot_pass() {
         (Vec::new(), Defect::MissingCheck { check: "fmt".into() }),
     ];
     for (observations, defect) in cases {
-        assert_eq!(super::checks::classify(subject(&policy, &revision), &observations), Verdict::Rejected { defect });
+        let verdict = super::checks::classify(subject(&policy, &revision), &observations, None);
+        assert_eq!(verdict, Verdict::Rejected { defect });
     }
+}
+
+#[test]
+// r[verify lattice.implementation_attempt.repair.scenario.bypass]
+fn a_check_whose_candidate_copy_drifted_cannot_pass() {
+    let policy = policy();
+    let revision = hex('d');
+    let passed = [
+        observation("fmt", &revision, Outcome::Passed),
+        observation("unit", &revision, Outcome::Passed),
+    ];
+    let drift = |check: &str| Verdict::Rejected {
+        defect: Defect::CandidateDrift { check: check.into() },
+    };
+    // A formatter that rewrote its copy, followed by a passing unit check.
+    assert_eq!(super::checks::classify(subject(&policy, &revision), &passed, Some("fmt")), drift("fmt"));
+    // Drift outranks every other defect, including the checks it cut short.
+    let cut_short = [observation("fmt", &revision, Outcome::Skipped)];
+    assert_eq!(super::checks::classify(subject(&policy, &revision), &cut_short, Some("fmt")), drift("fmt"));
+    assert_eq!(super::checks::classify(subject(&policy, &revision), &passed, None), Verdict::Passed);
+    let mut state = fresh();
+    let request = spawn(&state, 0);
+    state.start(&request, &exited()).expect("same attempt");
+    let _ = state.after_step(&exited(), Some(revision.clone()), Some(0));
+    assert_eq!(
+        state.after_checks(drift("fmt"), Some(1)),
+        Next::Stop(Disposition::ChecksRejected {
+            defect: Defect::CandidateDrift { check: "fmt".into() }
+        })
+    );
 }
 
 #[test]
@@ -324,7 +356,7 @@ fn cancellation_uncertainty_and_unadmitted_failures_are_distinct_stops() {
         let request = spawn(&state, 0);
         let report = StepReport { outcome, ..exited() };
         state.start(&request, &report).expect("same attempt");
-        assert_eq!(state.after_step(&report, Some(hex('1'))), Next::Stop(expected));
+        assert_eq!(state.after_step(&report, Some(hex('1')), Some(0)), Next::Stop(expected));
     }
     let mut unknown = fresh();
     assert_eq!(
@@ -356,7 +388,7 @@ fn an_exit_zero_step_without_a_candidate_is_a_failure_never_a_pass() {
     let request = spawn(&state, 0);
     state.start(&request, &exited()).expect("same attempt");
     assert_eq!(
-        state.after_step(&exited(), None),
+        state.after_step(&exited(), None, Some(0)),
         Next::Stop(Disposition::NotRepairable {
             classes: vec![super::NO_CANDIDATE.into()]
         })
@@ -366,7 +398,7 @@ fn an_exit_zero_step_without_a_candidate_is_a_failure_never_a_pass() {
     let mut state = Loop::new(admitted, binding(), None, STEP_MODEL_REQUESTS).expect("policy");
     let request = spawn(&state, 0);
     state.start(&request, &exited()).expect("same attempt");
-    assert_eq!(state.after_step(&exited(), None), Next::Repair);
+    assert_eq!(state.after_step(&exited(), None, Some(0)), Next::Repair);
     assert_eq!(spawn(&state, 1).failures, vec![super::NO_CANDIDATE.to_owned()]);
 }
 
@@ -401,11 +433,148 @@ fn changed_work_and_new_semantic_attempts_stay_with_kiln() {
     };
     state.start(&request, &proposing).expect("same attempt");
     assert_eq!(
-        state.after_step(&proposing, Some(hex('1'))),
+        state.after_step(&proposing, Some(hex('1')), Some(0)),
         Next::Stop(Disposition::KilnOwned {
             continuation: super::KilnOwned::NewSemanticAttempt
         })
     );
+}
+
+#[test]
+// r[verify lattice.implementation_attempt.repair.scenario.kiln_owned]
+fn an_unknown_or_cancelled_outcome_outranks_a_proposal() {
+    let cases = [
+        (WorkerOutcome::Unknown, Disposition::Uncertain {
+            cause: Uncertainty::WorkerOutcome,
+        }),
+        (WorkerOutcome::Cancelled, Disposition::Cancelled),
+        (WorkerOutcome::Exited { code: 0 }, Disposition::KilnOwned {
+            continuation: super::KilnOwned::ChangedWork,
+        }),
+    ];
+    for (outcome, expected) in cases {
+        let mut state = fresh();
+        let request = spawn(&state, 0);
+        let report = StepReport {
+            outcome,
+            proposal: Some(super::KilnOwned::ChangedWork),
+            ..exited()
+        };
+        state.start(&request, &report).expect("same attempt");
+        assert_eq!(state.after_step(&report, Some(hex('1')), Some(0)), Next::Stop(expected), "{outcome:?}");
+    }
+}
+
+/// A policy with an aggregate tool budget of six: one step of two tool
+/// invocations and its two checks fit it.
+fn six_tools() -> super::Policy {
+    let mut six = policy();
+    six.max_tool_invocations = 6;
+    six
+}
+
+/// Start one step reporting `tools` tool invocations and decide after it.
+fn reported(state: &mut Loop, tools: u64, elapsed_ms: Option<u64>) -> Next {
+    let request = spawn(state, 0);
+    let report = StepReport {
+        model_requests: Some(STEP_MODEL_REQUESTS),
+        tool_invocations: Some(tools),
+        ..exited()
+    };
+    state.start(&request, &report).expect("same attempt");
+    state.after_step(&report, Some(hex('1')), elapsed_ms)
+}
+
+#[test]
+// r[verify lattice.implementation_attempt.repair.scenario.dispositions]
+fn a_candidate_whose_charges_overran_a_budget_is_never_passed() {
+    let exhausted = |bound| Next::Stop(Disposition::BudgetExhausted { bound });
+    let checked = Next::Check { revision: hex('1') };
+    // The first step reports nine tool invocations against a budget of six:
+    // it is never checked, so its checks cannot pass it.
+    let mut over = Loop::new(six_tools(), binding(), None, STEP_MODEL_REQUESTS).expect("policy");
+    assert_eq!(reported(&mut over, 9, Some(0)), exhausted(super::state::Bound::ToolInvocations));
+    // Five fit before the checks; the two check executions overrun six, so a
+    // pass is still exhausted.
+    let mut checks_over = Loop::new(six_tools(), binding(), None, STEP_MODEL_REQUESTS).expect("policy");
+    assert_eq!(reported(&mut checks_over, 5, Some(0)), checked);
+    let _ = checks_over.charge_checks(1, 2);
+    assert_eq!(checks_over.after_checks(Verdict::Passed, Some(1)), exhausted(Bound::ToolInvocations));
+    // Exactly six fits.
+    let mut exact = Loop::new(six_tools(), binding(), None, STEP_MODEL_REQUESTS).expect("policy");
+    assert_eq!(reported(&mut exact, 4, Some(0)), checked);
+    let _ = exact.charge_checks(1, 2);
+    assert_eq!(
+        exact.after_checks(Verdict::Passed, Some(1)),
+        Next::Stop(Disposition::CorrectCandidate { revision: hex('1') })
+    );
+    // A reported model overrun is exhausted the same way.
+    let mut models = fresh();
+    let request = spawn(&models, 0);
+    let report = StepReport {
+        model_requests: Some(7),
+        ..exited()
+    };
+    models.start(&request, &report).expect("same attempt");
+    assert_eq!(models.after_step(&report, Some(hex('1')), Some(0)), exhausted(Bound::ModelRequests));
+}
+
+#[test]
+// r[verify lattice.implementation_attempt.lineage.scenario.exhausted]
+fn a_candidate_whose_charges_overran_the_lineage_is_never_passed() {
+    let tools = crate::implementation_attempt::lineage::TOOL_INVOCATIONS;
+    let lineage = crate::implementation_attempt::lineage::tests::binding(100, 5);
+    let mut over = Loop::new(policy(), binding(), Some(lineage.clone()), STEP_MODEL_REQUESTS).expect("policy");
+    assert_eq!(reported(&mut over, 4, Some(0)), Next::Check { revision: hex('1') });
+    let _ = over.charge_checks(1, 2);
+    assert_eq!(
+        over.after_checks(Verdict::Passed, Some(1)),
+        Next::Stop(Disposition::BudgetExhausted {
+            bound: Bound::Lineage {
+                dimension: tools.into()
+            }
+        })
+    );
+    let mut fits = Loop::new(policy(), binding(), Some(lineage), STEP_MODEL_REQUESTS).expect("policy");
+    assert_eq!(reported(&mut fits, 3, Some(0)), Next::Check { revision: hex('1') });
+    let _ = fits.charge_checks(1, 2);
+    assert_eq!(
+        fits.after_checks(Verdict::Passed, Some(1)),
+        Next::Stop(Disposition::CorrectCandidate { revision: hex('1') })
+    );
+}
+
+#[test]
+// r[verify lattice.implementation_attempt.repair.scenario.dispositions]
+fn the_elapsed_bound_and_the_clock_hold_through_the_terminal_decision() {
+    let state = fresh();
+    assert_eq!(state.remaining_ms(Some(59_000)), Ok(1_000));
+    assert_eq!(state.remaining_ms(Some(60_000)), Err(Disposition::BudgetExhausted { bound: Bound::Elapsed }));
+    let clock = Disposition::Uncertain {
+        cause: Uncertainty::Clock,
+    };
+    assert_eq!(state.remaining_ms(None), Err(clock.clone()));
+    // A worker that returns past the bound, or without a readable clock, is
+    // never checked.
+    for (elapsed_ms, expected) in [
+        (Some(60_000), Disposition::BudgetExhausted { bound: Bound::Elapsed }),
+        (None, clock.clone()),
+    ] {
+        let mut state = fresh();
+        assert_eq!(reported(&mut state, 2, elapsed_ms), Next::Stop(expected));
+    }
+    // Checks that pass past the bound, or without a readable clock, do not
+    // make a candidate; just inside the bound they do.
+    for (elapsed_ms, expected) in [
+        (Some(60_001), Disposition::BudgetExhausted { bound: Bound::Elapsed }),
+        (None, clock.clone()),
+        (Some(59_999), Disposition::CorrectCandidate { revision: hex('1') }),
+    ] {
+        let mut state = fresh();
+        assert_eq!(reported(&mut state, 2, Some(0)), Next::Check { revision: hex('1') });
+        let _ = state.charge_checks(1, 2);
+        assert_eq!(state.after_checks(Verdict::Passed, elapsed_ms), Next::Stop(expected));
+    }
 }
 
 #[test]
@@ -418,12 +587,15 @@ fn charges_are_conservative_and_unknown_usage_stays_unknown() {
     assert_eq!(unknown.provenance, crate::orchestration::UsageProvenance::Unknown);
     assert_eq!((unknown.charged.model_requests, unknown.charged.tool_invocations), (2, 2));
     assert_eq!(unknown.phase, Phase::Edit);
-    let _ = state.after_step(&exited(), Some(hex('1')));
+    let _ = state.after_step(&exited(), Some(hex('1')), Some(0));
     let checks = state.charge_checks(1, 2);
     assert_eq!((checks.phase, checks.charged.tool_invocations, checks.charged.model_requests), (Phase::Check, 2, 0));
-    let _ = state.after_checks(Verdict::Failed {
-        classes: vec!["test".into()],
-    });
+    let _ = state.after_checks(
+        Verdict::Failed {
+            classes: vec!["test".into()],
+        },
+        Some(1),
+    );
     let repair = spawn(&state, 1);
     let over = StepReport {
         model_requests: Some(1),
