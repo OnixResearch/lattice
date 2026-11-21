@@ -70,7 +70,8 @@
       "tests": [
         "src/implementation_attempt/cli/tests/repair.rs::lineage_and_missing_ports_refuse_before_any_write"
       ],
-      "scenario": "first-run lineage_exhausted, lineage_blocked and repair_ports_unavailable refusals leave no state root; a lineage_exhausted refusal in an existing state root adds no entry at any depth"
+      "scenario": "first-run lineage_exhausted, lineage_blocked and repair_ports_unavailable refusals leave no state root; a lineage_exhausted refusal in an existing state root adds no entry at any depth",
+      "superseded": "By fence-intent-creation-atomically task 3.2 (review of 6384d535): these refusals now write exactly the attempt-fence's closure marker, the attempt directory, the per-work lock directory and the state root, so a later request for the attempt-fence cannot create an intent after their dispatched:false. Test renamed lineage_and_missing_ports_refusals_write_only_the_closure_marker; see fence-intent-creation-atomically/evidence/verification.json (closure)."
     },
     {
       "id": 7,

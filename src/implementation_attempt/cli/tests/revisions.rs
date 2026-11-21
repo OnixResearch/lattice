@@ -281,10 +281,15 @@ pub(super) fn recorded(
         .expect("intent exists")
 }
 
+/// Refused before any intent: the attempt directory holds only the closure
+/// marker the refusal created under the per-work lock, so no request for this
+/// attempt-fence can create an intent afterwards.
+// r[verify lattice.implementation_attempt.consumer.scenario.closure]
 pub(super) fn assert_not_started(directory: &std::path::Path) {
+    let intent = std::fs::read(directory.join(super::super::session::intent::FILE)).expect("closure marker");
+    assert!(super::super::recovery::is_closed_marker(&intent), "the refusal closed the attempt-fence");
     for name in [
         super::super::binding::ADMITTED_FILE,
-        super::super::session::intent::FILE,
         "candidate.redb",
         "raw-events.jsonl",
         "omp-observation.json",
@@ -359,8 +364,11 @@ async fn a_managed_attempt_is_pinned_closed_and_a_later_one_refused_after_revoca
     assert_eq!(refused, Err(super::super::refusal::Reason::RevisionNotAdmitted.message().to_owned()));
     assert_not_started(&fixture.directory(&second));
     let fence = fixture.state.join("works").join(blake3::hash(second.envelope.work_id.as_bytes()).to_hex().as_str());
-    assert!(!fence.join(format!("{:020}", 8)).exists(), "a refused session records no fence");
+    let fence_record = std::fs::read(fence.join(format!("{:020}", 8))).expect("the fence precedes admission");
+    assert_eq!(fence_record, second.envelope.attempt_id.as_bytes());
     assert!(fixture.lifecycle(&definition).sessions.is_empty(), "a refused session is never pinned");
+    let inventory = fixture.inventory(&second_path, true).expect("a closed attempt is inspectable");
+    assert!(inventory["instance"].is_null(), "a refused attempt has no worker instance");
 
     let output_parent = fixture.root.join("exports");
     std::fs::create_dir(&output_parent).expect("output parent");

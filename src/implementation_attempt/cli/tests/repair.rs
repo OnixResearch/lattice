@@ -633,22 +633,50 @@ async fn a_proposed_change_of_work_or_new_attempt_stays_with_kiln() {
     assert!(invocations.is_empty(), "no repair or check follows a Kiln-owned proposal");
 }
 
-/// The first line printed by a refusal is not captured here; the typed
-/// reason is the returned diagnostic and nothing is written.
-fn assert_nothing_written(directory: &std::path::Path) {
-    for name in [
-        super::super::binding::ADMITTED_FILE,
-        super::super::session::intent::FILE,
-        "candidate.redb",
-        "repair",
-    ] {
-        assert!(!directory.join(name).exists(), "{name} must not exist");
+/// Every path under `root`, sorted.
+fn entries(root: &std::path::Path) -> Vec<std::path::PathBuf> {
+    let mut pending = vec![root.to_path_buf()];
+    let mut paths = Vec::new();
+    while let Some(directory) = pending.pop() {
+        for entry in std::fs::read_dir(&directory).expect("state directory") {
+            let path = entry.expect("entry").path();
+            if path.is_dir() {
+                pending.push(path.clone());
+            }
+            paths.push(path);
+        }
     }
+    paths.sort();
+    paths
+}
+
+/// The closure path a pre-intent refusal of `request` writes: the per-work
+/// lock directory and the attempt directory with its closure marker.
+fn closure_path(state: &std::path::Path, request: &super::super::Request) -> Vec<std::path::PathBuf> {
+    let works = state.join("works");
+    let directory = super::super::artifacts::directory(state, request);
+    vec![
+        works.join(blake3::hash(request.envelope.work_id.as_bytes()).to_hex().as_str()),
+        works,
+        directory.join(super::super::session::intent::FILE),
+        directory,
+    ]
+}
+
+/// The first line printed by a refusal is not captured here; the typed
+/// reason is the returned diagnostic, and the only write is the closure
+/// marker.
+fn assert_closed(directory: &std::path::Path) {
+    let intent = std::fs::read(directory.join(super::super::session::intent::FILE)).expect("closure marker");
+    assert!(super::super::recovery::is_closed_marker(&intent), "the refusal closed the attempt-fence");
+    let names = std::fs::read_dir(directory).expect("attempt directory").count();
+    assert_eq!(names, 1, "the closure marker is the attempt directory's only entry");
 }
 
 #[tokio::test]
 // r[verify lattice.implementation_attempt.lineage.scenario.exhausted]
-async fn lineage_and_missing_ports_refuse_before_any_write() {
+// r[verify lattice.implementation_attempt.consumer.scenario.closure]
+async fn lineage_and_missing_ports_refusals_write_only_the_closure_marker() {
     let fixture = Fixture::new();
     let mut overloaded = crate::implementation_attempt::lineage::tests::binding(10, 10);
     overloaded.backpressure = crate::implementation_attempt::lineage::Backpressure::Overloaded;
@@ -663,17 +691,28 @@ async fn lineage_and_missing_ports_refuse_before_any_write() {
         ),
         (overloaded, super::super::refusal::Reason::LineageBlocked),
     ];
+    let mut expected = Vec::new();
     for (index, (lineage, reason)) in cases.into_iter().enumerate() {
         for policy in [Some(policy()), None] {
             let attempt = format!("attempt-lineage-{index}-{}", policy.is_some());
-            let request = fixture.request(&attempt, policy, Some(lineage.clone()));
+            let request = fixture.request(&attempt, policy.clone(), Some(lineage.clone()));
             let path = fixture.write(&request);
             let mut worker = FixtureWorker::new(Vec::new());
             let mut checks = FixtureChecks::admitted();
             let refused = run(&path, &fixture.state, &mut worker, &mut checks).await;
             assert_eq!(refused, Err(reason.message().to_owned()), "{attempt}");
             assert!(worker.requests.is_empty());
-            assert_nothing_written(&fixture.directory(&request));
+            assert_closed(&fixture.directory(&request));
+            expected.extend(closure_path(&fixture.state, &request));
+            // A valid request for the same attempt-fence can never create an
+            // intent once the refusal reported `dispatched: false`.
+            let valid = fixture.request(&attempt, policy, None);
+            let path = fixture.write(&valid);
+            let mut worker = FixtureWorker::new(vec![write("fixed")]);
+            let closed = run(&path, &fixture.state, &mut worker, &mut checks).await;
+            assert_eq!(closed, Err(super::super::refusal::Reason::AttemptClosed.message().to_owned()), "{attempt}");
+            assert!(worker.requests.is_empty(), "{attempt}: no step starts");
+            assert_closed(&fixture.directory(&request));
         }
     }
     let request = fixture.request("attempt-standalone", Some(policy()), None);
@@ -687,41 +726,33 @@ async fn lineage_and_missing_ports_refuse_before_any_write() {
         super::super::execution::run(&path, &fixture.state, Some(ports), super::super::session::revision::Store(None))
             .await;
     assert_eq!(refused, Err(super::super::refusal::Reason::RepairPortsUnavailable.message().to_owned()));
-    assert_nothing_written(&fixture.directory(&request));
-    // A first run's pre-write refusals never create the state root.
-    assert!(!fixture.state.exists(), "the state root is unchanged after every pre-write refusal");
+    assert_closed(&fixture.directory(&request));
+    expected.extend(closure_path(&fixture.state, &request));
+    expected.sort();
+    expected.dedup();
+    // No fence record, binding, candidate store or repair record anywhere.
+    assert_eq!(entries(&fixture.state), expected, "only the closure paths exist in the state root");
     let record = super::super::refusal::record(&request.envelope, super::super::refusal::Reason::LineageExhausted);
     assert_eq!((record["reason"].clone(), record["dispatched"].clone()), ("lineage_exhausted".into(), false.into()));
-    // An existing state root keeps exactly its entries.
+    // An existing state root gains exactly the refused attempt's closure path.
     let fixture = Fixture::new();
     let admitted = fixture.request("attempt-admitted-first", Some(policy()), None);
     let path = fixture.write(&admitted);
     let mut worker = FixtureWorker::new(vec![write("fixed")]);
     let mut checks = FixtureChecks::admitted();
     run(&path, &fixture.state, &mut worker, &mut checks).await.expect("a first attempt runs");
-    let entries = || {
-        let mut pending = vec![fixture.state.clone()];
-        let mut paths = Vec::new();
-        while let Some(directory) = pending.pop() {
-            for entry in std::fs::read_dir(&directory).expect("state directory") {
-                let path = entry.expect("entry").path();
-                if path.is_dir() {
-                    pending.push(path.clone());
-                }
-                paths.push(path);
-            }
-        }
-        paths.sort();
-        paths
-    };
-    let before = entries();
+    let before = entries(&fixture.state);
     let exhausted = crate::implementation_attempt::lineage::tests::binding(0, 10);
     let request = fixture.request("attempt-lineage-later", Some(policy()), Some(exhausted));
     let path = fixture.write(&request);
     let mut worker = FixtureWorker::new(Vec::new());
     let refused = run(&path, &fixture.state, &mut worker, &mut checks).await;
     assert_eq!(refused, Err(super::super::refusal::Reason::LineageExhausted.message().to_owned()));
-    assert_eq!(entries(), before, "no new entry in the state root");
+    let mut expected = before;
+    expected.extend(closure_path(&fixture.state, &request));
+    expected.sort();
+    expected.dedup();
+    assert_eq!(entries(&fixture.state), expected, "only the closure marker path is new");
 }
 
 /// A panicking worker step stands in for a controller lost mid-step.

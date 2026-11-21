@@ -176,6 +176,12 @@ fn a_superseded_attempt_closed_before_execution_never_dispatched() {
     std::fs::write(&fresh_path, bytes).expect("request");
     let (_, record) = fixture.refusal("run", &fresh_path);
     assert_eq!(record["dispatched"], false, "no attempt directory, no intent");
+    // `dispatched:false` is made durable: the refusal closed the attempt-fence.
+    let key = fixture.state.join(format!("{}-{}", fresh.envelope.attempt_id, fresh.envelope.fence));
+    let directory = fixture.state.join(blake3::hash(key.as_os_str().as_encoded_bytes()).to_hex().as_str());
+    let marker = std::fs::read(directory.join("intent.json")).expect("closure marker");
+    let identity = blake3::hash(&serde_json::to_vec(&fresh).expect("request bytes")).to_hex().to_string();
+    assert_eq!(marker, format!("closed-before-execution:{identity}").into_bytes());
 }
 
 #[test]

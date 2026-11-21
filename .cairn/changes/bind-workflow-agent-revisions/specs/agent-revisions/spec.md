@@ -49,9 +49,16 @@ r[lattice.agent_revisions.workflow.attempt.scenario.subject]
 
 #### Scenario: A mismatched, unknown or malformed pair is refused before any intent
 r[lattice.agent_revisions.workflow.attempt.scenario.refused]
-- GIVEN a request naming a bundle for another worker profile revision, a plain agent bundle, an unknown definition, an unknown revision, a malformed pair, or a pair without `--revision-store`
-- WHEN the attempt runs
-- THEN it MUST be refused with no fence record, binding, intent or pin: `revision_not_admitted` with `revision_not_selected`, `malformed`, `unknown_revision` and `unknown_revision` respectively, a validation error for the malformed pair, and an error naming `--revision-store` without a store
+- GIVEN a request naming a bundle for another worker profile revision, a plain agent bundle, an unknown definition, an unknown revision, a malformed pair, or a pair without `--revision-store`, and a request whose envelope's profile revision is not its current one submitted to `admit-session`
+- WHEN the attempt runs, or the session is admitted through `admit-session`
+- THEN the run MUST be refused with no binding, intent or pin: `revision_not_admitted` with `revision_not_selected`, `malformed`, `unknown_revision` and `unknown_revision` respectively after its fence record, closing the attempt-fence so a later valid request for it is `attempt_closed`, a validation error for the malformed pair and an error naming `--revision-store` without a store, both before any write
+- AND `admit-session` MUST apply the request validation `implementation-attempt run` applies and refuse such a request before any pin
+
+#### Scenario: A request of another revision never acts on a pinned session
+r[lattice.agent_revisions.workflow.attempt.scenario.single_flight]
+- GIVEN two selected workflow-agent definitions, or two revisions of one definition, named by requests that share one envelope and so one attempt-fence and session
+- WHEN one request is admitted and creates its intent while the other is paused after finding no intent, then resumes; and when `seam::effect`, `seam::retained` and `seam::close` are called for the other revision while the first is pinned
+- THEN the resumed request MUST be refused as `substituted_request` with `dispatched: true` without pinning or closing anything, exactly the first request's pin MUST be live, and the seam calls for the other revision MUST be blocked or refused as `session_conflict` while the first pin stays live
 
 #### Scenario: An absent field changes nothing
 r[lattice.agent_revisions.workflow.attempt.scenario.absent]

@@ -104,12 +104,14 @@ struct Context {
     state: std::path::PathBuf,
     directory: std::path::PathBuf,
     identity: String,
+    /// The envelope names a revision of an earlier profile framing.
+    is_superseded: bool,
 }
 
+type Pending = super::refusal::deferred::Pending;
+
 impl Context {
-    /// Read and validate the request without writing anything: a refusal
-    /// here or in a first run's pre-write gates leaves the state root as it
-    /// was.
+    /// Read and validate the request without writing anything.
     fn load(request_path: &std::path::Path, state: &std::path::Path) -> Result<Self, String> {
         let (request, bytes) = super::artifacts::load_request(request_path)?;
         // Recovery does not restore expired authority; it only reads retained evidence.
@@ -120,23 +122,14 @@ impl Context {
         let identity = blake3::hash(&bytes).to_hex().to_string();
         let directory = super::artifacts::directory(state, &request);
         // Attempts retained under an earlier profile-revision framing are never
-        // re-executed or recovered by this framing. One whose directory holds an
-        // execution intent may have run under that framing.
-        if !request.is_current_profile_revision()? {
-            let session = super::session::revision::identifier(&request);
-            let subject = super::session::intent::Subject {
-                request_identity: &identity,
-                session: &session,
-            };
-            let retained = super::session::intent::read(&directory, subject)?;
-            let has_retained_intent = !matches!(retained, None | Some(super::session::intent::Record::Closed));
-            return Err(super::refusal::refuse_superseded(&request.envelope, has_retained_intent));
-        }
+        // re-executed or recovered by this framing; `run` refuses them.
+        let is_superseded = !request.is_current_profile_revision()?;
         Ok(Self {
             request,
             state: state.to_path_buf(),
             directory,
             identity,
+            is_superseded,
         })
     }
 
@@ -151,56 +144,60 @@ impl Context {
         ports: Option<super::Ports<'_>>,
         revisions: super::session::revision::Store<'_>,
     ) -> Result<(), String> {
+        if self.is_superseded {
+            let guard = self.lock()?;
+            let pending = Pending::new(super::refusal::Reason::ProfileRevisionSuperseded);
+            return Err(self.settle(&guard, pending));
+        }
         let intent = self.directory.join(super::session::intent::FILE);
         let Some(ports) = ports.filter(|_| !intent.exists()) else {
             self.create_directories()?;
             return recover_existing(&self.request, &self.state, &self.directory, &self.identity, revisions);
         };
+        self.first_run(ports, revisions).await
+    }
+
+    /// A first run, once no intent was seen. Everything up to the intent
+    /// happens under the per-work lock, in this order: the intent store is
+    /// read again, the lineage and repair-port gates run, the fence is checked
+    /// and recorded, the revision session is admitted, the execution binding
+    /// is admitted and persisted, and the intent is created. An intent that
+    /// appeared meanwhile is reconciled like any retained one and nothing is
+    /// admitted; a typed refusal is settled; a session this run pinned is
+    /// abandoned on every path that ends before its intent.
+    // r[impl lattice.implementation_attempt.consumer.scenario.fence_lock]
+    async fn first_run(
+        self,
+        ports: super::Ports<'_>,
+        revisions: super::session::revision::Store<'_>,
+    ) -> Result<(), String> {
         let worker = worker_request(&self.request)?;
+        super::session::revision::require_named(revisions, &self.request)?;
         let super::Ports {
             compute,
             serving,
             repair,
         } = ports;
-        // The lineage gate and repair ports are checked before any write.
-        let repair = super::repair::admit(&self.request, repair)?;
-        // The session is admitted before anything is written; a refusal starts nothing.
-        let session = super::session::revision::admit(revisions, &self.request)?;
-        // r[impl lattice.implementation_attempt.lineage.scenario.exhausted]
-        // Only now, after every pre-write refusal, is the state root touched.
-        let prepared = self.create_directories().and_then(|()| self.prepare(&mut *compute));
-        let (guard, admitted, store) = match prepared {
-            Ok(prepared) => prepared,
-            Err(error) => {
-                super::session::revision::abandon(revisions, &self.request, &session)
-                    .map_err(|close| format!("{error}; {close}"))?;
-                return Err(error);
-            }
-        };
-        let identifier = super::session::revision::identifier(&self.request);
-        let subject = super::session::intent::Subject {
-            request_identity: &self.identity,
-            session: &identifier,
-        };
-        let bytes = super::session::intent::encode(subject, session.recorded.as_ref())?;
-        // r[impl lattice.implementation_attempt.consumer.scenario.fence_lock]
-        // Still under the lock that recorded the fence: recheck it, then
-        // create the intent. The lock is released before any worker effect.
-        let created = guard.create_intent(&self.request.envelope, &self.directory, &bytes);
-        drop(guard);
-        let is_created = match created {
-            Ok(is_created) => is_created,
-            Err(refused @ super::session::fencing::Error::Refused(_)) => {
-                let error = refused.report(&self.request.envelope);
-                super::session::revision::abandon(revisions, &self.request, &session)
-                    .map_err(|close| format!("{error}; {close}"))?;
-                return Err(error);
-            }
-            Err(error) => return Err(error.report(&self.request.envelope)),
-        };
-        if !is_created {
-            return Err("concurrent execution intent requires reconciliation".into());
+        let guard = self.lock()?;
+        if self.directory.join(super::session::intent::FILE).exists() {
+            drop(guard);
+            return recover_existing(&self.request, &self.state, &self.directory, &self.identity, revisions);
         }
+        let (repair, session) = match self.gate(&guard, repair, revisions) {
+            Ok(gated) => gated,
+            Err(stop) => return Err(self.stop(&guard, stop)),
+        };
+        let (admitted, store) = match self.prepare(&guard, &mut *compute, &session) {
+            Ok(prepared) => prepared,
+            Err(stop) => {
+                let error = self.stop(&guard, stop);
+                super::session::revision::abandon(revisions, &self.request, &session)
+                    .map_err(|close| format!("{error}; {close}"))?;
+                return Err(error);
+            }
+        };
+        // The lock is released before any worker effect.
+        drop(guard);
         let recorded = session.recorded.unwrap_or(super::session::intent::Recorded::UNMANAGED);
         // No worker ever spawns for this attempt once a pre-spawn step fails,
         // so its session is closed.
@@ -261,29 +258,9 @@ impl Context {
         };
         super::session::launch::execute(execution, &self.directory).await
     }
-
-    /// The fence record, persisted binding and candidate store, all before
-    /// the intent. The returned guard still holds the fence lock, so the
-    /// fence check, its record and the intent are one critical section.
-    fn prepare(
-        &self,
-        compute: &mut dyn crate::execution_binding::ComputeAllocationPort,
-    ) -> Result<
-        (
-            super::session::fencing::Guard,
-            lattice_core::execution_binding::admission::bound::Admitted,
-            crate::store::Store,
-        ),
-        String,
-    > {
-        // r[impl lattice.implementation_attempt.consumer.scenario.refusal]
-        let guard = super::session::fencing::admit(&self.state, &self.request.envelope, &self.directory)?;
-        let admitted = super::binding::admit_and_persist(&self.request, &self.directory, compute)?;
-        let store =
-            crate::store::Store::new(self.directory.join("candidate.redb")).map_err(|error| error.to_string())?;
-        Ok((guard, admitted, store))
-    }
 }
+
+pub(super) mod admission;
 
 /// `None` reconciles retained evidence only; ports are used only to admit,
 /// revalidate and gate a first dispatch. `revisions` names the optional

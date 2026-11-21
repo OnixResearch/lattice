@@ -49,7 +49,7 @@
       "src/implementation_attempt/repair/tests.rs (16 tests)"
     ],
     "shell": [
-      "src/implementation_attempt/cli/tests/repair.rs (18 tests: correct, repaired, iteration and lineage exhaustion, newer fence, cancellation during and between steps, uncertain worker and check, exit-zero/fabricated/reconfigured/skipped/self-approved bypasses, Kiln-owned proposal, lineage and missing-port refusals that leave the state root unchanged, lost controller, base drift, absent-field byte identity, single-shot lineage draw, tool overrun whose check would pass, per-check read-only copies and drift, slow and clockless workers and checks, withdrawn execution binding, revoked or unreadable managed revision)"
+      "src/implementation_attempt/cli/tests/repair.rs (18 tests: correct, repaired, iteration and lineage exhaustion, newer fence, cancellation during and between steps, uncertain worker and check, exit-zero/fabricated/reconfigured/skipped/self-approved bypasses, Kiln-owned proposal, lineage and missing-port refusals that write only the attempt-fence's closure marker (left the state root unchanged until fence-intent-creation-atomically task 3.2), lost controller, base drift, absent-field byte identity, single-shot lineage draw, tool overrun whose check would pass, per-check read-only copies and drift, slow and clockless workers and checks, withdrawn execution binding, revoked or unreadable managed revision)"
     ],
     "fixture_ports": "fixture WorkerPort, CheckPort and clock; no OMP process, sandbox, model endpoint, check executor or Kiln ledger"
   },

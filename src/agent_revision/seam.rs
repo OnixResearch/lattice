@@ -176,8 +176,10 @@ pub fn admit(store: &crate::store::Store, request: &Request, session: &str) -> R
     })
 }
 
+// r[impl lattice.agent_revisions.workflow.attempt.scenario.single_flight]
 /// Whether `session`, admitted as `admission`, may perform its next
-/// protected effect. A managed session unknown to the lifecycle is blocked.
+/// protected effect. A managed session unknown to the lifecycle, or pinned to
+/// another revision than the request's subject, is blocked.
 pub fn effect(
     store: &crate::store::Store,
     request: &Request,
@@ -187,14 +189,17 @@ pub fn effect(
     if admission == Admission::Unmanaged {
         return Ok(Effect::Unmanaged);
     }
-    let definition = subject(request)?.definition;
-    let Some((_, lifecycle)) = store.load_lifecycle(&definition).map_err(|error| error.to_string())? else {
+    let subject = subject(request)?;
+    let Some((_, lifecycle)) = store.load_lifecycle(&subject.definition).map_err(|error| error.to_string())? else {
         return Ok(Effect::Blocked {
             refusal: Refusal::UnknownSession,
         });
     };
     Ok(match lattice_core::agent_revision::ops::sessions::effect_permitted(&lifecycle, session) {
-        Ok(permit) => Effect::Permitted { permit },
+        Ok(permit) if permit.revision == subject.revision => Effect::Permitted { permit },
+        Ok(_) => Effect::Blocked {
+            refusal: Refusal::SessionConflict,
+        },
         Err(refusal) => Effect::Blocked { refusal },
     })
 }
@@ -203,7 +208,8 @@ pub fn effect(
 /// `permit`, may still be published after the session closed. Closing forgets
 /// the pin, so the caller passes the one it recorded at admission. An
 /// unmanaged session answers `unmanaged` without reading the store; a managed
-/// one is blocked once its session, revision or qualification is revoked.
+/// one is blocked when `permit` names another revision than the request's
+/// subject, and once its session, revision or qualification is revoked.
 pub fn retained(
     store: &crate::store::Store,
     request: &Request,
@@ -214,8 +220,16 @@ pub fn retained(
     if admission == Admission::Unmanaged {
         return Ok(Effect::Unmanaged);
     }
-    let definition = subject(request)?.definition;
-    let Some((_, lifecycle)) = store.load_lifecycle(&definition).map_err(|error| error.to_string())? else {
+    let subject = subject(request)?;
+    if permit.revision != subject.revision {
+        return Ok(Effect::Blocked {
+            refusal: Refusal::SessionConflict,
+        });
+    }
+    // Only a managed session's own revision reaches its lifecycle.
+    debug_assert_eq!(admission, Admission::Managed);
+    debug_assert_eq!(permit.revision, subject.revision);
+    let Some((_, lifecycle)) = store.load_lifecycle(&subject.definition).map_err(|error| error.to_string())? else {
         return Ok(Effect::Blocked {
             refusal: Refusal::UnknownSession,
         });
@@ -229,7 +243,9 @@ pub fn retained(
 }
 
 /// Close `session`, admitted as `admission`, holding its checkpoints on the
-/// pinned revision. An unmanaged session is left untouched.
+/// pinned revision. An unmanaged session is left untouched, and a session
+/// pinned to another revision than the request's subject is refused as
+/// `session_conflict` without closing it.
 pub fn close(
     store: &crate::store::Store,
     request: &Request,
@@ -240,13 +256,23 @@ pub fn close(
     if admission == Admission::Unmanaged {
         return Ok(Closure::Unmanaged);
     }
-    let definition = subject(request)?.definition;
-    if store.load_lifecycle(&definition).map_err(|error| error.to_string())?.is_none() {
+    let subject = subject(request)?;
+    debug_assert_eq!(admission, Admission::Managed);
+    let definition = subject.definition.as_str();
+    // The request names exactly one subject; its session is keyed in that
+    // definition's lifecycle only.
+    debug_assert!(!definition.is_empty() && !subject.revision.is_empty());
+    if store.load_lifecycle(definition).map_err(|error| error.to_string())?.is_none() {
         return Ok(Closure::Refused {
             refusal: Refusal::UnknownSession,
         });
     }
-    let closed = super::commands::transact(store, &definition, super::commands::Seed::Existing, |lifecycle| {
+    let closed = super::commands::transact(store, definition, super::commands::Seed::Existing, |lifecycle| {
+        // A session pinned to another revision than the request's subject
+        // is not this request's to close.
+        if lifecycle.sessions.get(session).is_some_and(|pin| pin.revision != subject.revision) {
+            return Err(Refusal::SessionConflict);
+        }
         lattice_core::agent_revision::ops::sessions::close(lifecycle, session, checkpoints)
     })?;
     Ok(match closed {

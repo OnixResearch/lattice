@@ -19,8 +19,8 @@ fn digest(label: &str) -> String {
     format!("b3:{}", blake3::hash(label.as_bytes()).to_hex())
 }
 
-/// A one-obligation fixture plan.
-fn compiled() -> crate::workflow::intent::CompiledPlan {
+/// A one-obligation fixture plan; another `guidance` is another plan.
+fn compiled(guidance: &str) -> crate::workflow::intent::CompiledPlan {
     use crate::workflow::intent as wi;
     let cohort = wi::SourceCohort {
         producer_identity: digest("producer"),
@@ -35,7 +35,7 @@ fn compiled() -> crate::workflow::intent::CompiledPlan {
     let obligation = wi::Obligation {
         id: "A".into(),
         obligation_identity: digest("obligation:A"),
-        guidance_identity: digest("guidance:A"),
+        guidance_identity: digest(&format!("{guidance}:A")),
         remaining_condition_identity: digest("remaining:A"),
         precondition_identity: digest("precondition:A"),
         operation_class: "cairn_validate".into(),
@@ -73,8 +73,13 @@ fn compiled() -> crate::workflow::intent::CompiledPlan {
 /// `worker`'s own bundle, then desire and prepare it; returns its definition
 /// and revision.
 fn desired(fixture: &Fixture, worker: &Request) -> (String, String) {
+    desired_as(fixture, worker, "verify-change", "guidance")
+}
+
+/// [`desired`] under pairing `name` with plan `guidance`.
+fn desired_as(fixture: &Fixture, worker: &Request, name: &str, guidance: &str) -> (String, String) {
     let resolved = crate::agent_revision::bundle::resolve(worker).expect("resolves");
-    let composed = crate::agent_revision::composite::compose("verify-change", &compiled(), resolved).expect("composes");
+    let composed = crate::agent_revision::composite::compose(name, &compiled(guidance), resolved).expect("composes");
     let store = crate::store::Store::new(&fixture.store).expect("store");
     crate::agent_revision::transact(&store, &composed.definition, crate::agent_revision::Seed::Create, |lifecycle| {
         lattice_core::agent_revision::ops::prepare::desire(lifecycle, &composed.bundle)
@@ -123,14 +128,25 @@ fn effect(fixture: &Fixture, request: &Request, session: &str) -> crate::agent_r
         .expect("seam")
 }
 
-/// Refused before any fence record, binding, intent or session pin.
+/// Refused under the per-work lock after the fence record and before any
+/// binding, intent or session pin: the refusal closed the attempt-fence.
 fn assert_refused_before_any_intent(fixture: &Fixture, request: &Request, definition: &str) {
     super::revisions::assert_not_started(&fixture.directory(request));
     let fence = fixture
         .state
         .join("works")
         .join(blake3::hash(request.envelope.work_id.as_bytes()).to_hex().as_str());
-    assert!(!fence.join(format!("{:020}", request.envelope.fence)).exists(), "no fence is recorded");
+    let recorded = std::fs::read(fence.join(format!("{:020}", request.envelope.fence))).expect("fence record");
+    assert_eq!(recorded, request.envelope.attempt_id.as_bytes(), "the fence precedes admission");
+    assert!(
+        stored(fixture, definition).is_none_or(|lifecycle| lifecycle.sessions.is_empty()),
+        "nothing is pinned"
+    );
+}
+
+/// Refused as an error before the state root is touched.
+fn assert_untouched(fixture: &Fixture, request: &Request, definition: &str) {
+    assert!(!fixture.directory(request).exists(), "no attempt directory");
     assert!(
         stored(fixture, definition).is_none_or(|lifecycle| lifecycle.sessions.is_empty()),
         "nothing is pinned"
@@ -205,7 +221,8 @@ async fn a_matching_bundle_admits_the_attempt_under_the_pair_not_the_worker() {
     let (definition, revision) = desired(&fixture, &worker);
     assert_ne!(definition, worker_definition);
     let qualification_ref = fixture.promoted(&definition, &revision);
-    let request = named(fixture.request("attempt-workflow-pair", 7), &definition, &revision);
+    // The refused worker attempt recorded fence 7 before its admission.
+    let request = named(fixture.request("attempt-workflow-pair", 8), &definition, &revision);
     let (request_path, identity) = fixture.write("pair.json", &request);
     fixture
         .attempt("run", &request_path, true)
@@ -322,10 +339,9 @@ async fn revoking_the_pair_refuses_new_attempts_and_the_retained_export() {
     assert!(std::fs::read_dir(&output_parent).expect("exports").next().is_none(), "nothing is exported");
 }
 
-#[tokio::test]
-// r[verify lattice.agent_revisions.workflow.attempt.scenario.subject]
-async fn revoking_the_pairs_session_after_admission_blocks_the_attempt_before_spawn() {
-    let fixture = Fixture::new();
+/// A provider-allocation worker request, and a fixture port with the two
+/// observations its admission and its pre-spawn revalidation read.
+fn provider(fixture: &Fixture) -> (Request, crate::execution_binding::FixtureComputePort) {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/execution-binding/observations/positive/agent-a-1-active.json");
     let observation =
@@ -344,20 +360,28 @@ async fn revoking_the_pairs_session_after_admission_blocks_the_attempt_before_sp
         },
     );
     worker.workspace_root = fixture.root.join("workspace");
-    let worker = super::with_capability(worker, super::revisions::capability());
-    let (definition, revision) = desired(&fixture, &worker);
-    fixture.promoted(&definition, &revision);
-    let request = named(worker, &definition, &revision);
-    let (request_path, _) = fixture.write("pair.json", &request);
     let mut later = observation.clone();
     later.port.observation_sequence = 2;
     later.offer = None;
     let reply = |observed| Ok(crate::execution_binding::AllocationReply::Observed(Box::new(observed)));
+    let replies = crate::execution_binding::FixtureComputePort::new(vec![reply(observation), reply(later)]);
+    (super::with_capability(worker, super::revisions::capability()), replies)
+}
+
+#[tokio::test]
+// r[verify lattice.agent_revisions.workflow.attempt.scenario.subject]
+async fn revoking_the_pairs_session_after_admission_blocks_the_attempt_before_spawn() {
+    let fixture = Fixture::new();
+    let (worker, replies) = provider(&fixture);
+    let (definition, revision) = desired(&fixture, &worker);
+    fixture.promoted(&definition, &revision);
+    let request = named(worker, &definition, &revision);
+    let (request_path, _) = fixture.write("pair.json", &request);
     let mut port = super::revisions::RevokingPort {
         fixture: &fixture,
         definition: definition.clone(),
         session: super::super::session::revision::identifier(&request),
-        replies: crate::execution_binding::FixtureComputePort::new(vec![reply(observation), reply(later)]),
+        replies,
         calls: 0,
     };
     let blocked = super::super::execution::run(
@@ -430,12 +454,15 @@ async fn an_unknown_definition_or_revision_or_a_missing_store_is_refused_before_
     fixture.promoted(&definition, &revision);
     let unknown_definition = format!("blake3:{}", blake3::hash(b"unknown definition").to_hex());
     let unknown_revision = "f".repeat(64);
+    // Each refusal records its fence first, so every attempt takes a new one.
     let pairs = [
-        (unknown_definition.as_str(), revision.as_str()),
-        (definition.as_str(), unknown_revision.as_str()),
+        (8, unknown_definition.as_str(), revision.as_str()),
+        (9, definition.as_str(), unknown_revision.as_str()),
     ];
-    for (index, (pair_definition, pair_revision)) in pairs.into_iter().enumerate() {
-        let request = named(fixture.request(&format!("attempt-unknown-{index}"), 7), pair_definition, pair_revision);
+    for (fence, pair_definition, pair_revision) in pairs {
+        let attempt = format!("attempt-unknown-{fence}");
+        let request = named(fixture.request(&attempt, fence), pair_definition, pair_revision);
+        let index = fence;
         let (request_path, _) = fixture.write(&format!("unknown-{index}.json"), &request);
         let refused = fixture.attempt("run", &request_path, true).await;
         assert_eq!(refused, Err(Reason::RevisionNotAdmitted.message().to_owned()), "{index}");
@@ -443,6 +470,13 @@ async fn an_unknown_definition_or_revision_or_a_missing_store_is_refused_before_
         assert_eq!(admit(&fixture, &request, "session-probe"), crate::agent_revision::seam::Decision::Refused {
             refusal: Refusal::UnknownRevision,
         });
+        // The refusal reported `dispatched: false`, so even a valid request
+        // for this attempt-fence can never create an intent.
+        let valid = named(fixture.request(&attempt, fence), &definition, &revision);
+        let (valid_path, _) = fixture.write(&format!("valid-{index}.json"), &valid);
+        let closed = fixture.attempt("run", &valid_path, true).await;
+        assert_eq!(closed, Err(Reason::AttemptClosed.message().to_owned()), "{index}");
+        assert_refused_before_any_intent(&fixture, &valid, &definition);
     }
     assert!(stored(&fixture, &unknown_definition).is_none(), "a refused pair creates no lifecycle");
     assert!(fixture.lifecycle(&definition).sessions.is_empty());
@@ -454,11 +488,191 @@ async fn an_unknown_definition_or_revision_or_a_missing_store_is_refused_before_
     let (malformed_path, _) = fixture.write("malformed.json", &malformed);
     let error = fixture.attempt("run", &malformed_path, true).await.expect_err("malformed pair");
     assert!(error.contains("workflow-agent"), "{error}");
-    assert_refused_before_any_intent(&fixture, &malformed, &definition);
+    assert_untouched(&fixture, &malformed, &definition);
 
     let storeless = named(fixture.request("attempt-storeless", 7), &definition, &revision);
     let (storeless_path, _) = fixture.write("storeless.json", &storeless);
     let error = fixture.attempt("run", &storeless_path, false).await.expect_err("a pair needs its store");
     assert!(error.contains("--revision-store"), "{error}");
-    assert_refused_before_any_intent(&fixture, &storeless, &definition);
+    assert_untouched(&fixture, &storeless, &definition);
+}
+
+/// Answers the provider allocation and, on revalidation (after the first
+/// request's intent and pin, before its spawn), resumes the paused second
+/// request on another thread and records its outcome and the live pins.
+struct ResumingPort<'a> {
+    fixture: &'a Fixture,
+    paused: Option<super::super::execution::admission::Paused>,
+    definitions: [String; 2],
+    replies: crate::execution_binding::FixtureComputePort,
+    calls: u32,
+    resumed: Option<Result<(), String>>,
+    pins: [usize; 2],
+}
+
+impl crate::execution_binding::ComputeAllocationPort for ResumingPort<'_> {
+    fn observe_allocation(
+        &mut self,
+        query: &crate::execution_binding::AllocationQuery,
+    ) -> Result<crate::execution_binding::AllocationReply, crate::execution_binding::ComputePortIssue> {
+        self.calls += 1;
+        if self.calls == 2
+            && let Some(paused) = self.paused.take()
+        {
+            let store = self.fixture.store.as_path();
+            let resumed = std::thread::scope(|scope| {
+                scope
+                    .spawn(move || {
+                        let runtime =
+                            tokio::runtime::Builder::new_current_thread().enable_all().build().expect("runtime");
+                        let ports = super::super::Ports {
+                            compute: &mut crate::execution_binding::UnavailableComputePort,
+                            serving: Box::new(crate::execution_binding::serving::UnavailableOwner),
+                            repair: None,
+                        };
+                        runtime.block_on(paused.resume(ports, super::super::session::revision::Store(Some(store))))
+                    })
+                    .join()
+                    .expect("the paused request returns")
+            });
+            self.resumed = Some(resumed);
+            self.pins = self.definitions.clone().map(|definition| self.fixture.lifecycle(&definition).sessions.len());
+        }
+        self.replies.observe_allocation(query)
+    }
+}
+
+#[tokio::test]
+// r[verify lattice.agent_revisions.workflow.attempt.scenario.single_flight]
+// r[verify lattice.implementation_attempt.consumer.scenario.closure]
+async fn a_request_paused_while_another_dispatched_its_attempt_is_substituted_and_never_pins() {
+    let fixture = Fixture::new();
+    let (worker, replies) = provider(&fixture);
+    let (first_definition, first_revision) = desired_as(&fixture, &worker, "verify-change", "guidance");
+    fixture.promoted(&first_definition, &first_revision);
+    let (second_definition, second_revision) = desired_as(&fixture, &worker, "review-change", "guidance");
+    fixture.promoted(&second_definition, &second_revision);
+    assert_ne!(first_definition, second_definition, "two selected pairs");
+    let first = named(worker.clone(), &first_definition, &first_revision);
+    let second = named(worker, &second_definition, &second_revision);
+    assert_eq!(first.envelope, second.envelope, "one envelope, one attempt-fence, one session");
+    let (first_path, first_identity) = fixture.write("first.json", &first);
+    let (second_path, _) = fixture.write("second.json", &second);
+    // R2 parsed its request and found no intent, then paused.
+    let paused = super::super::execution::admission::Paused::load(&second_path, &fixture.state).expect("R2 loads");
+    let untouched = fixture.lifecycle(&second_definition);
+    let mut port = ResumingPort {
+        fixture: &fixture,
+        paused: Some(paused),
+        definitions: [first_definition.clone(), second_definition.clone()],
+        replies,
+        calls: 0,
+        resumed: None,
+        pins: [0, 0],
+    };
+    super::super::execution::run(
+        &first_path,
+        &fixture.state,
+        Some(super::super::Ports {
+            compute: &mut port,
+            serving: Box::new(crate::execution_binding::serving::UnavailableOwner),
+            repair: None,
+        }),
+        super::super::session::revision::Store(Some(&fixture.store)),
+    )
+    .await
+    .expect("R1 reaches a terminal result");
+    assert_eq!(port.calls, 2, "admitted, then revalidated right before spawn");
+    // R2 resumed after R1's intent: a possibly executed attempt, never admitted.
+    assert_eq!(port.resumed, Some(Err(Reason::SubstitutedRequest.message().to_owned())));
+    let record = super::super::refusal::record(&second.envelope, Reason::SubstitutedRequest);
+    assert_eq!(record["dispatched"], true);
+    assert_eq!(port.pins, [1, 0], "exactly R1's pin was live when R2 ended");
+    assert_eq!(fixture.lifecycle(&second_definition), untouched, "R2 never pinned or closed anything");
+    let directory = fixture.directory(&first);
+    let super::super::session::intent::Record::Owned(recorded) =
+        super::revisions::recorded(&directory, &first, &first_identity)
+    else {
+        panic!("R1 owns the attempt's intent");
+    };
+    assert_eq!(recorded.pin.expect("R1's pin").revision, first_revision);
+}
+
+#[tokio::test]
+// r[verify lattice.agent_revisions.workflow.attempt.scenario.subject]
+// r[verify lattice.agent_revisions.workflow.attempt.scenario.single_flight]
+async fn a_request_naming_another_revision_never_acts_on_the_pinned_session() {
+    let fixture = Fixture::new();
+    let worker = fixture.request("attempt-two-revisions", 7);
+    let (definition, first) = desired_as(&fixture, &worker, "verify-change", "guidance");
+    fixture.promoted(&definition, &first);
+    let (same_definition, second) = desired_as(&fixture, &worker, "verify-change", "guidance-2");
+    assert_eq!((same_definition.as_str(), first == second), (definition.as_str(), false), "two revisions");
+    let pinned = named(worker.clone(), &definition, &first);
+    let other = named(worker, &definition, &second);
+    let (pinned_path, _) = fixture.write("pinned.json", &pinned);
+    let session = super::super::session::revision::identifier(&pinned);
+    assert_eq!(session, super::super::session::revision::identifier(&other), "one envelope");
+    fixture
+        .revision(&["admit-session", "--request", path(&pinned_path), "--session", &session])
+        .expect("admit-session pins the selected revision");
+    let crate::agent_revision::seam::Effect::Permitted { permit } = effect(&fixture, &pinned, &session) else {
+        panic!("the pinned revision permits its effect");
+    };
+    let conflict = Refusal::SessionConflict;
+    assert_eq!(effect(&fixture, &other, &session), crate::agent_revision::seam::Effect::Blocked {
+        refusal: conflict.clone(),
+    });
+    let managed = crate::agent_revision::seam::Admission::Managed;
+    let store = crate::store::Store::new(&fixture.store).expect("store");
+    let retained = crate::agent_revision::seam::retained(&store, &other, &session, managed, permit.clone());
+    assert_eq!(retained.expect("seam"), crate::agent_revision::seam::Effect::Blocked {
+        refusal: conflict.clone(),
+    });
+    let closed = crate::agent_revision::seam::close(&store, &other, &session, managed, &[]).expect("seam");
+    assert_eq!(closed, crate::agent_revision::seam::Closure::Refused { refusal: conflict });
+    drop(store);
+    let live = fixture.lifecycle(&definition).sessions.get(&session).cloned().expect("still pinned");
+    assert_eq!(live.revision, first);
+    assert_eq!(live.status, lattice_core::agent_revision::state::SessionStatus::Live);
+    assert!(matches!(effect(&fixture, &pinned, &session), crate::agent_revision::seam::Effect::Permitted { .. }));
+    // The pinned request's own session still closes.
+    let store = crate::store::Store::new(&fixture.store).expect("store");
+    let closed = crate::agent_revision::seam::close(&store, &pinned, &session, managed, &[]).expect("seam");
+    assert!(matches!(closed, crate::agent_revision::seam::Closure::Closed { .. }), "{closed:?}");
+    drop(store);
+    assert!(fixture.lifecycle(&definition).sessions.is_empty());
+}
+
+#[tokio::test]
+// r[verify lattice.agent_revisions.workflow.attempt.scenario.refused]
+async fn admit_session_refuses_a_request_run_would_refuse_before_any_pin() {
+    let fixture = Fixture::new();
+    let worker = fixture.request("attempt-admit-validated", 7);
+    let (definition, revision) = desired(&fixture, &worker);
+    fixture.promoted(&definition, &revision);
+    let mut mismatched = named(worker.clone(), &definition, &revision);
+    mismatched.envelope.worker_profile = "e".repeat(64);
+    mismatched.admitted_envelope = mismatched.envelope.identity();
+    assert!(mismatched.validate(1).is_err(), "run refuses this request");
+    let (mismatched_path, _) = fixture.write("mismatched.json", &mismatched);
+    let session = super::super::session::revision::identifier(&mismatched);
+    let error = fixture
+        .revision(&[
+            "admit-session",
+            "--request",
+            path(&mismatched_path),
+            "--session",
+            &session,
+        ])
+        .expect_err("the worker profile mismatch is refused");
+    assert!(error.contains("profile revision"), "{error}");
+    assert!(fixture.lifecycle(&definition).sessions.is_empty(), "nothing is pinned");
+    let valid = named(worker, &definition, &revision);
+    let (valid_path, _) = fixture.write("valid.json", &valid);
+    let session = super::super::session::revision::identifier(&valid);
+    fixture
+        .revision(&["admit-session", "--request", path(&valid_path), "--session", &session])
+        .expect("a request run would admit is pinned");
+    assert_eq!(fixture.lifecycle(&definition).sessions.get(&session).expect("pinned").revision, revision);
 }

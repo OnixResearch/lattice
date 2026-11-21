@@ -42,8 +42,9 @@ interfaces.
   explanation, account remainder and serving gate, and accepts every
   dimension name Kiln's `Alias` admits, reporting the ones Lattice cannot
   charge as unaccounted; a blocker, backpressure or exhausted remainder is
-  refused before the state root is touched (`lineage_blocked`,
-  `lineage_exhausted`), every step draws from the one account, and a child is
+  refused before the fence record, writing only the attempt-fence's closure
+  marker (`lineage_blocked`, `lineage_exhausted`), every step draws from the
+  one account, and a child is
   admitted only within the remainder. Usage is attributed per phase with the
   existing provenance and unknown counts stay unknown. `cli::Ports` gains the
   `repair` field. See `docs/candidate-worker.md`.
@@ -74,9 +75,12 @@ interfaces.
   `--revision-store`, a stored bundle and `workflow::check_attempt` against
   the request's profile revision. An unknown, mismatched or revoked pair, or
   a plain agent bundle named as one, is `revision_not_admitted` with
-  `dispatched:false` before any fence record or intent. `inspect` reads the
-  attempt's pin from the workflow-agent lifecycle. See
-  `docs/agent-revisions.md`.
+  `dispatched:false` after the fence record and before any binding or intent.
+  `seam::effect`, `retained` and `close` also compare the revision, so a
+  request naming another revision of the same definition never acts on a
+  pinned session (`session_conflict`), and `admit-session` applies `run`'s
+  request validation before any pin. `inspect` reads the attempt's pin from
+  the workflow-agent lifecycle. See `docs/agent-revisions.md`.
 - An inert draft-schema comparison of the NVIDIA agent-package proposal
   (`697872570744c8cfc1cf6b1d72e04db66e1a2c83`) with Lattice bundle
   identities: a reviewed skill, a plugin with bundled skills, 31 negative
@@ -364,6 +368,22 @@ interfaces.
   where a superseded fence ends the loop as `fence_superseded`, and recovery's
   closure marker. `stale_fence` and `crossed_attempt` refusals now read
   `dispatched` from the attempt's intent store under that lock.
+  A first run now does everything up to its intent under that lock: it reads
+  the intent store first (another request's intent is `substituted_request`
+  with `dispatched:true` and nothing is admitted), then the lineage and
+  repair-port gates, the fence, the agent revision session, the binding and
+  the intent. Every refusal decided before this request's intent
+  (`lineage_blocked`, `lineage_exhausted`, `repair_ports_unavailable`,
+  `stale_fence`, `crossed_attempt`, `revision_not_admitted`,
+  `profile_revision_superseded`) settles `dispatched` from the intent store
+  under the lock and, when it is `false`, first writes the attempt-fence's
+  closure marker, so no request for that attempt-fence can create an intent
+  afterwards; such a refusal therefore writes the state root, the lock and
+  attempt directories and the marker (and, for `revision_not_admitted`, the
+  fence record it follows) instead of leaving the state root untouched. A
+  request of other bytes for a closed attempt-fence is refused as the new
+  `attempt_closed` (`dispatched:false`), and `inspect` reports a closed
+  attempt as `instance: null`.
 
 - Bounded local processes whose cancellation flag is already set return the
   existing `Cancelled` outcome without spawning. The pinned bounded-exec runner

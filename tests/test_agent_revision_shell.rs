@@ -502,6 +502,23 @@ fn the_recorded_admission_mode_keeps_unmanaged_sessions_and_fails_closed() {
     });
 }
 
+/// `request` as a dispatcher would export it for `implementation-attempt
+/// run`: its one brokered `primary` route and its current profile revision,
+/// readmitted. `admit-session` applies the same validation.
+fn runnable(mut request: Request) -> Request {
+    let resolved = lattice::agent_revision::bundle::resolve(&request).expect("resolves");
+    let route = lattice_core::execution_binding::request::NamedRoute {
+        name: lattice::agent_revision::bundle::PRIMARY_ROUTE.into(),
+        route_identity: resolved.bundle.routes[0].route_identity.clone(),
+    };
+    request.execution_binding.model_routes =
+        lattice_core::execution_binding::request::RouteDeclaration::Routes { routes: vec![route] };
+    request.envelope.worker_profile = request.worker_profile_identity().expect("profile revision");
+    request.admitted_envelope = request.envelope.identity();
+    request.validate(1).expect("runnable");
+    request
+}
+
 #[test]
 // r[verify lattice.agent_revisions.shell]
 // r[verify lattice.agent_revisions.shell.scenario.exit_status]
@@ -509,11 +526,12 @@ fn the_cli_exits_non_zero_on_every_refusal() {
     let root = tempfile::tempdir().expect("scratch");
     let store_path = root.path().join("lattice.redb");
     let store = store_path.as_os_str();
-    let base = request("make the candidate");
+    let base = runnable(request("make the candidate"));
     let resolved = lattice::agent_revision::bundle::resolve(&base).expect("resolves");
     let definition = resolved.definition.identity.clone();
     let mut changed = base.clone();
     changed.omp.executable_blake3 = "9".repeat(64);
+    let changed = runnable(changed);
     let other = lattice::agent_revision::bundle::resolve(&changed).expect("resolves");
     let request_path = write_request(root.path(), "request.json", &base);
     let changed_path = write_request(root.path(), "changed.json", &changed);

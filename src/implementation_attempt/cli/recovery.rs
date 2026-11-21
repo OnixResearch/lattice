@@ -122,10 +122,11 @@ pub(super) fn is_closed_marker(bytes: &[u8]) -> bool {
 
 /// Recovery with no intent closes the attempt by exclusively creating its
 /// intent path, so a racing or later run of the same request can never create
-/// its own intent. The caller holds the per-work fence lock. Different request
-/// bytes are a typed substitution refusal. `None` means the attempt was
-/// closed before execution; otherwise the admission recorded with the intent
-/// is returned, never re-derived.
+/// its own intent. The caller holds the per-work fence lock. Another
+/// request's closure marker is an `attempt_closed` refusal (nothing was
+/// dispatched); another request's execution intent is a typed substitution
+/// refusal. `None` means the attempt was closed before execution; otherwise
+/// the admission recorded with the intent is returned, never re-derived.
 // r[impl lattice.implementation_attempt.consumer.scenario.recovery]
 // r[impl lattice.implementation_attempt.consumer.scenario.fence_lock]
 pub(super) fn reconcile_intent(
@@ -156,7 +157,12 @@ pub(super) fn reconcile_intent(
         Some(super::session::intent::Record::Owned(recorded)) => Ok(Some(recorded)),
         Some(super::session::intent::Record::Closed) => Ok(None),
         Some(super::session::intent::Record::Foreign) | None => {
-            Err(super::refusal::refuse(&request.envelope, super::refusal::Reason::SubstitutedRequest))
+            let reason = if super::session::intent::is_execution_retained(directory)? {
+                super::refusal::Reason::SubstitutedRequest
+            } else {
+                super::refusal::Reason::AttemptClosed
+            };
+            Err(super::refusal::refuse(&request.envelope, reason))
         }
     }
 }

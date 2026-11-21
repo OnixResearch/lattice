@@ -203,6 +203,9 @@ fn prepare(
 
 fn admit(request: &std::path::Path, store: &crate::store::Store, session: &str) -> Result<Value, String> {
     let request = super::bundle::load(request)?;
+    // The same request binding and profile validation `implementation-attempt
+    // run` applies, before any pin.
+    request.validate(crate::implementation_attempt::cli::now_ms()?)?;
     let decision = super::seam::admit(store, &request, session)?;
     let definition = super::seam::subject(&request)?.definition;
     let result = match decision {

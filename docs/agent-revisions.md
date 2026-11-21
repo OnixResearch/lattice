@@ -319,15 +319,21 @@ identity, and its lifecycle subject is the worker's definition and profile
 revision, or the named workflow-agent definition and revision (see
 [attempt seam](#attempt-seam)).
 
-1. `run` calls `seam::admit` before writing anything for the attempt: before
-   its fence record, execution binding, candidate store or intent.
+1. `run` calls `seam::admit` under the per-work fence lock, after it found no
+   intent for the attempt and recorded its fence, and before its execution
+   binding, candidate store or intent
+   ([candidate worker](candidate-worker.md#coordinator-transport)). A request
+   that finds another request's intent is refused as `substituted_request`
+   without calling the seam, so it never pins.
    - `Refused` prints one `lattice.implementation-attempt-refusal.v1` record
      with reason `revision_not_admitted`, `dispatched: false` and the
      lifecycle's own refusal in `revision_refusal`, exits non-zero and writes
-     nothing: no fence, binding, intent or worker effect.
+     only the attempt-fence's closure marker under the lock, so no request
+     for that attempt-fence can create an intent afterwards.
    - `Admitted` (a `pinned` or `already_pinned` session) and `Unmanaged`
-     proceed. If the fence or binding step then fails, a session this run
-     pinned is closed so no live pin is left behind.
+     proceed. If the binding or intent step then fails, a session this run
+     pinned is closed so no live pin is left behind; a session another run
+     pinned is never closed.
 2. With a store, `intent.json` is a canonical
    `lattice.implementation-attempt-intent.v1` record of the request identity,
    the session and its admission, created in one exclusive write:
@@ -531,9 +537,17 @@ subject: the named workflow-agent definition and revision, else the worker's
 own definition and profile revision. `seam::admit`, `seam::effect`,
 `seam::retained`, `seam::close` and `admit-session --request` all key on it,
 so an attempt's session is pinned, permitted, closed and its retained
-candidate checked in the workflow-agent lifecycle, never the worker's. With
-a named pair, `seam::admit` does the following under the same lifecycle
-transaction that pins the session:
+candidate checked in the workflow-agent lifecycle, never the worker's. Each
+compares the whole subject: `seam::effect` and `seam::retained` block, and
+`seam::close` refuses without closing, as `session_conflict` when the
+session's pin or the recorded permit names another revision than the
+request's, so a request naming one revision never acts on a session pinned
+to another revision of the same definition. `admit-session` first applies
+the request validation `implementation-attempt run` applies (schema,
+envelope identity, current profile revision, coordinator fields, the pair's
+shape, the binding and the execution bounds), so it never pins a request
+that fails that validation. With a named pair, `seam::admit` does the following under
+the same lifecycle transaction that pins the session:
 
 - No lifecycle for the named definition: `unknown_revision` (a named pair is
   never `unmanaged`).
@@ -546,8 +560,10 @@ transaction that pins the session:
 
 `implementation-attempt run` reports each of these refusals as
 `revision_not_admitted` with `dispatched: false` and the lifecycle refusal in
-`revision_refusal`, before any fence record, binding, intent or worker
-effect. Revoking the pair's session after admission blocks the attempt right
+`revision_refusal`, after the fence record and before any binding, intent or
+worker effect, and closes the attempt-fence under the per-work lock (see
+[integration](#integration)). Revoking the pair's session after admission
+blocks the attempt right
 before spawn as `revision_blocked`; revoking the pair's revision refuses new
 attempts (the `revision_refusal` code is `revision_revoked`) and an executed
 attempt's export as `export_revoked`, exactly as for a worker definition. A

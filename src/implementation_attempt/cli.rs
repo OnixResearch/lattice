@@ -215,7 +215,7 @@ impl Request {
     }
 }
 
-fn now_ms() -> Result<u64, String> {
+pub(crate) fn now_ms() -> Result<u64, String> {
     let observed_ms = crate::operation::shell::Clock::observe_epoch_millis(&crate::operation::shell::SystemClock);
     u64::try_from(observed_ms).map_err(|error| error.to_string())
 }

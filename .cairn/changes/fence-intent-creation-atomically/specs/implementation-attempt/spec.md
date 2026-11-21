@@ -4,7 +4,7 @@
 
 ### Requirement: Explicit one-attempt execution consumer
 
-r[lattice.implementation_attempt.consumer] An explicitly selected CLI MUST bind the admitted immutable envelope, source snapshot, workspace, worker profile and provider before invoking the existing bounded isolated OMP worker. It MUST persist execution intent before effects. Re-entry after possible dispatch MUST reconcile retained results instead of redispatching. Worker text and process exit MUST NOT establish acceptance, integration or project completion. Within one state root, the fence check, the fence record and the creation of the execution intent of one work item MUST be one critical section under an exclusive lock that the operating system releases when its holder exits and that is never treated as stale by timeout.
+r[lattice.implementation_attempt.consumer] An explicitly selected CLI MUST bind the admitted immutable envelope, source snapshot, workspace, worker profile and provider before invoking the existing bounded isolated OMP worker. It MUST persist execution intent before effects. Re-entry after possible dispatch MUST reconcile retained results instead of redispatching. Worker text and process exit MUST NOT establish acceptance, integration or project completion. Within one state root, a first run's read of the attempt's intent store, its fence check and record, its agent revision session admission and the creation of its execution intent MUST be one critical section under an exclusive per-work lock that the operating system releases when its holder exits and that is never treated as stale by timeout.
 
 #### Scenario: Crash after execution intent
 
@@ -18,11 +18,21 @@ r[lattice.implementation_attempt.consumer.scenario.recovery]
 #### Scenario: Stale, crossed and substituted requests
 
 r[lattice.implementation_attempt.consumer.scenario.refusal]
-- GIVEN a state root that records a higher fence of the same work, another attempt at the same fence, or the intent of different request bytes
+- GIVEN a state root that records a higher fence of the same work, another attempt at the same fence, the intent of different request bytes, or a closure marker of different request bytes
 - WHEN a run or recovery is requested
 - THEN it MUST print one typed `lattice.implementation-attempt-refusal.v1` record and exit non-zero
-- AND it MUST NOT create an execution binding, intent or worker process for that request
-- AND the record's `dispatched` MUST state whether a worker effect of the refused attempt may have started, not whether this request dispatched: for `stale_fence` and `crossed_attempt`, `true` exactly when the refused attempt's directory holds an execution intent other than recovery's closure marker, read under the work's fence lock; `false` for `revision_not_admitted` and `revision_blocked`; `true` for `substituted_request`, whose attempt directory holds another request's intent, and for `export_revoked`, whose attempt executed; and for `profile_revision_superseded`, `true` exactly when the attempt directory holds an intent other than recovery's closure marker
+- AND it MUST NOT create an execution binding, intent, agent revision pin or worker process for that request
+- AND the record's `dispatched` MUST state whether a worker step of the refused attempt-fence may have started, not whether this request dispatched: `true` exactly when the attempt directory holds an execution intent other than a closure marker, read under the work's fence lock, for `stale_fence`, `crossed_attempt` and `profile_revision_superseded`; `true` for `substituted_request`, whose attempt directory holds another request's intent, and for `export_revoked`, whose attempt executed; `false` for `attempt_closed`, whose attempt directory holds another request's closure marker, and for `revision_blocked`, refused before spawn
+
+#### Scenario: A refusal before the intent closes the attempt-fence
+
+r[lattice.implementation_attempt.consumer.scenario.closure]
+- GIVEN a first run refused before its own intent exists as `lineage_blocked`, `lineage_exhausted`, `repair_ports_unavailable`, `stale_fence`, `crossed_attempt`, `revision_not_admitted` or `profile_revision_superseded`, or a run paused after finding no intent while another request of the same attempt-fence created its intent
+- WHEN the refusal is printed, a later valid request for the same attempt-fence runs, or the paused run resumes
+- THEN a refusal with `dispatched: false` MUST first exclusively create the attempt-fence's closure marker under the work's lock, so no worker step of that attempt-fence has started or can start in that state root, and the later request MUST be refused as `attempt_closed` with `dispatched: false` and create no intent
+- AND a lineage or repair-port refusal MUST write only the state root, the lock directory, the attempt directory and the closure marker
+- AND the resumed run MUST read the intent store under the lock before any gate and be refused as `substituted_request` with `dispatched: true`, admitting and pinning nothing
+- AND a session a run pinned MUST be closed on every path that ends before its intent, a session another run pinned MUST NOT be closed, and the lock MUST be taken before the agent revision store is opened, never while holding it
 
 #### Scenario: Fence check, record and intent are one critical section
 

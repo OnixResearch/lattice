@@ -1,8 +1,10 @@
 //! The agent-revision session seam of one attempt (Lattice #25).
 //!
 //! With `--revision-store`, a run admits the attempt's session, whose
-//! identifier is the envelope identity, through `seam::admit` before anything
-//! is written. A refused session starts nothing. The admission mode, and the
+//! identifier is the envelope identity, through `seam::admit` under the
+//! per-work fence lock, after its fence record and before its binding and
+//! intent. A refused session pins nothing; the caller settles the typed
+//! refusal, which closes the attempt-fence. The admission mode, and the
 //! pin of a managed session, are recorded in the intent; `seam::effect` runs
 //! with that mode immediately before the worker would spawn, and `seam::close`
 //! (no checkpoints: the worker is single-shot) after the terminal result or
@@ -64,59 +66,11 @@ impl Store<'_> {
         }
         Ok(())
     }
-
-    /// The worker definition's lifecycle for profile facts and the session
-    /// subject's lifecycle for its pin, both `None` without a store. They
-    /// are one read unless the request names a workflow-agent revision.
-    pub(in super::super) fn lifecycles(self, request: &Request) -> Result<Lifecycles, String> {
-        let Some(path) = self.0 else {
-            return Ok(Lifecycles {
-                profile: None,
-                workflow: None,
-            });
-        };
-        let store = Self::open(path)?;
-        let load = |definition: &str| {
-            store
-                .load_lifecycle(definition)
-                .map(|stored| stored.map(|(_, lifecycle)| lifecycle))
-                .map_err(|error| error.to_string())
-        };
-        let worker = crate::agent_revision::bundle::resolve(request)?.definition.identity;
-        let subject = crate::agent_revision::seam::subject(request)?.definition;
-        let workflow = (subject != worker).then(|| load(&subject)).transpose()?;
-        Ok(Lifecycles {
-            profile: load(&worker)?,
-            workflow,
-        })
-    }
 }
 
-type Lifecycle = lattice_core::agent_revision::state::Lifecycle;
+mod inspection;
 
-/// The lifecycles one inspection reads.
-pub(in super::super) struct Lifecycles {
-    /// The worker definition's.
-    profile: Option<Lifecycle>,
-    /// The workflow-agent definition's, read only when the session subject
-    /// is not the worker definition.
-    workflow: Option<Option<Lifecycle>>,
-}
-
-impl Lifecycles {
-    /// The worker definition's lifecycle, for the worker profile facts.
-    pub(in super::super) fn profile(&self) -> Option<&Lifecycle> {
-        self.profile.as_ref()
-    }
-
-    /// The session subject's lifecycle, for the attempt's pin.
-    pub(in super::super) fn session(&self) -> Option<&Lifecycle> {
-        match &self.workflow {
-            Some(workflow) => workflow.as_ref(),
-            None => self.profile.as_ref(),
-        }
-    }
-}
+type Stop = super::super::refusal::deferred::Stop;
 
 /// One run's admission before its intent.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -127,13 +81,22 @@ pub(in super::super) struct Admitted {
     is_fresh: bool,
 }
 
-/// Admit the attempt's session before anything is written. A refusal prints
-/// the typed refusal and starts nothing.
-pub(in super::super) fn admit(store: Store<'_>, request: &Request) -> Result<Admitted, String> {
+/// A request naming a workflow-agent revision is never unmanaged: without a
+/// store it is an error before anything is written.
+pub(in super::super) fn require_named(store: Store<'_>, request: &Request) -> Result<(), String> {
+    if store.0.is_none() && request.workflow_agent.is_some() {
+        return Err("a workflow-agent attempt requires its --revision-store; nothing was dispatched".into());
+    }
+    Ok(())
+}
+
+/// Admit the attempt's session under the per-work lock, after the fence
+/// record and before the intent. A refusal is returned typed for the caller
+/// to settle; nothing is pinned then.
+pub(in super::super) fn admit(store: Store<'_>, request: &Request) -> Result<Admitted, Stop> {
     let Some(path) = store.0 else {
-        if request.workflow_agent.is_some() {
-            return Err("a workflow-agent attempt requires its --revision-store; nothing was dispatched".into());
-        }
+        // `require_named` refused a named pair without a store.
+        debug_assert!(request.workflow_agent.is_none());
         return Ok(Admitted {
             recorded: None,
             is_fresh: false,
@@ -151,11 +114,7 @@ pub(in super::super) fn admit(store: Store<'_>, request: &Request) -> Result<Adm
             }
         },
         crate::agent_revision::seam::Decision::Refused { refusal } => {
-            return Err(super::super::refusal::refuse_revision(
-                &request.envelope,
-                super::super::refusal::Reason::RevisionNotAdmitted,
-                &refusal,
-            ));
+            return Err(Stop::Refused(super::super::refusal::deferred::Pending::revision(&refusal)));
         }
     };
     // Only a session this run pinned is fresh, and the lifecycle pins bare
@@ -183,7 +142,8 @@ fn recorded_pin(pin: lattice_core::agent_revision::state::Pin, pin_identity: Str
 }
 
 /// Close a session this run pinned when the attempt ends before its intent,
-/// so a refused fence or binding never leaves a live pin behind.
+/// so a refused fence, binding or intent never leaves a live pin behind. A
+/// session another run pinned is never closed here.
 pub(in super::super) fn abandon(store: Store<'_>, request: &Request, admitted: &Admitted) -> Result<(), String> {
     match &admitted.recorded {
         Some(recorded) if admitted.is_fresh => close(store, request, recorded),

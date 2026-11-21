@@ -43,6 +43,44 @@
     {"command": "cairn gate proposal|design|tasks fence-intent-creation-atomically", "exit": 0, "result": "PASS before tasks were checked; rerun after"},
     {"command": "gitleaks dir --redact on each changed path", "exit": 0}
   ],
+  "closure": {
+    "trigger": "review of 6384d535 (HIGH: a paused request reported revision_not_admitted with dispatched:false after another request of the same attempt-fence dispatched; MEDIUM: a second pin leaked when its intent creation failed)",
+    "base_revision": "9718284d9c5095d43e8e0d5fc25fa82d1335f36b",
+    "recorded_on": "2026-11-21",
+    "rule": "A first run holds the per-work lock from its intent-store read through its intent. Every refusal decided before this request's intent settles dispatched from the intent store under that lock and, when false, first exclusively creates the attempt-fence's closed-before-execution marker; another request's intent is substituted_request with dispatched:true and nothing admitted; another request's closure marker is attempt_closed with dispatched:false.",
+    "writes_of_a_lineage_or_port_refusal": ["state root", "works/", "works/<blake3(work_id)>/", "<attempt directory>/", "<attempt directory>/intent.json (closure marker)"],
+    "lock_order": "per-work lock, then the agent revision store; Guard::acquire is called only at the top of a run, recovery and a repair step, never while a revision store is open (by code inspection, not by a test)",
+    "tasks": {
+      "3.1": [
+        "src/implementation_attempt/cli/tests/workflow_agent.rs::a_request_paused_while_another_dispatched_its_attempt_is_substituted_and_never_pins"
+      ],
+      "3.2": [
+        "src/implementation_attempt/cli/tests/repair.rs::lineage_and_missing_ports_refusals_write_only_the_closure_marker",
+        "src/implementation_attempt/cli/tests/workflow_agent.rs::an_unknown_definition_or_revision_or_a_missing_store_is_refused_before_any_intent",
+        "src/implementation_attempt/cli/tests/coordinator.rs::stale_fences_and_crossed_attempts_are_refused_before_any_effect",
+        "src/implementation_attempt/cli/tests/revisions.rs::a_managed_attempt_is_pinned_closed_and_a_later_one_refused_after_revocation",
+        "tests/test_implementation_attempt_refusals.rs::a_superseded_attempt_closed_before_execution_never_dispatched"
+      ],
+      "3.3": [
+        "docs/candidate-worker.md (coordinator transport, refusal table, repair paragraph, closed-attempt inspection)",
+        "docs/agent-revisions.md (integration step 1, attempt seam)",
+        "docs/worker-inventory.md (lineage note, capture list)",
+        "CHANGELOG.md (Fixed)"
+      ]
+    },
+    "gates": [
+      {"command": "cargo test -p lattice --lib -- implementation_attempt", "exit": 0, "result": "113 passed, 0 failed, 402 filtered out"},
+      {"command": "LATTICE_INVENTORY_CAPTURE_DIR=<scratch> cargo test -p lattice --lib -- capture_managed_worker_inventory_v3", "exit": 0, "result": "1 passed; managed-7-refused-after-revocation has instance null"},
+      {"command": "cargo test -p lattice --test test_agent_revision_workflow --test test_agent_revision_shell --test test_agent_revision_core --test test_implementation_attempt_refusals --test test_agent_revision_attachments", "exit": 0, "result": "11 + 9 + 20 + 3 + 17 passed"},
+      {"command": "cargo clippy -p lattice -p lattice-core --all-targets --no-deps -- -D warnings", "exit": 0},
+      {"command": "cargo fmt -p lattice -p lattice-core --check", "exit": 0},
+      {"command": "octet-precommit-check", "exit": 0, "result": "root warning-only 1052 accepted, 1052 current, 0 new, 0 stale; lattice-core 25/25, 0 new, 0 stale; baselines unchanged"},
+      {"command": "octet_semantic_delta.py against 9718284d baselines", "exit": 0, "result": "root new_semantic=0 resolved_semantic=0; lattice-core new_semantic=0 resolved_semantic=0"},
+      {"command": "cairn validate --root . --policy cairn-policy/generated/cairn-policy.json", "exit": 0, "result": "valid, 64 specs, 0 issues"},
+      {"command": "cairn gate proposal|design|tasks fence-intent-creation-atomically", "exit": 0, "result": "PASS"},
+      {"command": "gitleaks dir --no-banner over every changed and new path", "exit": 0, "result": "no leaks found"}
+    ]
+  },
   "not_run": [
     "scripts/check.rs and nix flake check (parent runs them at integration)"
   ]

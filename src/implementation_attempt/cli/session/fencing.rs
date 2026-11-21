@@ -4,14 +4,19 @@
 //! fence of that work. Every write that can start or preclude a worker of
 //! that work in this state root is made while this process holds the
 //! exclusive lock on the `works/<blake3(work_id)>` directory: recording a
-//! fence, creating an attempt's execution intent, creating a repair step's
-//! intent and recovery's closure marker. An execution intent and every step
-//! intent are created only after a recheck under that lock finds this attempt
-//! recorded at its fence and no higher fence recorded. So once a higher fence
-//! or another attempt is recorded, no attempt it supersedes can create an
-//! intent or spawn a step in this state root, and the `dispatched` of a fence
-//! refusal, read from the intent store under the same lock, stays true of
-//! every later run.
+//! fence, admitting the attempt's agent revision session, creating an
+//! attempt's execution intent, creating a repair step's intent, and the
+//! closure marker that recovery or a refusal before the intent writes. A first
+//! run reads the intent store under the lock before anything else, so it
+//! never admits an attempt another request already holds. An execution
+//! intent and every step intent are created only after a recheck under that
+//! lock finds this attempt recorded at its fence and no higher fence
+//! recorded. So once a higher fence or another attempt is recorded, or the
+//! attempt-fence is closed, no attempt it supersedes can create an intent or
+//! spawn a step in this state root, and the `dispatched` of a refusal, read
+//! from the intent store under the same lock, stays true of every later run.
+//! The agent revision store may be opened while holding this lock, but no
+//! path takes this lock while holding the store open.
 //!
 //! The lock is `flock(2)` through [`std::fs::File::lock`]: waiters block, it
 //! never expires, and the kernel releases it when its holder closes the
@@ -173,7 +178,8 @@ impl Guard {
 }
 
 /// Take the lock and record this attempt at its fence, or print a stale or
-/// crossed refusal. The returned guard keeps the lock for the intent.
+/// crossed refusal, as a run records its fence; tests record fences with it.
+#[cfg(test)]
 pub(in super::super) fn admit(
     state: &std::path::Path,
     envelope: &Envelope,

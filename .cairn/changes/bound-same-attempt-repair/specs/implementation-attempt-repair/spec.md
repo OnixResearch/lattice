@@ -47,7 +47,7 @@ r[lattice.implementation_attempt.repair.scenario.absent]
 - GIVEN a request without a repair policy and without a budget lineage
 - WHEN it is encoded, framed and run
 - THEN its bytes, request identity and profile revision MUST be unchanged and it MUST run the single bounded worker step as before
-- AND a request with a repair policy MUST be refused before any write as `repair_ports_unavailable` when the embedder supplies no worker and check ports, which the standalone CLI never does
+- AND a request with a repair policy MUST be refused before its fence record and intent as `repair_ports_unavailable` when the embedder supplies no worker and check ports, which the standalone CLI never does, writing only its attempt-fence's closure marker
 
 ### Requirement: Kiln budget lineage consumer
 
@@ -58,7 +58,7 @@ r[lattice.implementation_attempt.lineage] An attempt MAY carry Kiln #61's admitt
 r[lattice.implementation_attempt.lineage.scenario.exhausted]
 - GIVEN a lineage with a blocker, a serving gate other than `none` or `eligible`, a zero remainder in any dimension, or a remainder that cannot cover the next step's reservation in a dimension Lattice charges
 - WHEN an attempt is run, or its loop asks for another step
-- THEN the first step MUST be refused before any write, leaving the state root unchanged, as `lineage_blocked` or `lineage_exhausted` with `dispatched:false`, and a later step MUST NOT spawn and the loop MUST end as `budget_exhausted` with the lineage dimension or `lineage_blocked`
+- THEN the first step MUST be refused before its fence record and intent as `lineage_blocked` or `lineage_exhausted` with `dispatched:false`, writing only the state root, the per-work lock directory, the attempt directory and the attempt-fence's closure marker, so no request for that attempt-fence can create an intent afterwards, and a later step MUST NOT spawn and the loop MUST end as `budget_exhausted` with the lineage dimension or `lineage_blocked`
 
 #### Scenario: One aggregate budget
 

@@ -164,9 +164,9 @@ fn instance(
     let recorded = match super::session::intent::read(directory, subject)? {
         None => None,
         Some(super::session::intent::Record::Owned(recorded)) => Some(recorded),
-        Some(super::session::intent::Record::Closed) => {
-            return Err("recovery closed this attempt before any execution; it has no worker instance".into());
-        }
+        // A refusal before the intent, or recovery, closed the attempt before
+        // any execution: it has no worker instance.
+        Some(super::session::intent::Record::Closed) => return Ok(None),
         Some(super::session::intent::Record::Foreign) => {
             return Err("retained intent belongs to a different request".into());
         }

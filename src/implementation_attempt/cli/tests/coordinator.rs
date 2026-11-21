@@ -130,7 +130,11 @@ async fn stale_fences_and_crossed_attempts_are_refused_before_any_effect() {
     let error = run(&path, &fixture.state).await;
     assert_eq!(error, Err(super::super::refusal::Reason::StaleFence.message().to_owned()));
     assert_never_bound(&fixture.directory(&stale));
-    assert!(!fixture.directory(&stale).join("intent.json").exists());
+    let closed = |directory: std::path::PathBuf| {
+        let intent = std::fs::read(directory.join("intent.json")).expect("closure marker");
+        super::super::recovery::is_closed_marker(&intent)
+    };
+    assert!(closed(fixture.directory(&stale)), "the stale refusal closed its attempt-fence");
 
     let recorded = fixture.request("attempt-recorded", 9);
     super::super::session::fencing::admit(&fixture.state, &recorded.envelope, &fixture.directory(&recorded))
@@ -141,7 +145,7 @@ async fn stale_fences_and_crossed_attempts_are_refused_before_any_effect() {
     assert_eq!(error, Err(super::super::refusal::Reason::CrossedAttempt.message().to_owned()));
     assert_eq!(recover(&path, &fixture.state).await, error, "recovery refuses the crossed attempt too");
     assert_never_bound(&fixture.directory(&crossed));
-    assert!(!fixture.directory(&crossed).join("intent.json").exists());
+    assert!(closed(fixture.directory(&crossed)), "the crossed refusal closed its attempt-fence");
 }
 
 #[tokio::test]

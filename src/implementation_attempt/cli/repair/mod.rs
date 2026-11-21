@@ -98,9 +98,13 @@ fn first_reservation(request: &super::Request) -> Result<crate::implementation_a
     }
 }
 
-/// Before any write: the lineage must admit the first step, and a repair
-/// policy needs embedder ports. Each refusal is typed and dispatches nothing.
-pub(super) fn admit<'a>(request: &super::Request, ports: Option<Ports<'a>>) -> Result<Option<Ports<'a>>, String> {
+/// Before the fence record: the lineage must admit the first step, and a
+/// repair policy needs embedder ports. Each refusal is typed; the caller
+/// settles it under the per-work lock, which closes the attempt-fence.
+pub(super) fn admit<'a>(
+    request: &super::Request,
+    ports: Option<Ports<'a>>,
+) -> Result<Option<Ports<'a>>, super::refusal::deferred::Stop> {
     debug_assert!(request.validate_binding().is_ok(), "admission follows request validation");
     if let Some(lineage) = &request.lineage {
         let next = first_reservation(request)?;
@@ -113,15 +117,16 @@ pub(super) fn admit<'a>(request: &super::Request, ports: Option<Ports<'a>>) -> R
                 }
                 _ => super::refusal::Reason::LineageBlocked,
             };
-            return Err(super::refusal::refuse_lineage(&request.envelope, reason, &refusal));
+            let pending = super::refusal::deferred::Pending::lineage(reason, &refusal);
+            return Err(super::refusal::deferred::Stop::Refused(pending));
         }
     }
     match (&request.repair, ports) {
         (None, _) => Ok(None),
         (Some(_), Some(ports)) => Ok(Some(ports)),
-        (Some(_), None) => {
-            Err(super::refusal::refuse(&request.envelope, super::refusal::Reason::RepairPortsUnavailable))
-        }
+        (Some(_), None) => Err(super::refusal::deferred::Stop::Refused(super::refusal::deferred::Pending::new(
+            super::refusal::Reason::RepairPortsUnavailable,
+        ))),
     }
 }
 

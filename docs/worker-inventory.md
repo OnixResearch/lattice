@@ -284,7 +284,8 @@ revoked. An unmanaged profile never carries it.
 
 A Kiln budget lineage blocker, serving backpressure or exhaustion and a
 missing repair port are not wait reasons. Lattice refuses such a request
-before any write (`lineage_blocked`, `lineage_exhausted`,
+before its fence record and intent, writing only the attempt-fence's closure
+marker (`lineage_blocked`, `lineage_exhausted`,
 `repair_ports_unavailable`), and Kiln owns waiting for its lineage. A repair
 loop's exhausted bound is a terminal disposition, not a wait. Inventory v3
 does not read repair records yet: an attempt run with a repair policy has no
@@ -484,8 +485,8 @@ route with a ready port and with a silent port), all unmanaged, plus a managed
 lifecycle: desired, prepared through the fixture preparation port, promoted
 with an Animus #18 fixture attachment, a live admitted session, a terminal
 attempt whose pin was released, both after revocation of the revision, and the
-profile after an attempt refused before any write (`managed-1` to
-`managed-7`). Every field is deterministic except `observed_at_epoch_ms` and
+profile after an attempt refused before its intent, whose closed attempt has
+no instance (`managed-1` to `managed-7`). Every field is deterministic except `observed_at_epoch_ms` and
 `liveness.observed_at_epoch_ms`, and, in the managed scenarios, the instance's
 `incarnation` and `state_digest`, whose requests name a per-run temporary
 workspace. The capture directory's `README.md` lists the exact command, every

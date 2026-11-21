@@ -51,10 +51,58 @@
     "scripts_check": "not run in this slice",
     "nix_flake_check": "not run in this slice"
   },
+  "review": {
+    "reviewed_revision": "6384d535",
+    "verdict_before": "hold",
+    "base_revision": "9718284d9c5095d43e8e0d5fc25fa82d1335f36b",
+    "findings": [
+      {
+        "id": 1,
+        "severity": "high",
+        "finding": "workflow_agent is outside the envelope and profile revision, so two valid requests can share an attempt-fence and session; a paused one admitted its session before the fence lock and printed revision_not_admitted with dispatched:false although the other had dispatched, and the other could create its intent after that refusal.",
+        "resolution": "A first run reads the intent store under the per-work lock before any gate and admits its session under that lock after its fence record; another request's intent is substituted_request with dispatched:true and nothing admitted; every pre-intent refusal closes the attempt-fence before printing dispatched:false (fence-intent-creation-atomically task 3.2).",
+        "tests": [
+          "src/implementation_attempt/cli/tests/workflow_agent.rs::a_request_paused_while_another_dispatched_its_attempt_is_substituted_and_never_pins",
+          "src/implementation_attempt/cli/tests/workflow_agent.rs::an_unknown_definition_or_revision_or_a_missing_store_is_refused_before_any_intent",
+          "src/implementation_attempt/cli/tests/repair.rs::lineage_and_missing_ports_refusals_write_only_the_closure_marker"
+        ]
+      },
+      {
+        "id": 2,
+        "severity": "medium",
+        "finding": "Two selected pairs under one envelope could both pin before either took the fence lock; the loser's intent creation failed on Error::State without abandoning its pin.",
+        "resolution": "Admission is single-flight under the lock, so the second request never pins; every path that ends before this run's intent, including a failed intent creation, abandons a pin this run made, never another run's (revision::abandon closes only a fresh pin; the failed-intent path cannot be reached under the lock and is checked by code inspection, not by a test).",
+        "tests": [
+          "src/implementation_attempt/cli/tests/workflow_agent.rs::a_request_paused_while_another_dispatched_its_attempt_is_substituted_and_never_pins (exactly the first pair's pin is live while the second resumes; the second lifecycle is unchanged)"
+        ]
+      },
+      {
+        "id": 3,
+        "severity": "medium",
+        "finding": "seam::effect, retained and close compared only the subject's definition, so a request naming an unselected revision got the pinned revision's permit and could close its pin.",
+        "resolution": "They compare the pin's or permit's revision with the request's subject: effect and retained are blocked and close is refused as session_conflict without closing.",
+        "tests": [
+          "src/implementation_attempt/cli/tests/workflow_agent.rs::a_request_naming_another_revision_never_acts_on_the_pinned_session"
+        ]
+      },
+      {
+        "id": 4,
+        "severity": "medium",
+        "finding": "admit-session called seam::admit without run's request validation, so it could pin a pair for a request that cannot run.",
+        "resolution": "admit-session applies Request::validate, the same function run applies, before seam::admit.",
+        "tests": [
+          "src/implementation_attempt/cli/tests/workflow_agent.rs::admit_session_refuses_a_request_run_would_refuse_before_any_pin",
+          "tests/test_agent_revision_shell.rs::the_cli_exits_non_zero_on_every_refusal"
+        ]
+      }
+    ],
+    "gates": "the closure gates recorded in fence-intent-creation-atomically/evidence/verification.json (closure.gates), run on the same tree; cairn gate proposal|design|tasks bind-workflow-agent-revisions: PASS"
+  },
   "non_claims": [
     "No workflow-agent revision was prepared, qualified or run live; the plans, attachments and workers are fixtures.",
     "The fixture worker is blocked at broker admission and never reaches a model.",
     "A revoked qualification of the pair and an unselected pair were not exercised separately; they reach the same session admission and effect checks as a worker definition.",
-    "No per-step seam recheck exists yet; a repair step does not call the seam."
+    "The per-step repair recheck added at 9718284d goes through seam::effect and so through seam::subject; no repair-policy attempt naming a workflow-agent revision was exercised.",
+    "The paused-request race is exercised by resuming the paused request from inside the first request's pre-spawn revalidation; other interleavings rely on the per-work lock, not on further tests."
   ]
 }
