@@ -5,6 +5,8 @@
 // r[verify lattice.worker_inventory.capability.scenario.declared]
 // r[verify lattice.worker_inventory.capability.scenario.malformed]
 
+mod coordinator;
+
 /// A valid v3 request with one brokered `primary` route.
 pub(super) fn request(
     attempt_id: &str,
@@ -77,6 +79,8 @@ pub(super) fn request(
             model_routes: lattice_core::execution_binding::request::RouteDeclaration::NoModel {},
         },
         worker_capability: None,
+        network: None,
+        dispatch_plan: None,
     };
     request.execution_binding.model_routes = lattice_core::execution_binding::request::RouteDeclaration::Routes {
         routes: vec![super::binding::primary_route(&request).expect("primary route identity")],
@@ -194,25 +198,17 @@ pub(super) fn capability(tools: &[&str]) -> lattice_core::execution_binding::cap
     }
 }
 
+/// `request` re-admitted after `change`, as a dispatcher would export it.
+fn readmitted(mut request: super::Request, change: impl FnOnce(&mut super::Request)) -> super::Request {
+    change(&mut request);
+    request.envelope.worker_profile = request.worker_profile_identity().expect("profile identity");
+    request.admitted_envelope = request.envelope.identity();
+    request
+}
+
 #[test]
 fn capability_is_framed_into_the_revision_only_when_declared() {
     let undeclared = host_local();
-    let legacy_tuple = serde_json::to_vec(&(
-        &undeclared.program,
-        &undeclared.sandbox_program,
-        &undeclared.omp,
-        &undeclared.read_paths,
-        &undeclared.write_paths,
-        undeclared.output_limit_bytes,
-        undeclared.allow_unchanged,
-        &undeclared.worker_compute,
-    ))
-    .expect("legacy tuple");
-    assert_eq!(
-        undeclared.envelope.worker_profile,
-        blake3::hash(&legacy_tuple).to_hex().to_string(),
-        "requests without a declaration keep their revision bytes"
-    );
     let bytes = serde_json::to_value(&undeclared).expect("request json");
     assert!(bytes.get("worker_capability").is_none(), "an absent declaration is not serialized");
     let declared = with_capability(host_local(), capability(&["read", "edit"]));
@@ -225,6 +221,106 @@ fn capability_is_framed_into_the_revision_only_when_declared() {
     let mut swapped = declared.clone();
     swapped.worker_capability = Some(capability(&["read", "bash"]));
     assert!(swapped.validate(1).expect_err("changed tools").contains("stale, crossed"));
+}
+
+#[test]
+// r[verify lattice.implementation_attempt.consumer.scenario.profile_revision]
+fn per_attempt_values_keep_the_revision_and_profile_changes_replace_it() {
+    let base = with_capability(host_local(), capability(&["read", "edit"]));
+    let revision = base.envelope.worker_profile.clone();
+    assert!(crate::implementation_attempt::is_blake3(&revision), "bare lowercase hex, no prefix");
+    let per_attempt: [fn(&mut super::Request); 6] = [
+        |request| request.omp.prompt = "implement a different task".into(),
+        |request| request.omp.base_identity = "1".repeat(64),
+        |request| request.omp.model_broker.expires_at_ms = 1_000,
+        |request| request.workspace_root = "/workspace/other-attempt".into(),
+        |request| request.dispatch_plan = Some("2".repeat(64)),
+        |request| request.network = Some(false),
+    ];
+    for change in per_attempt {
+        let changed = readmitted(base.clone(), change);
+        assert_eq!(changed.envelope.worker_profile, revision, "per-attempt values never move the revision");
+    }
+    let profile_level: [fn(&mut super::Request); 8] = [
+        |request| request.program = "/usr/bin/other-worker".into(),
+        |request| request.omp.executable_blake3 = "9".repeat(64),
+        |request| {
+            request.omp.model = "lattice/other-model".into();
+            request.omp.model_broker.model = "other-model".into();
+        },
+        |request| request.omp.model_broker.endpoint = "https://other.invalid/v1/chat/completions".into(),
+        |request| request.omp.model_broker.relay.blake3 = "8".repeat(64),
+        |request| request.worker_capability = Some(capability(&["read", "edit", "write"])),
+        |request| {
+            request.worker_compute = lattice_core::execution_binding::request::ComputeRequirement::ProviderExecution {
+                direct_accelerator: None,
+            }
+        },
+        |request| request.worker_capability = None,
+    ];
+    for change in profile_level {
+        let changed = readmitted(base.clone(), change);
+        assert_ne!(changed.envelope.worker_profile, revision, "profile configuration is a new revision");
+    }
+    let definition = |request: &super::Request| {
+        lattice_core::execution_binding::projection::lineage::definition(
+            lattice_core::execution_binding::projection::inventory::ProfileOwner::ImplementationAttempt,
+            lattice_core::execution_binding::projection::inventory::ATTEMPT_DEFINITION,
+            request.worker_capability.as_ref().map(|declared| declared.definition.as_str()),
+        )
+        .expect("definition")
+        .identity
+    };
+    let new_executable = readmitted(base.clone(), |request| request.omp.executable_blake3 = "9".repeat(64));
+    let new_prompt = readmitted(base.clone(), |request| request.omp.prompt = "another task".into());
+    assert_eq!(definition(&new_executable), definition(&base), "a new revision keeps its definition");
+    assert_eq!(definition(&new_prompt), definition(&base));
+}
+
+#[test]
+// r[verify lattice.implementation_attempt.consumer.scenario.profile_revision]
+fn requests_under_the_superseded_framing_are_refused_before_effects() {
+    let current = host_local();
+    let legacy_tuple = serde_json::to_vec(&(
+        &current.program,
+        &current.sandbox_program,
+        &current.omp,
+        &current.read_paths,
+        &current.write_paths,
+        current.output_limit_bytes,
+        current.allow_unchanged,
+        &current.worker_compute,
+    ))
+    .expect("legacy tuple");
+    let mut legacy = current.clone();
+    legacy.envelope.worker_profile = blake3::hash(&legacy_tuple).to_hex().to_string();
+    legacy.admitted_envelope = legacy.envelope.identity();
+    assert_ne!(legacy.envelope.worker_profile, current.envelope.worker_profile, "the framing changed");
+    let error = legacy.validate(1).expect_err("superseded framing");
+    assert_eq!(error, super::refusal::Reason::ProfileRevisionSuperseded.message());
+    let record = super::refusal::record(&legacy.envelope, super::refusal::Reason::ProfileRevisionSuperseded);
+    assert_eq!(record["schema"], super::refusal::SCHEMA);
+    assert_eq!(record["reason"], "profile_revision_superseded");
+    assert_eq!(record["dispatched"], false);
+}
+
+#[test]
+fn coordinator_network_and_dispatch_plan_declarations_are_bounded() {
+    let quiet = readmitted(host_local(), |request| request.network = Some(false));
+    quiet.validate(1).expect("explicit no-network declaration");
+    let shared = readmitted(host_local(), |request| request.network = Some(true));
+    assert!(shared.validate(1).expect_err("shared network").contains("shared-network"));
+    let planned = readmitted(host_local(), |request| request.dispatch_plan = Some("a".repeat(64)));
+    planned.validate(1).expect("plan identity");
+    for malformed in ["A".repeat(64), "a".repeat(63), format!("blake3:{}", "a".repeat(64))] {
+        let crossed = readmitted(host_local(), |request| request.dispatch_plan = Some(malformed));
+        assert!(crossed.validate(1).expect_err("malformed plan").contains("dispatch-plan"));
+    }
+    let absent = serde_json::to_value(host_local()).expect("request json");
+    assert!(
+        absent.get("network").is_none() && absent.get("dispatch_plan").is_none(),
+        "absent fields stay absent"
+    );
 }
 
 #[test]

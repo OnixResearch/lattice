@@ -49,6 +49,18 @@ interfaces.
   `qualification_unavailable` (owner `animus#18`). Implementation attempts,
   their revisions and the inventory are unchanged. See
   `docs/agent-revisions.md`.
+- Coordinator transport for Kiln #45's `kiln-lattice-dispatch --worker-request`
+  (#6). Implementation-attempt requests may declare `network:false` and the
+  coordinator's `dispatch_plan` identity; `network:true` is refused. A run
+  records its attempt per work and fence before any binding or intent, and
+  stale fences, crossed attempts and substituted request bytes are refused with
+  a typed `lattice.implementation-attempt-refusal.v1` record before any effect.
+  Recovery that finds no intent closes the attempt, so a late or duplicate run
+  can never dispatch. Every observation, including binding refusals and the new
+  `not_started_closed_by_recovery` status, carries the exact envelope and
+  request identity. A `cairn_artifact` source must name its exact
+  `change/stage/artifact`; issue and task identity bytes are unchanged. See
+  `docs/candidate-worker.md`.
 - Worker inventory v2 facts for Kiln #60 (#24, #25 slots only). Each profile
   carries a definition identity that is stable across revisions
   (`lattice-worker-definition-v1`). It also carries declared `task_families`
@@ -162,13 +174,23 @@ interfaces.
 
 ### Changed
 
+- Breaking: the implementation-attempt profile revision is now the
+  `lattice-worker-profile-revision-v2` identity over profile-level
+  configuration only, still spelled as bare hex. The base snapshot, task prompt,
+  broker expiry and workspace root no longer change it; the exact request
+  bytes bind them. Every revision value changes. Attempts retained under the
+  earlier framing are refused with `profile_revision_superseded` and are never
+  re-executed or recovered; prepare new work again (#6, Lattice #25).
+- Breaking: the implementation-attempt issue source kind is spelled
+  `github_issue`, the name Kiln sends, instead of the derived `git_hub_issue`.
+  Its identity tag is unchanged.
 - Breaking: `implementation-attempt inspect` prints `lattice.worker-inventory.v2`
   with `lattice.worker-profile-facts.v2` and
   `lattice.worker-instance-observation.v2`, and
   `RuntimeOptions::worker_profile_facts` returns profile facts v2. No v1
   inventory is emitted. Readers that deny unknown fields, such as Kiln's
-  `worker_inventory` adapter, must move to v2. Existing requests and worker
-  configurations without `worker_capability` keep their profile revision.
+  `worker_inventory` adapter, must move to v2. The later profile-revision
+  framing change above replaces every revision value.
 - Re-pinned Choregraph to `fcbae0aa` (Choregraph #4, default-off preference
   annotations). Its v1 receipts are byte-identical to `c3577352`; the source
   admission receipt, flake assertions and frozen role-protocol revision name the

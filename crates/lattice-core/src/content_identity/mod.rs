@@ -3,6 +3,12 @@
 //! Lattice owns every domain, canonical input, output spelling, persistence rule,
 //! and claim. The shared package supplies only admitted unkeyed framing mechanics.
 
+mod attempt;
+pub use attempt::RuntimeArtifactInput;
+pub use attempt::WORKER_PROFILE_REVISION_DOMAIN;
+pub use attempt::WorkerProfileRevisionInput;
+pub use attempt::worker_profile_revision;
+
 pub const SCHEDULE_OCCURRENCE_DOMAIN: &str = "lattice-schedule-occurrence-v1";
 const SCHEDULE_ID_TAG: &[u8] = b"schedule-id";
 const DUE_EPOCH_MS_TAG: &[u8] = b"due-epoch-ms";

@@ -56,6 +56,33 @@ pub(super) async fn finish(task: tokio::task::JoinHandle<Result<(), String>>) ->
     }
 }
 
+/// `cancel`: request cancellation only; no compute port is called and nothing
+/// is released. An attempt that recovery closed before execution has nothing
+/// to cancel.
+// r[impl lattice.execution_binding.recovery.scenario.cancellation]
+pub(super) fn request(request_path: &std::path::Path, state: &std::path::Path) -> Result<(), String> {
+    let (request, bytes) = super::artifacts::load_request(request_path)?;
+    request.envelope.validate().map_err(|error| error.to_string())?;
+    let directory = super::artifacts::directory(state, &request);
+    let identity = blake3::hash(&bytes).to_hex().to_string();
+    let marker = super::recovery::closed_marker(&identity);
+    debug_assert!(marker.len() > identity.len(), "the closure marker never equals a request identity");
+    let intent = super::artifacts::read_optional(&directory.join("intent.json"), marker.len())?;
+    if intent.as_deref() == Some(marker.as_bytes()) {
+        let report =
+            serde_json::json!({"cancellation_requested":false,"termination_observed":false,"not_started":true});
+        println!("{report}");
+        return Ok(());
+    }
+    if intent.as_deref() != Some(identity.as_bytes()) {
+        return Err("cancel request differs from persisted execution".into());
+    }
+    debug_assert_eq!(identity.len(), 64, "the request identity is one BLAKE3 digest");
+    super::artifacts::write_once(&directory.join("cancel.request"), identity.as_bytes())?;
+    println!("{}", serde_json::json!({"cancellation_requested":true,"termination_observed":false}));
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     #[tokio::test]

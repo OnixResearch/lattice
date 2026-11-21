@@ -130,8 +130,12 @@ fn pre_spawn_revalidation_refuses_changed_allocations_without_spawn() {
         let refusal = super::refusal(root.path()).expect("readable").expect("persisted once");
         assert_eq!(refusal["decision"]["reason"], *reason);
         assert!(super::revalidate(root.path(), &bound, &mut port).is_err(), "replay is still refused");
-        let report = super::super::recovery::not_dispatched(root.path(), &bound, &refusal).expect("not dispatched");
+        let request = provider(&base);
+        let report =
+            super::super::recovery::not_dispatched(&request, root.path(), &bound, &refusal).expect("not dispatched");
         assert_eq!(report["status"], "not_dispatched_binding_rejected");
+        assert_eq!(report["envelope"], serde_json::to_value(&request.envelope).expect("envelope"));
+        assert_eq!(report["request_identity"], request.admitted_envelope.as_str());
     }
     let root = tempfile::tempdir().expect("attempt directory");
     let mut port = crate::execution_binding::FixtureComputePort::new(vec![reply(later(base))]);
@@ -202,7 +206,8 @@ fn lost_acknowledgement_reconciles_without_rebinding_or_port_calls() {
     let state = root.path().join("state");
     let directory = super::super::artifacts::directory(&state, &request);
     let identity = blake3::hash(&std::fs::read(&request_path).expect("bytes")).to_hex().to_string();
-    let error = super::super::execution::recover_existing(&request, &directory, &identity).expect_err("unknown");
+    let error =
+        super::super::execution::recover_existing(&request, &state, &directory, &identity).expect_err("unknown");
     assert!(error.contains("outcome unknown"), "{error}");
     assert!(error.contains(&binding_identity), "{error}");
     assert_eq!(
@@ -216,7 +221,7 @@ fn cancellation_is_requested_not_observed_and_releases_nothing() {
     let root = tempfile::tempdir().expect("scratch");
     let (request, request_path, binding_identity) = dispatched(root.path());
     let state = root.path().join("state");
-    super::super::cancel(&request_path, &state).expect("cancellation requested");
+    super::super::cancellation::request(&request_path, &state).expect("cancellation requested");
     let directory = super::super::artifacts::directory(&state, &request);
     assert!(directory.join("cancel.request").exists());
     assert!(!directory.join(super::REFUSAL_FILE).exists());

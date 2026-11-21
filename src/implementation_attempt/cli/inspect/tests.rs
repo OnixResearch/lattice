@@ -163,7 +163,7 @@ fn retained_lifecycle_and_cancellation_stay_conservative() {
     let output = project(&dispatched.request_path, &dispatched.state).expect("inventory");
     assert_eq!(output["instance"]["lifecycle"]["state"], "dispatch_recorded_outcome_unknown");
     assert_eq!(output["instance"]["cancellation"], "not_requested");
-    super::super::cancel(&dispatched.request_path, &dispatched.state).expect("cancel requested");
+    super::super::cancellation::request(&dispatched.request_path, &dispatched.state).expect("cancel requested");
     let output = project(&dispatched.request_path, &dispatched.state).expect("inventory");
     assert_eq!(output["instance"]["cancellation"], "requested_unobserved");
     publish(&dispatched, crate::candidate::CandidateDisposition::Cancelled);

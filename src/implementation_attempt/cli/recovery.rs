@@ -39,6 +39,7 @@ pub(super) fn recover(
 
 /// A pre-spawn refusal with no worker artifacts is a definite non-dispatch.
 pub(super) fn not_dispatched(
+    request: &super::Request,
     directory: &std::path::Path,
     admitted: &lattice_core::execution_binding::admission::bound::Admitted,
     refusal: &serde_json::Value,
@@ -51,15 +52,51 @@ pub(super) fn not_dispatched(
     if !is_same_binding || has_worker_artifacts {
         return Err("binding refusal contradicts the retained binding or worker artifacts".into());
     }
-    Ok(serde_json::json!({
+    debug_assert!(is_same_binding && !has_worker_artifacts);
+    debug_assert_eq!(admitted.attempt.attempt_id, request.envelope.attempt_id, "the binding names this attempt");
+    let mut observation = serde_json::json!({
         "schema": "lattice.implementation-attempt-observation.v1",
+        "envelope": request.envelope,
+        "request_identity": request.admitted_envelope,
         "envelope_attempt": admitted.attempt.attempt_id,
         "status": "not_dispatched_binding_rejected",
         "execution_binding": admitted.binding_identity,
         "revalidation": refusal.get("decision"),
         "accepted": false,
         "integrated": false,
-    }))
+    });
+    echo_dispatch_plan(request, &mut observation);
+    Ok(observation)
+}
+
+/// The exclusive intent content of an attempt that recovery closed before any
+/// execution. It never equals a request identity, so a later run of the same
+/// request cannot create its intent.
+pub(super) fn closed_marker(request_identity: &str) -> String {
+    format!("closed-before-execution:{request_identity}")
+}
+
+/// Recovery found no intent and closed the attempt: the worker never started
+/// and never will for this attempt directory.
+// r[impl lattice.implementation_attempt.consumer.scenario.recovery]
+pub(super) fn not_started(request: &super::Request) -> serde_json::Value {
+    let mut observation = serde_json::json!({
+        "schema": "lattice.implementation-attempt-observation.v1",
+        "envelope": request.envelope,
+        "request_identity": request.admitted_envelope,
+        "status": "not_started_closed_by_recovery",
+        "result": null,
+        "accepted": false,
+        "integrated": false,
+    });
+    echo_dispatch_plan(request, &mut observation);
+    observation
+}
+
+fn echo_dispatch_plan(request: &super::Request, observation: &mut serde_json::Value) {
+    if let (Some(plan), Some(fields)) = (&request.dispatch_plan, observation.as_object_mut()) {
+        fields.insert("dispatch_plan".to_owned(), serde_json::Value::from(plan.as_str()));
+    }
 }
 
 fn validate_receipt(result: &crate::candidate_worker::AttemptResult, request: &super::Request) -> Result<(), String> {
@@ -109,11 +146,13 @@ fn project(
     result: &crate::candidate_worker::AttemptResult,
     unchanged: Option<&Unchanged>,
 ) -> serde_json::Value {
-    serde_json::json!({"schema":"lattice.implementation-attempt-observation.v1",
+    let mut observation = serde_json::json!({"schema":"lattice.implementation-attempt-observation.v1",
         "envelope":request.envelope,"request_identity":request.admitted_envelope,"result":result,
         "artifacts":{"raw_events":directory.join("raw-events.jsonl"),
             "omp_observation":directory.join("omp-observation.json"),
             "unchanged_receipt":unchanged.map(|retained| &retained.path)},
         "unchanged":unchanged.map(|retained| &retained.observation),
-        "accepted":false,"integrated":false})
+        "accepted":false,"integrated":false});
+    echo_dispatch_plan(request, &mut observation);
+    observation
 }

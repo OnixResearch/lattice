@@ -1,0 +1,583 @@
+{
+ "commands": {
+  "environment": "LATTICE=/nix/store/b44qz608maz1g0pi5prdbxf0hnizmz0l-lattice-k45-9a74e7ef-d3b3171c3b03/bin/lattice KILN=$W/k45-kiln-target/debug/kiln-lattice-dispatch HARNESS=$W/k45-kiln-target/debug/k45-harness OMP=/nix/store/ii3yn9v4cj6dg87b9kkzycjzxplgf93d-omp-18.18.7/bin/omp BWRAP=/nix/store/gr9l6ql3wg70idpqlqhnfdx81hak22c8-bubblewrap-0.11.0/bin/bwrap SOCAT=/nix/store/k562gy1wa1rwyhlp6ma2cp37zlc0mspl-socat-1.8.1.3/bin/socat1 WORKER_SHELL=/nix/store/v8sa6r6q037ihghxfbwzjj4p59v2x0pv-bash-5.3p9/bin/bash OUT=/tmp/k45q (W=/home/brittonr/.cargo-target/producer-work)",
+  "rest": "composed-qualification/qualify.sh lost_before_start lost_during_run refusals cancel",
+  "run": "composed-qualification/qualify.sh run",
+  "summary": "composed-qualification/summarize.py /tmp/k45q"
+ },
+ "external_model_calls": 0,
+ "issue": "https://github.com/OnixResearch/lattice/issues/6",
+ "kiln_issue": "https://github.com/OnixResearch/kiln/issues/45",
+ "kind": "composed-local-fault-qualification",
+ "live_command_for_parent": "With an operator-approved authless loopback model gateway: LATTICE=/nix/store/b44qz608maz1g0pi5prdbxf0hnizmz0l-lattice-k45-9a74e7ef-d3b3171c3b03/bin/lattice KILN=$W/k45-kiln-target/debug/kiln-lattice-dispatch HARNESS=$W/k45-kiln-target/debug/k45-harness OMP=/nix/store/ii3yn9v4cj6dg87b9kkzycjzxplgf93d-omp-18.18.7/bin/omp BWRAP=/nix/store/gr9l6ql3wg70idpqlqhnfdx81hak22c8-bubblewrap-0.11.0/bin/bwrap SOCAT=/nix/store/k562gy1wa1rwyhlp6ma2cp37zlc0mspl-socat-1.8.1.3/bin/socat1 WORKER_SHELL=/nix/store/v8sa6r6q037ihghxfbwzjj4p59v2x0pv-bash-5.3p9/bin/bash OUT=/tmp/k45-live LIVE_ENDPOINT=http://127.0.0.1:PORT/v1/chat/completions LIVE_MODEL=<exact model> composed-qualification/qualify.sh live",
+ "live_model": false,
+ "non_claims": [
+  "no live model, model-produced candidate or code change",
+  "no Kiln capture, verification, acceptance, publication or landing",
+  "the recorded qualified isolation-tools path was not reproduced; only the listed bubblewrap ran",
+  "synthetic local Kiln admission and owner reservation, not a provider or serving-owner grant",
+  "debug builds; not the release package",
+  "Kiln metrics stayed unavailable except for normalized terminals"
+ ],
+ "observations": {
+  "cancel": {
+   "calls": {
+    "dispatch": {
+     "exit": 0,
+     "stderr": "kiln worker metrics unavailable: native OMP terminal observation is unavailable",
+     "stdout": [
+      {
+       "accepted": false,
+       "envelope_attempt": "971f2767981a580c55b01cd0858bd156751882f2f990baa258613e93e821058c",
+       "envelope_fence": 1,
+       "execution_binding": "blake3:006dc28879ac48b0e9739bc7c789fc323edf8d2555de23f4ff629fc58c1e5186",
+       "integrated": false,
+       "request_identity": "534406a828a2f5c4cb83836ffc60476c4052cf9048e00694493b0bee26f7b099",
+       "result": {
+        "disposition": "cancelled",
+        "receipt": null,
+        "stdout_blake3": "cea93654f5abed0bb3e06c45457610716e87e8b28db0613e5ff613f2935b1f17"
+       },
+       "schema": "lattice.implementation-attempt-observation.v1"
+      }
+     ]
+    }
+   },
+   "endpoint_requests": 1,
+   "kiln_attempt": {
+    "dispatch": {
+     "effect_id": "dispatch-214b646728d3cd826adb1866c914f83ab1d59aae368e27cab5ad0b74132d7456",
+     "idempotency_key": {
+      "contract_version": 1,
+      "native_id": "214b646728d3cd826adb1866c914f83ab1d59aae368e27cab5ad0b74132d7456",
+      "native_kind": "implementation-dispatch",
+      "provider_namespace": "kiln"
+     },
+     "plan": "af15b1e39f9f2b425d7e33cf9159c919e2c425a17883869e0fab755aa71827b1",
+     "provider_profile": "scripted-local-omp",
+     "reserved_at_ms": 1795224141039,
+     "schema": "kiln.implementation-dispatch.v1"
+    },
+    "dispatch_request_binding": {
+     "attempt": "971f2767981a580c55b01cd0858bd156751882f2f990baa258613e93e821058c",
+     "fence": 1,
+     "plan": "af15b1e39f9f2b425d7e33cf9159c919e2c425a17883869e0fab755aa71827b1",
+     "request_digest": "29152f3e27196d6d6c145def2dd4e40e937a59559badcdc35e3b0f1b400ac515",
+     "schema": "kiln.implementation-dispatch-request-binding.v1",
+     "seal": "f358bbb06aa0cc9dde5026267e30880740d2ac5c53aa47768dcbac93bd676ae7"
+    },
+    "execution": null,
+    "fence": 1,
+    "phase": "cancelled"
+   },
+   "lattice_state_files": [
+    "3fcfab0820fc66b9494562d407935dc1d9a3524468dacf5f5af9e5b6d3315d55/cancel.request 64",
+    "3fcfab0820fc66b9494562d407935dc1d9a3524468dacf5f5af9e5b6d3315d55/candidate.redb 548864",
+    "3fcfab0820fc66b9494562d407935dc1d9a3524468dacf5f5af9e5b6d3315d55/execution-binding.json 780",
+    "3fcfab0820fc66b9494562d407935dc1d9a3524468dacf5f5af9e5b6d3315d55/intent.json 64",
+    "3fcfab0820fc66b9494562d407935dc1d9a3524468dacf5f5af9e5b6d3315d55/omp-observation.json 64",
+    "3fcfab0820fc66b9494562d407935dc1d9a3524468dacf5f5af9e5b6d3315d55/raw-events.jsonl 624",
+    "works/be2d0d4abfaba9c2bcf7cb060531f9608d18063b3d12f5eb4d9a68e625ce766f/00000000000000000001 64"
+   ],
+   "omp_observation": {
+    "Err": "OMP JSONL stream is malformed, truncated or incomplete"
+   },
+   "prepared_worker_profile": "f7b055da4f51243450d00f6ccecede0cc5be60d537d52b5972efb0b253263cb9"
+  },
+  "lost-before-start": {
+   "calls": {
+    "recover": {
+     "exit": 0,
+     "stderr": "kiln worker metrics unavailable: worker metrics artifact is unavailable",
+     "stdout": [
+      {
+       "accepted": false,
+       "envelope_attempt": "d92c099bf4058d2f15c1506d9b6dbc76960958e1e8ded042b89ab7560a6a1a5d",
+       "envelope_fence": 1,
+       "integrated": false,
+       "request_identity": "63d393087c838e7417f099a77fe1916fc5fbba740fdb00ceabc01bbb44b5d4f9",
+       "result": null,
+       "schema": "lattice.implementation-attempt-observation.v1",
+       "status": "not_started_closed_by_recovery"
+      }
+     ]
+    },
+    "recover-replay": {
+     "exit": 0,
+     "stderr": "kiln worker metrics unavailable: worker metrics artifact is unavailable",
+     "stdout": [
+      {
+       "accepted": false,
+       "envelope_attempt": "d92c099bf4058d2f15c1506d9b6dbc76960958e1e8ded042b89ab7560a6a1a5d",
+       "envelope_fence": 1,
+       "integrated": false,
+       "request_identity": "63d393087c838e7417f099a77fe1916fc5fbba740fdb00ceabc01bbb44b5d4f9",
+       "result": null,
+       "schema": "lattice.implementation-attempt-observation.v1",
+       "status": "not_started_closed_by_recovery"
+      }
+     ]
+    }
+   },
+   "endpoint_requests": 0,
+   "kiln_attempt": {
+    "dispatch": {
+     "effect_id": "dispatch-5d0ce66df9281cd10ff89f9115cf78aae0e3e6a8cdcd0a792df8adaa3de06844",
+     "idempotency_key": {
+      "contract_version": 1,
+      "native_id": "5d0ce66df9281cd10ff89f9115cf78aae0e3e6a8cdcd0a792df8adaa3de06844",
+      "native_kind": "implementation-dispatch",
+      "provider_namespace": "kiln"
+     },
+     "plan": "6d70ba8c13779fc780f0223a3a1972260628eeb4c682be4b1789782abcd61f7f",
+     "provider_profile": "scripted-local-omp",
+     "reserved_at_ms": 1795223550605,
+     "schema": "kiln.implementation-dispatch.v1"
+    },
+    "dispatch_request_binding": {
+     "attempt": "d92c099bf4058d2f15c1506d9b6dbc76960958e1e8ded042b89ab7560a6a1a5d",
+     "fence": 1,
+     "plan": "6d70ba8c13779fc780f0223a3a1972260628eeb4c682be4b1789782abcd61f7f",
+     "request_digest": "dc9fdd2eb1594577f9b0fe0a801ecc0032aae1f0b266e50ab767e8e9d51c6700",
+     "schema": "kiln.implementation-dispatch-request-binding.v1",
+     "seal": "7b9f9052e356743f8a4acd89d2fac2e0ff29f7adad80d2f92315dddc0132f0b0"
+    },
+    "execution": null,
+    "fence": 1,
+    "phase": "executing"
+   },
+   "lattice_state_files": [
+    "eb3cc1beb70ec7fdc05e6d0c9ee83382b9e768551c4329f45bd43a7892fd374c/intent.json 88"
+   ],
+   "omp_observation": null,
+   "prepared_worker_profile": "6fefc3ef5004ecf22dad2f8a462b7e797eeab5c97b4a9412df7b1b32049d0995"
+  },
+  "lost-during-run": {
+   "calls": {
+    "dispatch": {
+     "exit": 137,
+     "stderr": "",
+     "stdout": []
+    },
+    "recover": {
+     "exit": 0,
+     "stderr": "",
+     "stdout": [
+      {
+       "accepted": false,
+       "envelope_attempt": "fb7df24b7e6f791d0d3cc0b9c16354ac4a82e855f2c0d7bce62f03c6913c3bf5",
+       "envelope_fence": 1,
+       "execution_binding": "blake3:50931e75ba9d3f85e796f976071710b0cbb4c72d3371f79f29154c8b199f7162",
+       "integrated": false,
+       "request_identity": "99b8b0564127b75a6d926ef28868f1af8a01b4da29c2e732c51d2ecc4e8c37a6",
+       "result": {
+        "disposition": "failed",
+        "receipt": null,
+        "stdout_blake3": "f57ecd6454287fe4dbb8aff1727a6fee71c233af13df0ea3a715fc50bf91e043"
+       },
+       "schema": "lattice.implementation-attempt-observation.v1"
+      }
+     ]
+    },
+    "recover-replay": {
+     "exit": 0,
+     "stderr": "",
+     "stdout": [
+      {
+       "accepted": false,
+       "envelope_attempt": "fb7df24b7e6f791d0d3cc0b9c16354ac4a82e855f2c0d7bce62f03c6913c3bf5",
+       "envelope_fence": 1,
+       "execution_binding": "blake3:50931e75ba9d3f85e796f976071710b0cbb4c72d3371f79f29154c8b199f7162",
+       "integrated": false,
+       "request_identity": "99b8b0564127b75a6d926ef28868f1af8a01b4da29c2e732c51d2ecc4e8c37a6",
+       "result": {
+        "disposition": "failed",
+        "receipt": null,
+        "stdout_blake3": "f57ecd6454287fe4dbb8aff1727a6fee71c233af13df0ea3a715fc50bf91e043"
+       },
+       "schema": "lattice.implementation-attempt-observation.v1"
+      }
+     ]
+    }
+   },
+   "endpoint_requests": 1,
+   "kiln_attempt": {
+    "dispatch": {
+     "effect_id": "dispatch-3bbb3b6f53ce7913c40f234489f75ad8622739a9be74e786255ee88f5d852693",
+     "idempotency_key": {
+      "contract_version": 1,
+      "native_id": "3bbb3b6f53ce7913c40f234489f75ad8622739a9be74e786255ee88f5d852693",
+      "native_kind": "implementation-dispatch",
+      "provider_namespace": "kiln"
+     },
+     "plan": "8452a0f93b7e58bbd57ceb1070c3f0177d06a545de2e45598909576e86d01632",
+     "provider_profile": "scripted-local-omp",
+     "reserved_at_ms": 1795223823592,
+     "schema": "kiln.implementation-dispatch.v1"
+    },
+    "dispatch_request_binding": {
+     "attempt": "fb7df24b7e6f791d0d3cc0b9c16354ac4a82e855f2c0d7bce62f03c6913c3bf5",
+     "fence": 1,
+     "plan": "8452a0f93b7e58bbd57ceb1070c3f0177d06a545de2e45598909576e86d01632",
+     "request_digest": "dc7dc867909cc13fcbb6eb8c5add9f25fcf339e74db483e6b81969f91f661bf2",
+     "schema": "kiln.implementation-dispatch-request-binding.v1",
+     "seal": "e8d99c138cf14259e87a220746a6a2f2262d066858fef62e59f455ffdba31fef"
+    },
+    "execution": null,
+    "fence": 1,
+    "phase": "executing"
+   },
+   "lattice_state_files": [
+    "d1048d60d670b832dad66a6460095c6da4d2a491f5c381f15d8899ab6c7d5a02/candidate.redb 548864",
+    "d1048d60d670b832dad66a6460095c6da4d2a491f5c381f15d8899ab6c7d5a02/execution-binding.json 780",
+    "d1048d60d670b832dad66a6460095c6da4d2a491f5c381f15d8899ab6c7d5a02/intent.json 64",
+    "d1048d60d670b832dad66a6460095c6da4d2a491f5c381f15d8899ab6c7d5a02/omp-observation.json 250",
+    "d1048d60d670b832dad66a6460095c6da4d2a491f5c381f15d8899ab6c7d5a02/raw-events.jsonl 3251",
+    "works/1a19f02bd6b0c93c2d29c8c25bea916e0767233529e0e5f9331e7a721c54a4ea/00000000000000000001 64"
+   ],
+   "omp_observation": {
+    "Ok": {
+     "event_count": 8,
+     "raw_events_blake3": "f57ecd6454287fe4dbb8aff1727a6fee71c233af13df0ea3a715fc50bf91e043",
+     "schema": "lattice.omp-jsonl-observation.v1",
+     "session_id": "01a1fbad-aaaa-7259-bf91-500be4cb664c",
+     "terminal": "failed",
+     "usage_complete": false
+    }
+   },
+   "prepared_worker_profile": "6064369b7852561763d11a8391935969aae83c9dd54f38fedd155c530d9c165b"
+  },
+  "refusals": {
+   "calls": {
+    "kiln-crossed-fence": {
+     "exit": 2,
+     "stderr": "kiln-lattice-dispatch: worker request is crossed with admitted work, attempt, workspace or model policy",
+     "stdout": []
+    },
+    "lattice-crossed": {
+     "exit": 1,
+     "stderr": "configuration error: implementation request is crossed: another attempt is recorded at this fence",
+     "stdout": [
+      {
+       "dispatched": false,
+       "reason": "crossed_attempt",
+       "schema": "lattice.implementation-attempt-refusal.v1"
+      }
+     ]
+    },
+    "lattice-higher": {
+     "exit": 1,
+     "stderr": "configuration error: execution binding was not admitted; nothing was persisted",
+     "stdout": [
+      {
+       "execution_binding": {
+        "outcome": "blocked",
+        "reason": "provider_unavailable"
+       }
+      }
+     ]
+    },
+    "stale-fence": {
+     "exit": 2,
+     "stderr": "kiln-lattice-dispatch: worker has no complete observed result; retain state and reconcile",
+     "stdout": []
+    }
+   },
+   "endpoint_requests": 0,
+   "kiln_attempt": {
+    "dispatch": {
+     "effect_id": "dispatch-0d56fdd666e69d6993f66edbeb6626879038838a3e765f8162bf9732631dc3d2",
+     "idempotency_key": {
+      "contract_version": 1,
+      "native_id": "0d56fdd666e69d6993f66edbeb6626879038838a3e765f8162bf9732631dc3d2",
+      "native_kind": "implementation-dispatch",
+      "provider_namespace": "kiln"
+     },
+     "plan": "b75c0d68f77991e6f7700fb691ae296918f5a9bcaa23ad0245a8353412fe5699",
+     "provider_profile": "scripted-local-omp",
+     "reserved_at_ms": 1795224085216,
+     "schema": "kiln.implementation-dispatch.v1"
+    },
+    "dispatch_request_binding": {
+     "attempt": "6b7bfe32f9b91a0330ba59f7545a14447ed1277619f960ea71adb42acc37958e",
+     "fence": 1,
+     "plan": "b75c0d68f77991e6f7700fb691ae296918f5a9bcaa23ad0245a8353412fe5699",
+     "request_digest": "052e1219916d19b47ab6f052de47a6c634e68efb830725a402b1fd1821172f42",
+     "schema": "kiln.implementation-dispatch-request-binding.v1",
+     "seal": "82d18c6be33e9871ec3e604b402b8109424082b6d2c67efce8c715310268a149"
+    },
+    "execution": null,
+    "fence": 1,
+    "phase": "claimed"
+   },
+   "lattice_state_files": [
+    "works/4b8f4209cdcf1f49a5a32e41c06e09e2062c76f066fcbf958484c6e6509878b3/00000000000000000002 64"
+   ],
+   "omp_observation": null,
+   "prepared_worker_profile": "9f93f5d8b766f8d31495d4b60fd6b3c74dc8251f7e4271f00c88e3fb391c9342"
+  },
+  "run": {
+   "calls": {
+    "dispatch": {
+     "exit": 0,
+     "stderr": "",
+     "stdout": [
+      {
+       "accepted": false,
+       "envelope_attempt": "005fbe79437145dde67c37f87d872214dc30c14c696c579a7751e50898d11ab9",
+       "envelope_fence": 1,
+       "execution_binding": "blake3:c541c418ea30813753fc70687be92a3f5da3e14f9a2a5e884066e53684150537",
+       "integrated": false,
+       "request_identity": "2160b61b7dbffa68ef6e4dc172361294fa3d868b2ef592ee295fa1fa1f4228ee",
+       "result": {
+        "disposition": "failed",
+        "receipt": null,
+        "stdout_blake3": "989bf5af8749446eafd078a4b4f92acf835557cd199b71082351ca3857aca589"
+       },
+       "schema": "lattice.implementation-attempt-observation.v1"
+      }
+     ]
+    },
+    "duplicate": {
+     "exit": 0,
+     "stderr": "",
+     "stdout": [
+      {
+       "accepted": false,
+       "envelope_attempt": "005fbe79437145dde67c37f87d872214dc30c14c696c579a7751e50898d11ab9",
+       "envelope_fence": 1,
+       "execution_binding": "blake3:c541c418ea30813753fc70687be92a3f5da3e14f9a2a5e884066e53684150537",
+       "integrated": false,
+       "request_identity": "2160b61b7dbffa68ef6e4dc172361294fa3d868b2ef592ee295fa1fa1f4228ee",
+       "result": {
+        "disposition": "failed",
+        "receipt": null,
+        "stdout_blake3": "989bf5af8749446eafd078a4b4f92acf835557cd199b71082351ca3857aca589"
+       },
+       "schema": "lattice.implementation-attempt-observation.v1"
+      }
+     ]
+    },
+    "kiln-substituted": {
+     "exit": 2,
+     "stderr": "kiln-lattice-dispatch: implementation_request_binding_conflict: attempt already retains a different request byte binding",
+     "stdout": []
+    },
+    "lattice-duplicate": {
+     "exit": 0,
+     "stderr": "",
+     "stdout": [
+      {
+       "accepted": false,
+       "envelope_attempt": "005fbe79437145dde67c37f87d872214dc30c14c696c579a7751e50898d11ab9",
+       "envelope_fence": 1,
+       "execution_binding": "blake3:c541c418ea30813753fc70687be92a3f5da3e14f9a2a5e884066e53684150537",
+       "integrated": false,
+       "request_identity": "2160b61b7dbffa68ef6e4dc172361294fa3d868b2ef592ee295fa1fa1f4228ee",
+       "result": {
+        "disposition": "failed",
+        "receipt": null,
+        "stdout_blake3": "989bf5af8749446eafd078a4b4f92acf835557cd199b71082351ca3857aca589"
+       },
+       "schema": "lattice.implementation-attempt-observation.v1"
+      }
+     ]
+    },
+    "lattice-substituted": {
+     "exit": 1,
+     "stderr": "configuration error: request differs from persisted execution intent; nothing was dispatched",
+     "stdout": [
+      {
+       "dispatched": false,
+       "reason": "substituted_request",
+       "schema": "lattice.implementation-attempt-refusal.v1"
+      }
+     ]
+    }
+   },
+   "endpoint_requests": 1,
+   "kiln_attempt": {
+    "dispatch": {
+     "effect_id": "dispatch-e86cd3ef918d5fb4bea2ed33800236bbc39959494c58245fab90b17ff94a9fc5",
+     "idempotency_key": {
+      "contract_version": 1,
+      "native_id": "e86cd3ef918d5fb4bea2ed33800236bbc39959494c58245fab90b17ff94a9fc5",
+      "native_kind": "implementation-dispatch",
+      "provider_namespace": "kiln"
+     },
+     "plan": "94b9240acda3e5641e66d1e19bfc2ea18cf1c80fce923e3a469b2d6905640812",
+     "provider_profile": "scripted-local-omp",
+     "reserved_at_ms": 1795223414188,
+     "schema": "kiln.implementation-dispatch.v1"
+    },
+    "dispatch_request_binding": {
+     "attempt": "005fbe79437145dde67c37f87d872214dc30c14c696c579a7751e50898d11ab9",
+     "fence": 1,
+     "plan": "94b9240acda3e5641e66d1e19bfc2ea18cf1c80fce923e3a469b2d6905640812",
+     "request_digest": "425e40c03f92e157148d92ef2170ad61a7124704efe95024dd7473bd423b4604",
+     "schema": "kiln.implementation-dispatch-request-binding.v1",
+     "seal": "4c24087ae0fc52c756ffe15b24a6a721a8de9695b8c0057763ec0dba8ad03f8e"
+    },
+    "execution": null,
+    "fence": 1,
+    "phase": "executing"
+   },
+   "lattice_state_files": [
+    "3eb2930fd82d5dc0dc97b49e32020102548fde044efd9f19f30adf48f330c873/candidate.redb 548864",
+    "3eb2930fd82d5dc0dc97b49e32020102548fde044efd9f19f30adf48f330c873/execution-binding.json 780",
+    "3eb2930fd82d5dc0dc97b49e32020102548fde044efd9f19f30adf48f330c873/intent.json 64",
+    "3eb2930fd82d5dc0dc97b49e32020102548fde044efd9f19f30adf48f330c873/omp-observation.json 250",
+    "3eb2930fd82d5dc0dc97b49e32020102548fde044efd9f19f30adf48f330c873/raw-events.jsonl 3251",
+    "works/ac916c4b20dddb7cdba2311acba8edce7972317c9535bbf9656ea46aacd054bb/00000000000000000001 64"
+   ],
+   "omp_observation": {
+    "Ok": {
+     "event_count": 8,
+     "raw_events_blake3": "989bf5af8749446eafd078a4b4f92acf835557cd199b71082351ca3857aca589",
+     "schema": "lattice.omp-jsonl-observation.v1",
+     "session_id": "01a1fba7-6ec9-70e1-acd3-88791666df49",
+     "terminal": "failed",
+     "usage_complete": false
+    }
+   },
+   "prepared_worker_profile": "9925c64b9958d1b645c5a4a828380dbf49d9dbe83d7a8345c81bdc6f92b1d659"
+  }
+ },
+ "observed_on": "2026-11-20, Linux 6.18.60 x86_64",
+ "pins": {
+  "bubblewrap": {
+   "blake3": "cd5be4481cfe2e79bbf4183ef9122dd15c3ce379594b67121a4b540ac920864e",
+   "note": "The recorded qualified tools /nix/store/fmr18iwdk05j0jbzfgm6qi0zwhhnbfqc-lattice-worker-isolation-tools and pin 37z73...-bubblewrap-0.11.0 are absent; no flake output or derivation in Lattice produces them (only source-qualification.json names them). This qualification pins the bubblewrap that actually ran.",
+   "origin": "bubblewrap 0.11.0 from Lattice's pinned nixpkgs input",
+   "path": "/nix/store/gr9l6ql3wg70idpqlqhnfdx81hak22c8-bubblewrap-0.11.0/bin/bwrap"
+  },
+  "endpoint.py": {
+   "blake3": "74f29ad0155f07720157d79a511054de85ef369adcaeb1cd727d5216f6d376f6",
+   "path": "composed-qualification/endpoint.py"
+  },
+  "k45_harness": {
+   "blake3": "0f2e2286076f4bde241bd71632e2cef83b210f4dcb712c6d1e07b81657a333ff",
+   "path": "/home/brittonr/.cargo-target/producer-work/k45-kiln-target/debug/k45-harness",
+   "source": "composed-qualification/harness-main.rs.txt (scratch, path-depends on kiln-core and kiln-implementer at 70c8f217; mirrors Kiln's implementation-fixture setup_local_admission and reserve_local_fixture)",
+   "source_blake3": "68dd1893432a0da676d4f6af9e8731925a1d4357a0f87b552e44e5c49ecb3b51"
+  },
+  "kiln_lattice_dispatch": {
+   "blake3": "f53f2bb0c0399822e05c5c9a08d79a3c0db41fc0cf7d3eebe4a90a8f4276bfaa",
+   "build": "nix develop -c env CARGO_BUILD_JOBS=6 CARGO_TARGET_DIR=$W/k45-kiln-target cargo build --offline --locked -p kiln-adapter-lattice --bin kiln-lattice-dispatch",
+   "path": "/home/brittonr/.cargo-target/producer-work/k45-kiln-target/debug/kiln-lattice-dispatch",
+   "source": "OnixResearch/kiln 70c8f217433bb24010d4f48a1abdc55ce8e44e03 (unmodified)"
+  },
+  "lattice": {
+   "blake3": "239833c778c42e655cb575afab9d2236ade7e69315c4d40950c5379e142d739d",
+   "build": "nix develop -c env CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=6 CARGO_TARGET_DIR=$W/k45-lattice-target cargo build --locked --bin lattice; nix store add --mode nar (dev profile)",
+   "path": "/nix/store/b44qz608maz1g0pi5prdbxf0hnizmz0l-lattice-k45-9a74e7ef-d3b3171c3b03/bin/lattice",
+   "source": "OnixResearch/lattice 9a74e7ef1da4e0ca7610dce0db039b3825a7154d plus the uncommitted execute-admitted-implementation-attempt worktree delta (blake3 over git diff HEAD and untracked files: d3b3171c3b03b946ef20314d95d880cd1f9b20f1c0e41eb7775c1abdbb4f5c65)"
+  },
+  "omp": {
+   "blake3": "7ee769b6a4161b9d50410b31be252133fedb459e4441c6da4c92f3733a8d135f",
+   "matches_recorded_executable_blake3": true,
+   "path": "/nix/store/ii3yn9v4cj6dg87b9kkzycjzxplgf93d-omp-18.18.7/bin/omp",
+   "rebuilt_with": "the build command recorded in preserve-candidate-worker-observations/evidence/source-qualification.json",
+   "source_revision": "e325ffc73ab86e03bdd20a91b77d8e2b3964c906"
+  },
+  "qualify.sh": {
+   "blake3": "11fd2e83e58600fac954446f648d4d1f361b786b46597f2ac749cebb03146cdb",
+   "path": "composed-qualification/qualify.sh"
+  },
+  "shell": {
+   "blake3": "e2129fd97d773dec8d2702df5f415030332c9e309ed8c9e50fdd9cbbc2b61bae",
+   "matches_recorded_pin": true,
+   "path": "/nix/store/v8sa6r6q037ihghxfbwzjj4p59v2x0pv-bash-5.3p9/bin/bash"
+  },
+  "socat": {
+   "blake3": "b8e3a6f91077c9cf3a65265e260b969edbdbb99ebcdbb190340df4fa99676f04",
+   "matches_recorded_pin": true,
+   "path": "/nix/store/k562gy1wa1rwyhlp6ma2cp37zlc0mspl-socat-1.8.1.3/bin/socat1"
+  },
+  "summarize.py": {
+   "blake3": "2b68b39de76962bbf73450b32e7caf7ac970a9c081c01e2c1673a4d5c276b3ef",
+   "path": "composed-qualification/summarize.py"
+  }
+ },
+ "results": {
+  "cancel": {
+   "claim": "SIGTERM to Kiln after the worker's local request arrived; Kiln's watcher ran lattice implementation-attempt cancel, Lattice cancelled the worker process group and published a cancelled result; Kiln accepted the observation (exit 0) and moved its attempt to cancelled. The truncated JSONL has no terminal, so the OMP observation stays unavailable and Kiln records no metrics.",
+   "endpoint_requests": 1,
+   "kiln_side": {
+    "attempt_phase": "cancelled",
+    "dispatch_exit": 0
+   },
+   "lattice_side": {
+    "cancel_request_retained": true,
+    "disposition": "cancelled",
+    "omp_observation": "Err: OMP JSONL stream is malformed, truncated or incomplete"
+   }
+  },
+  "lost_before_start": {
+   "claim": "Kiln persisted transport intent through its own pre-transport steps and stopped before spawning Lattice. Kiln re-entry called recover; Lattice found no intent, closed the attempt and reported not_started_closed_by_recovery with result null; a second re-entry replayed the same report. No worker ran.",
+   "endpoint_requests": 0,
+   "kiln_side": {
+    "recover_exit": 0,
+    "recover_replay_exit": 0
+   },
+   "lattice_side": {
+    "state_files": [
+     "intent.json (closed-before-execution marker)"
+    ],
+    "status": "not_started_closed_by_recovery"
+   }
+  },
+  "lost_during_run": {
+   "claim": "Kiln was SIGKILLed (exit 137) while the worker held a local request; the Lattice process finished on its own after the endpoint answered HTTP 400. Kiln re-entry recovered the retained failed result twice without executing again.",
+   "endpoint_requests": 1,
+   "kiln_side": {
+    "dispatch_exit": 137,
+    "recover_exit": 0,
+    "recover_replay_exit": 0
+   },
+   "lattice_side": {
+    "disposition": "failed",
+    "omp_terminal": "failed"
+   }
+  },
+  "refusals": {
+   "claim": "Kiln refused a plan whose fence differs from the request (exit 2, Lattice not invoked). Lattice recorded fence 2 of the same work for a higher-fence request whose provider binding was then blocked (no intent or worker). A second attempt at fence 2 was refused as crossed_attempt. Kiln's current attempt at fence 1 then reached Lattice through the real transport and Lattice refused it with a typed stale_fence record before any binding, intent or worker; Kiln retained the outcome (exit 2).",
+   "endpoint_requests": 0,
+   "kiln_side": {
+    "crossed_plan_fence_exit": 2,
+    "stale_fence_dispatch_exit": 2
+   },
+   "lattice_side": {
+    "crossed_attempt_exit": 1,
+    "crossed_reason": "crossed_attempt",
+    "higher_fence_binding": "blocked provider_unavailable",
+    "higher_fence_exit": 1,
+    "stale_fence_reason_in_kiln_transport_stdout": "stale_fence"
+   }
+  },
+  "run": {
+   "claim": "Kiln's real --worker-request transport ran the real lattice binary; the pinned OMP in bubblewrap reached only the local HTTP-400 endpoint once and returned a normalized failed terminal that Kiln accepted (exit 0). Kiln's exact duplicate dispatch began recovery and printed the identical retained observation with no second endpoint request. A direct duplicate lattice run did the same. Substituted request bytes were refused by Kiln before transport (implementation_request_binding_conflict) and by Lattice with a typed substituted_request refusal.",
+   "endpoint_requests": 1,
+   "kiln_side": {
+    "dispatch_exit": 0,
+    "duplicate_exit": 0,
+    "substituted_exit": 2
+   },
+   "lattice_side": {
+    "disposition": "failed",
+    "duplicate_run_exit": 0,
+    "omp_terminal": "failed",
+    "refusal_reason": "substituted_request",
+    "substituted_run_exit": 1
+   }
+  }
+ },
+ "worker_profile_revision_note": "Each scenario has its own local endpoint port, which is profile-level broker configuration, so revisions differ per scenario; the prompt, base snapshot, expiry and workspace root are not framed.",
+ "worker_profile_revisions": {
+  "cancel": "f7b055da4f51243450d00f6ccecede0cc5be60d537d52b5972efb0b253263cb9",
+  "lost-before-start": "6fefc3ef5004ecf22dad2f8a462b7e797eeab5c97b4a9412df7b1b32049d0995",
+  "lost-during-run": "6064369b7852561763d11a8391935969aae83c9dd54f38fedd155c530d9c165b",
+  "refusals": "9f93f5d8b766f8d31495d4b60fd6b3c74dc8251f7e4271f00c88e3fb391c9342",
+  "run": "9925c64b9958d1b645c5a4a828380dbf49d9dbe83d7a8345c81bdc6f92b1d659"
+ }
+}

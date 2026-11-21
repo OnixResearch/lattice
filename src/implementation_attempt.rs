@@ -19,6 +19,8 @@ pub const MAX_REPOSITORY_BYTES: usize = 512;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SourceKind {
+    /// Kiln's wire name `github_issue`; identity tag 1 is unchanged.
+    #[serde(rename = "github_issue")]
     GitHubIssue,
     CairnTask,
     CairnArtifact,

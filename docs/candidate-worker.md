@@ -295,27 +295,107 @@ attempt result. See [worker compute binding](worker-compute-binding.md) and
 [worker serving binding](worker-serving-binding.md).
 
 An optional `worker_capability` (`lattice.worker-capability.v1`) names the
-agent definition and declares bounded task families and tools. It is part of
-`worker_profile_identity` only when present, so existing requests keep their
-revision. A malformed declaration is refused before any effect. `inspect`
-prints `lattice.worker-inventory.v2`; see [worker inventory](worker-inventory.md).
+agent definition and declares bounded task families and tools. It is framed
+into `worker_profile_identity` only when present. A malformed declaration is
+refused before any effect. `inspect` prints `lattice.worker-inventory.v2`; see
+[worker inventory](worker-inventory.md).
+
+### Profile revision framing (breaking)
+
+`worker_profile_identity` is the `lattice-worker-profile-revision-v2` content
+identity, spelled as bare lowercase hex like every earlier revision. It frames
+only profile-level configuration: the program and sandbox program, the OMP
+source revision, executable BLAKE3 and model, the broker's schema, endpoint,
+model, credential reference, relay and shell artifacts, sandbox BLAKE3 and
+request ceiling, the read and write paths, `output_limit_bytes`,
+`allow_unchanged`, `worker_compute` and, when declared, the canonical
+capability. Attempts of one profile therefore share one revision. A new
+executable, model, route, tool set, compute requirement or capability is a new
+revision of the same definition.
+
+Per-attempt values are not part of the revision. The base snapshot, task
+prompt, broker expiry and workspace root are bound by the exact request bytes:
+their BLAKE3 is the one-shot `intent.json` content, the attempt usage
+observation's `dispatch_id`, and the digest Kiln seals to its dispatch plan.
+The candidate receipt must also match the request's base snapshot. Work,
+attempt, fence, workspace, base commit, source and policy stay in the envelope
+and its `admitted_envelope` identity, which the execution binding frames.
+
+This changes every profile revision. A request whose envelope names a revision
+of the earlier framing is refused before any effect with a typed
+`profile_revision_superseded` refusal. That includes every attempt retained
+before this change: `run` and `recover` never re-execute or recover it, and its
+state is left untouched. Retained attempts must be reconciled by their own
+coordinator, and new work must be prepared again and dispatched as a new
+attempt.
+
+### Coordinator transport
+
+Kiln's `kiln-lattice-dispatch --worker-request` runs `run` and, after a
+possible earlier dispatch, `recover` with a frozen copy of the exact request
+bytes. Its per-attempt directory key is the same
+`state/<blake3(state/<attempt>-<fence>)>` as Lattice's, and it reads
+`artifacts.omp_observation` from there. The request may carry two optional
+coordinator fields, neither of which is part of the profile revision:
+
+- `network` states the coordinator's workspace network. Only `false` is
+  admitted: the OMP worker never receives a network device, only its brokered
+  model route. `true` is refused before any effect.
+- `dispatch_plan` is the coordinator's dispatch-plan identity (64 lowercase
+  hex). The exact request bytes bind it, and every observation echoes it.
+
+Before the binding and intent, a run records its attempt at
+`works/<blake3(work_id)>/<fence>` under an exclusive lock. A request whose fence
+is lower than one already recorded for its work, or that names a different
+attempt at a recorded fence, is refused. A request whose bytes differ from an
+existing intent is refused as substituted. Each refusal prints one
+`lattice.implementation-attempt-refusal.v1` record (`stale_fence`,
+`crossed_attempt`, `substituted_request` or `profile_revision_superseded`) with
+`dispatched:false`, and the command exits non-zero. Kiln remains the fence
+authority; these records only stop one state root from executing a superseded
+or crossed request.
 
 Re-entry with the exact request only reconciles retained results and reports the
 persisted binding identity; it never calls the compute port, rebinds or
-releases compute. Changed requests and missing/incomplete evidence never
-authorize another execution. Raw JSONL and normalization artifacts are
-separately fsynced before the candidate result. Recovery bounds their reads,
-rejects symbolic links, checks the raw digest against the owned stdout
-observation, and independently repeats normalization. Missing, substituted, or
-contradictory artifacts cannot become a published result. Version 2 removed the
-old `network`/`network_namespace` fields rather than accepting shared-network
-compatibility requests. Broker expiry cannot exceed the enclosing attempt
-expiry. This shell creates no external authorization grant.
+releases compute. A duplicate `run` of a request that already has an intent
+reconciles exactly as `recover` does and prints the retained observation.
+Changed requests and missing/incomplete evidence never authorize another
+execution. When `recover` finds no intent, the worker cannot have started,
+because the intent precedes every worker effect. Recovery then closes the
+attempt by exclusively creating its intent path with a
+`closed-before-execution:` marker and prints
+`status:"not_started_closed_by_recovery"` with `result:null`. A racing or later
+`run` of that attempt can no longer create its intent, so it never dispatches.
+Cancelling a closed attempt reports `not_started:true`, and `inspect` reports
+that the attempt has no worker instance. Every observation, including
+`not_dispatched_binding_rejected`, carries the exact `envelope` and
+`request_identity` that Kiln checks.
+
+A worker blocked before it emitted any event, for example because its broker
+socket could not be bound, retains the blocker as its unavailable OMP
+observation next to empty raw events. Recovery accepts that pair and reports the
+blocked result; it never invents a terminal. The broker socket lives at
+`<workspace parent>/.lattice-model-<32 hex>/model.sock`, so the workspace parent
+must leave room within the 108-byte Unix socket path limit.
+
+Raw JSONL and normalization artifacts are separately fsynced before the
+candidate result. Recovery bounds their reads, rejects symbolic links, checks
+the raw digest against the owned stdout observation, and independently repeats
+normalization. Missing, substituted, or contradictory artifacts cannot become a
+published result. Version 2 removed the old `network_namespace` field rather
+than accepting shared-network compatibility requests. Broker expiry cannot
+exceed the enclosing attempt expiry. This shell creates no external
+authorization grant.
 
 Cancel writes only an exact persisted request; the running owner observes it and
 uses the existing process-group cancellation. Requested cancellation is not a
 termination receipt. Controller loss or unknown teardown retains the workspace
 and usage uncertainty rather than releasing it for a successor.
+
+A `cairn_artifact` source names its exact native stage context as
+`change/stage/artifact` and uses its own identity tag. It is never a relabeled
+coding task. Issue and task identity bytes are unchanged; the issue source wire
+name is `github_issue`, which is the name Kiln sends.
 
 An exit-zero unchanged workspace is a typed `Unchanged` observation, still a
 generic failed/no-candidate result. Only explicit `allow_unchanged:true` plus

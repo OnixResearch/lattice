@@ -93,6 +93,8 @@ fn fixture() -> Fixture {
             model_routes: lattice_core::execution_binding::request::RouteDeclaration::NoModel {},
         },
         worker_capability: None,
+        network: None,
+        dispatch_plan: None,
     };
     request_value.execution_binding.model_routes = lattice_core::execution_binding::request::RouteDeclaration::Routes {
         routes: vec![super::super::binding::primary_route(&request_value).expect("primary route")],

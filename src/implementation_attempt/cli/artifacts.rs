@@ -156,7 +156,10 @@ pub(super) fn verify_events(
     let retained: Result<crate::candidate_worker::omp::Observation, String> =
         serde_json::from_slice(&normalized).map_err(|_| "retained OMP observation is malformed")?;
     let expected = crate::candidate_worker::omp::normalize_jsonl(&raw, output_limit_bytes, "/workspace");
-    if retained != expected {
+    // A worker blocked before it produced any event retains its blocker as the
+    // unavailable observation; no terminal can be invented from empty output.
+    let is_blocked_before_output = raw.is_empty() && retained.is_err() && expected.is_err();
+    if retained != expected && !is_blocked_before_output {
         return Err("retained OMP observation does not describe the exact raw event artifact".into());
     }
     Ok(())

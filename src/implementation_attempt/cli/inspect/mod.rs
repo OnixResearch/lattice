@@ -134,7 +134,11 @@ fn instance(
     let admitted = super::binding::load(directory, request)?;
     let identities = artifact_identities(directory, request.output_limit_bytes)?;
     let present = |name: &str| identities.iter().any(|(artifact, _)| *artifact == name);
-    let intent = super::artifacts::read_optional(&directory.join("intent.json"), request_identity.len())?;
+    let marker = super::recovery::closed_marker(request_identity);
+    let intent = super::artifacts::read_optional(&directory.join("intent.json"), marker.len())?;
+    if intent.as_deref() == Some(marker.as_bytes()) {
+        return Err("recovery closed this attempt before any execution; it has no worker instance".into());
+    }
     if intent.as_deref().is_some_and(|bytes| bytes != request_identity.as_bytes()) {
         return Err("retained intent belongs to a different request".into());
     }

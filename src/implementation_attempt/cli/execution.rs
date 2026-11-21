@@ -42,21 +42,54 @@ fn build_worker(
     }
 }
 
+/// The retained intent of one attempt directory as seen by recovery.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Intent {
+    /// This exact request owns the execution intent.
+    Owned,
+    /// Recovery closed the attempt before any execution.
+    Closed,
+}
+
+/// Recovery with no intent closes the attempt by exclusively creating its
+/// intent path, so a racing or later run of the same request can never create
+/// its own intent. Different request bytes are a typed substitution refusal.
+// r[impl lattice.implementation_attempt.consumer.scenario.recovery]
+fn reconcile_intent(request: &super::Request, directory: &std::path::Path, identity: &str) -> Result<Intent, String> {
+    let path = directory.join("intent.json");
+    let marker = super::recovery::closed_marker(identity);
+    let mut retained = super::artifacts::read_optional(&path, marker.len())?;
+    if retained.is_none() {
+        if super::artifacts::create_new(&path, marker.as_bytes())? {
+            return Ok(Intent::Closed);
+        }
+        retained = super::artifacts::read_optional(&path, marker.len())?;
+    }
+    match retained.as_deref() {
+        Some(bytes) if bytes == identity.as_bytes() => Ok(Intent::Owned),
+        Some(bytes) if bytes == marker.as_bytes() => Ok(Intent::Closed),
+        Some(_) | None => Err(super::refusal::refuse(&request.envelope, super::refusal::Reason::SubstitutedRequest)),
+    }
+}
+
 // r[impl lattice.execution_binding.recovery]
 // r[impl lattice.execution_binding.recovery.scenario.lost_acknowledgement]
 pub(super) fn recover_existing(
     request: &super::Request,
+    state: &std::path::Path,
     directory: &std::path::Path,
     identity: &str,
 ) -> Result<(), String> {
-    if super::artifacts::read_bounded(&directory.join("intent.json"), identity.len())? != identity.as_bytes() {
-        return Err("request differs from persisted execution intent".into());
+    super::fencing::check(state, &request.envelope)?;
+    if reconcile_intent(request, directory, identity)? == Intent::Closed {
+        println!("{}", super::recovery::not_started(request));
+        return Ok(());
     }
     // Recovery reads retained evidence only; it never calls the compute port.
     let admitted = super::binding::load(directory, request)?
         .ok_or("execution intent exists without a persisted execution binding; outcome unknown")?;
     if let Some(refusal) = super::binding::refusal(directory)? {
-        println!("{}", super::recovery::not_dispatched(directory, &admitted, &refusal)?);
+        println!("{}", super::recovery::not_dispatched(request, directory, &admitted, &refusal)?);
         return Ok(());
     }
     let store_path = directory.join("candidate.redb");
@@ -184,6 +217,7 @@ async fn execute(execution: WorkerStep, directory: &std::path::Path) -> Result<(
 
 struct Context {
     request: super::Request,
+    state: std::path::PathBuf,
     directory: std::path::PathBuf,
     identity: String,
 }
@@ -196,12 +230,18 @@ impl Context {
         if request.admitted_envelope != request.envelope.identity() {
             return Err("crossed envelope".into());
         }
+        // Attempts retained under an earlier profile-revision framing are never
+        // re-executed or recovered by this framing.
+        if !request.is_current_profile_revision()? {
+            return Err(super::refusal::refuse(&request.envelope, super::refusal::Reason::ProfileRevisionSuperseded));
+        }
         super::artifacts::private_directory(state)?;
         let identity = blake3::hash(&bytes).to_hex().to_string();
         let directory = super::artifacts::directory(state, &request);
         super::artifacts::private_directory(&directory)?;
         Ok(Self {
             request,
+            state: state.to_path_buf(),
             directory,
             identity,
         })
@@ -210,9 +250,11 @@ impl Context {
     async fn run(self, ports: Option<super::Ports<'_>>) -> Result<(), String> {
         let intent = self.directory.join("intent.json");
         let Some(ports) = ports.filter(|_| !intent.exists()) else {
-            return recover_existing(&self.request, &self.directory, &self.identity);
+            return recover_existing(&self.request, &self.state, &self.directory, &self.identity);
         };
         let worker = worker_request(&self.request)?;
+        // r[impl lattice.implementation_attempt.consumer.scenario.refusal]
+        super::fencing::admit(&self.state, &self.request.envelope)?;
         let admitted = super::binding::admit_and_persist(&self.request, &self.directory, ports.compute)?;
         let store_path = self.directory.join("candidate.redb");
         let store = crate::store::Store::new(&store_path).map_err(|error| error.to_string())?;
