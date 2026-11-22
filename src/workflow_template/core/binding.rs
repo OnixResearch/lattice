@@ -145,9 +145,12 @@ pub fn bind(
 
 /// Re-verify a bound bundle at a save or start boundary.
 ///
-/// The recorded values must still resolve and still be the values in the workflow. The content
-/// must pass full admission again, its recomputed revision must equal the recorded and bound
-/// revisions, and the bound identity must commit to exactly these values and that revision.
+/// It compares, in order: the recorded values re-resolve to the same `Resolved`; the workflow
+/// still holds them and passes the target checks; the content passes full admission again; the
+/// recomputed workflow revision equals the recorded and bound revisions; the recomputed
+/// orchestration revision equals the recorded one; the template identity recomputed from the
+/// manifest and file identities equals the bound template; and the bound identity recomputed
+/// from template, values, and revision equals the bundle identity.
 pub fn reverify(bundle: &super::model::ValidatedBundle) -> Result<(), super::model::Diagnostic> {
     let label = bundle.manifest.id.as_str();
     let drift = |message: &'static str| diagnostic(label, super::model::DiagnosticCode::BoundContentDrift, message);
@@ -175,6 +178,9 @@ pub fn reverify(bundle: &super::model::ValidatedBundle) -> Result<(), super::mod
     if content.orchestration_revision != bundle.orchestration_revision {
         return Err(drift("bound orchestration revision differs"));
     }
+    if bundle_identity(&bundle.manifest_identity, &bundle.file_identities) != bound.template {
+        return Err(drift("bound template identity differs"));
+    }
     if super::params::bound_identity(&bound.template, &resolved, &content.workflow_revision) != bundle.identity {
         return Err(drift("bound identity differs"));
     }
@@ -192,6 +198,7 @@ fn param_diagnostic(bundle: &str, error: &super::params::ParamError) -> super::m
         super::params::ParamErrorCode::WrongType => super::model::DiagnosticCode::ParamTypeMismatch,
         super::params::ParamErrorCode::OutOfBounds => super::model::DiagnosticCode::ParamOutOfBounds,
         super::params::ParamErrorCode::MissingRequired => super::model::DiagnosticCode::MissingParam,
+        super::params::ParamErrorCode::TargetExpression => super::model::DiagnosticCode::ParamTargetExpression,
     };
     diagnostic(bundle, code, error.message())
 }

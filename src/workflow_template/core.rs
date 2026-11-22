@@ -23,13 +23,8 @@ pub fn validate_bundle(
         diagnostic(&bundle, super::model::DiagnosticCode::InvalidWorkflow, "workflow content is invalid")
     })?;
     let content = admit_content(&input.manifest, workflow, input.orchestration, &bundle)?;
-    super::params::validate_bindings(input.manifest.params(), &content.workflow).map_err(|_| {
-        diagnostic(
-            &bundle,
-            super::model::DiagnosticCode::InvalidParamDeclaration,
-            "bundle parameter binding is invalid",
-        )
-    })?;
+    super::params::validate_bindings(input.manifest.params(), &content.workflow)
+        .map_err(|error| param_diagnostic(&bundle, &error))?;
     let manifest_identity = super::model::ContentIdentity::from_bytes(&input.manifest_bytes);
     let identity = bundle_identity(&manifest_identity, &file_identities);
     debug_assert!(total_bytes <= super::model::MAX_BUNDLE_BYTES);

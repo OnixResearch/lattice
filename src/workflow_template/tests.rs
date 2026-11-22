@@ -98,13 +98,58 @@ fn tampered() -> Vec<(&'static str, super::ValidatedBundle)> {
     }
     let mut mode = bound();
     mode.manifest.mode = Some(super::BundleMode::ReadOnly);
+    let mut orchestration = bound();
+    orchestration.orchestration_revision =
+        Some(crate::orchestration::DefinitionRevision::try_from_hex("a".repeat(64)).expect("revision fixture"));
+    let mut template_identity = bound();
+    if let Some(bound) = template_identity.params.as_mut() {
+        bound.template = super::ContentIdentity::from_bytes(b"another template");
+    }
+    let mut identity = bound();
+    identity.identity = super::ContentIdentity::from_bytes(b"another bound identity");
+    let mut credential = bound();
+    add_param_credential(&mut credential.workflow);
     vec![
         ("command", command),
         ("value", value),
         ("revision", revision),
         ("values", values),
         ("mode", mode),
+        ("orchestration", orchestration),
+        ("template", template_identity),
+        ("identity", identity),
+        ("credential", credential),
     ]
+}
+
+fn add_param_credential(workflow: &mut crate::engine::Workflow) {
+    let node = workflow.configs.keys().next().copied().expect("fixture node");
+    let secret = crate::credentials::SecretRef::new("env", "TOKEN", None);
+    let refs = crate::credentials::NodeCredentialRefs {
+        env: std::collections::HashMap::from([(KEY.to_owned(), secret)]),
+    };
+    workflow.credentials.insert(node, refs);
+}
+
+#[test]
+fn each_reverify_comparison_reports_its_own_drift() {
+    let message = |case: &str| {
+        let (_, bundle) = tampered().into_iter().find(|(name, _)| *name == case).expect("case exists");
+        super::reverify(&bundle).expect_err(case).message
+    };
+    assert_eq!(message("orchestration"), "bound orchestration revision differs");
+    assert_eq!(message("template"), "bound template identity differs");
+    assert_eq!(message("identity"), "bound identity differs");
+    assert_eq!(message("revision"), "bound workflow revision differs");
+    assert_eq!(message("credential"), "bound workflow does not hold the resolved values");
+}
+
+#[test]
+fn bind_refuses_a_parameter_credential() {
+    let mut template = template();
+    add_param_credential(&mut template.workflow);
+    let refused = super::bind(&template, &std::collections::BTreeMap::new()).expect_err("credential shadows a value");
+    assert_eq!(refused.code, super::DiagnosticCode::InvalidParamDeclaration);
 }
 
 #[test]

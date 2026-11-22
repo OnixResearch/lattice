@@ -120,6 +120,8 @@ pub enum ParamErrorCode {
     OutOfBounds,
     MissingRequired,
     TooManyValues,
+    /// A node that receives a value has a `{{…}}` expression in its `cwd` or `env`.
+    TargetExpression,
 }
 
 /// A safe parameter diagnostic. It names only a declared parameter and never echoes a value.
@@ -145,6 +147,7 @@ impl ParamError {
             ParamErrorCode::OutOfBounds => "parameter value is outside its declared bounds",
             ParamErrorCode::MissingRequired => "a required parameter is missing",
             ParamErrorCode::TooManyValues => "too many parameter values were supplied",
+            ParamErrorCode::TargetExpression => "a node that receives a parameter has an expression in its cwd or env",
         }
     }
 }

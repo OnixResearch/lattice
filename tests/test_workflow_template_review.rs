@@ -107,6 +107,59 @@ fn a_value_can_never_choose_the_program_or_reach_shell_syntax() {
 
 // r[verify lattice.workflow_templates.params.scenario.declaration]
 #[test]
+fn shell_builtins_wrappers_and_case_variants_are_refused_in_any_word() {
+    let invalid = Err(DiagnosticCode::InvalidParamDeclaration);
+    for command in [
+        "trap \"${LATTICE_PARAM_TOOL}\" EXIT",
+        "jobs -x \"${LATTICE_PARAM_TOOL}\" out",
+        "coproc \"${LATTICE_PARAM_TOOL}\" out",
+        "mapfile -c1 -C \"${LATTICE_PARAM_TOOL}\" lines",
+        "enable -f \"${LATTICE_PARAM_TOOL}\" x",
+        "ENV \"${LATTICE_PARAM_TOOL}\"",
+        "tool sh \"${LATTICE_PARAM_TOOL}\"",
+        "tool l BASH \"${LATTICE_PARAM_TOOL}\"",
+        "- \"${LATTICE_PARAM_TOOL}\"",
+    ] {
+        assert_eq!(code(command, &[]), invalid, "{command:?}");
+    }
+    assert_eq!(code("tar -xf - -C \"${LATTICE_PARAM_TOOL}\"", &[]), Ok(()), "`-` stays valid as an argument");
+}
+
+// r[verify lattice.workflow_templates.params.scenario.declaration]
+#[test]
+fn receiving_node_cwd_and_env_hold_no_expressions() {
+    for place in ["cwd", "env value", "env key"] {
+        let mut fixture = input("printf %s \"${LATTICE_PARAM_TOOL}\"", &[]);
+        let workflow = fixture.workflow.as_mut().expect("fixture workflow");
+        let producer = workflow.add_shell_node("producer", "printf x");
+        let port = workflow.graph.nodes().find(|node| node.id == producer).expect("producer").output_ports[0].id;
+        let expression = format!("{{{{node:{}:port:{}}}}}", producer.0, port.0);
+        let receiving = workflow.graph.nodes().find(|node| node.label == LABEL).expect("receiving node").id;
+        let Some(lattice::engine::workflow::NodeConfig::Shell { cwd, env, .. }) =
+            workflow.configs.get_mut(&receiving.0)
+        else {
+            panic!("receiving node is a shell node");
+        };
+        match place {
+            "cwd" => *cwd = Some(expression),
+            "env value" => drop(env.insert("PATH".to_owned(), expression)),
+            _ => drop(env.insert(expression, "x".to_owned())),
+        }
+        let declared = fixture.manifest.params.clone().expect("fixture params");
+        let pure = lattice::workflow_template::params::validate_bindings(
+            &declared,
+            fixture.workflow.as_ref().expect("workflow"),
+        );
+        assert_eq!(pure.expect_err(place).code, lattice::workflow_template::params::ParamErrorCode::TargetExpression);
+        let loaded = lattice::workflow_template::validate_bundle(fixture)
+            .map(|_| ())
+            .map_err(|diagnostic| diagnostic.code);
+        assert_eq!(loaded, Err(DiagnosticCode::ParamTargetExpression), "{place}");
+    }
+}
+
+// r[verify lattice.workflow_templates.params.scenario.declaration]
+#[test]
 fn credentials_never_shadow_parameter_values() {
     let passing = "printf %s \"${LATTICE_PARAM_TOOL}\"";
     assert_eq!(code(passing, &["API_TOKEN"]), Ok(()));

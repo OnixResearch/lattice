@@ -193,6 +193,7 @@ pub enum DiagnosticCode {
     ParamsUnbound,
     ModeViolation,
     BoundContentDrift,
+    ParamTargetExpression,
 }
 
 impl DiagnosticCode {
@@ -227,6 +228,7 @@ impl DiagnosticCode {
             Self::ParamsUnbound => "params_unbound",
             Self::ModeViolation => "mode_violation",
             Self::BoundContentDrift => "bound_content_drift",
+            Self::ParamTargetExpression => "param_target_expression",
         }
     }
 }

@@ -15,10 +15,12 @@ r[lattice.workflow_templates.params.scenario.bounds]
 #### Scenario: Unsafe declarations fail at load
 r[lattice.workflow_templates.params.scenario.declaration]
 - GIVEN a manifest parameter with a duplicate or invalid name, inconsistent bounds, a required default, a missing or out-of-bounds optional default, an open or unknown type shape, or a target key outside `LATTICE_PARAM_`
-- OR a target shell node whose command is not one simple command of space-separated safe literals and whole-word `"${KEY}"` references to its bound keys, whose first word is a reference, an assignment or an argument-executing program, or that contains `-exec`, `-execdir`, `-ok` or `-c`
+- OR a target shell node whose command is not one simple command of space-separated safe literals and whole-word `"${KEY}"` references to its bound keys, whose first word is a reference, an assignment, a shell, an argument-executing builtin or a denied wrapper, any of whose later literal words names a shell (all by basename and ignoring ASCII case), or that contains `-exec`, `-execdir`, `-ok`, `-okdir` or `-c`
 - OR a node that binds a `LATTICE_PARAM_*` key as a credential, or a template environment that does not hold the rendered default
+- OR a target shell node with a `{{…}}` expression in its `cwd` or `env`
 - WHEN the loader validates the bundle, including after its workflow is re-pinned
-- THEN the bundle MUST be rejected with `invalid_param_declaration` and other bundles MUST remain available
+- THEN the bundle MUST be rejected with `invalid_param_declaration`, or `param_target_expression` for the expression case, and other bundles MUST remain available
+- AND a value MUST NOT take the command-name position of the bound command and MUST NOT be parsed by the shell as shell syntax; the deny list is defense in depth and MUST NOT be claimed to stop a program that executes its own arguments
 
 #### Scenario: Values bind as environment values without widening grants
 r[lattice.workflow_templates.params.scenario.binding]

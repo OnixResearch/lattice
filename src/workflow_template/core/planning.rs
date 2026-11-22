@@ -1,12 +1,21 @@
+/// Plan application after re-verifying bound content with [`reverify`].
 pub fn plan_application(
+    bundle: &super::model::ValidatedBundle,
+    facts: &super::model::ApplicationFacts,
+) -> super::model::ApplicationPlan {
+    if let Err(diagnostic) = reverify(bundle) {
+        return super::model::ApplicationPlan::Conflict(diagnostic.code);
+    }
+    plan_verified_application(bundle, facts)
+}
+
+/// Plan application for a bundle the caller has just re-verified.
+pub(crate) fn plan_verified_application(
     bundle: &super::model::ValidatedBundle,
     facts: &super::model::ApplicationFacts,
 ) -> super::model::ApplicationPlan {
     debug_assert!(!bundle.manifest.id.is_empty());
     debug_assert!(!bundle.workflow_revision.content_hash.as_str().is_empty());
-    if let Err(diagnostic) = reverify(bundle) {
-        return super::model::ApplicationPlan::Conflict(diagnostic.code);
-    }
     let Ok(workflow_identity) =
         super::model::ContentIdentity::try_from_hex(bundle.workflow_revision.content_hash.as_str())
     else {

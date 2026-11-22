@@ -90,23 +90,35 @@ Each `params` entry is a closed record:
   - `{ kind = "relative_path", max_bytes }`, with 1 to 256 bytes.
   No type accepts free-form text.
 - A required parameter has no `default`. An optional parameter must have a `default` that satisfies its type.
-- `bindings` lists 1 to 8 targets. Each names a shell node by its label, which must match exactly one node, and the environment variable it receives. Labels are used because Nickel import renumbers node identities. The key must start with `LATTICE_PARAM_`, so a parameter can never set `PATH` or another ambient variable.
+- `bindings` lists 1 to 8 targets. Each names a shell node by its label, which must match exactly one node, and the environment variable it receives. Labels are used because Nickel import renumbers node identities. Every binding target key must start with `LATTICE_PARAM_`, so a binding can never target `PATH` or another ambient variable.
 
 A bundle declares at most 16 parameters. Unknown fields and other kinds are rejected.
 
-A `relative_path` value uses only ASCII letters, digits, `.`, `_`, `-`, and `/`. Its components are nonempty, never `..`, and never start with `-`. An `enum` value is one of the declared tokens. These values contain no whitespace, quote, or shell metacharacter.
+A `relative_path` value uses only ASCII letters, digits, `.`, `_`, `-`, and `/`. Its components are nonempty, never `..`, and never start with `-`. An `enum` value is one of the declared tokens. These values contain no whitespace, quote, or shell metacharacter. An `integer` whose bounds admit negative numbers renders as `-N`, which a receiving program may read as an option; declare non-negative bounds unless the program expects a negative argument.
 
 ### Binding without shell interpolation
 
-A value reaches the workflow only as the environment value of each declared shell node. It is never spliced into command text, and it can never choose the program.
+A value reaches the workflow only as the environment value of each declared shell node. In the receiving node it is never spliced into command text: it never takes the command-name position of the bound command, and the shell never parses it as shell syntax.
 
 Every shell node that receives a value must be one simple command in a strict grammar:
 
 - words are separated by spaces;
 - each word is either a literal over ASCII letters, digits, and `-`, `_`, `.`, `/`, `=`, `:`, `,`, `+`, `@`, `%`, or exactly `"${LATTICE_PARAM_NAME}"` as a whole word for a key bound to that node;
 - the first word is a literal program without `=`, so it is never a reference or an environment assignment;
-- the first word's basename is not an argument-executing program: `sh`, `bash`, `dash`, `zsh`, `ksh`, `fish`, `eval`, `exec`, `env`, `xargs`, `command`, `builtin`, `source`, `.`, `nohup`, `timeout`, `nice`, `ionice`, `setsid`, `stdbuf`, `taskset`, `chrt`, `sudo`, `doas`, `su`, `runuser`, `busybox`, `time`, `watch`, `parallel`, `find`, or `git`;
-- no word is `-exec`, `-execdir`, `-ok`, or `-c`.
+- the first word's basename, compared ignoring ASCII case, is neither a shell nor on the first-word deny list below;
+- no later literal word's basename, compared ignoring ASCII case, is a shell, so a wrapper cannot hand a value to a shell (`flock l bash "${…}"`); other names stay valid as arguments, as in `systemctl enable`, `kubectl get jobs`, `find .` and `tar -xf -`;
+- no word is exactly `-exec`, `-execdir`, `-ok`, `-okdir`, or `-c`.
+
+The deny lists are defense in depth against the shell's own argument-executing builtins and common wrappers, not a guarantee:
+
+- shells, checked in every word: `sh`, `bash`, `dash`, `zsh`, `ksh`, `fish`, `ash`, `mksh`, `rbash`, `oksh`, `yash`, `posh`, `csh`, `tcsh`, `pwsh`, `nu`, `elvish`, `xonsh`;
+- first word only, builtins that execute or load an argument: `eval`, `exec`, `command`, `builtin`, `source`, `.`, `trap`, `jobs`, `coproc`, `mapfile`, `readarray`, `enable`;
+- first word only, precautionary builtins and zsh precommand modifiers: `fc`, `bind`, `complete`, `compgen`, `noglob`, `nocorrect`, `-`;
+- first word only, wrappers that run an argument: `env`, `xargs`, `nohup`, `timeout`, `nice`, `ionice`, `setsid`, `stdbuf`, `taskset`, `chrt`, `sudo`, `doas`, `su`, `runuser`, `busybox`, `time`, `watch`, `parallel`, `flock`, `prlimit`, `setpriv`, `unshare`, `nsenter`, `strace`, `ltrace`, `script`, `systemd-run`, `firejail`, `bwrap`, `chroot`, `nix-shell`.
+
+`git` and `find` are allowed so runbooks can run `git -C "${…}" checkout "${…}"` and `find . -name "${…}"`; `find`'s executing options are refused as words.
+
+The receiving node's `cwd` and `env` may hold no `{{…}}` expression. Otherwise another node's output, for example `PATH={{node:A:…}}`, could change where or how that node looks up its program. Such a node fails with `param_target_expression`. Expressions also cannot appear in the bound command, because `{` and `}` are outside the literal alphabet.
 
 The literal alphabet excludes `$`, backticks, quotes, backslashes, `;`, `|`, `&`, `<`, `>`, `(`, `)`, `{`, `}`, `*`, `?`, `[`, `~`, `#`, whitespace other than the separating space, newline, and NUL. A bound command therefore has no command substitution, arithmetic, here-document, redirection, glob, or control operator. The shell passes each value as one argument without word splitting or globbing.
 
@@ -114,7 +126,10 @@ No shell node in a bundle may bind a `LATTICE_PARAM_*` key as a credential (`sec
 
 The template workflow must hold each optional parameter's rendered default under its key and must not hold a required parameter's key. Binding the defaults therefore reproduces the reviewed workflow exactly.
 
-Non-claim: the grammar fixes the program and keeps values out of shell syntax, but a program that interprets its own arguments as code (a script interpreter, a template engine, a query language) can still turn a value into code. Reviewers must not bind parameters into such programs.
+Non-claims:
+
+- Any program that executes an argument can still run a program a value chooses. Examples: `git` through aliases, `--upload-pack`, `--receive-pack`, `--exec` or `ext::` URLs; `fd -x`; `rg --pre`; `nix develop --command`; script interpreters, template engines and query languages; and wrappers named only in a later word or not on the list. Reviewing the bound command for such programs is the bundle reviewer's job. `lattice authority inspect` lists the bound revision's exact grants for the resolved values.
+- Other nodes can consume the receiving node's outputs through expressions or stdin edges. Those nodes are ordinary reviewed workflow content; the grammar governs only receiving nodes.
 
 ### Resolution and identity
 
@@ -122,7 +137,7 @@ Non-claim: the grammar fixes the program and keeps values out of shell syntax, b
 
 `lattice::workflow_template::bind(template, supplied)` resolves values against a catalog template. It writes them into a copy of the workflow and rebinds an optional orchestration to the new workflow revision. Then it re-runs the template's admission checks: workflow validation, compatibility, mode, orchestration binding, guarded authority, and the binding grammar. The bound bundle's identity is BLAKE3 over the template identity, the resolved-value identity, and the bound workflow revision.
 
-`ValidatedBundle` content is read-only outside Lattice; read it through `identity()`, `manifest()`, `workflow()`, `workflow_revision()`, `orchestration()`, `orchestration_revision()`, `file_identities()`, and `params()`. `save_draft`, activation planning, and start call `reverify`, which re-resolves the recorded values, checks that the workflow still holds them, repeats full content admission, and checks that the recomputed revision and identity equal the bound ones. Any difference refuses with `bound_content_drift` (`BoundContentDrift`) before a store write or dispatch.
+`ValidatedBundle` content is read-only outside Lattice; read it through `identity()`, `manifest()`, `workflow()`, `workflow_revision()`, `orchestration()`, `orchestration_revision()`, `file_identities()`, and `params()`. `save_draft`, activation planning, and start call `reverify` before any store write or dispatch. It checks, in order, that the recorded values re-resolve to the same values; that the workflow still holds them and passes the target checks above; that the content passes full admission again; that the recomputed workflow revision equals the recorded and bound revisions; that the recomputed orchestration revision equals the recorded one; that the template identity recomputed from the manifest and file identities equals the bound template; and that the bound identity recomputed from template, values, and revision equals the bundle identity. A failed mode check refuses with `mode_violation`; any other failure refuses with `bound_content_drift` (`BoundContentDrift`).
 
 Parameters cannot widen effect authority. Binding changes only declared environment values, so node kinds, commands, resources, and abilities stay as reviewed. `lattice authority inspect` on the saved bound workflow lists the same grants as the template, under the bound workflow revision.
 
@@ -176,7 +191,7 @@ If the current canvas has unsaved changes, Lattice refuses replacement. Save or 
 
 ## Save and start boundaries
 
-Save and start accept only a bound bundle. `save_draft` fails with `ParamsUnbound` for an unbound catalog template, and activation planning blocks with `ParamsUnbound` or `ModeViolation`.
+Save and start accept only a bound bundle. `save_draft` fails with `ParamsUnbound` for an unbound catalog template and with `BoundContentDrift` when bound content no longer verifies. Activation planning blocks with `ParamsUnbound`, `ModeViolation`, or `BoundContentDrift`.
 
 A saved workflow must have the exact previewed revision. A same-name workflow with different content is a conflict, not overwrite authority. This includes the same template bound to different values.
 

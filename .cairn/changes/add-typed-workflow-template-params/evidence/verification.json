@@ -188,5 +188,70 @@
         "baseline_rekeyed": false
       }
     }
+  },
+  "review_3": {
+    "reviewer": "ParamsVerify (verification review)",
+    "reviewed_commit": "915f16a0",
+    "closed_by_review": ["#2 credential shadowing", "#3 bound content immutability", "#4 schema 1 null"],
+    "claim": "In a receiving node a value never takes the command-name position of the bound command and the shell never parses it as shell syntax; the deny list is defense in depth, not a guarantee.",
+    "findings": {
+      "P1_shell_builtins": {
+        "fix": "DENIED_PROGRAMS adds trap, jobs, coproc, mapfile, readarray, enable; precautions fc, bind, complete, compgen; zsh precommand modifiers noglob, nocorrect and '-' as the first word",
+        "tests": [
+          "src/workflow_template/params/grammar.rs::tests::shell_builtins_that_execute_an_argument_are_denied",
+          "tests/test_workflow_template_review.rs::shell_builtins_wrappers_and_case_variants_are_refused_in_any_word"
+        ]
+      },
+      "P2_deny_list_gaps": {
+        "fix": "basename match with eq_ignore_ascii_case; the first word is checked against SHELLS and DENIED_PROGRAMS, later literal words only against SHELLS (ash, mksh, rbash, oksh, yash, posh, csh, tcsh, pwsh, nu, elvish, xonsh added), so wrappers cannot hand a value to a shell; wrappers flock, prlimit, setpriv, unshare, nsenter, strace, ltrace, script, systemd-run, firejail, bwrap, chroot, nix-shell added to the first-word list; '.' and '-' refused as the first word only; follow-up correction: find and git removed from DENIED_PROGRAMS (find's -exec/-execdir/-ok/-okdir refused as words, -okdir added; git's argument-executing forms are a documented non-claim); the exact -c rule is unchanged",
+        "tests": [
+          "src/workflow_template/params/grammar.rs::tests::shells_are_matched_in_any_case_and_any_word (flock l bash, prlimit sh -ec, tool l /bin/BASH, find . -okdir refused)",
+          "src/workflow_template/params/grammar.rs::tests::argument_executing_programs_are_denied_by_basename (every name refused as first word; shells refused later; other names allowed later)",
+          "src/workflow_template/params/grammar.rs::tests::a_simple_command_with_whole_word_references_passes (git -C ... checkout, find . -name, systemctl enable, kubectl get jobs, tar -xf -, tool .)"
+        ]
+      },
+      "P2_expressions_in_receiving_node": {
+        "fix": "a receiving node with a {{...}} expression in its cwd, an env key or an env value fails with param_target_expression; expressions cannot appear in the bound command because '{' and '}' are outside the literal alphabet",
+        "tests": [
+          "tests/test_workflow_template_review.rs::receiving_node_cwd_and_env_hold_no_expressions",
+          "src/workflow_template/params/grammar.rs::tests::every_forbidden_construct_is_rejected"
+        ]
+      },
+      "test_gaps": {
+        "tests": [
+          "src/workflow_template/tests.rs::bind_refuses_a_parameter_credential",
+          "src/workflow_template/tests.rs::each_reverify_comparison_reports_its_own_drift (orchestration revision, template identity, bound identity, workflow revision, credential)",
+          "src/workflow_template/tests.rs::tampered_bound_content_is_refused_at_every_boundary (9 cases)"
+        ]
+      },
+      "cleanups": [
+        "save_draft runs reverify once, then plan_verified_application",
+        "reverify also compares the template identity recomputed from the manifest and file identities with the bound template",
+        "docs: activation blocks with BoundContentDrift; negative integers render as -N; binding targets are only LATTICE_PARAM_* keys",
+        "CHANGELOG: the bound identity covers the template, the values and the bound workflow revision",
+        "bound-identity domain tag stays v1"
+      ]
+    },
+    "api_changes": [
+      "ParamErrorCode::TargetExpression",
+      "DiagnosticCode::ParamTargetExpression",
+      "pub(crate) plan_verified_application; plan_application, reverify, resolve and bind signatures unchanged"
+    ],
+    "gates": {
+      "focused_integration_tests": {
+        "exit": 0,
+        "passed": { "params": 5, "binding": 4, "modes": 5, "review": 5, "workflow_templates": 17, "guarded": 19, "agent_evaluation_core": 12 },
+        "failed": 0
+      },
+      "lib_tests": { "command": "cargo test -p lattice --no-fail-fast --lib -- workflow_template", "exit": 0, "passed": 12, "failed": 0 },
+      "clippy": { "exit": 0 },
+      "fmt": { "exit": 0 },
+      "octet_precommit_check": {
+        "exit": 0,
+        "root": { "accepted_total": 1052, "current_total": 1052, "new_total": 0, "stale_total": 0 },
+        "lattice_core": { "accepted_total": 25, "current_total": 25, "new_total": 0, "stale_total": 0 },
+        "baseline_rekeyed": false
+      }
+    }
   }
 }

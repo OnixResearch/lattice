@@ -1,19 +1,80 @@
 //! The strict simple-command grammar for shell nodes that receive parameter values. Pure.
 //!
 //! A bound command is words separated by spaces. Each word is either a literal over a safe
-//! alphabet or exactly `"${KEY}"` for a key bound to that node. The first word is a literal
-//! program name that is not an argument-executing program, so a value can never choose the
-//! program or reach shell syntax.
+//! alphabet or exactly `"${KEY}"` for a key bound to that node. The first word is a literal, so
+//! a value never takes the command-name position of the bound command, and the shell never
+//! parses a value as shell syntax. The deny lists below are defense in depth against the
+//! shell's own argument-executing builtins and common wrappers; they are not a guarantee that
+//! no program the command runs will execute an argument.
 
-/// Programs that run, wrap, or re-parse their arguments as commands, matched by basename.
+/// Shell names, matched by basename and ignoring ASCII case against every literal word, so a
+/// wrapper cannot hand a value to a shell (`flock l bash "${KEY}"`).
+const SHELLS: &[&str] = &[
+    "sh", "bash", "dash", "zsh", "ksh", "fish", "ash", "mksh", "rbash", "oksh", "yash", "posh", "csh", "tcsh", "pwsh",
+    "nu", "elvish", "xonsh",
+];
+
+/// Shell builtins, precommand modifiers, and wrappers that run, wrap, or re-parse an argument
+/// as a command. Matched by basename, ignoring ASCII case, against the first word only, so
+/// ordinary arguments such as `systemctl enable` or `kubectl get jobs` stay valid.
 const DENIED_PROGRAMS: &[&str] = &[
-    "sh", "bash", "dash", "zsh", "ksh", "fish", "eval", "exec", "env", "xargs", "command", "builtin", "source", ".",
-    "nohup", "timeout", "nice", "ionice", "setsid", "stdbuf", "taskset", "chrt", "sudo", "doas", "su", "runuser",
-    "busybox", "time", "watch", "parallel", "find", "git",
+    // Shell builtins that execute or load an argument.
+    "eval",
+    "exec",
+    "command",
+    "builtin",
+    "source",
+    ".",
+    "trap",
+    "jobs",
+    "coproc",
+    "mapfile",
+    "readarray",
+    "enable",
+    // Precautionary builtins and zsh precommand modifiers.
+    "fc",
+    "bind",
+    "complete",
+    "compgen",
+    "noglob",
+    "nocorrect",
+    "-",
+    // Wrappers that run an argument as a program.
+    "env",
+    "xargs",
+    "nohup",
+    "timeout",
+    "nice",
+    "ionice",
+    "setsid",
+    "stdbuf",
+    "taskset",
+    "chrt",
+    "sudo",
+    "doas",
+    "su",
+    "runuser",
+    "busybox",
+    "time",
+    "watch",
+    "parallel",
+    "flock",
+    "prlimit",
+    "setpriv",
+    "unshare",
+    "nsenter",
+    "strace",
+    "ltrace",
+    "script",
+    "systemd-run",
+    "firejail",
+    "bwrap",
+    "chroot",
+    "nix-shell",
 ];
 
 /// Literal words that make common programs execute an argument.
-const DENIED_WORDS: &[&str] = &["-exec", "-execdir", "-ok", "-c"];
+const DENIED_WORDS: &[&str] = &["-exec", "-execdir", "-ok", "-okdir", "-c"];
 
 /// Whether `command` is one simple command in the strict grammar for the bound `keys`.
 pub(super) fn is_simple_bound_command(command: &str, keys: &[&str]) -> bool {
@@ -21,10 +82,14 @@ pub(super) fn is_simple_bound_command(command: &str, keys: &[&str]) -> bool {
     let Some(program) = words.next() else {
         return false;
     };
-    if !is_literal(program) || program.contains('=') || is_denied_program(program) {
+    let is_plain_program = is_literal(program) && !program.contains('=');
+    let is_denied = names_any(program, SHELLS) || names_any(program, DENIED_PROGRAMS);
+    if !is_plain_program || is_denied {
         return false;
     }
-    words.all(|word| is_reference(word, keys) || (is_literal(word) && !DENIED_WORDS.contains(&word)))
+    words.all(|word| {
+        is_reference(word, keys) || (is_literal(word) && !DENIED_WORDS.contains(&word) && !names_any(word, SHELLS))
+    })
 }
 
 fn is_reference(word: &str, keys: &[&str]) -> bool {
@@ -43,9 +108,10 @@ fn is_literal(word: &str) -> bool {
         })
 }
 
-fn is_denied_program(program: &str) -> bool {
-    let basename = program.rsplit('/').next().unwrap_or(program);
-    DENIED_PROGRAMS.contains(&basename)
+/// Basename match ignoring ASCII case, because case-insensitive filesystems resolve `ENV` to `env`.
+fn names_any(word: &str, names: &[&str]) -> bool {
+    let basename = word.rsplit('/').next().unwrap_or(word);
+    names.iter().any(|name| name.eq_ignore_ascii_case(basename))
 }
 
 #[cfg(test)]
@@ -58,16 +124,53 @@ mod tests {
 
     #[test]
     fn a_simple_command_with_whole_word_references_passes() {
-        assert!(accepts("lattice evaluation catalog --root \"${LATTICE_PARAM_ROOT}\" --output json"));
-        assert!(accepts("/usr/bin/tool --flag=on \"${LATTICE_PARAM_ROOT}\" \"${LATTICE_PARAM_TOOL}\""));
+        for command in [
+            "lattice evaluation catalog --root \"${LATTICE_PARAM_ROOT}\" --output json",
+            "/usr/bin/tool --flag=on \"${LATTICE_PARAM_ROOT}\" \"${LATTICE_PARAM_TOOL}\"",
+            "tar -xf - -C \"${LATTICE_PARAM_ROOT}\"",
+            "tool . \"${LATTICE_PARAM_ROOT}\"",
+            "git -C \"${LATTICE_PARAM_ROOT}\" checkout \"${LATTICE_PARAM_TOOL}\"",
+            "find . -name \"${LATTICE_PARAM_TOOL}\"",
+            "systemctl enable \"${LATTICE_PARAM_TOOL}\"",
+            "kubectl get jobs \"${LATTICE_PARAM_TOOL}\"",
+        ] {
+            assert!(accepts(command), "{command:?} passes");
+        }
     }
 
     #[test]
-    fn a_value_can_never_choose_the_program() {
+    fn a_value_never_takes_the_command_name_position() {
         assert!(!accepts("echo \"$(\"${LATTICE_PARAM_TOOL}\" output.txt)\""));
         assert!(!accepts("\"${LATTICE_PARAM_TOOL}\" output.txt"));
         assert!(!accepts("LD_PRELOAD=x \"${LATTICE_PARAM_TOOL}\""));
         assert!(!accepts("A=1 tool \"${LATTICE_PARAM_ROOT}\""));
+    }
+
+    #[test]
+    fn shell_builtins_that_execute_an_argument_are_denied() {
+        for command in [
+            "trap \"${LATTICE_PARAM_TOOL}\" EXIT",
+            "jobs -x \"${LATTICE_PARAM_TOOL}\" out",
+            "coproc \"${LATTICE_PARAM_TOOL}\" out",
+            "mapfile -c1 -C \"${LATTICE_PARAM_TOOL}\" lines",
+            "readarray -c1 -C \"${LATTICE_PARAM_TOOL}\" lines",
+            "enable -f \"${LATTICE_PARAM_TOOL}\" x",
+            "noglob \"${LATTICE_PARAM_TOOL}\"",
+            "- \"${LATTICE_PARAM_TOOL}\"",
+        ] {
+            assert!(!accepts(command), "{command:?} is denied");
+        }
+    }
+
+    #[test]
+    fn shells_are_matched_in_any_case_and_any_word() {
+        assert!(!accepts("ENV \"${LATTICE_PARAM_TOOL}\""));
+        assert!(!accepts("/usr/bin/Bash -e \"${LATTICE_PARAM_TOOL}\""));
+        assert!(!accepts("tool sh \"${LATTICE_PARAM_TOOL}\""));
+        assert!(!accepts("tool l /bin/BASH \"${LATTICE_PARAM_TOOL}\""));
+        assert!(!accepts("flock l bash \"${LATTICE_PARAM_TOOL}\""));
+        assert!(!accepts("prlimit sh -ec \"${LATTICE_PARAM_TOOL}\""));
+        assert!(!accepts("find . -okdir \"${LATTICE_PARAM_TOOL}\""));
     }
 
     #[test]
@@ -79,6 +182,7 @@ mod tests {
             "\"${LATTICE_PARAM_ROOT:-/}\"",
             "\"${LATTICE_PARAM_OTHER}\"",
             "x\"${LATTICE_PARAM_ROOT}\"",
+            "{{node:A:stdout}}",
             "$(id)",
             "`id`",
             "$((1+1))",
@@ -105,6 +209,7 @@ mod tests {
             "-exec",
             "-execdir",
             "-ok",
+            "-okdir",
             "-c",
         ] {
             assert!(!accepts(&format!("tool {construct}")), "{construct:?} is rejected");
@@ -115,9 +220,15 @@ mod tests {
 
     #[test]
     fn argument_executing_programs_are_denied_by_basename() {
-        for program in super::DENIED_PROGRAMS {
+        for program in super::SHELLS.iter().chain(super::DENIED_PROGRAMS) {
             assert!(!accepts(&format!("{program} \"${{LATTICE_PARAM_ROOT}}\"")), "{program} is denied");
             assert!(!accepts(&format!("/usr/bin/{program} \"${{LATTICE_PARAM_ROOT}}\"")), "{program} path is denied");
+        }
+        for shell in super::SHELLS {
+            assert!(!accepts(&format!("tool {shell} \"${{LATTICE_PARAM_ROOT}}\"")), "{shell} argument is denied");
+        }
+        for program in super::DENIED_PROGRAMS {
+            assert!(accepts(&format!("tool {program} \"${{LATTICE_PARAM_ROOT}}\"")), "{program} argument is allowed");
         }
     }
 }

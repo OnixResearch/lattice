@@ -46,7 +46,8 @@ interfaces.
   and returns the values with a BLAKE3 identity. `workflow_template::bind`
   writes them only as environment values and re-runs bundle admission. It
   rebinds an optional orchestration and returns a bundle whose identity
-  covers the template and the values. Commands may read a bound variable
+  covers the template, the values and the bound workflow revision. Commands
+  may read a bound variable
   only as `"${NAME}"`, and binding never changes a node kind, command or
   `authority inspect` grant. Modes are classified conservatively: only file
   reads and image inputs are read-only, so any shell, operation, HTTP, agent,
@@ -59,11 +60,18 @@ interfaces.
   `--root .`. Schema 1 manifests still load as `mutating` without
   parameters; see `docs/workflow-template-bundles.md`. A shell node that
   receives a value must be one simple command of safe literals and whole-word
-  `"${NAME}"` references, with a literal, non-argument-executing program and
-  no `-exec`, `-execdir`, `-ok` or `-c`. A `LATTICE_PARAM_*` credential key is
-  refused. `ValidatedBundle` content is read through accessors only, and save,
-  activation planning and start re-verify bound values, content, revision and
-  identity (`bound_content_drift`). A schema 1 manifest that names `mode` or
+  `"${NAME}"` references, so a value never takes the command-name position
+  and the shell never parses it as syntax. As defense in depth
+  (case-insensitive), the first word may not name a shell, an
+  argument-executing builtin such as `trap`, `jobs`, `coproc`, `mapfile` or
+  `enable`, or a common wrapper; later words may not name a shell; and
+  `-exec`, `-execdir`, `-ok`, `-okdir` and `-c` are refused. `git` and `find`
+  stay usable. Its `cwd` and `env` may
+  hold no `{{…}}` expression (`param_target_expression`). A
+  `LATTICE_PARAM_*` credential key is refused. `ValidatedBundle` content is
+  read through accessors only, and save, activation planning and start
+  re-verify bound values, content, revisions, template and identity
+  (`bound_content_drift`). A schema 1 manifest that names `mode` or
   `params`, even as `null`, is refused.
 - Git-backed runbook catalogs admitted through content-addressed operation
   packs (Lattice #29). A pack can carry workflow-template bundles as

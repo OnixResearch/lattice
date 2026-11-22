@@ -25,6 +25,8 @@ pub fn validate_bound(
 /// - No node binds a `LATTICE_PARAM_*` key as a credential, so a credential never shadows a value.
 /// - Each target names exactly one shell node, and its key holds `expected`.
 /// - Every shell node that receives a value is one simple command in the strict grammar.
+/// - Its `cwd` and `env` hold no `{{…}}` expression, so another node's output can never change
+///   where or how it looks up its program (for example `PATH={{node:A:…}}`).
 fn validate_targets(
     declared: &[super::ParamDeclaration],
     workflow: &crate::engine::Workflow,
@@ -53,16 +55,27 @@ fn validate_targets(
         }
     }
     for (id, keys) in &node_keys {
-        let Some(crate::engine::workflow::NodeConfig::Shell { command, .. }) = workflow.configs.get(id) else {
+        let Some(crate::engine::workflow::NodeConfig::Shell { command, cwd, env, .. }) = workflow.configs.get(id)
+        else {
             return Err(super::ParamError::new(super::ParamErrorCode::InvalidDeclaration, None));
         };
         if !super::grammar::is_simple_bound_command(command, keys) {
             return Err(super::ParamError::new(super::ParamErrorCode::InvalidDeclaration, None));
         }
+        let has_expression = cwd.as_deref().is_some_and(is_expression)
+            || env.iter().any(|(key, value)| is_expression(key) || is_expression(value));
+        if has_expression {
+            return Err(super::ParamError::new(super::ParamErrorCode::TargetExpression, None));
+        }
     }
     debug_assert!(node_keys.values().all(|keys| !keys.is_empty()));
     debug_assert!(node_keys.len() <= declared.iter().map(|declaration| declaration.bindings.len()).sum::<usize>());
     Ok(())
+}
+
+/// Whether text contains a workflow expression marker.
+fn is_expression(text: &str) -> bool {
+    text.contains("{{")
 }
 
 /// Bind resolved values into a copy of the template workflow as shell environment values.
