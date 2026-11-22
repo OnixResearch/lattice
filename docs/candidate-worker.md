@@ -704,8 +704,11 @@ bits and changed-path base digests, usage, draws and unaccounted dimensions,
 observation, and printed. Both records are typed: an unknown field, a missing
 field or a nullable field left out is refused. Recovery and a duplicate `run`
 print the retained disposition, also a first-schema
-(`...repair-observation.v1`) one; without one the outcome is unknown and
-nothing runs again. No disposition is acceptance: Kiln #46 keeps independent
+(`...repair-observation.v1`) one when its request identities, envelope,
+policy, execution binding, step count and `accepted`/`integrated` fields name
+this attempt; any other first-schema record is malformed or crossed, read the
+same way by recovery, export and inventory. Without a disposition the outcome
+is unknown and nothing runs again. No disposition is acceptance: Kiln #46 keeps independent
 verification. `export-candidate` exports the candidate of a passing
 disposition and `inspect` reports a disposition whose records prove its
 workers stopped ([exporting repaired candidates](#exporting-repaired-candidates)).
@@ -828,8 +831,9 @@ started has stopped:
 
 Anything else stays `dispatch_recorded_outcome_unknown` with the
 `dispatch_outcome_unknown` reason, as does an attempt without a disposition or
-with a first-schema one. A malformed, crossed or contradicted record set is an
-error, never terminal.
+with a valid first-schema one of this attempt. A malformed, crossed or
+contradicted record set, first-schema ones included, is an error, never
+terminal.
 
 The shell tests in `src/implementation_attempt/cli/tests/repair/export.rs` and
 `src/implementation_attempt/cli/tests/repair/forged.rs` drive fixture repair

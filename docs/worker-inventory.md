@@ -244,11 +244,13 @@ one of `correct_candidate`, `repaired_candidate`, `budget_exhausted`,
 worker outcome, including an unknown teardown) never is: it stays
 `dispatch_recorded_outcome_unknown`, as does any step intent without a record
 other than the one `budget_exhausted` (`elapsed`) or `uncertain` (`clock`)
-leaves before its worker is called, and a first-schema (v1) disposition. Only
-the kind is published; the revision, repair count, bound, cause and defect
-stay in the retained record, which `recover` prints. A repair `cancelled` is
-observed termination like a single-shot one. A malformed, crossed or
-contradicted record set is an error, never a guessed state. This is the
+leaves before its worker is called, and a first-schema (v1) disposition whose
+request identities, envelope, policy, execution binding and step count name
+this attempt. Only the kind is published; the revision, repair count, bound,
+cause and defect stay in the retained record, which `recover` prints. A repair
+`cancelled` is observed termination like a single-shot one. A malformed,
+crossed or contradicted record set is an error, never a guessed state; for a
+first-schema record `recover` refuses it with the same reason. This is the
 existing v3 shape: Kiln's v3 reader at `4899d149` decodes `disposition` as an
 open string, so no schema or enumeration changes
 ([candidate worker](candidate-worker.md#exporting-repaired-candidates)).

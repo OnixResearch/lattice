@@ -48,6 +48,12 @@ pub(super) fn read(
     let retained: serde_json::Value = typed(&records, super::records::DISPOSITION_FILE)?.ok_or(Unretained::Missing)?;
     let schema = retained.get("schema").and_then(serde_json::Value::as_str);
     if schema == Some(crate::implementation_attempt::repair::retained::LEGACY_OBSERVATION_SCHEMA) {
+        // A first-schema record of this attempt is unknown, never acted on;
+        // any other one is malformed or crossed, as recovery reads it.
+        let binding_identity = records.legacy(request, &retained)?;
+        if binding_identity != admitted.binding_identity {
+            return Err(Unretained::Crossed);
+        }
         return Err(Unretained::Legacy);
     }
     let observation: Observation = serde::Deserialize::deserialize(&retained).map_err(|_| Unretained::Malformed)?;

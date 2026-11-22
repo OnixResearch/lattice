@@ -121,6 +121,28 @@
       {"command": "gitleaks 8.28.0 dir --no-banner --redact on each changed or new path", "exit": 0, "leaks": 0}
     ]
   },
+  "review_2": {
+    "source": "history://RepairExportReview, verification review of d83638bd: findings 1-7 closed, one P2 regression",
+    "finding": {
+      "severity": "P2",
+      "location": "src/implementation_attempt/cli/repair/evidence.rs:50-51 at d83638bd",
+      "finding": "the reader returned Legacy on the v1 schema alone, so another attempt's v1 record or a schema-only object made inspect report unknown while recover rejected it",
+      "resolution": "records::Retained::legacy parses the v1 record's required fields (schema, envelope, request and worker-request identities, execution binding, policy, disposition, steps, accepted, integrated): missing ones are Malformed, as is a step count over 9 or one that contradicts a passing kind; other request bytes, envelope or policy, or a claimed acceptance or integration, are Crossed. The evidence reader and recovery both apply it and compare the execution binding with the persisted one (recover now takes the admitted binding), so a valid v1 record of this attempt reads Legacy and any other is refused alike",
+      "tests": [
+        "src/implementation_attempt/cli/tests/repair/forged.rs::a_first_schema_disposition_is_printed_but_never_acted_on (this attempt's v1: recover prints, inspect unknown; another attempt's v1 and another execution binding: Crossed; schema-only and without envelope: Malformed; recover and inspect return the same message in each refused case; export is repair_disposition_invalid in every case)"
+      ]
+    },
+    "checks": [
+      {"command": "cargo test -p lattice --lib -- implementation_attempt", "exit": 0, "passed": 140, "failed": 0},
+      {"command": "cargo test -p lattice --test test_worker_inventory", "exit": 0, "passed": 10, "failed": 0},
+      {"command": "cargo clippy -p lattice --all-targets --no-deps -- -D warnings", "exit": 0},
+      {"command": "cargo fmt -p lattice --check", "exit": 0},
+      {"command": "octet-precommit-check", "exit": 0, "root": {"status": "warning-only", "accepted": 1052, "current": 1052, "new": 0, "stale": 0}, "lattice_core": {"status": "warning-only", "accepted": 25, "current": 25, "new": 0, "stale": 0}, "baseline_rekeyed": false},
+      {"command": "cairn validate --root .", "exit": 0},
+      {"command": "cairn gate proposal|design|tasks export-repaired-candidates --root . --policy cairn-policy/generated/cairn-policy.json", "exit": 0, "verdict": "PASS"},
+      {"command": "gitleaks 8.28.0 dir --no-banner --redact on each changed or new path", "exit": 0, "leaks": 0}
+    ]
+  },
   "inventory": {
     "contract": "lattice.worker-inventory.v3, unchanged schema and enumerations",
     "consumer": "Kiln 4899d149 crates/kiln-adapter-lattice/src/worker_inventory.rs: LifecycleDto::TerminalObserved { disposition: String } is decoded without validating the string; lifecycle() requires liveness exited for terminal_observed; validate_instance() requires no instance wait reasons for terminal_observed. Read from source; Kiln was not built or run.",

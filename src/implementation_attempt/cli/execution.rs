@@ -84,7 +84,7 @@ pub(super) fn recover_existing(
     }
     // r[impl lattice.implementation_attempt.repair.scenario.dispositions]
     if request.repair.is_some() {
-        let observation = super::repair::recover(request, directory, identity)?;
+        let observation = super::repair::recover(request, directory, identity, &admitted)?;
         super::session::revision::close(revisions, request, &recorded)?;
         println!("{observation}");
         return Ok(());

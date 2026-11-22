@@ -208,8 +208,9 @@ pub(super) fn recover(
     request: &super::Request,
     directory: &std::path::Path,
     identity: &str,
+    admitted: &lattice_core::execution_binding::admission::bound::Admitted,
 ) -> Result<serde_json::Value, String> {
-    records::Retained::at(directory, identity).disposition(request)
+    records::Retained::at(directory, identity).disposition(request, &admitted.binding_identity)
 }
 
 /// The complete, request-bound retained records of this exact request under

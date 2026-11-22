@@ -31,6 +31,6 @@ r[lattice.implementation_attempt.repair_export.scenario.inventory]
 - GIVEN an attempt with a repair policy and an execution intent
 - WHEN `inspect` runs
 - THEN the instance MUST be `terminal_observed` with the disposition's `kind`, `exited` liveness and no wait reasons only when the complete record set agrees with the kind and every recorded step reports its worker exited or cancelled, and `cancelled` MUST be observed termination
-- AND `uncertain` with cause `worker_outcome`, a step intent without a record other than the one `budget_exhausted` (`elapsed`) or `uncertain` (`clock`) leaves before its worker is called, a missing disposition and a first-schema disposition MUST stay `dispatch_recorded_outcome_unknown` with the `dispatch_outcome_unknown` reason
-- AND a malformed, incomplete, crossed or contradicted record set MUST be an error, never terminal
+- AND `uncertain` with cause `worker_outcome`, a step intent without a record other than the one `budget_exhausted` (`elapsed`) or `uncertain` (`clock`) leaves before its worker is called, a missing disposition and a first-schema disposition whose request identities, envelope, policy, execution binding and step count name this attempt MUST stay `dispatch_recorded_outcome_unknown` with the `dispatch_outcome_unknown` reason
+- AND a malformed, incomplete, crossed or contradicted record set of either schema MUST be an error, never terminal, and recovery MUST refuse a first-schema record with the same reason
 - AND the document MUST keep the `lattice.worker-inventory.v3` schema and enumerations

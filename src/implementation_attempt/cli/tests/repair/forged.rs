@@ -190,13 +190,47 @@ async fn a_receipt_claiming_other_changed_paths_is_refused() {
 
 #[tokio::test]
 async fn a_first_schema_disposition_is_printed_but_never_acted_on() {
+    let legacy = crate::implementation_attempt::repair::retained::LEGACY_OBSERVATION_SCHEMA;
     let script = vec![super::write("fixed")];
-    let (fixture, path, directory, _) = ran("attempt-legacy", super::policy(), script, FixtureChecks::admitted()).await;
-    rewrite(&directory.join("repair/disposition.json"), |value| {
-        value["schema"] = crate::implementation_attempt::repair::retained::LEGACY_OBSERVATION_SCHEMA.into();
-    });
-    super::recover(&path, &fixture.state).await.expect("recovery prints the retained record");
-    Seen::Unknown.assert(inventory(&path, &fixture.state), "a first-schema disposition");
+    let (fixture, path, directory, observation) =
+        ran("attempt-legacy", super::policy(), script, FixtureChecks::admitted()).await;
+    let script = vec![super::write("fixed")];
+    let (_other, _, _, other) = ran("attempt-legacy-other", super::policy(), script, FixtureChecks::admitted()).await;
+    let first_schema = |mut value: serde_json::Value| {
+        value["schema"] = legacy.into();
+        value
+    };
+    let mut truncated = first_schema(observation.clone());
+    truncated.as_object_mut().expect("object").remove("envelope");
+    let mut rebound = first_schema(observation.clone());
+    rebound["execution_binding"] = "b".repeat(64).into();
+    let malformed = super::super::super::repair::Unretained::Malformed.message();
+    let crossed = super::super::super::repair::Unretained::Crossed.message();
+    let cases = [
+        ("this attempt's record", first_schema(observation.clone()), None),
+        ("another attempt's record", first_schema(other), Some(crossed)),
+        ("another execution binding", rebound, Some(crossed)),
+        ("only the schema", serde_json::json!({ "schema": legacy }), Some(malformed)),
+        ("a record without its envelope", truncated, Some(malformed)),
+    ];
     let parent = output_parent(&fixture.root, "exports");
-    assert_eq!(export(&path, &fixture.state, &parent), refused(Reason::RepairDispositionInvalid));
+    let retained = directory.join("repair/disposition.json");
+    for (name, record, refusal) in cases {
+        std::fs::write(&retained, serde_json::to_vec(&record).expect("bytes")).expect("replace the disposition");
+        let recovered = super::recover(&path, &fixture.state).await;
+        let inspected = inventory(&path, &fixture.state);
+        match refusal {
+            None => {
+                recovered.expect("recovery prints this attempt's first-schema record");
+                Seen::Unknown.assert(inspected, name);
+            }
+            Some(message) => {
+                // Recovery and inventory refuse it alike.
+                assert_eq!(recovered.expect_err(name), message, "{name}");
+                assert_eq!(inspected.expect_err(name), message, "{name}");
+            }
+        }
+        assert_eq!(export(&path, &fixture.state, &parent), refused(Reason::RepairDispositionInvalid), "{name}");
+    }
+    assert!(is_empty(&parent), "nothing is exported");
 }

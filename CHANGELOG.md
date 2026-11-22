@@ -32,8 +32,10 @@ interfaces.
   only when the records agree with the kind and show every started worker
   exited or cancelled; `uncertain` (`worker_outcome`) and unrecorded step
   intents stay `dispatch_recorded_outcome_unknown`, and contradicted records
-  are an error. Recovery still prints first-schema dispositions, which export
-  and inventory never act on. Single-shot attempts behave as before.
+  are an error. Recovery still prints a first-schema disposition of this
+  attempt, which export and inventory never act on; recovery and inventory
+  refuse any other first-schema record alike as malformed or crossed.
+  Single-shot attempts behave as before.
 - Bounded same-attempt repair and the Kiln #61 budget lineage for
   implementation attempts (Lattice #6). The v3 request accepts two optional
   fields; without them a request keeps its bytes, identity and profile

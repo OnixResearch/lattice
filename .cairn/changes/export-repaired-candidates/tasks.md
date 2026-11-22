@@ -23,4 +23,8 @@
 - [x] [serial] 4.7 P2, every receipt: require every recorded receipt to be a produced receipt of this work, attempt, fence, workspace and base. Tests: `src/implementation_attempt/repair/exportable/tests/contradicted.rs` (`every_recorded_receipt_and_revision_is_this_attempts`). Evidence: `evidence/verification.json` (`review.findings.7`). r[lattice.implementation_attempt.repair_export.scenario.refused]
 - [x] [serial] 4.8 Update the docs, the changelog and this change, rerun the gates, and record them under `review` in `evidence/verification.json`. r[lattice.implementation_attempt.repair_export]
 
+## Phase 5: Verification review of `d83638bd` (`RepairExportReview`)
+
+- [x] [serial] 5.1 P2, first-schema records: before reporting `Legacy`, parse the v1 record's required fields and bind its request identities, envelope, policy, step count, `accepted`/`integrated` and execution binding to this attempt, reporting `Malformed` or `Crossed` otherwise; recovery reads v1 records through the same check under the persisted binding, so recovery and inventory refuse them alike (`cli/repair/{records,evidence,mod}.rs`, `cli/execution.rs`). Tests: `src/implementation_attempt/cli/tests/repair/forged.rs` (`a_first_schema_disposition_is_printed_but_never_acted_on`). Evidence: `evidence/verification.json` (`review_2`). r[lattice.implementation_attempt.repair_export.scenario.inventory]
+
 Only checked tasks are complete.

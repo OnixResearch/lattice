@@ -70,7 +70,11 @@ impl Retained {
     /// The retained disposition of this exact request, of either schema, as
     /// recovery prints it; a missing one is an unknown outcome, never a reason
     /// to run again.
-    pub(super) fn disposition(&self, request: &super::super::Request) -> Result<serde_json::Value, String> {
+    pub(super) fn disposition(
+        &self,
+        request: &super::super::Request,
+        binding_identity: &str,
+    ) -> Result<serde_json::Value, String> {
         let bytes = match self.read(DISPOSITION_FILE) {
             Ok(Some(bytes)) => bytes,
             Ok(None) => return Err(Unretained::Missing.message().into()),
@@ -79,17 +83,53 @@ impl Retained {
         let observation: serde_json::Value =
             serde_json::from_slice(&bytes).map_err(|_| Unretained::Malformed.message())?;
         let text = |field: &str| observation.get(field).and_then(serde_json::Value::as_str);
-        let schemas = [
-            crate::implementation_attempt::repair::retained::OBSERVATION_SCHEMA,
-            crate::implementation_attempt::repair::retained::LEGACY_OBSERVATION_SCHEMA,
-        ];
-        if !text("schema").is_some_and(|schema| schemas.contains(&schema)) {
-            return Err(Unretained::Malformed.message().into());
-        }
-        if !self.is_same_request(request, text("worker_request"), text("request_identity")) {
-            return Err(Unretained::Crossed.message().into());
+        match text("schema") {
+            Some(crate::implementation_attempt::repair::retained::OBSERVATION_SCHEMA) => {
+                if !self.is_same_request(request, text("worker_request"), text("request_identity")) {
+                    return Err(Unretained::Crossed.message().into());
+                }
+            }
+            Some(crate::implementation_attempt::repair::retained::LEGACY_OBSERVATION_SCHEMA) => {
+                if self.legacy(request, &observation).map_err(Unretained::message)? != binding_identity {
+                    return Err(Unretained::Crossed.message().into());
+                }
+            }
+            _ => return Err(Unretained::Malformed.message().into()),
         }
         Ok(observation)
+    }
+
+    /// The execution binding a first-schema disposition of this exact request
+    /// names: `Malformed` without its required fields, `Crossed` when it names
+    /// other request bytes, another envelope or policy, or claims acceptance.
+    pub(super) fn legacy(
+        &self,
+        request: &super::super::Request,
+        observation: &serde_json::Value,
+    ) -> Result<String, Unretained> {
+        let legacy: Legacy = serde::Deserialize::deserialize(observation).map_err(|_| Unretained::Malformed)?;
+        debug_assert_eq!(legacy.schema, crate::implementation_attempt::repair::retained::LEGACY_OBSERVATION_SCHEMA);
+        let is_bound = self.is_same_request(request, Some(&legacy.worker_request), Some(&legacy.request_identity))
+            && legacy.envelope == request.envelope
+            && request.repair.as_ref().is_some_and(|policy| policy.identity() == legacy.repair_policy)
+            && !legacy.accepted
+            && !legacy.integrated;
+        if !is_bound {
+            return Err(Unretained::Crossed);
+        }
+        let is_counted = match &legacy.disposition {
+            crate::implementation_attempt::repair::state::Disposition::CorrectCandidate { .. } => legacy.steps == 1,
+            crate::implementation_attempt::repair::state::Disposition::RepairedCandidate { repairs, .. } => {
+                legacy.steps == repairs.saturating_add(1)
+            }
+            _ => true,
+        };
+        if !is_counted || legacy.steps > crate::implementation_attempt::repair::MAX_REPAIR_ITERATIONS.saturating_add(1)
+        {
+            return Err(Unretained::Malformed);
+        }
+        debug_assert!(is_bound, "only a record of this request reaches its binding");
+        Ok(legacy.execution_binding)
     }
 
     /// Whether a record names this exact request.
@@ -110,6 +150,22 @@ impl Retained {
             Ok(Some(_)) | Err(_) => true,
         }
     }
+}
+
+/// The fields every first-schema disposition carries; its other fields are
+/// not read.
+#[derive(serde::Deserialize)]
+struct Legacy {
+    schema: String,
+    envelope: crate::implementation_attempt::ImplementationAttemptEnvelope,
+    request_identity: String,
+    worker_request: String,
+    execution_binding: String,
+    repair_policy: String,
+    disposition: crate::implementation_attempt::repair::state::Disposition,
+    steps: u32,
+    accepted: bool,
+    integrated: bool,
 }
 
 /// Why no complete retained disposition of the exact request was read.
