@@ -13,7 +13,14 @@ type Checked = (
 
 impl super::Driver<'_, '_> {
     /// Run every declared check, each against its own read-only copy of the
-    /// candidate and within the time left, then classify the evidence.
+    /// candidate and within the time left, then classify the evidence. With
+    /// the standalone operator's ports, a grant that lapsed before the
+    /// revision's checks ends the loop as `authority_withdrawn` without
+    /// running any of them; a lapse between checks leaves the later checks
+    /// unrun and unknown. A cancellation requested by the end of the checks
+    /// ends the loop as `cancelled`, as it does during a worker step.
+    // r[impl lattice.implementation_attempt.operator_repair.scenario.authority]
+    // r[impl lattice.implementation_attempt.operator_repair.scenario.outcomes]
     pub(super) fn check(
         &mut self,
         ports: &mut super::super::Ports<'_>,
@@ -21,6 +28,12 @@ impl super::Driver<'_, '_> {
         revision: &str,
         tree: &super::super::materialized::Tree,
     ) -> Result<Checked, String> {
+        if let Some(withdrawal) = self.recheck_operator(iteration) {
+            let cause = withdrawal.cause;
+            self.withdrawal = Some(withdrawal);
+            let next = super::Next::Stop(super::Disposition::AuthorityWithdrawn { cause });
+            return Ok((Vec::new(), Vec::new(), None, next));
+        }
         let invocations = crate::implementation_attempt::repair::checks::invocations(&self.policy, revision, iteration);
         let mut observations = Vec::with_capacity(invocations.len());
         let mut copies = Vec::with_capacity(invocations.len());
@@ -67,6 +80,11 @@ impl super::Driver<'_, '_> {
         let verdict =
             crate::implementation_attempt::repair::checks::classify(subject, &observations, drifted.as_deref());
         let next = self.state.after_checks(verdict.clone(), self.elapsed_ms(ports.clock));
+        let next = if self.frame.records.is_cancel_requested() {
+            super::Next::Stop(super::Disposition::Cancelled)
+        } else {
+            next
+        };
         Ok((observations, copies, Some(verdict), next))
     }
 }

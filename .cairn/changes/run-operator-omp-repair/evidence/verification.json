@@ -84,5 +84,29 @@
       "cairn_gates": {"exit": {"proposal": 0, "design": 0, "tasks": 0}},
       "gitleaks": {"command": "gitleaks 8.30.1 dir --no-banner --redact <path>, every path changed since 7fb6dc47 and every untracked path", "paths": 47, "exit": 0, "leaks": 0}
     }
+  },
+  "review_2": {
+    "source": "verification of 6b99af1e: correct, F1 and F2 closed, no regressions; two P3 items and three notes",
+    "base_revision": "6b99af1e",
+    "findings": {
+      "authority_lapse_before_checks": {"severity": "P3", "resolution": "the driver's check phase (cli/repair/steps/checks.rs) rechecks the operator grant once before a revision's checks through Driver::recheck_operator; a lapse ends the loop authority_withdrawn (effect_authority) with the recheck evidence and runs no check; the per-check recheck still leaves a check unrun and unknown when the grant lapses between checks", "tests": ["src/implementation_attempt/cli/tests/repair/operator.rs::a_grant_withdrawn_during_a_worker_runs_none_of_its_checks", "src/implementation_attempt/cli/tests/repair/operator.rs::an_admission_that_expires_before_the_checks_runs_none_of_them", "src/implementation_attempt/cli/tests/repair/operator.rs::a_grant_withdrawn_between_checks_leaves_the_later_checks_unrun"]},
+      "cancel_during_checks": {"severity": "P3", "resolution": "a persisted cancellation request found when the check phase ends stops the loop as cancelled; inventory reports it terminal and export refuses it as repair_not_candidate", "tests": ["src/implementation_attempt/cli/tests/repair/operator.rs::a_cancellation_during_the_checks_is_cancelled"]}
+    },
+    "notes": {
+      "changelog": "the new public candidate_worker::omp::stop and engine::effect::standalone::check_subjects are listed",
+      "effect_authority_doc": "implementation-attempt repair is in the consumer list of docs/choregraph-effect-authority.md (Standalone operator profile)",
+      "rustdoc": "the intra-doc link to the pub(crate) operator module in cli/repair/mod.rs is plain code text"
+    },
+    "checks": {
+      "cargo_test_lib": {"exit": 0, "passed": 589, "failed": 0, "ignored": 8},
+      "cargo_test_focused": {"exit": 0, "passed": 204, "failed": 0, "ignored": 7},
+      "integration": {"exit": 0, "passed": [6, 10], "failed": 0},
+      "clippy": {"exit": 0},
+      "fmt": {"exit": 0},
+      "octet": {"exit": 0, "status": "warning-only", "baseline": {"accepted": 1052, "current_accepted": 1052, "new": 0, "stale": 0}},
+      "cairn_validate": {"exit": 0},
+      "cairn_gates": {"exit": {"proposal": 0, "design": 0, "tasks": 0}},
+      "gitleaks": {"command": "gitleaks 8.30.1 dir --no-banner --redact <path>, every path changed since 7fb6dc47 and every untracked path", "paths": 49, "exit": 0, "leaks": 0}
+    }
   }
 }

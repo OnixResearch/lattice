@@ -281,8 +281,16 @@ async fn a_grant_withdrawn_during_a_worker_runs_none_of_its_checks() {
     operated.after_launch(Box::new(rewrite));
     operated.run().await.expect("the loop reaches a disposition");
     let observation = operated.disposition();
-    assert_eq!(observation["disposition"], serde_json::json!({"kind": "uncertain", "cause": "check_outcome"}));
+    // A lapse before a revision's checks is a withdrawal, like one before a step.
+    assert_eq!(
+        observation["disposition"],
+        serde_json::json!({"kind": "authority_withdrawn", "cause": "effect_authority"})
+    );
+    assert_eq!(observation["authority_withdrawn"]["iteration"], 1);
+    assert_eq!(observation["authority_withdrawn"]["evidence"]["authority_refusal"], "not_granted");
     assert_eq!((operated.launches(), operated.check_runs()), (1, 0), "no check runs without the grant");
+    super::export::Seen::Terminal
+        .assert(super::export::inventory(&operated.path, &operated.fixture.state), "unchecked");
     assert_unexported(&operated, "unchecked");
 }
 
@@ -298,9 +306,47 @@ async fn an_admission_that_expires_before_the_checks_runs_none_of_them() {
     operated.after_launch(Box::new(|| std::thread::sleep(std::time::Duration::from_millis(4_500))));
     operated.run().await.expect("the loop reaches a disposition");
     let observation = operated.disposition();
-    assert_eq!(observation["disposition"], serde_json::json!({"kind": "uncertain", "cause": "check_outcome"}));
+    assert_eq!(
+        observation["disposition"],
+        serde_json::json!({"kind": "authority_withdrawn", "cause": "effect_authority"})
+    );
+    assert_eq!(observation["authority_withdrawn"]["evidence"]["admission_expired"], true);
     assert_eq!(operated.check_runs(), 0, "no check runs after the admission expired");
     assert_unexported(&operated, "expired");
+}
+
+#[tokio::test]
+async fn a_grant_withdrawn_between_checks_leaves_the_later_checks_unrun() {
+    let operated = Operated::with("attempt-operator-between", Options {
+        second_check: Some(harness::CHECK),
+        ..Options::default()
+    });
+    operated.script(&[Behaviour::Write("fixed")]);
+    let rewrite = operated.profile_writer(Profile::WorkerOnly);
+    operated.after_check(Box::new(rewrite));
+    operated.run().await.expect("the loop reaches a disposition");
+    let observation = operated.disposition();
+    assert_eq!(observation["disposition"], serde_json::json!({"kind": "uncertain", "cause": "check_outcome"}));
+    assert_eq!(operated.check_runs(), 1, "the second check never runs");
+    assert_unexported(&operated, "between");
+}
+
+#[tokio::test]
+async fn a_cancellation_during_the_checks_is_cancelled() {
+    let operated = Operated::new("attempt-operator-cancelled-checks", 2, 60_000);
+    operated.script(&[Behaviour::Write("fixed")]);
+    let (path, state) = (operated.path.clone(), operated.fixture.state.clone());
+    operated.after_check(Box::new(move || {
+        crate::implementation_attempt::cli::cancellation::request(&path, &state).expect("cancel");
+    }));
+    operated.run().await.expect("the loop reaches a disposition");
+    assert_eq!(operated.disposition()["disposition"], serde_json::json!({"kind": "cancelled"}));
+    super::export::Seen::Terminal
+        .assert(super::export::inventory(&operated.path, &operated.fixture.state), "cancelled checks");
+    let parent = super::export::output_parent(&operated.fixture.root, "cancelled-checks");
+    let exported = super::export::export(&operated.path, &operated.fixture.state, &parent);
+    assert_eq!(exported, super::export::refused(Reason::RepairNotCandidate), "a valid, non-passing disposition");
+    assert!(super::export::is_empty(&parent));
 }
 
 #[tokio::test]

@@ -125,14 +125,22 @@ fn store_shell() -> crate::candidate_worker::broker::Executable {
     crate::candidate_worker::broker::Executable { path: shell, blake3 }
 }
 
-/// The operator catalog of one `unit` check running `check` in the pinned
-/// Nix store shell.
-pub(super) fn catalog(check: &str) -> serde_json::Value {
+/// The operator catalog of a `unit` check running `check`, and with
+/// `second` a `unit-second` check running it, in the pinned Nix store shell.
+pub(super) fn catalog(check: &str, second: Option<&str>) -> serde_json::Value {
     let shell = store_shell();
+    let mut checks = vec![serde_json::json!(
+        {"name": "unit", "program": shell, "args": ["-c", check], "failure_class": "test"}
+    )];
+    if let Some(second) = second {
+        checks.push(serde_json::json!(
+            {"name": "unit-second", "program": shell, "args": ["-c", second], "failure_class": "test"}
+        ));
+    }
     serde_json::json!({
         "schema": crate::implementation_attempt::repair::checks::catalog::SCHEMA,
         "sandbox": shell,
-        "checks": [{"name": "unit", "program": shell, "args": ["-c", check], "failure_class": "test"}],
+        "checks": checks,
     })
 }
 

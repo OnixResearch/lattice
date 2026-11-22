@@ -10,6 +10,7 @@ use std::sync::atomic::AtomicU32;
 use std::sync::atomic::Ordering;
 
 pub(super) use doubles::Behaviour;
+pub(super) use doubles::CHECK;
 pub(super) use doubles::Profile;
 
 type Request = crate::implementation_attempt::cli::Request;
@@ -24,6 +25,8 @@ pub(super) struct Options {
     pub(super) expires_in_ms: Option<u64>,
     /// The `unit` check's shell script.
     pub(super) check: &'static str,
+    /// A second check, `unit-second`, running this script.
+    pub(super) second_check: Option<&'static str>,
     /// Read and write paths other than `src`; their directories are created.
     pub(super) paths: Option<(Vec<&'static str>, Vec<&'static str>)>,
 }
@@ -36,6 +39,7 @@ impl Default for Options {
             profile: Profile::Granting,
             expires_in_ms: None,
             check: doubles::CHECK,
+            second_check: None,
             paths: None,
         }
     }
@@ -90,7 +94,7 @@ impl Operated {
 
     pub(super) fn with(attempt: &str, options: Options) -> Self {
         let fixture = super::super::Fixture::new();
-        let catalog = doubles::catalog(options.check);
+        let catalog = doubles::catalog(options.check, options.second_check);
         let script = fixture.root.join("fake-omp");
         let mut request = super::super::super::host_local();
         request.envelope.attempt_id = attempt.into();

@@ -66,13 +66,13 @@ pub struct StepRecord {
     pub verdict: Option<super::checks::Verdict>,
 }
 
-/// The authority a step found withdrawn before its intent: the binding or
+/// The authority found withdrawn before a step's intent (the binding or
 /// managed revision before a later step, or the standalone operator's grant
-/// before any step.
+/// before any step) or before a revision's checks (the operator's grant).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Withdrawal {
-    /// The step that never spawned.
+    /// The step that never spawned, or whose checks never ran.
     pub iteration: u32,
     pub cause: super::state::Authority,
     /// The binding's revalidation record, the revision seam's refusal, or

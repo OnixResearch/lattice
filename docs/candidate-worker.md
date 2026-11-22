@@ -859,12 +859,16 @@ configuration or catalog.
   | Catalog checks | 2 | `lattice/shell` | `lattice://process/2` | `process/execute` |
 
   Without both, the run is refused as `repair_authority_denied` before the
-  fence record, with no step intent. Before every step's intent, under the
-  fence lock, and before every check, the same profile is evaluated once
-  again and must keep its admitted identity and both grants, and the
-  admission must not have expired; otherwise a step ends the loop as
-  `authority_withdrawn` with cause `effect_authority`, and a check is unrun
-  and unknown.
+  fence record, with no step intent. Before every step's intent (under the
+  fence lock), before every revision's checks and before every check, the
+  same profile is evaluated once again and must keep its admitted identity
+  and both grants, and the admission must not have expired. A lapse before a
+  step or before a revision's checks ends the loop as `authority_withdrawn`
+  with cause `effect_authority`, retaining the recheck's evidence; a lapse
+  between individual checks leaves the later checks unrun, and the loop ends
+  `uncertain` (`check_outcome`). A persisted cancellation request found when
+  the checks end stops the loop as `cancelled`, as it does during a worker
+  step.
 
 Every refusal here closes the attempt-fence for good, like the other
 pre-intent refusals: a configuration that does not load, an unreadable or

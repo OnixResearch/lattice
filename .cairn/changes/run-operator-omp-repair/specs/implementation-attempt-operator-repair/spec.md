@@ -20,7 +20,7 @@ r[lattice.implementation_attempt.operator_repair.scenario.authority]
 - GIVEN a repair request whose configuration selects no profile, or whose profile is expired, names another worker profile revision or lacks the worker or check tuple
 - WHEN `run` admits it
 - THEN it MUST be refused as `repair_authority_denied` with `dispatched:false` before the fence record, writing only the attempt-fence's closure marker and no step intent, and no OMP or check process MUST start
-- AND a profile that stops granting, changes identity, or an admission that expires during the run MUST end the loop as `authority_withdrawn` with cause `effect_authority` before the next step's intent, and MUST leave every later check unrun with an unknown outcome, so a candidate checked after the grant or admission lapsed is never passed or exported
+- AND a profile that stops granting, changes identity, or an admission that expires during the run MUST end the loop as `authority_withdrawn` with cause `effect_authority` and its recheck evidence when found before a step's intent or before a revision's checks, and MUST leave the later checks unrun and the loop `uncertain` when found between individual checks, so a candidate checked after the grant or admission lapsed is never passed or exported; a cancellation requested during the checks MUST end the loop as `cancelled`
 
 #### Scenario: Worker outcomes keep the loop's classes
 

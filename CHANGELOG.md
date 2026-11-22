@@ -22,16 +22,21 @@ interfaces.
   before the fence record, before every step's intent and before every
   check; otherwise the run is refused before any launch as
   `repair_ports_unavailable` (with `check_catalog`) or the new
-  `repair_authority_denied`, a grant withdrawn before a step ends the loop as
-  `authority_withdrawn` with the additive cause `effect_authority`, and one
-  withdrawn before a check leaves it unrun and unknown. Each step launches on
+  `repair_authority_denied`, a grant withdrawn before a step or before a
+  revision's checks ends the loop as `authority_withdrawn` with the additive
+  cause `effect_authority`, and one withdrawn between checks leaves the later
+  checks unrun and the loop `uncertain`. A cancellation during the checks ends
+  it as `cancelled`. Each step launches on
   the tree the previous step left, so a workspace changed between steps is
   blocked. OMP exits, signal deaths inside the sandbox (`128 + N`) and host
   stops are `exited`, cancellation `cancelled`, and every other launcher
   outcome, including a stop at a deadline the admission capped, `unknown`;
   check statuses of 126 and above are unknown, not failures. Each step
   retains `repair/omp-step-N.{jsonl,json}`, and `prepare` prints the profile
-  requirements as `repair_authority`. Requests without a repair policy are
+  requirements as `repair_authority`. New public items:
+  `candidate_worker::omp::stop` (how a failed launch ended) and
+  `engine::effect::standalone::check_subjects` (one profile evaluation
+  checking non-workflow grants). Requests without a repair policy are
   unchanged.
 - Export and inventory of repaired candidates (Lattice #6).
   `implementation-attempt export-candidate` exports the exact final candidate

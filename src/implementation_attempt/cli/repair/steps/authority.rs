@@ -11,14 +11,10 @@ impl super::Driver<'_, '_> {
     /// current permit.
     // r[impl lattice.implementation_attempt.operator_repair.scenario.authority]
     pub(super) fn recheck_authority(&mut self, iteration: u32) -> Option<super::Withdrawal> {
-        let authority = &mut self.frame.authority;
-        if let Some(evidence) = authority.operator.as_ref().and_then(|grant| grant.recheck(self.frame.request)) {
-            return Some(super::Withdrawal {
-                iteration,
-                cause: super::Authority::EffectAuthority,
-                evidence,
-            });
+        if let Some(withdrawal) = self.recheck_operator(iteration) {
+            return Some(withdrawal);
         }
+        let authority = &mut self.frame.authority;
         if iteration == 1 {
             return None;
         }
@@ -41,6 +37,20 @@ impl super::Driver<'_, '_> {
         Some(super::Withdrawal {
             iteration,
             cause: super::Authority::ManagedRevision,
+            evidence,
+        })
+    }
+
+    /// The standalone operator's grant, before step `iteration`'s intent or
+    /// before its candidate's checks: `Some` when it no longer grants both
+    /// tuples with its admitted identity or the admission expired; always
+    /// `None` for embedder-supplied ports.
+    // r[impl lattice.implementation_attempt.operator_repair.scenario.authority]
+    pub(super) fn recheck_operator(&self, iteration: u32) -> Option<super::Withdrawal> {
+        let evidence = self.frame.authority.operator.as_ref()?.recheck(self.frame.request)?;
+        Some(super::Withdrawal {
+            iteration,
+            cause: super::Authority::EffectAuthority,
             evidence,
         })
     }

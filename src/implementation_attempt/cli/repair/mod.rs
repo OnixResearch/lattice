@@ -3,7 +3,7 @@
 //! A [`WorkerPort`] runs one bounded worker step in the attempt workspace, a
 //! [`CheckPort`] runs one declared check, and a clock reads time. An
 //! embedder supplies them, or the standalone CLI supplies its operator
-//! ports ([`operator`]): the pinned OMP worker and the operator's check
+//! ports (`operator`): the pinned OMP worker and the operator's check
 //! catalog, used only while the operator's effect-authority profile grants
 //! them. The shell owns everything else: the frozen policy and lineage, the
 //! host-derived candidate of every step, the immutable copy of it each check

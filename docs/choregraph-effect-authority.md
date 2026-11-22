@@ -24,7 +24,9 @@ A duplicate attempt or persistence error stops before the adapter. Replay always
 ## Standalone operator profile
 
 The standalone CLI, TUI, scheduler, orchestration, and approval-resume paths use
-the optional absolute `effect_authority` path in application configuration. No
+the optional absolute `effect_authority` path in application configuration, as
+does `lattice implementation-attempt run` for the worker and check effects of a
+request with a repair policy ([standalone operator repair](candidate-worker.md#standalone-operator-repair)). No
 selection preserves unavailable authority. An invalid selected profile denies;
 it never falls back to another provider. Explicit embedding providers remain a
 separate host-owned choice.
