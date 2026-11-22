@@ -8,12 +8,10 @@
 
 use std::io::Write;
 
-use basalt::authority_core::BasaltPolicyRef;
 use basalt::oidc_exchange::BoundedHttpDocumentPort;
 use basalt::oidc_exchange::DocumentPort;
 use basalt::oidc_exchange::ExchangeReceipt;
 use basalt::oidc_exchange::ExchangeRequest;
-use basalt::oidc_exchange::HolderDelivery;
 use basalt::oidc_exchange::IssuerAdmission;
 use basalt::oidc_exchange::JwksCache;
 use basalt::oidc_exchange::MantleOperation;
@@ -149,23 +147,30 @@ impl ExchangedUcan {
     }
 }
 
+/// The exact request one exchange is for: the core plan, the typed native
+/// Mantle request the stable holder will sign, and the policy reference that
+/// its canonical resource binds. `plan.resource` is the core's semantic
+/// request/attempt identity.
+#[derive(Clone, Copy)]
+pub struct Subject<'a> {
+    pub plan: &'a CapabilityPlan,
+    pub native: &'a basalt::mantle::Request,
+    pub policy_ref: &'a basalt::authority_core::BasaltPolicyRef,
+}
+
 /// Consume a transient GitHub identity token through the real Basalt producer.
-/// `plan.resource` is the core's semantic request/attempt identity. `native`
-/// is the exact typed Mantle request the stable holder will sign; its
-/// canonical resource under `policy_ref` is the only resource granted, and the
-/// holder signs the resulting native operation binding, not a consumer-owned
-/// digest.
+/// The canonical resource of `subject.native` under `subject.policy_ref` is
+/// the only resource granted, and the holder signs the resulting native
+/// operation binding, not a consumer-owned digest.
 pub fn exchange(
     host: &mut dyn BasaltIssuerHost,
     token: OidcToken,
-    plan: &CapabilityPlan,
-    native: &basalt::mantle::Request,
-    policy_ref: &BasaltPolicyRef,
+    subject: Subject<'_>,
     now_ms: u64,
 ) -> Result<ExchangedUcan, ExchangeError> {
     let ports = host.ports();
-    exchange_through(
-        ExchangePorts {
+    through(
+        Ports {
             policy: ports.policy,
             cache: ports.cache,
             documents: ports.documents,
@@ -175,16 +180,14 @@ pub fn exchange(
             holder_signer: ports.holder_signer,
         },
         token.expose_for_exchange(),
-        plan,
-        native,
-        policy_ref,
+        subject,
         now_ms,
     )
 }
 
 /// The production ports with discovery widened to the producer's port trait,
 /// so the whole exchange path is exercised without the public network.
-struct ExchangePorts<'a> {
+struct Ports<'a> {
     policy: &'a OidcPolicy,
     cache: &'a mut JwksCache,
     documents: &'a mut dyn DocumentPort,
@@ -194,43 +197,25 @@ struct ExchangePorts<'a> {
     holder_signer: &'a dyn TokenSigner,
 }
 
-fn exchange_through(
-    ports: ExchangePorts<'_>,
-    token: &str,
-    plan: &CapabilityPlan,
-    native: &basalt::mantle::Request,
-    policy_ref: &BasaltPolicyRef,
-    now_ms: u64,
-) -> Result<ExchangedUcan, ExchangeError> {
+fn through(ports: Ports<'_>, token: &str, subject: Subject<'_>, now_ms: u64) -> Result<ExchangedUcan, ExchangeError> {
+    let Subject {
+        plan,
+        native,
+        policy_ref,
+    } = subject;
     let exact = basalt::mantle::canonical_enforcement(native, policy_ref).map_err(|_| ExchangeError::Policy)?;
     let exact_resource = exact.resource();
     admit_request(ports.policy, plan, &native.project, exact_resource)?;
-    let now_seconds = now_ms / MILLIS_PER_SECOND;
-    let not_before_ms = now_seconds * MILLIS_PER_SECOND;
-    let deadline_seconds = plan.expires_ms / MILLIS_PER_SECOND;
-    let lifetime_seconds = deadline_seconds
-        .checked_sub(now_seconds)
-        .filter(|seconds| *seconds > 0)
-        .ok_or(ExchangeError::Lifetime)?;
-    if not_before_ms < plan.not_before_ms
-        || plan.not_before_ms > now_ms
-        || lifetime_seconds > ports.policy.time.max_ucan_lifetime_seconds
-    {
-        return Err(ExchangeError::Lifetime);
-    }
-    let holder_did = ports.holder_signer.issuer().map_err(|_| ExchangeError::Signer)?;
-    let holder_key = ports.holder_signer.public_key().map_err(|_| ExchangeError::Signer)?;
-    if holder_key.issuer().map_err(|_| ExchangeError::Signer)? != holder_did {
-        return Err(ExchangeError::Signer);
-    }
-    let holder = ucan::AudienceDid::from(holder_did);
+    debug_assert!(
+        exact_resource.starts_with(&ports.policy.capability.resource_prefix)
+            && exact_resource.len() <= MAX_RESOURCE_BYTES
+    );
+    let lifetime_seconds = lifetime_seconds(ports.policy, plan, now_ms)?;
+    debug_assert!((1..=ports.policy.time.max_ucan_lifetime_seconds).contains(&lifetime_seconds));
+    let holder = stable_holder(ports.holder_signer)?;
     admit_holder_request(native, exact.ability(), &holder, plan)?;
-    let issuer_did = ports.issuer_signer.issuer().map_err(|_| ExchangeError::Signer)?;
-    let issuer_key = ucan::Ed25519VerificationKey::new(
-        issuer_did,
-        ports.issuer_signer.public_key().map_err(|_| ExchangeError::Signer)?,
-    )
-    .map_err(|_| ExchangeError::Signer)?;
+    debug_assert_eq!(native.subject, holder.as_str());
+    let issuer_key = issuer_key(ports.issuer_signer)?;
     let request = ExchangeRequest {
         audience: plan.audience.clone(),
         project: native.project.clone(),
@@ -240,7 +225,7 @@ fn exchange_through(
     };
     let issued = basalt::oidc_exchange::exchange_to_recipient(
         token,
-        now_seconds,
+        now_ms / MILLIS_PER_SECOND,
         ports.policy,
         &request,
         ports.cache,
@@ -248,14 +233,19 @@ fn exchange_through(
         ports.replay,
         ports.issuer,
         ports.issuer_signer,
-        &HolderDelivery {
+        &basalt::oidc_exchange::HolderDelivery {
             recipient: &holder,
             request: native,
             policy_ref,
         },
     )
     .map_err(|_| ExchangeError::Denied)?;
-    let facts = verify_issued_grant(&issued.token, issuer_key, &holder, &request, plan, now_ms)?;
+    let expected = Expected {
+        issuer_key,
+        holder: &holder,
+        request: &request,
+    };
+    let facts = verify_issued_grant(&issued.token, expected, plan, now_ms)?;
     Ok(ExchangedUcan {
         token: issued.token,
         holder,
@@ -264,6 +254,41 @@ fn exchange_through(
         facts,
         receipt: issued.receipt,
     })
+}
+
+/// Whole-second UCAN lifetime from now to the plan's deadline, within policy.
+fn lifetime_seconds(policy: &OidcPolicy, plan: &CapabilityPlan, now_ms: u64) -> Result<u64, ExchangeError> {
+    let now_seconds = now_ms / MILLIS_PER_SECOND;
+    let not_before_ms = now_seconds * MILLIS_PER_SECOND;
+    let deadline_seconds = plan.expires_ms / MILLIS_PER_SECOND;
+    let lifetime_seconds = deadline_seconds
+        .checked_sub(now_seconds)
+        .filter(|seconds| *seconds > 0)
+        .ok_or(ExchangeError::Lifetime)?;
+    if not_before_ms < plan.not_before_ms
+        || plan.not_before_ms > now_ms
+        || lifetime_seconds > policy.time.max_ucan_lifetime_seconds
+    {
+        return Err(ExchangeError::Lifetime);
+    }
+    Ok(lifetime_seconds)
+}
+
+/// The stable holder DID, refused unless the signer's public key names it.
+fn stable_holder(signer: &dyn TokenSigner) -> Result<ucan::AudienceDid, ExchangeError> {
+    let holder_did = signer.issuer().map_err(|_| ExchangeError::Signer)?;
+    let holder_key = signer.public_key().map_err(|_| ExchangeError::Signer)?;
+    if holder_key.issuer().map_err(|_| ExchangeError::Signer)? != holder_did {
+        return Err(ExchangeError::Signer);
+    }
+    Ok(ucan::AudienceDid::from(holder_did))
+}
+
+/// The trusted verification key of the admitted issuer signer.
+fn issuer_key(signer: &dyn TokenSigner) -> Result<ucan::Ed25519VerificationKey, ExchangeError> {
+    let issuer_did = signer.issuer().map_err(|_| ExchangeError::Signer)?;
+    ucan::Ed25519VerificationKey::new(issuer_did, signer.public_key().map_err(|_| ExchangeError::Signer)?)
+        .map_err(|_| ExchangeError::Signer)
 }
 
 /// Lattice's own binding of the native request to the stable holder and plan,
@@ -281,14 +306,25 @@ fn admit_holder_request(
     Ok(())
 }
 
+/// What the issued grant must name: the trusted issuer, the stable holder as
+/// audience, and the exact exchange request.
+struct Expected<'a> {
+    issuer_key: ucan::Ed25519VerificationKey,
+    holder: &'a ucan::AudienceDid,
+    request: &'a ExchangeRequest,
+}
+
 fn verify_issued_grant(
     token: &ucan::CompactToken,
-    issuer_key: ucan::Ed25519VerificationKey,
-    holder: &ucan::AudienceDid,
-    request: &ExchangeRequest,
+    expected: Expected<'_>,
     plan: &CapabilityPlan,
     now_ms: u64,
 ) -> Result<CapabilityFacts, ExchangeError> {
+    let Expected {
+        issuer_key,
+        holder,
+        request,
+    } = expected;
     let expected_issuer = issuer_key.issuer().clone();
     let now_seconds = now_ms / MILLIS_PER_SECOND;
     let context = ucan::VerificationContext::new(
@@ -320,6 +356,9 @@ fn verify_issued_grant(
         not_before_ms: bounds.not_before_seconds().checked_mul(MILLIS_PER_SECOND).ok_or(ExchangeError::Lifetime)?,
         expires_ms: bounds.expires_at_seconds().checked_mul(MILLIS_PER_SECOND).ok_or(ExchangeError::Lifetime)?,
     };
+    // Whole-second token bounds never widen the plan's millisecond window.
+    debug_assert_eq!(facts.not_before_ms / MILLIS_PER_SECOND, now_seconds);
+    debug_assert!(facts.expires_ms <= plan.expires_ms);
     plan.admit(&facts, now_ms).map_err(|_| ExchangeError::Grant)?;
     Ok(facts)
 }
@@ -625,6 +664,18 @@ mod tests {
         .expect("real signed UCAN fixture")
     }
 
+    fn expected<'a>(
+        issuer: &ucan::Ed25519InMemorySigner,
+        holder: &'a ucan::AudienceDid,
+        request: &'a ExchangeRequest,
+    ) -> Expected<'a> {
+        Expected {
+            issuer_key: issuer.verification_key().expect("trusted issuer key"),
+            holder,
+            request,
+        }
+    }
+
     #[test]
     fn authenticated_grant_rejects_other_issuer_holder_scope_ability_and_expiry() {
         let issuer = ucan::Ed25519InMemorySigner::from_seed_bytes([31; 32]);
@@ -638,15 +689,8 @@ mod tests {
         let request = fixture_request();
         let plan = fixture_plan();
         let valid = signed_token(&issuer, &holder, RESOURCE, "mantle/event/read", 70);
-        let facts = verify_issued_grant(
-            &valid,
-            issuer.verification_key().expect("trusted issuer key"),
-            &holder,
-            &request,
-            &plan,
-            NOW_MS,
-        )
-        .expect("actual signed exact grant");
+        let facts = verify_issued_grant(&valid, expected(&issuer, &holder, &request), &plan, NOW_MS)
+            .expect("actual signed exact grant");
         assert_eq!(facts.expires_ms, EXPIRY_MS);
         assert_eq!(facts.operations, [Operation::Events].into_iter().collect());
         for token in [
@@ -663,14 +707,7 @@ mod tests {
             signed_token(&issuer, &holder, RESOURCE, "mantle/event/read", 71),
         ] {
             assert_eq!(
-                verify_issued_grant(
-                    &token,
-                    issuer.verification_key().expect("trusted issuer key"),
-                    &holder,
-                    &request,
-                    &plan,
-                    NOW_MS
-                ),
+                verify_issued_grant(&token, expected(&issuer, &holder, &request), &plan, NOW_MS),
                 Err(ExchangeError::Grant)
             );
         }
@@ -784,15 +821,8 @@ mod tests {
             };
             let mut plan = fixture_plan();
             plan.operation = operation;
-            let facts = verify_issued_grant(
-                &token,
-                issuer.verification_key().expect("issuer key"),
-                &holder,
-                &exchange_request,
-                &plan,
-                NOW_MS,
-            )
-            .expect("cryptographically verified exact holder grant");
+            let facts = verify_issued_grant(&token, expected(&issuer, &holder, &exchange_request), &plan, NOW_MS)
+                .expect("cryptographically verified exact holder grant");
             let exchanged = ExchangedUcan {
                 token,
                 holder: holder.clone(),
@@ -956,7 +986,7 @@ mod tests {
         let holder_signer = ucan::Ed25519InMemorySigner::from_seed_bytes([72; 32]);
         let issuer = issuer_admission(&issuer_signer);
         let holder = holder_signer.issuer().expect("holder DID");
-        let policy_ref = BasaltPolicyRef::new(
+        let policy_ref = basalt::authority_core::BasaltPolicyRef::new(
             format!("blake3:{}", blake3::hash(basalt::DEFAULT_POLICY_JSON.as_bytes()).to_hex()),
             basalt::SUPPORTED_SCHEMA_VERSION,
             "mantle-build-submit",
@@ -995,8 +1025,8 @@ mod tests {
         };
         let token = signed_oidc_token();
         let mut run = |native: &basalt::mantle::Request, documents: &mut ScriptedDocuments| {
-            exchange_through(
-                ExchangePorts {
+            through(
+                Ports {
                     policy: &policy,
                     cache: &mut cache,
                     documents,
@@ -1006,9 +1036,11 @@ mod tests {
                     holder_signer: &holder_signer,
                 },
                 &token,
-                &plan,
-                native,
-                &policy_ref,
+                Subject {
+                    plan: &plan,
+                    native,
+                    policy_ref: &policy_ref,
+                },
                 OIDC_NOW_MS,
             )
         };
