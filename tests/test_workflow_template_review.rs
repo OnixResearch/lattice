@@ -158,6 +158,51 @@ fn receiving_node_cwd_and_env_hold_no_expressions() {
     }
 }
 
+fn env_code(command: &str, env: &[(&str, &str)]) -> Result<(), DiagnosticCode> {
+    let mut fixture = input(command, &[]);
+    let workflow = fixture.workflow.as_mut().expect("fixture workflow");
+    let receiving = workflow.graph.nodes().find(|node| node.label == LABEL).expect("receiving node").id;
+    if let Some(lattice::engine::workflow::NodeConfig::Shell { env: node_env, .. }) =
+        workflow.configs.get_mut(&receiving.0)
+    {
+        node_env.extend(env.iter().map(|(key, value)| ((*key).to_owned(), (*value).to_owned())));
+    }
+    lattice::workflow_template::validate_bundle(fixture)
+        .map(|_| ())
+        .map_err(|diagnostic| diagnostic.code)
+}
+
+// r[verify lattice.workflow_templates.params.scenario.declaration]
+#[test]
+fn receiving_node_env_cannot_let_the_shell_run_a_value() {
+    let printf = "printf %s \"${LATTICE_PARAM_TOOL}\"";
+    let refused = Err(DiagnosticCode::ParamTargetEnv);
+    assert_eq!(env_code(printf, &[("BASH_FUNC_printf%%", "() { \"$2\" out; }")]), refused, "exported function");
+    assert_eq!(env_code(printf, &[("BASH_FUNC_printf", "x")]), refused, "BASH_FUNC_ key");
+    assert_eq!(env_code(printf, &[("printf%%", "x")]), refused, "%% key");
+    let subscript = "a[$(\"${LATTICE_PARAM_TOOL}\" out)]";
+    assert_eq!(env_code(printf, &[("x", subscript)]), refused, "arithmetic subscript");
+    assert_eq!(env_code(printf, &[("x", "a[`id`]")]), refused, "backtick");
+    for evaluator in ["let x", "declare -i y=x", "typeset -i y=x", "local -i y=x"] {
+        let command = format!("{evaluator} \"${{LATTICE_PARAM_TOOL}}\"");
+        assert_eq!(env_code(&command, &[]), Err(DiagnosticCode::InvalidParamDeclaration), "{evaluator}");
+    }
+    assert_eq!(env_code(printf, &[("BASH_ENV", "${LATTICE_PARAM_TOOL}")]), refused, "BASH_ENV sources a value");
+    for key in ["BASH_ENV", "ENV", "SHELLOPTS", "BASHOPTS", "PS4"] {
+        assert_eq!(env_code(printf, &[(key, "plain")]), refused, "{key}");
+    }
+
+    assert_eq!(env_code(printf, &[("RUST_LOG", "info")]), Ok(()), "ordinary static env stays valid");
+    let mut fixture = input(printf, &[]);
+    let workflow = fixture.workflow.as_mut().expect("fixture workflow");
+    if let Some(lattice::engine::workflow::NodeConfig::Shell { env, .. }) = workflow.configs.values_mut().next() {
+        env.insert("RUST_LOG".to_owned(), "info".to_owned());
+    }
+    let template = lattice::workflow_template::validate_bundle(fixture).expect("ordinary env admits");
+    let touch = std::collections::BTreeMap::from([("tool".to_owned(), ParamValue::Text("touch".into()))]);
+    assert!(lattice::workflow_template::bind(&template, &touch).is_ok(), "ordinary env binds");
+}
+
 // r[verify lattice.workflow_templates.params.scenario.declaration]
 #[test]
 fn credentials_never_shadow_parameter_values() {

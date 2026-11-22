@@ -171,7 +171,12 @@ pub fn reverify(bundle: &super::model::ValidatedBundle) -> Result<(), super::mod
     }
     super::params::validate_bound(declared, &resolved, &bundle.workflow)
         .map_err(|_| drift("bound workflow does not hold the resolved values"))?;
-    let content = admit_content(&bundle.manifest, bundle.workflow.clone(), bundle.orchestration.clone(), label)?;
+    // A mode failure keeps `mode_violation`; every other admission failure is drift.
+    let content = admit_content(&bundle.manifest, bundle.workflow.clone(), bundle.orchestration.clone(), label)
+        .map_err(|error| match error.code {
+            super::model::DiagnosticCode::ModeViolation => error,
+            _ => drift("bound content no longer passes admission"),
+        })?;
     if content.workflow_revision != bundle.workflow_revision || content.workflow_revision != bound.workflow_revision {
         return Err(drift("bound workflow revision differs"));
     }
@@ -199,6 +204,7 @@ fn param_diagnostic(bundle: &str, error: &super::params::ParamError) -> super::m
         super::params::ParamErrorCode::OutOfBounds => super::model::DiagnosticCode::ParamOutOfBounds,
         super::params::ParamErrorCode::MissingRequired => super::model::DiagnosticCode::MissingParam,
         super::params::ParamErrorCode::TargetExpression => super::model::DiagnosticCode::ParamTargetExpression,
+        super::params::ParamErrorCode::TargetEnv => super::model::DiagnosticCode::ParamTargetEnv,
     };
     diagnostic(bundle, code, error.message())
 }

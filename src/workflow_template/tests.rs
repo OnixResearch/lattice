@@ -145,6 +145,21 @@ fn each_reverify_comparison_reports_its_own_drift() {
 }
 
 #[test]
+fn shell_controlling_env_is_refused_at_bind_and_in_reverify() {
+    let mut template = template();
+    shell_mut(&mut template).1.insert("BASH_ENV".to_owned(), "/tmp/rc".to_owned());
+    let refused = super::bind(&template, &std::collections::BTreeMap::new()).expect_err("BASH_ENV is refused");
+    assert_eq!(refused.code, super::DiagnosticCode::ParamTargetEnv);
+
+    let mut bound = bound();
+    shell_mut(&mut bound).1.insert("BASH_FUNC_tool%%".to_owned(), "() { :; }".to_owned());
+    assert_eq!(
+        super::reverify(&bound).expect_err("exported function").code,
+        super::DiagnosticCode::BoundContentDrift
+    );
+}
+
+#[test]
 fn bind_refuses_a_parameter_credential() {
     let mut template = template();
     add_param_credential(&mut template.workflow);
@@ -180,7 +195,12 @@ fn tampered_bound_content_is_refused_at_every_boundary() {
         let blocked = super::ActivationPlan::Blocked(expected_block);
         assert_eq!(super::plan_activation(&bundle, &start_facts(&bundle)), blocked, "{case}");
         let saved = super::save_draft(&store, &bundle).expect_err(case);
-        assert!(matches!(saved, super::Error::BoundContentDrift), "{case}");
+        let expected_save = if case == "mode" {
+            matches!(saved, super::Error::ModeViolation)
+        } else {
+            matches!(saved, super::Error::BoundContentDrift)
+        };
+        assert!(expected_save, "{case}");
         let started = super::shell::admit_activation(&store, &bundle, &start_facts(&bundle), "operator:local");
         assert!(matches!(started, Err(super::Error::ActivationBlocked(block)) if block == expected_block), "{case}");
     }

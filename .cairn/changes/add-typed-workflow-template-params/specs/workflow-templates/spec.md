@@ -18,8 +18,9 @@ r[lattice.workflow_templates.params.scenario.declaration]
 - OR a target shell node whose command is not one simple command of space-separated safe literals and whole-word `"${KEY}"` references to its bound keys, whose first word is a reference, an assignment, a shell, an argument-executing builtin or a denied wrapper, any of whose later literal words names a shell (all by basename and ignoring ASCII case), or that contains `-exec`, `-execdir`, `-ok`, `-okdir` or `-c`
 - OR a node that binds a `LATTICE_PARAM_*` key as a credential, or a template environment that does not hold the rendered default
 - OR a target shell node with a `{{…}}` expression in its `cwd` or `env`
-- WHEN the loader validates the bundle, including after its workflow is re-pinned
-- THEN the bundle MUST be rejected with `invalid_param_declaration`, or `param_target_expression` for the expression case, and other bundles MUST remain available
+- OR a target shell node whose static env has a `BASH_FUNC_*` or `%%` key, a `BASH_ENV`, `ENV`, `SHELLOPTS`, `BASHOPTS` or `PS4` key, or a value containing `$` or a backtick
+- WHEN the loader validates the bundle, including after its workflow is re-pinned, or the template is bound, or a bound bundle is re-verified
+- THEN the bundle MUST be rejected with `invalid_param_declaration`, `param_target_expression` for the expression case or `param_target_env` for the environment case (`bound_content_drift` when re-verified), and other bundles MUST remain available
 - AND a value MUST NOT take the command-name position of the bound command and MUST NOT be parsed by the shell as shell syntax; the deny list is defense in depth and MUST NOT be claimed to stop a program that executes its own arguments
 
 #### Scenario: Values bind as environment values without widening grants
@@ -29,7 +30,7 @@ r[lattice.workflow_templates.params.scenario.binding]
 - THEN the bound workflow MUST differ from the template only in the declared environment values, and each shell command MUST receive a value as one unchanged argument
 - AND authority inspection of the bound workflow MUST list the same grants as the template under the bound workflow revision
 - AND save and start MUST refuse an unbound template
-- AND a bound bundle whose workflow, values, revision or mode differ from what `bind` admitted MUST be refused at save, activation planning and start with `bound_content_drift` or `mode_violation` before any store write or dispatch, and bundle content MUST NOT be writable outside the crate
+- AND a bound bundle whose workflow, values, revision or mode differ from what `bind` admitted MUST be refused at save, activation planning and start before any store write or dispatch, with `mode_violation` for a mode failure and `bound_content_drift` for any other failure at every entry point, and bundle content MUST NOT be writable outside the crate
 
 #### Scenario: Built-in bundles are migrated
 r[lattice.workflow_templates.params.scenario.migration]

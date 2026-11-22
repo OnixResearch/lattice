@@ -50,7 +50,11 @@ pub fn save_draft(
         return Err(Error::ParamsUnbound);
     }
     // The one bound-content check before any store write; planning below does not repeat it.
-    super::core::reverify(bundle).map_err(|_| Error::BoundContentDrift)?;
+    super::core::reverify(bundle).map_err(|diagnostic| match diagnostic.code {
+        super::model::DiagnosticCode::ModeViolation => Error::ModeViolation,
+        _ => Error::BoundContentDrift,
+    })?;
+    debug_assert!(bundle.params.is_some());
     let facts = application_facts(store, bundle)?;
     debug_assert_eq!(facts.orchestration.is_some(), bundle.orchestration.is_some());
     let plan = super::core::plan_verified_application(bundle, &facts);

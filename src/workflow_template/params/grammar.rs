@@ -7,11 +7,12 @@
 //! shell's own argument-executing builtins and common wrappers; they are not a guarantee that
 //! no program the command runs will execute an argument.
 
-/// Shell names, matched by basename and ignoring ASCII case against every literal word, so a
-/// wrapper cannot hand a value to a shell (`flock l bash "${KEY}"`).
+/// Shell names, matched by basename, ignoring ASCII case and a trailing version suffix
+/// (`bash5`, `ksh93`, `zsh-5.9`), against every literal word, so a wrapper cannot hand a value
+/// to a shell named as a separate word (`flock l bash "${KEY}"`).
 const SHELLS: &[&str] = &[
-    "sh", "bash", "dash", "zsh", "ksh", "fish", "ash", "mksh", "rbash", "oksh", "yash", "posh", "csh", "tcsh", "pwsh",
-    "nu", "elvish", "xonsh",
+    "sh", "bash", "dash", "zsh", "ksh", "fish", "ash", "mksh", "lksh", "rbash", "oksh", "yash", "posh", "csh", "tcsh",
+    "pwsh", "nu", "elvish", "xonsh",
 ];
 
 /// Shell builtins, precommand modifiers, and wrappers that run, wrap, or re-parse an argument
@@ -31,6 +32,11 @@ const DENIED_PROGRAMS: &[&str] = &[
     "mapfile",
     "readarray",
     "enable",
+    // Builtins that evaluate an argument arithmetically or as a declaration.
+    "let",
+    "declare",
+    "typeset",
+    "local",
     // Precautionary builtins and zsh precommand modifiers.
     "fc",
     "bind",
@@ -41,6 +47,9 @@ const DENIED_PROGRAMS: &[&str] = &[
     "-",
     // Wrappers that run an argument as a program.
     "env",
+    "tmux",
+    "screen",
+    "hyperfine",
     "xargs",
     "nohup",
     "timeout",
@@ -83,12 +92,12 @@ pub(super) fn is_simple_bound_command(command: &str, keys: &[&str]) -> bool {
         return false;
     };
     let is_plain_program = is_literal(program) && !program.contains('=');
-    let is_denied = names_any(program, SHELLS) || names_any(program, DENIED_PROGRAMS);
+    let is_denied = names_shell(program) || names_any(program, DENIED_PROGRAMS);
     if !is_plain_program || is_denied {
         return false;
     }
     words.all(|word| {
-        is_reference(word, keys) || (is_literal(word) && !DENIED_WORDS.contains(&word) && !names_any(word, SHELLS))
+        is_reference(word, keys) || (is_literal(word) && !DENIED_WORDS.contains(&word) && !names_shell(word))
     })
 }
 
@@ -112,6 +121,15 @@ fn is_literal(word: &str) -> bool {
 fn names_any(word: &str, names: &[&str]) -> bool {
     let basename = word.rsplit('/').next().unwrap_or(word);
     names.iter().any(|name| name.eq_ignore_ascii_case(basename))
+}
+
+/// Whether a word names a shell by basename, ignoring ASCII case and a trailing version suffix of
+/// digits, `.`, `-`, and `_` (`bash5`, `ksh93`, `zsh-5.9`).
+fn names_shell(word: &str) -> bool {
+    let basename = word.rsplit('/').next().unwrap_or(word);
+    let unversioned =
+        basename.trim_end_matches(|character: char| character.is_ascii_digit() || matches!(character, '.' | '-' | '_'));
+    !unversioned.is_empty() && names_any(unversioned, SHELLS)
 }
 
 #[cfg(test)]
@@ -171,6 +189,14 @@ mod tests {
         assert!(!accepts("flock l bash \"${LATTICE_PARAM_TOOL}\""));
         assert!(!accepts("prlimit sh -ec \"${LATTICE_PARAM_TOOL}\""));
         assert!(!accepts("find . -okdir \"${LATTICE_PARAM_TOOL}\""));
+        for versioned in ["bash5", "ksh93", "zsh-5.9", "/usr/bin/BASH-5.2", "lksh"] {
+            assert!(!accepts(&format!("{versioned} \"${{LATTICE_PARAM_TOOL}}\"")), "{versioned} first word");
+            assert!(!accepts(&format!("tool {versioned} \"${{LATTICE_PARAM_TOOL}}\"")), "{versioned} later word");
+        }
+        for evaluating in ["let", "declare", "typeset", "local", "tmux", "screen", "hyperfine"] {
+            assert!(!accepts(&format!("{evaluating} x \"${{LATTICE_PARAM_TOOL}}\"")), "{evaluating} is denied");
+        }
+        assert!(accepts("tool v2 1.0 \"${LATTICE_PARAM_TOOL}\""), "version-like arguments are not shells");
     }
 
     #[test]

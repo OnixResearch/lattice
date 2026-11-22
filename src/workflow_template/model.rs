@@ -194,6 +194,7 @@ pub enum DiagnosticCode {
     ModeViolation,
     BoundContentDrift,
     ParamTargetExpression,
+    ParamTargetEnv,
 }
 
 impl DiagnosticCode {
@@ -229,6 +230,7 @@ impl DiagnosticCode {
             Self::ModeViolation => "mode_violation",
             Self::BoundContentDrift => "bound_content_drift",
             Self::ParamTargetExpression => "param_target_expression",
+            Self::ParamTargetEnv => "param_target_env",
         }
     }
 }

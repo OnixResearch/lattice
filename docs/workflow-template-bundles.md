@@ -105,20 +105,28 @@ Every shell node that receives a value must be one simple command in a strict gr
 - words are separated by spaces;
 - each word is either a literal over ASCII letters, digits, and `-`, `_`, `.`, `/`, `=`, `:`, `,`, `+`, `@`, `%`, or exactly `"${LATTICE_PARAM_NAME}"` as a whole word for a key bound to that node;
 - the first word is a literal program without `=`, so it is never a reference or an environment assignment;
-- the first word's basename, compared ignoring ASCII case, is neither a shell nor on the first-word deny list below;
-- no later literal word's basename, compared ignoring ASCII case, is a shell, so a wrapper cannot hand a value to a shell (`flock l bash "${…}"`); other names stay valid as arguments, as in `systemctl enable`, `kubectl get jobs`, `find .` and `tar -xf -`;
+- the first word's basename, compared ignoring ASCII case and a trailing version suffix for shells (`bash5`, `ksh93`, `zsh-5.9`), is neither a shell nor on the first-word deny list below;
+- a shell named as a separate later word is refused, so a wrapper cannot hand a value to it (`flock l bash "${…}"`); other names stay valid as arguments, as in `systemctl enable`, `kubectl get jobs`, `find .` and `tar -xf -`. A shell chosen through an option such as `--shell=bash`, `-sbash` or `SHELL=bash`, or a program that runs an argument through a shell such as `tmux` or `hyperfine` named in a later word, still gets through; see the non-claims below;
 - no word is exactly `-exec`, `-execdir`, `-ok`, `-okdir`, or `-c`.
 
 The deny lists are defense in depth against the shell's own argument-executing builtins and common wrappers, not a guarantee:
 
-- shells, checked in every word: `sh`, `bash`, `dash`, `zsh`, `ksh`, `fish`, `ash`, `mksh`, `rbash`, `oksh`, `yash`, `posh`, `csh`, `tcsh`, `pwsh`, `nu`, `elvish`, `xonsh`;
-- first word only, builtins that execute or load an argument: `eval`, `exec`, `command`, `builtin`, `source`, `.`, `trap`, `jobs`, `coproc`, `mapfile`, `readarray`, `enable`;
+- shells, checked in every word: `sh`, `bash`, `dash`, `zsh`, `ksh`, `fish`, `ash`, `mksh`, `lksh`, `rbash`, `oksh`, `yash`, `posh`, `csh`, `tcsh`, `pwsh`, `nu`, `elvish`, `xonsh`;
+- first word only, builtins that execute, load, or evaluate an argument: `eval`, `exec`, `command`, `builtin`, `source`, `.`, `trap`, `jobs`, `coproc`, `mapfile`, `readarray`, `enable`, `let`, `declare`, `typeset`, `local`;
 - first word only, precautionary builtins and zsh precommand modifiers: `fc`, `bind`, `complete`, `compgen`, `noglob`, `nocorrect`, `-`;
-- first word only, wrappers that run an argument: `env`, `xargs`, `nohup`, `timeout`, `nice`, `ionice`, `setsid`, `stdbuf`, `taskset`, `chrt`, `sudo`, `doas`, `su`, `runuser`, `busybox`, `time`, `watch`, `parallel`, `flock`, `prlimit`, `setpriv`, `unshare`, `nsenter`, `strace`, `ltrace`, `script`, `systemd-run`, `firejail`, `bwrap`, `chroot`, `nix-shell`.
+- first word only, wrappers that run an argument: `env`, `tmux`, `screen`, `hyperfine`, `xargs`, `nohup`, `timeout`, `nice`, `ionice`, `setsid`, `stdbuf`, `taskset`, `chrt`, `sudo`, `doas`, `su`, `runuser`, `busybox`, `time`, `watch`, `parallel`, `flock`, `prlimit`, `setpriv`, `unshare`, `nsenter`, `strace`, `ltrace`, `script`, `systemd-run`, `firejail`, `bwrap`, `chroot`, `nix-shell`.
 
-`git` and `find` are allowed so runbooks can run `git -C "${…}" checkout "${…}"` and `find . -name "${…}"`; `find`'s executing options are refused as words.
+`git` and `find` are allowed so runbooks can run `git -C "${…}" checkout "${…}"` and `find . -name "${…}"`; `find`'s executing options are refused as words. A repository a value selects (`-C`, `--git-dir`, `--work-tree`, `--exec-path`) brings its own hooks and config, which can run code.
 
 The receiving node's `cwd` and `env` may hold no `{{…}}` expression. Otherwise another node's output, for example `PATH={{node:A:…}}`, could change where or how that node looks up its program. Such a node fails with `param_target_expression`. Expressions also cannot appear in the bound command, because `{` and `}` are outside the literal alphabet.
+
+The receiving node's static `env` may not let the shell run a value. Such a node fails with `param_target_env` when its environment has:
+
+- a key starting with `BASH_FUNC_` or containing `%%` (an exported function, for example one that replaces `printf`);
+- one of the keys `BASH_ENV`, `ENV`, `SHELLOPTS`, `BASHOPTS`, or `PS4`;
+- a value containing `$` or a backtick (expanded when a builtin evaluates the variable arithmetically, for example `x=a[$(…)]`).
+
+Parameter values never contain `$` or a backtick, and ordinary static env such as `RUST_LOG=info` stays valid.
 
 The literal alphabet excludes `$`, backticks, quotes, backslashes, `;`, `|`, `&`, `<`, `>`, `(`, `)`, `{`, `}`, `*`, `?`, `[`, `~`, `#`, whitespace other than the separating space, newline, and NUL. A bound command therefore has no command substitution, arithmetic, here-document, redirection, glob, or control operator. The shell passes each value as one argument without word splitting or globbing.
 
@@ -128,7 +136,7 @@ The template workflow must hold each optional parameter's rendered default under
 
 Non-claims:
 
-- Any program that executes an argument can still run a program a value chooses. Examples: `git` through aliases, `--upload-pack`, `--receive-pack`, `--exec` or `ext::` URLs; `fd -x`; `rg --pre`; `nix develop --command`; script interpreters, template engines and query languages; and wrappers named only in a later word or not on the list. Reviewing the bound command for such programs is the bundle reviewer's job. `lattice authority inspect` lists the bound revision's exact grants for the resolved values.
+- Any program that executes an argument can still run a program a value chooses. Examples: `git` through aliases, `--upload-pack`, `--receive-pack`, `--exec` or `ext::` URLs, and through the hooks and config of a repository a value selects with `-C`, `--git-dir`, `--work-tree` or `--exec-path`; `fd -x`; `rg --pre`; `nix develop --command`; script interpreters, template engines and query languages; a shell chosen by an option such as `--shell=bash`, `-sbash` or `SHELL=bash`; and wrappers named only in a later word or not on the list. Reviewing the bound command for such programs is the bundle reviewer's job. `lattice authority inspect` lists the bound revision's exact grants for the resolved values.
 - Other nodes can consume the receiving node's outputs through expressions or stdin edges. Those nodes are ordinary reviewed workflow content; the grammar governs only receiving nodes.
 
 ### Resolution and identity
@@ -137,7 +145,7 @@ Non-claims:
 
 `lattice::workflow_template::bind(template, supplied)` resolves values against a catalog template. It writes them into a copy of the workflow and rebinds an optional orchestration to the new workflow revision. Then it re-runs the template's admission checks: workflow validation, compatibility, mode, orchestration binding, guarded authority, and the binding grammar. The bound bundle's identity is BLAKE3 over the template identity, the resolved-value identity, and the bound workflow revision.
 
-`ValidatedBundle` content is read-only outside Lattice; read it through `identity()`, `manifest()`, `workflow()`, `workflow_revision()`, `orchestration()`, `orchestration_revision()`, `file_identities()`, and `params()`. `save_draft`, activation planning, and start call `reverify` before any store write or dispatch. It checks, in order, that the recorded values re-resolve to the same values; that the workflow still holds them and passes the target checks above; that the content passes full admission again; that the recomputed workflow revision equals the recorded and bound revisions; that the recomputed orchestration revision equals the recorded one; that the template identity recomputed from the manifest and file identities equals the bound template; and that the bound identity recomputed from template, values, and revision equals the bundle identity. A failed mode check refuses with `mode_violation`; any other failure refuses with `bound_content_drift` (`BoundContentDrift`).
+`ValidatedBundle` content is read-only outside Lattice; read it through `identity()`, `manifest()`, `workflow()`, `workflow_revision()`, `orchestration()`, `orchestration_revision()`, `file_identities()`, and `params()`. `save_draft`, activation planning, and start call `reverify` before any store write or dispatch. It checks, in order, that the recorded values re-resolve to the same values; that the workflow still holds them and passes the target checks above; that the content passes full admission again; that the recomputed workflow revision equals the recorded and bound revisions; that the recomputed orchestration revision equals the recorded one; that the template identity recomputed from the manifest and file identities equals the bound template; and that the bound identity recomputed from template, values, and revision equals the bundle identity. Every entry point applies the same rule: a mode failure refuses with `mode_violation` (`ModeViolation` from `save_draft`, a `ModeViolation` conflict from `plan_application`, a `ModeViolation` block from activation planning); any other failure refuses with `bound_content_drift` (`BoundContentDrift`).
 
 Parameters cannot widen effect authority. Binding changes only declared environment values, so node kinds, commands, resources, and abilities stay as reviewed. `lattice authority inspect` on the saved bound workflow lists the same grants as the template, under the bound workflow revision.
 
@@ -191,7 +199,7 @@ If the current canvas has unsaved changes, Lattice refuses replacement. Save or 
 
 ## Save and start boundaries
 
-Save and start accept only a bound bundle. `save_draft` fails with `ParamsUnbound` for an unbound catalog template and with `BoundContentDrift` when bound content no longer verifies. Activation planning blocks with `ParamsUnbound`, `ModeViolation`, or `BoundContentDrift`.
+Save and start accept only a bound bundle. `save_draft` fails with `ParamsUnbound` for an unbound catalog template, with `ModeViolation` when the mode no longer admits the workflow, and with `BoundContentDrift` when bound content otherwise no longer verifies. Activation planning blocks with `ParamsUnbound`, `ModeViolation`, or `BoundContentDrift`.
 
 A saved workflow must have the exact previewed revision. A same-name workflow with different content is a conflict, not overwrite authority. This includes the same template bound to different values.
 

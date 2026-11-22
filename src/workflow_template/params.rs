@@ -122,6 +122,8 @@ pub enum ParamErrorCode {
     TooManyValues,
     /// A node that receives a value has a `{{…}}` expression in its `cwd` or `env`.
     TargetExpression,
+    /// A node that receives a value has static env a shell could use to run it.
+    TargetEnv,
 }
 
 /// A safe parameter diagnostic. It names only a declared parameter and never echoes a value.
@@ -148,6 +150,7 @@ impl ParamError {
             ParamErrorCode::MissingRequired => "a required parameter is missing",
             ParamErrorCode::TooManyValues => "too many parameter values were supplied",
             ParamErrorCode::TargetExpression => "a node that receives a parameter has an expression in its cwd or env",
+            ParamErrorCode::TargetEnv => "a node that receives a parameter has shell-controlling environment",
         }
     }
 }

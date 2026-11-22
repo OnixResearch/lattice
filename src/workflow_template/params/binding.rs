@@ -59,18 +59,48 @@ fn validate_targets(
         else {
             return Err(super::ParamError::new(super::ParamErrorCode::InvalidDeclaration, None));
         };
-        if !super::grammar::is_simple_bound_command(command, keys) {
-            return Err(super::ParamError::new(super::ParamErrorCode::InvalidDeclaration, None));
-        }
-        let has_expression = cwd.as_deref().is_some_and(is_expression)
-            || env.iter().any(|(key, value)| is_expression(key) || is_expression(value));
-        if has_expression {
-            return Err(super::ParamError::new(super::ParamErrorCode::TargetExpression, None));
-        }
+        check_receiving_node(command, cwd.as_deref(), env, keys)?;
     }
     debug_assert!(node_keys.values().all(|keys| !keys.is_empty()));
     debug_assert!(node_keys.len() <= declared.iter().map(|declaration| declaration.bindings.len()).sum::<usize>());
     Ok(())
+}
+
+/// Environment keys a shell reads to source files or change option and trace handling.
+const SHELL_CONTROL_KEYS: &[&str] = &["BASH_ENV", "ENV", "SHELLOPTS", "BASHOPTS", "PS4"];
+
+/// Checks for one shell node that receives a value: the strict command grammar, no `{{…}}`
+/// expression in `cwd` or `env`, and no static environment that would let the shell run a value.
+///
+/// The environment check refuses `BASH_FUNC_*` and `%%` keys (exported functions), the shell
+/// control keys above, and any value containing `$` or a backtick (expanded when a builtin
+/// evaluates the variable arithmetically). Parameter values never contain either character.
+fn check_receiving_node(
+    command: &str,
+    cwd: Option<&str>,
+    env: &std::collections::HashMap<String, String>,
+    keys: &[&str],
+) -> Result<(), super::ParamError> {
+    if !super::grammar::is_simple_bound_command(command, keys) {
+        return Err(super::ParamError::new(super::ParamErrorCode::InvalidDeclaration, None));
+    }
+    let has_expression =
+        cwd.is_some_and(is_expression) || env.iter().any(|(key, value)| is_expression(key) || is_expression(value));
+    if has_expression {
+        return Err(super::ParamError::new(super::ParamErrorCode::TargetExpression, None));
+    }
+    if env.iter().any(is_shell_control) {
+        return Err(super::ParamError::new(super::ParamErrorCode::TargetEnv, None));
+    }
+    debug_assert!(!keys.is_empty());
+    debug_assert!(env.keys().all(|key| !key.starts_with("BASH_FUNC_")));
+    Ok(())
+}
+
+fn is_shell_control((key, value): (&String, &String)) -> bool {
+    let is_function = key.starts_with("BASH_FUNC_") || key.contains("%%");
+    let is_control_key = SHELL_CONTROL_KEYS.contains(&key.as_str());
+    is_function || is_control_key || value.contains(['$', '`'])
 }
 
 /// Whether text contains a workflow expression marker.

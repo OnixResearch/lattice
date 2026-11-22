@@ -253,5 +253,52 @@
         "baseline_rekeyed": false
       }
     }
+  },
+  "review_4": {
+    "reviewer": "ParamsVerify (verification review)",
+    "reviewed_commit": "a832e3c0",
+    "findings": {
+      "P1_receiving_node_static_env": {
+        "routes": [
+          "BASH_FUNC_printf%% exported function plus printf %s \"${LATTICE_PARAM_TOOL}\"",
+          "x=a[$(\"${LATTICE_PARAM_TOOL}\" out)] plus let, declare -i or typeset -i",
+          "BASH_ENV=${LATTICE_PARAM_ROOT} with shell = bash"
+        ],
+        "fix": "check_receiving_node refuses BASH_FUNC_* and %% keys, BASH_ENV, ENV, SHELLOPTS, BASHOPTS and PS4, and values containing $ or a backtick, with param_target_env at load and bind and bound_content_drift in reverify; let, declare, typeset and local join the first-word builtins; the built-in catalog review still loads and binds",
+        "tests": [
+          "tests/test_workflow_template_review.rs::receiving_node_env_cannot_let_the_shell_run_a_value (each route refused; let/declare/typeset/local refused; RUST_LOG=info admits and binds)",
+          "src/workflow_template/tests.rs::shell_controlling_env_is_refused_at_bind_and_in_reverify",
+          "tests/test_workflow_template_binding.rs (built-in catalog review loads and binds)"
+        ]
+      },
+      "P3_error_codes": {
+        "fix": "one rule at every entry point: mode failure -> mode_violation (save_draft Error::ModeViolation, plan_application Conflict(ModeViolation), activation Blocked(ModeViolation)); any other failure, including non-mode admit_content failures in reverify, -> bound_content_drift",
+        "tests": ["src/workflow_template/tests.rs::tampered_bound_content_is_refused_at_every_boundary (mode case expects Error::ModeViolation from save_draft)"]
+      },
+      "P3_later_word_docs_and_versions": {
+        "fix": "lksh added; shells matched ignoring a trailing version suffix of digits, '.', '-', '_'; tmux, screen, hyperfine added as first-word wrappers; docs name what later-word checking misses (--shell=bash, -sbash, SHELL=bash, tmux/hyperfine in a later word) and point to the non-claim",
+        "tests": ["src/workflow_template/params/grammar.rs::tests::shells_are_matched_in_any_case_and_any_word (bash5, ksh93, zsh-5.9, /usr/bin/BASH-5.2, lksh as first and later word; v2 and 1.0 stay valid)"]
+      },
+      "P3_git_non_claim": {
+        "fix": "docs: the hooks and config of a repository a value selects (-C, --git-dir, --work-tree, --exec-path) can run code"
+      }
+    },
+    "api_changes": ["ParamErrorCode::TargetEnv", "DiagnosticCode::ParamTargetEnv (param_target_env)", "workflow_template::Error::ModeViolation"],
+    "gates": {
+      "focused_integration_tests": {
+        "exit": 0,
+        "passed": { "params": 5, "binding": 4, "modes": 5, "review": 6, "workflow_templates": 17, "guarded": 19, "agent_evaluation_core": 12 },
+        "failed": 0
+      },
+      "lib_tests": { "command": "cargo test -p lattice --no-fail-fast --lib -- workflow_template", "exit": 0, "passed": 13, "failed": 0 },
+      "clippy": { "exit": 0 },
+      "fmt": { "exit": 0 },
+      "octet_precommit_check": {
+        "exit": 0,
+        "root": { "accepted_total": 1052, "current_total": 1052, "new_total": 0, "stale_total": 0 },
+        "lattice_core": { "accepted_total": 25, "current_total": 25, "new_total": 0, "stale_total": 0 },
+        "baseline_rekeyed": false
+      }
+    }
   }
 }
