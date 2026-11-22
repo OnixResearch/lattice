@@ -23,11 +23,11 @@
 
 ## Phase 5: Documentation
 
-- [x] [serial] 5.1 Write `docs/vm-execution-profile.md` and add the changelog and docs-index entries. These are shared files, merged by the integration owner.
-- [x] [serial] 5.2 Re-verify in a private target (`CARGO_TARGET_DIR=…/lattice-s1-target`). Evidence: the lib filter `vm_profile model_gateway candidate_worker implementation_attempt` passed 220 with 7 ignored; `test_model_gateway_process` 4, `test_implementation_attempt_refusals` 6, `test_agent_revision_shell` 9 and `test_agent_revision_attachments` 17 passed; `cargo clippy -p lattice --lib --bins -D warnings` exit 0. Octet: every stable ID changes because the `nix` hunk changes `config_hash`/`profile_hash`, and `scripts/octet-baseline-migrate.rs` refuses with `candidate metadata differs: profile_hash` for both scopes. The semantic comparison against a pristine `5a8e1d51` reference (`evidence/octet-semantic-comparison.json`) shows 0 new and 0 resolved findings for `lattice` (1052) and `lattice-core` (25). The baselines were not rewritten; the integration owner admits the manifest cohort.
+- [x] [serial] 5.1 Write `docs/vm-execution-profile.md` and add the changelog and docs-index entries. These are shared files, merged by the integration owner. r[lattice.vm_profile.admission] r[lattice.vm_profile.binding] r[lattice.vm_profile.gateway]
+- [x] [serial] 5.2 Re-verify in a private target (`CARGO_TARGET_DIR=…/lattice-s1-target`). Evidence: the lib filter `vm_profile model_gateway candidate_worker implementation_attempt` passed 220 with 7 ignored; `test_model_gateway_process` 4, `test_implementation_attempt_refusals` 6, `test_agent_revision_shell` 9 and `test_agent_revision_attachments` 17 passed; `cargo clippy -p lattice --lib --bins -D warnings` exit 0. Octet: every stable ID changes because the `nix` hunk changes `config_hash`/`profile_hash`, and `scripts/octet-baseline-migrate.rs` refuses with `candidate metadata differs: profile_hash` for both scopes. The semantic comparison against a pristine `5a8e1d51` reference (`evidence/octet-semantic-comparison.json`) shows 0 new and 0 resolved findings for `lattice` (1052) and `lattice-core` (25). The baselines were not rewritten; the integration owner admits the manifest cohort. r[lattice.vm_profile.admission] r[lattice.vm_profile.request] r[lattice.vm_profile.forwarded_upstream] r[lattice.vm_profile.gateway]
 
 ## Phase 6: Remaining qualification (not this slice)
 
-- [ ] [serial] 6.1 Blocked on S4 (Kiln): Q2 on Cloud Hypervisor 54.0 with real vsock, the Kiln C3 server and a scripted upstream.
-- [ ] [serial] 6.2 Blocked on OD-3: a live model endpoint and credential.
-- [ ] [serial] 6.3 Blocked on MH + ASP: a cross-host move with a production placement and fencing authority and revocation.
+- [ ] [serial] 6.1 Blocked on S4 (Kiln): Q2 on Cloud Hypervisor 54.0 with real vsock, the Kiln C3 server and a scripted upstream. r[lattice.vm_profile.forwarded_upstream] r[lattice.vm_profile.effect_authority]
+- [ ] [serial] 6.2 Blocked on OD-3: a live model endpoint and credential. r[lattice.vm_profile.gateway]
+- [ ] [serial] 6.3 Blocked on MH + ASP: a cross-host move with a production placement and fencing authority and revocation. r[lattice.vm_profile.binding]

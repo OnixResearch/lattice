@@ -11,8 +11,8 @@
 
 ## Phase 3: Documentation and checks
 
-- [x] [serial] Document the guest gateway boundary and update the transport documentation. Evidence: `docs/workflow-exchange-guest-gateway.md`, `docs/workflow-exchange-transport.md`.
-- [x] [serial] Run focused tests, clippy `-D warnings` on the touched packages, and `octet-precommit-check`, and record the evidence. Evidence: `evidence/transport-tests.log`, `evidence/lib-exchange-tests.log`, `evidence/reconnect-tests.log`, `evidence/transport-clippy.log`, `evidence/lattice-clippy.log`, `evidence/transport-octet-status.json` (deny-all clean, 0 findings), and `evidence/octet-precommit.log` (lattice 1052/1052 accepted, 0 new, 0 stale; lattice-core 25/25, 0 new, 0 stale). Repository gates (`scripts/check.rs`, `nix flake check`) belong to the integration owner.
+- [x] [serial] Document the guest gateway boundary and update the transport documentation. Evidence: `docs/workflow-exchange-guest-gateway.md`, `docs/workflow-exchange-transport.md`. r[lattice.workflow_interchange.guest_listener] r[lattice.workflow_interchange.vsock_listener]
+- [x] [serial] Run focused tests, clippy `-D warnings` on the touched packages, and `octet-precommit-check`, and record the evidence. Evidence: `evidence/transport-tests.log`, `evidence/lib-exchange-tests.log`, `evidence/reconnect-tests.log`, `evidence/transport-clippy.log`, `evidence/lattice-clippy.log`, `evidence/transport-octet-status.json` (deny-all clean, 0 findings), and `evidence/octet-precommit.log` (lattice 1052/1052 accepted, 0 new, 0 stale; lattice-core 25/25, 0 new, 0 stale). Repository gates (`scripts/check.rs`, `nix flake check`) belong to the integration owner. r[lattice.workflow_interchange.guest_listener] r[lattice.workflow_interchange.vsock_profile] r[lattice.workflow_interchange.vsock_listener] r[lattice.workflow_interchange.handler_profile_v2] r[lattice.workflow_interchange.reconnect_rules] r[lattice.workflow_interchange.observation_continuity]
 
 ## Not in this change
 
