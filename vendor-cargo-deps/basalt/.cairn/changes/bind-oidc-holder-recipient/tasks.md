@@ -2,6 +2,27 @@
 
 - [x] [serial] Preserve the original exchange API and add explicit typed holder delivery without changing service attenuation or one-time replay, linked to r[ucan_token_flow.oidc.holder_recipient].
 - [x] [serial] Bind holder delivery into redacted receipt identities and author regression cases, linked to r[ucan_token_flow.oidc.holder_recipient].
-- [ ] [serial] Run focused producer OIDC regression cases and integrated consumer holder invocation verification, linked to r[ucan_token_flow.oidc.holder_recipient]. This remains unexecuted under the consumer integration owner's coordinated verification boundary.
+- [x] [serial] Expose `mantle::canonical_enforcement` and the event-read and result-read OIDC operations, linked to r[ucan_token_flow.oidc.native_signing].
 
-No lifecycle acceptance, sync execution, archive, publication or production activation is performed.
+## Phase 2: Review fixes on base 5e0f1f4c
+
+- [x] [serial] Run `cargo fmt` over the series and clear its clippy findings: `option_if_let_else` in the shell, `too_long_first_doc_paragraph` on `canonical_enforcement`, and `similar_names` and `redundant_clone` in the holder test (commit `13c5a7b`). r[ucan_token_flow.oidc.holder_recipient]
+- [x] [serial] Make the exchange one-time per OIDC token (issue #7): replay key over `(iss, jti)` only under `basalt.oidc.replay.v2`, reserved until `max(exp, iat + max_token_age) + skew`. Tests deny the same token for another operation and another resource, and after the old UCAN-bounded window while the token still verifies; a fresh token is accepted (commit `17d8107`). r[ucan_token_flow.oidc.replay_boundary]
+- [x] [serial] Bind holder grants to the exact canonical Mantle request through `HolderDelivery`, and refuse a recipient equal to the issuer. Negative tests cover a swapped project, audience and subject, a bare prefix, a truncated `…/1` resource, another operation, holder-as-service and issuer-as-recipient, all denied before key load and replay. Positive tests cover a second holder from a third seed with its grant verified, and an end-to-end admission through `mantle::Verifier` that is denied for another project. Regression tests check that failure receipts bind the recipient and that legacy `exchange` still names the service. `canonical_enforcement` equals `Verifier::enforcement` and rejects padded fields. Docs are corrected and the issue #10 grant-issuance note is added (commit `e35bd05`). r[ucan_token_flow.oidc.holder_recipient] r[ucan_token_flow.oidc.native_signing]
+- [x] [serial] Add the Nickel operation uniqueness clause, a valid `event-read`/`result-read` fixture, and invalid unsupported, empty and duplicated fixtures registered in `flake.nix`. Fix the fixture helper: on `5e0f1f4c` all 8 invalid OIDC fixtures failed with `infinite recursion` rather than the contract. Now all 11 invalid fixtures fail with `contract broken by a value`, the valid fixture exports both read operations, and `nix build path:.#checks.x86_64-linux.oidc-exchange-policy` exits 0 (commit `061a4eb`). r[ucan_token_flow.oidc.holder_recipient]
+
+## Phase 3: Verification that ran
+
+- [x] [serial] Focused checks on `e35bd05`: r[ucan_token_flow.oidc.replay_boundary] r[ucan_token_flow.oidc.holder_recipient] r[ucan_token_flow.oidc.native_signing]
+  - `cargo fmt --check` exited 0.
+  - `cargo clippy --all-targets -- -D warnings` exited 0 for both `--no-default-features` and `--features cli`.
+  - `cargo nextest run --test oidc_exchange --test ucan_enforcement --test public_api --test oidc_evidence_scan` passed 102/102.
+  - `cargo test --doc` passed.
+- [x] [serial] Full README release rail on the real tree at `061a4eb`: r[ucan_token_flow.oidc.replay_boundary] r[ucan_token_flow.oidc.holder_recipient] r[ucan_token_flow.oidc.native_signing]
+  - Ran in a fresh `RELEASE_VERIFY_SCRATCH_DIR` with no `RELEASE_VERIFY_*_FRESH` and no `RELEASE_VERIFY_CARGO_STEPS` override, so fmt and both Clippy steps ran.
+  - All 33 steps exited 0, including `vendored UCAN snapshot` and the six `nix build` freshness steps. Library nextest passed 297/297 and CLI nextest 310/310. Result: `release verification passed`, exit 0.
+  - Only the optional Clankers consumer fixture was deferred, because `../clankers` is absent.
+- [x] [serial] `nix flake check -L --keep-going --option builders '' --option min-free 0 --option secret-key-files ''` on `061a4eb` exited 0: `all checks passed!` across 22 x86_64-linux checks, including `checks.release` and `checks.oidc-exchange-policy`. r[ucan_token_flow.oidc.holder_recipient]
+- [ ] [serial] Integrated Lattice consumer verification against the new `exchange_to_recipient(…, holder: &HolderDelivery<'_>)` signature. This remains with the Lattice integration owner. r[ucan_token_flow.oidc.holder_recipient]
+
+No lifecycle acceptance, sync, archive, publication or production activation is performed by this record.

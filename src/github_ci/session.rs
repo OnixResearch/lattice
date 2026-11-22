@@ -252,8 +252,8 @@ impl InProcessAuthority<'_> {
         now_ms: u64,
     ) -> Result<exchange::ExchangedUcan, Error> {
         let token = self.oidc.acquire_from_environment(self.oidc_audience)?;
-        let resource = mantle::canonical_resource(endpoint, request)?;
-        Ok(exchange::exchange(self.basalt, token, plan, &endpoint.project, &resource, now_ms)?)
+        let native = mantle::authority_request(endpoint, request)?;
+        Ok(exchange::exchange(self.basalt, token, plan, &native, &endpoint.authority_policy, now_ms)?)
     }
     fn holder(&mut self) -> &dyn TokenSigner {
         self.basalt.ports().holder_signer

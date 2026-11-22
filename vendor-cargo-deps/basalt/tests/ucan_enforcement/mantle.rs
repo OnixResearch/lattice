@@ -360,7 +360,15 @@ fn mantle_root_delegation_reaches_exact_build_operation() {
 fn canonical_signing_request_rejects_malformed_fields_and_aggregate_bounds() {
     let reference = policy_ref();
     let original = request(Operation::BuildSubmit);
-    for target in [String::new(), "x".repeat(513), "invalid\nfield".into(), "nonascii-é".into()] {
+    for target in [
+        String::new(),
+        "x".repeat(513),
+        "invalid\nfield".into(),
+        "nonascii-é".into(),
+        " /jobs/approved".into(),
+        "/jobs/approved ".into(),
+        "\t/jobs/approved".into(),
+    ] {
         let mut altered = original.clone();
         altered.target = target;
         assert!(basalt::mantle::canonical_enforcement(&altered, &reference).is_err());
@@ -376,4 +384,38 @@ fn canonical_signing_request_rejects_malformed_fields_and_aggregate_bounds() {
     oversized.audience = "u".repeat(400);
     oversized.target = "t".repeat(400);
     assert!(basalt::mantle::canonical_enforcement(&oversized, &reference).is_err());
+}
+
+#[test]
+fn canonical_signing_request_equals_the_receiver_enforcement_and_rejects_padded_fields() {
+    let policy = default_policy().unwrap();
+    let reference = policy_ref();
+    let roots = [signer(ISSUER_SEED_BYTE).issuer().unwrap().as_str().into()];
+    let verifier = verifier(&policy, &reference, &roots);
+    for operation in [
+        Operation::BuildSubmit,
+        Operation::EventRead,
+        Operation::ResultRead,
+    ] {
+        let request = request(operation);
+        assert_eq!(
+            basalt::mantle::canonical_enforcement(&request, &reference).unwrap(),
+            verifier.enforcement(&request).unwrap()
+        );
+    }
+    let original = request(Operation::BuildSubmit);
+    for field in 0..5 {
+        let mut padded = original.clone();
+        match field {
+            0 => padded.subject.insert(0, ' '),
+            1 => padded.account.push(' '),
+            2 => padded.project.insert(0, ' '),
+            3 => padded.endpoint.push(' '),
+            _ => padded.audience.insert(0, ' '),
+        }
+        assert!(
+            basalt::mantle::canonical_enforcement(&padded, &reference).is_err(),
+            "field {field}"
+        );
+    }
 }

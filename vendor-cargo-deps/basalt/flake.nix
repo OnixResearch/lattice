@@ -86,13 +86,19 @@
           "duplicate-entry"
           "malformed-ability"
         ];
+        validOidcPolicyFixtures = [
+          "explicit-read-operations"
+        ];
         invalidOidcPolicyFixtures = [
           "algorithm-confusion"
+          "duplicate-operation"
+          "empty-operations"
           "redirect-enabled"
           "replay-disabled"
           "stale-cache"
           "token-digest-replay"
           "type-mismatch"
+          "unsupported-operation"
           "weakened-non-claims"
           "zero-key-limit"
         ];
@@ -265,8 +271,8 @@
               nickel export --format json contracts/ucan-v1-profile/mapping.ncl > "$TMPDIR/mapping.json"
               cmp "$TMPDIR/source-evidence.json" contracts/ucan-v1-profile/generated/source-evidence.json
               cmp "$TMPDIR/mapping.json" contracts/ucan-v1-profile/generated/mapping.json
-              expected_revision='3a2aa043068a82663cf72ec05ed5d56a7d65ecd5'
-              expected_manifest='82b5e1c414fadcbdc90ef951624c9ccd4e8eb6bdce0d57daf2830fd79cd592fb'
+              expected_revision='fca62a6ed6895689ff18112b497bc7a986516c20'
+              expected_manifest='9c094231b4d458e63f137a5f3ed464909504bbc234ebc44710c1460d075ceb24'
               test "$(tr -d '\n' < vendor/ucan-revision.txt)" = "$expected_revision"
               test "$(b3sum vendor/ucan.snapshot | cut -d' ' -f1)" = "$expected_manifest"
               for fixture in contracts/ucan-v1-profile/fixtures/invalid/*.ncl; do
@@ -398,6 +404,16 @@
               nickel export --format json contracts/oidc-exchange/policy.ncl > "$TMPDIR/policy.json"
               cmp "$TMPDIR/policy.json" contracts/oidc-exchange/generated/policy.json
               b3sum "$TMPDIR/policy.json" > "$TMPDIR/policy.blake3"
+              for fixture in ${builtins.concatStringsSep " " validOidcPolicyFixtures}; do
+                nickel export --format json "contracts/oidc-exchange/fixtures/valid/$fixture.ncl" > "$TMPDIR/$fixture.json"
+              done
+              # Explicitly selected read operations survive export; defaults never add them.
+              grep -q '"event-read"' "$TMPDIR/explicit-read-operations.json"
+              grep -q '"result-read"' "$TMPDIR/explicit-read-operations.json"
+              if grep -q -e '"event-read"' -e '"result-read"' "$TMPDIR/policy.json"; then
+                echo "default OIDC policy selects a read operation implicitly" >&2
+                exit 1
+              fi
               for fixture in ${builtins.concatStringsSep " " invalidOidcPolicyFixtures}; do
                 if nickel export --format json "contracts/oidc-exchange/fixtures/invalid/$fixture.ncl" > /dev/null 2>"$TMPDIR/$fixture.err"; then
                   echo "invalid OIDC policy fixture passed: $fixture" >&2
@@ -422,7 +438,9 @@
               cd ${./.}
               expected_url='https://seed.radicle.garden/z4ARxEt93T6gJTrTZpUyKHMAemPiv.git'
               expected_revision='5abc2b93e0f288aba251a0750ce2d716eb9757fc'
-              expected_jwt_revision='900010fb1be550ec2cfa8c32038eb154f9ef56d7'
+              expected_ring_version='0.17.14'
+              expected_ring_version_pattern='0\.17\.14'
+              expected_ring_checksum='a4689e6c2294d81e88dc6261c768b63bc4fcdb852be6d1352498b114f61383b7'
               expected_jwt_checksum='881733cbc631fc9e472e24447ce32a64bedf2da498d6d8570b08edc87de71f65'
               nickel typecheck contracts/oidc-exchange/source-boundary.ncl
               nickel export --format json contracts/oidc-exchange/source-boundary.ncl > "$TMPDIR/sources.json"
@@ -434,8 +452,20 @@
               done
               rg --fixed-strings "bounded-http = { git = \"$expected_url\", rev = \"$expected_revision\", optional = true }" Cargo.toml
               test "$(rg --fixed-strings --count-matches "rev=$expected_revision#$expected_revision" Cargo.lock)" -eq 2
-              rg --fixed-strings 'jsonwebtoken = { version = "=11.0.0", default-features = false, features = ["rust_crypto"] }' Cargo.toml
-              rg --fixed-strings "$expected_jwt_revision" contracts/oidc-exchange/source-contracts.ncl
+              awk '/^\[dependencies\]/ { runtime = 1; next } /^\[/ { runtime = 0 } runtime' Cargo.toml > "$TMPDIR/runtime-dependencies.toml"
+              awk '/^\[dev-dependencies\]/ { dev = 1; next } /^\[/ { dev = 0 } dev' Cargo.toml > "$TMPDIR/dev-dependencies.toml"
+              # The runtime RS256 primitive is exactly the ring release the source contract pins.
+              rg --fixed-strings --line-regexp "ring = \"=$expected_ring_version\"" "$TMPDIR/runtime-dependencies.toml"
+              rg --fixed-strings "ring_version = \"$expected_ring_version\"," contracts/oidc-exchange/source-contracts.ncl
+              rg --fixed-strings "ring_checksum = \"$expected_ring_checksum\"," contracts/oidc-exchange/source-contracts.ncl
+              rg --fixed-strings "\"crate_checksum\": \"$expected_ring_checksum\"" "$TMPDIR/sources.json"
+              rg --multiline "^name = \"ring\"\nversion = \"$expected_ring_version_pattern\"\nsource = \"registry\+https://github\.com/rust-lang/crates\.io-index\"\nchecksum = \"$expected_ring_checksum\"$" Cargo.lock
+              # jsonwebtoken only mints test tokens: an exact dev-dependency, never in the runtime closure.
+              rg --fixed-strings 'jsonwebtoken = { version = "=11.0.0", default-features = false, features = ["rust_crypto"] }' "$TMPDIR/dev-dependencies.toml"
+              if rg '^jsonwebtoken' "$TMPDIR/runtime-dependencies.toml"; then
+                echo 'jsonwebtoken returned to the runtime dependencies' >&2
+                exit 1
+              fi
               rg --fixed-strings "$expected_jwt_checksum" Cargo.lock
               if rg 'github.com/OnixResearch/bounded-http|path = "\.\./bounded-http"|branch = ' Cargo.toml; then
                 echo 'unsafe Bounded HTTP fallback found' >&2
@@ -526,7 +556,7 @@
                 nickel export --format json "$fixture_root/$fixture.ncl" > "$out/positive/$(basename "$fixture").json"
               done
               for fixture in ${builtins.concatStringsSep " " invalidPolicyAuthoringFixtures}; do
-                if nickel export --format json "$fixture_root/negative/$fixture.ncl" > /dev/null 2>"/tmp/$fixture.err"; then
+                if nickel export --format json "$fixture_root/negative/$fixture.ncl" > /dev/null 2>"$TMPDIR/$fixture.err"; then
                   echo "invalid policy-authoring fixture unexpectedly exported: $fixture" >&2
                   exit 1
                 fi

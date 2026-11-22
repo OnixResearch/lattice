@@ -112,7 +112,8 @@ pub(super) fn bind_recipient(receipt: &mut ExchangeReceipt, recipient: &ucan::Au
         update_frame(&mut hasher, recipient.as_str().as_bytes());
         format!("blake3:{}", hasher.finalize().to_hex())
     }
-    receipt.requested_capability_identity = identity(&receipt.requested_capability_identity, recipient);
+    receipt.requested_capability_identity =
+        identity(&receipt.requested_capability_identity, recipient);
     if let Some(granted) = &mut receipt.granted_capability_identity {
         *granted = identity(granted, recipient);
     }

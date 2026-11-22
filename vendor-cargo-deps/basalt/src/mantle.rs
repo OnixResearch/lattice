@@ -151,6 +151,7 @@ impl std::fmt::Debug for Session {
 
 // r[impl ucan_token_flow.oidc.native_signing]
 /// Canonical request shared by issuers, holder signers and the native receiver.
+///
 /// The policy reference is an explicit deployment binding, not proof that a
 /// policy is loaded or that the caller has authority. Only [`Verifier`] admits
 /// live authority against operator configuration, policy, roots and replay.
@@ -197,7 +198,11 @@ pub fn canonical_enforcement(
     if resource.len() > 4096 {
         return Err(Denied);
     }
-    Ok(EnforcementRequest::new(action.contract_id(), resource, action.ability()))
+    Ok(EnforcementRequest::new(
+        action.contract_id(),
+        resource,
+        action.ability(),
+    ))
 }
 
 /// Operator-loaded policy/configuration, never caller-supplied admission facts.

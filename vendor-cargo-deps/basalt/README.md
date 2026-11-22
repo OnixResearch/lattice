@@ -20,14 +20,20 @@ The repository uses a small functional core and imperative shell. Nickel owns po
 
 ## Publication status
 
-Basalt is under active development. Its UCAN dependency uses a checked-in reviewed snapshot.
+Basalt is pre-1.0 and under active development; public APIs may change between
+revisions. Its UCAN dependency uses a checked-in reviewed snapshot.
 
-The snapshot records integrated UCAN commit `3a2aa043068a82663cf72ec05ed5d56a7d65ecd5`.
+The snapshot records integrated UCAN commit `fca62a6ed6895689ff18112b497bc7a986516c20`.
 That revision is published on the UCAN `main` branch. The repository-owned snapshot remains the durable build boundary.
 
-`Cargo.toml` contains package metadata for downstream discovery. The crate retains the `AGPL-3.0-or-later` license.
+`Cargo.toml` contains package metadata for downstream discovery. The crate retains the `AGPL-3.0-or-later` license and `publish = false`.
 
 Basalt was previously named `ucan-nickel-contracts`. That name can remain in historical Cairn archives and stable policy schema identifiers.
+
+A passing Basalt check is not a security proof. Basalt evaluates supplied policy,
+token, and request facts. It does not provide key custody, revocation freshness,
+durable replay storage, transport security, deployment safety, or whole-system
+authority.
 
 ## License boundary
 
@@ -37,13 +43,32 @@ Downstream applications must review the license before adoption. Third-party dep
 
 Earlier grants remain valid. This README does not grant an alternate license, a compatibility exception, or legal advice.
 
+## Security
+
+Report vulnerabilities through GitHub private vulnerability reporting:
+
+<https://github.com/OnixResearch/basalt/security/advisories/new>
+
+Do not include vulnerability details in a public issue, discussion, commit, or
+pull request. See [`SECURITY.md`](SECURITY.md) for supported revisions, report
+contents, and the scope boundary.
+
+## Requirements
+
+The reproducible toolchain is the repository flake development shell: Rust
+`1.96.0` with rustfmt and clippy, Nickel `1.17.0`, `cargo-nextest`, and a C
+toolchain. Nix with flakes is required. Dependency fetch uses anonymous HTTPS
+from crates.io, GitHub, and pinned Radicle seed objects; no credentials are
+required. A standalone checkout does not need sibling repositories.
+
 ## Quick start
 
+Run the commands from a clean clone inside the development shell:
+
 ```bash
-mkdir -p contracts/generated
-nickel export contracts/policy.ncl > contracts/generated/policy.json
-cargo test
-cargo run --features cli -- enforce \
+nix develop -c nickel export contracts/policy.ncl > contracts/generated/policy.json
+nix develop -c cargo test
+nix develop -c cargo run --features cli -- enforce \
   --policy contracts/generated/policy.json \
   --contract document-write \
   --resource did:key:z6Mkresource/docs/report \
@@ -130,6 +155,9 @@ roots, current policy and replay before returning an opaque `Session`.
 Build submission, input upload, store read, project declaration, individual
 read operations, owned-attempt cancellation, publication and administration
 remain distinct grants. A serialized `Request` or receipt cannot mint a session.
+Grant tooling that issues Mantle prefix grants must end each prefix at a field
+boundary, because the generation is not length-prefixed; see
+[`docs/oidc-exchange.md`](docs/oidc-exchange.md#grant-issuance-and-mantle-resource-framing).
 
 Call `Verifier::revalidate` with fresh verification, revocation and caveat
 observations before each effect. Revalidation does not consume replay again.
@@ -396,7 +424,7 @@ The direct rail performs these checks:
 - deterministic authority, property, Steel-adapter, token, and semantics fixtures
 - doctests and Clippy for both feature sets
 - private source inventory and package-list contents without a registry tarball
-- the `../clankers/` consumer fixture when present
+- an optional consumer fixture from a workspace-local sibling checkout when present
 - library documentation without dependencies
 
 The rail uses `/tmp/basalt-release-*` target directories. It clears `RUSTC_WRAPPER` and enables Git CLI fetching.
@@ -437,20 +465,24 @@ nix develop -c env CARGO_TARGET_DIR=/tmp/basalt-target RUSTC_WRAPPER= cargo test
 # The feature-enabled test rail includes the external-style CLI smoke and negative CLI tests in tests/cli_feature.rs.
 ```
 
-## Downstream compatibility
+## Workspace-local downstream compatibility
 
-Run focused consumer checks with this command:
+`tools/downstream-compat.rs` is an optional, workspace-local runner for consumer
+checkouts that an operator keeps in a shared parent directory. It is not part of
+the public release gate and makes no compatibility claim for an external
+consumer. A standalone clone does not need it.
+
+The runner creates temporary worktrees in `target/downstream-compat/`, links the
+current Basalt checkout into each selected consumer, and runs narrow checks. It
+is local-only and requires no GitHub Actions token. Missing checkouts are
+reported rather than substituted. Compile the standalone tool and pass `--help`
+for its bounded options:
 
 ```bash
-nix develop -c rustc --edition=2024 tools/downstream-compat.rs -o /tmp/basalt-downstream-compat
-/tmp/basalt-downstream-compat --workspace-root .. --consumer clankers --consumer aspen --consumer onixos --require-present
+mkdir -p target
+nix develop -c rustc --edition=2024 tools/downstream-compat.rs -o target/basalt-downstream-compat
+target/basalt-downstream-compat --help
 ```
-
-The runner creates temporary worktrees in `target/downstream-compat/`. It links the current Basalt checkout into each consumer.
-
-Then it runs narrow checks for Clankers, Aspen, and OnixOS. The old `--consumer onix-modules` spelling remains an alias for `onixos`.
-
-The runner is local-only. Keep sibling checkouts under the same workspace root. Do not require GitHub Actions tokens for this matrix.
 
 ## References
 

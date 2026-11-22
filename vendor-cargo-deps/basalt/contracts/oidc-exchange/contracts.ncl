@@ -41,6 +41,10 @@ let exact_fields = fun allowed value =>
 in
 let field = fun name value => std.record.get name value in
 let positive = fun value => std.is_number value && value > 0 in
+# Every selected operation appears once; `parse_policy` rejects duplicates too.
+let unique = fun values =>
+  std.array.all (fun item => std.array.length (std.array.filter (fun other => other == item) values) == 1) values
+in
 let valid_policy = fun value =>
   exact_fields [
     "schema", "profile_id", "issuer", "audiences", "algorithm", "claims",
@@ -77,6 +81,7 @@ let valid_policy = fun value =>
   && field "vocabulary" (field "capability" value) == "onix.mantle.capability.v1"
   && std.array.length (field "operations" (field "capability" value)) > 0
   && std.array.all (fun operation => std.array.elem operation SupportedOperations) (field "operations" (field "capability" value))
+  && unique (field "operations" (field "capability" value))
   && exact_fields ["require_one_time", "require_jti"] (field "replay" value)
   && field "require_one_time" (field "replay" value) == true
   && field "require_jti" (field "replay" value) == true

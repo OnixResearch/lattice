@@ -39,6 +39,7 @@ include = [
     "docs/ast-grep-policy-audits.md",
     "docs/cap-std-cli-policy-boundary.md",
     "docs/durable-authority-state.md",
+    "docs/kiln-authority-adapter.md",
     "docs/license-consumption.md",
     "docs/nickel-toolchain.md",
     "docs/nostr-identity-bindings.md",
@@ -87,7 +88,7 @@ bounded-http = { git = "https://seed.radicle.garden/z4ARxEt93T6gJTrTZpUyKHMAemPi
 cap-std = { version = "4.0.2", optional = true }
 clap = { version = "4.5", features = ["derive"], optional = true }
 iddqd = "0.4.5"
-jsonwebtoken = { version = "=11.0.0", default-features = false, features = ["rust_crypto"] }
+ring = "=0.17.14"
 replay-ledger-core = { git = "https://seed.radicle.garden/z3kGDT73ja8rewvGLwJFLF5MTx1ih.git", rev = "a0de79303f3f45c18a34fff535b690a85cb3cf59", optional = true }
 revocation-view-core = { git = "https://seed.radicle.garden/z3kGDT73ja8rewvGLwJFLF5MTx1ih.git", rev = "a0de79303f3f45c18a34fff535b690a85cb3cf59", optional = true }
 secretspec = { version = "=0.17.0", default-features = false }
@@ -100,7 +101,8 @@ ucan-nostr = { version = "0.1.0", path = "vendor/ucan/crates/ucan-nostr" }
 
 [dev-dependencies]
 ed25519-dalek = "=2.2.0"
-k256 = { version = "=0.13.4", default-features = false, features = ["alloc", "arithmetic", "schnorr"] }
+jsonwebtoken = { version = "=11.0.0", default-features = false, features = ["rust_crypto"] }
+k256 = { version = "=0.14.0", default-features = false, features = ["alloc", "arithmetic", "schnorr"] }
 rand_chacha = "=0.3.1"
 rand_core = "=0.6.4"
 rsa = "=0.9.10"

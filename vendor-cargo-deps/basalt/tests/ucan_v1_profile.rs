@@ -33,7 +33,6 @@ const CLOCK_SKEW_SECONDS: i64 = 60;
 const INITIAL_CALL_COUNT: usize = 0;
 const ONE_CALL: usize = 1;
 const EXPECTED_LICENSE_COUNT: usize = 3;
-const SUBJECT: &str = "did:key:z6Mksubject";
 const DOCUMENT_RESOURCE: &str = "did:key:z6Mkresource/docs/final-profile";
 const OUTSIDE_POLICY_RESOURCE: &str = "https://outside.example/document";
 const DOCUMENT_WRITE_COMMAND: &str = "/document/write";
@@ -41,9 +40,9 @@ const UNKNOWN_COMMAND: &str = "/document/unknown";
 const ROOT_COMMAND: &str = "/document";
 const SOURCE_EVIDENCE_JSON: &str =
     include_str!("../contracts/ucan-v1-profile/generated/source-evidence.json");
-const EXPECTED_RUNTIME_REVISION: &str = "3a2aa043068a82663cf72ec05ed5d56a7d65ecd5";
+const EXPECTED_RUNTIME_REVISION: &str = "fca62a6ed6895689ff18112b497bc7a986516c20";
 const EXPECTED_SOURCE_MANIFEST: &str =
-    "82b5e1c414fadcbdc90ef951624c9ccd4e8eb6bdce0d57daf2830fd79cd592fb";
+    "9c094231b4d458e63f137a5f3ed464909504bbc234ebc44710c1460d075ceb24";
 
 struct KeyMap(BTreeMap<String, [u8; ed25519_dalek::PUBLIC_KEY_LENGTH]>);
 
@@ -140,7 +139,7 @@ impl ResourceOwnerVerifier for ExactOwner {
     ) -> Result<[u8; blake3::OUT_LEN], ResourceOwnerError> {
         self.calls.set(self.calls.get() + ONE_CALL);
         self.result?;
-        if subject != SUBJECT || resource != self.resource {
+        if subject != subject_did() || resource != self.resource {
             return Err(ResourceOwnerError::Denied);
         }
         let mut hasher = blake3::Hasher::new();
@@ -160,6 +159,11 @@ struct FinalFixture {
 
 fn signing_key(byte: u8) -> SigningKey {
     SigningKey::from_bytes(&[byte; ed25519_dalek::SECRET_KEY_LENGTH])
+}
+
+/// The UCAN 1.0 Subject is the root Delegation issuer.
+fn subject_did() -> String {
+    did_of(&signing_key(ROOT_KEY_BYTE))
 }
 
 fn did_of(key: &SigningKey) -> String {
@@ -240,7 +244,7 @@ fn invocation_fields(
         ),
         (
             wire_core::FIELD_SUBJECT.to_owned(),
-            Cbor::Text(SUBJECT.to_owned()),
+            Cbor::Text(subject_did()),
         ),
         (
             wire_core::FIELD_COMMAND.to_owned(),
@@ -270,6 +274,7 @@ fn final_fixture(delegated: bool, command: &str) -> FinalFixture {
     let middle = signing_key(MIDDLE_KEY_BYTE);
     let invoker = signing_key(INVOKER_KEY_BYTE);
     let root_did = did_of(&root);
+    let subject = subject_did();
     let middle_did = did_of(&middle);
     let invoker_did = did_of(&invoker);
     let mut store = MemoryStore::default();
@@ -279,7 +284,7 @@ fn final_fixture(delegated: bool, command: &str) -> FinalFixture {
         proofs.push(install_delegation(
             &mut store,
             &root,
-            &delegation_fields(&root_did, &middle_did, Some(SUBJECT), ROOT_COMMAND),
+            &delegation_fields(&root_did, &middle_did, Some(subject.as_str()), ROOT_COMMAND),
         ));
         proofs.push(install_delegation(
             &mut store,
@@ -290,7 +295,12 @@ fn final_fixture(delegated: bool, command: &str) -> FinalFixture {
         proofs.push(install_delegation(
             &mut store,
             &root,
-            &delegation_fields(&root_did, &invoker_did, Some(SUBJECT), ROOT_COMMAND),
+            &delegation_fields(
+                &root_did,
+                &invoker_did,
+                Some(subject.as_str()),
+                ROOT_COMMAND,
+            ),
         ));
     }
 
@@ -371,13 +381,13 @@ fn direct_and_delegated_final_invocations_return_live_exact_authority() {
             live.authorization().command().as_str(),
             DOCUMENT_WRITE_COMMAND
         );
-        assert_eq!(live.authorization().subject(), SUBJECT);
+        assert_eq!(live.authorization().subject(), subject_did());
         assert!(live.receipt().is_allowed());
         assert!(live.ucan_receipt().allowed);
         assert_eq!(replay.calls.get(), ONE_CALL);
         assert_eq!(owner.calls.get(), ONE_CALL);
         let serialized = serde_json::to_string(live.receipt()).expect("receipt JSON");
-        assert!(!serialized.contains(SUBJECT));
+        assert!(!serialized.contains(&subject_did()));
         assert!(!serialized.contains(DOCUMENT_RESOURCE));
         assert!(!serialized.contains(DOCUMENT_WRITE_COMMAND));
     }
@@ -540,6 +550,70 @@ fn final_replay_is_called_once_and_persisted_receipts_are_not_authority() {
     let restored: basalt::ucan_v1_profile::FinalProfileReceipt =
         serde_json::from_str(&persisted).expect("receipt must deserialize as evidence");
     assert!(!restored.is_allowed());
-    assert!(!persisted.contains(SUBJECT));
+    assert!(!persisted.contains(&subject_did()));
     assert!(!persisted.contains(DOCUMENT_RESOURCE));
+}
+
+#[test]
+fn forged_root_for_another_subject_is_denied_before_owner_or_replay() {
+    // The invoker signs its own root Delegation naming the resource owner's
+    // Subject. The owner observation would accept that Subject, so only the
+    // UCAN root-authority rule stands between this chain and live authority.
+    let invoker = signing_key(INVOKER_KEY_BYTE);
+    let invoker_did = did_of(&invoker);
+    let mut store = MemoryStore::default();
+    let forged_root = install_delegation(
+        &mut store,
+        &invoker,
+        &delegation_fields(
+            &invoker_did,
+            &invoker_did,
+            Some(subject_did().as_str()),
+            ROOT_COMMAND,
+        ),
+    );
+    let invocation = sign_payload(
+        &invocation_fields(
+            &invoker_did,
+            &invoker_did,
+            DOCUMENT_WRITE_COMMAND,
+            &[forged_root],
+        ),
+        &invoker,
+    );
+    let keys = KeyMap(BTreeMap::from([(
+        invoker_did.clone(),
+        invoker.verifying_key().to_bytes(),
+    )]));
+    let policy = default_policy().expect("default policy");
+    let trusted = default_authority_policy_ref("document-write");
+    let mapping = parse_final_profile_mapping(FINAL_PROFILE_MAPPING_JSON).expect("checked mapping");
+    let enforcement = document_request(DOCUMENT_RESOURCE);
+    let request = FinalProfileEnforcementRequest::new(
+        &enforcement,
+        &invocation,
+        BasaltUcanProtocolProfile::UcanWg100,
+        invoker_did.as_str(),
+    );
+    let replay = CountingReplay::allow();
+    let owner = ExactOwner::allow(DOCUMENT_RESOURCE);
+    let failure = verify_final_profile_enforcement(
+        &policy,
+        &trusted,
+        &mapping,
+        &request,
+        &keys,
+        &store,
+        &NoRevocations,
+        &replay,
+        &owner,
+        VERIFICATION_TIME,
+        CLOCK_SKEW_SECONDS,
+    )
+    .expect_err("a root not issued by its Subject must deny");
+
+    assert_eq!(failure.reason(), FinalProfileReason::UcanDenied);
+    assert!(!failure.receipt().allowed);
+    assert_eq!(replay.calls.get(), INITIAL_CALL_COUNT);
+    assert_eq!(owner.calls.get(), INITIAL_CALL_COUNT);
 }

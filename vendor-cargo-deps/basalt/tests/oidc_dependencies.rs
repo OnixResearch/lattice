@@ -1,12 +1,8 @@
 #![cfg(feature = "oidc-exchange")]
 
-use basalt::oidc_exchange::{
-    BOUNDED_HTTP_REVISION, BOUNDED_HTTP_RID, JSONWEBTOKEN_REVISION, JSONWEBTOKEN_VERSION,
-};
+use basalt::oidc_exchange::{BOUNDED_HTTP_REVISION, BOUNDED_HTTP_RID, RING_CHECKSUM, RING_VERSION};
 
 const BOUNDED_HTTP_URL: &str = "https://seed.radicle.garden/z4ARxEt93T6gJTrTZpUyKHMAemPiv.git";
-const JSONWEBTOKEN_CHECKSUM: &str =
-    "881733cbc631fc9e472e24447ce32a64bedf2da498d6d8570b08edc87de71f65";
 
 #[test]
 fn cargo_and_runtime_bind_the_same_reviewed_sources() {
@@ -18,9 +14,8 @@ fn cargo_and_runtime_bind_the_same_reviewed_sources() {
         BOUNDED_HTTP_RID,
         BOUNDED_HTTP_URL,
         BOUNDED_HTTP_REVISION,
-        JSONWEBTOKEN_VERSION,
-        JSONWEBTOKEN_REVISION,
-        JSONWEBTOKEN_CHECKSUM,
+        RING_VERSION,
+        RING_CHECKSUM,
     ] {
         assert!(
             manifest.contains(expected)
@@ -30,7 +25,7 @@ fn cargo_and_runtime_bind_the_same_reviewed_sources() {
             "missing reviewed source identity {expected}"
         );
     }
-    assert!(manifest.contains("default-features = false, features = [\"rust_crypto\"]"));
+    assert!(manifest.contains("ring = \"=0.17.14\""));
     assert!(lock.contains(&format!(
         "rev={BOUNDED_HTTP_REVISION}#{BOUNDED_HTTP_REVISION}"
     )));

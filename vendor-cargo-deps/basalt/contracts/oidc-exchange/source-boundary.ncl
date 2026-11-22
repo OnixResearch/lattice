@@ -6,11 +6,10 @@ let Contracts = import "source-contracts.ncl" in
     url = Contracts.identity.bounded_http_url,
     revision = Contracts.identity.bounded_http_revision,
   },
-  jsonwebtoken = {
-    version = Contracts.identity.jsonwebtoken_version,
-    upstream_revision = Contracts.identity.jsonwebtoken_revision,
-    crate_checksum = Contracts.identity.jsonwebtoken_checksum,
-    backend = "rust_crypto",
+  rs256_verifier = {
+    version = Contracts.identity.ring_version,
+    crate_checksum = Contracts.identity.ring_checksum,
+    algorithm = "RS256",
   },
   non_claims = Contracts.non_claims,
 }) | Contracts.Source

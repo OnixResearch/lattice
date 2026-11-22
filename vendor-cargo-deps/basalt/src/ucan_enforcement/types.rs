@@ -30,6 +30,10 @@ const STATE_SYNC_ADMIN_CONTRACT: &str = "onixos-state-sync-admin";
 const STATE_SYNC_ADMIN_ABILITY: &str = "state_sync.admin";
 const ONIXOS_TARGET_RESOURCE_PREFIX: &str = "did:key:z6Mkonix/onixos/";
 const STATE_SYNC_RESOURCE_PREFIX: &str = "onix://state-sync/";
+/// Shared by the frozen `v1/` and attenuable `v2/` implementation framings; the
+/// policy contract and the adapter select the exact version prefix.
+const KILN_RESOURCE_PREFIX: &str = "kiln://implementation/";
+const KILN_SOURCE_RESOURCE_PREFIX: &str = "kiln://source/v1/";
 
 /// Closed downstream actions with reviewed Basalt contract and UCAN ability mappings.
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -66,6 +70,40 @@ pub enum EnforcementAction {
     MantleOwnedAttemptCancel,
     MantlePublish,
     MantleAdmin,
+    /// Acquire one fenced Kiln implementation claim.
+    KilnClaimAcquire,
+    /// Renew one fenced Kiln implementation claim.
+    KilnClaimRenew,
+    /// Dispatch one bound Kiln implementation attempt.
+    KilnDispatch,
+    /// Submit one sealed candidate for an exact Kiln attempt.
+    KilnCandidateSubmit,
+    /// Admit verification evidence for one exact Kiln candidate.
+    KilnVerificationAdmit,
+    /// Cancel one owned fenced Kiln attempt.
+    KilnAttemptCancel,
+    /// Publish one separately verified Kiln candidate.
+    KilnPublicationPublish,
+    /// Integrate one exact Kiln candidate through the selected route.
+    KilnIntegrationLand,
+    /// Complete native lifecycle for one integrated Kiln change.
+    KilnLifecycleComplete,
+    /// Discover entries inside one authorized Kiln source scope.
+    KilnSourceDiscover,
+    /// Read the content of one exact Kiln source entry.
+    KilnSourceRead,
+    /// Read the history of one Kiln source entry or subtree.
+    KilnSourceHistory,
+    /// Prepare one projected Kiln workspace.
+    KilnSourcePrepare,
+    /// Modify one exact existing Kiln source entry.
+    KilnSourceModify,
+    /// Create one exact new Kiln source entry.
+    KilnSourceCreate,
+    /// Share one Kiln source scope onward.
+    KilnSourceDelegate,
+    /// Retrieve one result produced for a Kiln source scope.
+    KilnSourceResult,
 }
 
 impl EnforcementAction {
@@ -94,6 +132,23 @@ impl EnforcementAction {
             Self::MantleOwnedAttemptCancel => "mantle-owned-attempt-cancel",
             Self::MantlePublish => "mantle-publish",
             Self::MantleAdmin => "mantle-admin",
+            Self::KilnClaimAcquire => "kiln-claim-acquire",
+            Self::KilnClaimRenew => "kiln-claim-renew",
+            Self::KilnDispatch => "kiln-dispatch",
+            Self::KilnCandidateSubmit => "kiln-candidate-submit",
+            Self::KilnVerificationAdmit => "kiln-verification-admit",
+            Self::KilnAttemptCancel => "kiln-attempt-cancel",
+            Self::KilnPublicationPublish => "kiln-publication-publish",
+            Self::KilnIntegrationLand => "kiln-integration-land",
+            Self::KilnLifecycleComplete => "kiln-lifecycle-complete",
+            Self::KilnSourceDiscover => "kiln-source-discover",
+            Self::KilnSourceRead => "kiln-source-read",
+            Self::KilnSourceHistory => "kiln-source-history",
+            Self::KilnSourcePrepare => "kiln-source-prepare",
+            Self::KilnSourceModify => "kiln-source-modify",
+            Self::KilnSourceCreate => "kiln-source-create",
+            Self::KilnSourceDelegate => "kiln-source-delegate",
+            Self::KilnSourceResult => "kiln-source-result",
         }
     }
 
@@ -121,7 +176,24 @@ impl EnforcementAction {
             | Self::MantleUsageRead
             | Self::MantleOwnedAttemptCancel
             | Self::MantlePublish
-            | Self::MantleAdmin => self.as_str(),
+            | Self::MantleAdmin
+            | Self::KilnClaimAcquire
+            | Self::KilnClaimRenew
+            | Self::KilnDispatch
+            | Self::KilnCandidateSubmit
+            | Self::KilnVerificationAdmit
+            | Self::KilnAttemptCancel
+            | Self::KilnPublicationPublish
+            | Self::KilnIntegrationLand
+            | Self::KilnLifecycleComplete
+            | Self::KilnSourceDiscover
+            | Self::KilnSourceRead
+            | Self::KilnSourceHistory
+            | Self::KilnSourcePrepare
+            | Self::KilnSourceModify
+            | Self::KilnSourceCreate
+            | Self::KilnSourceDelegate
+            | Self::KilnSourceResult => self.as_str(),
         }
     }
 
@@ -150,6 +222,23 @@ impl EnforcementAction {
             Self::MantleOwnedAttemptCancel => "mantle/attempt/cancel-owned",
             Self::MantlePublish => "mantle/publish",
             Self::MantleAdmin => "mantle/admin",
+            Self::KilnClaimAcquire => "kiln/claim/acquire",
+            Self::KilnClaimRenew => "kiln/claim/renew",
+            Self::KilnDispatch => "kiln/dispatch",
+            Self::KilnCandidateSubmit => "kiln/candidate/submit",
+            Self::KilnVerificationAdmit => "kiln/verification/admit",
+            Self::KilnAttemptCancel => "kiln/attempt/cancel",
+            Self::KilnPublicationPublish => "kiln/publication/publish",
+            Self::KilnIntegrationLand => "kiln/integration/land",
+            Self::KilnLifecycleComplete => "kiln/lifecycle/complete",
+            Self::KilnSourceDiscover => "kiln/source/discover",
+            Self::KilnSourceRead => "kiln/source/read",
+            Self::KilnSourceHistory => "kiln/source/history",
+            Self::KilnSourcePrepare => "kiln/source/prepare",
+            Self::KilnSourceModify => "kiln/source/modify",
+            Self::KilnSourceCreate => "kiln/source/create",
+            Self::KilnSourceDelegate => "kiln/source/delegate",
+            Self::KilnSourceResult => "kiln/source/result",
         }
     }
 
@@ -177,6 +266,23 @@ impl EnforcementAction {
             | Self::MantleOwnedAttemptCancel
             | Self::MantlePublish
             | Self::MantleAdmin => "mantle://gateway/v1/",
+            Self::KilnClaimAcquire
+            | Self::KilnClaimRenew
+            | Self::KilnDispatch
+            | Self::KilnCandidateSubmit
+            | Self::KilnVerificationAdmit
+            | Self::KilnAttemptCancel
+            | Self::KilnPublicationPublish
+            | Self::KilnIntegrationLand
+            | Self::KilnLifecycleComplete => KILN_RESOURCE_PREFIX,
+            Self::KilnSourceDiscover
+            | Self::KilnSourceRead
+            | Self::KilnSourceHistory
+            | Self::KilnSourcePrepare
+            | Self::KilnSourceModify
+            | Self::KilnSourceCreate
+            | Self::KilnSourceDelegate
+            | Self::KilnSourceResult => KILN_SOURCE_RESOURCE_PREFIX,
         }
     }
 

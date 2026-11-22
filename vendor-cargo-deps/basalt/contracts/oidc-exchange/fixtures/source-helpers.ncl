@@ -1,14 +1,13 @@
 let Contracts = import "../source-contracts.ncl" in
 {
-  source = fun rid url revision version upstream checksum backend non_claims =>
+  source = fun rid url revision version checksum algorithm non_claims =>
     {
       schema = "basalt.oidc-exchange.sources.v1",
       bounded_http = { rid = rid, url = url, revision = revision },
-      jsonwebtoken = {
+      rs256_verifier = {
         version = version,
-        upstream_revision = upstream,
         crate_checksum = checksum,
-        backend = backend,
+        algorithm = algorithm,
       },
       non_claims = non_claims,
     } | Contracts.Source,

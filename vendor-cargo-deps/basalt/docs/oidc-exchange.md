@@ -14,7 +14,7 @@ Lattice or another client shell.
 - workflow and Git reference prefixes;
 - explicit clock skew, token age, UCAN lifetime, network, body, key, cache, and refresh limits;
 - one versioned Mantle capability vocabulary;
-- one-time exchange with an issuer-provided `jti`.
+- one-time exchange with an issuer-provided `jti`: one exchange per OIDC token.
 
 The generated policy contains no private key, provider credential, OIDC token,
 or secret value.
@@ -31,23 +31,42 @@ an operation does not grant it to an existing caller.
 4. The pure core fixes RS256 and verifies the signature with the selected public RSA key.
 5. The core checks issuer, audience, `exp`, `nbf`, `iat`, repository, workflow, commit, and reference.
 6. The core attenuates the requested Mantle audience, project, operation, resource, and lifetime.
-7. The shell commits one replay key derived from public facts and the exact request.
+7. The shell commits one replay key over the OIDC issuer and `jti` only.
 8. The caller-owned UCAN signer issues one token through the reviewed UCAN library.
 
 Signature validity does not grant authority by itself.
 
 ## Explicit holder delivery
 
-Use `exchange_to_recipient` when the issued UCAN must name the admitted holder's
-`AudienceDid`. Keep `ExchangeRequest.audience` equal to the policy-selected
-Mantle service: a holder recipient does not replace or broaden the service,
-project, operation, resource, or lifetime attenuation.
+Use `exchange_to_recipient` with a `HolderDelivery` when the issued UCAN must
+name a holder's `AudienceDid` instead of the policy's Mantle service. The
+delivery carries the typed `mantle::Request` the holder will sign and the
+`BasaltPolicyRef` the receiver binds into its canonical resource.
+
+Before key load and replay, the exchange requires that:
+
+- the Mantle request's `subject` equals the recipient;
+- its `audience` and `project`, and the `ExchangeRequest`'s, equal the policy's
+  service audience and project;
+- its operation has the ability of `ExchangeRequest.operation`;
+- `ExchangeRequest.resource` equals `canonical_enforcement(request, policy_ref)`
+  exactly, not a prefix of it;
+- the recipient is not the issuing signer, which UCAN verification would reject.
+
+Token verification then applies the usual attenuation. The policy's
+`resource_prefix` must therefore admit canonical Mantle resources, for example
+`mantle://gateway/v1/`.
+
+The issued UCAN then carries exactly that canonical resource. The admitted
+service and project are therefore bound into the grant itself, and a holder
+cannot reuse it for another account, project, target, generation or service.
+The legacy `exchange` still issues to the policy's service audience.
 
 The receiver must still verify a holder-signed invocation. Choosing a recipient
 does not prove possession of that holder's private key. Receipt capability
 identities bind the selected recipient without retaining bearer material.
-Changing recipients does not change the one-time exchange replay key and cannot
-make the same OIDC exchange reusable.
+The replay key names only the OIDC issuer and `jti`, so changing recipients,
+operations or resources cannot exchange the same OIDC token twice.
 
 For Mantle invocation signing, `mantle::canonical_enforcement` constructs the
 exact bounded request without inventing receiver policy, issuer trust, or a
@@ -56,6 +75,18 @@ holder signing. The receiver's `Verifier::enforcement` additionally checks its
 configured authority generation, endpoint, and service audience before using
 that same canonicalization; canonicalization alone is not admission. Keep the
 authority generation distinct from a builder endpoint generation.
+
+## Grant issuance and Mantle resource framing
+
+Holder grants from this exchange carry the exact canonical resource, never a
+prefix. Other grant tooling that issues Mantle prefix grants must end each
+prefix at a field boundary: after a field's closing `/`, or after the
+generation's `/`. Every field before the generation is length-prefixed, but the
+`generation` is written as plain decimal followed by `/`. A prefix ending in
+`…/1` therefore also covers generations 10–19, 100 and so on, and a prefix
+that ends inside a field's hex also matches other values. UCAN resource
+matching is a byte prefix, so a truncated prefix silently widens the grant
+(issue #10).
 
 
 ## Rotation and cache policy
@@ -80,9 +111,15 @@ OIDC public keys are accepted only while the bounded JWKS cache is fresh. A
 removed key becomes unusable after the next required refresh. Basalt does not
 claim instant provider revocation.
 
-The replay port must atomically reserve the planned key until UCAN expiration.
-A duplicate or unavailable store denies issuance. The receipt cannot recreate
-replay authority.
+The replay key is `(iss, jti)` alone: one OIDC token admits exactly one
+exchange, whatever operation, resource or holder a later request names. A
+client that needs several grants mints a fresh OIDC token per exchange.
+
+The replay port must atomically reserve the key until
+`max(exp, iat + max_token_age_seconds) + clock_skew_seconds`, the last moment
+the same token could still pass verification. The UCAN lifetime does not bound
+the reservation. A duplicate or unavailable store denies issuance. The receipt
+cannot recreate replay authority.
 
 ## Evidence
 

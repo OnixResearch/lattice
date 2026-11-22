@@ -16,6 +16,8 @@ const CARGO_TARGET_ENV: &str = "CARGO_TARGET_DIR";
 const RUSTC_WRAPPER_ENV: &str = "RUSTC_WRAPPER";
 const CARGO_GIT_FETCH_ENV: &str = "CARGO_NET_GIT_FETCH_WITH_CLI";
 const OUTPUT_TAIL_LIMIT: usize = 4_096;
+// Cargo `[patch]` key: must equal the source URL that consumers declare for
+// basalt, or the local candidate is silently not used. Not a Basalt build input.
 const PATCHED_BASALT_SOURCE: &str = "ssh://git@github.com/OnixResearch/basalt.git";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

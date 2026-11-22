@@ -485,6 +485,26 @@ interfaces.
 
 ### Changed
 
+- Breaking: `github_ci::exchange::exchange` takes the typed native
+  `basalt::mantle::Request` that the stable holder will sign, and its
+  `BasaltPolicyRef`, in place of the exact project and resource strings.
+  - The grant is delivered through Basalt's holder API, which binds it to
+    that request's canonical resource. The request's subject must be the
+    holder, and its service and project must be the admitted policy's.
+  - Before any producer effect, Lattice still checks that subject, service,
+    project, operation and canonical resource against the plan and policy.
+  - Lattice still verifies the issued grant.
+  - Each OIDC token now yields at most one exchange.
+- The vendored Basalt snapshot moves to `6ab48bffa29085f875d307dfbed1b73c9e5d1d6f`
+  (the Kiln cohort alignment). That revision is Basalt `main` `5e0f1f4c` plus
+  the holder series, pending its publication on `main`. `main` adds:
+  - the Kiln implementation v2 framing, source v1 operations and delegate rule;
+  - UCAN `fca62a6e` with k256 0.14;
+  - the ring RS256 OIDC check.
+
+  `jsonwebtoken` leaves the dependency graph, and the k256 0.14 family
+  (elliptic-curve 0.14, ecdsa 0.17, crypto-bigint 0.7, sec1 0.8) replaces
+  0.13. Lattice does not yet verify Kiln-issued grants.
 - Breaking: `implementation_attempt::cli::run_command` takes the
   application configuration path, read only by a `run` of a request with a
   repair policy for its operator `effect_authority` profile (Lattice #6).

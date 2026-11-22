@@ -200,7 +200,10 @@ fn native_operation(request: &wire::Request) -> basalt::mantle::Operation {
         wire::Request::Usage { .. } => Operation::UsageRead,
     }
 }
-fn authority_request(endpoint: &Endpoint, request: &wire::Request) -> Result<basalt::mantle::Request, Error> {
+pub(super) fn authority_request(
+    endpoint: &Endpoint,
+    request: &wire::Request,
+) -> Result<basalt::mantle::Request, Error> {
     endpoint.validate()?;
     validate_request(request)?;
     Ok(basalt::mantle::Request {

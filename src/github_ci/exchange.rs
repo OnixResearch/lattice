@@ -8,9 +8,12 @@
 
 use std::io::Write;
 
+use basalt::authority_core::BasaltPolicyRef;
 use basalt::oidc_exchange::BoundedHttpDocumentPort;
+use basalt::oidc_exchange::DocumentPort;
 use basalt::oidc_exchange::ExchangeReceipt;
 use basalt::oidc_exchange::ExchangeRequest;
+use basalt::oidc_exchange::HolderDelivery;
 use basalt::oidc_exchange::IssuerAdmission;
 use basalt::oidc_exchange::JwksCache;
 use basalt::oidc_exchange::MantleOperation;
@@ -147,19 +150,61 @@ impl ExchangedUcan {
 }
 
 /// Consume a transient GitHub identity token through the real Basalt producer.
-/// `plan.resource` is the core's semantic request/attempt identity. The caller
-/// constructs `exact_resource` using the native Basalt Mantle verifier and
-/// signs the resulting native operation binding, not a consumer-owned digest.
+/// `plan.resource` is the core's semantic request/attempt identity. `native`
+/// is the exact typed Mantle request the stable holder will sign; its
+/// canonical resource under `policy_ref` is the only resource granted, and the
+/// holder signs the resulting native operation binding, not a consumer-owned
+/// digest.
 pub fn exchange(
     host: &mut dyn BasaltIssuerHost,
     token: OidcToken,
     plan: &CapabilityPlan,
-    exact_project: &str,
-    exact_resource: &str,
+    native: &basalt::mantle::Request,
+    policy_ref: &BasaltPolicyRef,
     now_ms: u64,
 ) -> Result<ExchangedUcan, ExchangeError> {
     let ports = host.ports();
-    admit_request(ports.policy, plan, exact_project, exact_resource)?;
+    exchange_through(
+        ExchangePorts {
+            policy: ports.policy,
+            cache: ports.cache,
+            documents: ports.documents,
+            replay: ports.replay,
+            issuer: ports.issuer,
+            issuer_signer: ports.issuer_signer,
+            holder_signer: ports.holder_signer,
+        },
+        token.expose_for_exchange(),
+        plan,
+        native,
+        policy_ref,
+        now_ms,
+    )
+}
+
+/// The production ports with discovery widened to the producer's port trait,
+/// so the whole exchange path is exercised without the public network.
+struct ExchangePorts<'a> {
+    policy: &'a OidcPolicy,
+    cache: &'a mut JwksCache,
+    documents: &'a mut dyn DocumentPort,
+    replay: &'a mut dyn ReplayPort,
+    issuer: &'a IssuerAdmission,
+    issuer_signer: &'a dyn TokenSigner,
+    holder_signer: &'a dyn TokenSigner,
+}
+
+fn exchange_through(
+    ports: ExchangePorts<'_>,
+    token: &str,
+    plan: &CapabilityPlan,
+    native: &basalt::mantle::Request,
+    policy_ref: &BasaltPolicyRef,
+    now_ms: u64,
+) -> Result<ExchangedUcan, ExchangeError> {
+    let exact = basalt::mantle::canonical_enforcement(native, policy_ref).map_err(|_| ExchangeError::Policy)?;
+    let exact_resource = exact.resource();
+    admit_request(ports.policy, plan, &native.project, exact_resource)?;
     let now_seconds = now_ms / MILLIS_PER_SECOND;
     let not_before_ms = now_seconds * MILLIS_PER_SECOND;
     let deadline_seconds = plan.expires_ms / MILLIS_PER_SECOND;
@@ -179,6 +224,7 @@ pub fn exchange(
         return Err(ExchangeError::Signer);
     }
     let holder = ucan::AudienceDid::from(holder_did);
+    admit_holder_request(native, exact.ability(), &holder, plan)?;
     let issuer_did = ports.issuer_signer.issuer().map_err(|_| ExchangeError::Signer)?;
     let issuer_key = ucan::Ed25519VerificationKey::new(
         issuer_did,
@@ -187,13 +233,13 @@ pub fn exchange(
     .map_err(|_| ExchangeError::Signer)?;
     let request = ExchangeRequest {
         audience: plan.audience.clone(),
-        project: exact_project.to_owned(),
+        project: native.project.clone(),
         operation: producer_operation(plan.operation),
         resource: exact_resource.to_owned(),
         lifetime_seconds,
     };
     let issued = basalt::oidc_exchange::exchange_to_recipient(
-        token.expose_for_exchange(),
+        token,
         now_seconds,
         ports.policy,
         &request,
@@ -202,7 +248,11 @@ pub fn exchange(
         ports.replay,
         ports.issuer,
         ports.issuer_signer,
-        &holder,
+        &HolderDelivery {
+            recipient: &holder,
+            request: native,
+            policy_ref,
+        },
     )
     .map_err(|_| ExchangeError::Denied)?;
     let facts = verify_issued_grant(&issued.token, issuer_key, &holder, &request, plan, now_ms)?;
@@ -214,6 +264,21 @@ pub fn exchange(
         facts,
         receipt: issued.receipt,
     })
+}
+
+/// Lattice's own binding of the native request to the stable holder and plan,
+/// checked before any producer effect: the holder signs as the request's
+/// subject, for the plan's service and exact operation.
+fn admit_holder_request(
+    native: &basalt::mantle::Request,
+    ability: &str,
+    holder: &ucan::AudienceDid,
+    plan: &CapabilityPlan,
+) -> Result<(), ExchangeError> {
+    if native.subject != holder.as_str() || native.audience != plan.audience || ability != plan.operation.name() {
+        return Err(ExchangeError::Policy);
+    }
+    Ok(())
 }
 
 fn verify_issued_grant(
@@ -792,5 +857,196 @@ mod tests {
             assert!(verifier.verify(request, &invocation, &boundaries).is_err(), "nonce cannot be spent twice");
             assert_eq!(replay.0.borrow().len(), 1);
         }
+    }
+
+    const OIDC_NOW_MS: u64 = 1_700_000_060_000;
+    const OIDC_KEY_ID: &str = "lattice-fixture-rsa";
+
+    /// Scripted discovery and JWKS documents; records every fetch.
+    struct ScriptedDocuments {
+        responses: std::collections::VecDeque<basalt::oidc_exchange::DocumentResponse>,
+        fetches: usize,
+    }
+
+    impl DocumentPort for ScriptedDocuments {
+        fn fetch(
+            &mut self,
+            _kind: basalt::oidc_exchange::DocumentKind,
+            _url: &str,
+            _maximum_body_bytes: u64,
+        ) -> Result<basalt::oidc_exchange::DocumentResponse, basalt::oidc_exchange::DocumentFailure> {
+            self.fetches += 1;
+            self.responses.pop_front().ok_or(basalt::oidc_exchange::DocumentFailure::Unavailable)
+        }
+    }
+
+    fn json_document(body: &[u8], fresh_seconds: u64) -> basalt::oidc_exchange::DocumentResponse {
+        basalt::oidc_exchange::DocumentResponse {
+            status: 200,
+            content_type: "application/json".to_owned(),
+            body: body.to_vec(),
+            fresh_seconds,
+        }
+    }
+
+    /// A real RS256 GitHub-shaped OIDC token signed with the test-only key.
+    fn signed_oidc_token() -> String {
+        use base64::Engine as _;
+        use rustls::pki_types::pem::PemObject as _;
+        let encode = |bytes: &[u8]| base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes);
+        let header = serde_json::json!({"alg": "RS256", "typ": "JWT", "kid": OIDC_KEY_ID});
+        let claims: serde_json::Value =
+            serde_json::from_str(include_str!("../../vendor-cargo-deps/basalt/tests/fixtures/oidc/github-claims.json"))
+                .expect("producer GitHub claims fixture");
+        let signed = format!(
+            "{}.{}",
+            encode(&serde_json::to_vec(&header).expect("JWT header")),
+            encode(&serde_json::to_vec(&claims).expect("JWT claims"))
+        );
+        let key = rustls::pki_types::PrivateKeyDer::from_pem_slice(include_bytes!(
+            "../../tests/fixtures/github-ci/oidc-rs256-test-key.pem"
+        ))
+        .expect("test-only RSA key");
+        let signer = rustls::crypto::ring::sign::any_supported_type(&key)
+            .expect("RSA signing key")
+            .choose_scheme(&[rustls::SignatureScheme::RSA_PKCS1_SHA256])
+            .expect("RS256 scheme");
+        let signature = signer.sign(signed.as_bytes()).expect("RS256 signature");
+        format!("{signed}.{}", encode(&signature))
+    }
+
+    fn issuer_admission(signer: &dyn TokenSigner) -> IssuerAdmission {
+        use basalt::secretspec_issuer::IssuerKeyDeclaration;
+        use basalt::secretspec_issuer::IssuerResolutionResult;
+
+        let declaration = IssuerKeyDeclaration::new("production", "oidc-signing-key", "env://");
+        let rotation = basalt::secretspec_issuer::RotationWindow::new(
+            basalt::oidc_exchange::signer_verification_digest(signer).expect("public signer digest"),
+            Vec::new(),
+            declaration.key_id.clone(),
+        );
+        IssuerAdmission {
+            declaration,
+            resolution: IssuerResolutionResult {
+                schema: basalt::secretspec_issuer::ISSUER_RESOLUTION_RESULT_SCHEMA.to_owned(),
+                reason: basalt::secretspec_issuer::IssuerResolutionReason::Loaded,
+                allowed: true,
+                issues: Vec::new(),
+                non_claims: basalt::secretspec_issuer::REQUIRED_ISSUER_NON_CLAIMS.map(str::to_owned).to_vec(),
+            },
+            rotation,
+        }
+    }
+
+    fn reservations(path: &std::path::Path) -> usize {
+        std::fs::read_dir(path)
+            .expect("replay directory")
+            .filter(|entry| digest_name(&entry.as_ref().expect("replay entry").file_name().to_string_lossy()))
+            .count()
+    }
+
+    #[test]
+    fn real_holder_exchange_grants_only_the_canonical_request_once() {
+        let mut policy = basalt::oidc_exchange::parse_policy(include_str!(
+            "../../vendor-cargo-deps/basalt/contracts/oidc-exchange/generated/policy.json"
+        ))
+        .expect("accepted producer policy");
+        policy.capability.resource_prefix = "mantle://gateway/v1/".to_owned();
+        let issuer_signer = ucan::Ed25519InMemorySigner::from_seed_bytes([71; 32]);
+        let holder_signer = ucan::Ed25519InMemorySigner::from_seed_bytes([72; 32]);
+        let issuer = issuer_admission(&issuer_signer);
+        let holder = holder_signer.issuer().expect("holder DID");
+        let policy_ref = BasaltPolicyRef::new(
+            format!("blake3:{}", blake3::hash(basalt::DEFAULT_POLICY_JSON.as_bytes()).to_hex()),
+            basalt::SUPPORTED_SCHEMA_VERSION,
+            "mantle-build-submit",
+        );
+        let native = basalt::mantle::Request {
+            operation: basalt::mantle::Operation::StatusRead,
+            subject: holder.as_str().to_owned(),
+            account: "account-a".to_owned(),
+            project: PROJECT.to_owned(),
+            endpoint: "private-gateway".to_owned(),
+            audience: SERVICE.to_owned(),
+            generation: 7,
+            request_digest: [81; 32],
+            target: "attempt-a".to_owned(),
+        };
+        let canonical = basalt::mantle::canonical_enforcement(&native, &policy_ref).expect("canonical request");
+        let mut plan = fixture_plan();
+        plan.operation = Operation::Status;
+        plan.not_before_ms = OIDC_NOW_MS;
+        plan.expires_ms = OIDC_NOW_MS + 120_000;
+        let directory = private_directory();
+        let mut replay = replay_at(directory.path(), 8);
+        let mut cache = JwksCache::default();
+        let discovery = serde_json::to_vec(&serde_json::json!({
+            "issuer": policy.issuer_url,
+            "jwks_uri": policy.jwks_url,
+        }))
+        .expect("discovery document");
+        let mut documents = ScriptedDocuments {
+            responses: [
+                json_document(&discovery, 3_600),
+                json_document(include_bytes!("../../tests/fixtures/github-ci/oidc-rs256-test-jwks.json"), 3_600),
+            ]
+            .into(),
+            fetches: 0,
+        };
+        let token = signed_oidc_token();
+        let mut run = |native: &basalt::mantle::Request, documents: &mut ScriptedDocuments| {
+            exchange_through(
+                ExchangePorts {
+                    policy: &policy,
+                    cache: &mut cache,
+                    documents,
+                    replay: &mut replay,
+                    issuer: &issuer,
+                    issuer_signer: &issuer_signer,
+                    holder_signer: &holder_signer,
+                },
+                &token,
+                &plan,
+                native,
+                &policy_ref,
+                OIDC_NOW_MS,
+            )
+        };
+
+        // Lattice's own exact binding refuses before any producer effect.
+        for altered in [
+            basalt::mantle::Request {
+                subject: "did:key:z6Mkother-holder".to_owned(),
+                ..native.clone()
+            },
+            basalt::mantle::Request {
+                project: "other-project".to_owned(),
+                ..native.clone()
+            },
+            basalt::mantle::Request {
+                audience: "did:key:other-service".to_owned(),
+                ..native.clone()
+            },
+            basalt::mantle::Request {
+                operation: basalt::mantle::Operation::LogRead,
+                ..native.clone()
+            },
+        ] {
+            assert!(matches!(run(&altered, &mut documents), Err(ExchangeError::Policy)));
+        }
+        assert_eq!(documents.fetches, 0);
+        assert_eq!(reservations(directory.path()), 0);
+
+        let exchanged = run(&native, &mut documents).expect("real holder-bound exchange");
+        assert_eq!(exchanged.holder_did(), holder.as_str());
+        assert_eq!(exchanged.resource, canonical.resource());
+        assert_eq!(exchanged.facts().operations, [Operation::Status].into_iter().collect());
+        assert_eq!(exchanged.receipt().outcome, basalt::oidc_exchange::ExchangeOutcome::Issued);
+        assert_eq!(documents.fetches, 2);
+        assert_eq!(reservations(directory.path()), 1);
+
+        // One exchange per OIDC token, even for the same exact request.
+        assert!(matches!(run(&native, &mut documents), Err(ExchangeError::Denied)));
+        assert_eq!(reservations(directory.path()), 1);
     }
 }

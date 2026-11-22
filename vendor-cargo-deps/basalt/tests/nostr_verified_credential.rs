@@ -51,7 +51,8 @@ fn tag(name: &str, value: &str) -> Vec<String> {
 }
 
 fn signed_event() -> NostrEvent {
-    let signing_key = SigningKey::from_bytes(&decode_secret_key()).expect("valid test key");
+    let secret = k256::FieldBytes::from(decode_secret_key());
+    let signing_key = SigningKey::from_bytes(&secret).expect("valid test key");
     let mut event = NostrEvent {
         id: String::new(),
         pubkey: encode_lower_hex(&signing_key.verifying_key().to_bytes()),

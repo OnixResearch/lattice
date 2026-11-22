@@ -1,15 +1,17 @@
 name: basalt
-repository: ssh://git@github.com/OnixResearch/basalt.git
-revision: b34d6ac27ad396530fb799e79223acf71112ee0f
+repository: https://github.com/OnixResearch/basalt.git
+revision: 6ab48bffa29085f875d307dfbed1b73c9e5d1d6f
 paths:
 - .cairn
 - .cargo
 - .github
 - .gitignore
+- CHANGELOG.md
 - Cargo.lock
 - Cargo.toml
 - LICENSE
 - README.md
+- SECURITY.md
 - cairn-policy
 - contracts
 - docs

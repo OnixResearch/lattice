@@ -17,7 +17,7 @@ use ucan_core::peer_auth::{
 
 const POLICY_SCHEMA: &str = "basalt.peer-auth-policy.v1";
 const POLICY_ID: &str = "peer-control-v1";
-const UCAN_REVISION: &str = "3a2aa043068a82663cf72ec05ed5d56a7d65ecd5";
+const UCAN_REVISION: &str = "fca62a6ed6895689ff18112b497bc7a986516c20";
 const RECEIPT_SCHEMA: &str = "basalt.peer-auth-decision.v1";
 const RECEIPT_DOMAIN: &[u8] = b"basalt/peer-auth-decision/v1";
 const BLAKE3_PREFIX: &str = "blake3:";

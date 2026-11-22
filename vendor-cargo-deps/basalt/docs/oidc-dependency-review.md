@@ -11,18 +11,20 @@ Bounded HTTP supplies HTTPS discovery and JWKS retrieval.
 - reviewed object: `5abc2b93e0f288aba251a0750ce2d716eb9757fc`
 - license: `MIT OR Apache-2.0`
 
-`jsonwebtoken` supplies compact JWT parsing, JWK RSA components, and RS256
-signature verification through RustCrypto.
+`ring` supplies the RS256 signature primitive. Basalt keeps compact-JWS
+splitting, JWK RSA modulus/exponent decoding, header admission, claim decoding
+and every policy decision in its own pure core; `ring` verifies one signature
+over the exact `header.payload` bytes.
 
-- version: `11.0.0`
-- upstream tag object: `900010fb1be550ec2cfa8c32038eb154f9ef56d7`
-- crates.io checksum: `881733cbc631fc9e472e24447ce32a64bedf2da498d6d8570b08edc87de71f65`
-- license: `MIT`
-- selected backend: `rust_crypto`
+- version: `0.17.14`
+- crates.io checksum: `a4689e6c2294d81e88dc6261c768b63bc4fcdb852be6d1352498b114f61383b7`
+- license: `ISC AND MIT AND Apache-2.0`
+- selected primitive: `RSA_PKCS1_2048_8192_SHA256`
 
-Cargo disables the default PEM feature. Basalt uses public RSA modulus and
-exponent values from an admitted JWK. Basalt fixes the accepted algorithm to
-RS256 before signature validation.
+Basalt fixes the accepted algorithm to RS256 before signature validation, and
+rejects any header field outside `alg`, `typ` and `kid`. The earlier
+`jsonwebtoken` 11.0.0 dependency is retained only as a dev-dependency to mint
+fixture tokens; it is not in the runtime or consumer closure.
 
 ## Candidate review
 
@@ -31,7 +33,8 @@ independent review.
 
 | Family | Mechanism | Result |
 |---|---|---|
-| `jsonwebtoken` | Stable JWT, JWS, and JWK types with a RustCrypto provider | Selected |
+| `ring` RS256 primitive with a first-party compact-JWS core | One audited signature primitive; parsing and policy stay in Basalt | Selected |
+| `jsonwebtoken` 11.0.0 | Stable JWT, JWS, and JWK types with a RustCrypto provider | Removed from the runtime closure: its `rsa` 0.9 dependency carries RUSTSEC-2023-0071 and is pinned transitively |
 | `jwt-compact` | Typed algorithm API and pure-Rust RSA | Rejected because the reviewed release is beta |
 | `josekit` | Broad JOSE implementation through OpenSSL | Rejected because it expands the native and algorithm boundary |
 

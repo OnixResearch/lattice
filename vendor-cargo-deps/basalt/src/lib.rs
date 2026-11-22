@@ -62,6 +62,7 @@ pub mod authority_core;
 pub mod cli_fs;
 #[cfg(feature = "durable-authority")]
 pub mod durable_authority;
+pub mod kiln;
 pub mod license_consumption;
 pub mod mantle;
 pub mod nostr_identity;

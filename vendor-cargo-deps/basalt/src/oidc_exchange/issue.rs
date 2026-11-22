@@ -80,6 +80,7 @@ pub(super) fn issue_plan_to_recipient(
     signer: &dyn TokenSigner,
 ) -> Result<CompactToken, IssueFailure> {
     validate_issuer_admission(issuer, signer)?;
+    validate_recipient(recipient, signer)?;
     let capabilities = CapabilitySet::single(plan.resource.clone(), plan.operation.ability())
         .map_err(|_error| IssueFailure::Capability)?;
     let bounds = TokenTimeBounds::new(plan.not_before_seconds, plan.expires_at_seconds)
@@ -92,6 +93,28 @@ pub(super) fn issue_plan_to_recipient(
         bounds,
     )
     .map_err(|_error| IssueFailure::Token)
+}
+
+/// Refuse a recipient that is the issuing signer itself.
+///
+/// UCAN verification rejects self-issued grants, so such a token could never
+/// be used; refusing it first keeps the one-time replay key unspent.
+///
+/// # Errors
+///
+/// Returns [`IssueFailure::Audience`] when the recipient is the signer's DID,
+/// and [`IssueFailure::IssuerBinding`] when the signer has no issuer identity.
+pub(super) fn validate_recipient(
+    recipient: &AudienceDid,
+    signer: &dyn TokenSigner,
+) -> Result<(), IssueFailure> {
+    let issuer = signer
+        .issuer()
+        .map_err(|_error| IssueFailure::IssuerBinding)?;
+    if issuer.as_str() == recipient.as_str() {
+        return Err(IssueFailure::Audience);
+    }
+    Ok(())
 }
 
 /// Validate the `SecretSpec` result, public rotation facts, and signer identity.

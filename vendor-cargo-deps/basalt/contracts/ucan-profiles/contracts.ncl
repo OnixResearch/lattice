@@ -1,6 +1,6 @@
-let RuntimeRevision = "3a2aa043068a82663cf72ec05ed5d56a7d65ecd5" in
+let RuntimeRevision = "fca62a6ed6895689ff18112b497bc7a986516c20" in
 let SupportCatalogBlake3 = "fe77fd63076eaef555b74e702e4c14e483bdba70151ccc955c75b17d97412427" in
-let BasaltPolicyBlake3 = "ac691f3aaa8b4de0c79ffe7b9888b3633b1ad7a4545063a2bf7cad9c028025bb" in
+let BasaltPolicyBlake3 = "e929bde8e316da188eedb55013a695e82c280c69b88c15d0668c119589beb233" in
 let RequiredNonClaims = [
   "profile matching does not prove token correctness",
   "profile matching does not prove key trust or revocation freshness",

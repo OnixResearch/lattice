@@ -21,8 +21,7 @@ Receipt algorithms, Nostr credential contract, policy identity, and producer sch
 
 ## Observed checks
 
-Checks ran on 2026-09-08. Complete private logs and receipts are retained outside the worktree under
-`neural-stream/.pi/drains/materialization-complete/` in the research workspace.
+Checks ran on 2026-09-08. Complete operator logs and receipts are retained outside this repository.
 This report records the bounded results without publishing host paths or fixture transport contents.
 
 | Evidence | Observed result |

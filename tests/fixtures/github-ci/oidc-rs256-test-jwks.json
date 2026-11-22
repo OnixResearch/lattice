@@ -1,0 +1,15 @@
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "use": "sig",
+      "alg": "RS256",
+      "kid": "lattice-fixture-rsa",
+      "key_ops": [
+        "verify"
+      ],
+      "n": "hWJKetcDMY2zrlZHLv1AnrsjE-KMhNEw-5X0m0X-BKYASXopAMapRKJFjgmNN1BqrhksvPNhYbmlJpBFyLWdSkpB-3LWTIxkVafGv0XgxqGGhU6YlRzOz5bwOXYM3pCpqvcQ0AXQB_LANGtVZOIGkULyld-_uQjUbzLA3-lqKUKubUeCK-EhX7VjRbqSpwopvDIY1_YNCkrWqMfgGXrLrqwaQbiV3FF-qFX5XxyX1xJVOlF9pqlPvd22Bk82hVN11nQtHXz2j2L1No81c7tMtuEgBsf7V-y7a0QRkA8WfOHVC2dQcV6mtNm1nR2V5utt7XmlEWtcnw5vmabkVPQzUQ",
+      "e": "AQAB"
+    }
+  ]
+}

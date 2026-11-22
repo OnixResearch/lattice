@@ -1,0 +1,5 @@
+## Phase 1: Repair and evidence
+
+- [x] [serial] Replace the stale jsonwebtoken-revision assertion in `checks.oidc-exchange-sources`. The check now asserts the `ring` 0.17.14 pin and checksum in the runtime dependencies, the source contract, the exported boundary and the exact `Cargo.lock` entry. It keeps the jsonwebtoken pin scoped to `[dev-dependencies]`, keeps its lock checksum, and rejects jsonwebtoken in `[dependencies]`. r[ucan_token_flow.oidc.source_boundary]
+- [x] [serial] Prove the check both ways. `nix build path:.#checks.x86_64-linux.oidc-exchange-sources` exits 0 on the real tree. It exits 1 in a scratch copy whose `Cargo.lock` `ring` checksum is altered, and in one whose source-contract `ring_checksum` is altered. r[ucan_token_flow.oidc.source_boundary]
+- [x] [serial] Run `nix flake check -L --keep-going --option builders '' --option min-free 0` on the repaired tree: exit 0, including `checks.oidc-exchange-sources` and `checks.release`. r[ucan_token_flow.oidc.source_boundary]

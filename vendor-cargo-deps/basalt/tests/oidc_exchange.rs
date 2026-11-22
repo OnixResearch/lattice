@@ -7,20 +7,27 @@
 
 #![cfg(feature = "oidc-exchange")]
 
-use std::collections::{BTreeSet, VecDeque};
+use std::cell::Cell;
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::OnceLock;
 
+use basalt::authority_core::BasaltPolicyRef;
+use basalt::mantle;
 use basalt::oidc_exchange::{
-    DocumentFailure, DocumentKind, DocumentPort, DocumentResponse, ExchangeFailureClass,
-    ExchangeOutcome, ExchangeRequest, IssuerAdmission, JwksCache, KeyLoadFailure, MantleOperation,
-    OidcPolicy, PublicJwk, RejectReason, ReplayCommit, ReplayFailure, ReplayKey, ReplayPort,
-    exchange, inspect_token_key_id, load_verification_key, parse_policy,
+    DocumentFailure, DocumentKind, DocumentPort, DocumentResponse, ExchangeFailure,
+    ExchangeFailureClass, ExchangeOutcome, ExchangeRequest, ExchangeResult, HolderDelivery,
+    IssueFailure, IssuerAdmission, JwksCache, KeyLoadFailure, MantleOperation, OidcPolicy,
+    PublicJwk, RejectReason, ReplayCommit, ReplayFailure, ReplayKey, ReplayPort, exchange,
+    exchange_to_recipient, inspect_token_key_id, load_verification_key, parse_policy,
     signer_verification_digest, validate_receipt_redaction, verify_and_plan,
 };
 use basalt::secretspec_issuer::{
     ISSUER_RESOLUTION_RESULT_SCHEMA, IssuerKeyDeclaration, IssuerResolutionReason,
     IssuerResolutionResult, REQUIRED_ISSUER_NON_CLAIMS, RotationWindow,
 };
+use basalt::ucan::core::holder_invocation::HOLDER_INVOCATION_NONCE_BYTES;
+use basalt::ucan::token::DenyUnknownCaveats;
+use basalt::ucan_enforcement::{UcanEnforcementBoundaries, bind_enforcement_action};
 use base64::Engine as _;
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
 use rand_chacha::ChaCha20Rng;
@@ -29,14 +36,22 @@ use rsa::pkcs1::EncodeRsaPrivateKey;
 use rsa::traits::PublicKeyParts;
 use serde_json::Value;
 use ucan::{
-    Ed25519InMemorySigner, KeyResolutionContext, ProofCollection, TokenSigner, VerificationContext,
-    VerificationTime, verify_compact_token,
+    AudienceDid, CompactToken, Ed25519InMemorySigner, HolderInvocationLimits,
+    HolderInvocationNonce, HolderInvocationReplayAdmission, HolderInvocationReplayCandidate,
+    HolderInvocationReplayError, HolderInvocationSigningRequest, KeyResolutionContext,
+    NoRevocations, ProofCollection, TokenSigner, VerificationContext, VerificationLimits,
+    VerificationTime, sign_holder_invocation, verify_compact_token,
 };
 
 const POLICY_JSON: &str = include_str!("../contracts/oidc-exchange/generated/policy.json");
 const CLAIMS_JSON: &str = include_str!("fixtures/oidc/github-claims.json");
 const NOW_SECONDS: u64 = 1_700_000_060;
 const TOKEN_EXPIRATION_SECONDS: u64 = 1_700_000_300;
+const TOKEN_ISSUED_AT_SECONDS: u64 = 1_700_000_000;
+/// `max(exp, iat + 600 s token age) + 30 s skew` for the fixture claims.
+const FIXTURE_REPLAY_RESERVED_UNTIL_SECONDS: u64 = 1_700_000_630;
+/// A token that outlives the 300 s UCAN lifetime: `exp = iat + 900`.
+const LONG_TOKEN_EXPIRATION_SECONDS: u64 = 1_700_000_900;
 const REQUEST_LIFETIME_SECONDS: u64 = 120;
 const CACHE_FRESH_SECONDS: u64 = 60;
 const EXPIRED_TOKEN_SECONDS: u64 = 1_699_999_000;
@@ -94,6 +109,67 @@ fn valid_token_with_key(key_id: &str) -> String {
 
 fn valid_token() -> String {
     valid_token_with_key("fixture-rsa")
+}
+
+/// A distinct OIDC token: same identity claims, its own `jti` and expiry.
+fn token_with_jti(jti: &str, expiration_seconds: u64) -> String {
+    let mut fields = claims();
+    fields["jti"] = serde_json::json!(jti);
+    fields["exp"] = serde_json::json!(expiration_seconds);
+    let mut header = Header::new(Algorithm::RS256);
+    header.kid = Some("fixture-rsa".to_owned());
+    token_with(&fields, &header)
+}
+
+/// One exchange service: policy, key cache, documents, replay store and signer.
+struct Harness {
+    policy: OidcPolicy,
+    cache: JwksCache,
+    documents: ScriptedDocuments,
+    replay: MemoryReplay,
+    signer: Ed25519InMemorySigner,
+    issuer: IssuerAdmission,
+}
+
+impl Harness {
+    /// Key documents stay fresh for the policy maximum, so one load serves all.
+    fn new(policy: OidcPolicy) -> Self {
+        let mut discovery = discovery_response(&policy);
+        discovery.fresh_seconds = policy.cache.max_fresh_seconds;
+        let documents = ScriptedDocuments::new(vec![
+            Ok(discovery),
+            Ok(jwks_response("fixture-rsa", policy.cache.max_fresh_seconds)),
+        ]);
+        let signer = Ed25519InMemorySigner::from_seed_bytes([UCAN_TEST_SEED_BYTE; 32]);
+        let issuer = issuer_admission(&signer);
+        Self {
+            policy,
+            cache: JwksCache::default(),
+            documents,
+            replay: MemoryReplay::default(),
+            signer,
+            issuer,
+        }
+    }
+
+    fn exchange(
+        &mut self,
+        token: &str,
+        now_seconds: u64,
+        request: &ExchangeRequest,
+    ) -> Result<ExchangeResult, ExchangeFailure> {
+        exchange(
+            token,
+            now_seconds,
+            &self.policy,
+            request,
+            &mut self.cache,
+            &mut self.documents,
+            &mut self.replay,
+            &self.issuer,
+            &self.signer,
+        )
+    }
 }
 
 fn issuer_admission(signer: &dyn TokenSigner) -> IssuerAdmission {
@@ -181,27 +257,34 @@ impl DocumentPort for ScriptedDocuments {
     }
 }
 
+/// In-memory replay store that frees a key once its reservation has passed.
 #[derive(Default)]
 struct MemoryReplay {
-    committed: BTreeSet<String>,
+    committed: BTreeMap<String, u64>,
     calls: usize,
     failure: Option<ReplayFailure>,
+    now_seconds: u64,
 }
 
 impl ReplayPort for MemoryReplay {
     fn commit(
         &mut self,
         key: &ReplayKey,
-        _expires_at_seconds: u64,
+        expires_at_seconds: u64,
     ) -> Result<ReplayCommit, ReplayFailure> {
         self.calls = self.calls.saturating_add(1);
         if let Some(failure) = self.failure {
             return Err(failure);
         }
-        if self.committed.insert(key.as_str().to_owned()) {
-            Ok(ReplayCommit::Fresh)
-        } else {
-            Ok(ReplayCommit::Duplicate)
+        match self.committed.get(key.as_str()) {
+            Some(reserved_until) if *reserved_until > self.now_seconds => {
+                Ok(ReplayCommit::Duplicate)
+            }
+            _ => {
+                self.committed
+                    .insert(key.as_str().to_owned(), expires_at_seconds);
+                Ok(ReplayCommit::Fresh)
+            }
         }
     }
 }
@@ -241,6 +324,10 @@ fn valid_github_token_produces_one_exact_attenuated_plan() {
         NOW_SECONDS + REQUEST_LIFETIME_SECONDS
     );
     assert!(plan.expires_at_seconds <= TOKEN_EXPIRATION_SECONDS);
+    assert_eq!(
+        plan.replay_expires_at_seconds,
+        FIXTURE_REPLAY_RESERVED_UNTIL_SECONDS
+    );
     assert!(plan.subject.identity.starts_with("blake3:"));
 }
 
@@ -724,64 +811,532 @@ fn exchange_issues_verifiable_ucan_once_and_fails_closed_on_replay_or_outage() {
     );
 }
 
+// r[verify ucan_token_flow.oidc.replay_boundary]
+#[test]
+fn one_oidc_token_admits_exactly_one_exchange_until_it_can_no_longer_be_accepted() {
+    let mut harness = Harness::new(policy());
+    harness.replay.now_seconds = NOW_SECONDS;
+    let token = valid_token();
+    harness
+        .exchange(&token, NOW_SECONDS, &request())
+        .expect("first exchange issues");
+    let mut other_operation = request();
+    other_operation.operation = MantleOperation::StatusRead;
+    let mut other_resource = request();
+    other_resource.resource = "mantle://projects/onix-stack/builds/other".to_owned();
+    for (label, candidate) in [("operation", other_operation), ("resource", other_resource)] {
+        let duplicate = harness
+            .exchange(&token, NOW_SECONDS, &candidate)
+            .expect_err("a second exchange of one OIDC token must be denied");
+        assert_eq!(duplicate.class, ExchangeFailureClass::Duplicate, "{label}");
+    }
+    let fresh = token_with_jti("fixture-exchange-2", TOKEN_EXPIRATION_SECONDS);
+    harness
+        .exchange(&fresh, NOW_SECONDS, &request())
+        .expect("a fresh token is accepted");
+    assert_eq!(
+        harness
+            .replay
+            .committed
+            .values()
+            .copied()
+            .collect::<Vec<_>>(),
+        vec![FIXTURE_REPLAY_RESERVED_UNTIL_SECONDS; 2]
+    );
+
+    // The old reservation ended with the UCAN (at most 300 s); this token outlives it.
+    let long = token_with_jti("fixture-exchange-long", LONG_TOKEN_EXPIRATION_SECONDS);
+    let mut full_lifetime = request();
+    full_lifetime.lifetime_seconds = harness.policy.time.max_ucan_lifetime_seconds;
+    let issued = harness
+        .exchange(&long, NOW_SECONDS, &full_lifetime)
+        .expect("long-lived token exchanges once");
+    assert_eq!(issued.receipt.outcome, ExchangeOutcome::Issued);
+    let later = NOW_SECONDS + harness.policy.time.max_ucan_lifetime_seconds + 40;
+    assert!(
+        verify_and_plan(
+            &long,
+            &public_jwk("fixture-rsa"),
+            later,
+            &harness.policy,
+            &full_lifetime
+        )
+        .is_ok(),
+        "the token must still be acceptable after the UCAN window"
+    );
+    harness.replay.now_seconds = later;
+    let late = harness
+        .exchange(&long, later, &full_lifetime)
+        .expect_err("re-exchange after the UCAN window must be denied");
+    assert_eq!(late.class, ExchangeFailureClass::Duplicate);
+    let expected_reservation = LONG_TOKEN_EXPIRATION_SECONDS
+        .max(TOKEN_ISSUED_AT_SECONDS + harness.policy.time.max_token_age_seconds)
+        + harness.policy.time.clock_skew_seconds;
+    assert_eq!(
+        harness.replay.committed.values().copied().max(),
+        Some(expected_reservation)
+    );
+}
+
+const HOLDER_SEED_BYTE: u8 = 10;
+/// A third key, distinct from the exchange signer and the first holder.
+const SECOND_HOLDER_SEED_BYTE: u8 = 12;
+const MANTLE_SERVICE: &str = "did:key:z6Mkmantle-service";
+const MANTLE_GENERATION: u64 = 1;
+const MANTLE_NONCE_BYTE: u8 = 19;
+
+fn holder_signer(seed_byte: u8) -> Ed25519InMemorySigner {
+    Ed25519InMemorySigner::from_seed_bytes([seed_byte; 32])
+}
+
+fn did_of(signer: &Ed25519InMemorySigner) -> AudienceDid {
+    AudienceDid::from(signer.issuer().expect("signer DID"))
+}
+
+/// The shipped policy, admitting Mantle gateway resources for holder delivery.
+fn holder_policy() -> OidcPolicy {
+    let mut document: Value = serde_json::from_str(POLICY_JSON).expect("policy fixture");
+    document["capability"]["resource_prefix"] = serde_json::json!("mantle://gateway/v1/");
+    parse_policy(&serde_json::to_string(&document).expect("holder policy JSON"))
+        .expect("holder policy admitted")
+}
+
+fn mantle_policy_ref() -> BasaltPolicyRef {
+    BasaltPolicyRef::new(
+        format!(
+            "blake3:{}",
+            blake3::hash(basalt::DEFAULT_POLICY_JSON.as_bytes()).to_hex()
+        ),
+        basalt::SUPPORTED_SCHEMA_VERSION,
+        "mantle-build-submit",
+    )
+}
+
+fn mantle_request(subject: &AudienceDid) -> mantle::Request {
+    mantle::Request {
+        operation: mantle::Operation::BuildSubmit,
+        subject: subject.as_str().to_owned(),
+        account: "account-a".to_owned(),
+        project: "onix-stack".to_owned(),
+        endpoint: "private-gateway".to_owned(),
+        audience: MANTLE_SERVICE.to_owned(),
+        generation: MANTLE_GENERATION,
+        request_digest: [41; 32],
+        target: "/jobs/approved".to_owned(),
+    }
+}
+
+/// The exchange request for exactly the canonical resource of `mantle`.
+fn holder_exchange_request(
+    mantle: &mantle::Request,
+    policy_ref: &BasaltPolicyRef,
+) -> ExchangeRequest {
+    ExchangeRequest {
+        audience: MANTLE_SERVICE.to_owned(),
+        project: "onix-stack".to_owned(),
+        operation: MantleOperation::BuildSubmit,
+        resource: mantle::canonical_enforcement(mantle, policy_ref)
+            .expect("canonical fixture")
+            .resource,
+        lifetime_seconds: REQUEST_LIFETIME_SECONDS,
+    }
+}
+
+impl Harness {
+    fn exchange_to(
+        &mut self,
+        token: &str,
+        request: &ExchangeRequest,
+        holder: &HolderDelivery<'_>,
+    ) -> Result<ExchangeResult, ExchangeFailure> {
+        exchange_to_recipient(
+            token,
+            NOW_SECONDS,
+            &self.policy,
+            request,
+            &mut self.cache,
+            &mut self.documents,
+            &mut self.replay,
+            &self.issuer,
+            &self.signer,
+            holder,
+        )
+    }
+
+    fn verify(&self, token: &CompactToken) -> ucan::VerifiedToken {
+        let context = VerificationContext::new(
+            VerificationTime::from_unix_seconds(NOW_SECONDS),
+            KeyResolutionContext::new(vec![self.signer.verification_key().expect("issuer key")]),
+            ProofCollection::empty(),
+        );
+        verify_compact_token(token, &context).expect("signed holder grant")
+    }
+}
+
 // r[verify ucan_token_flow.oidc.holder_recipient]
 #[test]
-fn explicit_recipient_preserves_service_attenuation_and_one_time_exchange() {
-    let policy = policy();
+fn holder_delivery_issues_exactly_the_canonical_grant_to_the_holder_once() {
     let token = valid_token();
-    let request = request();
-    let signer = Ed25519InMemorySigner::from_seed_bytes([UCAN_TEST_SEED_BYTE; 32]);
-    let holder = Ed25519InMemorySigner::from_seed_bytes([10; 32]);
-    let recipient = ucan::AudienceDid::from(holder.issuer().expect("holder DID"));
-    let issuer = issuer_admission(&signer);
-    let mut cache = JwksCache::default();
-    let mut replay = MemoryReplay::default();
-    let mut documents = ScriptedDocuments::new(vec![
-        Ok(discovery_response(&policy)),
-        Ok(jwks_response("fixture-rsa", CACHE_FRESH_SECONDS)),
-    ]);
-    let issued = basalt::oidc_exchange::exchange_to_recipient(
-        &token, NOW_SECONDS, &policy, &request, &mut cache, &mut documents,
-        &mut replay, &issuer, &signer, &recipient,
-    ).expect("exchange to holder");
-    let context = VerificationContext::new(
-        VerificationTime::from_unix_seconds(NOW_SECONDS),
-        KeyResolutionContext::new(vec![signer.verification_key().expect("issuer key")]),
-        ProofCollection::empty(),
-    );
-    let verified = verify_compact_token(&issued.token, &context).expect("signed holder grant");
-    assert_eq!(verified.audience(), &recipient);
+    let policy_ref = mantle_policy_ref();
+    let mut harness = Harness::new(holder_policy());
+    let first = did_of(&holder_signer(HOLDER_SEED_BYTE));
+    let first_mantle = mantle_request(&first);
+    let first_request = holder_exchange_request(&first_mantle, &policy_ref);
+    let first_holder = HolderDelivery {
+        recipient: &first,
+        request: &first_mantle,
+        policy_ref: &policy_ref,
+    };
+    let issued = harness
+        .exchange_to(&token, &first_request, &first_holder)
+        .expect("exchange to holder");
+    let verified = harness.verify(&issued.token);
+    assert_eq!(verified.audience(), &first);
     let grants = verified.effective_delegation().capabilities().as_slice();
     assert_eq!(grants.len(), 1);
-    assert_eq!(grants[0].resource, request.resource);
-    assert_eq!(grants[0].ability, request.operation.ability());
-    assert_eq!(verified.effective_delegation().time_bounds().expires_at_seconds(),
-        NOW_SECONDS + REQUEST_LIFETIME_SECONDS);
+    assert_eq!(grants[0].resource, first_request.resource);
+    assert_eq!(grants[0].ability, "mantle/build/submit");
+    assert_eq!(
+        verified
+            .effective_delegation()
+            .time_bounds()
+            .expires_at_seconds(),
+        NOW_SECONDS + REQUEST_LIFETIME_SECONDS
+    );
 
-    let other = ucan::AudienceDid::from(signer.issuer().expect("other holder DID"));
-    let duplicate = basalt::oidc_exchange::exchange_to_recipient(
-        &token, NOW_SECONDS, &policy, &request, &mut cache, &mut documents,
-        &mut replay, &issuer, &signer, &other,
-    ).expect_err("changing holder must not bypass replay");
+    let second_signer = holder_signer(SECOND_HOLDER_SEED_BYTE);
+    let second = did_of(&second_signer);
+    assert_ne!(
+        second.as_str(),
+        harness.signer.issuer().expect("DID").as_str()
+    );
+    let second_mantle = mantle_request(&second);
+    let second_request = holder_exchange_request(&second_mantle, &policy_ref);
+    let second_holder = HolderDelivery {
+        recipient: &second,
+        request: &second_mantle,
+        policy_ref: &policy_ref,
+    };
+    let duplicate = harness
+        .exchange_to(&token, &second_request, &second_holder)
+        .expect_err("changing holder must not bypass replay");
     assert_eq!(duplicate.class, ExchangeFailureClass::Duplicate);
 
-    let second = basalt::oidc_exchange::exchange_to_recipient(
-        &token, NOW_SECONDS, &policy, &request, &mut cache, &mut documents,
-        &mut MemoryReplay::default(), &issuer, &signer, &other,
-    ).expect("independent replay fixture");
-    assert_ne!(issued.receipt.granted_capability_identity, second.receipt.granted_capability_identity);
-
-    let mut wrong_service = request.clone();
-    wrong_service.audience = recipient.as_str().to_owned();
-    let mut unused_replay = MemoryReplay::default();
-    let failure = basalt::oidc_exchange::exchange_to_recipient(
-        &token, NOW_SECONDS, &policy, &wrong_service, &mut cache, &mut documents,
-        &mut unused_replay, &issuer, &signer, &recipient,
-    ).expect_err("holder cannot replace service policy audience");
-    assert_eq!(failure.class, ExchangeFailureClass::Verification(RejectReason::CapabilityAudience));
-    assert_eq!(unused_replay.calls, 0);
+    let mut independent = Harness::new(holder_policy());
+    let delivered = independent
+        .exchange_to(&token, &second_request, &second_holder)
+        .expect("independent replay store");
+    let verified = independent.verify(&delivered.token);
+    assert_eq!(verified.audience(), &second);
+    assert_eq!(
+        verified.effective_delegation().capabilities().as_slice()[0].resource,
+        second_request.resource
+    );
+    assert_ne!(
+        issued.receipt.granted_capability_identity,
+        delivered.receipt.granted_capability_identity
+    );
     let receipt = serde_json::to_string(&issued.receipt).expect("redacted receipt");
-    validate_receipt_redaction(&receipt, &[&token, issued.token.as_str()]).expect("no bearer evidence");
+    validate_receipt_redaction(&receipt, &[&token, issued.token.as_str()])
+        .expect("no bearer evidence");
+}
+
+#[test]
+fn holder_delivery_refuses_unbound_requests_before_key_load_and_replay() {
+    let token = valid_token();
+    let policy_ref = mantle_policy_ref();
+    let mut harness = Harness::new(holder_policy());
+    let holder = did_of(&holder_signer(HOLDER_SEED_BYTE));
+    let other_holder = did_of(&holder_signer(SECOND_HOLDER_SEED_BYTE));
+    let exact = mantle_request(&holder);
+    let exact_request = holder_exchange_request(&exact, &policy_ref);
+
+    let mut swapped_project = mantle_request(&holder);
+    swapped_project.project = "other-project".to_owned();
+    let mut swapped_audience = mantle_request(&holder);
+    swapped_audience.audience = "did:key:z6Mkother-service".to_owned();
+    let swapped_subject = mantle_request(&other_holder);
+    let mut bare_prefix = exact_request.clone();
+    bare_prefix.resource = "mantle://gateway/v1/".to_owned();
+    let mut truncated = exact_request.clone();
+    let generation_end = truncated.resource.rfind('/').expect("digest separator");
+    truncated.resource.truncate(generation_end);
+    assert!(
+        truncated.resource.ends_with("/1"),
+        "cut after the generation"
+    );
+    let mut other_operation = exact_request.clone();
+    other_operation.operation = MantleOperation::StatusRead;
+    let mut holder_as_service = exact_request.clone();
+    holder_as_service.audience = holder.as_str().to_owned();
+
+    let cases = [
+        (
+            "swapped project",
+            holder_exchange_request(&swapped_project, &policy_ref),
+            &swapped_project,
+            RejectReason::CapabilityProject,
+        ),
+        (
+            "swapped audience",
+            holder_exchange_request(&swapped_audience, &policy_ref),
+            &swapped_audience,
+            RejectReason::CapabilityAudience,
+        ),
+        (
+            "swapped subject",
+            holder_exchange_request(&swapped_subject, &policy_ref),
+            &swapped_subject,
+            RejectReason::CapabilityHolder,
+        ),
+        (
+            "bare prefix",
+            bare_prefix,
+            &exact,
+            RejectReason::CapabilityResource,
+        ),
+        (
+            "truncated generation",
+            truncated,
+            &exact,
+            RejectReason::CapabilityResource,
+        ),
+        (
+            "other operation",
+            other_operation,
+            &exact,
+            RejectReason::CapabilityOperation,
+        ),
+        (
+            "holder as service",
+            holder_as_service,
+            &exact,
+            RejectReason::CapabilityAudience,
+        ),
+    ];
+    for (label, request, mantle, expected) in cases {
+        let delivery = HolderDelivery {
+            recipient: &holder,
+            request: mantle,
+            policy_ref: &policy_ref,
+        };
+        let failure = harness
+            .exchange_to(&token, &request, &delivery)
+            .expect_err("unbound holder request must be refused");
+        assert_eq!(
+            failure.class,
+            ExchangeFailureClass::Verification(expected),
+            "{label}"
+        );
+        assert_eq!(failure.receipt.outcome, ExchangeOutcome::Denied, "{label}");
+    }
+    assert!(harness.documents.calls.is_empty(), "no key load");
+    assert_eq!(harness.replay.calls, 0, "no replay commit");
+
+    let delivery = HolderDelivery {
+        recipient: &holder,
+        request: &exact,
+        policy_ref: &policy_ref,
+    };
+    harness
+        .exchange_to(&token, &exact_request, &delivery)
+        .expect("the exact request still exchanges once");
+    assert_eq!(harness.replay.calls, 1);
+}
+
+#[test]
+fn holder_recipient_equal_to_the_issuer_is_refused_before_key_load_and_replay() {
+    let token = valid_token();
+    let policy_ref = mantle_policy_ref();
+    let mut harness = Harness::new(holder_policy());
+    let issuer_did = did_of(&harness.signer);
+    let self_issued = mantle_request(&issuer_did);
+    let delivery = HolderDelivery {
+        recipient: &issuer_did,
+        request: &self_issued,
+        policy_ref: &policy_ref,
+    };
+    let failure = harness
+        .exchange_to(
+            &token,
+            &holder_exchange_request(&self_issued, &policy_ref),
+            &delivery,
+        )
+        .expect_err("a recipient equal to the issuer is refused");
+    assert_eq!(
+        failure.class,
+        ExchangeFailureClass::Issue(IssueFailure::Audience)
+    );
+    assert!(harness.documents.calls.is_empty(), "no key load");
+    assert_eq!(harness.replay.calls, 0, "no replay commit");
+}
+
+#[test]
+fn holder_failure_receipts_bind_the_recipient() {
+    let token = valid_token();
+    let policy_ref = mantle_policy_ref();
+    let mut harness = Harness::new(holder_policy());
+    let first = did_of(&holder_signer(HOLDER_SEED_BYTE));
+    let second = did_of(&holder_signer(SECOND_HOLDER_SEED_BYTE));
+    let mut receipts = Vec::new();
+    for recipient in [&first, &second] {
+        let mantle = mantle_request(recipient);
+        let mut request = holder_exchange_request(&mantle, &policy_ref);
+        request.audience = "did:key:z6Mkother-service".to_owned();
+        let delivery = HolderDelivery {
+            recipient,
+            request: &mantle,
+            policy_ref: &policy_ref,
+        };
+        let failure = harness
+            .exchange_to(&token, &request, &delivery)
+            .expect_err("wrong service audience");
+        receipts.push(failure.receipt);
+    }
+    let mut legacy_request = holder_exchange_request(&mantle_request(&first), &policy_ref);
+    legacy_request.audience = "did:key:z6Mkother-service".to_owned();
+    let legacy = harness
+        .exchange(&token, NOW_SECONDS, &legacy_request)
+        .expect_err("legacy wrong service audience");
+    assert_eq!(
+        legacy.class,
+        ExchangeFailureClass::Verification(RejectReason::CapabilityAudience)
+    );
+    receipts.push(legacy.receipt);
+    let identities: BTreeSet<&str> = receipts
+        .iter()
+        .map(|receipt| receipt.requested_capability_identity.as_str())
+        .collect();
+    assert_eq!(
+        identities.len(),
+        3,
+        "each recipient binds a distinct identity"
+    );
+    for receipt in &receipts {
+        assert_eq!(receipt.outcome, ExchangeOutcome::Denied);
+        assert!(receipt.granted_capability_identity.is_none());
+    }
+}
+
+#[test]
+fn legacy_exchange_still_issues_to_the_policy_service_audience() {
+    let token = valid_token();
+    let mut harness = Harness::new(policy());
+    let issued = harness
+        .exchange(&token, NOW_SECONDS, &request())
+        .expect("legacy exchange");
+    let verified = harness.verify(&issued.token);
+    assert_eq!(verified.audience().as_str(), MANTLE_SERVICE);
+    assert_eq!(
+        verified.audience().as_str(),
+        harness.policy.capability.audience
+    );
+}
+
+/// Final holder replay admission that counts and admits every candidate.
+struct CountingAdmission(Cell<u32>);
+
+impl HolderInvocationReplayAdmission for CountingAdmission {
+    fn admit_holder_invocation(
+        &self,
+        _candidate: &HolderInvocationReplayCandidate<'_>,
+    ) -> Result<(), HolderInvocationReplayError> {
+        self.0.set(self.0.get() + 1);
+        Ok(())
+    }
+}
+
+#[test]
+fn holder_grant_from_the_exchange_is_admitted_by_the_native_mantle_verifier() {
+    let token = valid_token();
+    let policy_ref = mantle_policy_ref();
+    let mut harness = Harness::new(holder_policy());
+    let holder = holder_signer(HOLDER_SEED_BYTE);
+    let recipient = did_of(&holder);
+    let mantle = mantle_request(&recipient);
+    let delivery = HolderDelivery {
+        recipient: &recipient,
+        request: &mantle,
+        policy_ref: &policy_ref,
+    };
+    let issued = harness
+        .exchange_to(
+            &token,
+            &holder_exchange_request(&mantle, &policy_ref),
+            &delivery,
+        )
+        .expect("exchange to holder");
+
+    let policy = basalt::default_policy().expect("default Basalt policy");
+    let roots = [harness.signer.issuer().expect("DID").as_str().to_owned()];
+    let verifier = mantle::Verifier {
+        policy: &policy,
+        policy_ref: &policy_ref,
+        generation: MANTLE_GENERATION,
+        endpoint: "private-gateway",
+        audience: MANTLE_SERVICE,
+        trusted_roots: &roots,
+    };
+    let exact = verifier.enforcement(&mantle).expect("receiver enforcement");
+    let binding =
+        bind_enforcement_action(mantle.operation.action(), &exact).expect("operation binding");
+    let nonce =
+        HolderInvocationNonce::from_bytes([MANTLE_NONCE_BYTE; HOLDER_INVOCATION_NONCE_BYTES]);
+    let signature = sign_holder_invocation(
+        &HolderInvocationSigningRequest::new(
+            issued.token.as_str(),
+            &recipient,
+            exact.resource(),
+            exact.ability(),
+            binding,
+            nonce,
+        ),
+        &holder,
+        VerificationLimits::default(),
+        HolderInvocationLimits::default(),
+    )
+    .expect("holder signs the canonical request");
+    let keys = KeyResolutionContext::new(vec![
+        harness.signer.verification_key().expect("issuer key"),
+        holder.verification_key().expect("holder key"),
+    ]);
+    let proofs = ProofCollection::empty();
+    let admission = CountingAdmission(Cell::new(0));
+    let boundaries = UcanEnforcementBoundaries {
+        verification_time: VerificationTime::from_unix_seconds(NOW_SECONDS + 1),
+        key_resolver: &keys,
+        proof_store: &proofs,
+        revocations: &NoRevocations,
+        caveat_policies: &DenyUnknownCaveats,
+        replay: &admission,
+        verification_limits: VerificationLimits::default(),
+        holder_limits: HolderInvocationLimits::default(),
+    };
+    let invocation = mantle::Invocation {
+        compact_token: issued.token.as_str(),
+        nonce,
+        holder_signature: &signature,
+    };
+    let session = verifier
+        .verify(mantle.clone(), &invocation, &boundaries)
+        .expect("native Mantle verifier admits the exchanged holder grant");
+    verifier
+        .revalidate(&session, &boundaries)
+        .expect("revalidation");
+    session
+        .require(mantle.operation, &mantle.target, mantle.request_digest)
+        .expect("exact operation");
+    assert_eq!(admission.0.get(), 1);
+
+    let mut other_project = mantle;
+    other_project.project = "other-project".to_owned();
+    assert!(
+        verifier
+            .verify(other_project, &invocation, &boundaries)
+            .is_err(),
+        "the grant covers only the admitted project"
+    );
+    assert_eq!(admission.0.get(), 1);
 }
 
 #[test]
@@ -791,8 +1346,10 @@ fn events_and_results_require_explicit_policy_selection() {
     for operation in [MantleOperation::EventRead, MantleOperation::ResultRead] {
         let mut request = request();
         request.operation = operation;
-        assert_eq!(verify_and_plan(&token, &key, NOW_SECONDS, &policy(), &request),
-            Err(RejectReason::CapabilityOperation));
+        assert_eq!(
+            verify_and_plan(&token, &key, NOW_SECONDS, &policy(), &request),
+            Err(RejectReason::CapabilityOperation)
+        );
         let mut document: Value = serde_json::from_str(POLICY_JSON).expect("policy fixture");
         document["capability"]["operations"] = serde_json::json!([operation]);
         let selected = parse_policy(&serde_json::to_string(&document).expect("selected policy"))
@@ -801,8 +1358,10 @@ fn events_and_results_require_explicit_policy_selection() {
             .expect("selected read operation");
         assert_eq!(plan.operation, operation);
         request.operation = MantleOperation::BuildSubmit;
-        assert_eq!(verify_and_plan(&token, &key, NOW_SECONDS, &selected, &request),
-            Err(RejectReason::CapabilityOperation));
+        assert_eq!(
+            verify_and_plan(&token, &key, NOW_SECONDS, &selected, &request),
+            Err(RejectReason::CapabilityOperation)
+        );
     }
 }
 
