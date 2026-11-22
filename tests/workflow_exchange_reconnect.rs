@@ -287,6 +287,9 @@ impl Write for FaultStream {
 
 impl Drop for FaultStream {
     fn drop(&mut self) {
+        // Shut the socket down before signalling: `inner` is only closed after this body returns,
+        // and a concurrently forked test child may briefly hold a duplicate of its descriptor.
+        let _shutdown = self.inner.shutdown(std::net::Shutdown::Both);
         let _signal = self.closed.try_send(());
     }
 }
