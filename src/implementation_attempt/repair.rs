@@ -18,6 +18,7 @@
 
 pub mod checks;
 pub mod exportable;
+pub mod retained;
 pub mod revision;
 pub mod state;
 pub mod step;

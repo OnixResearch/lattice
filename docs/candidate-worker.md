@@ -649,9 +649,13 @@ the shell:
    steps is checked;
 5. captures the workspace after an exited step. A tree equal to the parent or
    the base is no candidate; otherwise a native receipt against the admitted
-   base and a candidate revision binding envelope, attempt, fence, iteration
-   and parent are derived on the host. The worker's exit status, files and
-   claims are never check results;
+   base and a candidate revision binding envelope, attempt, fence, iteration,
+   parent, candidate tree, execute bits (`mode & 0o111` of every executable
+   file) and diff are derived on the host
+   (`lattice.implementation-attempt-candidate-revision.v2`). The revision
+   record also retains its execute bits and the base digest (length and
+   BLAKE3) of every changed path. The worker's exit status, files and claims
+   are never check results;
 6. invokes every declared check against that exact revision. Each check runs
    against its own copy of the captured candidate under
    `repair/check-N-<check>/`, written from the host snapshot with every write
@@ -672,8 +676,10 @@ the shell:
    the lineage remainder; a pass past the elapsed bound or over any of them is
    `budget_exhausted` naming the bound, and an unreadable clock is `uncertain`
    (`clock`);
-8. writes `repair/step-N.json` once and repeats only for failures inside the
-   admitted classes.
+8. writes `repair/step-N.json` (`lattice.implementation-attempt-repair-step.v2`:
+   the step, its report, its candidate revision, every check observation, the
+   integrity of every check's copy and the verdict) once and repeats only for
+   failures inside the admitted classes.
 
 The disposition is one of `correct_candidate`, `repaired_candidate` (with
 `repairs`), `budget_exhausted` (with its `bound`: `iterations`, `elapsed`,
@@ -688,18 +694,21 @@ unknown outcome the proposal is ignored and the loop ends as `cancelled` or
 another attempt, fence or envelope, is refused before it is recorded. Repair
 steps receive the parent revision and the admitted failure classes only, never
 a transcript or check output. The
-`lattice.implementation-attempt-repair-observation.v1` record (envelope,
+`lattice.implementation-attempt-repair-observation.v2` record (envelope,
 request and worker-request identities, execution binding, policy and lineage
-identities, disposition, revisions with their receipts, usage, draws and
-unaccounted dimensions, `accepted:false`, `integrated:false`, the dispatch plan
-when present and `authority_withdrawn` when that is the disposition) is
-written once to `repair/disposition.json` after the attempt's
-`Scope::Attempt` usage observation, and printed. Recovery and a duplicate
-`run` print the retained disposition; without one the outcome is unknown and
+identities, disposition, step count, revisions with their receipts, execute
+bits and changed-path base digests, usage, draws and unaccounted dimensions,
+`accepted:false`, `integrated:false`, the dispatch plan when present and
+`authority_withdrawn` when that is the disposition) is written once to
+`repair/disposition.json` after the attempt's `Scope::Attempt` usage
+observation, and printed. Both records are typed: an unknown field, a missing
+field or a nullable field left out is refused. Recovery and a duplicate `run`
+print the retained disposition, also a first-schema
+(`...repair-observation.v1`) one; without one the outcome is unknown and
 nothing runs again. No disposition is acceptance: Kiln #46 keeps independent
 verification. `export-candidate` exports the candidate of a passing
-disposition and `inspect` projects every retained disposition
-([exporting repaired candidates](#exporting-repaired-candidates)).
+disposition and `inspect` reports a disposition whose records prove its
+workers stopped ([exporting repaired candidates](#exporting-repaired-candidates)).
 
 Usage is attributed per phase (`preparation`, `edit`, `check`, `repair`) with
 the existing `UsageProvenance`. A worker step is charged the larger of its
@@ -748,51 +757,91 @@ pinned OMP route remains single-shot.
 #### Exporting repaired candidates
 
 A repair attempt has no native attempt result, so `export-candidate` and
-`inspect` read its retained disposition instead. Export first runs the same
-checks as a single-shot export: the request, envelope and binding validation,
-the persisted intent of the exact request bytes, the attempt-fence directory
-and output parent, and, for a managed attempt, the revision seam, which
-refuses a revoked session, pinned revision or qualification as
-`export_revoked`. An attempt refused or blocked before dispatch has no
-candidate. Then it reads `repair/disposition.json` of the exact request:
+`inspect` read its retained repair records instead, and act only on the
+complete set: the typed v2 disposition of the exact request bytes naming this
+envelope, persisted execution binding, policy, lineage and dispatch plan, with
+`accepted:false` and `integrated:false`, and the typed intent and record of
+every step it counts, each this attempt's step at its iteration, within the
+admitted policy's iterations. No single recorded field, a kind, a verdict or
+a receipt's own claims, is trusted alone.
 
-- none retained, for example after a controller was lost between a step
-  record and the disposition, is `repair_outcome_unknown`; the outcome stays
-  unknown and is never guessed;
-- an unreadable or malformed record, or one of other request bytes, is
+Export first runs the same checks as a single-shot export: the request,
+envelope and binding validation, the persisted intent of the exact request
+bytes, the attempt-fence directory and output parent, and, for a managed
+attempt, the revision seam, which refuses a revoked session, pinned revision
+or qualification as `export_revoked`. An attempt refused or blocked before
+dispatch has no candidate. Then:
+
+- no retained disposition, for example after a controller was lost between a
+  step record and the disposition, is `repair_outcome_unknown`; the outcome
+  stays unknown and is never guessed;
+- an unreadable, malformed, incomplete, first-schema or crossed record set is
   `repair_disposition_invalid`;
 - any disposition other than `correct_candidate` and `repaired_candidate` is
   `repair_not_candidate`;
-- a passing disposition must name the last recorded revision, at iteration 1
-  for `correct_candidate` and `repairs + 1` for `repaired_candidate`, equal to
-  the recorded step count. Every recorded revision must re-derive from this
-  envelope, attempt and fence, its iteration, its parent (the revision before
-  it) and its receipt's candidate and diff identities. The record must name
-  this envelope and execution binding, the final receipt must be a produced
-  receipt of this work, attempt, fence, workspace and base, and
-  `repair/step-N.json` of that iteration must record the same revision with a
-  `passed` verdict. Anything else is `repair_disposition_invalid`.
+- a passing disposition is replayed in the pure core
+  (`repair::exportable`). Its repairs must fit the admitted policy and the
+  global bound of 8, and the step count must be `repairs + 1`. Every step must
+  be exited, with the parent and failure classes the loop would have given it.
+  Every recorded revision must re-derive from this envelope, attempt and
+  fence, its iteration, parent, candidate tree, execute bits and diff, and
+  carry a produced receipt of this work, attempt, fence, workspace and base
+  whose changed paths are exactly its retained base digests. Every step's
+  verdict is re-derived from its check observations and the integrity of each
+  declared check's copy (`repair::checks::classify`); each step before the
+  last must have failed only with admitted classes, and the last must pass
+  with the named revision. Anything else is `repair_disposition_invalid`.
 
-The workspace must still capture to the final receipt's candidate identity,
-the tree the checks' read-only copies were written from; otherwise nothing is
-exported. The output is the single-shot layout: the workspace snapshot,
-`host-receipt.json` with the final revision's host-derived receipt and
-`native-observation.json` with the retained disposition, replayed exactly.
-All three refusals report `dispatched:true`. Single-shot attempts are
-exported exactly as before.
+The workspace must then still capture to the final revision: its execute bits
+must equal the retained ones the checks' copies were sealed with, and the
+whole receipt, changed paths included, must re-derive from the captured
+candidate and the retained base digests of the changed paths, so the base
+identity must also be the admitted one. Capture admits only regular files, so
+no other file type can appear. Otherwise nothing is exported. The output is
+the single-shot layout: the workspace snapshot, `host-receipt.json` with the
+re-derived final receipt and `native-observation.json` with the retained
+disposition, replayed exactly. All three refusals report `dispatched:true`.
+Single-shot attempts are exported exactly as before.
 
-[Worker inventory](worker-inventory.md#instance-observation) reports a retained
-disposition as `terminal_observed` with the disposition's `kind`, for example
-`correct_candidate` or `budget_exhausted`. Without one the instance stays
-`dispatch_recorded_outcome_unknown`; a malformed or crossed record is an
-error.
+[Worker inventory](worker-inventory.md#instance-observation) reports a repair
+attempt as `terminal_observed` with the disposition's `kind` only when the
+complete records agree with the kind and prove that every worker step the run
+started has stopped:
 
-The shell tests in `src/implementation_attempt/cli/tests/repair/export.rs`
-drive fixture repair runs through `run`, `export-candidate` and `inspect`,
-including a revision revoked after the run; the pure tests in
-`src/implementation_attempt/repair/exportable/tests.rs` cover the revision
-chain. The same non-claims apply. An export is not acceptance: Kiln #46 still
-verifies the exported candidate independently.
+- the kind must agree with what the records re-derive: every recorded verdict
+  is its re-derived one, `correct_candidate` and `repaired_candidate` replay as
+  for export, `not_repairable` is the last step's re-derived failure outside
+  the admitted classes (or `no_candidate`), `checks_rejected` its re-derived
+  defect and `uncertain` (`check_outcome`) its re-derived unknown outcome;
+  otherwise the record is an error;
+- every recorded step reports its worker `exited` or `cancelled`. So
+  `correct_candidate`, `repaired_candidate`, `budget_exhausted`, `cancelled`,
+  `uncertain` (`check_outcome` or `clock`), `not_repairable`,
+  `checks_rejected`, `lineage_blocked`, `kiln_owned`, `fence_superseded` and
+  `authority_withdrawn` are terminal when their records show this, and
+  `uncertain` (`worker_outcome`), whose worker outcome, including an unknown
+  teardown, is unknown, is never terminal;
+- a step intent after the counted steps without a record is a worker that
+  was never called only for `budget_exhausted` (`elapsed`) and `uncertain`
+  (`clock`), which the loop decides after the intent and before the call;
+  with any other disposition that worker may have run.
+
+Anything else stays `dispatch_recorded_outcome_unknown` with the
+`dispatch_outcome_unknown` reason, as does an attempt without a disposition or
+with a first-schema one. A malformed, crossed or contradicted record set is an
+error, never terminal.
+
+The shell tests in `src/implementation_attempt/cli/tests/repair/export.rs` and
+`src/implementation_attempt/cli/tests/repair/forged.rs` drive fixture repair
+runs through `run`, `export-candidate` and `inspect`, including a revision
+revoked after the run and records and workspaces changed after it; the pure
+tests in `src/implementation_attempt/repair/exportable/tests.rs`,
+`src/implementation_attempt/repair/retained/tests.rs` and
+`src/candidate/digests/tests.rs` cover the replay, the stop rule and the
+receipt re-derivation. The same non-claims apply, and anyone who can rewrite
+the private state directory can still forge a consistent record set. An
+export is not acceptance: Kiln #46 still verifies the exported candidate
+independently.
 
 
 The scoped broker extends the previously published Lattice worker route at

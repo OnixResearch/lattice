@@ -226,23 +226,32 @@ admitted binding's values, unchanged. v2 added `definition_identity`,
 | `admitted_not_dispatched` | Binding only, no intent |
 | `binding_rejected_before_dispatch` | Intent and binding refusal |
 | `revision_blocked_before_dispatch` | Intent and `revision-block.json`: the managed session's effect check (`seam::effect`) was blocked right before spawn, so the worker never started |
-| `dispatch_recorded_outcome_unknown` | Intent without a terminal result: no published native result, or, for an attempt with a repair policy, no retained `repair/disposition.json` |
-| `terminal_observed` | Published terminal result, with its `disposition`; for an attempt with a repair policy, its retained repair disposition |
+| `dispatch_recorded_outcome_unknown` | Intent without a terminal result: no published native result, or, for an attempt with a repair policy, no retained repair disposition whose complete records prove every started worker stopped |
+| `terminal_observed` | Published terminal result, with its `disposition`; for an attempt with a repair policy, a retained repair disposition whose complete records prove every started worker stopped |
 
 `disposition` is a token. A single-shot attempt publishes its native
 candidate disposition (`produced`, `failed`, `blocked`, `cancelled` or
-`unknown`). An attempt with a repair policy has no native result, so its
-retained `repair/disposition.json` of the exact request is its terminal
-result, and `disposition` is that record's `kind`: `correct_candidate`,
-`repaired_candidate`, `budget_exhausted`, `cancelled`, `uncertain`,
-`not_repairable`, `checks_rejected`, `lineage_blocked`, `kiln_owned`,
-`fence_superseded` or `authority_withdrawn`. Only the kind is published;
-the revision, repair count, bound, cause and defect stay in the retained
-record, which `recover` prints. A repair `cancelled` is observed termination
-like a single-shot one. A malformed record, or one of other request bytes,
-is an error, never a guessed state. This is the existing v3 shape: Kiln's v3
-reader at `4899d149` decodes `disposition` as an open string, so no schema or
-enumeration changes.
+`unknown`). An attempt with a repair policy has no native result. Its
+`disposition` is the `kind` of its retained v2 `repair/disposition.json` only
+when the complete record set of the exact request (the typed disposition
+under this envelope, execution binding, policy, lineage and dispatch plan,
+and the typed intent and record of every step it counts) agrees with that
+kind and shows every started worker `exited` or `cancelled`. Then the kind is
+one of `correct_candidate`, `repaired_candidate`, `budget_exhausted`,
+`cancelled`, `uncertain` (`check_outcome` or `clock`), `not_repairable`,
+`checks_rejected`, `lineage_blocked`, `kiln_owned`, `fence_superseded` or
+`authority_withdrawn`. `uncertain` with cause `worker_outcome` (an unknown
+worker outcome, including an unknown teardown) never is: it stays
+`dispatch_recorded_outcome_unknown`, as does any step intent without a record
+other than the one `budget_exhausted` (`elapsed`) or `uncertain` (`clock`)
+leaves before its worker is called, and a first-schema (v1) disposition. Only
+the kind is published; the revision, repair count, bound, cause and defect
+stay in the retained record, which `recover` prints. A repair `cancelled` is
+observed termination like a single-shot one. A malformed, crossed or
+contradicted record set is an error, never a guessed state. This is the
+existing v3 shape: Kiln's v3 reader at `4899d149` decodes `disposition` as an
+open string, so no schema or enumeration changes
+([candidate worker](candidate-worker.md#exporting-repaired-candidates)).
 
 ### Liveness
 
@@ -304,9 +313,8 @@ marker (`lineage_blocked`, `lineage_exhausted`,
 `repair_ports_unavailable`), and Kiln owns waiting for its lineage. A repair
 loop's exhausted bound is a terminal disposition, not a wait. An attempt run
 with a repair policy stays `dispatch_recorded_outcome_unknown` with the
-`dispatch_outcome_unknown` reason only until its disposition is retained;
-from then on it is `terminal_observed` with no wait reason
-([candidate worker](candidate-worker.md#exporting-repaired-candidates)).
+`dispatch_outcome_unknown` reason until its complete records prove its
+workers stopped; from then on it is `terminal_observed` with no wait reason.
 
 - Reasons are sorted by code in the order of the table above (not
   alphabetically), then by subject. They are deduplicated and bounded to 32,

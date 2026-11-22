@@ -13,17 +13,27 @@ interfaces.
   `implementation-attempt export-candidate` exports the exact final candidate
   revision of a retained `correct_candidate` or `repaired_candidate` repair
   disposition after the single-shot export's request, intent, output and
-  revision-seam checks (a revoked revision is still `export_revoked`). The
-  named revision must be the last recorded one at the iteration its kind
-  implies, every recorded revision must re-derive from this attempt and fence
-  through its parent chain, and its step record must record a pass; the
-  workspace must still capture to its receipt. New `dispatched:true` refusals:
-  `repair_outcome_unknown` (no retained disposition, never guessed),
-  `repair_not_candidate` and `repair_disposition_invalid` (malformed, crossed
-  or contradicted records). `inspect` reports a retained repair disposition as
-  `terminal_observed` with its kind instead of
-  `dispatch_recorded_outcome_unknown`, within `lattice.worker-inventory.v3`.
-  Single-shot attempts behave as before.
+  revision-seam checks (a revoked revision is still `export_revoked`). Export
+  and `inspect` act only on the complete, typed and request-bound record set:
+  the disposition (now `lattice.implementation-attempt-repair-observation.v2`)
+  and the intent and record (`...repair-step.v2`) of every step. Export
+  replays the run in the pure core: repairs within the admitted policy and the
+  global bound, every step exited with the loop's parent and failure classes,
+  every revision re-derived (`...candidate-revision.v2`, which also binds the
+  execute bits) with a receipt bound to this work, attempt, fence, workspace
+  and base, and every verdict re-derived from the check observations and the
+  retained integrity of each check's copy. The workspace must keep the
+  checked execute bits, and the whole receipt, changed paths included, must
+  re-derive from it and the retained base digests of the changed paths. New
+  `dispatched:true` refusals: `repair_outcome_unknown` (no retained
+  disposition, never guessed), `repair_not_candidate` and
+  `repair_disposition_invalid`. `inspect` reports a repair disposition as
+  `terminal_observed` with its kind, within `lattice.worker-inventory.v3`,
+  only when the records agree with the kind and show every started worker
+  exited or cancelled; `uncertain` (`worker_outcome`) and unrecorded step
+  intents stay `dispatch_recorded_outcome_unknown`, and contradicted records
+  are an error. Recovery still prints first-schema dispositions, which export
+  and inventory never act on. Single-shot attempts behave as before.
 - Bounded same-attempt repair and the Kiln #61 budget lineage for
   implementation attempts (Lattice #6). The v3 request accepts two optional
   fields; without them a request keeps its bytes, identity and profile

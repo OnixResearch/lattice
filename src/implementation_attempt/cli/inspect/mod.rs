@@ -180,9 +180,9 @@ fn instance(
     );
     let pinned = lattice_core::execution_binding::projection::lineage::pinned(retained.lifecycle, &session, admission);
     // A repair attempt has no native attempt result; its retained disposition
-    // is its terminal result.
+    // is its terminal result once its complete records prove it stopped.
     let disposition = if request.repair.is_some() {
-        super::repair::terminal_label(request, directory, request_identity)?
+        super::repair::terminal_label(request, directory, request_identity, admitted.as_ref())?
     } else {
         terminal_disposition(directory, &request.envelope.attempt_id)?
     };

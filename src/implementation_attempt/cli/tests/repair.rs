@@ -18,6 +18,7 @@ use crate::implementation_attempt::repair::step::Request as StepRequest;
 use crate::implementation_attempt::repair::step::WorkerOutcome;
 
 mod export;
+mod forged;
 
 const EXECUTOR: &str = "7777777777777777777777777777777777777777777777777777777777777777";
 const UNIT_CONFIG: &[u8] = b"unit-config";
@@ -531,7 +532,7 @@ async fn a_newer_fence_stops_the_loop_before_its_next_step_intent() {
         scenario(&fixture, &request, vec![first], FixtureChecks::admitted()).await;
     // A post-dispatch outcome: the retained repair observation of a step that
     // ran, never a refusal record and never `dispatched:false`.
-    assert_eq!(observation["schema"], "lattice.implementation-attempt-repair-observation.v1");
+    assert_eq!(observation["schema"], "lattice.implementation-attempt-repair-observation.v2");
     assert_eq!(observation["disposition"], serde_json::json!({"kind": "fence_superseded"}));
     assert!(observation.get("dispatched").is_none() && observation.get("reason").is_none());
     assert_eq!((observation["steps"].clone(), requests.len()), (1.into(), 1), "the repair never spawned");

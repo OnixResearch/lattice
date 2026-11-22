@@ -2,6 +2,15 @@
 
 // r[impl lattice.implementation_attempt.repair.scenario.bypass]
 
+/// The observations, each invocation's copy integrity, the verdict when every
+/// check ran, and the loop's next action.
+type Checked = (
+    Vec<super::Observation>,
+    Vec<crate::implementation_attempt::repair::retained::CopyIntegrity>,
+    Option<super::Verdict>,
+    super::Next,
+);
+
 impl super::Driver<'_, '_> {
     /// Run every declared check, each against its own read-only copy of the
     /// candidate and within the time left, then classify the evidence.
@@ -11,9 +20,10 @@ impl super::Driver<'_, '_> {
         iteration: u32,
         revision: &str,
         tree: &super::super::materialized::Tree,
-    ) -> Result<(Vec<super::Observation>, Option<super::Verdict>, super::Next), String> {
+    ) -> Result<Checked, String> {
         let invocations = crate::implementation_attempt::repair::checks::invocations(&self.policy, revision, iteration);
         let mut observations = Vec::with_capacity(invocations.len());
+        let mut copies = Vec::with_capacity(invocations.len());
         let mut drifted = None;
         let mut stopped = None;
         for invocation in &invocations {
@@ -35,6 +45,10 @@ impl super::Driver<'_, '_> {
             let is_intact = copy.is_intact(&tree.identity);
             copy.remove()?;
             observations.push(observation);
+            copies.push(crate::implementation_attempt::repair::retained::CopyIntegrity {
+                check: invocation.check.clone(),
+                is_intact,
+            });
             if !is_intact {
                 drifted = Some(invocation.check.clone());
                 break;
@@ -43,7 +57,7 @@ impl super::Driver<'_, '_> {
         let executions = u64::try_from(observations.len()).map_err(|error| error.to_string())?;
         self.usage.push(self.state.charge_checks(iteration, executions));
         if let Some(disposition) = stopped {
-            return Ok((observations, None, super::Next::Stop(disposition)));
+            return Ok((observations, copies, None, super::Next::Stop(disposition)));
         }
         let subject = crate::implementation_attempt::repair::checks::Subject {
             policy: &self.policy,
@@ -53,6 +67,6 @@ impl super::Driver<'_, '_> {
         let verdict =
             crate::implementation_attempt::repair::checks::classify(subject, &observations, drifted.as_deref());
         let next = self.state.after_checks(verdict.clone(), self.elapsed_ms(ports.clock));
-        Ok((observations, Some(verdict), next))
+        Ok((observations, copies, Some(verdict), next))
     }
 }

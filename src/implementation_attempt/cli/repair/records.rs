@@ -10,10 +10,9 @@
 // r[impl lattice.implementation_attempt.repair.scenario.dispositions]
 
 const DIRECTORY: &str = "repair";
-const DISPOSITION_FILE: &str = "disposition.json";
-pub(super) const OBSERVATION_SCHEMA: &str = "lattice.implementation-attempt-repair-observation.v1";
-pub(super) const STEP_SCHEMA: &str = "lattice.implementation-attempt-repair-step.v1";
-const MAX_RECORD_BYTES: usize = 1_048_576;
+pub(super) const DISPOSITION_FILE: &str = "disposition.json";
+/// A disposition retains every revision's changed-path base digests.
+const MAX_RECORD_BYTES: usize = 8 * 1_048_576;
 
 /// The retained repair records of one attempt directory.
 pub(super) struct Retained {
@@ -63,39 +62,44 @@ impl Retained {
         self.root.join(format!("check-{iteration}-{check}"))
     }
 
-    /// The retained disposition of this exact request; a missing one is an
-    /// unknown outcome, never a reason to run again.
-    pub(super) fn disposition(&self, request: &super::super::Request) -> Result<serde_json::Value, String> {
-        self.retained(request).map_err(|unretained| unretained.message().to_owned())
+    /// The bounded bytes of record `name`, `None` when it is missing.
+    pub(super) fn read(&self, name: &str) -> Result<Option<Vec<u8>>, String> {
+        super::super::artifacts::read_optional(&self.root.join(name), MAX_RECORD_BYTES)
     }
 
-    /// [`Self::disposition`] with a typed reason when none is read.
-    pub(super) fn retained(&self, request: &super::super::Request) -> Result<serde_json::Value, Unretained> {
-        let path = self.root.join(DISPOSITION_FILE);
-        let bytes = match super::super::artifacts::read_optional(&path, MAX_RECORD_BYTES) {
+    /// The retained disposition of this exact request, of either schema, as
+    /// recovery prints it; a missing one is an unknown outcome, never a reason
+    /// to run again.
+    pub(super) fn disposition(&self, request: &super::super::Request) -> Result<serde_json::Value, String> {
+        let bytes = match self.read(DISPOSITION_FILE) {
             Ok(Some(bytes)) => bytes,
-            Ok(None) => return Err(Unretained::Missing),
-            Err(_) => return Err(Unretained::Malformed),
+            Ok(None) => return Err(Unretained::Missing.message().into()),
+            Err(_) => return Err(Unretained::Malformed.message().into()),
         };
-        let observation: serde_json::Value = serde_json::from_slice(&bytes).map_err(|_| Unretained::Malformed)?;
+        let observation: serde_json::Value =
+            serde_json::from_slice(&bytes).map_err(|_| Unretained::Malformed.message())?;
         let text = |field: &str| observation.get(field).and_then(serde_json::Value::as_str);
-        if text("schema") != Some(OBSERVATION_SCHEMA) {
-            return Err(Unretained::Malformed);
+        let schemas = [
+            crate::implementation_attempt::repair::retained::OBSERVATION_SCHEMA,
+            crate::implementation_attempt::repair::retained::LEGACY_OBSERVATION_SCHEMA,
+        ];
+        if !text("schema").is_some_and(|schema| schemas.contains(&schema)) {
+            return Err(Unretained::Malformed.message().into());
         }
-        let is_same_request = text("worker_request") == Some(self.identity.as_str())
-            && text("request_identity") == Some(request.admitted_envelope.as_str());
-        if !is_same_request {
-            return Err(Unretained::Crossed);
+        if !self.is_same_request(request, text("worker_request"), text("request_identity")) {
+            return Err(Unretained::Crossed.message().into());
         }
         Ok(observation)
     }
 
-    /// The retained record of step `iteration`; `None` when it is missing,
-    /// unreadable or not JSON.
-    pub(super) fn step(&self, iteration: u32) -> Option<serde_json::Value> {
-        let path = self.root.join(format!("step-{iteration}.json"));
-        let bytes = super::super::artifacts::read_optional(&path, MAX_RECORD_BYTES).ok()??;
-        serde_json::from_slice(&bytes).ok()
+    /// Whether a record names this exact request.
+    pub(super) fn is_same_request(
+        &self,
+        request: &super::super::Request,
+        worker_request: Option<&str>,
+        request_identity: Option<&str>,
+    ) -> bool {
+        worker_request == Some(self.identity.as_str()) && request_identity == Some(request.admitted_envelope.as_str())
     }
 
     /// A persisted cancellation request of this exact request. Any other
@@ -108,14 +112,19 @@ impl Retained {
     }
 }
 
-/// Why no retained disposition of the exact request was read.
+/// Why no complete retained disposition of the exact request was read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in super::super) enum Unretained {
     /// None is retained: the outcome is unknown, never a reason to run again.
     Missing,
-    /// Unreadable, not JSON or not a repair observation.
+    /// A first-schema record, which lacks the evidence export and inventory
+    /// re-derive their answers from.
+    Legacy,
+    /// Unreadable, not JSON, not the complete typed record set, or
+    /// contradicting itself.
     Malformed,
-    /// The observation of other request bytes or another admitted envelope.
+    /// The records of other request bytes, another envelope, execution
+    /// binding, policy, lineage or dispatch plan.
     Crossed,
 }
 
@@ -126,6 +135,7 @@ impl Unretained {
                 "repair attempt has no retained disposition; outcome unknown; retain the workspace and reconcile, do \
                  not rerun"
             }
+            Self::Legacy => "retained repair disposition predates the retained check evidence",
             Self::Malformed => "retained repair disposition is malformed",
             Self::Crossed => "retained repair disposition does not describe this request",
         }

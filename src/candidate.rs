@@ -7,6 +7,7 @@
 use thiserror::Error;
 
 mod admission;
+pub mod digests;
 mod snapshots;
 
 pub const CANDIDATE_RECEIPT_SCHEMA: &str = "lattice.candidate-receipt.v1";
@@ -120,7 +121,7 @@ pub struct UnchangedObservation {
 }
 
 /// Named host-request identities borrowed during receipt construction or verification.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Bindings<'a> {
     pub work_id: &'a str,
     pub attempt_id: &'a str,

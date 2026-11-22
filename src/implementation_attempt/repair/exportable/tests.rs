@@ -1,9 +1,18 @@
 // r[verify lattice.implementation_attempt.repair_export.scenario.passing]
 // r[verify lattice.implementation_attempt.repair_export.scenario.refused]
 
+use super::super::checks::Outcome;
+use super::super::checks::Verdict;
+use super::super::retained::StepRecord;
 use super::super::revision::Record;
 use super::super::state::Disposition;
 use super::Unexportable;
+
+mod contradicted;
+
+const WORKER_PROFILE: &str = "9999999999999999999999999999999999999999999999999999999999999999";
+const WORKSPACE: &str = "workspace-export";
+const BASE: &[u8] = b"broken";
 
 fn binding(attempt_id: &str, fence: u64) -> super::super::StepBinding {
     super::super::StepBinding {
@@ -16,76 +25,188 @@ fn binding(attempt_id: &str, fence: u64) -> super::super::StepBinding {
     }
 }
 
-fn receipt(binding: &super::super::StepBinding, text: &str) -> crate::candidate::CandidateReceipt {
-    let tree = |bytes: &[u8]| std::collections::BTreeMap::from([("src/lib.txt".to_owned(), bytes.to_vec())]);
-    let fence = binding.fence.to_string();
-    let bindings = crate::candidate::Bindings {
-        work_id: &binding.work_id,
-        attempt_id: &binding.attempt_id,
-        fence: &fence,
-        workspace_id: "workspace-export",
-    };
-    crate::candidate::produced_receipt_from_snapshots(bindings, &tree(b"broken"), &tree(text.as_bytes()))
-        .expect("a produced receipt")
+fn tree(bytes: &[u8]) -> std::collections::BTreeMap<String, Vec<u8>> {
+    std::collections::BTreeMap::from([("src/lib.txt".to_owned(), bytes.to_vec())])
 }
 
-/// The revisions a loop over `binding` records for `texts`, in order.
-fn chain(binding: &super::super::StepBinding, texts: &[&str]) -> Vec<Record> {
-    let mut parent: Option<String> = None;
-    let mut records = Vec::with_capacity(texts.len());
-    for (iteration, text) in (1..).zip(texts) {
-        let receipt = receipt(binding, text);
-        let revision = super::super::revision::identity(super::super::revision::Input {
-            binding,
-            iteration,
-            parent: parent.as_deref(),
-            candidate_identity: receipt.candidate_identity.as_deref().expect("candidate"),
-            diff_identity: receipt.diff_identity.as_deref().expect("diff"),
-        });
-        records.push(Record {
-            iteration,
-            revision: revision.clone(),
-            parent: parent.replace(revision),
-            receipt,
-        });
+/// The admitted facts of `bound`, with `policy`.
+struct Admitted {
+    binding: super::super::StepBinding,
+    fence: String,
+    base_identity: String,
+    policy: super::super::Policy,
+}
+
+impl Admitted {
+    fn new(bound: super::super::StepBinding, policy: super::super::Policy) -> Self {
+        Self {
+            fence: bound.fence.to_string(),
+            base_identity: crate::candidate::snapshot_identity(&tree(BASE)).expect("base"),
+            binding: bound,
+            policy,
+        }
     }
-    records
+
+    fn bindings(&self) -> crate::candidate::Bindings<'_> {
+        crate::candidate::Bindings {
+            work_id: &self.binding.work_id,
+            attempt_id: &self.binding.attempt_id,
+            fence: &self.fence,
+            workspace_id: WORKSPACE,
+        }
+    }
+
+    fn frame(&self) -> super::Frame<'_> {
+        super::Frame {
+            binding: &self.binding,
+            receipt: self.bindings(),
+            base_identity: &self.base_identity,
+            policy: &self.policy,
+            worker_profile: WORKER_PROFILE,
+        }
+    }
+
+    fn identity(&self, record: &Record) -> String {
+        super::super::revision::identity(super::super::revision::Input {
+            binding: &self.binding,
+            iteration: record.iteration,
+            parent: record.parent.as_deref(),
+            candidate_identity: record.receipt.candidate_identity.as_deref().expect("candidate"),
+            executables: &record.executables,
+            diff_identity: record.receipt.diff_identity.as_deref().expect("diff"),
+        })
+    }
+
+    /// The records of a run whose step `n` checks both declared checks with
+    /// `outcomes[n]`, every copy intact, the run continuing on admitted
+    /// failures as the loop would.
+    fn run(&self, outcomes: &[Outcome]) -> (Vec<Record>, Vec<StepRecord>) {
+        let mut revisions: Vec<Record> = Vec::new();
+        let mut steps = Vec::new();
+        let mut failures = Vec::new();
+        for (iteration, outcome) in (1..).zip(outcomes) {
+            let receipt = crate::candidate::produced_receipt_from_snapshots(
+                self.bindings(),
+                &tree(BASE),
+                &tree(format!("candidate {iteration}").as_bytes()),
+            )
+            .expect("receipt");
+            let parent = revisions.last().map(|parent| parent.revision.clone());
+            let mut record = Record {
+                iteration,
+                revision: String::new(),
+                parent: parent.clone(),
+                receipt,
+                executables: std::collections::BTreeMap::new(),
+                base_files: std::collections::BTreeMap::from([(
+                    "src/lib.txt".to_owned(),
+                    Some(crate::candidate::digests::FileDigest::of(BASE)),
+                )]),
+            };
+            record.revision = self.identity(&record);
+            let checks: Vec<_> = self
+                .policy
+                .checks
+                .iter()
+                .map(|declared| super::super::checks::Observation {
+                    check: declared.name.clone(),
+                    configuration: declared.configuration.clone(),
+                    revision: record.revision.clone(),
+                    executor: self.policy.check_executor.clone(),
+                    outcome: outcome.clone(),
+                })
+                .collect();
+            let copies = checks
+                .iter()
+                .map(|observation| super::super::retained::CopyIntegrity {
+                    check: observation.check.clone(),
+                    is_intact: true,
+                })
+                .collect();
+            let subject = super::super::checks::Subject {
+                policy: &self.policy,
+                revision: &record.revision,
+                worker_profile: WORKER_PROFILE,
+            };
+            let verdict = super::super::checks::classify(subject, &checks, None);
+            steps.push(StepRecord {
+                schema: super::super::retained::STEP_SCHEMA.into(),
+                step: super::super::step::Request {
+                    binding: self.binding.clone(),
+                    iteration,
+                    phase: if iteration == 1 {
+                        super::super::step::Phase::Edit
+                    } else {
+                        super::super::step::Phase::Repair
+                    },
+                    parent,
+                    failures: std::mem::take(&mut failures),
+                },
+                report: super::super::step::Report {
+                    outcome: super::super::step::WorkerOutcome::Exited { code: 0 },
+                    model_requests: None,
+                    tool_invocations: None,
+                    proposal: None,
+                },
+                candidate: Some(record.clone()),
+                checks,
+                copies,
+                verdict: Some(verdict.clone()),
+            });
+            if let Verdict::Failed { classes } = verdict {
+                failures = classes;
+            }
+            revisions.push(record);
+        }
+        (revisions, steps)
+    }
+}
+
+fn failed() -> Outcome {
+    Outcome::Failed { class: "test".into() }
+}
+
+fn repaired(revisions: &[Record]) -> Disposition {
+    Disposition::RepairedCandidate {
+        revision: revisions.last().expect("revision").revision.clone(),
+        repairs: u32::try_from(revisions.len()).expect("count") - 1,
+    }
 }
 
 fn candidate<'a>(
-    binding: &super::super::StepBinding,
+    admitted: &Admitted,
     disposition: &'a Disposition,
-    steps: u32,
     revisions: &'a [Record],
+    steps: &'a [StepRecord],
 ) -> Result<&'a Record, Unexportable> {
-    super::candidate(binding, super::Retained {
+    super::candidate(&admitted.frame(), super::Retained {
         disposition,
-        steps,
         revisions,
+        steps,
     })
 }
 
 #[test]
-fn a_passing_disposition_names_its_exact_last_revision() {
-    let bound = binding("attempt-export", 7);
-    let first = chain(&bound, &["fixed"]);
+fn a_passing_run_names_its_exact_last_revision() {
+    let admitted = Admitted::new(binding("attempt-export", 7), super::super::tests::policy());
+    let (revisions, steps) = admitted.run(&[Outcome::Passed]);
     let correct = Disposition::CorrectCandidate {
-        revision: first[0].revision.clone(),
+        revision: revisions[0].revision.clone(),
     };
-    assert_eq!(candidate(&bound, &correct, 1, &first), Ok(&first[0]));
-    let repaired_chain = chain(&bound, &["still broken", "fixed"]);
-    let repaired = Disposition::RepairedCandidate {
-        revision: repaired_chain[1].revision.clone(),
-        repairs: 1,
-    };
-    assert_eq!(candidate(&bound, &repaired, 2, &repaired_chain), Ok(&repaired_chain[1]));
-    assert_eq!(repaired_chain[1].parent.as_deref(), Some(repaired_chain[0].revision.as_str()));
+    assert_eq!(candidate(&admitted, &correct, &revisions, &steps), Ok(&revisions[0]));
+    let (revisions, steps) = admitted.run(&[failed(), failed(), Outcome::Passed]);
+    let disposition = repaired(&revisions);
+    assert_eq!(
+        candidate(&admitted, &disposition, &revisions, &steps),
+        Ok(&revisions[2]),
+        "the policy's two repairs"
+    );
 }
 
 #[test]
 fn non_passing_dispositions_name_no_candidate() {
-    let bound = binding("attempt-export", 7);
-    let revisions = chain(&bound, &["still broken"]);
+    let admitted = Admitted::new(binding("attempt-export", 7), super::super::tests::policy());
+    let (revisions, steps) = admitted.run(&[failed()]);
     let stops = [
         Disposition::BudgetExhausted {
             bound: super::super::state::Bound::Iterations,
@@ -109,47 +230,56 @@ fn non_passing_dispositions_name_no_candidate() {
         },
     ];
     for stop in &stops {
-        assert_eq!(candidate(&bound, stop, 1, &revisions), Err(Unexportable::NotCandidate), "{stop:?}");
+        assert_eq!(candidate(&admitted, stop, &revisions, &steps), Err(Unexportable::NotCandidate), "{stop:?}");
     }
 }
 
 #[test]
-fn contradicted_or_crossed_records_name_no_candidate() {
-    let bound = binding("attempt-export", 7);
-    let revisions = chain(&bound, &["still broken", "fixed"]);
-    let repaired = |revision: &str, repairs| Disposition::RepairedCandidate {
-        revision: revision.to_owned(),
-        repairs,
+fn a_failed_or_drifted_check_cannot_be_relabelled_as_a_pass() {
+    let admitted = Admitted::new(binding("attempt-export", 7), super::super::tests::policy());
+    // A failure outside the admitted classes ended the run as not_repairable.
+    let (revisions, mut steps) = admitted.run(&[Outcome::Failed { class: "lint".into() }]);
+    let forged = Disposition::CorrectCandidate {
+        revision: revisions[0].revision.clone(),
     };
-    let last = revisions[1].revision.as_str();
-    let cases: [(&str, Disposition, u32, Vec<Record>); 7] = [
-        ("an earlier revision", repaired(&revisions[0].revision, 1), 2, revisions.clone()),
-        (
-            "a correct name for a repair",
-            Disposition::CorrectCandidate { revision: last.into() },
-            2,
-            revisions.clone(),
-        ),
-        ("no repairs", repaired(last, 0), 2, revisions.clone()),
-        ("other step count", repaired(last, 1), 3, revisions.clone()),
-        ("an unrecorded revision", repaired(&"f".repeat(64), 1), 2, revisions.clone()),
-        ("no revisions", repaired(last, 1), 2, Vec::new()),
-        ("a broken parent link", repaired(last, 1), 2, {
-            let mut unlinked = revisions.clone();
-            unlinked[1].parent = None;
-            unlinked
-        }),
-    ];
-    for (name, disposition, steps, records) in &cases {
-        assert_eq!(candidate(&bound, disposition, *steps, records), Err(Unexportable::Contradicted), "{name}");
-    }
-    let mut tampered = revisions.clone();
-    tampered[1].receipt.diff_identity = Some("d".repeat(64));
-    assert_eq!(candidate(&bound, &repaired(last, 1), 2, &tampered), Err(Unexportable::Contradicted));
-    for crossed in [binding("attempt-export", 8), binding("attempt-other", 7)] {
-        let foreign = chain(&crossed, &["still broken", "fixed"]);
-        let named = repaired(&foreign[1].revision, 1);
-        assert_eq!(candidate(&crossed, &named, 2, &foreign), Ok(&foreign[1]), "its own attempt exports it");
-        assert_eq!(candidate(&bound, &named, 2, &foreign), Err(Unexportable::Contradicted), "{crossed:?}");
-    }
+    assert_eq!(candidate(&admitted, &forged, &revisions, &steps), Err(Unexportable::Contradicted));
+    steps[0].verdict = Some(Verdict::Passed);
+    assert_eq!(candidate(&admitted, &forged, &revisions, &steps), Err(Unexportable::Contradicted), "verdict field");
+    let (revisions, clean) = admitted.run(&[Outcome::Passed]);
+    let correct = Disposition::CorrectCandidate {
+        revision: revisions[0].revision.clone(),
+    };
+    let mut drifted = clean.clone();
+    drifted[0].copies[1].is_intact = false;
+    assert_eq!(candidate(&admitted, &correct, &revisions, &drifted), Err(Unexportable::Contradicted), "drift");
+    let mut uncopied = clean.clone();
+    uncopied[0].copies.pop();
+    assert_eq!(candidate(&admitted, &correct, &revisions, &uncopied), Err(Unexportable::Contradicted), "no copy");
+    let mut missing = clean.clone();
+    missing[0].checks.pop();
+    missing[0].copies.pop();
+    assert_eq!(candidate(&admitted, &correct, &revisions, &missing), Err(Unexportable::Contradicted), "a check");
+    let mut unknown = clean.clone();
+    unknown[0].report.outcome = super::super::step::WorkerOutcome::Unknown;
+    assert_eq!(candidate(&admitted, &correct, &revisions, &unknown), Err(Unexportable::Contradicted), "worker");
+    assert_eq!(candidate(&admitted, &correct, &revisions, &clean), Ok(&revisions[0]));
+}
+
+#[test]
+fn iterations_beyond_the_admitted_policy_name_no_candidate() {
+    let mut narrow = super::super::tests::policy();
+    narrow.max_iterations = 1;
+    let admitted = Admitted::new(binding("attempt-export", 7), narrow);
+    let (revisions, steps) = admitted.run(&[failed(), Outcome::Passed]);
+    assert_eq!(candidate(&admitted, &repaired(&revisions), &revisions, &steps), Ok(&revisions[1]));
+    let (revisions, steps) = admitted.run(&[failed(), failed(), Outcome::Passed]);
+    let over = repaired(&revisions);
+    assert_eq!(candidate(&admitted, &over, &revisions, &steps), Err(Unexportable::Contradicted), "policy bound");
+    let mut wide = super::super::tests::policy();
+    wide.max_iterations = 20;
+    let admitted = Admitted::new(binding("attempt-export", 7), wide);
+    let outcomes: Vec<_> = (0..9).map(|_| failed()).chain([Outcome::Passed]).collect();
+    let (revisions, steps) = admitted.run(&outcomes);
+    let over = repaired(&revisions);
+    assert_eq!(candidate(&admitted, &over, &revisions, &steps), Err(Unexportable::Contradicted), "global bound");
 }

@@ -37,12 +37,23 @@ impl super::Driver<'_, '_> {
         };
         self.parent_identity.clone_from(&identity);
         let parent = self.state.last_revision().map(str::to_owned);
+        // The execute bits every check's copy is sealed with, and the base
+        // digest of every changed path, retained with the revision.
+        let executables = crate::implementation_attempt::repair::revision::executables(&modes);
+        let base_files = receipt
+            .changed_paths
+            .iter()
+            .map(|path| {
+                (path.clone(), self.base.get(path).map(|bytes| crate::candidate::digests::FileDigest::of(bytes)))
+            })
+            .collect();
         let revision = crate::implementation_attempt::repair::revision::identity(
             crate::implementation_attempt::repair::revision::Input {
                 binding: &step.binding,
                 iteration: step.iteration,
                 parent: parent.as_deref(),
                 candidate_identity: receipt.candidate_identity.as_deref().unwrap_or_default(),
+                executables: &executables,
                 diff_identity: receipt.diff_identity.as_deref().unwrap_or_default(),
             },
         );
@@ -52,6 +63,8 @@ impl super::Driver<'_, '_> {
                 revision,
                 parent,
                 receipt,
+                executables,
+                base_files,
             },
             tree: super::super::materialized::Tree {
                 files: snapshot,

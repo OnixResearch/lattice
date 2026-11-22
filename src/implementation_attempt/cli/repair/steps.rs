@@ -29,26 +29,10 @@ struct Candidate {
 }
 
 /// The retained record of one step.
-#[derive(serde::Serialize)]
-struct StepRecord<'a> {
-    schema: &'static str,
-    step: &'a StepRequest,
-    report: &'a crate::implementation_attempt::repair::step::Report,
-    candidate: Option<&'a Revision>,
-    checks: &'a [Observation],
-    verdict: Option<&'a Verdict>,
-}
+type StepRecord = crate::implementation_attempt::repair::retained::StepRecord;
 
 /// The authority a later step found withdrawn before its intent.
-#[derive(Debug, Clone, serde::Serialize)]
-struct Withdrawal {
-    /// The step that never spawned.
-    iteration: u32,
-    cause: Authority,
-    /// The binding's revalidation record, the revision seam's refusal, or
-    /// the error that kept the seam from answering.
-    evidence: serde_json::Value,
-}
+type Withdrawal = crate::implementation_attempt::repair::retained::Withdrawal;
 
 /// What one run's loop is bound to.
 pub(super) struct Frame<'a, 'p> {
@@ -190,20 +174,21 @@ impl<'a, 'p> Driver<'a, 'p> {
         let candidate = self.candidate(step, &report)?;
         let revision = candidate.as_ref().map(|candidate| candidate.revision.revision.clone());
         let next = self.state.after_step(&report, revision, self.elapsed_ms(ports.clock));
-        let (observations, verdict, next) = match (next, &candidate) {
+        let (observations, copies, verdict, next) = match (next, &candidate) {
             (Next::Check { revision }, Some(candidate)) => {
                 self.check(ports, step.iteration, &revision, &candidate.tree)?
             }
             (Next::Check { .. }, None) => return Err("repair loop asked for checks without a candidate".into()),
-            (other, _) => (Vec::new(), None, other),
+            (other, _) => (Vec::new(), Vec::new(), None, other),
         };
         records.retain(&format!("step-{}.json", step.iteration), &StepRecord {
-            schema: super::records::STEP_SCHEMA,
-            step,
-            report: &report,
-            candidate: candidate.as_ref().map(|candidate| &candidate.revision),
-            checks: &observations,
-            verdict: verdict.as_ref(),
+            schema: crate::implementation_attempt::repair::retained::STEP_SCHEMA.to_owned(),
+            step: step.clone(),
+            report,
+            candidate: candidate.as_ref().map(|candidate| candidate.revision.clone()),
+            checks: observations,
+            copies,
+            verdict,
         })?;
         if let Some(candidate) = candidate {
             self.revisions.push(candidate.revision);
@@ -218,33 +203,27 @@ impl<'a, 'p> Driver<'a, 'p> {
         identity: &str,
         receipt: &super::super::binding::usage::WorkerReceipt,
         disposition: &Disposition,
-    ) -> serde_json::Value {
+    ) -> Result<serde_json::Value, String> {
         let lineage = request.lineage.as_ref();
-        let mut observation = serde_json::json!({
-            "schema": super::records::OBSERVATION_SCHEMA,
-            "envelope": request.envelope,
-            "request_identity": request.admitted_envelope,
-            "worker_request": identity,
-            "execution_binding": receipt.admitted().binding_identity,
-            "repair_policy": self.policy.identity(),
-            "budget_lineage": lineage.map(crate::implementation_attempt::lineage::Binding::identity),
-            "disposition": disposition,
-            "steps": self.state.steps(),
-            "revisions": self.revisions,
-            "usage": self.usage,
-            "drawn": self.state.drawn(),
-            "unaccounted_dimensions": lineage.map(crate::implementation_attempt::lineage::Binding::unaccounted),
-            "accepted": false,
-            "integrated": false,
-        });
-        if let Some(fields) = observation.as_object_mut() {
-            if let Some(plan) = &request.dispatch_plan {
-                fields.insert("dispatch_plan".to_owned(), serde_json::Value::from(plan.as_str()));
-            }
-            if let Some(withdrawal) = &self.withdrawal {
-                fields.insert("authority_withdrawn".to_owned(), serde_json::json!(withdrawal));
-            }
-        }
-        observation
+        let observation = crate::implementation_attempt::repair::retained::Observation {
+            schema: crate::implementation_attempt::repair::retained::OBSERVATION_SCHEMA.to_owned(),
+            envelope: request.envelope.clone(),
+            request_identity: request.admitted_envelope.clone(),
+            worker_request: identity.to_owned(),
+            execution_binding: receipt.admitted().binding_identity.clone(),
+            repair_policy: self.policy.identity(),
+            budget_lineage: lineage.map(crate::implementation_attempt::lineage::Binding::identity),
+            disposition: disposition.clone(),
+            steps: self.state.steps(),
+            revisions: self.revisions.clone(),
+            usage: self.usage.clone(),
+            drawn: self.state.drawn().clone(),
+            unaccounted_dimensions: lineage.map(crate::implementation_attempt::lineage::Binding::unaccounted),
+            accepted: false,
+            integrated: false,
+            dispatch_plan: request.dispatch_plan.clone(),
+            authority_withdrawn: self.withdrawal.clone(),
+        };
+        serde_json::to_value(&observation).map_err(|error| error.to_string())
     }
 }

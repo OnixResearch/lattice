@@ -6,19 +6,19 @@
   "base_revision": "0862c01706cdc66fabedcf7f6db98554c5a2a15b",
   "integration_head": null,
   "recorded_on": "2026-11-21",
-  "note": "Uncommitted worktree on base 0862c017; the integrating agent records the integration head.",
+  "note": "First version committed by the integrating agent as 2dff32d1; the review fixes are an uncommitted worktree on it. The integrating agent records the integration head.",
   "tasks": {
     "1.1": [
-      "src/implementation_attempt/repair/exportable/tests.rs::a_passing_disposition_names_its_exact_last_revision",
+      "src/implementation_attempt/repair/exportable/tests.rs::a_passing_run_names_its_exact_last_revision",
       "src/implementation_attempt/repair/exportable/tests.rs::non_passing_dispositions_name_no_candidate",
-      "src/implementation_attempt/repair/exportable/tests.rs::contradicted_or_crossed_records_name_no_candidate"
+      "src/implementation_attempt/repair/exportable/tests/contradicted.rs::contradicted_records_name_no_candidate"
     ],
     "2.1": [
       "src/implementation_attempt/cli/tests/repair/export.rs::the_exact_correct_and_repaired_candidate_revisions_are_exported",
       "src/implementation_attempt/cli/tests/repair/export.rs::a_non_passing_disposition_is_refused_and_inventory_reports_it",
       "src/implementation_attempt/cli/tests/repair/export.rs::missing_malformed_crossed_and_contradicted_dispositions_are_refused",
       "src/implementation_attempt/cli/tests/repair/export.rs::a_revoked_revision_refuses_the_export_of_a_repaired_candidate",
-      "src/implementation_attempt/cli/export/tests.rs (3 single-shot tests, unchanged, passing)",
+      "src/implementation_attempt/cli/export/tests.rs (3 single-shot tests; cli/export/content.rs is byte-identical to 0862c017)",
       "tests/test_implementation_attempt_refusals.rs (6 tests)"
     ],
     "2.2": [
@@ -28,15 +28,103 @@
       "tests/test_worker_inventory.rs (10 tests)"
     ],
     "3.1": [
-      "docs/candidate-worker.md (refusal table; Exporting repaired candidates)",
+      "docs/candidate-worker.md (refusal table; repair records; Exporting repaired candidates)",
       "docs/worker-inventory.md (lifecycle table; disposition tokens; wait-reason note)",
       "CHANGELOG.md"
+    ]
+  },
+  "review": {
+    "source": "history://RepairExportReview, review of 2dff32d1, verdict: do not publish",
+    "principle": "export and terminal status derive from complete, request-bound retained evidence, re-derived and cross-checked; no single recorded field is trusted alone",
+    "findings": {
+      "1": {
+        "severity": "P1",
+        "finding": "a failed step's verdict field relabelled as passed exported its candidate",
+        "resolution": "step records retain each check copy's integrity; exportable::candidate re-derives every verdict with checks::classify from the observations and copy integrity and requires it to equal the recorded one; earlier steps must fail only with admitted classes, the last must pass",
+        "tests": [
+          "src/implementation_attempt/repair/exportable/tests.rs::a_failed_or_drifted_check_cannot_be_relabelled_as_a_pass",
+          "src/implementation_attempt/cli/tests/repair/forged.rs::a_failed_or_drifted_check_relabelled_as_a_pass_is_refused"
+        ]
+      },
+      "2": {
+        "severity": "P1",
+        "finding": "chmod +x after a passing run was published though the checks saw a non-executable copy",
+        "resolution": "revisions retain their execute bits, bound into the v2 revision identity; export refuses a workspace whose execute bits differ; capture admits only regular files",
+        "tests": [
+          "src/implementation_attempt/cli/tests/repair/forged.rs::execute_bits_are_exported_only_as_they_were_checked",
+          "src/implementation_attempt/repair/exportable/tests/contradicted.rs::every_recorded_receipt_and_revision_is_this_attempts"
+        ]
+      },
+      "3": {
+        "severity": "P1",
+        "finding": "uncertain (worker_outcome) became terminal_observed with exited liveness",
+        "resolution": "retained::is_stopped requires every recorded step exited or cancelled, never settles uncertain (worker_outcome), and accepts an unrecorded step intent only for budget_exhausted (elapsed) and uncertain (clock); otherwise the instance stays dispatch_recorded_outcome_unknown",
+        "tests": [
+          "src/implementation_attempt/repair/retained/tests.rs::only_observed_worker_stops_settle_a_disposition",
+          "src/implementation_attempt/cli/tests/repair/forged.rs::an_unknown_worker_or_an_unrecorded_step_stays_unknown"
+        ]
+      },
+      "4": {
+        "severity": "P1",
+        "finding": "a partial record, or another attempt's record with two identity strings changed, was reported terminal",
+        "resolution": "typed v2 records refuse unknown, missing and left-out nullable fields; cli::repair::evidence binds them to the request bytes, envelope, persisted execution binding, policy, lineage and dispatch plan with every step intent and record; exportable::is_consistent requires the kind to agree with the re-derived records before inventory reports it; malformed, crossed or contradicted is an error, v1 is unknown",
+        "tests": [
+          "src/implementation_attempt/repair/retained/tests.rs::records_refuse_unknown_and_missing_fields",
+          "src/implementation_attempt/cli/tests/repair/export.rs::missing_malformed_crossed_and_contradicted_dispositions_are_refused",
+          "src/implementation_attempt/cli/tests/repair/forged.rs::a_first_schema_disposition_is_printed_but_never_acted_on"
+        ]
+      },
+      "5": {
+        "severity": "P2",
+        "finding": "changed_paths rewritten in both receipt copies left the revision unchanged",
+        "resolution": "revisions retain the base digest of every changed path; the core requires them to name exactly the changed paths, and export re-derives the whole receipt from the captured workspace and those digests (candidate::digests::produced_receipt_from_changes) with the admitted base identity",
+        "tests": [
+          "src/candidate/digests/tests.rs::changed_base_digests_re_derive_the_snapshot_receipt",
+          "src/candidate/digests/tests.rs::claimed_changes_that_do_not_re_derive_are_refused",
+          "src/implementation_attempt/cli/tests/repair/forged.rs::a_receipt_claiming_other_changed_paths_is_refused"
+        ]
+      },
+      "6": {
+        "severity": "P2",
+        "finding": "a one-record repaired_candidate at iteration 10 passed; the admitted policy bound was ignored",
+        "resolution": "the core takes the admitted policy and bounds every iteration, the repairs and the step count by its max_iterations and the global 8",
+        "tests": [
+          "src/implementation_attempt/repair/exportable/tests.rs::iterations_beyond_the_admitted_policy_name_no_candidate"
+        ]
+      },
+      "7": {
+        "severity": "P2",
+        "finding": "only the last receipt's bindings were checked",
+        "resolution": "every recorded receipt must be a produced receipt of this work, attempt, fence, workspace and base",
+        "tests": [
+          "src/implementation_attempt/repair/exportable/tests/contradicted.rs::every_recorded_receipt_and_revision_is_this_attempts"
+        ]
+      }
+    },
+    "record_changes": {
+      "disposition": "lattice.implementation-attempt-repair-observation.v2 (recovery still prints v1)",
+      "step": "lattice.implementation-attempt-repair-step.v2",
+      "revision_identity": "lattice.implementation-attempt-candidate-revision.v2 identity, adds execute bits",
+      "record_bound_bytes": 8388608
+    },
+    "checks": [
+      {"command": "cargo test -p lattice --lib -- implementation_attempt", "exit": 0, "passed": 140, "failed": 0},
+      {"command": "cargo test -p lattice --lib -- candidate::", "exit": 0, "passed": 10, "failed": 0},
+      {"command": "cargo test -p lattice --test test_worker_inventory", "exit": 0, "passed": 10, "failed": 0},
+      {"command": "cargo test -p lattice --test test_implementation_attempt_refusals", "exit": 0, "passed": 6, "failed": 0},
+      {"command": "LATTICE_INVENTORY_CAPTURE_DIR=... cargo test --locked -p lattice --lib -- capture_ --test-threads 1", "exit": 0, "passed": 5, "failed": 0, "captures": {"files": 16, "same_file_names": true, "byte_identical": 5, "changed_after_normalizing": 0, "reference": "0862c017"}},
+      {"command": "cargo clippy -p lattice --all-targets --no-deps -- -D warnings", "exit": 0},
+      {"command": "cargo fmt -p lattice --check", "exit": 0},
+      {"command": "octet-precommit-check", "exit": 0, "root": {"status": "warning-only", "accepted": 1052, "current": 1052, "new": 0, "stale": 0}, "lattice_core": {"status": "warning-only", "accepted": 25, "current": 25, "new": 0, "stale": 0}, "baseline_rekeyed": false},
+      {"command": "cairn validate --root .", "exit": 0},
+      {"command": "cairn gate proposal|design|tasks export-repaired-candidates --root . --policy cairn-policy/generated/cairn-policy.json", "exit": 0, "verdict": "PASS"},
+      {"command": "gitleaks 8.28.0 dir --no-banner --redact on each changed or new path", "exit": 0, "leaks": 0}
     ]
   },
   "inventory": {
     "contract": "lattice.worker-inventory.v3, unchanged schema and enumerations",
     "consumer": "Kiln 4899d149 crates/kiln-adapter-lattice/src/worker_inventory.rs: LifecycleDto::TerminalObserved { disposition: String } is decoded without validating the string; lifecycle() requires liveness exited for terminal_observed; validate_instance() requires no instance wait reasons for terminal_observed. Read from source; Kiln was not built or run.",
-    "projection": "a retained repair disposition of the exact request is terminal_observed with the disposition kind, liveness exited, no wait reasons, cancelled as observed_terminated; none retained stays dispatch_recorded_outcome_unknown with dispatch_outcome_unknown; malformed or crossed is an error",
+    "projection": "a repair disposition is terminal_observed with its kind, liveness exited and no wait reasons only when the complete records agree with the kind and show every started worker exited or cancelled; uncertain (worker_outcome), a step intent that may have run unrecorded, a missing or v1 disposition stay dispatch_recorded_outcome_unknown with dispatch_outcome_unknown; malformed, crossed or contradicted is an error",
     "v4_needed_for": "publishing the revision, repair count, bound, cause or defect, or a structural repair/single-shot distinction (a typed terminal_observed.repair object, which Kiln's deny_unknown_fields DTO rejects in v3)",
     "captures": {
       "command": "LATTICE_INVENTORY_CAPTURE_DIR=DIR cargo test --locked -p lattice --lib -- capture_ --test-threads 1",
@@ -55,23 +143,13 @@
     "consumer": "Kiln 4899d149 crates/kiln-adapter-lattice/src/worker_settlement.rs classify_refusal returns Retain for any reason outside NOT_DISPATCHED_REASONS or with dispatched:true. Read from source."
   },
   "checks": [
-    {"command": "cargo test -p lattice --lib -- implementation_attempt", "exit": 0, "passed": 130, "failed": 0},
-    {"command": "cargo test -p lattice --lib -- inspect worker_inventory export refusal", "exit": 0, "passed": 27, "failed": 0},
-    {"command": "cargo test -p lattice --test test_worker_inventory", "exit": 0, "passed": 10, "failed": 0},
-    {"command": "cargo test -p lattice --test test_implementation_attempt_refusals", "exit": 0, "passed": 6, "failed": 0},
-    {"command": "LATTICE_INVENTORY_CAPTURE_DIR=... cargo test --locked -p lattice --lib -- capture_ --test-threads 1", "exit": 0, "passed": 5, "failed": 0},
-    {"command": "cargo clippy -p lattice --all-targets --no-deps -- -D warnings", "exit": 0},
-    {"command": "cargo fmt -p lattice --check", "exit": 0},
-    {"command": "octet-precommit-check", "exit": 0, "root": {"status": "warning-only", "accepted": 1052, "current": 1052, "new": 0, "stale": 0}, "lattice_core": {"status": "warning-only", "accepted": 25, "current": 25, "new": 0, "stale": 0}, "baseline_rekeyed": false},
-    {"command": "cairn validate --root .", "exit": 0},
-    {"command": "cairn gate proposal export-repaired-candidates --root . --policy cairn-policy/generated/cairn-policy.json", "exit": 0, "verdict": "PASS"},
-    {"command": "cairn gate design export-repaired-candidates --root . --policy cairn-policy/generated/cairn-policy.json", "exit": 0, "verdict": "PASS"},
-    {"command": "cairn gate tasks export-repaired-candidates --root . --policy cairn-policy/generated/cairn-policy.json", "exit": 0, "verdict": "PASS", "task_done": 5},
-    {"command": "gitleaks 8.28.0 dir --no-banner --redact on each of the 24 changed or new paths", "exit": 0, "leaks": 0}
+    {"command": "cargo test -p lattice --lib -- implementation_attempt", "exit": 0, "passed": 130, "failed": 0, "at": "2dff32d1 worktree before the review"},
+    {"command": "octet-precommit-check", "exit": 0, "at": "2dff32d1 worktree before the review", "root": {"new": 0, "stale": 0}, "lattice_core": {"new": 0, "stale": 0}}
   ],
   "non_claims": [
     "Fixture repair runs only: no OMP process, check executor, model endpoint or Kiln lineage was exercised.",
     "Kiln's v3 reader and refusal classifier were read at 4899d149, not executed against a repair inventory document.",
+    "An actor who can rewrite the private state directory can still forge a fully consistent record set.",
     "An export is not acceptance; Kiln #46 keeps independent verification."
   ]
 }

@@ -11,12 +11,15 @@
 // r[impl lattice.implementation_attempt.repair.scenario.absent]
 // r[impl lattice.implementation_attempt.lineage.scenario.exhausted]
 
+mod evidence;
 mod materialized;
 mod records;
 mod steps;
 
-/// Why no retained disposition of the exact request was read.
+/// Why no complete retained disposition of the exact request was read.
 pub(super) type Unretained = records::Unretained;
+/// One attempt's complete, request-bound retained repair records.
+pub(super) type Evidence = evidence::RecordSet;
 
 /// One bounded worker step of the attempt.
 pub trait WorkerPort {
@@ -193,7 +196,7 @@ pub(super) fn execute(run: Run<'_>, ports: Ports<'_>) -> Result<serde_json::Valu
     // The attempt usage observation precedes the retained disposition.
     debug_assert_eq!(run.receipt.request_identity(), run.identity, "the receipt binds this request");
     run.receipt.persist(&run.store, window, run.directory)?;
-    let observation = driver.observation(run.request, run.identity, &run.receipt, &disposition);
+    let observation = driver.observation(run.request, run.identity, &run.receipt, &disposition)?;
     debug_assert!(observation.get("disposition").is_some(), "the observation names its disposition");
     records.retain_disposition(&observation)?;
     Ok(observation)
@@ -209,39 +212,81 @@ pub(super) fn recover(
     records::Retained::at(directory, identity).disposition(request)
 }
 
-/// The retained disposition of this exact request, with a typed reason when
-/// none is read. It only reads.
-pub(super) fn retained(
+/// The complete, request-bound retained records of this exact request under
+/// its persisted execution binding, with a typed reason when they are not.
+/// It only reads.
+pub(super) fn evidence(
     request: &super::Request,
     directory: &std::path::Path,
     identity: &str,
-) -> Result<serde_json::Value, Unretained> {
-    records::Retained::at(directory, identity).retained(request)
+    admitted: &lattice_core::execution_binding::admission::bound::Admitted,
+) -> Result<Evidence, Unretained> {
+    evidence::read(request, directory, identity, admitted)
 }
 
-/// The retained record of step `iteration`, if it is readable JSON.
-pub(super) fn step_record(directory: &std::path::Path, identity: &str, iteration: u32) -> Option<serde_json::Value> {
-    records::Retained::at(directory, identity).step(iteration)
+/// Run `decide` with what this request admits for replaying its retained
+/// records; `None` without a repair policy.
+pub(super) fn with_frame<T>(
+    request: &super::Request,
+    decide: impl FnOnce(&crate::implementation_attempt::repair::exportable::Frame<'_>) -> T,
+) -> Option<T> {
+    let policy = request.repair.as_ref()?;
+    let fence = request.envelope.fence.to_string();
+    let binding = crate::implementation_attempt::repair::StepBinding::of(&request.envelope);
+    let frame = crate::implementation_attempt::repair::exportable::Frame {
+        binding: &binding,
+        receipt: crate::candidate::Bindings {
+            work_id: &request.envelope.work_id,
+            attempt_id: &request.envelope.attempt_id,
+            fence: &fence,
+            workspace_id: &request.envelope.workspace_id,
+        },
+        base_identity: &request.omp.base_identity,
+        policy,
+        worker_profile: &request.envelope.worker_profile,
+    };
+    Some(decide(&frame))
 }
 
 /// The disposition inventory v3 publishes for a repair attempt: the kind of
-/// its retained disposition, or `None` while none is retained. A malformed or
-/// crossed record is an error, never a guessed state.
+/// its retained disposition once the complete records agree with it and
+/// prove every worker step it started has stopped, otherwise `None`, an
+/// unknown outcome. A malformed, crossed or contradicted record is an error,
+/// never a guessed state.
 // r[impl lattice.implementation_attempt.repair_export.scenario.inventory]
 pub(super) fn terminal_label(
     request: &super::Request,
     directory: &std::path::Path,
     identity: &str,
+    admitted: Option<&lattice_core::execution_binding::admission::bound::Admitted>,
 ) -> Result<Option<String>, String> {
-    let observation = match retained(request, directory, identity) {
-        Ok(observation) => observation,
-        Err(Unretained::Missing) => return Ok(None),
+    debug_assert!(request.repair.is_some(), "only a repair attempt retains repair records");
+    // Without a persisted execution binding nothing can bind the records.
+    let Some(admitted) = admitted else {
+        return Ok(None);
+    };
+    let evidence = match evidence::read(request, directory, identity, admitted) {
+        Ok(evidence) => evidence,
+        Err(Unretained::Missing | Unretained::Legacy) => return Ok(None),
         Err(unretained @ (Unretained::Malformed | Unretained::Crossed)) => return Err(unretained.message().into()),
     };
-    let value = observation.get("disposition").ok_or(Unretained::Malformed.message())?;
-    let _: crate::implementation_attempt::repair::state::Disposition =
-        serde::Deserialize::deserialize(value).map_err(|_| Unretained::Malformed.message())?;
+    let is_consistent = with_frame(request, |frame| {
+        crate::implementation_attempt::repair::exportable::is_consistent(frame, evidence.view())
+    });
+    if is_consistent != Some(true) {
+        return Err(Unretained::Malformed.message().into());
+    }
+    let disposition = &evidence.observation.disposition;
+    if !crate::implementation_attempt::repair::retained::is_stopped(
+        disposition,
+        &evidence.steps,
+        evidence.has_unrecorded_intent,
+    ) {
+        return Ok(None);
+    }
+    let value = serde_json::to_value(disposition).map_err(|error| error.to_string())?;
     let label = value.get("kind").and_then(serde_json::Value::as_str).ok_or(Unretained::Malformed.message())?;
+    debug_assert!(!label.is_empty(), "a disposition names its kind");
     Ok(Some(label.to_owned()))
 }
 

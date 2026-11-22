@@ -13,33 +13,64 @@ use super::FixtureWorker;
 use super::StepReport;
 use super::WorkerOutcome;
 
-type Reason = super::super::super::refusal::Reason;
+pub(super) type Reason = super::super::super::refusal::Reason;
 
-fn export(path: &std::path::Path, state: &std::path::Path, parent: &std::path::Path) -> Result<(), String> {
+pub(super) fn export(path: &std::path::Path, state: &std::path::Path, parent: &std::path::Path) -> Result<(), String> {
     super::super::super::export::run(path, state, parent, Store(None))
 }
 
-fn refused(reason: Reason) -> Result<(), String> {
+pub(super) fn refused(reason: Reason) -> Result<(), String> {
     Err(reason.message().to_owned())
 }
 
-fn output_parent(root: &std::path::Path, name: &str) -> std::path::PathBuf {
+pub(super) fn output_parent(root: &std::path::Path, name: &str) -> std::path::PathBuf {
     let parent = root.join(name);
     std::fs::create_dir(&parent).expect("output parent");
     parent
 }
 
-fn is_empty(directory: &std::path::Path) -> bool {
+pub(super) fn is_empty(directory: &std::path::Path) -> bool {
     std::fs::read_dir(directory).expect("output parent").next().is_none()
 }
 
-fn inventory(path: &std::path::Path, state: &std::path::Path) -> Result<serde_json::Value, String> {
+pub(super) fn inventory(path: &std::path::Path, state: &std::path::Path) -> Result<serde_json::Value, String> {
     super::super::super::inspect::project(
         path,
         state,
         &mut crate::execution_binding::serving::UnavailableOwner,
         Store(None),
     )
+}
+
+/// What inventory shows for an attempt.
+#[derive(Debug, Clone, Copy)]
+pub(super) enum Seen {
+    /// `dispatch_recorded_outcome_unknown` with `dispatch_outcome_unknown`.
+    Unknown,
+    /// An error, never a guessed state.
+    Error,
+    /// `terminal_observed` with `exited` liveness and no wait reasons.
+    Terminal,
+}
+
+impl Seen {
+    pub(super) fn assert(self, inspected: Result<serde_json::Value, String>, name: &str) {
+        match self {
+            Self::Error => assert!(inspected.is_err(), "{name}: {inspected:?}"),
+            Self::Unknown => {
+                let instance = &inspected.expect("inventory")["instance"];
+                assert_eq!(instance["lifecycle"]["state"], "dispatch_recorded_outcome_unknown", "{name}");
+                assert_eq!(instance["liveness"]["state"], "unknown", "{name}");
+                assert!(instance["wait_reasons"].to_string().contains("dispatch_outcome_unknown"), "{name}");
+            }
+            Self::Terminal => {
+                let instance = &inspected.expect("inventory")["instance"];
+                assert_eq!(instance["lifecycle"]["state"], "terminal_observed", "{name}");
+                assert_eq!(instance["liveness"]["state"], "exited", "{name}");
+                assert_eq!(instance["wait_reasons"], serde_json::json!([]), "{name}");
+            }
+        }
+    }
 }
 
 fn json(path: &std::path::Path) -> serde_json::Value {
@@ -151,42 +182,37 @@ async fn missing_malformed_crossed_and_contradicted_dispositions_are_refused() {
     unschema["schema"] = "lattice.implementation-attempt-observation.v1".into();
     let mut failed_step: serde_json::Value = serde_json::from_slice(&original_step).expect("step json");
     failed_step["verdict"] = serde_json::json!({"kind": "failed", "classes": ["test"]});
+    // Only the four fields earlier reads checked.
+    let mut minimal = serde_json::json!({"disposition": {"kind": "cancelled"}});
+    for field in ["schema", "worker_request", "request_identity"] {
+        minimal[field] = observation[field].clone();
+    }
+    // Another fence's disposition under this request's two identities.
+    let mut renamed = crossed.clone();
+    for field in ["request_identity", "worker_request"] {
+        renamed[field] = observation[field].clone();
+    }
     let bytes = |value: &serde_json::Value| Some(serde_json::to_vec(value).expect("bytes"));
+    let step_bytes = Some(original_step.clone());
+    let invalid = Reason::RepairDispositionInvalid;
     let cases = [
-        ("a crash before the disposition", None, Some(original_step.clone()), Reason::RepairOutcomeUnknown),
         (
-            "malformed",
-            Some(b"{not json".to_vec()),
-            Some(original_step.clone()),
-            Reason::RepairDispositionInvalid,
+            "a crash before the disposition",
+            None,
+            step_bytes.clone(),
+            Reason::RepairOutcomeUnknown,
+            Seen::Unknown,
         ),
-        (
-            "not a repair observation",
-            bytes(&unschema),
-            Some(original_step.clone()),
-            Reason::RepairDispositionInvalid,
-        ),
-        (
-            "another fence's disposition",
-            bytes(&crossed),
-            Some(original_step.clone()),
-            Reason::RepairDispositionInvalid,
-        ),
-        (
-            "another fence's revisions",
-            bytes(&forged),
-            Some(original_step.clone()),
-            Reason::RepairDispositionInvalid,
-        ),
-        ("no step record", Some(original.clone()), None, Reason::RepairDispositionInvalid),
-        (
-            "a failed step record",
-            Some(original.clone()),
-            bytes(&failed_step),
-            Reason::RepairDispositionInvalid,
-        ),
+        ("malformed", Some(b"{not json".to_vec()), step_bytes.clone(), invalid, Seen::Error),
+        ("not a repair observation", bytes(&unschema), step_bytes.clone(), invalid, Seen::Error),
+        ("only the identities and a kind", bytes(&minimal), step_bytes.clone(), invalid, Seen::Error),
+        ("another fence's disposition", bytes(&crossed), step_bytes.clone(), invalid, Seen::Error),
+        ("another fence's envelope", bytes(&renamed), step_bytes.clone(), invalid, Seen::Error),
+        ("another fence's revisions", bytes(&forged), step_bytes.clone(), invalid, Seen::Error),
+        ("no step record", Some(original.clone()), None, invalid, Seen::Error),
+        ("a relabelled step verdict", Some(original.clone()), bytes(&failed_step), invalid, Seen::Error),
     ];
-    for (name, disposition, step_record, reason) in cases {
+    for (name, disposition, step_record, reason, seen) in cases {
         for (file, content) in [(&retained, disposition), (&step, step_record)] {
             if file.exists() {
                 std::fs::remove_file(file).expect("remove the retained record");
@@ -196,21 +222,7 @@ async fn missing_malformed_crossed_and_contradicted_dispositions_are_refused() {
             }
         }
         assert_eq!(export(&path, &fixture.state, &parent), refused(reason), "{name}");
-        let inspected = inventory(&path, &fixture.state);
-        match name {
-            "a crash before the disposition" => {
-                let instance = &inspected.expect("inventory")["instance"];
-                assert_eq!(instance["lifecycle"]["state"], "dispatch_recorded_outcome_unknown", "{name}");
-                assert!(instance["wait_reasons"].to_string().contains("dispatch_outcome_unknown"), "{name}");
-            }
-            "malformed" | "not a repair observation" | "another fence's disposition" => {
-                assert!(inspected.is_err(), "{name}: never a guessed state");
-            }
-            _ => {
-                let instance = &inspected.expect("inventory")["instance"];
-                assert_eq!(instance["lifecycle"]["state"], "terminal_observed", "{name}");
-            }
-        }
+        seen.assert(inventory(&path, &fixture.state), name);
     }
     assert!(is_empty(&parent), "nothing is exported");
     std::fs::write(&retained, &original).expect("restore the disposition");
