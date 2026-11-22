@@ -495,9 +495,9 @@ interfaces.
     project, operation and canonical resource against the plan and policy.
   - Lattice still verifies the issued grant.
   - Each OIDC token now yields at most one exchange.
-- The vendored Basalt snapshot moves to `6ab48bffa29085f875d307dfbed1b73c9e5d1d6f`
-  (the Kiln cohort alignment). That revision is Basalt `main` `5e0f1f4c` plus
-  the holder series, pending its publication on `main`. `main` adds:
+- The vendored Basalt snapshot moves to published Basalt `main`
+  `fac0d7f1fd7ac936ca4d3f251f3287666e93d4bb` (the Kiln cohort alignment). It
+  includes the holder series and builds on `5e0f1f4c`, which adds:
   - the Kiln implementation v2 framing, source v1 operations and delegate rule;
   - UCAN `fca62a6e` with k256 0.14;
   - the ring RS256 OIDC check.
@@ -505,6 +505,10 @@ interfaces.
   `jsonwebtoken` leaves the dependency graph, and the k256 0.14 family
   (elliptic-curve 0.14, ecdsa 0.17, crypto-bigint 0.7, sec1 0.8) replaces
   0.13. Lattice does not yet verify Kiln-issued grants.
+- Bounded Exec stays at the Radicle-admitted `29dac88e`. The stdin EPIPE race
+  that can fail a successful process run under load, fixed upstream only on
+  GitHub (`c33f1bd`, bounded-exec#2), remains a known limitation until a
+  reviewed fixed revision is on the admitted Radicle RID.
 - Breaking: `implementation_attempt::cli::run_command` takes the
   application configuration path, read only by a `run` of a request with a
   repair policy for its operator `effect_authority` profile (Lattice #6).

@@ -1,10 +1,31 @@
 ## MODIFIED Requirements
 
+### Requirement: ucan_token_flow.oidc.attenuated_ucan
+
+r[ucan_token_flow.oidc.attenuated_ucan]
+
+Basalt SHALL issue a UCAN only after successful OIDC verification, and the UCAN operations, project, resource scope, and lifetime SHALL NOT exceed policy or verified OIDC validity. The legacy exchange SHALL issue to the configured Mantle audience; holder delivery SHALL issue to the bound holder only as `ucan_token_flow.oidc.holder_recipient` defines.
+
+#### Scenario: Allowed build capability is exchanged
+
+- **GIVEN** verified identity facts and a request for an allowed Mantle build resource
+- **WHEN** Basalt issues the UCAN through the legacy exchange
+- **THEN** the token SHALL target the configured Mantle audience
+- **AND** it SHALL contain only the granted capability scope
+- **AND** it SHALL expire no later than both applicable limits
+
+#### Scenario: Caller requests broader authority
+
+- **GIVEN** a request for an unapproved operation, project, resource, audience, or lifetime
+- **WHEN** attenuation evaluates it
+- **THEN** exchange SHALL reject or reduce it only as the explicit policy defines
+- **AND** it SHALL never silently grant the broader request
+
 ### Requirement: ucan_token_flow.oidc.replay_boundary
 
 r[ucan_token_flow.oidc.replay_boundary]
 
-Basalt SHALL admit at most one exchange per OIDC token. The replay key SHALL cover only the token issuer and `jti`, so a later request for another audience, project, operation, resource or holder SHALL be a duplicate. The shell SHALL reserve the key until `max(exp, iat + max_token_age_seconds) + clock_skew_seconds`, the last time at which the same token can still pass verification, and SHALL apply the configured replay policy before issuance.
+Basalt SHALL admit at most one exchange per OIDC token. The replay key SHALL cover only the token issuer and `jti`, so a later request for another audience, project, operation, resource or holder SHALL be a duplicate. The shell SHALL reserve the key until `max(exp, iat + max_token_age_seconds) + clock_skew_seconds`, which is no earlier than the last time the same token can pass verification (`min(exp, iat + max_token_age_seconds) + clock_skew_seconds`), and SHALL apply the configured replay policy before issuance.
 
 #### Scenario: One OIDC token is exchanged again
 

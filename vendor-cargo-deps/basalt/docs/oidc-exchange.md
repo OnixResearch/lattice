@@ -116,10 +116,15 @@ exchange, whatever operation, resource or holder a later request names. A
 client that needs several grants mints a fresh OIDC token per exchange.
 
 The replay port must atomically reserve the key until
-`max(exp, iat + max_token_age_seconds) + clock_skew_seconds`, the last moment
-the same token could still pass verification. The UCAN lifetime does not bound
-the reservation. A duplicate or unavailable store denies issuance. The receipt
-cannot recreate replay authority.
+`max(exp, iat + max_token_age_seconds) + clock_skew_seconds`. That is a safe
+upper bound, not the exact end of acceptance: verification accepts the token
+no later than `min(exp, iat + max_token_age_seconds) + clock_skew_seconds`.
+The UCAN lifetime does not bound the reservation. A duplicate or unavailable
+store denies issuance. The receipt cannot recreate replay authority.
+
+Raising `clock_skew_seconds` later widens the acceptance window of tokens
+already exchanged under the smaller value. Their reservations can then lapse
+while they are acceptable again, for at most the size of the increase.
 
 ## Evidence
 

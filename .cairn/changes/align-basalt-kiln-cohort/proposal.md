@@ -18,7 +18,7 @@ This change is the L2 cohort alignment, a prerequisite for that later verificati
 
 ## What Changes
 
-- Re-vendor `vendor-cargo-deps/basalt` through `scripts/sync-vendored-sibling.rs` at a revision whose tree is `5e0f1f4c` plus the holder series. The candidate is `6ab48bffa29085f875d307dfbed1b73c9e5d1d6f`; the final pin is the published Basalt `main` revision with the same tree. Record it in `SOURCE` and the vendor README. The archive path selection gains the new top-level `SECURITY.md` and `CHANGELOG.md`.
+- Re-vendor `vendor-cargo-deps/basalt` through `scripts/sync-vendored-sibling.rs` at published Basalt `main` `fac0d7f1fd7ac936ca4d3f251f3287666e93d4bb`, which is `5e0f1f4c` plus the holder series and is available on GitHub and Radicle. Gates first ran against the local candidate `6ab48bffa29085f875d307dfbed1b73c9e5d1d6f`; `fac0d7f1` differs from it only in non-Rust files and Rust doc comments. Record the revision in `SOURCE` and the vendor README. The archive path selection gains the new top-level `SECURITY.md` and `CHANGELOG.md`.
 - `github_ci::exchange::exchange` passes the typed native Mantle request that the GitHub CI session already builds, plus the endpoint's `BasaltPolicyRef`, to Basalt's holder delivery. It no longer passes a pre-rendered resource string.
 - Lattice keeps its own checks:
   - before any producer effect: exact project, service, operation, the canonical resource prefix, and that the stable holder is the request's subject;
@@ -30,7 +30,8 @@ This change is the L2 cohort alignment, a prerequisite for that later verificati
 
 - Verifying Kiln-issued grants in Lattice; a later change consumes this cohort for that.
 - Changing the separately vendored Mantle snapshot's own Basalt pin.
-- Publishing the holder series on Basalt `main`. Its owner does that; this change then re-pins to the published revision.
+- Publishing the holder series on Basalt `main`; its owner published it as `fac0d7f1`.
+- Adopting Bounded Exec `c33f1bd`. The stdin EPIPE race it fixes remains a known limitation (see design).
 
 ## Impact
 

@@ -29,8 +29,8 @@ pub enum ReplayFailure {
 
 /// Caller-owned consumptive replay capability.
 pub trait ReplayPort {
-    /// Atomically reserve one replay key until `expires_at_seconds`, the last
-    /// time at which the same OIDC token could still be accepted.
+    /// Atomically reserve one replay key until `expires_at_seconds`, a safe
+    /// upper bound: the same OIDC token is not accepted again after it.
     ///
     /// # Errors
     ///

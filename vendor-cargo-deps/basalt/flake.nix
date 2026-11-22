@@ -419,7 +419,18 @@
                   echo "invalid OIDC policy fixture passed: $fixture" >&2
                   exit 1
                 fi
-                test -s "$TMPDIR/$fixture.err"
+                # Each invalid fixture must fail on the policy contract itself,
+                # never on an evaluation error such as a recursive helper.
+                if grep -q "infinite recursion" "$TMPDIR/$fixture.err"; then
+                  echo "invalid OIDC policy fixture failed by infinite recursion: $fixture" >&2
+                  cat "$TMPDIR/$fixture.err" >&2
+                  exit 1
+                fi
+                if ! grep -q "contract broken" "$TMPDIR/$fixture.err"; then
+                  echo "invalid OIDC policy fixture failed without a contract violation: $fixture" >&2
+                  cat "$TMPDIR/$fixture.err" >&2
+                  exit 1
+                fi
               done
               mkdir -p "$out"
               cp "$TMPDIR/policy.json" "$out/policy.json"

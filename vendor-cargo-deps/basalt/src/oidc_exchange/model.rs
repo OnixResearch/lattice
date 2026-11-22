@@ -285,7 +285,7 @@ pub struct IssuancePlan {
     /// Replay key over the OIDC issuer and `jti` only: one exchange per token.
     pub replay_key: ReplayKey,
     /// End of the replay reservation: `max(exp, iat + max_token_age) + skew`,
-    /// the latest time at which the same OIDC token could still be accepted.
+    /// no earlier than the last time the same OIDC token could be accepted.
     pub replay_expires_at_seconds: u64,
 }
 

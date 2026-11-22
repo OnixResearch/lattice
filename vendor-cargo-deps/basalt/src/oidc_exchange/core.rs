@@ -385,7 +385,7 @@ fn replay_identity(claims: &OidcClaims) -> ReplayKey {
     ))
 }
 
-/// Reserve the key for as long as this token could pass `validate_time_claims`.
+/// Reserve the key at least as long as this token can pass `validate_time_claims`.
 fn replay_reservation_end(claims: &OidcClaims, policy: &OidcPolicy) -> u64 {
     claims
         .exp

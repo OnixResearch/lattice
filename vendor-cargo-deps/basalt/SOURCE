@@ -1,6 +1,6 @@
 name: basalt
 repository: https://github.com/OnixResearch/basalt.git
-revision: 6ab48bffa29085f875d307dfbed1b73c9e5d1d6f
+revision: fac0d7f1fd7ac936ca4d3f251f3287666e93d4bb
 paths:
 - .cairn
 - .cargo

@@ -15,7 +15,7 @@ The GitHub CI session already builds the exact native `basalt::mantle::Request`,
 
 ### Decision: Align to `main` and include the revised holder series
 
-**Choice:** Vendor a tree equal to `5e0f1f4c` plus the revised holder series. Pin the final import to the published Basalt `main` revision with that tree. Candidate `6ab48bf` lets gates run before publication.
+**Choice:** Vendor published Basalt `main` `fac0d7f1`, which is `5e0f1f4c` plus the revised holder series and is on GitHub and Radicle. Gates first ran against the local candidate `6ab48bf`. Against it, `fac0d7f1` changes only Cairn records, CHANGELOG, docs, `flake.nix`, and the wording of three Rust doc comments in `src/oidc_exchange/{core,model,shell}.rs`; no Rust code token changes.
 
 **Rationale:** A verbatim `5e0f1f4c` import deletes APIs that Lattice's GitHub CI exchange and Mantle signing depend on. Re-creating them in Lattice would fork authority logic around Basalt-private issuance. The revised series supplies those APIs and binds holder grants to the exact canonical request.
 
@@ -72,5 +72,12 @@ The vendored Mantle snapshot still declares Basalt `4c5c9e919b4573a7865559db2dc9
 
 ## Risks / Trade-offs
 
-- Until Basalt publishes the holder series, the candidate revision `6ab48bf` exists only in the local Basalt checkout. Archiving this change requires a re-sync at the published revision, and a check that its tree equals the candidate's for the synced paths.
 - The k256 0.14 RustCrypto family enters the lock at the same versions as Basalt's own lock: elliptic-curve 0.14, ecdsa 0.17, crypto-bigint 0.7, sec1 0.8, hybrid-array 0.4, digest 0.11 and signature 3. The 0.10/2.x digest and signature lines stay alongside them for ed25519 and rsa. Lattice code does not use these crates directly.
+
+## Known Limitation: Bounded Exec stdin EPIPE race
+
+Vendored Bounded Exec stays at the Radicle-admitted `29dac88ecded94457572db3fdfaaaab95fa91525`. That tree is byte-identical to the admitted Radicle tree and is pinned by the admission and cutover evidence.
+
+Under load, its stdin EPIPE race can report a successful process node as a capture failure (`AdapterRejected`). Bounded Exec `c33f1bd` fixes this: unread stdin never fails a run. That revision exists only on GitHub, and Bounded Exec's GitHub, Radicle (`1baa4f5`) and local histories have diverged. The issue is tracked at https://github.com/OnixResearch/bounded-exec/issues/2.
+
+Adoption waits for a reviewed fixed revision on the admitted Radicle RID `rad:z2CpqLFpdP36fZXYUK5ZNWxMibpCo`, with regenerated admission and cutover evidence. Taking it from GitHub would break `lattice.repository_validation.radicle_bounded_exec_source`. Tests that drain stdin with `cat > /dev/null` keep their workaround until then.

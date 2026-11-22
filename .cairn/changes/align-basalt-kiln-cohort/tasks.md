@@ -15,4 +15,4 @@
 - [x] [serial] Run `cargo check -p lattice --all-targets`, the focused library tests (authority, OIDC, GitHub CI, effect authority, operation shell, workflow exchange) and the integration tests (Choregraph effect authority, GitHub CI Mantle, headless, role-protocol authority). r[lattice.repository_validation.basalt_cohort]
 - [x] [serial] Run `cargo clippy -p lattice --no-deps --all-targets -- -D warnings`. r[lattice.repository_validation.basalt_cohort]
 - [ ] [serial] Re-key Octet once in the relocation integration. r[lattice.repository_validation.basalt_cohort]
-- [ ] [serial] Re-sync at the published Basalt `main` revision. Confirm that its tree equals the candidate's for the synced paths, then update `SOURCE` and the README pin before archiving. r[lattice.repository_validation.basalt_cohort.scenario.provenance]
+- [x] [serial] Re-sync at published Basalt `main` `fac0d7f1`. Confirm that its Rust code equals the candidate's (only doc-comment wording differs), update `SOURCE` and the README pin, and rerun `cargo check -p lattice --all-targets` and the exchange tests. r[lattice.repository_validation.basalt_cohort.scenario.provenance]
