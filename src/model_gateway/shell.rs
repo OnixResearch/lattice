@@ -170,9 +170,9 @@ impl<P: super::authority::AuthorityPort> Server<'_, P> {
             Ok(body) => body,
             Err(code) => return refused(code),
         };
-        let Some(timeout_secs) = self.timeout_secs(now_ms) else {
+        if self.timeout_secs(now_ms).is_none() {
             return refused(super::core::ForwardedRefusal::Deadline);
-        };
+        }
         super::admission::decided(&mut self.session, request_index);
         self.gate.prepare(request_index);
         let checks = crate::execution_binding::serving::gate::Checks {
@@ -185,6 +185,19 @@ impl<P: super::authority::AuthorityPort> Server<'_, P> {
         };
         debug_assert!(self.gate.admission().is_some(), "an admitted ticket has an authority admission");
         self.session.forwarded_requests = self.session.forwarded_requests.saturating_add(1);
+        // `Admit` takes time: the deadline and the upstream timeout follow the
+        // host clock after it, never the reading before it.
+        // r[impl lattice.vm_profile.gateway.scenario.admit_latency]
+        let Some(timeout_secs) = (self.clock)().ok().and_then(|now_ms| self.timeout_secs(now_ms)) else {
+            let cancelled = super::core::SettleOutcome::Cancelled;
+            let is_recorded = self.gate.settle_outcome(ticket, cancelled, None).is_ok();
+            debug_assert!(self.gate.admission().is_none(), "every admission is settled once");
+            // Nothing reached the upstream; a lost settlement stays uncertain on both sides.
+            if is_recorded {
+                return refused(super::core::ForwardedRefusal::Deadline);
+            }
+            return super::admission::reply(request_index, super::admission::Observed::NotSent, String::new(), false);
+        };
         let (observed, body) = self.call(body, timeout_secs);
         let usage = match observed {
             super::admission::Observed::Response { .. } => {

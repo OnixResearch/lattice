@@ -98,6 +98,12 @@ r[lattice.vm_profile.gateway.scenario.deadline]
 - WHEN a request is forwarded
 - THEN it MUST be refused as `deadline` without upstream contact, and without an authority call in the first case
 
+#### Scenario: Deadline reached during admission
+r[lattice.vm_profile.gateway.scenario.admit_latency]
+- GIVEN an authority whose `Admit` reply arrives after the host clock reached the binding deadline
+- WHEN the gateway prepares the upstream call
+- THEN it MUST reread the host clock after `Admit`, MUST NOT call the upstream, MUST settle the request `cancelled` and MUST refuse it as `deadline`, or report it `uncertain` when that settlement is lost
+
 #### Scenario: Lost settlement
 r[lattice.vm_profile.gateway.scenario.lost_settle]
 - GIVEN an admitted call whose `Settle` reply is lost

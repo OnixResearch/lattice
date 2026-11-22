@@ -579,3 +579,39 @@ fn published_authority_and_forwarded_fixtures_decode_exactly() {
         serde_json::from_slice(&read("forwarded-upstream/refused-upstream-credential-provider.json")).expect("decodes");
     assert!(super::admission::validate_upstream(&file_provider).is_err());
 }
+
+/// A slow authority: the host clock passes the deadline while `Admit` is in
+/// flight. The gateway rereads the clock after `Admit`, never calls the
+/// upstream and settles the request `cancelled`.
+// r[verify lattice.vm_profile.gateway.scenario.admit_latency]
+#[test]
+fn a_deadline_that_passes_during_a_slow_admit_settles_cancelled_without_upstream_contact() {
+    let directory = tempfile::tempdir().expect("scratch");
+    let now = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(NOW_MS));
+    let elapsed = now.clone();
+    let mut admit = admitting("host-a", 0, MAX_REQUESTS);
+    let authority = Authority::start(
+        directory.path(),
+        "slow.sock",
+        Box::new(move |request| {
+            if matches!(request, AuthorityRequest::Admit { .. }) {
+                // The admission took until the binding deadline.
+                elapsed.store(DEADLINE_MS, std::sync::atomic::Ordering::SeqCst);
+            }
+            admit(request)
+        }),
+    );
+    let upstream = Upstream::start(response_body());
+    let stopped = std::sync::atomic::AtomicBool::new(false);
+    let clock = move || -> Result<u64, String> { Ok(now.load(std::sync::atomic::Ordering::SeqCst)) };
+    let mut gateway = gateway(&authority, &upstream, &stopped, &clock, std::process::id());
+    assert_eq!(refused(&gateway.decide(forwarded(0))), Some(ForwardedRefusal::Deadline));
+    assert_eq!(upstream.calls(), 0, "nothing reaches the upstream after the deadline");
+    let seen = authority.seen();
+    assert_eq!(kinds(&seen), ["admit", "settle"]);
+    assert!(matches!(seen[1], AuthorityRequest::Settle {
+        outcome: super::core::SettleOutcome::Cancelled,
+        usage: None,
+        ..
+    }));
+}
