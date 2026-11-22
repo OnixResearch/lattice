@@ -110,6 +110,7 @@ pub(super) fn with_route<T>(
         requests: 0,
         failure: None,
         forwarding,
+        first_request_index: services.first_request_index,
     };
     std::thread::scope(|scope| {
         let worker = std::thread::Builder::new()

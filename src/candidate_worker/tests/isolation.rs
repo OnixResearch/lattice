@@ -70,6 +70,7 @@ fn omp_worker_produces_a_sandboxed_candidate() {
                     .collect::<Vec<_>>(),
             ),
             gate: &mut super::super::broker::DirectRoute,
+            first_request_index: 0,
         },
     )
     .expect("selected OMP route");

@@ -42,6 +42,7 @@ impl Fixture {
             crate::candidate_worker::broker::Services {
                 credentials: &crate::credentials::EnvironmentCredentialProvider::from_current_env(&[]),
                 gate: &mut crate::candidate_worker::broker::DirectRoute,
+                first_request_index: 0,
             },
         )
         .expect("actual selected OMP route");

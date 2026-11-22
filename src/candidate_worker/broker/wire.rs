@@ -19,6 +19,8 @@ pub(super) struct Handler<'a> {
     /// The host gateway of a forwarding (VM guest) broker; `None` calls the
     /// profile's endpoint directly.
     pub forwarding: Option<super::forwarded::Target>,
+    /// The forwarded index of this handler's first request.
+    pub first_request_index: u32,
 }
 
 impl Handler<'_> {
@@ -101,9 +103,10 @@ impl Handler<'_> {
             is_within_budget: self.requests < self.profile.max_requests,
             is_current: self.is_current(),
         };
+        // r[impl lattice.vm_profile.forwarded_upstream.scenario.request_index]
+        let request_index = self.first_request_index.checked_add(self.requests).ok_or(())?;
         let ticket = self.gate.admit(checks).ok_or(())?;
         debug_assert!(checks.is_within_budget && checks.is_current, "no gate admits outside the broker checks");
-        let request_index = self.requests;
         self.requests += 1;
         if let Some((target, binding)) = forwarding {
             let exchange = super::forwarded::Call {

@@ -61,6 +61,8 @@ pub(super) struct Operated {
     before_repair: Arc<Mutex<Option<Hook>>>,
     after_check: Arc<Mutex<Option<Hook>>>,
     is_lost: Arc<AtomicBool>,
+    indices: Arc<Mutex<Vec<u32>>>,
+    on_launch: Arc<Mutex<Option<doubles::IndexHook>>>,
 }
 
 fn now_ms() -> u64 {
@@ -143,6 +145,8 @@ impl Operated {
             before_repair: Arc::new(Mutex::new(None)),
             after_check: Arc::new(Mutex::new(None)),
             is_lost: Arc::new(AtomicBool::new(false)),
+            indices: Arc::new(Mutex::new(Vec::new())),
+            on_launch: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -189,6 +193,8 @@ impl Operated {
                 after: self.after.clone(),
                 before_repair: self.before_repair.clone(),
                 is_lost: self.is_lost.clone(),
+                indices: self.indices.clone(),
+                on_launch: self.on_launch.clone(),
             }),
             execute: Box::new(doubles::Unsandboxed {
                 runs: self.check_runs.clone(),
@@ -219,6 +225,16 @@ impl Operated {
         let revisions = crate::implementation_attempt::cli::session::revision::Store(None);
         crate::implementation_attempt::cli::execution::run(&self.path, &self.fixture.state, Some(ports), revisions)
             .await
+    }
+
+    /// The first forwarded request index of every launch, in order.
+    pub(super) fn indices(&self) -> Vec<u32> {
+        self.indices.lock().expect("indices").clone()
+    }
+
+    /// Run `hook` at every launch with that step's first forwarded index.
+    pub(super) fn on_launch(&self, hook: doubles::IndexHook) {
+        *self.on_launch.lock().expect("hook") = Some(hook);
     }
 
     pub(super) fn launches(&self) -> u32 {

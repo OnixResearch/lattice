@@ -113,7 +113,12 @@ impl WorkerStep {
         } else {
             &mut direct
         };
-        let services = crate::candidate_worker::broker::Services { credentials, gate };
+        // A single-shot attempt runs one broker incarnation: indices start at 0.
+        let services = crate::candidate_worker::broker::Services {
+            credentials,
+            gate,
+            first_request_index: 0,
+        };
         crate::candidate_worker::omp::run(
             &self.worker,
             &self.profile,

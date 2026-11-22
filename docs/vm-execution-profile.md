@@ -156,6 +156,14 @@ The C4 refusal codes are the C3 codes plus `malformed`, which the gateway uses
 for a body that is not JSON or names another model. Frame bounds derive from
 `crate::http::MAX_REQUEST_BODY_BYTES` and `MAX_RESPONSE_BODY_BYTES`.
 
+`request_index` strictly increases per binding and is never reused; it need
+not be consecutive. Each broker run of an attempt serves at most
+`max_requests` requests, so repair step `n` (from 1) numbers its requests from
+`(n - 1) * max_requests` and a single-shot attempt from 0. The range is
+derived from the retained step iteration, so a restarted controller
+reproduces it. The gateway refuses a reused or lower index as `not_current`
+before any authority or upstream call.
+
 The guest broker keeps the direct route's settlement semantics: a delivered
 response settles `Responded`, a guest-side timeout `TimedOut` and cancellation
 `Cancelled`. A refusal, an `uncertain` reply, a lost or malformed reply, or a

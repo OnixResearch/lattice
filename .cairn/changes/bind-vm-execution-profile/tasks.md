@@ -31,3 +31,7 @@
 - [ ] [serial] 6.1 Blocked on S4 (Kiln): Q2 on Cloud Hypervisor 54.0 with real vsock, the Kiln C3 server and a scripted upstream. r[lattice.vm_profile.forwarded_upstream] r[lattice.vm_profile.effect_authority]
 - [ ] [serial] 6.2 Blocked on OD-3: a live model endpoint and credential. r[lattice.vm_profile.gateway]
 - [ ] [serial] 6.3 Blocked on MH + ASP: a cross-host move with a production placement and fencing authority and revocation. r[lattice.vm_profile.binding]
+
+## Phase 7: Review fixes (RelocReview)
+
+- [x] [serial] 7.1 [P2] Number forwarded requests per attempt, not per broker run: `broker::Services::first_request_index`, and repair step `n` starts at `(n - 1) * max_requests` (`repair/operator/worker.rs`), so no repair step after the first is refused as `not_current`. Repair policies stay admitted for VM-bound requests. Evidence (Q1, Unix stand-in gateway, private target): `forwarded_request_indices_continue_across_repair_steps_through_one_gateway` passed. Both steps of a two-step repair loop forwarded through one gateway at indices 0 and 1 and reached the upstream twice; a replayed index 0 got the broker's 403 with no third upstream call. r[lattice.vm_profile.forwarded_upstream.scenario.request_index]

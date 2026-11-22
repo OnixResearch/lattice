@@ -14,7 +14,7 @@ mod host;
 mod isolation_tests;
 pub(crate) mod serving;
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 #[cfg(unix)]
 mod wire;
 
@@ -186,6 +186,11 @@ pub struct OwnerGate<'a> {
 pub struct Services<'a> {
     pub credentials: &'a dyn crate::credentials::CredentialProvider,
     pub gate: &'a mut dyn ModelRequestGate,
+    /// The C4 request index of this incarnation's first forwarded request.
+    /// Every broker run of one attempt starts where the previous runs' index
+    /// range ends, so a host gateway never sees an index twice; `0` for a
+    /// single-shot attempt and for a direct route.
+    pub first_request_index: u32,
 }
 
 pub(super) fn with_route<T>(

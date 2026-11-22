@@ -19,6 +19,65 @@ pub(crate) fn profile() -> Profile {
     }
 }
 
+/// A forwarding broker profile of `binding` at `vsock_port`, for `model`.
+pub(crate) fn forwarding_profile(
+    model: &str,
+    max_requests: u32,
+    binding: String,
+    vsock_port: crate::vm_profile::VsockPort,
+) -> Profile {
+    let mut forwarding = profile();
+    forwarding.model = model.into();
+    forwarding.max_requests = max_requests;
+    forwarding.forwarded = Some(Forwarded {
+        schema: FORWARDED_SCHEMA.into(),
+        vsock_port,
+        binding,
+    });
+    forwarding
+}
+
+/// One worker request through a real forwarding broker handler whose first
+/// forwarded index is `first_request_index`, against the gateway (or its
+/// stand-in) at `gateway`; the raw HTTP response the worker reads.
+#[cfg(unix)]
+pub(crate) fn forward_one(profile: &Profile, gateway: &std::path::Path, first_request_index: u32) -> String {
+    use std::io::Read;
+    use std::io::Write;
+    let credentials = crate::credentials::EmptyCredentialProvider;
+    let mut gate = DirectRoute;
+    let cancellation = std::sync::atomic::AtomicBool::new(false);
+    let stopped = std::sync::atomic::AtomicBool::new(false);
+    let mut handler = wire::Handler {
+        profile,
+        credentials: &credentials,
+        gate: &mut gate,
+        cancellation: &cancellation,
+        stopped: &stopped,
+        deadline: std::time::Instant::now() + std::time::Duration::from_secs(5),
+        requests: 0,
+        failure: None,
+        forwarding: Some(forwarded::Target::Unix(gateway.to_path_buf())),
+        first_request_index,
+    };
+    let body = serde_json::json!({"model": profile.model}).to_string();
+    let request = format!(
+        "POST /v1/chat/completions HTTP/1.1\r\nHost: 127.0.0.1:{PORT}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+        body.len()
+    );
+    let (server, mut client) = std::os::unix::net::UnixStream::pair().expect("private channel");
+    client.set_read_timeout(Some(std::time::Duration::from_secs(10))).expect("bounded read");
+    std::thread::scope(|scope| {
+        let host = scope.spawn(|| handler.exchange(server));
+        client.write_all(request.as_bytes()).expect("write request");
+        client.shutdown(std::net::Shutdown::Write).expect("complete request");
+        let mut response = String::new();
+        client.read_to_string(&mut response).expect("bounded response");
+        host.join().expect("host join").expect("response delivery");
+        response
+    })
+}
+
 #[test]
 fn endpoint_policy_rejects_url_credentials_redirect_surfaces_and_unbounded_calls() {
     let accepted = profile();
@@ -135,6 +194,7 @@ mod transport {
             requests: 0,
             failure: None,
             forwarding: None,
+            first_request_index: 0,
         };
         let denied = request("/v1/chat/completions", r#"{"model":"ungranted-model"}"#);
         assert!(exchange(&mut handler, denied.as_bytes()).starts_with("HTTP/1.1 403"));
@@ -172,6 +232,7 @@ mod transport {
             requests: 0,
             failure: None,
             forwarding: None,
+            first_request_index: 0,
         };
         for invalid in [
             request("/v1/models", r#"{"model":"admitted-model"}"#),
@@ -206,6 +267,7 @@ mod transport {
             requests: 0,
             failure: None,
             forwarding: None,
+            first_request_index: 0,
         };
         assert!(
             exchange(&mut handler, request("/v1/chat/completions", r#"{"model":"admitted-model"}"#).as_bytes())
@@ -301,6 +363,7 @@ mod transport {
                 requests: 0,
                 failure: None,
                 forwarding: Some(super::super::forwarded::Target::Unix(gateway.to_path_buf())),
+                first_request_index: 0,
             }
         }
 
@@ -455,6 +518,7 @@ mod transport {
             let services = super::super::Services {
                 credentials: &credentials,
                 gate: &mut gate,
+                first_request_index: 0,
             };
             let refusal = super::super::with_route(request, &profile, services, &cancellation, |_| {
                 started.store(true, Ordering::Release);

@@ -8,6 +8,8 @@ use std::sync::atomic::AtomicU32;
 use std::sync::atomic::Ordering;
 
 pub(super) type Hook = Box<dyn FnMut() + Send>;
+/// Runs at every launch with the step's first forwarded request index.
+pub(in super::super) type IndexHook = Box<dyn FnMut(u32) + Send>;
 
 /// What one launch of the fake OMP does before it prints a completed
 /// terminal stream.
@@ -58,6 +60,9 @@ pub(super) struct Scripted {
     /// Runs once, at the start of the first repair launch.
     pub(super) before_repair: Arc<Mutex<Option<Hook>>>,
     pub(super) is_lost: Arc<AtomicBool>,
+    /// The first forwarded request index each launch was given.
+    pub(super) indices: Arc<Mutex<Vec<u32>>>,
+    pub(super) on_launch: Arc<Mutex<Option<IndexHook>>>,
 }
 
 impl crate::implementation_attempt::cli::repair::operator::Launch for Scripted {
@@ -65,8 +70,13 @@ impl crate::implementation_attempt::cli::repair::operator::Launch for Scripted {
         &mut self,
         worker: &crate::candidate_worker::Request,
         profile: &crate::candidate_worker::omp::Profile,
+        first_request_index: u32,
         cancellation: &std::sync::atomic::AtomicBool,
     ) -> Result<crate::candidate_worker::omp::RunResult, String> {
+        self.indices.lock().expect("indices").push(first_request_index);
+        if let Some(on_launch) = self.on_launch.lock().expect("hook").as_mut() {
+            on_launch(first_request_index);
+        }
         let launch = self.launches.fetch_add(1, Ordering::SeqCst);
         if launch > 0
             && let Some(mut before) = self.before_repair.lock().expect("hook").take()

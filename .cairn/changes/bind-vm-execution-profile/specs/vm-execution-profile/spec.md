@@ -73,6 +73,13 @@ r[lattice.vm_profile.forwarded_upstream.scenario.no_fallback]
 - WHEN the attempt's broker route is prepared
 - THEN it MUST fail before the worker spawns, and MUST NOT fall back to a host-process broker or credential
 
+#### Scenario: Request indices across broker runs
+r[lattice.vm_profile.forwarded_upstream.scenario.request_index]
+- GIVEN an attempt whose worker runs several broker incarnations, such as the steps of a repair policy, against one host gateway
+- WHEN each incarnation forwards its requests
+- THEN step `n` (from 1) MUST number them from `(n - 1) * max_requests`, so indices strictly increase across the attempt, are derived from the retained step iteration alone and are never reused; a single-shot attempt MUST start at 0
+- AND the gateway MUST refuse a reused or lower index as `not_current` without an authority or upstream call
+
 ### Requirement: Kiln effect authority
 r[lattice.vm_profile.effect_authority] The gateway MUST speak `lattice.vm-effect-authority.v1` to a Unix socket: one length-prefixed JSON frame each way per connection. `admit { binding, request_index, model, route }` is answered by `admitted { placement_host, placement_generation, consumed_requests, remaining_requests, deadline_unix_ms }` or `refused { code }`, with code `not_current`, `deadline`, `budget`, `revoked` or `unknown_binding`. `settle { binding, request_index, outcome, usage? }` is answered by `recorded { consumed_requests }` or `refused { code }`.
 

@@ -24,11 +24,14 @@ const CANCEL_POLL: std::time::Duration = std::time::Duration::from_millis(20);
 
 /// Launches one pinned OMP step; the shell owns everything around it.
 pub(crate) trait Launch: Send {
-    /// Run `worker` with `profile` and stop it when `cancellation` is set.
+    /// Run `worker` with `profile` and stop it when `cancellation` is set. A
+    /// forwarding broker numbers this step's model requests from
+    /// `first_request_index`.
     fn launch(
         &mut self,
         worker: &crate::candidate_worker::Request,
         profile: &crate::candidate_worker::omp::Profile,
+        first_request_index: u32,
         cancellation: &std::sync::atomic::AtomicBool,
     ) -> Result<crate::candidate_worker::omp::RunResult, String>;
 }
@@ -45,6 +48,7 @@ impl Launch for PinnedOmp {
         &mut self,
         worker: &crate::candidate_worker::Request,
         profile: &crate::candidate_worker::omp::Profile,
+        first_request_index: u32,
         cancellation: &std::sync::atomic::AtomicBool,
     ) -> Result<crate::candidate_worker::omp::RunResult, String> {
         let credentials = super::super::session::launch::credentials(profile)?;
@@ -52,6 +56,7 @@ impl Launch for PinnedOmp {
         let services = crate::candidate_worker::broker::Services {
             credentials: &credentials,
             gate: &mut gate,
+            first_request_index,
         };
         let config = crate::process::core::RuntimeConfig::default();
         crate::candidate_worker::omp::run(worker, profile, &config, cancellation, services)

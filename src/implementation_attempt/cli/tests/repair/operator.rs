@@ -58,6 +58,68 @@ async fn a_granted_operator_repairs_after_one_failing_check_and_exports_it() {
     assert!(super::export::export(&operated.path, &operated.fixture.state, &parent).is_err());
 }
 
+/// Every repair step's broker forwards from the step's own index range, so
+/// one host gateway serves both steps of a VM-bound repair attempt; a
+/// reused index is refused before any upstream call.
+// r[verify lattice.vm_profile.forwarded_upstream.scenario.request_index]
+#[cfg(unix)]
+#[test]
+fn forwarded_request_indices_continue_across_repair_steps_through_one_gateway() {
+    use crate::model_gateway::tests as gateway;
+    let operated = Operated::new("attempt-operator-forwarded", 2, 60_000);
+    operated.script(&[Behaviour::Write("still broken"), Behaviour::Write("fixed")]);
+    let directory = tempfile::tempdir().expect("gateway scratch");
+    let authority = gateway::Authority::start(directory.path(), "authority.sock", gateway::admitting("host-a", 0, 4));
+    let upstream = gateway::Upstream::start(gateway::response_body());
+    let socket = directory.path().join("vsock.sock_10243");
+    let listener = crate::model_gateway::shell::listen(&socket).expect("gateway listener");
+    let stopped = std::sync::atomic::AtomicBool::new(false);
+    // The guest broker of each step, with the request's own per-step ceiling.
+    let max_requests = operated.request.omp.model_broker.max_requests;
+    let profile = crate::candidate_worker::broker::tests::forwarding_profile(
+        gateway::MODEL,
+        max_requests,
+        gateway::binding_identity(),
+        crate::vm_profile::VsockPort(10243),
+    );
+    let responses = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let (seen, forwarding, gateway_socket) = (responses.clone(), profile.clone(), socket.clone());
+    operated.on_launch(Box::new(move |first_request_index| {
+        let response =
+            crate::candidate_worker::broker::tests::forward_one(&forwarding, &gateway_socket, first_request_index);
+        seen.lock().expect("responses").push(response);
+    }));
+    let mut server = gateway::gateway(&authority, &upstream, &stopped, &gateway::fixed_clock, std::process::id());
+    let reused = std::thread::scope(|scope| {
+        let serving = scope.spawn(|| server.serve(&listener));
+        let ran = harness::block_on(operated.run());
+        // A reused index is refused by the gateway before any upstream call.
+        let reused = crate::candidate_worker::broker::tests::forward_one(&profile, &socket, 0);
+        stopped.store(true, std::sync::atomic::Ordering::Release);
+        serving.join().expect("gateway join").expect("gateway serve");
+        ran.expect("the loop reaches a disposition");
+        reused
+    });
+    assert_eq!(operated.disposition()["disposition"]["kind"], "repaired_candidate");
+    assert_eq!(operated.indices(), [0, max_requests], "each step starts after the previous step's range");
+    let responses = responses.lock().expect("responses").clone();
+    assert_eq!(responses.len(), 2);
+    for response in &responses {
+        assert!(response.starts_with("HTTP/1.1 200"), "{response}");
+    }
+    assert!(reused.starts_with("HTTP/1.1 403"), "{reused}");
+    assert_eq!(upstream.calls(), 2, "both steps reached the upstream through one gateway; the replay did not");
+    let admitted: Vec<u32> = authority
+        .seen()
+        .iter()
+        .filter_map(|request| match request {
+            crate::model_gateway::core::AuthorityRequest::Admit { request_index, .. } => Some(*request_index),
+            crate::model_gateway::core::AuthorityRequest::Settle { .. } => None,
+        })
+        .collect();
+    assert_eq!(admitted, [0, max_requests]);
+}
+
 #[tokio::test]
 async fn repairs_stop_at_the_iteration_bound() {
     let operated = Operated::new("attempt-operator-exhausted", 1, 60_000);

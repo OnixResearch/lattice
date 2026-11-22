@@ -105,6 +105,7 @@ fn bubblewrap_broker_allows_only_the_model_route_and_hides_host_capabilities() {
         let services = super::Services {
             credentials: &credentials,
             gate: &mut super::DirectRoute,
+            first_request_index: 0,
         };
         let (outcome, clean) = with_route(request, &profile, services, &cancellation, |selected| {
             let mut crossed = selected.clone();
