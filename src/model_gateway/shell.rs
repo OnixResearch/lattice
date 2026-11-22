@@ -10,6 +10,8 @@
 // r[impl lattice.vm_profile.gateway]
 // r[impl lattice.vm_profile.gateway.scenario.peer]
 
+mod upstream;
+
 use std::io::Write;
 
 const MAX_RECORD_BYTES: u64 = 262_144;
@@ -221,45 +223,6 @@ impl<P: super::authority::AuthorityPort> Server<'_, P> {
         let remaining_secs = self.session.bound.deadline_unix_ms.checked_sub(now_ms)?.checked_div(1000)?;
         let timeout_secs = remaining_secs.min(crate::http::MAX_TIMEOUT_SECS);
         (timeout_secs > 0).then_some(timeout_secs)
-    }
-
-    /// Exactly one upstream call with the host-only credential.
-    fn call(&self, body: String, timeout_secs: u64) -> (super::admission::Observed, String) {
-        let mut request = crate::http::HttpRequestPlan {
-            method: "POST".into(),
-            url: self.endpoint.clone(),
-            headers: [("content-type".into(), "application/json".into())].into(),
-            body: Some(body),
-            timeout_secs,
-        };
-        if let Some(value) = &self.credential {
-            request.headers.insert("authorization".into(), format!("Bearer {}", value.expose_for_execution()));
-        }
-        let response = crate::http::HttpClient::execute_bounded(
-            &crate::http::NativeHttpClient,
-            &request,
-            &crate::http::HttpBounds::default(),
-            Some(self.stopped),
-        );
-        for value in request.headers.values_mut() {
-            zeroize::Zeroize::zeroize(value);
-        }
-        match response {
-            Ok(value) => {
-                let is_echoed =
-                    self.credential.as_ref().is_some_and(|secret| value.body.contains(secret.expose_for_execution()));
-                if is_echoed {
-                    (super::admission::Observed::Withheld, String::new())
-                } else {
-                    (super::admission::Observed::Response { status: value.status }, value.body)
-                }
-            }
-            Err(crate::http::HttpError::Timeout(_)) => (super::admission::Observed::TimedOut, String::new()),
-            Err(crate::http::HttpError::Cancelled) => (super::admission::Observed::Cancelled, String::new()),
-            Err(crate::http::HttpError::InvalidRequest(_)) => (super::admission::Observed::NotSent, String::new()),
-            Err(crate::http::HttpError::LimitExceeded(_)) => (super::admission::Observed::Withheld, String::new()),
-            Err(crate::http::HttpError::Transport(_)) => (super::admission::Observed::TransportFailed, String::new()),
-        }
     }
 }
 

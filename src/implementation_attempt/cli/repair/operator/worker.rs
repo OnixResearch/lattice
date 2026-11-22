@@ -70,7 +70,7 @@ impl<'a, 'r> OmpPort<'a, 'r> {
         profile.base_identity.clone_from(&self.expected_base);
         profile.prompt = crate::implementation_attempt::repair::step::operator::prompt(&self.request.omp.prompt, step);
         let is_capped = crate::implementation_attempt::repair::step::operator::is_capped(deadline, admitted_secs);
-        let first_request_index = first_request_index(step.iteration, self.request.omp.model_broker.max_requests)?;
+        let first_request_index = first_request_index(step, &self.request.omp.model_broker)?;
         Ok(Prepared {
             worker,
             profile,
@@ -98,15 +98,19 @@ impl<'a, 'r> OmpPort<'a, 'r> {
 }
 
 /// The forwarded index of a step's first model request. Each broker run
-/// serves at most `max_requests` requests, so step `n` (from 1) owns the
-/// range `[(n - 1) * max_requests, n * max_requests)`: indices strictly
-/// increase across the steps of one attempt and are derived from the
-/// retained step iteration alone, so a restarted controller reproduces them.
+/// serves at most the broker's `max_requests` requests, so step `n` (from 1)
+/// owns the range `[(n - 1) * max_requests, n * max_requests)`: indices
+/// strictly increase across the steps of one attempt and are derived from
+/// the retained step iteration alone, so a restarted controller reproduces
+/// them.
 // r[impl lattice.vm_profile.forwarded_upstream.scenario.request_index]
-fn first_request_index(iteration: u32, max_requests: u32) -> Result<u32, String> {
-    iteration
+fn first_request_index(
+    step: &crate::implementation_attempt::repair::step::Request,
+    broker: &crate::candidate_worker::broker::Profile,
+) -> Result<u32, String> {
+    step.iteration
         .checked_sub(1)
-        .and_then(|earlier_steps| earlier_steps.checked_mul(max_requests))
+        .and_then(|earlier_steps| earlier_steps.checked_mul(broker.max_requests))
         .ok_or_else(|| "the step's forwarded request indices exceed their range".to_owned())
 }
 
