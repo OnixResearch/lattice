@@ -1,0 +1,108 @@
+{
+  "kind": "octet-semantic-comparison",
+  "change": "restart-from-application-checkpoint",
+  "reference_revision": "5a8e1d51",
+  "reference_tree": "not run; the committed baselines at 5a8e1d51 are the reference",
+  "comparison_fields": [
+    "identity_status",
+    "lint",
+    "group",
+    "severity",
+    "file",
+    "message",
+    "crate_name"
+  ],
+  "method": "unique stable IDs of the candidate run, compared as multisets of the comparison fields against the committed baseline",
+  "why_ids_differ": "cargo-octet stable IDs hash the whitespace-normalized primary-span snippet; the only differing ID is the function_length finding whose function shrank below the limit",
+  "scopes": [
+    {
+      "scope": "lattice",
+      "baseline": "octet-baseline.json",
+      "baseline_blake3": "68967a12a8a2f431db4cdb57c8da5dac358ba9c7f2f968b3d474de550c5221b0",
+      "baseline_findings": 1052,
+      "candidate": {
+        "status": "warning-only",
+        "gate": "octet-precommit-check fails closed on the one stale baseline entry",
+        "cargo": {
+          "classification": "success",
+          "code": 0
+        },
+        "metadata": {
+          "tool_name": "cargo-octet",
+          "tool_version": "0.1.0",
+          "rustc_version": "rustc 1.96.0-nightly (ac7f9ec7d 2026-03-20)",
+          "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu",
+          "profile_name": "workspace-metadata",
+          "profile_hash": "b3:d2ff43855d70abf076f3597c441f3c90718857d7ce696b2f7aa11a3d7f570959",
+          "config_hash": "b3:373a458321454dae9fcfee8b696e906f8dd0e978769601ea777ddfcd080ad018"
+        },
+        "baseline_counts": {
+          "accepted_total": 1052,
+          "accepted_current": 1051,
+          "current_total": 1051,
+          "new_total": 0,
+          "stale_total": 1
+        },
+        "new_finding_ids": [],
+        "stale_finding_ids": [
+          "b3:ed6925922d467aea"
+        ],
+        "unique_findings": 1051
+      },
+      "new_against_baseline": [],
+      "resolved_against_baseline": [
+        {
+          "stable_id": "b3:ed6925922d467aea",
+          "identity_status": "computed",
+          "lint": "function_length",
+          "group": "tigerstyle::structure",
+          "severity": "warning",
+          "file": "src/headless/shell.rs",
+          "line": 137,
+          "message": "function `run_workflow_snapshot_with_executor_factory` is 73 lines (limit: 70)",
+          "crate_name": "lattice",
+          "resolution": "the shared snapshot persistence sequence moved to src/headless/shell/record.rs; the function is now 39 lines"
+        }
+      ],
+      "changed": []
+    },
+    {
+      "scope": "lattice-core",
+      "baseline": "crates/lattice-core/octet-baseline.json",
+      "baseline_blake3": "1fdf29f4804d2ec72e72b8ee2c020d1097dbff4ab5029fae1d1dad0be1009bfe",
+      "baseline_findings": 25,
+      "candidate": {
+        "status": "warning-only",
+        "metadata": {
+          "tool_name": "cargo-octet",
+          "tool_version": "0.1.0",
+          "rustc_version": "rustc 1.96.0-nightly (ac7f9ec7d 2026-03-20)",
+          "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu",
+          "profile_name": "workspace-metadata",
+          "profile_hash": "b3:af60c63c1586dfb2fae270cc86569aaa3fa1e892daa8a5355e75d451d9995e12",
+          "config_hash": "b3:c6c36ad09022fd006010c778b568bfb3447c78c17434d701ba83a810caca723a"
+        },
+        "baseline_counts": {
+          "accepted_total": 25,
+          "accepted_current": 25,
+          "current_total": 25,
+          "new_total": 0,
+          "stale_total": 0
+        },
+        "unique_findings": 25,
+        "note": "from the preceding octet-precommit-check run of this change; octet-precommit-check stops after a lattice lint-failure, and no lattice-core source or manifest changed since"
+      },
+      "new_against_baseline": [],
+      "resolved_against_baseline": [],
+      "changed": []
+    }
+  ],
+  "plan_fixed_exceptions": [
+    "function_length on run_workflow_snapshot_with_executor_factory may shrink, change or go stale (owner decision)"
+  ],
+  "semantically_new_total": 0,
+  "non_claims": [
+    "not a baseline migration and not a cohort admission",
+    "baselines were not rewritten"
+  ]
+}

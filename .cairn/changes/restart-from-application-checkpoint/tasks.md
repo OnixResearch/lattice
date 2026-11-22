@@ -1,0 +1,20 @@
+## Phase 1: Producer implementation
+
+- [x] [serial] Pure C8 manifest construction and admission with one refusal code per rule, r[lattice.application_checkpoint.admission], r[lattice.application_checkpoint.portable], r[lattice.application_checkpoint.workspace].
+- [x] [serial] Node-boundary hook absent unless the route's C1 profile declares a checkpoint; boundary publication with the sensitive-output rule; synchronous effect fence and drain, r[lattice.application_checkpoint.hook], r[lattice.application_checkpoint.publish], r[lattice.application_checkpoint.fence], r[lattice.application_checkpoint.commit].
+- [x] [serial] Restore into a fresh store through `Session::new_with_checkpoint`; uncertain nodes adopted as `Unknown`; carry-forward oracle, r[lattice.application_checkpoint.restore], r[lattice.application_checkpoint.carry_forward].
+- [x] [serial] C8 restart receipt and restart classification, r[lattice.application_checkpoint.receipt].
+- [x] [serial] Profiles without hooks report `Unavailable` and refuse restore, r[lattice.application_checkpoint.unavailable].
+- [x] [serial] `lattice application-checkpoint restore|inspect`, docs and fixtures.
+
+## Phase 2: Evidence
+
+- [x] Q0 unit tests (`cargo test -p lattice --lib checkpoint`, selecting `checkpoint::tests`): 34 passed, 0 failed, exit 0 (isolated target dir `lattice-s3-target`; `src/checkpoint/tests.rs` declares 34 tests).
+- [x] Q1 two-root restart after SIGKILL (`cargo test -p lattice --test application_checkpoint_restart -- --test-threads 2`): three consecutive runs under host load, each 7 passed, 0 failed, exit 0; plus 16 parallel stress runs of `drained_source_restarts_on_a_second_root_after_sigkill`, all exit 0. Earlier intermittent failure (target execution `failed`): reproduced once in 16 parallel stress runs with node diagnostics `b Failed "effect dispatch failed: AdapterRejected"`; the test releases `b` before the restore, so the target's `b` exited before the runtime wrote its piped stdin (restored output of `a`), and bounded-exec returns the resulting broken-pipe write error for a normally exited child (`finish_stdin_worker`), which the process adapter maps to `AdapterRejected`. Fixture fix: gated nodes drain stdin first and carry an explicit 900 s timeout; the source role parks instead of sleeping; failed-state assertions print the target's node errors. Source = re-executed test binary (production handler, worker, executor, real shell effects); target = real `lattice application-checkpoint restore` process on a second state root; source state root deleted before restore.
+- [x] Existing suites: lib filter `workflow_exchange orchestration engine::executor headless workflow::gate checkpoint engine::effect` 92 passed, exit 0; `test_headless` 11 and `test_orchestration_shell` 13 passed, exit 0 (after the extraction); earlier on this change `test_scheduler_occurrences` 17, `test_orchestration_cli` 11, `test_workflow_approval` 14 (1 ignored), `test_typed_policy_resume` 3, all passed.
+- [ ] Q1-emulated aarch64 restore of an x86_64-produced checkpoint. Not attempted per owner direction: the dev shell toolchain sysroot holds only `x86_64-unknown-linux-gnu`; `nix build path:.#packages.aarch64-linux.lattice --dry-run` needs 672 derivations under qemu-user binfmt. Portable admission is covered at Q0 only.
+- [x] Clippy and Octet: `cargo clippy -p lattice --no-deps --lib --bin lattice --test application_checkpoint_restart -- -D warnings` exit 0; `cargo clippy -p lattice --no-deps --lib --profile test -- -D warnings` exit 0. `octet-precommit-check`: `Baseline: 1052 accepted, 1051 current accepted, 0 new, 1 stale` (lattice; gate exit 1 on the stale entry); the one stale entry `b3:ed6925922d467aea` is `function_length src/headless/shell.rs run_workflow_snapshot_with_executor_factory is 73 lines`, resolved by sharing the persistence sequence (owner-approved exception); lattice-core 25/25, 0 new, 0 stale. Semantic comparison: `evidence/octet-semantic-comparison.json`, 0 semantically new findings.
+
+## Verification status
+
+Single-host Q0/Q1 only. No cross-host, production-placement, live-model or native-ARM claim.

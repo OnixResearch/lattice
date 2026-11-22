@@ -6,6 +6,8 @@
     reason = "the imperative handler keeps durable admission and transport operation dispatch visible"
 )]
 
+mod checkpoint;
+
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
@@ -39,6 +41,7 @@ pub struct ApplicationHandler {
     profile_identity: Identity,
     agent_runtime: crate::agent_node::RuntimeOptions,
     workers: BTreeMap<String, Worker>,
+    checkpoint: Option<crate::checkpoint::CheckpointBinding>,
 }
 
 impl ApplicationHandler {
@@ -56,6 +59,7 @@ impl ApplicationHandler {
             profile_identity,
             agent_runtime,
             workers: BTreeMap::new(),
+            checkpoint: None,
         })
     }
 
@@ -143,7 +147,7 @@ impl ApplicationHandler {
             AdmissionResolution::Existing(record) => Ok(record.accepted),
             AdmissionResolution::Inserted(record) => {
                 let accepted = record.accepted.clone();
-                self.spawn_worker(record, route, workflow);
+                self.spawn_worker(record, route, workflow, checkpoint::WorkerStart::default());
                 Ok(accepted)
             }
         }
@@ -154,12 +158,14 @@ impl ApplicationHandler {
         record: ExecutionRecord,
         route: WorkflowRoute,
         workflow: crate::engine::workflow::Workflow,
+        start: checkpoint::WorkerStart,
     ) {
         let execution_identity = record.accepted.execution_identity.as_str().to_string();
-        let cancellation = Arc::new(AtomicBool::new(false));
+        let cancellation = Arc::new(AtomicBool::new(start.is_cancelled));
         let worker_cancellation = Arc::clone(&cancellation);
         let store = self.store.clone();
         let agent_runtime = self.agent_runtime.clone();
+        let checkpoint = self.route_checkpoint(&route);
         let worker_name = format!("{WORKER_THREAD_PREFIX}-{}", record.run_id);
         let spawn = std::thread::Builder::new().name(worker_name).spawn(move || {
             super::worker::run(super::worker::WorkerInput {
@@ -169,6 +175,9 @@ impl ApplicationHandler {
                 workflow,
                 agent_runtime,
                 cancellation: worker_cancellation,
+                checkpoint,
+                seed: start.seed,
+                restored: start.restored,
             });
         });
         match spawn {

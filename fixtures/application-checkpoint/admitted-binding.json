@@ -1,0 +1,16 @@
+{
+  "binding": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "checkpoint": "workflow-node-boundary-v1",
+  "deadline_unix_ms": 4102444800000,
+  "graph_identity": "b3:3983b1220308e461105950f5baea8714f2b248ba776b98dbea1b859c68259c93",
+  "non_claims": [
+    "an application checkpoint does not preserve process, memory or socket state",
+    "a restart receipt does not prove the source host stopped executing",
+    "an uncertain node outcome is not evidence that its effect did or did not happen",
+    "checkpoint admission does not establish current placement or budget authority"
+  ],
+  "root": "/checkpoint",
+  "schema": "lattice.application-checkpoint-binding.v1",
+  "vm_profile": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "workflow_revision": "b3:8888888888888888888888888888888888888888888888888888888888888888"
+}

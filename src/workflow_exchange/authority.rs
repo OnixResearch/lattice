@@ -20,12 +20,21 @@ const PROCESS_CONTRACT: &str = "lattice-process";
 const PROTOCOL_CONTRACT: &str = "lattice-role-protocol";
 const AGENT_CONTRACT: &str = "lattice-agent";
 
+/// Synchronous admission run immediately before the route reserves an effect attempt.
+///
+/// A refusal prevents the reservation and therefore the effect. Application checkpoint hooks
+/// use it to commit an `uncertain` manifest before any effect can be dispatched.
+pub trait ReservationFence: Send + Sync + std::fmt::Debug {
+    fn admit(&self, binding: &authority::IntentBinding) -> Result<(), dispatch::Error>;
+}
+
 #[derive(Debug, Clone)]
 pub struct RouteExactAuthorityProvider {
     workflow_revision: String,
     run_id: RunId,
     run_reference: String,
     authority_reference: String,
+    fence: Option<std::sync::Arc<dyn ReservationFence>>,
 }
 
 impl RouteExactAuthorityProvider {
@@ -52,7 +61,31 @@ impl RouteExactAuthorityProvider {
             run_id,
             run_reference,
             authority_reference,
+            fence: None,
         }
+    }
+
+    /// Run `fence` synchronously before every effect attempt reservation.
+    #[must_use]
+    pub fn with_reservation_fence(mut self, fence: std::sync::Arc<dyn ReservationFence>) -> Self {
+        self.fence = Some(fence);
+        self
+    }
+}
+
+struct FencedAttempts {
+    fence: std::sync::Arc<dyn ReservationFence>,
+    inner: Box<dyn dispatch::EffectAttemptStore>,
+}
+
+impl dispatch::EffectAttemptStore for FencedAttempts {
+    fn reserve(&self, binding: authority::IntentBinding) -> Result<authority::Attempt, dispatch::Error> {
+        self.fence.admit(&binding)?;
+        self.inner.reserve(binding)
+    }
+
+    fn record_outcome(&self, event: &authority::AuthorizationOutcomeEvent) -> Result<(), dispatch::Error> {
+        self.inner.record_outcome(event)
     }
 }
 
@@ -68,6 +101,13 @@ impl execution::RunContextProvider for RouteExactAuthorityProvider {
         let attempts: Box<dyn dispatch::EffectAttemptStore> = match store {
             Some(store) => Box::new(execution::StoreAttempts::new(store)),
             None => Box::new(execution::UnavailableAttempts),
+        };
+        let attempts: Box<dyn dispatch::EffectAttemptStore> = match &self.fence {
+            Some(fence) => Box::new(FencedAttempts {
+                fence: std::sync::Arc::clone(fence),
+                inner: attempts,
+            }),
+            None => attempts,
         };
         let shell = dispatch::Shell::new(
             Box::new(RouteExactAuthorityFacts {

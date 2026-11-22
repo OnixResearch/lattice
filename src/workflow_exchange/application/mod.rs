@@ -24,6 +24,7 @@ pub(super) use super::ExecutionRecord;
 pub(super) use super::HANDLER_PROFILE_V2_SCHEMA;
 pub(super) use super::HandlerListener;
 pub(super) use super::HandlerProfile;
+pub(super) use super::ReservationFence;
 pub(super) use super::RouteExactAuthorityProvider;
 pub(super) use super::VersionedHandlerProfile;
 pub(super) use super::WorkflowFacts;

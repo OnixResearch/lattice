@@ -77,6 +77,8 @@ enum CliCommand {
     Authority(AuthorityCommandArgs),
     /// Serve the bounded durable workflow exchange
     WorkflowExchange(WorkflowExchangeCommandArgs),
+    /// Restore or inspect committed application checkpoints of the workflow exchange
+    ApplicationCheckpoint(lattice::checkpoint::cli::CommandArgs),
     /// Export a saved workflow to a typed Nickel file
     Export(ExportWorkflowArgs),
     /// Import a typed Nickel workflow file into the store
@@ -599,6 +601,9 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
         }
         Some(CliCommand::WorkflowExchange(exchange_args)) => {
             Ok(run_workflow_exchange_command(&app_config, &exchange_args))
+        }
+        Some(CliCommand::ApplicationCheckpoint(checkpoint_args)) => {
+            Ok(lattice::checkpoint::cli::run(&app_config, &checkpoint_args))
         }
         Some(CliCommand::Export(export_args)) => Ok(export_workflow_command(&app_config, &export_args)),
         Some(CliCommand::Import(import_args)) => Ok(import_workflow_command(&app_config, &import_args)),

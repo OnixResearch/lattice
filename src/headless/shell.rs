@@ -1,6 +1,8 @@
 //! Imperative shell for one persisted product workflow run.
 
 mod bound;
+mod checkpoint;
+mod record;
 
 #[derive(Debug, Clone)]
 pub struct OwnedRunRequest {
@@ -161,57 +163,15 @@ pub(super) async fn run_workflow_snapshot_with_executor_factory(
         .map_err(|error| super::HeadlessRunError::Validation(vec![authority_context_diagnostic(error.to_string())]))?;
     let cache = std::collections::HashMap::new();
     let outcome = executor.run_authorized_until_approval(&workflow, &cache, &authority).await;
-    let observed_completion_order = executor.observed_completion_order().to_vec();
-    super::persist_completed_outputs_to_cache(store, &outcome.results);
-    if let Some(suspension) = outcome.suspension {
-        let (summary, _request) =
-            crate::workflow::gate::shell::persist_suspension(crate::workflow::gate::shell::SuspensionCommitInput {
-                store,
-                workflow: &workflow,
-                run_id,
-                owner,
-                started_epoch_millis: started_epoch_ms,
-                observed_epoch_millis: super::run_finished_epoch_ms(),
-                results: &outcome.results,
-                suspension,
-                policy_decisions: executor.take_policy_decisions(),
-            })
-            .map_err(|error| super::HeadlessRunError::Store(error.to_string()))?;
-        return Ok(SnapshotRunOutcome {
-            summary,
-            cancelled: executor.cancellation_observed(),
-        });
-    }
-    let results = outcome.results;
-    let summary = super::summarize_run(run_id, &workflow, &results);
-    let finished_epoch_ms = super::run_finished_epoch_ms();
-    let record = run_record_from_summary_with_owner(&summary, started_epoch_ms, Some(finished_epoch_ms), owner);
-    let mut details = crate::run::history::detail_record_from_results_with_completion_order(
+    let facts = record::SnapshotRunFacts {
         run_id,
-        &workflow,
-        &results,
-        observed_completion_order,
-    );
-    // r[impl lattice.typed_policy.record]
-    crate::workflow::decision::ledger::attach(&mut details, executor.take_policy_decisions());
-    debug_assert_eq!(details.run_id, run_id);
-    debug_assert_eq!(details.nodes.len(), results.len());
-    store.save_run(&record)?;
-    // r[impl lattice.workflow_execution.headless_run_details]
-    store.save_run_details(&details)?;
-    let replay_events = crate::replay::replay_events_from_results(
-        run_id,
-        &workflow,
-        &results,
+        owner,
         started_epoch_ms,
-        Some(finished_epoch_ms),
-    );
-    store.save_run_replay_events(run_id, &replay_events)?;
-
-    Ok(SnapshotRunOutcome {
-        summary,
-        cancelled: executor.cancellation_observed(),
-    })
+    };
+    let persisted = record::persist_snapshot_outcome(store, &workflow, &mut executor, facts, outcome)?;
+    debug_assert_eq!(persisted.summary.run_id, run_id);
+    debug_assert_eq!(persisted.summary.workflow_name, workflow_name);
+    Ok(persisted)
 }
 
 #[derive(Debug, Clone)]

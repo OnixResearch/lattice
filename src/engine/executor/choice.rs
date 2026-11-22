@@ -157,3 +157,29 @@ fn failed(
         input_hash,
     }
 }
+
+impl super::Executor {
+    /// Continue a product run from terminal checkpoint steps, stopping at approval gates.
+    ///
+    /// Checkpoint nodes restore through `Session::new_with_checkpoint` and are never re-run.
+    /// An empty checkpoint is exactly [`Self::run_authorized_until_approval`].
+    pub async fn run_authorized_from_checkpoint(
+        &mut self,
+        workflow: &crate::engine::workflow::Workflow,
+        cache: &std::collections::HashMap<
+            crate::engine::value::ContentHash,
+            std::collections::HashMap<crate::engine::workflow::PortId, crate::engine::value::Value>,
+        >,
+        context: &crate::engine::effect::execution::RunContext,
+        checkpoint: &[super::StepResult],
+    ) -> super::ApprovalRunOutcome {
+        let control = super::ExecutionControl {
+            checkpoint,
+            stop_at_approval: true,
+            resumed_gate: None,
+            resumed_gate_outputs: None,
+        };
+        let bound_inputs = std::collections::HashMap::new();
+        self.run_with_bound_inputs_control(workflow, cache, &bound_inputs, Some(context), control).await
+    }
+}

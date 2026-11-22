@@ -8,10 +8,14 @@ mod core;
 mod model;
 mod projection;
 
+pub use core::AdoptedNode;
+pub use core::CheckpointAdoption;
+pub use core::adopt_checkpoint;
 pub use core::complete;
 pub use core::initial_record;
 pub use core::mark_running;
 pub use core::mark_unknown;
+pub use core::node_receipt_identity;
 pub use core::request_cancellation;
 
 pub use admission::VersionedHandlerProfile;
@@ -24,6 +28,7 @@ pub use admission::validate_route;
 pub use application::ApplicationHandler;
 pub use application::load_profile;
 pub use application::serve;
+pub use authority::ReservationFence;
 pub use authority::RouteExactAuthorityProvider;
 pub use binding::SOURCE_PROVIDER_ENV;
 pub use binding::SOURCE_REPOSITORY_ENV;

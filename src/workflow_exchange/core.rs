@@ -27,6 +27,13 @@ use super::RetainedLog;
 use super::TransitionError;
 use super::WorkflowRoute;
 
+mod restore;
+
+pub use restore::AdoptedNode;
+pub use restore::CheckpointAdoption;
+pub use restore::adopt_checkpoint;
+pub use restore::node_receipt_identity;
+
 const EXECUTION_IDENTITY_DOMAIN: &[u8] = b"lattice.workflow-exchange-execution.v1";
 const ADAPTER_IDENTITY_DOMAIN: &[u8] = b"lattice.workflow-exchange-adapter.v1";
 const NODE_RECEIPT_IDENTITY_DOMAIN: &[u8] = b"lattice.workflow-exchange-node-receipt.v1";
@@ -220,14 +227,8 @@ fn terminalize_node(
     execution_identity: &Identity,
 ) -> Result<(), TransitionError> {
     node.state = state;
-    node.receipt_identity = if state == NodeState::Skipped {
-        None
-    } else {
-        Some(framed_identity(
-            NODE_RECEIPT_IDENTITY_DOMAIN,
-            &(execution_identity.as_str(), node.request_node_id.as_str(), node.workflow_node_id, state),
-        )?)
-    };
+    node.receipt_identity =
+        node_receipt_identity(execution_identity, &node.request_node_id, node.workflow_node_id, state)?;
     Ok(())
 }
 

@@ -1,0 +1,8 @@
+{
+  "refused-crossed-request-manifest.json": "crossed_request",
+  "refused-duplicate-node-manifest.json": "duplicate_node",
+  "refused-profile-manifest.json": "schema",
+  "refused-schema-manifest.json": "schema",
+  "refused-unknown-field-manifest.json": "schema",
+  "refused-workspace-path-manifest.json": "workspace_path"
+}

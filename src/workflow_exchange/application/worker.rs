@@ -25,6 +25,12 @@ pub(super) struct WorkerInput {
     pub workflow: crate::engine::workflow::Workflow,
     pub agent_runtime: crate::agent_node::RuntimeOptions,
     pub cancellation: Arc<AtomicBool>,
+    /// The route's checkpoint binding; `None` or a `none` profile keeps the hook absent.
+    pub checkpoint: Option<crate::checkpoint::CheckpointBinding>,
+    /// Carried incarnation, budget and completed nodes of an adopted checkpoint.
+    pub seed: crate::checkpoint::HookSeed,
+    /// Terminal steps of an adopted checkpoint; restored, never re-run.
+    pub restored: Vec<crate::engine::executor::StepResult>,
 }
 
 pub(super) fn run(input: WorkerInput) {
@@ -35,6 +41,9 @@ pub(super) fn run(input: WorkerInput) {
         workflow,
         agent_runtime,
         cancellation,
+        checkpoint,
+        seed,
+        restored,
     } = input;
     let Ok(running) = super::mark_running(&admitted) else {
         return;
@@ -42,32 +51,32 @@ pub(super) fn run(input: WorkerInput) {
     if store.save_workflow_exchange_transition(&admitted, &running).is_err() {
         return;
     }
-    let authority: Box<dyn crate::engine::effect::execution::RunContextProvider> = match authority_mode {
-        EffectAuthorityMode::Unavailable => Box::new(crate::engine::effect::execution::UnavailableRunContextSource),
-        EffectAuthorityMode::RouteExact => Box::new(super::RouteExactAuthorityProvider::new(
-            &running.handler_profile_identity,
-            &running.request.identity,
-            &running.workflow_revision,
-            crate::engine::RunId(running.run_id),
-        )),
+    // r[impl lattice.application_checkpoint.hook]
+    let Ok(hook) = crate::checkpoint::NodeBoundaryHook::for_route(&store, checkpoint.as_ref(), &running, seed) else {
+        return mark_unknown(&store, &running);
+    };
+    let Some(wiring) = wire_checkpoint(&running, &workflow, authority_mode, hook) else {
+        return mark_unknown(&store, &running);
     };
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build();
     let result = match runtime {
-        Ok(runtime) => {
-            runtime.block_on(crate::headless::run_workflow_snapshot_with_authority_provider_and_cancellation(
-                &store,
-                crate::headless::SnapshotRunRequest {
-                    workflow,
-                    run_id: crate::engine::RunId(running.run_id),
-                    owner: crate::store::RunOwner::Unscoped,
-                    agent_runtime,
-                    cancellation: Arc::clone(&cancellation),
-                },
-                authority.as_ref(),
-            ))
-        }
+        Ok(runtime) => runtime.block_on(
+            crate::headless::SnapshotRunRequest {
+                workflow,
+                run_id: crate::engine::RunId(running.run_id),
+                owner: crate::store::RunOwner::Unscoped,
+                agent_runtime,
+                cancellation: Arc::clone(&cancellation),
+            }
+            .run_from_checkpoint(&store, wiring.authority.as_ref(), restored, wiring.progress),
+        ),
         Err(_) => return mark_unknown(&store, &running),
     };
+    if let Some(observer) = wiring.observer
+        && observer.join().is_err()
+    {
+        tracing::warn!("application checkpoint observer stopped abnormally");
+    }
     let current = match store.load_workflow_exchange(&running.accepted.execution_identity) {
         Ok(Some(current)) => current,
         _ => return,
@@ -80,6 +89,49 @@ pub(super) fn run(input: WorkerInput) {
     if store.save_workflow_exchange_transition(&current, &next).is_err() {
         mark_unknown(&store, &current);
     }
+}
+
+/// The run's authority source and, for a checkpointed route, its hook's progress wiring.
+struct CheckpointWiring {
+    authority: Box<dyn crate::engine::effect::execution::RunContextProvider>,
+    progress: Option<crate::engine::executor::progress::Sender>,
+    observer: Option<std::thread::JoinHandle<()>>,
+}
+
+/// `None` when the route's checkpoint hook cannot be observed.
+fn wire_checkpoint(
+    running: &ExecutionRecord,
+    workflow: &crate::engine::workflow::Workflow,
+    authority_mode: EffectAuthorityMode,
+    hook: Option<Arc<crate::checkpoint::NodeBoundaryHook>>,
+) -> Option<CheckpointWiring> {
+    let (progress, observer) = match &hook {
+        Some(hook) => {
+            let (sender, receiver) = crate::engine::executor::progress::channel(workflow).ok()?;
+            (Some(sender), Some(hook.observe_progress(receiver).ok()?))
+        }
+        None => (None, None),
+    };
+    let authority: Box<dyn crate::engine::effect::execution::RunContextProvider> = match authority_mode {
+        EffectAuthorityMode::Unavailable => Box::new(crate::engine::effect::execution::UnavailableRunContextSource),
+        EffectAuthorityMode::RouteExact => {
+            let provider = super::RouteExactAuthorityProvider::new(
+                &running.handler_profile_identity,
+                &running.request.identity,
+                &running.workflow_revision,
+                crate::engine::RunId(running.run_id),
+            );
+            Box::new(match &hook {
+                Some(hook) => provider.with_reservation_fence(Arc::clone(hook) as Arc<dyn super::ReservationFence>),
+                None => provider,
+            })
+        }
+    };
+    Some(CheckpointWiring {
+        authority,
+        progress,
+        observer,
+    })
 }
 
 fn completion_facts(

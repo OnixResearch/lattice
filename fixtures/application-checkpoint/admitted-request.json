@@ -1,0 +1,9 @@
+{
+  "admission": "kiln-admission:test-1",
+  "binding": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "checkpoint": "b3:17cef9c35be8f5c6b87824ece95979f0f1e0d605324bf266af22a2cc5700e7d9",
+  "execution": "b3:13a01b4ff6b9074c9a58a746f896ee067cbfc5d9a0396dc4816bebec651d7d7f",
+  "request": "b3:6d07b498ca31d0f1543b991bee85c65c431305bb431f3b9edadd30c03eec7dd3",
+  "restarted_incarnation": 1,
+  "schema": "lattice.application-restart-request.v1"
+}

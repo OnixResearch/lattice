@@ -1,0 +1,54 @@
+{
+  "architecture": "x86_64",
+  "binding": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "cancellation_requested": false,
+  "completed_nodes": [
+    {
+      "adapter_identity": "b3:fd400addd2e5938592547262d4885bbbd1e0232b790d5a2404dc3334d4a0ef12",
+      "outputs_object": "b3:f1b3743cc5ded3917a0d533b3f49e64100b72cd7adbc40108ecd0285483c708a",
+      "receipt_identity": "b3:4aec967711f015be0a8b80139cb7d84a193eae81d5dac97599994bd49eea7af7",
+      "state": "completed",
+      "workflow_node_id": 1
+    }
+  ],
+  "consumed": {
+    "cost_micros": 40,
+    "elapsed_ms": 1000,
+    "model_requests": 3
+  },
+  "deadline_unix_ms": 4102444800000,
+  "execution": {
+    "accepted": {
+      "execution_identity": "b3:13a01b4ff6b9074c9a58a746f896ee067cbfc5d9a0396dc4816bebec651d7d7f",
+      "idempotency_key": "b3:2222222222222222222222222222222222222222222222222222222222222222",
+      "request_identity": "b3:6d07b498ca31d0f1543b991bee85c65c431305bb431f3b9edadd30c03eec7dd3",
+      "schema": "lattice.workflow-accepted.v1",
+      "workflow_identity": "b3:8888888888888888888888888888888888888888888888888888888888888888"
+    },
+    "handler_profile": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+    "request": "b3:6d07b498ca31d0f1543b991bee85c65c431305bb431f3b9edadd30c03eec7dd3",
+    "sequence": 0,
+    "workflow_revision": "b3:8888888888888888888888888888888888888888888888888888888888888888"
+  },
+  "producing_incarnation": 0,
+  "profile": "workflow-node-boundary-v1",
+  "runtime": {
+    "lattice_binary_blake3": "0000000000000000000000000000000000000000000000000000000000000001",
+    "lattice_revision": "lattice-test-runtime"
+  },
+  "schema": "lattice.application-checkpoint-manifest.v1",
+  "uncertain_nodes": [
+    {
+      "adapter_identity": "b3:2b1fd405347225d75b496e637230f627d4a7ed69076cea441596f0aa0adaed8c",
+      "last_state": "running",
+      "workflow_node_id": 2
+    }
+  ],
+  "workspace_objects": [
+    {
+      "blake3": "3ae7d805f6789a6402acb70ad4096a85a56bf6804eaf25c0493ac697548d30b5",
+      "bytes": 1,
+      "path": "../escape"
+    }
+  ]
+}
