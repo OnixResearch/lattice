@@ -177,10 +177,16 @@ pub fn reverify(bundle: &super::model::ValidatedBundle) -> Result<(), super::mod
     }
     super::params::validate_bound(declared, &resolved, &bundle.workflow)
         .map_err(|_| drift("bound workflow does not hold the resolved values"))?;
-    let mut reconciled = bundle.workflow.clone();
-    crate::authoring::reconcile_materialized(&mut reconciled)
+    // Reconciliation changes the association exactly when the workflow diverges from its recorded
+    // expansion and the association is not already a fork; anything else is a fixed point.
+    let diverges = crate::authoring::diverges_from_expansion(&bundle.workflow)
         .map_err(|_| drift("bound workflow source association is invalid"))?;
-    if reconciled.authoring != bundle.workflow.authoring {
+    let forked = bundle
+        .workflow
+        .authoring
+        .as_ref()
+        .is_some_and(|association| association.state == crate::authoring::AssociationState::MaterializedFork);
+    if diverges == Some(true) && !forked {
         return Err(drift("bound workflow source association differs"));
     }
     // A mode failure keeps `mode_violation`; every other admission failure is drift.

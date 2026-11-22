@@ -27,7 +27,7 @@ r[lattice.workflow_templates.params.scenario.declaration]
 r[lattice.workflow_templates.params.scenario.binding]
 - GIVEN a validated catalog template and accepted values
 - WHEN the template is bound
-- THEN the bound workflow MUST differ from the template only in the declared environment values, and each shell command MUST receive a value as one unchanged argument
+- THEN the bound workflow MUST differ from the template only in the declared environment values and, when those values change the expanded graph, in its source association's state, which becomes `MaterializedFork`; each shell command MUST receive a value as one unchanged argument
 - AND authority inspection of the bound workflow MUST list the same grants as the template under the bound workflow revision
 - AND save and start MUST refuse an unbound template
 - AND a bound bundle whose workflow, values, revision or mode differ from what `bind` admitted MUST be refused at save, activation planning and start before any store write or dispatch, with `mode_violation` for a mode failure and `bound_content_drift` for any other failure at every entry point, and bundle content MUST NOT be writable outside the crate
