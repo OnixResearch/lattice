@@ -66,6 +66,14 @@ already uses (OD-1), and exactly one process may run it. Every check and the wor
 precede the adoption commit, and the carry-forward check runs inside the transaction, so a
 refused or crashed restore never leaves a record that a retry would report as done.
 
+Adopted executions count against `maximum_active_executions`: the exchange starts at most that
+many, lowest run id first, and starts the rest from `refresh_workers` at the next exchange request
+after a slot frees (a worker cannot reach the handler, which the serve loop owns). Waiting ones
+observe as `queued`; one that was `running` when its process died observes as `unknown`. A
+possible later, Kiln-facing addition is a restore-time capacity refusal; it is not added now,
+because it would be a racy snapshot of the target and widen the restart contract, while queuing
+already enforces the bound.
+
 ### Decision: Uncertain nodes freeze the restored execution as `Unknown`
 
 **Choice:** If any node is uncertain after admission, the adopted record is `Unknown`, those

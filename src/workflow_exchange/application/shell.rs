@@ -91,6 +91,9 @@ impl ApplicationHandler {
                 self.mark_execution_unknown(&identity);
             }
         }
+        if self.resume_adopted().is_err() {
+            tracing::warn!("workflow exchange handler could not start waiting adopted executions");
+        }
     }
 
     fn mark_execution_unknown(&self, execution_identity: &str) {
@@ -214,10 +217,8 @@ impl ApplicationHandler {
             return Err(HandlerError::Rejected);
         }
         let execution_identity = accepted.execution_identity.as_str();
-        if !record.state.is_terminal()
-            && record.state != DurableExecutionState::Unknown
-            && !self.workers.contains_key(execution_identity)
-        {
+        let is_live = self.workers.contains_key(execution_identity) || self.is_waiting_adoption(&record);
+        if !record.state.is_terminal() && record.state != DurableExecutionState::Unknown && !is_live {
             let unknown = super::mark_unknown(&record).map_err(|_| HandlerError::Rejected)?;
             self.store
                 .save_workflow_exchange_transition(&record, &unknown)

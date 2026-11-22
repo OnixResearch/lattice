@@ -89,7 +89,10 @@ impl ApplicationHandler {
     }
 
     // r[impl lattice.application_checkpoint.resume]
-    /// Start every adopted execution that never started, publishing under this handler's binding.
+    /// Start adopted executions that never started, up to the active-execution limit and lowest
+    /// run id first, publishing under this handler's binding. The rest stay `Queued`;
+    /// `refresh_workers` calls this again at the start of every exchange request, so a waiting
+    /// adoption starts on the first request after a slot frees.
     ///
     /// The worker's `Queued` to `Running` transition is a compare-and-swap in the single-writer
     /// store, so exactly one process runs an adopted execution. An adoption that cannot be
@@ -98,36 +101,77 @@ impl ApplicationHandler {
         let Some(binding) = self.checkpoint.clone() else {
             return Ok(());
         };
+        let maximum_active =
+            usize::try_from(self.profile.maximum_active_executions()).map_err(|_| ApplicationError::Profile)?;
+        let capacity = maximum_active.saturating_sub(self.workers.len());
+        if capacity == 0 {
+            return Ok(());
+        }
+        let mut waiting = self.waiting_adoptions()?;
+        waiting.sort_by_key(|(record, _adoption)| record.run_id);
         let root = crate::checkpoint::CheckpointRoot::new(binding.root.clone());
-        for adoption in self.store.list_workflow_exchange_adoptions().map_err(|_| ApplicationError::Store)? {
-            let record = self.store.load_workflow_exchange(&adoption.execution).map_err(|_| ApplicationError::Store)?;
-            let Some(record) = record.filter(|record| record.state == DurableExecutionState::Queued) else {
-                continue;
-            };
-            let resumable = (record.handler_profile_identity == self.profile_identity)
-                .then(|| self.instantiated_route(&record.request))
-                .flatten()
-                .filter(|(route, _workflow, revision)| {
-                    binds_route(&binding, route) && *revision == record.workflow_revision
-                })
-                .zip(crate::checkpoint::adopted_steps(&root, &adoption).ok());
-            let Some(((route, workflow, _revision), restored)) = resumable else {
-                self.mark_execution_unknown(adoption.execution.as_str());
-                continue;
-            };
-            let start = WorkerStart {
-                seed: crate::checkpoint::HookSeed {
-                    incarnation: adoption.receipt.restarted_incarnation,
-                    consumed: adoption.consumed,
-                    cancellation_requested: adoption.cancellation_requested,
-                    completed: adoption.completed_nodes,
-                },
-                restored,
-                is_cancelled: record.cancellation_requested,
-            };
-            self.spawn_worker(record, route, workflow, start);
+        for (record, adoption) in waiting.into_iter().take(capacity) {
+            self.start_adoption(&binding, &root, record, adoption);
         }
         Ok(())
+    }
+
+    /// Adopted executions still `Queued` with no worker in this process.
+    fn waiting_adoptions(
+        &self,
+    ) -> Result<Vec<(super::ExecutionRecord, crate::checkpoint::AdoptionRecord)>, ApplicationError> {
+        let adoptions = self.store.list_workflow_exchange_adoptions().map_err(|_| ApplicationError::Store)?;
+        let records = adoptions
+            .into_iter()
+            .map(|adoption| {
+                let record =
+                    self.store.load_workflow_exchange(&adoption.execution).map_err(|_| ApplicationError::Store)?;
+                Ok(record.map(|record| (record, adoption)))
+            })
+            .collect::<Result<Vec<_>, ApplicationError>>()?;
+        Ok(records
+            .into_iter()
+            .flatten()
+            .filter(|(record, _adoption)| record.state == DurableExecutionState::Queued)
+            .filter(|(record, _adoption)| !self.workers.contains_key(record.accepted.execution_identity.as_str()))
+            .collect())
+    }
+
+    fn start_adoption(
+        &mut self,
+        binding: &crate::checkpoint::CheckpointBinding,
+        root: &crate::checkpoint::CheckpointRoot,
+        record: super::ExecutionRecord,
+        adoption: crate::checkpoint::AdoptionRecord,
+    ) {
+        let resumable = (record.handler_profile_identity == self.profile_identity)
+            .then(|| self.instantiated_route(&record.request))
+            .flatten()
+            .filter(|(route, _workflow, revision)| binds_route(binding, route) && *revision == record.workflow_revision)
+            .zip(crate::checkpoint::adopted_steps(root, &adoption).ok());
+        let Some(((route, workflow, _revision), restored)) = resumable else {
+            self.mark_execution_unknown(adoption.execution.as_str());
+            return;
+        };
+        let start = WorkerStart {
+            seed: crate::checkpoint::HookSeed {
+                incarnation: adoption.receipt.restarted_incarnation,
+                consumed: adoption.consumed,
+                cancellation_requested: adoption.cancellation_requested,
+                completed: adoption.completed_nodes,
+            },
+            restored,
+            is_cancelled: record.cancellation_requested,
+        };
+        self.spawn_worker(record, route, workflow, start);
+    }
+
+    /// A `Queued` adopted execution waiting for a slot: observed as `Queued`, never `Unknown`.
+    pub(super) fn is_waiting_adoption(&self, record: &super::ExecutionRecord) -> bool {
+        if self.checkpoint.is_none() || record.state != DurableExecutionState::Queued {
+            return false;
+        }
+        matches!(self.store.load_workflow_exchange_adoption(&record.accepted.execution_identity), Ok(Some(_)))
     }
 
     /// The route a request selects, with its saved workflow validated and instantiated.

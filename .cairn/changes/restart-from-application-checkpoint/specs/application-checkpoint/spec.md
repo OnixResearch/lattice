@@ -124,13 +124,19 @@ r[lattice.application_checkpoint.restore.scenario.workspace_conflict]
 
 ### Requirement: Restarted runs through the exchange
 
-r[lattice.application_checkpoint.resume] `lattice workflow-exchange serve` MUST accept a checkpoint binding, publish checkpoints for its route, and start every adopted execution that never started, observable and cancellable through the same listener and admission as a fresh dispatch. Exactly one process MUST run an adopted execution, and it MUST be started only when no node is uncertain.
+r[lattice.application_checkpoint.resume] `lattice workflow-exchange serve` MUST accept a checkpoint binding, publish checkpoints for its route, and start adopted executions that never started, observable and cancellable through the same listener and admission as a fresh dispatch. Adopted executions MUST count against `maximum_active_executions`: at most that many MUST run, lowest run id first, and the rest MUST stay and observe as `queued` until a slot frees. Exactly one process MUST run an adopted execution, it MUST be started only when no node is uncertain, and one that was running when its process died MUST become `Unknown`.
 
 #### Scenario: Observe and cancel a restored execution
 r[lattice.application_checkpoint.resume.scenario.cancel]
 - GIVEN an adopted execution whose remaining node is running on the target exchange
 - WHEN a client observes and cancels it over the exchange socket
 - THEN the observation MUST show it running, it MUST end `cancelled`, and a second process MUST NOT serve the same state root.
+
+#### Scenario: More adoptions than the active-execution limit
+r[lattice.application_checkpoint.resume.scenario.limit]
+- GIVEN one more adopted execution than the profile's `maximum_active_executions`
+- WHEN the target exchange serves them
+- THEN at most the limit MUST run, the extra one MUST observe as `queued`, and it MUST start and complete once a slot frees.
 
 ### Requirement: Restart receipt
 

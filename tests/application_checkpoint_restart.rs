@@ -70,6 +70,11 @@ fn contract_profile() -> CapabilityProfile {
 }
 
 fn workflow_request() -> WorkflowRequest {
+    keyed_request('2')
+}
+
+/// A request of the same route under its own idempotency key, so its execution is distinct.
+fn keyed_request(key: char) -> WorkflowRequest {
     let node = |id: &str, operation: char| WorkflowNode {
         id: label(id),
         kind: label("build"),
@@ -90,7 +95,7 @@ fn workflow_request() -> WorkflowRequest {
     let mut request = WorkflowRequest {
         schema: REQUEST_SCHEMA.to_string(),
         identity: identity('0'),
-        idempotency_key: identity('2'),
+        idempotency_key: identity(key),
         profile_identity: profile_identity(&contract_profile()),
         platform: label("linux-x86_64"),
         kiln: KilnLinkage {
@@ -120,10 +125,12 @@ fn workflow_request() -> WorkflowRequest {
 /// Each node drains its piped stdin, appends once to `effects/<name>` and then waits for
 /// `effects/release-<name>`. Draining first keeps a released node from exiting before the
 /// runtime has written its stdin, which bounded-exec reports as a broken pipe and so a failure.
+/// A gate also ends once `effects` is gone, so a node orphaned by a SIGKILLed exchange cannot
+/// outlive its test's temporary directory.
 fn gated(effects: &Path, name: &str) -> String {
     let effects = effects.display();
     format!(
-        "cat > /dev/null; printf {name} >> '{effects}/{name}'; while [ ! -e '{effects}/release-{name}' ]; do sleep 0.05; done; printf {name}"
+        "cat > /dev/null; printf {name} >> '{effects}/{name}'; while [ ! -e '{effects}/release-{name}' ] && [ -d '{effects}' ]; do sleep 0.05; done; printf {name}"
     )
 }
 
@@ -337,9 +344,13 @@ impl Exchange {
     }
 
     fn dispatch(&self) -> WorkflowAccepted {
+        self.dispatch_as(&workflow_request())
+    }
+
+    fn dispatch_as(&self, request: &WorkflowRequest) -> WorkflowAccepted {
         match self.call(ExchangeCommand::Dispatch {
             profile: contract_profile(),
-            request: workflow_request(),
+            request: request.clone(),
         }) {
             ExchangeSuccess::Accepted(accepted) => accepted,
             other => panic!("dispatch must be accepted: {other:?}"),
@@ -347,9 +358,13 @@ impl Exchange {
     }
 
     fn observe(&self, accepted: &WorkflowAccepted) -> ExecutionObservation {
+        self.observe_as(&workflow_request(), accepted)
+    }
+
+    fn observe_as(&self, request: &WorkflowRequest, accepted: &WorkflowAccepted) -> ExecutionObservation {
         match self.call(ExchangeCommand::Observe {
             profile: contract_profile(),
-            request: workflow_request(),
+            request: request.clone(),
             accepted: accepted.clone(),
         }) {
             ExchangeSuccess::Observation(observation) => observation,
@@ -379,9 +394,13 @@ impl Exchange {
     }
 
     fn wait_terminal(&self, accepted: &WorkflowAccepted) -> ExecutionObservation {
+        self.wait_terminal_as(&workflow_request(), accepted)
+    }
+
+    fn wait_terminal_as(&self, request: &WorkflowRequest, accepted: &WorkflowAccepted) -> ExecutionObservation {
         let started = Instant::now();
         loop {
-            let observation = self.observe(accepted);
+            let observation = self.observe_as(request, accepted);
             if observation.terminal {
                 return observation;
             }
@@ -638,6 +657,115 @@ fn restored_execution_is_observed_and_cancelled_through_the_exchange() {
     assert_eq!(count(&killed.effects, "a"), 1, "a is restored, not replayed");
     let (_, newest) = latest(&CheckpointRoot::new(&target_root.checkpoint));
     assert_eq!(newest.producing_incarnation, 1, "the served exchange publishes the restarted incarnation");
+}
+
+/// A source of `request` that drains before its first effect, killed and transferred: its
+/// manifest completes nothing and leaves nothing uncertain.
+fn drained_before_dispatch(
+    directory: &Path,
+    effects: &Path,
+    socket: &Path,
+    request: &WorkflowRequest,
+) -> (CheckpointRoot, WorkflowAccepted) {
+    let name = request.idempotency_key.as_str().trim_start_matches(BLAKE3_PREFIX)[..1].to_string();
+    let source = root(
+        &directory.join(format!("source-{name}")),
+        effects,
+        socket,
+        CheckpointProfile::WorkflowNodeBoundaryV1,
+    );
+    std::fs::create_dir_all(&source.checkpoint).expect("source checkpoint root");
+    std::fs::write(source.checkpoint.join("drain-request"), b"").expect("drain requested");
+    let exchange = Exchange::start(&source);
+    let accepted = exchange.dispatch_as(request);
+    wait_for("drain acknowledgement", || source.checkpoint.join("drained.json").exists());
+    exchange.kill();
+    let transfer = directory.join(format!("transfer-{name}"));
+    copy_tree(&source.checkpoint, &transfer);
+    std::fs::remove_dir_all(&source.directory).expect("source state root discarded");
+    (CheckpointRoot::new(transfer), accepted)
+}
+
+// r[verify lattice.application_checkpoint.resume]
+/// More adopted executions than the active-execution limit: the served exchange runs at most the
+/// limit, lowest run id first; the extra one observes as `queued` and starts on the first
+/// exchange request after a slot frees.
+#[test]
+fn adopted_executions_wait_for_the_active_execution_limit() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let effects = directory.path().join("effects");
+    std::fs::create_dir_all(&effects).expect("effects directory");
+    let socket = directory.path().join("exchange.sock");
+    let target_root =
+        root(&directory.path().join("target"), &effects, &socket, CheckpointProfile::WorkflowNodeBoundaryV1);
+    let limit = usize::try_from(target_root.profile.maximum_active_executions).expect("limit");
+    let executions = ['5', '8', '9']
+        .into_iter()
+        .take(limit + 1)
+        .map(|key| {
+            let request = keyed_request(key);
+            let (transfer, accepted) = drained_before_dispatch(directory.path(), &effects, &socket, &request);
+            let (checkpoint, manifest) = latest(&transfer);
+            let (ok, report) =
+                cli_restore(&target_root, &transfer, &restart_request(&checkpoint, &manifest, 1, ADMISSION));
+            assert!(ok, "restore succeeds: {report}");
+            assert_eq!(report["execution_state"], "queued");
+            (request, accepted)
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(executions.len(), limit + 1);
+
+    let exchange = Exchange::start(&target_root);
+    wait_for("the limit's executions to start node a", || count(&effects, "a") == limit);
+    // A bounded stability check: an execution past the limit must not start while the others
+    // hold their gates, however many exchange requests arrive.
+    for _ in 0..20 {
+        let states = executions
+            .iter()
+            .map(|(request, accepted)| exchange.observe_as(request, accepted).state)
+            .collect::<Vec<_>>();
+        assert_eq!(states, [vec![ExecutionState::Running; limit], vec![ExecutionState::Queued]].concat());
+        assert_eq!(count(&effects, "a"), limit, "no execution past the limit started");
+        std::thread::sleep(OBSERVE_POLL);
+    }
+    release(&effects, "a");
+    release(&effects, "b");
+    let (waiting_request, waiting_accepted) = executions.last().expect("the waiting execution");
+    let waiting = exchange.wait_terminal_as(waiting_request, waiting_accepted);
+    let others = executions
+        .iter()
+        .map(|(request, accepted)| exchange.wait_terminal_as(request, accepted).state)
+        .collect::<Vec<_>>();
+    exchange.kill();
+    assert_eq!(
+        waiting.state,
+        ExecutionState::Completed,
+        "{}",
+        run_diagnostics(&target_root, &waiting_accepted.execution_identity)
+    );
+    assert_eq!(others, vec![ExecutionState::Completed; limit + 1]);
+    assert_eq!((count(&effects, "a"), count(&effects, "b")), (limit + 1, limit + 1), "every execution ran once");
+}
+
+// r[verify lattice.application_checkpoint.resume]
+/// An adopted execution that was running when its exchange process died is `Unknown` to the
+/// next exchange process, which never runs it again.
+#[test]
+fn crashed_running_adoption_is_unknown_to_the_next_exchange() {
+    let (killed, checkpoint, manifest) = drained_after_a();
+    let target_root = target(&killed, "target", CheckpointProfile::WorkflowNodeBoundaryV1);
+    let request = restart_request(&checkpoint, &manifest, 1, ADMISSION);
+    let (success, report) = cli_restore(&target_root, &killed.transfer, &request);
+    assert!(success, "restore succeeds: {report}");
+    let exchange = Exchange::start(&target_root);
+    wait_for("node b to start on the target", || count(&killed.effects, "b") == 1);
+    assert_eq!(exchange.observe(&killed.accepted).state, ExecutionState::Running);
+    exchange.kill();
+    let restarted = Exchange::start(&target_root);
+    assert_eq!(restarted.observe(&killed.accepted).state, ExecutionState::Unknown);
+    restarted.kill();
+    release(&killed.effects, "b");
+    assert_eq!(count(&killed.effects, "b"), 1, "the restarted exchange never runs it again");
 }
 
 // r[verify lattice.application_checkpoint.cancellation]

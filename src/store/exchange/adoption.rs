@@ -1,9 +1,7 @@
 #![allow(
     unknown_lints,
     compound_condition,
-    non_trait_imports,
     path_segment_repetition,
-    unbounded_collection_growth,
     reason = "the adoption transaction keeps its occupancy check and four inserts in one explicit write"
 )]
 
@@ -12,8 +10,6 @@
 use redb::ReadableDatabase as _;
 use redb::ReadableTable as _;
 
-use super::store_db_error;
-use super::store_table_error;
 use crate::store::StoreError;
 
 /// Adopted application checkpoints, keyed by execution identity.
@@ -38,31 +34,33 @@ impl crate::store::Store {
             StoreError,
         >,
     ) -> Result<crate::checkpoint::AdoptionOutcome, StoreError> {
-        let transaction = self.db.begin_write().map_err(store_db_error)?;
+        let transaction = self.db.begin_write().map_err(super::store_db_error)?;
         let execution_identity = accepted.execution_identity.as_str();
         let prior = {
-            let adoptions = transaction.open_table(WORKFLOW_EXCHANGE_ADOPTIONS).map_err(store_table_error)?;
+            let adoptions = transaction.open_table(WORKFLOW_EXCHANGE_ADOPTIONS).map_err(super::store_table_error)?;
             adoptions
                 .get(execution_identity)
-                .map_err(store_db_error)?
+                .map_err(super::store_db_error)?
                 .map(|value| crate::store::deserialize::<crate::checkpoint::AdoptionRecord>(value.value()))
                 .transpose()?
         };
         if let Some(prior) = prior {
-            transaction.abort().map_err(store_db_error)?;
+            transaction.abort().map_err(super::store_db_error)?;
             return Ok(crate::checkpoint::AdoptionOutcome::Existing(prior));
         }
         let is_occupied = {
-            let executions =
-                transaction.open_table(crate::store::WORKFLOW_EXCHANGE_EXECUTIONS).map_err(store_table_error)?;
-            let request_index =
-                transaction.open_table(crate::store::WORKFLOW_EXCHANGE_REQUEST_INDEX).map_err(store_table_error)?;
+            let executions = transaction
+                .open_table(crate::store::WORKFLOW_EXCHANGE_EXECUTIONS)
+                .map_err(super::store_table_error)?;
+            let request_index = transaction
+                .open_table(crate::store::WORKFLOW_EXCHANGE_REQUEST_INDEX)
+                .map_err(super::store_table_error)?;
             let idempotency_index = transaction
                 .open_table(crate::store::WORKFLOW_EXCHANGE_IDEMPOTENCY_INDEX)
-                .map_err(store_table_error)?;
-            executions.get(execution_identity).map_err(store_db_error)?.is_some()
-                || request_index.get(accepted.request_identity.as_str()).map_err(store_db_error)?.is_some()
-                || idempotency_index.get(accepted.idempotency_key.as_str()).map_err(store_db_error)?.is_some()
+                .map_err(super::store_table_error)?;
+            executions.get(execution_identity).map_err(super::store_db_error)?.is_some()
+                || request_index.get(accepted.request_identity.as_str()).map_err(super::store_db_error)?.is_some()
+                || idempotency_index.get(accepted.idempotency_key.as_str()).map_err(super::store_db_error)?.is_some()
         };
         if is_occupied {
             return Err(StoreError::Conflict("checkpoint adoption target already holds this execution".to_string()));
@@ -75,22 +73,27 @@ impl crate::store::Store {
         let record_bytes = crate::store::serialize(&record)?;
         let adoption_bytes = crate::store::serialize(&adoption)?;
         {
-            let mut executions =
-                transaction.open_table(crate::store::WORKFLOW_EXCHANGE_EXECUTIONS).map_err(store_table_error)?;
-            executions.insert(execution_identity, record_bytes.as_slice()).map_err(store_db_error)?;
-            let mut request_index =
-                transaction.open_table(crate::store::WORKFLOW_EXCHANGE_REQUEST_INDEX).map_err(store_table_error)?;
-            request_index.insert(record.request.identity.as_str(), execution_identity).map_err(store_db_error)?;
+            let mut executions = transaction
+                .open_table(crate::store::WORKFLOW_EXCHANGE_EXECUTIONS)
+                .map_err(super::store_table_error)?;
+            executions.insert(execution_identity, record_bytes.as_slice()).map_err(super::store_db_error)?;
+            let mut request_index = transaction
+                .open_table(crate::store::WORKFLOW_EXCHANGE_REQUEST_INDEX)
+                .map_err(super::store_table_error)?;
+            request_index
+                .insert(record.request.identity.as_str(), execution_identity)
+                .map_err(super::store_db_error)?;
             let mut idempotency_index = transaction
                 .open_table(crate::store::WORKFLOW_EXCHANGE_IDEMPOTENCY_INDEX)
-                .map_err(store_table_error)?;
+                .map_err(super::store_table_error)?;
             idempotency_index
                 .insert(record.request.idempotency_key.as_str(), execution_identity)
-                .map_err(store_db_error)?;
-            let mut adoptions = transaction.open_table(WORKFLOW_EXCHANGE_ADOPTIONS).map_err(store_table_error)?;
-            adoptions.insert(execution_identity, adoption_bytes.as_slice()).map_err(store_db_error)?;
+                .map_err(super::store_db_error)?;
+            let mut adoptions =
+                transaction.open_table(WORKFLOW_EXCHANGE_ADOPTIONS).map_err(super::store_table_error)?;
+            adoptions.insert(execution_identity, adoption_bytes.as_slice()).map_err(super::store_db_error)?;
         }
-        transaction.commit().map_err(store_db_error)?;
+        transaction.commit().map_err(super::store_db_error)?;
         Ok(crate::checkpoint::AdoptionOutcome::Adopted {
             record: Box::new(record),
             adoption: Box::new(adoption),
@@ -101,32 +104,34 @@ impl crate::store::Store {
         &self,
         execution_identity: &lattice_workflow_contract::Identity,
     ) -> Result<Option<crate::checkpoint::AdoptionRecord>, StoreError> {
-        let transaction = self.db.begin_read().map_err(store_db_error)?;
+        let transaction = self.db.begin_read().map_err(super::store_db_error)?;
         let adoptions = match transaction.open_table(WORKFLOW_EXCHANGE_ADOPTIONS) {
             Ok(table) => table,
             Err(redb::TableError::TableDoesNotExist(_)) => return Ok(None),
-            Err(error) => return Err(store_table_error(error)),
+            Err(error) => return Err(super::store_table_error(error)),
         };
         adoptions
             .get(execution_identity.as_str())
-            .map_err(store_db_error)?
+            .map_err(super::store_db_error)?
             .map(|value| crate::store::deserialize(value.value()))
             .transpose()
     }
 
     /// Every adoption in this store, in execution-identity order.
     pub fn list_workflow_exchange_adoptions(&self) -> Result<Vec<crate::checkpoint::AdoptionRecord>, StoreError> {
-        let transaction = self.db.begin_read().map_err(store_db_error)?;
+        let transaction = self.db.begin_read().map_err(super::store_db_error)?;
         let adoptions = match transaction.open_table(WORKFLOW_EXCHANGE_ADOPTIONS) {
             Ok(table) => table,
             Err(redb::TableError::TableDoesNotExist(_)) => return Ok(Vec::new()),
-            Err(error) => return Err(store_table_error(error)),
+            Err(error) => return Err(super::store_table_error(error)),
         };
-        let mut records = Vec::new();
-        for entry in adoptions.iter().map_err(store_db_error)? {
-            let (_execution, value) = entry.map_err(store_db_error)?;
-            records.push(crate::store::deserialize(value.value())?);
-        }
-        Ok(records)
+        adoptions
+            .iter()
+            .map_err(super::store_db_error)?
+            .map(|entry| {
+                let (_execution, value) = entry.map_err(super::store_db_error)?;
+                crate::store::deserialize(value.value())
+            })
+            .collect()
     }
 }

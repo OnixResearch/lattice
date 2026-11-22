@@ -94,6 +94,12 @@ start is a compare-and-swap from `queued` to `running` in the single-writer stor
 process runs an adopted execution; a second process cannot open the store. `restore` must run
 before the target's exchange starts.
 
+Adopted executions count against the profile's `maximum_active_executions` like fresh ones.
+`serve` starts at most that many, lowest run id first; the rest stay `queued`, observe as
+`queued` (never `unknown`), and start on the first exchange request after a slot frees, before
+any fresh dispatch is considered. An adopted execution that was `running` when its exchange
+process died observes as `unknown` and never runs again.
+
 The restart request is `lattice.application-restart-request.v1`:
 `{ schema, checkpoint, admission, restarted_incarnation, request, execution, binding?,
 cancellation_requested }`. `admission` is Kiln's opaque `KilnAdmissionRef`; Lattice never mints
