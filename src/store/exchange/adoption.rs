@@ -10,8 +10,6 @@
 use redb::ReadableDatabase as _;
 use redb::ReadableTable as _;
 
-use crate::store::StoreError;
-
 /// Adopted application checkpoints, keyed by execution identity.
 const WORKFLOW_EXCHANGE_ADOPTIONS: redb::TableDefinition<&str, &[u8]> =
     redb::TableDefinition::new("workflow_exchange_adoptions_v1");
@@ -31,9 +29,9 @@ impl crate::store::Store {
             u64,
         ) -> Result<
             (crate::workflow_exchange::ExecutionRecord, crate::checkpoint::AdoptionRecord),
-            StoreError,
+            crate::store::StoreError,
         >,
-    ) -> Result<crate::checkpoint::AdoptionOutcome, StoreError> {
+    ) -> Result<crate::checkpoint::AdoptionOutcome, crate::store::StoreError> {
         let transaction = self.db.begin_write().map_err(super::store_db_error)?;
         let execution_identity = accepted.execution_identity.as_str();
         let prior = {
@@ -63,12 +61,16 @@ impl crate::store::Store {
                 || idempotency_index.get(accepted.idempotency_key.as_str()).map_err(super::store_db_error)?.is_some()
         };
         if is_occupied {
-            return Err(StoreError::Conflict("checkpoint adoption target already holds this execution".to_string()));
+            return Err(crate::store::StoreError::Conflict(
+                "checkpoint adoption target already holds this execution".to_string(),
+            ));
         }
         let run_id = crate::store::reserve_run_id(&transaction)?;
         let (record, adoption) = build(run_id.0)?;
         if record.accepted != *accepted || adoption.execution != accepted.execution_identity {
-            return Err(StoreError::Conflict("checkpoint adoption changed the adopted execution identity".to_string()));
+            return Err(crate::store::StoreError::Conflict(
+                "checkpoint adoption changed the adopted execution identity".to_string(),
+            ));
         }
         let record_bytes = crate::store::serialize(&record)?;
         let adoption_bytes = crate::store::serialize(&adoption)?;
@@ -103,7 +105,7 @@ impl crate::store::Store {
     pub fn load_workflow_exchange_adoption(
         &self,
         execution_identity: &lattice_workflow_contract::Identity,
-    ) -> Result<Option<crate::checkpoint::AdoptionRecord>, StoreError> {
+    ) -> Result<Option<crate::checkpoint::AdoptionRecord>, crate::store::StoreError> {
         let transaction = self.db.begin_read().map_err(super::store_db_error)?;
         let adoptions = match transaction.open_table(WORKFLOW_EXCHANGE_ADOPTIONS) {
             Ok(table) => table,
@@ -118,7 +120,9 @@ impl crate::store::Store {
     }
 
     /// Every adoption in this store, in execution-identity order.
-    pub fn list_workflow_exchange_adoptions(&self) -> Result<Vec<crate::checkpoint::AdoptionRecord>, StoreError> {
+    pub fn list_workflow_exchange_adoptions(
+        &self,
+    ) -> Result<Vec<crate::checkpoint::AdoptionRecord>, crate::store::StoreError> {
         let transaction = self.db.begin_read().map_err(super::store_db_error)?;
         let adoptions = match transaction.open_table(WORKFLOW_EXCHANGE_ADOPTIONS) {
             Ok(table) => table,

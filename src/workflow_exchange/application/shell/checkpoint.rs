@@ -103,14 +103,14 @@ impl ApplicationHandler {
         };
         let maximum_active =
             usize::try_from(self.profile.maximum_active_executions()).map_err(|_| ApplicationError::Profile)?;
-        let capacity = maximum_active.saturating_sub(self.workers.len());
-        if capacity == 0 {
+        let free_slot_count = maximum_active.saturating_sub(self.workers.len());
+        if free_slot_count == 0 {
             return Ok(());
         }
         let mut waiting = self.waiting_adoptions()?;
         waiting.sort_by_key(|(record, _adoption)| record.run_id);
         let root = crate::checkpoint::CheckpointRoot::new(binding.root.clone());
-        for (record, adoption) in waiting.into_iter().take(capacity) {
+        for (record, adoption) in waiting.into_iter().take(free_slot_count) {
             self.start_adoption(&binding, &root, record, adoption);
         }
         Ok(())
