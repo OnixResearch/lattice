@@ -82,23 +82,55 @@ r[lattice.application_checkpoint.workspace.scenario.unsafe]
 
 ### Requirement: Carry-forward
 
-r[lattice.application_checkpoint.carry_forward] Restore MUST carry consumed budget, deadline and cancellation forward unchanged, MUST take the maximum budget and any cancellation across sibling manifests of the same execution, and MUST treat nodes that siblings show as started as uncertain. An independent check MUST refuse an adoption that drops any of them.
+r[lattice.application_checkpoint.carry_forward] Restore MUST carry the measured elapsed budget, deadline and cancellation forward unchanged, MUST take the maximum elapsed budget and any cancellation across sibling manifests of the same execution, and MUST treat nodes that siblings show as started as uncertain. The target binding MUST reproduce the checkpoint's deadline and attempt binding. An independent check MUST refuse an adoption that drops any of them. Model requests and cost are not measured at node boundaries; the manifest MUST NOT record them, and the host's per-binding budget ledger enforces them across a restart.
 
 #### Scenario: Older checkpoint
 r[lattice.application_checkpoint.carry_forward.scenario.older]
 - GIVEN a root with a newer committed manifest than the one restored
 - WHEN the older manifest is restored
-- THEN budget MUST be at least the newer one, nodes the newer one started MUST be `Unknown`, and nothing MUST be replayed.
+- THEN the elapsed budget MUST be at least the newer one, nodes the newer one started MUST be `Unknown`, and nothing MUST be replayed.
+
+#### Scenario: Moved deadline or attempt binding
+r[lattice.application_checkpoint.carry_forward.scenario.binding]
+- GIVEN a target binding whose deadline or attempt binding differs from the checkpoint's
+- WHEN the checkpoint is restored
+- THEN restore MUST refuse with `carry_forward` or `crossed_binding` and adopt nothing.
+
+### Requirement: Kiln's cancel decision
+
+r[lattice.application_checkpoint.cancellation] The restart request MUST carry Kiln's cancel decision as a required `cancellation_requested`. Admission MUST OR it with the cancellation of the manifest and its siblings; when the result is set, the adopted record MUST start cancelled and the restarted run MUST dispatch no new effect.
+
+#### Scenario: Cancel acknowledged after a drain
+r[lattice.application_checkpoint.cancellation.scenario.after_drain]
+- GIVEN a drained, uncancelled manifest and a restart request with `cancellation_requested: true`
+- WHEN the checkpoint is restored and the target exchange serves it
+- THEN the execution MUST end `cancelled` and no further effect MUST run.
 
 ### Requirement: Restore into a fresh store
 
-r[lattice.application_checkpoint.restore] Restore MUST adopt into a store holding no trace of the execution, keep the producer's acceptance and execution identity, reproduce every adapter and receipt identity on the target route, restore completed nodes through `Session::new_with_checkpoint` without re-running them, and continue only when no node is uncertain.
+r[lattice.application_checkpoint.restore] Restore MUST adopt into a store holding no trace of the execution, keep the producer's acceptance and execution identity, reproduce every adapter and receipt identity on the target route, and restore completed nodes through `Session::new_with_checkpoint` without re-running them. Every check and the workspace write MUST precede the adoption commit, and the carry-forward check MUST run inside the adoption transaction, so a refused restore adopts nothing and a committed adoption is complete. Restore MUST NOT run the execution.
 
 #### Scenario: Restart after source loss
 r[lattice.application_checkpoint.restore.scenario.source_loss]
 - GIVEN a drained source process killed with SIGKILL and its state root discarded
 - WHEN the transferred checkpoint is restored on a second state root
 - THEN completed nodes MUST NOT run again, the remaining nodes MUST run once, and the execution identity MUST be unchanged.
+
+#### Scenario: Conflicting target workspace
+r[lattice.application_checkpoint.restore.scenario.workspace_conflict]
+- GIVEN a target workspace holding different content at a checkpointed path
+- WHEN the checkpoint is restored, and again
+- THEN every attempt MUST refuse with `workspace_path`, adopt nothing and leave the workspace unchanged.
+
+### Requirement: Restarted runs through the exchange
+
+r[lattice.application_checkpoint.resume] `lattice workflow-exchange serve` MUST accept a checkpoint binding, publish checkpoints for its route, and start every adopted execution that never started, observable and cancellable through the same listener and admission as a fresh dispatch. Exactly one process MUST run an adopted execution, and it MUST be started only when no node is uncertain.
+
+#### Scenario: Observe and cancel a restored execution
+r[lattice.application_checkpoint.resume.scenario.cancel]
+- GIVEN an adopted execution whose remaining node is running on the target exchange
+- WHEN a client observes and cancels it over the exchange socket
+- THEN the observation MUST show it running, it MUST end `cancelled`, and a second process MUST NOT serve the same state root.
 
 ### Requirement: Restart receipt
 

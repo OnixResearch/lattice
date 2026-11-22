@@ -27,11 +27,44 @@ nonblocking observation contract.
 
 **Choice:** Admission unions the other committed manifests of the same execution in the root:
 nodes they show as completed or uncertain, but which the restored manifest does not complete,
-become uncertain; `consumed` is the component-wise maximum; cancellation is OR-ed; a different
+become uncertain; `consumed.elapsed_ms` is the maximum; cancellation is OR-ed; a different
 deadline or binding is refused.
 
-**Rationale:** Kiln may admit an older checkpoint. Restoring it must not reset budget, deadline
-or cancellation (#12) and must not replay what a later manifest shows started.
+**Rationale:** Kiln may admit an older checkpoint. Restoring it must not reset the elapsed
+budget, deadline or cancellation (#12) and must not replay what a later manifest shows started.
+
+### Decision: Only the elapsed budget travels in the manifest
+
+**Choice:** `consumed` carries `elapsed_ms` only. Model requests and cost are not measured at
+node boundaries, so the manifest does not record them (a deviation from the C8 field list).
+
+**Rationale:** A zero for an unmeasured quantity would read as "nothing consumed". For a
+VM-bound attempt the host's per-binding C3 budget ledger counts model requests and cost and
+enforces them across a restart; the checkpoint claims only what it measures.
+
+### Decision: Kiln's cancel decision travels in the restart request
+
+**Choice:** `lattice.application-restart-request.v1` carries a required
+`cancellation_requested`, OR-ed at admission with the manifest's and siblings' flags. When set,
+the adopted record starts cancelled and the restarted run dispatches no new effect.
+
+**Rationale:** After a drain publishes a quiescent manifest, or while the source sits in a long
+effect-free node, a Cancel lives only in the source store. Kiln owns the cancel decision and is
+the only restorer, so it supplies it at restart; the manifest flag still records cancels observed
+before publication.
+
+### Decision: Restore adopts; the served exchange runs
+
+**Choice:** `lattice application-checkpoint restore` only adopts (record, adoption and workspace)
+and prints the receipt. `lattice workflow-exchange serve --checkpoint-binding` publishes
+checkpoints for its route and, at startup, starts every adopted execution still `queued`, behind
+the same listener and admission as fresh dispatches. The start is the worker's compare-and-swap
+`queued` → `running` in the single-writer store.
+
+**Rationale:** A restored run must be observable and cancellable through the exchange Kiln
+already uses (OD-1), and exactly one process may run it. Every check and the workspace write
+precede the adoption commit, and the carry-forward check runs inside the transaction, so a
+refused or crashed restore never leaves a record that a retry would report as done.
 
 ### Decision: Uncertain nodes freeze the restored execution as `Unknown`
 
@@ -53,7 +86,12 @@ Kiln's `DrainDisposition::Checkpointed` and needs no wire-schema change (D6).
 
 ### Decision: Runtime match by source revision; portable profiles admit separate builds
 
-**Choice:** `runtime.lattice_revision` is the executor/restore source digest. A portable profile
+**Choice:** `runtime.lattice_revision` is
+`lattice-<version>-runtime-<LATTICE_RUNTIME_IMPLEMENTATION_BLAKE3>-checkpoint-<LATTICE_CHECKPOINT_IMPLEMENTATION_BLAKE3>`.
+The checkpoint digest is a build-time, length-framed BLAKE3 over path and bytes, in sorted path
+order, of `Cargo.lock`, every file under `src/checkpoint/` and `src/workflow_exchange/`,
+`src/engine/executor/choice.rs`, `src/headless/shell/checkpoint.rs`,
+`src/headless/shell/record.rs` and `src/workflow/gate/shell/checkpoint.rs`. A portable profile
 admits any binary of that revision on any architecture; a non-portable profile would also need
 the same architecture and identical binary.
 
@@ -64,8 +102,10 @@ profile carries only JSON outcomes and workspace bytes.
 
 **Choice:** `lattice.application-checkpoint-binding.v1` names one route by graph identity and
 workflow revision, the opaque C1 identity, its declared checkpoint, the checkpoint root, optional
-workspace, C2 binding identity, environment and deadline. It is supplied to the handler with
-`with_application_checkpoint`.
+workspace, C2 binding identity, environment and deadline. It is supplied with
+`with_application_checkpoint`, through the command as `workflow-exchange serve
+--checkpoint-binding` and `application-checkpoint restore --binding`. The target binding must
+reproduce the checkpoint's deadline and C2 binding.
 
 **Rationale:** The handler profile v1 must stay byte- and identity-compatible, and the plan does
 not define how a route references C1. Keeping the binding separate avoids changing any existing
