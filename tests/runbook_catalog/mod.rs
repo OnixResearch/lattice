@@ -64,9 +64,35 @@ pub fn git(directory: &Path, arguments: &[&str]) -> String {
 
 /// Commit the seed catalog tree into a new local repository and return it with the commit.
 pub fn catalog_repository(root: &Path) -> (PathBuf, String) {
+    catalog_repository_with(root, &Repository::default())
+}
+
+/// Options for a fixture catalog repository.
+#[derive(Default)]
+pub struct Repository<'options> {
+    /// `sha256` for a SHA-256 repository; SHA-1 otherwise.
+    pub object_format: Option<&'options str>,
+    /// Let `upload-pack` honor `--filter`, as hosted servers do.
+    pub allow_filter: bool,
+    /// Extra committed files: repository-relative path and byte length of incompressible bytes.
+    pub large_files: &'options [(&'options str, usize)],
+}
+
+pub fn catalog_repository_with(root: &Path, options: &Repository<'_>) -> (PathBuf, String) {
     let repository = root.join("catalog-repository");
     copy_tree(&seed_catalog(), &repository);
-    git(&repository, &["init", "--quiet"]);
+    let format = format!("--object-format={}", options.object_format.unwrap_or("sha1"));
+    git(&repository, &["init", "--quiet", &format]);
+    if options.allow_filter {
+        git(&repository, &["config", "uploadpack.allowFilter", "true"]);
+    }
+    for (path, length) in options.large_files {
+        let target = repository.join(path);
+        std::fs::create_dir_all(target.parent().expect("large file parent")).expect("large file directory");
+        let mut bytes = vec![0u8; *length];
+        blake3::Hasher::new().update(path.as_bytes()).finalize_xof().fill(&mut bytes);
+        std::fs::write(&target, bytes).expect("large file");
+    }
     git(&repository, &["add", "--all"]);
     git(&repository, &["commit", "--quiet", "--message", "Publish the seed runbook catalog"]);
     let commit = git(&repository, &["rev-parse", "HEAD"]);

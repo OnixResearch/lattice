@@ -1,4 +1,10 @@
 //! Create-only, per-bundle atomic placement of admitted pack bundles into a local catalog.
+//!
+//! Every declared bundle's bytes are read and verified against the pack declaration into memory
+//! before anything is staged, so any drift refuses the whole pack. The captured bytes are written
+//! into one private, pinned staging directory, verified there by the workflow-template loader,
+//! and each admitted bundle is renamed into the catalog through directory handles only while its
+//! id is absent and the catalog stays within the loader's bundle limit.
 #![allow(
     unknown_lints,
     assertion_density,
@@ -9,72 +15,136 @@ use std::io::Write as _;
 
 const STAGING_PREFIX: &str = ".lattice-catalog-";
 const STAGING_SUFFIX: &str = ".staging";
-/// Any entry at `<catalog>/<id>`, including a symlink or an unreadable one, blocks that bundle.
-pub(super) fn existing_ids(
-    catalog: &std::path::Path,
-    manifest: &super::super::super::model::Manifest,
-) -> std::collections::BTreeSet<String> {
-    manifest
+const STAGING_IDENTITY_CHARACTERS: usize = 16;
+const PLACEMENT_CODE: &str = "installation";
+const CURRENT_DIRECTORY: &str = ".";
+
+/// Verified bytes of every declared bundle: bundle id to `(bundle-relative path, bytes)`.
+pub(super) type Captured = std::collections::BTreeMap<String, Vec<(String, Vec<u8>)>>;
+
+/// Read every declared bundle file and verify it against the pack declaration.
+///
+/// Returns the captured bytes and the ids of every bundle whose bytes could not be read or no
+/// longer match; a non-empty drift list must refuse the whole pack.
+pub(super) fn capture(request: &super::InstallRequest<'_>) -> (Captured, Vec<String>) {
+    let candidate = &request.admitted.candidate;
+    let read = candidate
+        .manifest
         .workflow_bundles
         .iter()
-        .filter(|declaration| is_occupied(&catalog.join(&declaration.id)))
+        .map(|declaration| {
+            let contents = super::super::super::catalog::bundle_contents(&candidate.manifest, &declaration.id);
+            let files = contents
+                .iter()
+                .map(|(relative, content)| {
+                    super::super::read_content(request.pack_root, candidate, &content.id)
+                        .map(|bytes| ((*relative).to_string(), bytes))
+                })
+                .collect::<Result<Vec<_>, _>>();
+            (declaration.id.clone(), files)
+        })
+        .collect::<Vec<_>>();
+    let drifted = read.iter().filter(|(_, files)| files.is_err()).map(|(id, _)| id.clone()).collect();
+    let captured = read.into_iter().filter_map(|(id, files)| files.ok().map(|files| (id, files))).collect();
+    (captured, drifted)
+}
+
+/// Decide every bundle against one loader result and the catalog's current entries.
+pub(super) fn decide_against(
+    manifest: &super::super::super::model::Manifest,
+    loaded: &crate::workflow_template::Catalog,
+    catalog: &cap_std::fs::Dir,
+) -> Result<Vec<super::super::super::catalog::decision::BundleOutcome>, super::super::super::Error> {
+    let (observed, diagnostics) = super::super::super::catalog::decision::observe(loaded);
+    let existing = manifest
+        .workflow_bundles
+        .iter()
+        .filter(|declaration| is_occupied(catalog, &declaration.id))
         .map(|declaration| declaration.id.clone())
-        .collect()
+        .collect();
+    let facts = super::super::super::catalog::decision::Facts {
+        observed: &observed,
+        diagnostics: &diagnostics,
+        existing: &existing,
+        free_slots: super::super::super::catalog::decision::free_slots(directory_count(catalog)?),
+    };
+    Ok(super::super::super::catalog::decision::decide(manifest, &facts))
 }
 
-pub(super) fn is_occupied(path: &std::path::Path) -> bool {
-    !matches!(std::fs::symlink_metadata(path), Err(error) if error.kind() == std::io::ErrorKind::NotFound)
-}
-
-/// Stage, re-verify and rename one admitted bundle; the staging directory is always removed.
-pub(super) fn publish_bundle(
+/// Stage the captured bundles privately, verify them, and publish each admitted one.
+pub(super) fn publish(
     request: &super::InstallRequest<'_>,
     parent: &std::path::Path,
-    bundle_id: &str,
-) -> Result<(), super::super::super::Error> {
-    super::super::super::catalog::validate_bundle_id(bundle_id)?;
-    let staging = parent.join(format!("{STAGING_PREFIX}{bundle_id}{STAGING_SUFFIX}"));
-    std::fs::create_dir(&staging).map_err(|_| super::super::super::Error::Conflict("catalog staging exists"))?;
-    let result = stage_and_publish(request, &staging, bundle_id);
-    let cleanup = super::super::installation::remove_staging(&staging);
-    result?;
+    catalog: &cap_std::fs::Dir,
+    captured: &Captured,
+) -> Result<Vec<super::super::super::catalog::decision::BundleOutcome>, super::super::super::Error> {
+    let identity = request.admitted.candidate.pack_identity.trim_start_matches("b3:");
+    let short_identity = identity.get(..STAGING_IDENTITY_CHARACTERS).unwrap_or(identity);
+    let staging = super::pinned::Staging::create(parent, &format!("{STAGING_PREFIX}{short_identity}{STAGING_SUFFIX}"))?;
+    let result = stage_and_publish(request, &staging, catalog, captured);
+    let cleanup = staging.remove();
+    let outcomes = result?;
     cleanup?;
-    super::super::installation::sync_directory(parent)
+    Ok(outcomes)
 }
 
 fn stage_and_publish(
     request: &super::InstallRequest<'_>,
-    staging: &std::path::Path,
-    bundle_id: &str,
-) -> Result<(), super::super::super::Error> {
-    let root = cap_std::fs::Dir::open_ambient_dir(staging, cap_std::ambient_authority())
-        .map_err(|_| super::super::super::Error::Io("catalog staging authority"))?;
-    root.create_dir(bundle_id).map_err(|_| super::super::super::Error::Io("catalog staging create"))?;
-    let bundle = root.open_dir(bundle_id).map_err(|_| super::super::super::Error::Io("catalog staging open"))?;
-    write_bundle(request, &bundle, bundle_id)?;
-    verify_staged(request, staging, bundle_id)?;
-    let target = request.catalog.join(bundle_id);
-    if is_occupied(&target) {
-        return Err(super::super::super::Error::Conflict("catalog already holds this bundle id"));
+    staging: &super::pinned::Staging,
+    catalog: &cap_std::fs::Dir,
+    captured: &Captured,
+) -> Result<Vec<super::super::super::catalog::decision::BundleOutcome>, super::super::super::Error> {
+    for (bundle_id, files) in captured {
+        super::super::super::catalog::validate_bundle_id(bundle_id)?;
+        write_bundle(staging.dir(), bundle_id, files)?;
     }
-    std::fs::rename(staging.join(bundle_id), &target)
-        .map_err(|_| super::super::super::Error::Io("catalog bundle publish"))?;
-    super::super::installation::sync_directory(request.catalog)
+    let inodes = captured
+        .keys()
+        .map(|bundle_id| Ok((bundle_id.as_str(), staging.entry_inode(bundle_id)?)))
+        .collect::<Result<std::collections::BTreeMap<_, _>, super::super::super::Error>>()?;
+    staging.ensure_pinned()?;
+    let loaded = crate::workflow_template::load_catalog(staging.path())
+        .map_err(|_| super::super::super::Error::Io("catalog staging read"))?;
+    staging.ensure_pinned()?;
+    let mut outcomes = decide_against(&request.admitted.candidate.manifest, &loaded, catalog)?;
+    for outcome in &mut outcomes {
+        if outcome.status != super::super::super::catalog::decision::Status::Admitted {
+            continue;
+        }
+        if super::super::super::catalog::decision::free_slots(directory_count(catalog)?) == 0 {
+            super::super::super::catalog::decision::reject_for_capacity(outcome);
+            continue;
+        }
+        let inode = *inodes.get(outcome.id.as_str()).ok_or(super::super::super::Error::Invalid("staged bundle"))?;
+        let target = super::pinned::Target {
+            dir: catalog,
+            name: &outcome.id,
+        };
+        match staging.publish(&outcome.id, inode, target) {
+            Ok(()) => outcome.status = super::super::super::catalog::decision::Status::Installed,
+            Err(error) => {
+                outcome.status = super::super::super::catalog::decision::Status::Rejected;
+                outcome.code = Some(PLACEMENT_CODE.to_string());
+                outcome.reason = Some(error.to_string());
+            }
+        }
+    }
+    Ok(outcomes)
 }
 
-/// Write each bundle file create-only beneath the staged bundle directory, then sync every
-/// directory.
+/// Write one captured bundle create-only beneath the staging handle, then sync every directory.
 fn write_bundle(
-    request: &super::InstallRequest<'_>,
-    bundle: &cap_std::fs::Dir,
+    staging: &cap_std::fs::Dir,
     bundle_id: &str,
+    files: &[(String, Vec<u8>)],
 ) -> Result<(), super::super::super::Error> {
-    let candidate = &request.admitted.candidate;
-    let contents = super::super::super::catalog::bundle_contents(&candidate.manifest, bundle_id);
+    staging
+        .create_dir(bundle_id)
+        .map_err(|_| super::super::super::Error::Io("catalog staging create"))?;
+    let bundle = staging.open_dir(bundle_id).map_err(|_| super::super::super::Error::Io("catalog staging open"))?;
     let mut directories = std::collections::BTreeSet::new();
-    directories.insert(std::path::PathBuf::from("."));
-    for (relative, content) in contents {
-        let bytes = super::super::read_content(request.pack_root, candidate, &content.id)?;
+    directories.insert(std::path::PathBuf::from(CURRENT_DIRECTORY));
+    for (relative, bytes) in files {
         let relative_path = std::path::Path::new(relative);
         if let Some(directory) = relative_path.parent().filter(|directory| !directory.as_os_str().is_empty()) {
             bundle
@@ -92,7 +162,7 @@ fn write_bundle(
         let mut file = bundle
             .open_with(relative_path, &options)
             .map_err(|_| super::super::super::Error::Conflict("catalog bundle file exists"))?;
-        file.write_all(&bytes).map_err(|_| super::super::super::Error::Io("catalog bundle file write"))?;
+        file.write_all(bytes).map_err(|_| super::super::super::Error::Io("catalog bundle file write"))?;
         file.sync_all().map_err(|_| super::super::super::Error::Io("catalog bundle file sync"))?;
     }
     for directory in directories.iter().rev() {
@@ -101,32 +171,26 @@ fn write_bundle(
             .and_then(|opened| opened.sync_all())
             .map_err(|_| super::super::super::Error::Io("catalog bundle directory sync"))?;
     }
-    Ok(())
+    super::pinned::sync(staging)
 }
 
-/// Re-run the workflow-template loader over the staged bytes and re-apply the pack decision.
-fn verify_staged(
-    request: &super::InstallRequest<'_>,
-    staging: &std::path::Path,
-    bundle_id: &str,
-) -> Result<(), super::super::super::Error> {
-    let staged = crate::workflow_template::load_catalog(staging)
-        .map_err(|_| super::super::super::Error::Io("catalog staging read"))?;
-    let (observed, diagnostics) = super::super::super::catalog::decision::observe(&staged);
-    let none = std::collections::BTreeSet::new();
-    let outcomes = super::super::super::catalog::decision::decide(
-        &request.admitted.candidate.manifest,
-        &super::super::super::catalog::decision::Facts {
-            observed: &observed,
-            diagnostics: &diagnostics,
-            existing: &none,
-        },
-    );
-    let is_verified = outcomes.iter().any(|outcome| {
-        outcome.id == bundle_id && outcome.status == super::super::super::catalog::decision::Status::Admitted
-    });
-    if !is_verified {
-        return Err(super::super::super::Error::Invalid("staged bundle failed verification"));
+/// Any entry at `<catalog>/<id>`, including a symlink or an unreadable one, blocks that bundle.
+fn is_occupied(catalog: &cap_std::fs::Dir, bundle_id: &str) -> bool {
+    !matches!(catalog.symlink_metadata(bundle_id), Err(error) if error.kind() == std::io::ErrorKind::NotFound)
+}
+
+/// Directories the workflow-template loader would count, stopping just past its limit.
+fn directory_count(catalog: &cap_std::fs::Dir) -> Result<usize, super::super::super::Error> {
+    let mut count = 0usize;
+    for entry in catalog.entries().map_err(|_| super::super::super::Error::Io("catalog read"))? {
+        let entry = entry.map_err(|_| super::super::super::Error::Io("catalog entry"))?;
+        let file_type = entry.file_type().map_err(|_| super::super::super::Error::Io("catalog entry type"))?;
+        if file_type.is_dir() && !file_type.is_symlink() {
+            count = count.saturating_add(1);
+        }
+        if count > crate::workflow_template::MAX_CATALOG_BUNDLES {
+            break;
+        }
     }
-    Ok(())
+    Ok(count)
 }

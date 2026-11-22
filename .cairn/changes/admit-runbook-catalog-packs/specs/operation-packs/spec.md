@@ -31,13 +31,40 @@ r[lattice.operation_packs.runbook_catalog.scenario.fetch_denied]
 - WHEN `lattice pack catalog-fetch` runs
 - THEN it MUST fail without publishing the destination and MUST remove its staging directory
 
+#### Scenario: Fetch transfer and blob sizes are bounded
+
+r[lattice.operation_packs.runbook_catalog.scenario.fetch_bounds]
+- GIVEN a catalog repository with large blobs inside or outside the selected subdirectory, a server that may ignore partial-clone filters, and a SHA-1 or SHA-256 commit
+- WHEN `lattice pack catalog-fetch` runs with a transfer budget
+- THEN it MUST fetch the commit without blob content, fetch only the selected blobs by object name, cap every file `git` writes at the remaining budget, keep the staging repository's total within the budget, and disable lazy object fetching
+- AND it MUST check every selected blob's type, size and the selected total against the pack limits before reading any blob content
+- AND a transfer that would exceed the budget MUST end with a typed transfer-bound refusal and nothing published
+- AND a 64-character commit MUST be fetched into a SHA-256 staging repository
+
+#### Scenario: Staging is private and pinned through publication
+
+r[lattice.operation_packs.runbook_catalog.scenario.pinned]
+- GIVEN a fetch or installation staging directory
+- WHEN its bytes are verified and published
+- THEN the staging directory MUST be created mode 0700 through a handle on its parent
+- AND the published entry MUST be renamed relative to pinned directory handles only while the staging path and the entry are still the inodes Lattice created and the target name is absent
+
 #### Scenario: Pack byte drift refuses the pack and names every drifted bundle
 
 r[lattice.operation_packs.runbook_catalog.scenario.drift]
-- GIVEN a locked pack whose bundle bytes no longer match the pack declaration
+- GIVEN a locked pack whose bundle bytes no longer match the pack declaration, before admission or after admission and before the first bundle is published
 - WHEN `lattice pack catalog-install` runs
 - THEN it MUST install nothing and exit non-zero
 - AND the report MUST name each drifted bundle as `pack_bytes_drift` and every other bundle as `pack_refused`
+- AND every bundle's bytes MUST be captured and verified before the first bundle is staged or published
+
+#### Scenario: Installation keeps the loader's catalog limit
+
+r[lattice.operation_packs.runbook_catalog.scenario.capacity]
+- GIVEN a catalog whose bundle directories would exceed `MAX_CATALOG_BUNDLES` with another installed bundle
+- WHEN `lattice pack catalog-install` previews or installs
+- THEN each bundle beyond the remaining capacity MUST be rejected as `catalog_capacity`, checked again before each rename
+- AND the existing catalog MUST stay loadable without a `limit_exceeded` diagnostic
 
 #### Scenario: One bad bundle does not hide the others
 

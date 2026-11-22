@@ -10,6 +10,7 @@
 
 pub mod decision;
 pub mod source;
+pub mod transfer;
 
 /// Pack-relative directory that holds every carried bundle as `<root>/<bundle-id>/...`.
 pub const BUNDLE_ROOT: &str = "workflow-templates";

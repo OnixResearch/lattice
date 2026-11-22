@@ -9,10 +9,10 @@
 )]
 
 pub mod fetch;
+mod pinned;
 mod placement;
 
 const CONFIRM_FLAG: &str = "--confirm-create";
-const PLACEMENT_CODE: &str = "installation";
 
 /// One admitted pack and the local `workflow-templates/` catalog that may receive its bundles.
 #[derive(Debug, Clone, Copy)]
@@ -25,9 +25,11 @@ pub struct InstallRequest<'request> {
 
 /// Decide every bundle, then install each admitted one when the operator confirmed creation.
 ///
-/// Each bundle is copied from verified pack bytes into a fresh staging directory beside the
-/// catalog, re-validated by the workflow-template loader, and renamed into the catalog only when
-/// its id is absent. A failure rejects that bundle and never stops the others.
+/// Before anything is staged, every declared bundle file is read and verified against the pack
+/// declaration; any drift refuses the whole pack. The captured bytes are staged privately,
+/// re-validated by the workflow-template loader, and each admitted bundle is renamed into the
+/// catalog only while its id is absent and the catalog has room. A later per-bundle failure
+/// rejects that bundle and never stops the others.
 pub fn install(request: &InstallRequest<'_>) -> Result<InstallReport, super::super::Error> {
     super::installation::validate_directory(request.catalog)?;
     let parent = request.catalog.parent().ok_or(super::super::Error::Invalid("catalog parent"))?;
@@ -36,38 +38,26 @@ pub fn install(request: &InstallRequest<'_>) -> Result<InstallReport, super::sup
     if manifest.workflow_bundles.is_empty() {
         return Err(super::super::Error::Invalid("pack carries no workflow bundles"));
     }
-    let bundle_root = request.pack_root.join(super::super::catalog::BUNDLE_ROOT);
-    let loaded = crate::workflow_template::load_catalog(&bundle_root)
-        .map_err(|_| super::super::Error::Io("pack bundle root read"))?;
-    let (observed, diagnostics) = super::super::catalog::decision::observe(&loaded);
-    let existing = placement::existing_ids(request.catalog, manifest);
-    let mut outcomes = super::super::catalog::decision::decide(manifest, &super::super::catalog::decision::Facts {
-        observed: &observed,
-        diagnostics: &diagnostics,
-        existing: &existing,
-    });
-    if request.confirm_create {
-        for outcome in &mut outcomes {
-            if outcome.status != super::super::catalog::decision::Status::Admitted {
-                continue;
-            }
-            match placement::publish_bundle(request, parent, &outcome.id) {
-                Ok(()) => outcome.status = super::super::catalog::decision::Status::Installed,
-                Err(error) => {
-                    outcome.status = super::super::catalog::decision::Status::Rejected;
-                    outcome.code = Some(PLACEMENT_CODE.to_string());
-                    outcome.reason = Some(error.to_string());
-                }
-            }
-        }
-    }
+    let catalog = cap_std::fs::Dir::open_ambient_dir(request.catalog, cap_std::ambient_authority())
+        .map_err(|_| super::super::Error::Io("catalog authority"))?;
     let header = Header {
         pack_id: manifest.pack_id.clone(),
         pack_identity: request.admitted.candidate.pack_identity.clone(),
         lock_identity: Some(request.admitted.lock.identity.clone()),
     };
-    let required_flag = (!request.confirm_create).then_some(CONFIRM_FLAG);
-    Ok(report(header, outcomes, false, required_flag))
+    if !request.confirm_create {
+        let bundle_root = request.pack_root.join(super::super::catalog::BUNDLE_ROOT);
+        let loaded = crate::workflow_template::load_catalog(&bundle_root)
+            .map_err(|_| super::super::Error::Io("pack bundle root read"))?;
+        let outcomes = placement::decide_against(manifest, &loaded, &catalog)?;
+        return Ok(report(header, outcomes, false, Some(CONFIRM_FLAG)));
+    }
+    let (captured, drifted) = placement::capture(request);
+    if !drifted.is_empty() {
+        return Ok(report(header, refused_outcomes(manifest, &drifted), true, None));
+    }
+    let outcomes = placement::publish(request, parent, &catalog, &captured)?;
+    Ok(report(header, outcomes, false, None))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -145,7 +135,19 @@ pub fn refusal_report(
     manifest: &super::super::model::Manifest,
     drifted: &[String],
 ) -> Result<InstallReport, super::super::Error> {
-    let bundles = manifest
+    let header = Header {
+        pack_id: manifest.pack_id.clone(),
+        pack_identity: super::super::identity::pack_identity(manifest)?,
+        lock_identity: None,
+    };
+    Ok(report(header, refused_outcomes(manifest, drifted), true, None))
+}
+
+fn refused_outcomes(
+    manifest: &super::super::model::Manifest,
+    drifted: &[String],
+) -> Vec<super::super::catalog::decision::BundleOutcome> {
+    manifest
         .workflow_bundles
         .iter()
         .map(|declaration| {
@@ -166,13 +168,7 @@ pub fn refusal_report(
                 ),
             }
         })
-        .collect::<Vec<_>>();
-    let header = Header {
-        pack_id: manifest.pack_id.clone(),
-        pack_identity: super::super::identity::pack_identity(manifest)?,
-        lock_identity: None,
-    };
-    Ok(report(header, bundles, true, None))
+        .collect()
 }
 
 /// List one local catalog through the workflow-template loader; no network, no authority.

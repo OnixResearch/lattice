@@ -19,6 +19,10 @@ pub struct FetchArgs {
     /// Refuse publication unless the fetched pack has exactly this `b3:` identity.
     #[arg(long)]
     pub pack_identity: Option<String>,
+    /// Hard budget for repository bytes written while fetching; every file git writes is capped
+    /// at the remaining budget and the total is checked after each fetch.
+    #[arg(long, default_value_t = super::super::catalog::transfer::DEFAULT_TRANSFER_LIMIT_BYTES)]
+    pub maximum_transfer_bytes: u64,
     /// New absolute directory that receives the verified pack tree.
     #[arg(long)]
     pub destination: std::path::PathBuf,
@@ -56,6 +60,7 @@ pub(super) fn fetch_command(
     super::super::catalog::source::validate_repository_locator(&args.repository)?;
     super::super::catalog::source::validate_commit(&args.commit)?;
     super::super::catalog::source::validate_subdirectory(args.subdirectory.as_deref())?;
+    super::super::catalog::transfer::check_budget(args.maximum_transfer_bytes)?;
     if !args.confirm_fetch {
         super::print_json(&serde_json::json!({
             "commit": args.commit,
@@ -72,6 +77,7 @@ pub(super) fn fetch_command(
         subdirectory: args.subdirectory.clone(),
         expected_pack_identity: args.pack_identity.clone(),
         destination: args.destination.clone(),
+        transfer_limit_bytes: args.maximum_transfer_bytes,
         process: app_config.effective_agent_runtime().local_process,
     })?;
     super::print_json(&receipt)?;

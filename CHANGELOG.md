@@ -71,17 +71,24 @@ interfaces.
   per-file identities and a declared loader `bundle_identity`; the pack
   identity covers every bundle byte, and packs without bundles keep their
   identity. `lattice pack catalog-fetch` is the only networked step: it
-  fetches one full commit from a `file://`, `https://` or `ssh://` repository
-  through bounded `git` with a cleared environment, refuses symlink and
-  submodule members and an unexpected `--pack-identity`, and publishes a
-  verified tree create-only. `lattice pack catalog-install` reads local bytes
-  only: pack byte drift refuses the whole pack while naming every drifted
-  bundle; after admission each bundle is decided independently (loader
-  diagnostics such as compatibility, `identity_mismatch`,
-  `pack_content_mismatch`, `catalog_conflict`) and the good ones are staged,
-  re-verified and renamed into the catalog one at a time. Installation grants
-  no effect authority. `lattice pack catalog-list` lists a catalog through the
-  workflow-template loader. A seed catalog fixture is retained in
+  fetches one full SHA-1 or SHA-256 commit from a `file://`, `https://` or
+  `ssh://` repository through bounded `git` with a cleared environment and
+  lazy fetching disabled. The commit's trees are fetched with
+  `--filter=blob:none`, then only the selected blobs. Every file git writes
+  is capped at the remaining `--maximum-transfer-bytes` budget, and blob sizes
+  and their total are checked before any content is read. It refuses symlink
+  and submodule members and an unexpected `--pack-identity`, and publishes a
+  verified tree create-only from a private, handle-pinned staging directory.
+  Only `file://` is exercised by tests. `lattice pack catalog-install` reads
+  local bytes only: pack byte drift, before admission or while capturing the
+  bytes to install, refuses the whole pack while naming every drifted bundle;
+  after admission each bundle is decided independently (loader diagnostics
+  such as compatibility, `identity_mismatch`, `pack_content_mismatch`,
+  `catalog_conflict`, `catalog_capacity` at the loader's 64-bundle limit) and
+  the good ones are renamed one at a time from a private, handle-pinned
+  staging directory. Installation grants no effect authority.
+  `lattice pack catalog-list` lists a catalog through the workflow-template
+  loader. A seed catalog fixture is retained in
   `tests/fixtures/runbook-catalog`. See `docs/operation-packs.md`.
 - Bounded same-attempt repair and the Kiln #61 budget lineage for
   implementation attempts (Lattice #6). The v3 request accepts two optional

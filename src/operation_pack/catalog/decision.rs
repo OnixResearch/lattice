@@ -51,12 +51,27 @@ pub struct LoaderDiagnostic {
     pub message: &'static str,
 }
 
-/// Shell-collected facts for one decision: loader results and the catalog's existing ids.
+/// Shell-collected facts for one decision: loader results, the catalog's existing ids and how
+/// many more bundle directories the catalog can hold before the loader's limit.
 #[derive(Debug, Clone, Copy)]
 pub struct Facts<'facts> {
     pub observed: &'facts [Observed],
     pub diagnostics: &'facts [LoaderDiagnostic],
     pub existing: &'facts std::collections::BTreeSet<String>,
+    pub free_slots: usize,
+}
+
+/// Remaining bundle directories before `workflow_template::MAX_CATALOG_BUNDLES` is reached.
+pub(crate) fn free_slots(directory_count: usize) -> usize {
+    crate::workflow_template::MAX_CATALOG_BUNDLES.saturating_sub(directory_count)
+}
+
+/// Reject one bundle because publishing it would exceed the loader's catalog limit.
+pub fn reject_for_capacity(outcome: &mut BundleOutcome) {
+    settle(outcome, Status::Rejected, Finding {
+        code: "catalog_capacity",
+        reason: "the catalog already holds the loader's maximum number of bundle directories",
+    });
 }
 
 /// Project the workflow-template loader's catalog into decision facts.
@@ -91,9 +106,11 @@ pub fn observe(catalog: &crate::workflow_template::Catalog) -> (Vec<Observed>, V
 ///
 /// A bundle is admitted only when the loader validated it, its loader-measured manifest and
 /// file identities equal the pack's declared content identities, its loader identity equals the
-/// declared `bundle_identity`, and the catalog does not already hold its id.
+/// declared `bundle_identity`, the catalog does not already hold its id, and the catalog has a
+/// free slot left after the bundles admitted before it.
 pub fn decide(manifest: &super::super::model::Manifest, facts: &Facts<'_>) -> Vec<BundleOutcome> {
     let mut outcomes = Vec::with_capacity(manifest.workflow_bundles.len());
+    let mut free_slots = facts.free_slots;
     for declaration in &manifest.workflow_bundles {
         let mut outcome = BundleOutcome {
             id: declaration.id.clone(),
@@ -104,6 +121,12 @@ pub fn decide(manifest: &super::super::model::Manifest, facts: &Facts<'_>) -> Ve
             reason: None,
         };
         decide_one(manifest, declaration, facts, &mut outcome);
+        if outcome.status == Status::Admitted {
+            match free_slots.checked_sub(1) {
+                Some(remaining) => free_slots = remaining,
+                None => reject_for_capacity(&mut outcome),
+            }
+        }
         outcomes.push(outcome);
     }
     debug_assert_eq!(outcomes.len(), manifest.workflow_bundles.len());

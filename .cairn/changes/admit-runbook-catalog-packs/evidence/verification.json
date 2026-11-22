@@ -54,5 +54,55 @@
     "per-bundle atomicity only; no transaction across bundles",
     "the create-only absence check before rename is not atomic against a concurrent writer",
     "a commit or pack identity proves exact bytes, not maintainer or source trust"
-  ]
+  ],
+  "review": {
+    "trigger": "CatalogReview of 182667cd: do not publish (P1 unbounded git transfer and blob reads; P1 catalog limit exceeded on install; P1 umask staging with path-based verify and rename; P2 mid-install drift rejected one bundle only; P2 SHA-256 commits fetched into SHA-1 staging)",
+    "base_revision": "182667cd",
+    "recorded_on": "2026-11-21",
+    "git_behaviour_confirmed_with": "git 2.53.0 and the dev-shell sh (bash 5.3 in POSIX mode): ulimit -f counts 512-byte blocks; SIGXFSZ stops index-pack and the fetch exits 128 with tmp_pack at exactly the cap; protocol v2 file:// upload-pack serves unadvertised reachable commits and blob names without allowAnySHA1InWant; --filter is ignored with a warning unless uploadpack.allowFilter; GIT_NO_LAZY_FETCH=1 reports promisor blobs as missing; SHA-256 file:// fetch into --object-format=sha256 staging works and a SHA-256 name does not resolve in a SHA-1 repository",
+    "tasks": {
+      "4.1": [
+        "tests/test_runbook_catalog_fetch.rs::a_large_blob_outside_the_pack_is_never_downloaded (4 MiB incompressible blob outside the pack, filter-honoring server, 1 MiB budget: fetch succeeds, transferred_bytes < 1 MiB)",
+        "tests/test_runbook_catalog_fetch.rs::a_transfer_beyond_the_budget_is_refused_before_publication (filter-ignoring server, and a 4 MiB blob inside the pack: catalog fetch transfer bound, destination and staging absent; budget below 64 KiB refused)",
+        "tests/test_runbook_catalog_fetch.rs::object_sizes_are_checked_before_any_blob_is_read"
+      ],
+      "4.2": [
+        "tests/test_runbook_catalog_install.rs::installation_never_exceeds_the_loader_catalog_limit (63 directories: one installed, one catalog_capacity, 64 directories and no limit_exceeded; 64 directories: nothing installed, catalog unchanged)"
+      ],
+      "4.3": [
+        "src/operation_pack/shell/catalog/pinned/tests.rs::staging_is_private_and_publishes_the_pinned_entry (mode 0700, handle-relative rename)",
+        "src/operation_pack/shell/catalog/pinned/tests.rs::a_swapped_staging_directory_or_entry_is_refused (substituted entry, substituted staging path and existing target each refused; nothing published)"
+      ],
+      "4.4": [
+        "tests/test_runbook_catalog_install.rs::bytes_that_drift_after_admission_refuse_the_whole_pack (drift after admit: pack_refused, status pack_bytes_drift, hello pack_refused, catalog empty, no staging left; undrifted copy installs both)"
+      ],
+      "4.5": [
+        "tests/test_runbook_catalog_fetch.rs::sha256_repositories_fetch_into_sha256_staging (SHA-256 file:// repository yields the seed pack identity; a SHA-256 name against a SHA-1 repository fails with nothing published)"
+      ],
+      "4.6": [
+        "docs/operation-packs.md (Fetch, lock, install and list; Installation contract)",
+        "CHANGELOG.md (Added)",
+        "specs/operation-packs/spec.md (scenarios fetch_bounds, pinned, capacity; drift extended)",
+        "design.md (review decision, tests, risks)"
+      ]
+    },
+    "gates": [
+      {"command": "cargo test -p lattice --test test_runbook_catalog_core --test test_runbook_catalog_cli --test test_runbook_catalog_fetch --test test_runbook_catalog_install", "exit": 0, "result": "5, 3, 4 and 2 passed, 0 failed"},
+      {"command": "cargo test -p lattice --test test_operation_pack_core --test test_operation_pack_shell --test test_operation_pack_cli --test test_operation_pack_analyzers --test test_operation_pack_wasm_core --test test_operation_pack_component_shell --test test_workflow_templates --test test_cairn_specs --test test_traceability_marker_alignment", "exit": 0, "result": "9, 8, 4, 6, 8, 1, 17, 3 and 2 passed, 0 failed"},
+      {"command": "cargo test -p lattice --lib -- operation_pack workflow_template inet::route", "exit": 0, "result": "4 passed (including the 2 pinned staging tests), 0 failed, 523 filtered out"},
+      {"command": "cargo clippy -p lattice --all-targets --no-deps -- -D warnings", "exit": 0},
+      {"command": "cargo fmt -p lattice --check", "exit": 0},
+      {"command": "nickel typecheck cairn-policy/*.ncl policy/*.ncl profiles/*.ncl contracts/*.ncl builtins/*/*.ncl builtins/agent-evaluations/requests/*.ncl builtins/workflow-templates/*/*.ncl", "exit": 0},
+      {"command": "octet-precommit-check", "exit": 0, "result": "root 1052 accepted, 1052 current, 0 new, 0 stale; lattice-core 25/25, 0 new, 0 stale; no re-key"},
+      {"command": "cairn validate --root . --policy cairn-policy/generated/cairn-policy.json", "exit": 0},
+      {"command": "cairn gate proposal|design|tasks admit-runbook-catalog-packs", "exit": 0, "result": "PASS"},
+      {"command": "gitleaks dir --redact on each changed path", "exit": 0}
+    ],
+    "non_claims": [
+      "filters and blob wants were exercised only against a local file:// upload-pack; hosted https:// and ssh:// servers were not",
+      "while a fetch runs, disk use can briefly reach the budget once per file git writes before the total is measured",
+      "inode checks and mode 0700 exclude other users; a process running as the same user can still modify files inside staging",
+      "absence and capacity checks before each rename are not atomic against a concurrent writer to the same catalog"
+    ]
+  }
 }
