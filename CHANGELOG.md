@@ -62,19 +62,23 @@ interfaces.
   receives a value must be one simple command of safe literals and whole-word
   `"${NAME}"` references, so a value never takes the command-name position
   and the shell never parses it as syntax. As defense in depth
-  (case-insensitive, shells also with a version suffix such as `bash5`), the
+  (case-insensitive, shells also with a version or `-static` suffix such as
+  `bash5` or `bash-static`), the
   first word may not name a shell, an argument-executing or evaluating
   builtin such as `trap`, `jobs`, `coproc`, `mapfile`, `enable`, `let` or
   `declare`, or a common wrapper such as `tmux` or `hyperfine`; later words
   may not name a shell; and `-exec`, `-execdir`, `-ok`, `-okdir` and `-c` are
   refused. `git` and `find` stay usable. Its `cwd` and `env` may hold no
-  `{{…}}` expression (`param_target_expression`), and its static env may not
-  set `BASH_FUNC_*`, `%%`, `BASH_ENV`, `ENV`, `SHELLOPTS`, `BASHOPTS` or
-  `PS4` keys or hold `$` or a backtick (`param_target_env`). A
+  `{{…}}` expression (`param_target_expression`), and its static env or
+  credential bindings may not set `BASH_FUNC_*`, `%%`, `BASH_ENV`,
+  `SSH_CLIENT`, `SSH2_CLIENT`, `SHLVL`, `HOME`, `SHELLOPTS`, `BASHOPTS` or
+  `PS4` keys, nor may its env hold `$` or a backtick (`param_target_env`);
+  `ENV` stays allowed. A
   `LATTICE_PARAM_*` credential key is refused. `ValidatedBundle` content is
   read through accessors only, and save, activation planning and start
-  re-verify bound values, content, revisions, template and identity, refusing
-  a mode failure with `mode_violation` and anything else with
+  re-verify bound values, content, revisions, template and identity. An
+  unbound bundle is refused with `ParamsUnbound`; for a bound bundle a mode
+  failure is `mode_violation` and anything else is
   `bound_content_drift`. A schema 1 manifest that names `mode` or
   `params`, even as `null`, is refused.
 - Git-backed runbook catalogs admitted through content-addressed operation

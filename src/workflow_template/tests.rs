@@ -123,12 +123,7 @@ fn tampered() -> Vec<(&'static str, super::ValidatedBundle)> {
 }
 
 fn add_param_credential(workflow: &mut crate::engine::Workflow) {
-    let node = workflow.configs.keys().next().copied().expect("fixture node");
-    let secret = crate::credentials::SecretRef::new("env", "TOKEN", None);
-    let refs = crate::credentials::NodeCredentialRefs {
-        env: std::collections::HashMap::from([(KEY.to_owned(), secret)]),
-    };
-    workflow.credentials.insert(node, refs);
+    add_credential(workflow, KEY);
 }
 
 #[test]
@@ -157,6 +152,39 @@ fn shell_controlling_env_is_refused_at_bind_and_in_reverify() {
         super::reverify(&bound).expect_err("exported function").code,
         super::DiagnosticCode::BoundContentDrift
     );
+}
+
+fn add_credential(workflow: &mut crate::engine::Workflow, key: &str) {
+    let node = workflow.configs.keys().next().copied().expect("fixture node");
+    let secret = crate::credentials::SecretRef::new("env", "TOKEN", None);
+    let refs = crate::credentials::NodeCredentialRefs {
+        env: std::collections::HashMap::from([(key.to_owned(), secret)]),
+    };
+    workflow.credentials.insert(node, refs);
+}
+
+#[test]
+fn shell_control_credential_keys_are_refused_at_bind_and_in_reverify() {
+    let mut template = template();
+    add_credential(&mut template.workflow, "BASH_ENV");
+    let refused = super::bind(&template, &std::collections::BTreeMap::new()).expect_err("credential BASH_ENV");
+    assert_eq!(refused.code, super::DiagnosticCode::ParamTargetEnv);
+
+    let mut bound = bound();
+    add_credential(&mut bound.workflow, "BASH_FUNC_tool");
+    assert_eq!(
+        super::reverify(&bound).expect_err("credential function").code,
+        super::DiagnosticCode::BoundContentDrift
+    );
+}
+
+#[test]
+fn a_non_mode_admission_failure_is_drift_in_reverify() {
+    let mut bound = bound();
+    bound.manifest.compatibility.node_kinds = vec!["file".to_owned()];
+    let refused = super::reverify(&bound).expect_err("shell node kind is no longer declared");
+    assert_eq!(refused.code, super::DiagnosticCode::BoundContentDrift);
+    assert_eq!(refused.message, "bound content no longer passes admission");
 }
 
 #[test]

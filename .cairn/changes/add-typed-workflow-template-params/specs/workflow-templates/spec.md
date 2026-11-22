@@ -18,7 +18,7 @@ r[lattice.workflow_templates.params.scenario.declaration]
 - OR a target shell node whose command is not one simple command of space-separated safe literals and whole-word `"${KEY}"` references to its bound keys, whose first word is a reference, an assignment, a shell, an argument-executing builtin or a denied wrapper, any of whose later literal words names a shell (all by basename and ignoring ASCII case), or that contains `-exec`, `-execdir`, `-ok`, `-okdir` or `-c`
 - OR a node that binds a `LATTICE_PARAM_*` key as a credential, or a template environment that does not hold the rendered default
 - OR a target shell node with a `{{…}}` expression in its `cwd` or `env`
-- OR a target shell node whose static env has a `BASH_FUNC_*` or `%%` key, a `BASH_ENV`, `ENV`, `SHELLOPTS`, `BASHOPTS` or `PS4` key, or a value containing `$` or a backtick
+- OR a target shell node whose static env or credential bindings have a `BASH_FUNC_*` or `%%` key or a `BASH_ENV`, `SSH_CLIENT`, `SSH2_CLIENT`, `SHLVL`, `HOME`, `SHELLOPTS`, `BASHOPTS` or `PS4` key, or whose static env has a value containing `$` or a backtick; `ENV` MUST stay allowed
 - WHEN the loader validates the bundle, including after its workflow is re-pinned, or the template is bound, or a bound bundle is re-verified
 - THEN the bundle MUST be rejected with `invalid_param_declaration`, `param_target_expression` for the expression case or `param_target_env` for the environment case (`bound_content_drift` when re-verified), and other bundles MUST remain available
 - AND a value MUST NOT take the command-name position of the bound command and MUST NOT be parsed by the shell as shell syntax; the deny list is defense in depth and MUST NOT be claimed to stop a program that executes its own arguments

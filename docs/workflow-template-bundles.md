@@ -111,7 +111,7 @@ Every shell node that receives a value must be one simple command in a strict gr
 
 The deny lists are defense in depth against the shell's own argument-executing builtins and common wrappers, not a guarantee:
 
-- shells, checked in every word: `sh`, `bash`, `dash`, `zsh`, `ksh`, `fish`, `ash`, `mksh`, `lksh`, `rbash`, `oksh`, `yash`, `posh`, `csh`, `tcsh`, `pwsh`, `nu`, `elvish`, `xonsh`;
+- shells, checked in every word, ignoring a trailing `-static` and version suffix: `sh`, `bash`, `dash`, `zsh`, `ksh`, `fish`, `ash`, `mksh`, `lksh`, `rbash`, `rksh`, `oksh`, `yash`, `posh`, `csh`, `tcsh`, `pwsh`, `nu`, `elvish`, `xonsh`, `hush`, `osh`, `ysh`, `sash`;
 - first word only, builtins that execute, load, or evaluate an argument: `eval`, `exec`, `command`, `builtin`, `source`, `.`, `trap`, `jobs`, `coproc`, `mapfile`, `readarray`, `enable`, `let`, `declare`, `typeset`, `local`;
 - first word only, precautionary builtins and zsh precommand modifiers: `fc`, `bind`, `complete`, `compgen`, `noglob`, `nocorrect`, `-`;
 - first word only, wrappers that run an argument: `env`, `tmux`, `screen`, `hyperfine`, `xargs`, `nohup`, `timeout`, `nice`, `ionice`, `setsid`, `stdbuf`, `taskset`, `chrt`, `sudo`, `doas`, `su`, `runuser`, `busybox`, `time`, `watch`, `parallel`, `flock`, `prlimit`, `setpriv`, `unshare`, `nsenter`, `strace`, `ltrace`, `script`, `systemd-run`, `firejail`, `bwrap`, `chroot`, `nix-shell`.
@@ -120,13 +120,15 @@ The deny lists are defense in depth against the shell's own argument-executing b
 
 The receiving node's `cwd` and `env` may hold no `{{…}}` expression. Otherwise another node's output, for example `PATH={{node:A:…}}`, could change where or how that node looks up its program. Such a node fails with `param_target_expression`. Expressions also cannot appear in the bound command, because `{` and `}` are outside the literal alphabet.
 
-The receiving node's static `env` may not let the shell run a value. Such a node fails with `param_target_env` when its environment has:
+The receiving node's static `env` and credential bindings may not set keys that make the shell run something before or around the command. Such a node fails with `param_target_env` (`bound_content_drift` when re-verified) when:
 
-- a key starting with `BASH_FUNC_` or containing `%%` (an exported function, for example one that replaces `printf`);
-- one of the keys `BASH_ENV`, `ENV`, `SHELLOPTS`, `BASHOPTS`, or `PS4`;
-- a value containing `$` or a backtick (expanded when a builtin evaluates the variable arithmetically, for example `x=a[$(…)]`).
+- an env or credential key starts with `BASH_FUNC_` or contains `%%`: bash imports it as a function, for example one that replaces `printf` and runs its argument;
+- an env or credential key is `BASH_ENV`: a non-interactive bash sources the file it names;
+- an env or credential key is `SSH_CLIENT`, `SSH2_CLIENT`, `SHLVL`, or `HOME`: a bash built with `SSH_SOURCE_BASHRC` sources `$HOME/.bashrc` before a `-c` command when an SSH variable is set and `SHLVL` is below 2, and `HOME` chooses that file;
+- an env or credential key is `SHELLOPTS`, `BASHOPTS`, or `PS4`: they import options such as `xtrace`, and `PS4` is expanded for every traced command;
+- an env value contains `$` or a backtick: it is expanded when a builtin evaluates the variable arithmetically, for example `x=a[$(…)]`.
 
-Parameter values never contain `$` or a backtick, and ordinary static env such as `RUST_LOG=info` stays valid.
+The check is limited to these keys and characters. `ENV` is allowed because non-interactive `sh -c` and `bash -c` never read it, so `ENV=production` binds. Parameter values never contain `$` or a backtick, and ordinary static env such as `RUST_LOG=info` stays valid.
 
 The literal alphabet excludes `$`, backticks, quotes, backslashes, `;`, `|`, `&`, `<`, `>`, `(`, `)`, `{`, `}`, `*`, `?`, `[`, `~`, `#`, whitespace other than the separating space, newline, and NUL. A bound command therefore has no command substitution, arithmetic, here-document, redirection, glob, or control operator. The shell passes each value as one argument without word splitting or globbing.
 
@@ -145,7 +147,7 @@ Non-claims:
 
 `lattice::workflow_template::bind(template, supplied)` resolves values against a catalog template. It writes them into a copy of the workflow and rebinds an optional orchestration to the new workflow revision. Then it re-runs the template's admission checks: workflow validation, compatibility, mode, orchestration binding, guarded authority, and the binding grammar. The bound bundle's identity is BLAKE3 over the template identity, the resolved-value identity, and the bound workflow revision.
 
-`ValidatedBundle` content is read-only outside Lattice; read it through `identity()`, `manifest()`, `workflow()`, `workflow_revision()`, `orchestration()`, `orchestration_revision()`, `file_identities()`, and `params()`. `save_draft`, activation planning, and start call `reverify` before any store write or dispatch. It checks, in order, that the recorded values re-resolve to the same values; that the workflow still holds them and passes the target checks above; that the content passes full admission again; that the recomputed workflow revision equals the recorded and bound revisions; that the recomputed orchestration revision equals the recorded one; that the template identity recomputed from the manifest and file identities equals the bound template; and that the bound identity recomputed from template, values, and revision equals the bundle identity. Every entry point applies the same rule: a mode failure refuses with `mode_violation` (`ModeViolation` from `save_draft`, a `ModeViolation` conflict from `plan_application`, a `ModeViolation` block from activation planning); any other failure refuses with `bound_content_drift` (`BoundContentDrift`).
+`ValidatedBundle` content is read-only outside Lattice; read it through `identity()`, `manifest()`, `workflow()`, `workflow_revision()`, `orchestration()`, `orchestration_revision()`, `file_identities()`, and `params()`. `save_draft`, activation planning, and start call `reverify` before any store write or dispatch. It checks, in order, that the recorded values re-resolve to the same values; that the workflow still holds them and passes the target checks above; that the content passes full admission again; that the recomputed workflow revision equals the recorded and bound revisions; that the recomputed orchestration revision equals the recorded one; that the template identity recomputed from the manifest and file identities equals the bound template; and that the bound identity recomputed from template, values, and revision equals the bundle identity. Every entry point applies the same rule. An unbound bundle refuses with `ParamsUnbound`. For a bound bundle, a mode failure refuses with `mode_violation` (`ModeViolation` from `save_draft`, a `ModeViolation` conflict from `plan_application`, a `ModeViolation` block from activation planning), and any other failure refuses with `bound_content_drift` (`BoundContentDrift`).
 
 Parameters cannot widen effect authority. Binding changes only declared environment values, so node kinds, commands, resources, and abilities stay as reviewed. `lattice authority inspect` on the saved bound workflow lists the same grants as the template, under the bound workflow revision.
 

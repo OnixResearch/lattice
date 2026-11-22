@@ -11,8 +11,8 @@
 /// (`bash5`, `ksh93`, `zsh-5.9`), against every literal word, so a wrapper cannot hand a value
 /// to a shell named as a separate word (`flock l bash "${KEY}"`).
 const SHELLS: &[&str] = &[
-    "sh", "bash", "dash", "zsh", "ksh", "fish", "ash", "mksh", "lksh", "rbash", "oksh", "yash", "posh", "csh", "tcsh",
-    "pwsh", "nu", "elvish", "xonsh",
+    "sh", "bash", "dash", "zsh", "ksh", "fish", "ash", "mksh", "lksh", "rbash", "rksh", "oksh", "yash", "posh", "csh",
+    "tcsh", "pwsh", "nu", "elvish", "xonsh", "hush", "osh", "ysh", "sash",
 ];
 
 /// Shell builtins, precommand modifiers, and wrappers that run, wrap, or re-parse an argument
@@ -123,12 +123,14 @@ fn names_any(word: &str, names: &[&str]) -> bool {
     names.iter().any(|name| name.eq_ignore_ascii_case(basename))
 }
 
-/// Whether a word names a shell by basename, ignoring ASCII case and a trailing version suffix of
-/// digits, `.`, `-`, and `_` (`bash5`, `ksh93`, `zsh-5.9`).
+/// Whether a word names a shell by basename, ignoring ASCII case, a trailing `-static`, and a
+/// trailing version suffix of digits, `.`, `-`, and `_` (`bash5`, `ksh93`, `zsh-5.9`,
+/// `bash-static`).
 fn names_shell(word: &str) -> bool {
     let basename = word.rsplit('/').next().unwrap_or(word);
+    let unpacked = basename.strip_suffix("-static").or_else(|| basename.strip_suffix("-STATIC")).unwrap_or(basename);
     let unversioned =
-        basename.trim_end_matches(|character: char| character.is_ascii_digit() || matches!(character, '.' | '-' | '_'));
+        unpacked.trim_end_matches(|character: char| character.is_ascii_digit() || matches!(character, '.' | '-' | '_'));
     !unversioned.is_empty() && names_any(unversioned, SHELLS)
 }
 
@@ -189,7 +191,22 @@ mod tests {
         assert!(!accepts("flock l bash \"${LATTICE_PARAM_TOOL}\""));
         assert!(!accepts("prlimit sh -ec \"${LATTICE_PARAM_TOOL}\""));
         assert!(!accepts("find . -okdir \"${LATTICE_PARAM_TOOL}\""));
-        for versioned in ["bash5", "ksh93", "zsh-5.9", "/usr/bin/BASH-5.2", "lksh"] {
+        for versioned in [
+            "bash5",
+            "ksh93",
+            "zsh-5.9",
+            "/usr/bin/BASH-5.2",
+            "lksh",
+            "bash-static",
+            "zsh-static",
+            "mksh-static",
+            "bash-5.2-static",
+            "hush",
+            "osh",
+            "ysh",
+            "rksh",
+            "sash",
+        ] {
             assert!(!accepts(&format!("{versioned} \"${{LATTICE_PARAM_TOOL}}\"")), "{versioned} first word");
             assert!(!accepts(&format!("tool {versioned} \"${{LATTICE_PARAM_TOOL}}\"")), "{versioned} later word");
         }

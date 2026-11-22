@@ -60,14 +60,36 @@ fn validate_targets(
             return Err(super::ParamError::new(super::ParamErrorCode::InvalidDeclaration, None));
         };
         check_receiving_node(command, cwd.as_deref(), env, keys)?;
+        let credentials = workflow.credentials.get(id);
+        if credentials.is_some_and(|refs| refs.env.keys().any(|key| is_control_key(key))) {
+            return Err(super::ParamError::new(super::ParamErrorCode::TargetEnv, None));
+        }
     }
     debug_assert!(node_keys.values().all(|keys| !keys.is_empty()));
     debug_assert!(node_keys.len() <= declared.iter().map(|declaration| declaration.bindings.len()).sum::<usize>());
     Ok(())
 }
 
-/// Environment keys a shell reads to source files or change option and trace handling.
-const SHELL_CONTROL_KEYS: &[&str] = &["BASH_ENV", "ENV", "SHELLOPTS", "BASHOPTS", "PS4"];
+/// Environment keys that make bash source a file, import options, or trace before the command:
+///
+/// - `BASH_ENV` names a file a non-interactive bash sources;
+/// - `SSH_CLIENT`, `SSH2_CLIENT`, and `SHLVL` trigger a `SSH_SOURCE_BASHRC` bash to source
+///   `$HOME/.bashrc` before a `-c` command, and `HOME` chooses that file;
+/// - `SHELLOPTS` and `BASHOPTS` import options such as `xtrace`;
+/// - `PS4` is expanded for every traced command.
+///
+/// `ENV` is not refused: non-interactive `sh -c` and `bash -c` never read it, and refusing it
+/// would block the common `ENV=production`.
+const SHELL_CONTROL_KEYS: &[&str] = &[
+    "BASH_ENV",
+    "SSH_CLIENT",
+    "SSH2_CLIENT",
+    "SHLVL",
+    "HOME",
+    "SHELLOPTS",
+    "BASHOPTS",
+    "PS4",
+];
 
 /// Checks for one shell node that receives a value: the strict command grammar, no `{{…}}`
 /// expression in `cwd` or `env`, and no static environment that would let the shell run a value.
@@ -98,9 +120,12 @@ fn check_receiving_node(
 }
 
 fn is_shell_control((key, value): (&String, &String)) -> bool {
-    let is_function = key.starts_with("BASH_FUNC_") || key.contains("%%");
-    let is_control_key = SHELL_CONTROL_KEYS.contains(&key.as_str());
-    is_function || is_control_key || value.contains(['$', '`'])
+    is_control_key(key) || value.contains(['$', '`'])
+}
+
+/// Exported-function keys (`BASH_FUNC_*`, `%%`) and the shell control keys above.
+fn is_control_key(key: &str) -> bool {
+    key.starts_with("BASH_FUNC_") || key.contains("%%") || SHELL_CONTROL_KEYS.contains(&key)
 }
 
 /// Whether text contains a workflow expression marker.

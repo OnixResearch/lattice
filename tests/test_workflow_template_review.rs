@@ -188,19 +188,35 @@ fn receiving_node_env_cannot_let_the_shell_run_a_value() {
         assert_eq!(env_code(&command, &[]), Err(DiagnosticCode::InvalidParamDeclaration), "{evaluator}");
     }
     assert_eq!(env_code(printf, &[("BASH_ENV", "${LATTICE_PARAM_TOOL}")]), refused, "BASH_ENV sources a value");
-    for key in ["BASH_ENV", "ENV", "SHELLOPTS", "BASHOPTS", "PS4"] {
+    let ssh_bashrc = [("SSH_CLIENT", "1"), ("SHLVL", "0"), ("HOME", "h")];
+    assert_eq!(env_code(printf, &ssh_bashrc), refused, "SSH .bashrc trigger");
+    for key in [
+        "BASH_ENV",
+        "SSH_CLIENT",
+        "SSH2_CLIENT",
+        "SHLVL",
+        "HOME",
+        "SHELLOPTS",
+        "BASHOPTS",
+        "PS4",
+    ] {
         assert_eq!(env_code(printf, &[(key, "plain")]), refused, "{key}");
     }
-
-    assert_eq!(env_code(printf, &[("RUST_LOG", "info")]), Ok(()), "ordinary static env stays valid");
-    let mut fixture = input(printf, &[]);
-    let workflow = fixture.workflow.as_mut().expect("fixture workflow");
-    if let Some(lattice::engine::workflow::NodeConfig::Shell { env, .. }) = workflow.configs.values_mut().next() {
-        env.insert("RUST_LOG".to_owned(), "info".to_owned());
+    for credential in ["BASH_ENV", "BASH_FUNC_printf", "SSH_CLIENT"] {
+        assert_eq!(code(printf, &[credential]), refused, "credential key {credential}");
     }
-    let template = lattice::workflow_template::validate_bundle(fixture).expect("ordinary env admits");
-    let touch = std::collections::BTreeMap::from([("tool".to_owned(), ParamValue::Text("touch".into()))]);
-    assert!(lattice::workflow_template::bind(&template, &touch).is_ok(), "ordinary env binds");
+
+    for ordinary in [("RUST_LOG", "info"), ("ENV", "production")] {
+        assert_eq!(env_code(printf, &[ordinary]), Ok(()), "ordinary static env {ordinary:?} stays valid");
+        let mut fixture = input(printf, &[]);
+        let workflow = fixture.workflow.as_mut().expect("fixture workflow");
+        if let Some(lattice::engine::workflow::NodeConfig::Shell { env, .. }) = workflow.configs.values_mut().next() {
+            env.insert(ordinary.0.to_owned(), ordinary.1.to_owned());
+        }
+        let template = lattice::workflow_template::validate_bundle(fixture).expect("ordinary env admits");
+        let touch = std::collections::BTreeMap::from([("tool".to_owned(), ParamValue::Text("touch".into()))]);
+        assert!(lattice::workflow_template::bind(&template, &touch).is_ok(), "{ordinary:?} binds");
+    }
 }
 
 // r[verify lattice.workflow_templates.params.scenario.declaration]
