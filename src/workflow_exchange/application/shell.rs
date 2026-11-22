@@ -23,7 +23,7 @@ use super::AdmissionResolution;
 use super::ApplicationError;
 use super::DurableExecutionState;
 use super::ExecutionRecord;
-use super::HandlerProfile;
+use super::VersionedHandlerProfile;
 use super::WorkflowRoute;
 
 const WORKER_THREAD_PREFIX: &str = "lattice-exchange";
@@ -35,7 +35,7 @@ struct Worker {
 
 pub struct ApplicationHandler {
     store: crate::store::Store,
-    profile: HandlerProfile,
+    profile: VersionedHandlerProfile,
     profile_identity: Identity,
     agent_runtime: crate::agent_node::RuntimeOptions,
     workers: BTreeMap<String, Worker>,
@@ -44,11 +44,12 @@ pub struct ApplicationHandler {
 impl ApplicationHandler {
     pub fn new(
         store: crate::store::Store,
-        profile: HandlerProfile,
+        profile: impl Into<VersionedHandlerProfile>,
         agent_runtime: crate::agent_node::RuntimeOptions,
     ) -> Result<Self, ApplicationError> {
-        super::validate_handler_profile(&profile).map_err(|_| ApplicationError::Profile)?;
-        let profile_identity = super::handler_profile_identity(&profile).map_err(|_| ApplicationError::Profile)?;
+        let profile = profile.into();
+        profile.validate().map_err(|_| ApplicationError::Profile)?;
+        let profile_identity = profile.identity().map_err(|_| ApplicationError::Profile)?;
         Ok(Self {
             store,
             profile,
@@ -59,7 +60,7 @@ impl ApplicationHandler {
     }
 
     #[must_use]
-    pub const fn profile(&self) -> &HandlerProfile {
+    pub const fn profile(&self) -> &VersionedHandlerProfile {
         &self.profile
     }
 
@@ -115,11 +116,11 @@ impl ApplicationHandler {
             return Err(HandlerError::Rejected);
         }
         let maximum_active =
-            usize::try_from(self.profile.maximum_active_executions).map_err(|_| HandlerError::Unavailable)?;
+            usize::try_from(self.profile.maximum_active_executions()).map_err(|_| HandlerError::Unavailable)?;
         if self.workers.len() >= maximum_active {
             return Err(HandlerError::Unavailable);
         }
-        let route = super::select_route(&self.profile, request).map_err(|_| HandlerError::Rejected)?.clone();
+        let route = self.profile.select_route(request).map_err(|_| HandlerError::Rejected)?.clone();
         let workflow = self
             .store
             .load_workflow(&route.workflow_name)

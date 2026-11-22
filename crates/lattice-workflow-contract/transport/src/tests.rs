@@ -291,6 +291,9 @@ fn unknown_wire_operation_is_rejected_before_admission() {
     assert!(decoded.is_err());
 }
 
+#[cfg(target_os = "linux")]
+mod listener;
 mod protocol;
+mod reconnect;
 #[cfg(target_os = "linux")]
 mod socket;

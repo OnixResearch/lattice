@@ -1,4 +1,5 @@
-# Typed application profile for the durable workflow exchange handler.
+# Typed application profiles for the durable workflow exchange handler:
+# version one (Unix socket) and version two (explicit Unix or vsock listener).
 
 let Transport = import "workflow-transport-profile.ncl" in
 let MaximumRoutes = 1024 in
@@ -33,6 +34,10 @@ let NonNegative = std.contract.from_predicate (fun value =>
 
 let ExactSchema = std.contract.from_predicate (fun value =>
   value == "lattice.workflow-exchange-handler-profile.v1"
+) in
+
+let ExactSchemaV2 = std.contract.from_predicate (fun value =>
+  value == "lattice.workflow-exchange-handler-profile.v2"
 ) in
 
 let EffectAuthority = std.contract.from_predicate (fun value =>
@@ -87,11 +92,38 @@ let HandlerControls = {
   resume | std.contract.from_predicate (fun value => value == false) | optional,
 } in
 
+let UnixListener = {
+  kind | std.contract.from_predicate (fun value => value == "unix"),
+  socket_path | AbsolutePath,
+  transport | Transport.TransportProfile,
+} in
+
+let VsockListener = {
+  kind | std.contract.from_predicate (fun value => value == "vsock"),
+  transport | Transport.VsockTransportProfile,
+} in
+
+# A listener is tagged by `kind`; any tag other than "vsock" must be a Unix listener.
+let Listener = std.contract.custom (fun label value =>
+  if std.is_record value && std.record.has_field "kind" value && value.kind == "vsock" then
+    'Ok (std.contract.apply VsockListener label value)
+  else
+    'Ok (std.contract.apply UnixListener label value)
+) in
+
 {
   HandlerProfile = {
     schema | ExactSchema,
     socket_path | AbsolutePath,
     transport | Transport.TransportProfile,
+    maximum_active_executions | PositiveAtMost MaximumActiveExecutions,
+    controls | HandlerControls | optional,
+    routes | RouteList | Array Route,
+    non_claims | RequiredNonClaims,
+  },
+  HandlerProfileV2 = {
+    schema | ExactSchemaV2,
+    listener | Listener,
     maximum_active_executions | PositiveAtMost MaximumActiveExecutions,
     controls | HandlerControls | optional,
     routes | RouteList | Array Route,

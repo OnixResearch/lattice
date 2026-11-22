@@ -6,31 +6,63 @@
 
 use super::ApplicationError;
 use super::ApplicationHandler;
+#[cfg(target_os = "linux")]
+use super::HandlerListener;
 use super::HandlerProfile;
+use super::VersionedHandlerProfile;
 
-pub fn load_profile(path: &std::path::Path) -> Result<HandlerProfile, ApplicationError> {
+/// Loads a typed Nickel handler profile. The evaluated `schema` selects version
+/// two; every other value is decoded and validated as version one.
+// r[impl lattice.workflow_interchange.handler_profile_v2]
+pub fn load_profile(path: &std::path::Path) -> Result<VersionedHandlerProfile, ApplicationError> {
     let value = crate::nickel::evaluate_file(path).map_err(|_| ApplicationError::Profile)?;
-    let profile: HandlerProfile = serde_json::from_value(value).map_err(|_| ApplicationError::Profile)?;
-    super::validate_handler_profile(&profile).map_err(|_| ApplicationError::Profile)?;
+    let is_version_two =
+        value.get("schema").and_then(serde_json::Value::as_str) == Some(super::HANDLER_PROFILE_V2_SCHEMA);
+    let profile = if is_version_two {
+        VersionedHandlerProfile::V2(serde_json::from_value(value).map_err(|_| ApplicationError::Profile)?)
+    } else {
+        let profile: HandlerProfile = serde_json::from_value(value).map_err(|_| ApplicationError::Profile)?;
+        VersionedHandlerProfile::V1(profile)
+    };
+    profile.validate().map_err(|_| ApplicationError::Profile)?;
     Ok(profile)
 }
 
+/// The listener a profile selects: version one is always the Unix socket.
+#[cfg(target_os = "linux")]
+fn selected_listener(profile: &VersionedHandlerProfile) -> HandlerListener {
+    match profile {
+        VersionedHandlerProfile::V1(profile) => HandlerListener::Unix {
+            socket_path: profile.socket_path.clone(),
+            transport: profile.transport.clone(),
+        },
+        VersionedHandlerProfile::V2(profile) => profile.listener.clone(),
+    }
+}
+
 // r[impl lattice.workflow_interchange.application_command]
+// r[impl lattice.workflow_interchange.guest_listener]
 #[cfg(target_os = "linux")]
 pub fn serve(
     store: crate::store::Store,
-    profile: HandlerProfile,
+    profile: impl Into<VersionedHandlerProfile>,
     agent_runtime: crate::agent_node::RuntimeOptions,
 ) -> Result<lattice_workflow_transport::ServeReport, ApplicationError> {
-    let socket_path = profile.socket_path.clone();
-    let transport_profile = profile.transport.clone();
+    let profile = profile.into();
+    let listener = selected_listener(&profile);
     let handler = ApplicationHandler::new(store, profile, agent_runtime)?;
     let mut service = lattice_workflow_transport::WorkflowExchangeService::new(handler);
-    let endpoint = lattice_workflow_transport::UnixEndpoint {
-        socket_path: &socket_path,
-        profile: &transport_profile,
+    let served = match &listener {
+        HandlerListener::Unix { socket_path, transport } => {
+            let endpoint = lattice_workflow_transport::UnixEndpoint {
+                socket_path,
+                profile: transport,
+            };
+            lattice_workflow_transport::serve(endpoint, &mut service)
+        }
+        HandlerListener::Vsock { transport } => lattice_workflow_transport::serve_vsock(transport, &mut service),
     };
-    let report = lattice_workflow_transport::serve(endpoint, &mut service).map_err(|_| ApplicationError::Transport)?;
+    let report = served.map_err(|_| ApplicationError::Transport)?;
     service.handler_mut().wait_for_workers();
     Ok(report)
 }
@@ -38,7 +70,7 @@ pub fn serve(
 #[cfg(not(target_os = "linux"))]
 pub fn serve(
     _store: crate::store::Store,
-    _profile: HandlerProfile,
+    _profile: impl Into<VersionedHandlerProfile>,
     _agent_runtime: crate::agent_node::RuntimeOptions,
 ) -> Result<lattice_workflow_transport::ServeReport, ApplicationError> {
     Err(ApplicationError::UnsupportedHost)

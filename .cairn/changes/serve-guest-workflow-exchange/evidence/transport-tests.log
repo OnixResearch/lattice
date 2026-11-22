@@ -1,0 +1,109 @@
+   Compiling proc-macro2 v1.0.106
+   Compiling quote v1.0.45
+   Compiling serde_core v1.0.228
+   Compiling serde v1.0.228
+   Compiling serde_json v1.0.149
+   Compiling getrandom v0.4.2
+   Compiling tempfile v3.27.0
+   Compiling syn v2.0.117
+   Compiling serde_derive v1.0.228
+   Compiling lattice-workflow-contract v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/crates/lattice-workflow-contract)
+   Compiling lattice-workflow-transport v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/crates/lattice-workflow-contract/transport)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 13.03s
+warning: the following packages contain code that will be rejected by a future version of Rust: nix v0.31.3
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 2`
+     Running unittests src/lib.rs (target/debug/deps/lattice_workflow_transport-6f9dcabb8174e87d)
+
+running 26 tests
+test tests::frame_reader_rejects_oversized_declaration_before_body_read ... ok
+test tests::listener::vsock_serving_refuses_an_invalid_profile_before_accepting ... ok
+test tests::reconnect::vsock_profile_refuses_every_invalid_field ... ok
+test tests::frame_round_trip_preserves_exchange_request ... ok
+test tests::protocol::changed_recovery_request_fails_before_handler_invocation ... ok
+test tests::stale_control_is_rejected_before_handler_invocation ... ok
+test tests::service_admits_dispatch_and_validates_handler_result ... ok
+test tests::protocol::stale_recovery_observation_is_replaced_with_a_safe_rejection ... ok
+test tests::protocol::dispatch_recovery_returns_the_exact_linked_acceptance ... ok
+test tests::socket::client_classifies_a_malformed_response_as_unknown_after_write ... ok
+test tests::socket::client_classifies_a_missing_response_as_unknown_after_write ... ok
+test tests::request_identity_is_deterministic_and_body_bound ... ok
+test tests::reconnect::vsock_profile_admits_sorted_bounded_peer_cids ... ok
+test tests::socket::recovery_disconnect_remains_unknown_without_automatic_redispatch ... ok
+test tests::protocol::dispatch_recovery_rejects_an_observation_without_the_exact_acceptance ... ok
+test tests::reconnect::reconnect_rules_recover_instead_of_redispatching ... ok
+test tests::socket::unix_server_rejects_an_unlisted_peer_before_handler_invocation ... ok
+test tests::unknown_wire_operation_is_rejected_before_admission ... ok
+test tests::reconnect::continuity_rejects_forks_and_names_gaps ... ok
+test tests::socket::unix_client_and_server_exchange_one_admitted_request ... ok
+test tests::protocol::missing_recovery_request_returns_a_closed_not_found_rejection ... ok
+test tests::protocol::linked_log_bytes_are_returned_with_the_admitted_observation ... ok
+test tests::protocol::log_bytes_must_match_the_admitted_reference ... ok
+test tests::listener::vsock_serving_admits_only_allowed_peer_cids_before_handler_invocation ... ok
+test tests::socket::server_deadline_stops_a_stalled_peer_before_handler_invocation ... ok
+test tests::listener::server_write_deadline_stops_a_peer_that_never_reads_the_response ... ok
+
+test result: ok. 26 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+     Running tests/continuity-fixtures.rs (target/debug/deps/continuity_fixtures-87f167159d8ef2dc)
+
+running 1 test
+test checked_in_continuity_cases_match_the_pure_check ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/exchange-recovery-fixtures.rs (target/debug/deps/exchange_recovery_fixtures-35d0e46df1b490ba)
+
+running 3 tests
+test checked_in_rule_table_matches_the_planned_c6_rows ... ok
+test refused_rule_rows_are_never_produced ... ok
+test checked_in_rule_table_matches_the_pure_rules_exhaustively ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/producer-fixtures.rs (target/debug/deps/producer_fixtures-3ba0b79f32b0e988)
+
+running 2 tests
+test rejected_producer_fixtures_keep_stable_failure_classes ... ok
+test accepted_producer_fixture_passes_independent_admission ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/recovery-fixtures.rs (target/debug/deps/recovery_fixtures-829cfc9954b6bd3c)
+
+running 1 test
+test recovery_producer_fixtures_pass_independent_admission ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/source-boundary.rs (target/debug/deps/source_boundary-4b934579578bf14b)
+
+running 2 tests
+test source_guard_rejects_application_and_process_markers ... ok
+test transport_source_does_not_import_the_lattice_application_or_process_shell ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests examples/emit-continuity-fixtures.rs (target/debug/examples/emit_continuity_fixtures-3f5ecbc7c0c6b056)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests examples/emit-exchange-recovery-fixtures.rs (target/debug/examples/emit_exchange_recovery_fixtures-67045eb96ba9f6e3)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests examples/emit-recovery-fixtures.rs (target/debug/examples/emit_recovery_fixtures-a29d7de26e87db43)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests examples/emit-fixtures.rs (target/debug/examples/emit_transport_fixtures-88257b5696608f13)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

@@ -61,6 +61,30 @@ pub struct TransportProfile {
     pub non_claims: Vec<String>,
 }
 
+pub const VSOCK_TRANSPORT_PROFILE_SCHEMA: &str = "lattice.workflow-vsock-transport-profile.v1";
+pub const MAXIMUM_ALLOWED_CIDS: u32 = 64;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct VsockPeerPolicy {
+    pub allowed_cids: Vec<u32>,
+}
+
+#[allow(
+    unknown_lints,
+    numeric_units,
+    reason = "a vsock port is an address, not a quantity; `port` is the published C5 wire field name"
+)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct VsockTransportProfile {
+    pub schema: String,
+    pub port: u32,
+    pub limits: TransportLimits,
+    pub peers: VsockPeerPolicy,
+    pub non_claims: Vec<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "operation", content = "payload", rename_all = "snake_case")]
 pub enum ExchangeCommand {

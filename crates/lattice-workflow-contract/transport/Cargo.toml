@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
 rust-version = "1.88"
-description = "Bounded Unix workflow exchange transport for Lattice consumers"
+description = "Bounded Unix and vsock workflow exchange transport for Lattice consumers"
 publish = false
 
 [dependencies]

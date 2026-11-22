@@ -1,11 +1,11 @@
 # Lattice workflow transport
 
-`lattice-workflow-transport` provides a bounded Linux Unix-domain-socket exchange for `lattice-workflow-contract` values.
+`lattice-workflow-transport` provides a bounded Linux exchange for `lattice-workflow-contract` values, over a Unix-domain socket or a guest `AF_VSOCK` socket.
 
 The crate contains two parts:
 
-- a functional core for envelope identity, admission, linkage, and failure classification
-- an imperative Unix shell for finite framed I/O, peer checks, deadlines, clients, and servers
+- a functional core for envelope identity, admission, linkage, failure classification, the reconnect rule table (`next_step`), and observation continuity (`continuity`)
+- imperative Unix and vsock shells for finite framed I/O, peer checks, deadlines, clients, and servers
 
 ## Handler boundary
 
@@ -17,9 +17,11 @@ The handler owns workflow runtime behavior. The transport does not select operat
 
 `serve` binds one explicit socket path, applies owner-only permissions, and handles the profile's finite connection count.
 
-`serve_listener` accepts an already bound listener. It supports supervisors and local conformance tests that own listener creation.
+`serve_listener` drives any `Listener` whose peers are Unix credentials. It supports supervisors and local conformance tests that own listener creation.
 
 Both paths require an ordered explicit Unix user-ID allowlist. The server checks peer credentials before it reads a request body.
+
+`serve_vsock` binds `VMADDR_CID_ANY:port` from a `lattice.workflow-vsock-transport-profile.v1` profile and admits only its ordered peer CIDs; `serve_vsock_listener` drives any `Listener` with vsock peers. See `docs/workflow-exchange-guest-gateway.md` in the Lattice repository.
 
 ## Client ambiguity
 
@@ -29,7 +31,7 @@ Both paths require an ordered explicit Unix user-ID allowlist. The server checks
 - `NotAccepted`: the client did not finish writing the request frame
 - `UnknownAfterWrite`: the request frame was complete, but no complete valid admitted response arrived
 
-The client does not retry automatically.
+The client does not retry automatically. `exchange_connected` runs the same client over a stream the caller already connected, such as a hybrid-vsock stream after its `CONNECT` handshake.
 
 After an unknown dispatch, `RecoverDispatch` uses the original admitted request to look up the exact acceptance. Observation-only recovery fails closed.
 
@@ -40,6 +42,8 @@ The transport fixture generator is exposed as `emit-transport-fixtures` so its C
 ```text
 cargo run --manifest-path crates/lattice-workflow-contract/transport/Cargo.toml --example emit-transport-fixtures
 ```
+
+The reconnect rule table and continuity check ship as `fixtures/exchange-recovery-fixtures-v1.json` and `fixtures/continuity-fixtures-v1.json`, emitted by the `emit-exchange-recovery-fixtures` and `emit-continuity-fixtures` examples.
 
 ## Verification
 

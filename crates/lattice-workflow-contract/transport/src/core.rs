@@ -29,6 +29,7 @@ use crate::MAXIMUM_LOG_BYTES;
 use crate::REQUIRED_NON_CLAIMS;
 use crate::Rejection;
 use crate::TRANSPORT_PROFILE_SCHEMA;
+use crate::TransportLimits;
 use crate::TransportProfile;
 
 const REQUEST_IDENTITY_DOMAIN: &[u8] = b"lattice.workflow-exchange-request-identity.v1";
@@ -70,7 +71,24 @@ pub fn validate_transport_profile(profile: &TransportProfile) -> Result<(), Admi
     if profile.schema != TRANSPORT_PROFILE_SCHEMA {
         return Err(AdmissionError::ProfileSchema);
     }
-    let limits = profile.limits;
+    validate_transport_limits(profile.limits)?;
+    let user_count = u32::try_from(profile.peers.allowed_user_ids.len()).map_err(|_| AdmissionError::PeerPolicy)?;
+    if user_count == 0 || user_count > MAXIMUM_ALLOWED_USERS {
+        return Err(AdmissionError::PeerPolicy);
+    }
+    if !is_strictly_ascending(&profile.peers.allowed_user_ids) {
+        return Err(AdmissionError::PeerPolicy);
+    }
+    if !declares_required_non_claims(&profile.non_claims) {
+        return Err(AdmissionError::ProfileSchema);
+    }
+    debug_assert_eq!(profile.schema, TRANSPORT_PROFILE_SCHEMA);
+    debug_assert!(!profile.peers.allowed_user_ids.is_empty());
+    Ok(())
+}
+
+// Shared by the Unix and vsock transport profiles: both carry the same bounded limits record.
+pub(crate) const fn validate_transport_limits(limits: TransportLimits) -> Result<(), AdmissionError> {
     let has_positive_limits = limits.maximum_frame_bytes > 0
         && limits.maximum_log_bytes > 0
         && limits.maximum_connections > 0
@@ -84,26 +102,15 @@ pub fn validate_transport_profile(profile: &TransportProfile) -> Result<(), Admi
     if !has_positive_limits || !is_within_contract_limits {
         return Err(AdmissionError::ProfileLimit);
     }
-    let user_count = u32::try_from(profile.peers.allowed_user_ids.len()).map_err(|_| AdmissionError::PeerPolicy)?;
-    if user_count == 0 || user_count > MAXIMUM_ALLOWED_USERS {
-        return Err(AdmissionError::PeerPolicy);
-    }
-    let is_user_list_ordered = profile.peers.allowed_user_ids.windows(2).all(|pair| match pair {
-        [left, right] => left < right,
-        _ => false,
-    });
-    if !is_user_list_ordered {
-        return Err(AdmissionError::PeerPolicy);
-    }
-    let has_non_claims = REQUIRED_NON_CLAIMS
-        .iter()
-        .all(|required| profile.non_claims.iter().any(|declared| declared == required));
-    if !has_non_claims {
-        return Err(AdmissionError::ProfileSchema);
-    }
-    debug_assert_eq!(profile.schema, TRANSPORT_PROFILE_SCHEMA);
-    debug_assert!(!profile.peers.allowed_user_ids.is_empty());
     Ok(())
+}
+
+pub(crate) fn is_strictly_ascending(values: &[u32]) -> bool {
+    values.windows(2).all(|pair| matches!(pair, [left, right] if left < right))
+}
+
+pub(crate) fn declares_required_non_claims(declared: &[String]) -> bool {
+    REQUIRED_NON_CLAIMS.iter().all(|required| declared.iter().any(|value| value == required))
 }
 
 // r[impl lattice.workflow_interchange.transport_envelope]
@@ -181,11 +188,15 @@ pub fn validate_exchange_response(
 
 pub fn validate_response_limits(profile: &TransportProfile, response: &ExchangeResponse) -> Result<(), AdmissionError> {
     validate_transport_profile(profile)?;
+    validate_log_limit(profile.limits, response)
+}
+
+pub(crate) fn validate_log_limit(limits: TransportLimits, response: &ExchangeResponse) -> Result<(), AdmissionError> {
     if let ExchangeResult::Success(success) = &response.result
         && let ExchangeSuccess::Log { bytes, .. } = success.as_ref()
     {
         let byte_count_bytes = u32::try_from(bytes.len()).map_err(|_| AdmissionError::LogBound)?;
-        if byte_count_bytes > profile.limits.maximum_log_bytes {
+        if byte_count_bytes > limits.maximum_log_bytes {
             return Err(AdmissionError::LogBound);
         }
     }

@@ -7,6 +7,7 @@
 )]
 
 use std::fs::Permissions;
+use std::io::Read;
 use std::io::Write;
 use std::net::Shutdown;
 use std::os::unix::fs::PermissionsExt;
@@ -25,6 +26,7 @@ use crate::FrameFailure;
 use crate::SOCKET_PERMISSION_MODE;
 use crate::ServeReport;
 use crate::ServerFailure;
+use crate::TransportLimits;
 use crate::TransportProfile;
 use crate::WorkflowExchangeHandler;
 use crate::WorkflowExchangeService;
@@ -53,20 +55,97 @@ impl<'a> UnixClient<'a> {
 
     // r[impl lattice.workflow_interchange.transport_ambiguity]
     pub fn exchange(&self, request: &ExchangeRequest) -> Result<ExchangeResponse, ClientFailure> {
-        validate_transport_profile(self.endpoint.profile).map_err(|_| ClientFailure::InvalidProfile)?;
-        validate_exchange_request(request).map_err(|_| ClientFailure::InvalidRequest)?;
-        let limits = self.endpoint.profile.limits;
-        let frame = encode_frame(request, limits.maximum_frame_bytes).map_err(|_| ClientFailure::InvalidRequest)?;
-        let mut stream = UnixStream::connect(self.endpoint.socket_path).map_err(|_| ClientFailure::ConnectFailed)?;
-        set_stream_deadlines(&stream, self.endpoint.profile).map_err(|_| ClientFailure::ConnectFailed)?;
-        write_frame(&mut stream, &frame).map_err(classify_incomplete_write)?;
-        stream.shutdown(Shutdown::Write).map_err(|_| ClientFailure::UnknownAfterWrite)?;
-        let body = read_frame(&mut stream, limits.maximum_frame_bytes).map_err(|_| ClientFailure::UnknownAfterWrite)?;
-        let response: ExchangeResponse = serde_json::from_slice(&body).map_err(|_| ClientFailure::UnknownAfterWrite)?;
-        validate_exchange_response(request, &response).map_err(|_| ClientFailure::UnknownAfterWrite)?;
-        crate::validate_response_limits(self.endpoint.profile, &response)
-            .map_err(|_| ClientFailure::UnknownAfterWrite)?;
-        Ok(response)
+        let frame = prepare_request_frame(self.endpoint.profile, request)?;
+        let stream = UnixStream::connect(self.endpoint.socket_path).map_err(|_| ClientFailure::ConnectFailed)?;
+        exchange_frame(stream, self.endpoint.profile, request, &frame)
+    }
+}
+
+/// Exchanges one request over a stream the caller already connected.
+///
+/// This is the client half for supervised channels such as a Cloud Hypervisor
+/// hybrid-vsock socket after its `CONNECT` handshake, or a socketpair in tests. It
+/// applies the same deadlines, framing and failure classes as [`UnixClient`].
+// r[impl lattice.workflow_interchange.transport_ambiguity]
+// r[impl lattice.workflow_interchange.guest_listener]
+pub fn exchange_connected(
+    stream: UnixStream,
+    profile: &TransportProfile,
+    request: &ExchangeRequest,
+) -> Result<ExchangeResponse, ClientFailure> {
+    let frame = prepare_request_frame(profile, request)?;
+    exchange_frame(stream, profile, request, &frame)
+}
+
+fn prepare_request_frame(profile: &TransportProfile, request: &ExchangeRequest) -> Result<Vec<u8>, ClientFailure> {
+    validate_transport_profile(profile).map_err(|_| ClientFailure::InvalidProfile)?;
+    validate_exchange_request(request).map_err(|_| ClientFailure::InvalidRequest)?;
+    encode_frame(request, profile.limits.maximum_frame_bytes).map_err(|_| ClientFailure::InvalidRequest)
+}
+
+fn exchange_frame(
+    mut stream: UnixStream,
+    profile: &TransportProfile,
+    request: &ExchangeRequest,
+    frame: &[u8],
+) -> Result<ExchangeResponse, ClientFailure> {
+    let limits = profile.limits;
+    set_stream_deadlines(&stream, limits).map_err(|_| ClientFailure::ConnectFailed)?;
+    write_frame(&mut stream, frame).map_err(classify_incomplete_write)?;
+    stream.shutdown(Shutdown::Write).map_err(|_| ClientFailure::UnknownAfterWrite)?;
+    let body = read_frame(&mut stream, limits.maximum_frame_bytes).map_err(|_| ClientFailure::UnknownAfterWrite)?;
+    let response: ExchangeResponse = serde_json::from_slice(&body).map_err(|_| ClientFailure::UnknownAfterWrite)?;
+    validate_exchange_response(request, &response).map_err(|_| ClientFailure::UnknownAfterWrite)?;
+    crate::validate_response_limits(profile, &response).map_err(|_| ClientFailure::UnknownAfterWrite)?;
+    Ok(response)
+}
+
+/// A bounded stream source that the exchange server drives.
+///
+/// The server accepts one stream, observes its peer, asks the serving profile
+/// whether that peer is admitted, applies the profile deadlines, and only then
+/// reads a request. Implementations own socket creation and peer observation;
+/// admission policy stays with the serving profile.
+// r[impl lattice.workflow_interchange.guest_listener]
+pub trait Listener {
+    type Stream: Read + Write;
+    type Peer;
+
+    fn accept(&self) -> Result<Self::Stream, ServerFailure>;
+    fn observe_peer(&self, stream: &Self::Stream) -> Result<Self::Peer, ServerFailure>;
+    fn set_deadlines(&self, stream: &mut Self::Stream, limits: TransportLimits) -> Result<(), ServerFailure>;
+}
+
+/// Kernel-observed credentials of a Unix-domain peer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UnixPeer {
+    pub user_id: u32,
+}
+
+impl UnixPeer {
+    pub fn observe(stream: &UnixStream) -> Result<Self, ServerFailure> {
+        let credentials = getsockopt(stream, PeerCredentials).map_err(|_| ServerFailure::PeerObservationFailed)?;
+        Ok(Self {
+            user_id: credentials.uid(),
+        })
+    }
+}
+
+impl Listener for UnixListener {
+    type Stream = UnixStream;
+    type Peer = UnixPeer;
+
+    fn accept(&self) -> Result<UnixStream, ServerFailure> {
+        let (stream, _address) = Self::accept(self).map_err(|_| ServerFailure::AcceptFailed)?;
+        Ok(stream)
+    }
+
+    fn observe_peer(&self, stream: &UnixStream) -> Result<UnixPeer, ServerFailure> {
+        UnixPeer::observe(stream)
+    }
+
+    fn set_deadlines(&self, stream: &mut UnixStream, limits: TransportLimits) -> Result<(), ServerFailure> {
+        set_stream_deadlines(stream, limits)
     }
 }
 
@@ -91,31 +170,66 @@ pub fn serve<H: WorkflowExchangeHandler>(
     report
 }
 
-pub fn serve_listener<H: WorkflowExchangeHandler>(
-    listener: &UnixListener,
+/// Serves a listener whose peers are Unix credentials, admitting the profile's user IDs.
+// r[impl lattice.workflow_interchange.guest_listener]
+pub fn serve_listener<L, H>(
+    listener: &L,
     profile: &TransportProfile,
     service: &mut WorkflowExchangeService<H>,
-) -> Result<ServeReport, ServerFailure> {
+) -> Result<ServeReport, ServerFailure>
+where
+    L: Listener<Peer = UnixPeer>,
+    H: WorkflowExchangeHandler,
+{
     debug_assert!(profile.limits.maximum_connections > 0);
     debug_assert!(!profile.peers.allowed_user_ids.is_empty());
+    let admits_peer = |peer: &UnixPeer| profile.peers.allowed_user_ids.binary_search(&peer.user_id).is_ok();
+    let admits_response = |response: &ExchangeResponse| crate::validate_response_limits(profile, response).is_ok();
+    let admission = ServeAdmission {
+        limits: profile.limits,
+        peer: &admits_peer,
+        response: &admits_response,
+    };
+    serve_connections(listener, &admission, service)
+}
+
+/// Serving policy shared by every listener kind: bounds, peer admission and response bounds.
+pub(crate) struct ServeAdmission<'a, P> {
+    pub(crate) limits: TransportLimits,
+    pub(crate) peer: &'a dyn Fn(&P) -> bool,
+    pub(crate) response: &'a dyn Fn(&ExchangeResponse) -> bool,
+}
+
+pub(crate) fn serve_connections<L, H>(
+    listener: &L,
+    admission: &ServeAdmission<'_, L::Peer>,
+    service: &mut WorkflowExchangeService<H>,
+) -> Result<ServeReport, ServerFailure>
+where
+    L: Listener,
+    H: WorkflowExchangeHandler,
+{
+    debug_assert!(admission.limits.maximum_connections > 0);
+    debug_assert!(admission.limits.read_deadline_milliseconds > 0);
     let mut report = ServeReport {
         accepted_connections: 0,
         completed_exchanges: 0,
         rejected_peers: 0,
         failed_exchanges: 0,
     };
-    while report.accepted_connections < profile.limits.maximum_connections {
-        let (mut stream, _address) = listener.accept().map_err(|_| ServerFailure::AcceptFailed)?;
+    while report.accepted_connections < admission.limits.maximum_connections {
+        let mut stream = listener.accept()?;
         report.accepted_connections = report.accepted_connections.checked_add(1).ok_or(ServerFailure::AcceptFailed)?;
-        if !peer_is_admitted(&stream, profile)? {
+        let peer = listener.observe_peer(&stream)?;
+        if !(admission.peer)(&peer) {
             report.rejected_peers = report.rejected_peers.checked_add(1).ok_or(ServerFailure::PeerDenied)?;
             continue;
         }
-        if set_stream_deadlines(&stream, profile).is_err() {
+        if listener.set_deadlines(&mut stream, admission.limits).is_err() {
             increment_failures(&mut report)?;
             continue;
         }
-        if exchange_one(&mut stream, profile, service).is_err() {
+        if exchange_one(&mut stream, admission, service).is_err() {
             increment_failures(&mut report)?;
             continue;
         }
@@ -124,17 +238,22 @@ pub fn serve_listener<H: WorkflowExchangeHandler>(
     Ok(report)
 }
 
-fn exchange_one<H: WorkflowExchangeHandler>(
-    stream: &mut UnixStream,
-    profile: &TransportProfile,
+fn exchange_one<S, P, H>(
+    stream: &mut S,
+    admission: &ServeAdmission<'_, P>,
     service: &mut WorkflowExchangeService<H>,
-) -> Result<(), ServerFailure> {
-    debug_assert!(profile.limits.maximum_frame_bytes > 0);
-    debug_assert!(profile.limits.maximum_log_bytes > 0);
-    let body = read_frame(stream, profile.limits.maximum_frame_bytes).map_err(map_read_failure)?;
+) -> Result<(), ServerFailure>
+where
+    S: Read + Write,
+    H: WorkflowExchangeHandler,
+{
+    let limits = admission.limits;
+    debug_assert!(limits.maximum_frame_bytes > 0);
+    debug_assert!(limits.maximum_log_bytes > 0);
+    let body = read_frame(stream, limits.maximum_frame_bytes).map_err(map_read_failure)?;
     let request: ExchangeRequest = serde_json::from_slice(&body).map_err(|_| ServerFailure::ReadFailed)?;
     let candidate = service.exchange(&request).map_err(|_| ServerFailure::WriteFailed)?;
-    let response = if crate::validate_response_limits(profile, &candidate).is_ok() {
+    let response = if (admission.response)(&candidate) {
         candidate
     } else {
         crate::new_response(
@@ -146,19 +265,14 @@ fn exchange_one<H: WorkflowExchangeHandler>(
         )
         .map_err(|_| ServerFailure::WriteFailed)?
     };
-    let frame = encode_frame(&response, profile.limits.maximum_frame_bytes).map_err(map_write_failure)?;
+    let frame = encode_frame(&response, limits.maximum_frame_bytes).map_err(map_write_failure)?;
     write_frame(stream, &frame).map_err(map_write_failure)?;
     stream.flush().map_err(|_| ServerFailure::WriteFailed)
 }
 
-fn peer_is_admitted(stream: &UnixStream, profile: &TransportProfile) -> Result<bool, ServerFailure> {
-    let credentials = getsockopt(stream, PeerCredentials).map_err(|_| ServerFailure::PeerObservationFailed)?;
-    Ok(profile.peers.allowed_user_ids.binary_search(&credentials.uid()).is_ok())
-}
-
-fn set_stream_deadlines(stream: &UnixStream, profile: &TransportProfile) -> Result<(), ServerFailure> {
-    let read = Duration::from_millis(profile.limits.read_deadline_milliseconds);
-    let write = Duration::from_millis(profile.limits.write_deadline_milliseconds);
+fn set_stream_deadlines(stream: &UnixStream, limits: TransportLimits) -> Result<(), ServerFailure> {
+    let read = Duration::from_millis(limits.read_deadline_milliseconds);
+    let write = Duration::from_millis(limits.write_deadline_milliseconds);
     stream.set_read_timeout(Some(read)).map_err(|_| ServerFailure::ReadFailed)?;
     stream.set_write_timeout(Some(write)).map_err(|_| ServerFailure::WriteFailed)
 }

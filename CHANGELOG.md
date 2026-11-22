@@ -9,6 +9,19 @@ interfaces.
 
 ### Added
 
+- Guest workflow exchange over vsock (Lattice #11, Lattice side). The exchange
+  transport serves through a `Listener` seam: the Unix path keeps its wire
+  behaviour, and a new guest listener binds `VMADDR_CID_ANY:port` under
+  `lattice.workflow-vsock-transport-profile.v1` and admits only an ordered
+  peer-CID allow-list. `exchange_connected` runs the client over a
+  caller-connected stream. Handler profile
+  `lattice.workflow-exchange-handler-profile.v2` selects a `unix` or `vsock`
+  listener under its own identity domain; version one is unchanged, and workflow
+  pause and resume stay refused. The pure reconnect rule table
+  (`lattice.workflow-exchange-recovery.v1`) and observation continuity check
+  (`lattice.workflow-observation-continuity.v1`) ship as the Kiln-facing
+  fixtures `exchange-recovery-fixtures-v1.json` and `continuity-fixtures-v1.json`.
+  Evidence is Q0/Q1 only: real `AF_VSOCK` is not exercised here.
 - Standalone operator repair (Lattice #6). `lattice implementation-attempt
   run --repair-checks CATALOG` runs a request with a repair policy through
   operator ports when no embedder supplies repair ports: one pinned OMP step

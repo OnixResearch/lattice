@@ -14,9 +14,12 @@ pub use core::mark_running;
 pub use core::mark_unknown;
 pub use core::request_cancellation;
 
+pub use admission::VersionedHandlerProfile;
 pub use admission::handler_profile_identity;
+pub use admission::handler_profile_v2_identity;
 pub use admission::select_route;
 pub use admission::validate_handler_profile;
+pub use admission::validate_handler_profile_v2;
 pub use admission::validate_route;
 pub use application::ApplicationHandler;
 pub use application::load_profile;

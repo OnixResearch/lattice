@@ -15,10 +15,12 @@ use lattice_workflow_contract::NodeState;
 use lattice_workflow_contract::WorkflowAccepted;
 use lattice_workflow_contract::WorkflowRequest;
 use lattice_workflow_transport::TransportProfile;
+use lattice_workflow_transport::VsockTransportProfile;
 use serde::Deserialize;
 use serde::Serialize;
 
 pub const HANDLER_PROFILE_SCHEMA: &str = "lattice.workflow-exchange-handler-profile.v1";
+pub const HANDLER_PROFILE_V2_SCHEMA: &str = "lattice.workflow-exchange-handler-profile.v2";
 pub const EXECUTION_RECORD_SCHEMA: &str = "lattice.workflow-exchange-execution.v1";
 pub const MAXIMUM_ROUTES: u32 = 1_024;
 pub const MAXIMUM_ROUTE_NODES: u32 = lattice_workflow_contract::CONTRACT_MAXIMUM_NODES;
@@ -97,6 +99,30 @@ pub struct HandlerProfile {
     pub schema: String,
     pub socket_path: PathBuf,
     pub transport: TransportProfile,
+    pub maximum_active_executions: u32,
+    #[serde(default)]
+    pub controls: HandlerControls,
+    pub routes: Vec<WorkflowRoute>,
+    pub non_claims: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum HandlerListener {
+    Unix {
+        socket_path: PathBuf,
+        transport: TransportProfile,
+    },
+    Vsock {
+        transport: VsockTransportProfile,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HandlerProfileV2 {
+    pub schema: String,
+    pub listener: HandlerListener,
     pub maximum_active_executions: u32,
     #[serde(default)]
     pub controls: HandlerControls,

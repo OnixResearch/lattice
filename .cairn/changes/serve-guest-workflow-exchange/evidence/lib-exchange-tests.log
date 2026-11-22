@@ -1,0 +1,305 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling libc v0.2.189
+   Compiling serde v1.0.228
+   Compiling zeroize v1.9.0
+   Compiling blake3 v1.8.5
+   Compiling zmij v1.0.21
+   Compiling thiserror v2.0.18
+   Compiling num-traits v0.2.19
+   Compiling generic-array v0.14.7
+   Compiling serde_json v1.0.149
+   Compiling smallvec v1.15.1
+   Compiling der v0.7.10
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling zerofrom v0.1.6
+   Compiling num-integer v0.1.46
+   Compiling getrandom v0.2.17
+   Compiling digest v0.10.7
+   Compiling parking_lot_core v0.9.12
+   Compiling rand_core v0.6.4
+   Compiling errno v0.3.14
+   Compiling mio v1.2.0
+   Compiling parking_lot v0.12.5
+   Compiling sha2 v0.10.9
+   Compiling spki v0.7.3
+   Compiling signal-hook-registry v1.4.8
+   Compiling yoke v0.8.1
+   Compiling signature v2.2.0
+   Compiling pkcs8 v0.10.2
+   Compiling indexmap v1.9.3
+   Compiling wasmtime-internal-core v45.0.0
+   Compiling darling_core v0.23.0
+   Compiling derive_more-impl v2.1.1
+   Compiling zerovec v0.11.5
+   Compiling signal-hook v0.3.18
+   Compiling indexmap v2.14.2
+   Compiling signal-hook-mio v0.2.5
+   Compiling cranelift-bitset v0.132.0
+   Compiling tinystr v0.8.2
+   Compiling potential_utf v0.1.4
+   Compiling zerotrie v0.2.3
+   Compiling icu_locale_core v2.1.1
+   Compiling strum v0.27.2
+   Compiling icu_collections v2.1.1
+   Compiling hmac v0.12.1
+   Compiling kasuari v0.4.12
+   Compiling pulley-interpreter v45.0.0
+   Compiling derive_more v2.1.1
+   Compiling crossterm v0.29.0
+   Compiling icu_provider v2.1.1
+   Compiling ratatui-core v0.1.0
+   Compiling cranelift-entity v0.132.0
+   Compiling darling_macro v0.23.0
+   Compiling num-bigint v0.4.8
+   Compiling socket2 v0.6.3
+   Compiling time v0.3.47
+   Compiling cranelift-codegen-meta v0.132.0
+   Compiling darling v0.23.0
+   Compiling tokio v1.50.0
+   Compiling instability v0.3.12
+   Compiling icu_properties v2.1.2
+   Compiling cranelift-bforest v0.132.0
+   Compiling futures-util v0.3.32
+   Compiling verus_state_machines_macros v0.0.0-2026-01-25-0057
+   Compiling ff v0.13.1
+   Compiling sec1 v0.7.3
+   Compiling cranelift-codegen v0.132.0
+   Compiling petgraph v0.7.1
+   Compiling ratatui-widgets v0.3.0
+   Compiling ratatui-crossterm v0.1.0
+   Compiling wasmparser v0.248.0
+   Compiling curve25519-dalek v4.1.3
+   Compiling ratatui-macros v0.7.0
+   Compiling group v0.13.0
+   Compiling hkdf v0.12.4
+   Compiling regalloc2 v0.15.2
+   Compiling vstd v0.0.0-2026-01-25-0057
+   Compiling ed25519 v2.2.3
+   Compiling crypto-bigint v0.5.5
+   Compiling cobs v0.3.0
+   Compiling lalrpop v0.22.2
+   Compiling elliptic-curve v0.13.8
+   Compiling wasmprinter v0.248.0
+   Compiling postcard v1.1.3
+   Compiling ed25519-dalek v2.2.0
+   Compiling ratatui v0.30.0
+   Compiling getrandom v0.3.4
+   Compiling rustls-pki-types v1.15.0
+   Compiling ring v0.17.14
+   Compiling malachite-nz v0.9.1
+   Compiling wasmtime-environ v45.0.0
+   Compiling rand_core v0.9.5
+   Compiling icu_normalizer v2.1.1
+   Compiling rfc6979 v0.4.0
+   Compiling logos-codegen v0.16.1
+   Compiling ecdsa v0.16.9
+   Compiling hashbrown v0.14.5
+   Compiling idna_adapter v1.2.1
+   Compiling rand_chacha v0.9.0
+   Compiling rustls-webpki v0.103.13
+   Compiling proc-macro2-diagnostics v0.10.1
+   Compiling getrandom v0.4.2
+   Compiling rand_chacha v0.3.1
+   Compiling md-5 v0.10.6
+   Compiling ouroboros_macro v0.18.5
+   Compiling idna v1.1.0
+   Compiling nickel-lang-parser v0.3.0
+   Compiling preserves v5.0.0-rc.7
+   Compiling rand v0.8.5
+   Compiling rustls v0.23.42
+   Compiling malachite-q v0.9.1
+   Compiling malachite-float v0.9.1
+   Compiling rand v0.9.2
+   Compiling logos-derive v0.16.1
+   Compiling dashmap v6.2.1
+   Compiling redb v2.6.3
+   Compiling num-iter v0.1.46
+   Compiling codespan-reporting v0.13.1
+   Compiling ratcore v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/rats/source/ratcore)
+   Compiling ouroboros v0.18.5
+   Compiling generic_singleton v0.5.3
+   Compiling backtrace v0.3.76
+   Compiling wit-parser v0.248.0
+   Compiling tracing v0.1.44
+   Compiling codespan v0.13.1
+   Compiling num-bigint-dig v0.8.6
+   Compiling logos v0.16.1
+   Compiling lasso v0.7.3
+   Compiling cranelift-native v0.132.0
+   Compiling cranelift-frontend v0.132.0
+   Compiling wasmtime-internal-unwinder v45.0.0
+   Compiling wasmtime-internal-cranelift v45.0.0
+   Compiling malachite v0.9.1
+   Compiling url v2.5.8
+   Compiling nickel-lang-core v0.18.0 (https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=f0ea0d2a31d3482ddf4e575482f6ddf7a7e7d4e9#f0ea0d2a)
+   Compiling nickel-lang-vector v0.2.0
+   Compiling webpki-roots v1.0.9
+   Compiling primeorder v0.13.6
+   Compiling choregraph-core v0.1.0 (https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=fcbae0aa17bc0eab1345529adb9ff104a46540ef#fcbae0aa)
+   Compiling futures-executor v0.3.32
+   Compiling num-rational v0.4.2
+   Compiling codegen v0.2.0
+   Compiling pkcs1 v0.7.5
+   Compiling compact_str v0.8.2
+   Compiling rand_xoshiro v0.6.0
+   Compiling ordered-float v5.3.0
+   Compiling animus-router v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/animus/crates/animus-router)
+   Compiling animus-adapter-daemon v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/animus/crates/animus-adapter-daemon)
+   Compiling animus-core v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/animus/crates/animus-core)
+   Compiling animus-adapter-continual v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/animus/crates/animus-adapter-continual)
+   Compiling host-control-core v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/host-control/crates/host-control-core)
+   Compiling animus-adapter-rlm-kernel v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/animus/crates/animus-adapter-rlm-kernel)
+   Compiling thin-vec v0.2.18
+   Compiling chrono v0.4.44
+   Compiling steel-parser v0.8.2
+   Compiling animus-adapters v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/animus/crates/animus-adapters)
+   Compiling hyper v1.10.1
+   Compiling serde_yaml v0.9.34+deprecated
+   Compiling im-rc v15.1.0
+   Compiling steel-gen v0.8.2
+   Compiling rsa v0.9.10
+   Compiling winch-codegen v45.0.0
+   Compiling icu_casemap v2.1.1
+   Compiling wasmtime-internal-wit-bindgen v45.0.0
+   Compiling bigdecimal v0.4.10
+   Compiling backtrace-ext v0.2.1
+   Compiling im-lists v0.11.4
+   Compiling uuid v1.23.0
+   Compiling sha-1 v0.10.1
+   Compiling which v8.0.5
+   Compiling steel-quickscope v0.3.2
+   Compiling bincode v1.3.3
+   Compiling miette v7.6.0
+   Compiling tempfile v3.27.0
+   Compiling steel-core v0.8.2
+   Compiling tower v0.5.3
+   Compiling molten-batch-core v0.2.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/aspen-render/source/batch-core)
+   Compiling inquire v0.9.4
+   Compiling thiserror v1.0.69
+   Compiling snafu v0.8.9
+   Compiling clap v4.6.0
+   Compiling wasmtime-internal-winch v45.0.0
+   Compiling wasmtime-internal-component-macro v45.0.0
+   Compiling wasmtime-internal-fiber v45.0.0
+   Compiling memoffset v0.9.1
+   Compiling linkme v0.3.37
+   Compiling hyper-util v0.1.20
+   Compiling choregraph-kamacite v0.1.0 (https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=fcbae0aa17bc0eab1345529adb9ff104a46540ef#fcbae0aa)
+   Compiling p256 v0.13.2
+   Compiling p384 v0.13.1
+   Compiling verified-logic v0.2.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/basalt/vendor/ucan/vendor/verified-logic)
+   Compiling tokio-rustls v0.26.4
+   Compiling k256 v0.13.4
+   Compiling rat-chrome v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/rats/source/subwayrat/crates/rat-chrome)
+   Compiling ucan-core v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/basalt/vendor/ucan/crates/ucan-core)
+   Compiling wasmtime-internal-jit-icache-coherence v45.0.0
+   Compiling artifact-auth-core v0.1.0 (https://github.com/OnixResearch/onix-artifact.git?rev=5f3962d7471d1547e044f57daeda72f56621fd52#5f3962d7)
+   Compiling revocation-view-core v0.1.0 (https://seed.radicle.garden/z3kGDT73ja8rewvGLwJFLF5MTx1ih.git?rev=a0de79303f3f45c18a34fff535b690a85cb3cf59#a0de7930)
+   Compiling replay-ledger-core v0.1.0 (https://seed.radicle.garden/z3kGDT73ja8rewvGLwJFLF5MTx1ih.git?rev=a0de79303f3f45c18a34fff535b690a85cb3cf59#a0de7930)
+   Compiling bounded-http-core v0.1.0 (https://seed.radicle.garden/z4ARxEt93T6gJTrTZpUyKHMAemPiv.git?rev=5abc2b93e0f288aba251a0750ce2d716eb9757fc#5abc2b93)
+   Compiling secrecy v0.10.3
+   Compiling secretspec v0.17.0
+   Compiling bounded-http v0.1.0 (https://seed.radicle.garden/z4ARxEt93T6gJTrTZpUyKHMAemPiv.git?rev=5abc2b93e0f288aba251a0750ce2d716eb9757fc#5abc2b93)
+   Compiling wasmtime v45.0.0
+   Compiling artifact-auth-ed25519 v0.1.0 (https://github.com/OnixResearch/onix-artifact.git?rev=5f3962d7471d1547e044f57daeda72f56621fd52#5f3962d7)
+   Compiling ucan-nostr v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/basalt/vendor/ucan/crates/ucan-nostr)
+   Compiling hyper-rustls v0.27.9
+   Compiling jsonwebtoken v11.0.0
+   Compiling animus-steel v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/animus/crates/animus-steel)
+   Compiling nix v0.28.0
+   Compiling lattice v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2)
+   Compiling nix v0.31.3
+   Compiling nix v0.30.1
+   Compiling filedescriptor v0.8.3
+   Compiling molten-orchestrator-codec v0.2.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/aspen-render/source/codec)
+   Compiling tower-http v0.6.11
+   Compiling animus-session-core v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/animus/crates/animus-session-core)
+   Compiling rat-keymap v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/rats/source/subwayrat/crates/rat-keymap)
+   Compiling verified-logic v0.2.0 (https://github.com/OnixResearch/trellis.git?rev=d65974b14978e1a44b0f5067beb9ef6d83317dc8#d65974b1)
+   Compiling ucan v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/basalt/vendor/ucan)
+   Compiling serde_urlencoded v0.7.1
+   Compiling tokio-stream v0.1.18
+   Compiling serial2 v0.2.37
+   Compiling crunch-wasm-component-core v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/mantle/crates/crunch-wasm-component-core)
+   Compiling hardened-wasmtime-runtime v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/hardened-wasmtime-runtime/crates/hardened-wasmtime-runtime)
+   Compiling lattice-workflow-contract v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/crates/lattice-workflow-contract)
+   Compiling content-identity-core v0.1.0 (https://seed.radicle.garden/zA14jhTdwST4PxPBdsryc4zS7Kpq.git?rev=7f55597b5dc879b7601856e8d7fd0dbacaa2a498#7f55597b)
+   Compiling rat-canvas v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/rats/source/subwayrat/crates/rat-canvas)
+   Compiling rat-widgets v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/rats/source/subwayrat/crates/rat-widgets)
+   Compiling mantle-wasm-consumer-verifier v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/mantle/crates/mantle-wasm-consumer-verifier)
+   Compiling choregraph-choreography v0.1.0 (https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=fcbae0aa17bc0eab1345529adb9ff104a46540ef#fcbae0aa)
+   Compiling lattice-workflow-transport v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/crates/lattice-workflow-contract/transport)
+   Compiling bounded-exec v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/bounded-exec/crates/bounded-exec)
+   Compiling tracing-subscriber v0.3.23
+   Compiling portable-pty v0.9.0
+   Compiling snafu v0.9.0
+   Compiling rat-nodegraph v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/rats/source/subwayrat/crates/rat-nodegraph)
+   Compiling lattice-core v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/crates/lattice-core)
+   Compiling hardened-wasmtime-shell v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/hardened-wasmtime-runtime/crates/hardened-wasmtime-shell)
+   Compiling tokio-test v0.4.5
+warning: use of deprecated method `std::sync::atomic::Atomic::<u32>::fetch_update`: renamed to `try_update` for consistency
+  --> vendor-cargo-deps/hardened-wasmtime-runtime/crates/hardened-wasmtime-shell/src/concurrency.rs:20:10
+   |
+20 |         .fetch_update(
+   |          ^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+help: replace the use of the deprecated method
+   |
+20 -         .fetch_update(
+20 +         .try_update(
+   |
+
+   Compiling rand v0.10.0
+   Compiling reqwest v0.12.28
+   Compiling basalt v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/basalt)
+warning: `hardened-wasmtime-shell` (lib) generated 1 warning (run `cargo fix --lib -p hardened-wasmtime-shell` to apply 1 suggestion)
+   Compiling animus-runtime v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/animus/crates/animus-runtime)
+   Compiling rat-tree v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/rats/source/subwayrat/crates/rat-tree)
+   Compiling nickel-lang v2.2.0 (https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=f0ea0d2a31d3482ddf4e575482f6ddf7a7e7d4e9#f0ea0d2a)
+   Compiling trybuild v1.0.119
+   Compiling molten-render-pilot v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/aspen-render/source/render)
+   Compiling valence-core v0.1.0 (https://github.com/OnixResearch/valence.git?rev=15e72b5a330b08139ac7c809ac31e7e87f825b22#15e72b5a)
+   Compiling rat-streaming v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/rats/source/subwayrat/crates/rat-streaming)
+   Compiling nickel-eval v0.1.0 (https://seed.radicle.garden/z21miuQLqLwe1HkaMu2mEZy5fdG9F.git?rev=f0ea0d2a31d3482ddf4e575482f6ddf7a7e7d4e9#f0ea0d2a)
+   Compiling choregraph-nickel v0.1.0 (https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=fcbae0aa17bc0eab1345529adb9ff104a46540ef#fcbae0aa)
+   Compiling rat-layers v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/rats/source/subwayrat/crates/rat-layers)
+   Compiling rat-fuzzy v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/rats/source/subwayrat/crates/rat-fuzzy)
+   Compiling rat-table v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/rats/source/subwayrat/crates/rat-table)
+   Compiling choregraph-seaglass v0.1.0 (https://seed.radicle.garden/zL2ncTUeASVYwcoGkEXv9JKgGbAF.git?rev=fcbae0aa17bc0eab1345529adb9ff104a46540ef#fcbae0aa)
+   Compiling futures v0.3.32
+   Compiling rat-editor v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/rats/source/subwayrat/crates/rat-editor)
+   Compiling animus-frozen-policy v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/animus/crates/animus-frozen-policy)
+   Compiling mantle-build-contract v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/vendor-cargo-deps/mantle/crates/mantle-build-contract)
+   Compiling budget-ledger-core v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/crates/budget-ledger-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 57s
+warning: the following packages contain code that will be rejected by a future version of Rust: nix v0.28.0, nix v0.30.1, nix v0.31.3
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+     Running unittests src/lib.rs (target/debug/deps/lattice-16097a22fe4188f8)
+
+running 18 tests
+test workflow_exchange::tests::accepted_execution_without_live_worker_becomes_unknown_without_redispatch ... ok
+test workflow_exchange::tests::serving_rejects_a_profile_that_advertises_pause ... ok
+test workflow_exchange::tests::unavailable_route_authority_denies_effects_without_fallback ... ok
+test workflow_exchange::tests::unix_service_composes_the_application_handler_and_bounded_transport ... ok
+test workflow_exchange::tests::reused_idempotency_key_with_changed_request_is_rejected ... ok
+test workflow_exchange::tests::handler_profile_and_exact_route_reject_revision_drift ... ok
+test workflow_exchange::tests::handler_profile_rejects_advertised_pause_or_resume ... ok
+test workflow_exchange::tests::handler_profile_v2_keeps_workflow_pause_and_resume_refused ... ok
+test workflow_exchange::tests::handler_profile_v2_validates_the_selected_listener ... ok
+test workflow_exchange::tests::stale_cancel_and_unsupported_pause_fail_closed ... ok
+test workflow_exchange::tests::handler_profile_versions_keep_separate_identity_domains ... ok
+test workflow_exchange::tests::active_cancel_stops_started_child_and_prevents_dependent_effect ... ok
+test workflow_exchange::tests::source_context_instantiates_exact_shell_environment_and_revision ... ok
+test workflow_exchange::tests::dispatch_executes_once_recovers_acceptance_and_reads_bounded_log ... ok
+test workflow_exchange::tests::typed_handler_profile_loads_and_negative_profiles_fail ... ok
+test workflow_exchange::application::worker::tests::real_completion_wins_late_durable_and_atomic_cancel_intent ... ok
+test workflow_exchange::tests::exchange_shell_exit_controls_durable_results_and_dependent_effects ... ok
+test workflow_exchange::tests::typed_handler_profile_v2_loads_and_negative_profiles_fail ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 583 filtered out; finished in 1.36s
+

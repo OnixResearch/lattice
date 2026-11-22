@@ -791,3 +791,143 @@ fn unix_service_composes_the_application_handler_and_bounded_transport() {
     assert_eq!(report.accepted_connections, 1);
     assert_eq!(report.completed_exchanges, 1);
 }
+
+fn vsock_transport() -> VsockTransportProfile {
+    VsockTransportProfile {
+        schema: VSOCK_TRANSPORT_PROFILE_SCHEMA.to_string(),
+        port: 10_300,
+        limits: transport_profile().limits,
+        peers: VsockPeerPolicy { allowed_cids: vec![2] },
+        non_claims: lattice_workflow_transport::REQUIRED_NON_CLAIMS.map(str::to_string).to_vec(),
+    }
+}
+
+fn v2_profile(v1: &super::HandlerProfile) -> super::HandlerProfileV2 {
+    super::HandlerProfileV2 {
+        schema: super::HANDLER_PROFILE_V2_SCHEMA.to_string(),
+        listener: super::HandlerListener::Vsock {
+            transport: vsock_transport(),
+        },
+        maximum_active_executions: v1.maximum_active_executions,
+        controls: v1.controls,
+        routes: v1.routes.clone(),
+        non_claims: v1.non_claims.clone(),
+    }
+}
+
+// r[verify lattice.workflow_interchange.handler_profile_v2]
+// r[verify lattice.workflow_interchange.handler_profile_v2.scenario.controls]
+#[test]
+fn handler_profile_v2_keeps_workflow_pause_and_resume_refused() {
+    let (_directory, store, _workflow, _contract, _request, v1) = fixture(TEST_COMMAND);
+    let mut profile = v2_profile(&v1);
+    assert_eq!(super::validate_handler_profile_v2(&profile), Ok(()));
+    profile.controls.pause = true;
+    assert_eq!(super::validate_handler_profile_v2(&profile), Err(super::ProfileError::Controls));
+    profile.controls.pause = false;
+    profile.controls.resume = true;
+    assert_eq!(super::validate_handler_profile_v2(&profile), Err(super::ProfileError::Controls));
+    let result = super::ApplicationHandler::new(store, profile, crate::agent_node::RuntimeOptions::default());
+    assert!(matches!(result, Err(super::ApplicationError::Profile)));
+}
+
+// r[verify lattice.workflow_interchange.handler_profile_v2]
+// r[verify lattice.workflow_interchange.handler_profile_v2.scenario.listener]
+#[test]
+fn handler_profile_v2_validates_the_selected_listener() {
+    let (_directory, _store, _workflow, _contract, _request, v1) = fixture(TEST_COMMAND);
+    let mut profile = v2_profile(&v1);
+    let super::HandlerListener::Vsock { transport } = &mut profile.listener else {
+        panic!("fixture selects vsock");
+    };
+    transport.peers.allowed_cids = vec![3, 2];
+    assert_eq!(super::validate_handler_profile_v2(&profile), Err(super::ProfileError::Transport));
+
+    profile.listener = super::HandlerListener::Unix {
+        socket_path: std::path::PathBuf::from("relative.sock"),
+        transport: v1.transport.clone(),
+    };
+    assert_eq!(super::validate_handler_profile_v2(&profile), Err(super::ProfileError::SocketPath));
+    profile.listener = super::HandlerListener::Unix {
+        socket_path: v1.socket_path.clone(),
+        transport: v1.transport.clone(),
+    };
+    assert_eq!(super::validate_handler_profile_v2(&profile), Ok(()));
+    profile.maximum_active_executions = TEST_CONNECTIONS.saturating_add(1);
+    assert_eq!(super::validate_handler_profile_v2(&profile), Err(super::ProfileError::ActiveLimit));
+
+    let mut v1_schema = v2_profile(&v1);
+    v1_schema.schema = super::HANDLER_PROFILE_SCHEMA.to_string();
+    assert_eq!(super::validate_handler_profile_v2(&v1_schema), Err(super::ProfileError::Schema));
+
+    let encoded = serde_json::to_value(v2_profile(&v1)).expect("v2 profile encodes");
+    assert_eq!(encoded["listener"]["kind"], "vsock");
+    let mut unknown_field = encoded.clone();
+    unknown_field["listener"]["socket_path"] = serde_json::json!("/run/lattice/workflow-exchange.sock");
+    assert!(serde_json::from_value::<super::HandlerProfileV2>(unknown_field).is_err());
+    let mut unknown_kind = encoded;
+    unknown_kind["listener"]["kind"] = serde_json::json!("tcp");
+    assert!(serde_json::from_value::<super::HandlerProfileV2>(unknown_kind).is_err());
+}
+
+/// Identity of `tests/fixtures/workflow-exchange-handler/profile-valid.ncl` under the
+/// unchanged version-one domain.
+const V1_PROFILE_IDENTITY: &str = "b3:103bcda647f39116f2e51c751c8fc1150b7930a15db5405b168a9b3445a10a93";
+
+// r[verify lattice.workflow_interchange.handler_profile_v2.scenario.identity]
+#[test]
+fn handler_profile_versions_keep_separate_identity_domains() {
+    let (_directory, _store, _workflow, _contract, _request, v1) = fixture(TEST_COMMAND);
+    let v1_identity = super::handler_profile_identity(&v1).expect("v1 identity exists");
+    let versioned = super::VersionedHandlerProfile::from(v1.clone());
+    assert_eq!(versioned.identity(), Ok(v1_identity.clone()));
+    let encoded = serde_json::to_value(&v1).expect("v1 profile encodes");
+    assert!(encoded.get("listener").is_none(), "version one keeps its wire shape");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let checked_in = super::load_profile(&root.join("tests/fixtures/workflow-exchange-handler/profile-valid.ncl"))
+        .expect("v1 profile loads");
+    assert_eq!(
+        checked_in.identity().map(|identity| identity.as_str().to_string()),
+        Ok(V1_PROFILE_IDENTITY.to_string()),
+        "the checked-in version-one profile keeps its pinned identity"
+    );
+
+    let mut unix = v2_profile(&v1);
+    unix.listener = super::HandlerListener::Unix {
+        socket_path: v1.socket_path.clone(),
+        transport: v1.transport.clone(),
+    };
+    let unix_identity = super::handler_profile_v2_identity(&unix).expect("v2 identity exists");
+    assert_ne!(unix_identity, v1_identity, "the same Unix listener under v2 has a v2 identity");
+    let vsock_identity = super::handler_profile_v2_identity(&v2_profile(&v1)).expect("v2 identity exists");
+    assert_ne!(vsock_identity, unix_identity);
+}
+
+// r[verify lattice.workflow_interchange.handler_profile_v2.scenario.typed]
+#[test]
+fn typed_handler_profile_v2_loads_and_negative_profiles_fail() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/workflow-exchange-handler");
+    let valid_v1 = super::load_profile(&root.join("profile-valid.ncl")).expect("v1 profile loads");
+    assert!(matches!(valid_v1, super::VersionedHandlerProfile::V1(_)));
+    let vsock = super::load_profile(&root.join("profile-v2-vsock.ncl")).expect("v2 vsock profile loads");
+    assert!(matches!(
+        &vsock,
+        super::VersionedHandlerProfile::V2(profile) if matches!(profile.listener, super::HandlerListener::Vsock { .. })
+    ));
+    let unix = super::load_profile(&root.join("profile-v2-unix.ncl")).expect("v2 Unix profile loads");
+    assert!(matches!(
+        &unix,
+        super::VersionedHandlerProfile::V2(profile) if matches!(profile.listener, super::HandlerListener::Unix { .. })
+    ));
+    for negative in [
+        "profile-v2-pause.ncl",
+        "profile-v2-unsorted-cids.ncl",
+        "profile-v2-wildcard-cid.ncl",
+    ] {
+        assert_eq!(
+            super::load_profile(&root.join("negative").join(negative)),
+            Err(super::ApplicationError::Profile),
+            "{negative} must be refused"
+        );
+    }
+}

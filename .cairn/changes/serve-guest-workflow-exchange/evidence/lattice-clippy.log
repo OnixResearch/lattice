@@ -1,0 +1,18 @@
+warning: use of deprecated method `std::sync::atomic::Atomic::<u32>::fetch_update`: renamed to `try_update` for consistency
+  --> vendor-cargo-deps/hardened-wasmtime-runtime/crates/hardened-wasmtime-shell/src/concurrency.rs:20:10
+   |
+20 |         .fetch_update(
+   |          ^^^^^^^^^^^^
+   |
+   = note: `#[warn(deprecated)]` on by default
+help: replace the use of the deprecated method
+   |
+20 -         .fetch_update(
+20 +         .try_update(
+   |
+
+warning: `hardened-wasmtime-shell` (lib) generated 1 warning (run `cargo clippy --fix --lib -p hardened-wasmtime-shell -- --no-deps -D warnings` to apply 1 suggestion)
+    Checking lattice v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 34.77s
+warning: the following packages contain code that will be rejected by a future version of Rust: nix v0.28.0, nix v0.30.1, nix v0.31.3
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`

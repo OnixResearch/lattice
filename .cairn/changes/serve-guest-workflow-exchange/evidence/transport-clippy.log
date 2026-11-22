@@ -1,0 +1,11 @@
+    Checking serde_core v1.0.228
+    Checking memchr v2.8.0
+    Checking getrandom v0.4.2
+    Checking tempfile v3.27.0
+    Checking serde v1.0.228
+    Checking serde_json v1.0.149
+    Checking lattice-workflow-contract v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/crates/lattice-workflow-contract)
+    Checking lattice-workflow-transport v0.1.0 (/home/brittonr/.cargo-target/producer-work/lattice-s2/crates/lattice-workflow-contract/transport)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.73s
+warning: the following packages contain code that will be rejected by a future version of Rust: nix v0.31.3
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 2`

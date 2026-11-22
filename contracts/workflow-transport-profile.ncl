@@ -1,4 +1,5 @@
-# Typed operator profile for the bounded Linux workflow exchange transport.
+# Typed operator profiles for the bounded Linux workflow exchange transports:
+# the Unix-domain profile (v1) and the guest vsock profile (vsock v1).
 
 let MaximumFrameBytes = 33554432 in
 let MaximumLogBytes = 16777216 in
@@ -6,6 +7,9 @@ let MaximumConnections = 65536 in
 let MaximumDeadlineMilliseconds = 300000 in
 let MaximumAllowedUsers = 64 in
 let MaximumUserId = 4294967295 in
+let MaximumAllowedCids = 64 in
+# VMADDR_CID_ANY and VMADDR_PORT_ANY are never admissible.
+let VsockAny = 4294967295 in
 
 let PositiveAtMost = fun maximum => std.contract.from_predicate (fun value =>
   std.is_number value && value > 0 && value <= maximum
@@ -55,11 +59,61 @@ let PeerPolicy = {
   allowed_user_ids | NonEmptyUsers,
 } in
 
+let VsockExactSchema = std.contract.from_predicate (fun value =>
+  value == "lattice.workflow-vsock-transport-profile.v1"
+) in
+
+let VsockPort = std.contract.from_predicate (fun value =>
+  std.is_number value && value > 0 && value < VsockAny
+) in
+
+let NonEmptyCids = std.contract.from_predicate (fun value =>
+  if !std.is_array value then false else
+  let state = std.array.fold_left
+    (fun state cid => {
+      valid = state.valid
+        && std.is_number cid
+        && cid >= 0
+        && cid < VsockAny
+        && (state.previous == null || state.previous < cid),
+      previous = cid,
+    })
+    { valid = true, previous = null }
+    value in
+  std.array.length value > 0
+  && std.array.length value <= MaximumAllowedCids
+  && state.valid
+) in
+
+let RequiredNonClaimsIncluded = std.contract.from_predicate (fun value =>
+  std.is_array value
+  && std.array.all
+    (fun required => std.array.elem required value)
+    [
+      "transport admission does not prove workflow correctness",
+      "transport peer identity does not prove peer intent",
+      "transport acceptance does not prove an operation executed",
+      "transport response does not prove an external effect succeeded",
+      "transport checks do not establish production deployment",
+    ]
+) in
+
+let VsockPeerPolicy = {
+  allowed_cids | NonEmptyCids,
+} in
+
 {
   TransportProfile = {
     schema | ExactSchema,
     limits | TransportLimits,
     peers | PeerPolicy,
     non_claims | RequiredNonClaims,
+  },
+  VsockTransportProfile = {
+    schema | VsockExactSchema,
+    port | VsockPort,
+    limits | TransportLimits,
+    peers | VsockPeerPolicy,
+    non_claims | RequiredNonClaimsIncluded,
   },
 }

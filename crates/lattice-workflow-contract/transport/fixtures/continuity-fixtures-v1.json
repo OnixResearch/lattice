@@ -1,0 +1,1735 @@
+{
+  "schema": "lattice.workflow-observation-continuity-fixtures.v1",
+  "check": "lattice.workflow-observation-continuity.v1",
+  "non_claims": [
+    "continuity does not prove that an observation is authentic or current",
+    "a continuous result does not prove that no output was lost outside the referenced logs",
+    "a gap names incomplete streams and does not recover their bytes"
+  ],
+  "cases": [
+    {
+      "name": "first observation without history",
+      "previous": null,
+      "next": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:4bbf69bea60df32bdbf51de7baa09441a4767f3eea9c3f844cfccf27f1393725",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 5,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 0,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "expected": {
+        "outcome": "continuous"
+      }
+    },
+    {
+      "name": "identical replayed observation",
+      "previous": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:4bbf69bea60df32bdbf51de7baa09441a4767f3eea9c3f844cfccf27f1393725",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 5,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 0,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "next": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:4bbf69bea60df32bdbf51de7baa09441a4767f3eea9c3f844cfccf27f1393725",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 5,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 0,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "expected": {
+        "outcome": "continuous"
+      }
+    },
+    {
+      "name": "log cursor resumes forward",
+      "previous": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:4bbf69bea60df32bdbf51de7baa09441a4767f3eea9c3f844cfccf27f1393725",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 5,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 0,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "next": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:64396523dfa56556efe032c381e18c94b7091b0790ad7b091feda55369a896c7",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 6,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 32,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "expected": {
+        "outcome": "continuous"
+      }
+    },
+    {
+      "name": "running execution completes",
+      "previous": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:4bbf69bea60df32bdbf51de7baa09441a4767f3eea9c3f844cfccf27f1393725",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 5,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 0,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "next": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:c4ee4c98695ac5e23bfbedf768288b76abe0767119333d8a3e696fb39d4a0777",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 7,
+        "state": "completed",
+        "terminal": true,
+        "successful": true,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "completed",
+            "terminal": true,
+            "successful": true,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": "b3:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          {
+            "node_id": "test",
+            "state": "completed",
+            "terminal": true,
+            "successful": true,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": "b3:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 0,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": "b3:1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "expected": {
+        "outcome": "continuous"
+      }
+    },
+    {
+      "name": "handler restart reports unknown",
+      "previous": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:4bbf69bea60df32bdbf51de7baa09441a4767f3eea9c3f844cfccf27f1393725",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 5,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 0,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "next": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:b973cc9c091526cf9ac6f5a12fa033a8fcb74aece67140212f4ed89f28e2760e",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 6,
+        "state": "unknown",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 0,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "expected": {
+        "outcome": "continuous"
+      }
+    },
+    {
+      "name": "terminal observation replayed",
+      "previous": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:c4ee4c98695ac5e23bfbedf768288b76abe0767119333d8a3e696fb39d4a0777",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 7,
+        "state": "completed",
+        "terminal": true,
+        "successful": true,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "completed",
+            "terminal": true,
+            "successful": true,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": "b3:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          {
+            "node_id": "test",
+            "state": "completed",
+            "terminal": true,
+            "successful": true,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": "b3:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 0,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": "b3:1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "next": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:c4ee4c98695ac5e23bfbedf768288b76abe0767119333d8a3e696fb39d4a0777",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 7,
+        "state": "completed",
+        "terminal": true,
+        "successful": true,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "completed",
+            "terminal": true,
+            "successful": true,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": "b3:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          {
+            "node_id": "test",
+            "state": "completed",
+            "terminal": true,
+            "successful": true,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": "b3:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 0,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": "b3:1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "expected": {
+        "outcome": "continuous"
+      }
+    },
+    {
+      "name": "explicit gap before resumed cursor",
+      "previous": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:4bbf69bea60df32bdbf51de7baa09441a4767f3eea9c3f844cfccf27f1393725",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 5,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 0,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "next": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:715281a13ce3c56c707353a981d3073523d79bd9255219c4fae4bb6902d1815a",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 6,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 64,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": true,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "expected": {
+        "outcome": "gap",
+        "nodes": [
+          "build"
+        ],
+        "streams": [
+          {
+            "node_id": "build",
+            "stream": "stdout"
+          }
+        ]
+      }
+    },
+    {
+      "name": "log no longer retained",
+      "previous": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:4bbf69bea60df32bdbf51de7baa09441a4767f3eea9c3f844cfccf27f1393725",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 5,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 0,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "next": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:9b3236420e87cebdf0cefea2171e1b0942890f71a39e6e8fdcd960eb59dca8d5",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 6,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 64,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": false
+          }
+        ],
+        "receipt_identity": null
+      },
+      "expected": {
+        "outcome": "gap",
+        "nodes": [
+          "build"
+        ],
+        "streams": [
+          {
+            "node_id": "build",
+            "stream": "stdout"
+          }
+        ]
+      }
+    },
+    {
+      "name": "log truncated",
+      "previous": null,
+      "next": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:0a10af7125757bfe9044faa34a347a20b8e2b15de1ab6e19c79458cc79a55838",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 5,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 64,
+            "bytes": 32,
+            "truncated": true,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "expected": {
+        "outcome": "gap",
+        "nodes": [
+          "build"
+        ],
+        "streams": [
+          {
+            "node_id": "build",
+            "stream": "stdout"
+          }
+        ]
+      }
+    },
+    {
+      "name": "gaps on two nodes",
+      "previous": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:4bbf69bea60df32bdbf51de7baa09441a4767f3eea9c3f844cfccf27f1393725",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 5,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 0,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "next": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:5c04cf8cfefe6416a1d2e85de326bd8b5c9826b5be647e4468ca57e4a9b4b73a",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 6,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 64,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": true,
+            "retained": true
+          },
+          {
+            "node_id": "test",
+            "stream": "stderr",
+            "reference_identity": "b3:8888888888888888888888888888888888888888888888888888888888888888",
+            "cursor": 0,
+            "bytes": 32,
+            "truncated": true,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "expected": {
+        "outcome": "gap",
+        "nodes": [
+          "build",
+          "test"
+        ],
+        "streams": [
+          {
+            "node_id": "build",
+            "stream": "stdout"
+          },
+          {
+            "node_id": "test",
+            "stream": "stderr"
+          }
+        ]
+      }
+    },
+    {
+      "name": "request identity changed",
+      "previous": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:4bbf69bea60df32bdbf51de7baa09441a4767f3eea9c3f844cfccf27f1393725",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 5,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 0,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "next": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:895a0af46a0dc492dce4592f500ef4cd086919c4a116373963b5969a68da0559",
+        "request_identity": "b3:5555555555555555555555555555555555555555555555555555555555555555",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 6,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 32,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "expected": {
+        "outcome": "reject",
+        "reason": "request_changed"
+      }
+    },
+    {
+      "name": "execution identity changed",
+      "previous": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:4bbf69bea60df32bdbf51de7baa09441a4767f3eea9c3f844cfccf27f1393725",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 5,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 0,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "next": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:31175758824924ac70118e25148b42f3c96801033e144f2360488a53fb6b7092",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:6666666666666666666666666666666666666666666666666666666666666666",
+        "sequence": 6,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 32,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "expected": {
+        "outcome": "reject",
+        "reason": "execution_changed"
+      }
+    },
+    {
+      "name": "workflow identity changed",
+      "previous": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:4bbf69bea60df32bdbf51de7baa09441a4767f3eea9c3f844cfccf27f1393725",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 5,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 0,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "next": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:38f4358dadb79e6c8218cf95ce12bfb5b9c9161eb24f478ae0d148c6bf7fca45",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:7777777777777777777777777777777777777777777777777777777777777777",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 6,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 32,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "expected": {
+        "outcome": "reject",
+        "reason": "workflow_changed"
+      }
+    },
+    {
+      "name": "sequence decreased",
+      "previous": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:64396523dfa56556efe032c381e18c94b7091b0790ad7b091feda55369a896c7",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 6,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 32,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "next": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:4bbf69bea60df32bdbf51de7baa09441a4767f3eea9c3f844cfccf27f1393725",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 5,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 0,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "expected": {
+        "outcome": "reject",
+        "reason": "sequence_decreased"
+      }
+    },
+    {
+      "name": "terminal reverted to running",
+      "previous": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:c4ee4c98695ac5e23bfbedf768288b76abe0767119333d8a3e696fb39d4a0777",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 7,
+        "state": "completed",
+        "terminal": true,
+        "successful": true,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "completed",
+            "terminal": true,
+            "successful": true,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": "b3:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          {
+            "node_id": "test",
+            "state": "completed",
+            "terminal": true,
+            "successful": true,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": "b3:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 0,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": "b3:1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "next": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:85b6a09233e8740106b562dbed3453a8723c9f2623d768a339d03b38a525da62",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 8,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 0,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "expected": {
+        "outcome": "reject",
+        "reason": "terminal_reverted"
+      }
+    },
+    {
+      "name": "terminal outcome changed",
+      "previous": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:c4ee4c98695ac5e23bfbedf768288b76abe0767119333d8a3e696fb39d4a0777",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 7,
+        "state": "completed",
+        "terminal": true,
+        "successful": true,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "completed",
+            "terminal": true,
+            "successful": true,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": "b3:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          {
+            "node_id": "test",
+            "state": "completed",
+            "terminal": true,
+            "successful": true,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": "b3:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 0,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": "b3:1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "next": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:6c335d9b5844e0a713798e388bc1a856a1a45c0929e40eac04bc6786b912830f",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 8,
+        "state": "failed",
+        "terminal": true,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "completed",
+            "terminal": true,
+            "successful": true,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": "b3:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          {
+            "node_id": "test",
+            "state": "completed",
+            "terminal": true,
+            "successful": true,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": "b3:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 0,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": "b3:1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "expected": {
+        "outcome": "reject",
+        "reason": "terminal_reverted"
+      }
+    },
+    {
+      "name": "terminal became unknown",
+      "previous": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:c4ee4c98695ac5e23bfbedf768288b76abe0767119333d8a3e696fb39d4a0777",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 7,
+        "state": "completed",
+        "terminal": true,
+        "successful": true,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "completed",
+            "terminal": true,
+            "successful": true,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": "b3:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          {
+            "node_id": "test",
+            "state": "completed",
+            "terminal": true,
+            "successful": true,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": "b3:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 0,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": "b3:1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "next": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:5b2ab725cb708ed6ec9c7567cd94a36a7f27e8ddf3d2d8dd2676f2566980f352",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 8,
+        "state": "unknown",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "completed",
+            "terminal": true,
+            "successful": true,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": "b3:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          {
+            "node_id": "test",
+            "state": "completed",
+            "terminal": true,
+            "successful": true,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": "b3:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 0,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": "b3:1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "expected": {
+        "outcome": "reject",
+        "reason": "terminal_reverted"
+      }
+    },
+    {
+      "name": "log cursor moved backwards",
+      "previous": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:59613e9c6835725fa9f507111f5c37c9ecf96d3f64ab636b1a39bebb56205590",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 6,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 64,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "next": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:38e7b06cc161a222cdeccd047d7ac0ce094f88ac5b894f1f81b24bdd8f42dfbf",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 7,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 32,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "expected": {
+        "outcome": "reject",
+        "reason": "cursor_regressed"
+      }
+    },
+    {
+      "name": "rejection takes precedence over a gap",
+      "previous": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:59613e9c6835725fa9f507111f5c37c9ecf96d3f64ab636b1a39bebb56205590",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 6,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 64,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": false,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "next": {
+        "schema": "lattice.workflow-observation.v1",
+        "identity": "b3:8182eb2ff69c938ace3e318cf2cb7905d2cc4614c306595ba11bed6e26947fb2",
+        "request_identity": "b3:0222541eb3fcf22ac85586e115d64ea16e0e1a1a29963c445b753d169a8525fe",
+        "idempotency_key": "b3:3333333333333333333333333333333333333333333333333333333333333333",
+        "workflow_identity": "b3:9999999999999999999999999999999999999999999999999999999999999999",
+        "execution_identity": "b3:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sequence": 7,
+        "state": "running",
+        "terminal": false,
+        "successful": false,
+        "nodes": [
+          {
+            "node_id": "build",
+            "state": "running",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "receipt_identity": null
+          },
+          {
+            "node_id": "test",
+            "state": "pending",
+            "terminal": false,
+            "successful": false,
+            "adapter_identity": "b3:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "receipt_identity": null
+          }
+        ],
+        "logs": [
+          {
+            "node_id": "build",
+            "stream": "stdout",
+            "reference_identity": "b3:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "cursor": 32,
+            "bytes": 32,
+            "truncated": false,
+            "gap_before": true,
+            "retained": true
+          }
+        ],
+        "receipt_identity": null
+      },
+      "expected": {
+        "outcome": "reject",
+        "reason": "cursor_regressed"
+      }
+    }
+  ]
+}

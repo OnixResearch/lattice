@@ -67,7 +67,9 @@ maintained topic documents by the question they answer.
 - [Execution backend orchestration](execution-backend-orchestration.md): admitted
   backends and dispatch bounds.
 - [Workflow exchange transport](workflow-exchange-transport.md): the versioned
-  local Unix transport.
+  local Unix and vsock transport.
+- [Guest workflow exchange over vsock](workflow-exchange-guest-gateway.md): the
+  guest listener, handler profile v2, reconnect rules, and continuity fixtures.
 - [Durable workflow exchange application](workflow-exchange-application.md):
   handler profiles, durable admission, lifecycle, and logs.
 - [Workflow exchange consumer compatibility](workflow-exchange-consumer-compatibility.md):

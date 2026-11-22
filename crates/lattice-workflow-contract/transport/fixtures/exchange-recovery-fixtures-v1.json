@@ -1,0 +1,1821 @@
+{
+  "schema": "lattice.workflow-exchange-recovery-fixtures.v1",
+  "table": "lattice.workflow-exchange-recovery.v1",
+  "non_claims": [
+    "the rule table does not prove which endpoint incarnation answered",
+    "same_incarnation is gateway evidence and never Lattice wire data",
+    "retry bounds and backoff are owned by the caller",
+    "a recovery step does not prove that any workflow effect happened"
+  ],
+  "rules": [
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "failure",
+        "class": "invalid_profile"
+      },
+      "same_incarnation": false,
+      "step": "stop_invalid"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "failure",
+        "class": "invalid_profile"
+      },
+      "same_incarnation": true,
+      "step": "stop_invalid"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "failure",
+        "class": "invalid_request"
+      },
+      "same_incarnation": false,
+      "step": "stop_invalid"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "failure",
+        "class": "invalid_request"
+      },
+      "same_incarnation": true,
+      "step": "stop_invalid"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "failure",
+        "class": "connect_failed"
+      },
+      "same_incarnation": false,
+      "step": "resend_identical"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "failure",
+        "class": "connect_failed"
+      },
+      "same_incarnation": true,
+      "step": "resend_identical"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "failure",
+        "class": "not_accepted"
+      },
+      "same_incarnation": false,
+      "step": "resend_identical"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "failure",
+        "class": "not_accepted"
+      },
+      "same_incarnation": true,
+      "step": "resend_identical"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "failure",
+        "class": "unknown_after_write"
+      },
+      "same_incarnation": false,
+      "step": "recover_dispatch"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "failure",
+        "class": "unknown_after_write"
+      },
+      "same_incarnation": true,
+      "step": "recover_dispatch"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "success"
+      },
+      "same_incarnation": false,
+      "step": "complete"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "success"
+      },
+      "same_incarnation": true,
+      "step": "complete"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_schema"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_schema"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_identity"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_identity"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_contract"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_contract"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_operation_result"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_operation_result"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "frame_too_large"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "frame_too_large"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "log_too_large"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "log_too_large"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "peer_denied"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "peer_denied"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "handler_unavailable"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "handler_unavailable"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "not_found"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "not_found"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "encoding_failure"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "encoding_failure"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "failure",
+        "class": "invalid_profile"
+      },
+      "same_incarnation": false,
+      "step": "stop_invalid"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "failure",
+        "class": "invalid_profile"
+      },
+      "same_incarnation": true,
+      "step": "stop_invalid"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "failure",
+        "class": "invalid_request"
+      },
+      "same_incarnation": false,
+      "step": "stop_invalid"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "failure",
+        "class": "invalid_request"
+      },
+      "same_incarnation": true,
+      "step": "stop_invalid"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "failure",
+        "class": "connect_failed"
+      },
+      "same_incarnation": false,
+      "step": "retry_bounded"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "failure",
+        "class": "connect_failed"
+      },
+      "same_incarnation": true,
+      "step": "retry_bounded"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "failure",
+        "class": "not_accepted"
+      },
+      "same_incarnation": false,
+      "step": "retry_bounded"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "failure",
+        "class": "not_accepted"
+      },
+      "same_incarnation": true,
+      "step": "retry_bounded"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "failure",
+        "class": "unknown_after_write"
+      },
+      "same_incarnation": false,
+      "step": "retry_bounded"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "failure",
+        "class": "unknown_after_write"
+      },
+      "same_incarnation": true,
+      "step": "retry_bounded"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "success"
+      },
+      "same_incarnation": false,
+      "step": "complete"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "success"
+      },
+      "same_incarnation": true,
+      "step": "complete"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_schema"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_schema"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_identity"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_identity"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_contract"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_contract"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_operation_result"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_operation_result"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "frame_too_large"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "frame_too_large"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "log_too_large"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "log_too_large"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "peer_denied"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "peer_denied"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "handler_unavailable"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "handler_unavailable"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "not_found"
+      },
+      "same_incarnation": false,
+      "step": "stop_unknown"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "not_found"
+      },
+      "same_incarnation": true,
+      "step": "resend_dispatch"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "encoding_failure"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "encoding_failure"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "failure",
+        "class": "invalid_profile"
+      },
+      "same_incarnation": false,
+      "step": "stop_invalid"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "failure",
+        "class": "invalid_profile"
+      },
+      "same_incarnation": true,
+      "step": "stop_invalid"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "failure",
+        "class": "invalid_request"
+      },
+      "same_incarnation": false,
+      "step": "stop_invalid"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "failure",
+        "class": "invalid_request"
+      },
+      "same_incarnation": true,
+      "step": "stop_invalid"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "failure",
+        "class": "connect_failed"
+      },
+      "same_incarnation": false,
+      "step": "retry_bounded"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "failure",
+        "class": "connect_failed"
+      },
+      "same_incarnation": true,
+      "step": "retry_bounded"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "failure",
+        "class": "not_accepted"
+      },
+      "same_incarnation": false,
+      "step": "retry_bounded"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "failure",
+        "class": "not_accepted"
+      },
+      "same_incarnation": true,
+      "step": "retry_bounded"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "failure",
+        "class": "unknown_after_write"
+      },
+      "same_incarnation": false,
+      "step": "retry_bounded"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "failure",
+        "class": "unknown_after_write"
+      },
+      "same_incarnation": true,
+      "step": "retry_bounded"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "success"
+      },
+      "same_incarnation": false,
+      "step": "complete"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "success"
+      },
+      "same_incarnation": true,
+      "step": "complete"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_schema"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_schema"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_identity"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_identity"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_contract"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_contract"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_operation_result"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_operation_result"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "rejected",
+        "class": "frame_too_large"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "rejected",
+        "class": "frame_too_large"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "rejected",
+        "class": "log_too_large"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "rejected",
+        "class": "log_too_large"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "rejected",
+        "class": "peer_denied"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "rejected",
+        "class": "peer_denied"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "rejected",
+        "class": "handler_unavailable"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "rejected",
+        "class": "handler_unavailable"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "rejected",
+        "class": "not_found"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "rejected",
+        "class": "not_found"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "rejected",
+        "class": "encoding_failure"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "observe",
+      "outcome": {
+        "kind": "rejected",
+        "class": "encoding_failure"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "failure",
+        "class": "invalid_profile"
+      },
+      "same_incarnation": false,
+      "step": "stop_invalid"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "failure",
+        "class": "invalid_profile"
+      },
+      "same_incarnation": true,
+      "step": "stop_invalid"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "failure",
+        "class": "invalid_request"
+      },
+      "same_incarnation": false,
+      "step": "stop_invalid"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "failure",
+        "class": "invalid_request"
+      },
+      "same_incarnation": true,
+      "step": "stop_invalid"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "failure",
+        "class": "connect_failed"
+      },
+      "same_incarnation": false,
+      "step": "resend_identical"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "failure",
+        "class": "connect_failed"
+      },
+      "same_incarnation": true,
+      "step": "resend_identical"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "failure",
+        "class": "not_accepted"
+      },
+      "same_incarnation": false,
+      "step": "resend_identical"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "failure",
+        "class": "not_accepted"
+      },
+      "same_incarnation": true,
+      "step": "resend_identical"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "failure",
+        "class": "unknown_after_write"
+      },
+      "same_incarnation": false,
+      "step": "observe_then_compare"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "failure",
+        "class": "unknown_after_write"
+      },
+      "same_incarnation": true,
+      "step": "observe_then_compare"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "success"
+      },
+      "same_incarnation": false,
+      "step": "complete"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "success"
+      },
+      "same_incarnation": true,
+      "step": "complete"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_schema"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_schema"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_identity"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_identity"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_contract"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_contract"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_operation_result"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_operation_result"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "rejected",
+        "class": "frame_too_large"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "rejected",
+        "class": "frame_too_large"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "rejected",
+        "class": "log_too_large"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "rejected",
+        "class": "log_too_large"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "rejected",
+        "class": "peer_denied"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "rejected",
+        "class": "peer_denied"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "rejected",
+        "class": "handler_unavailable"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "rejected",
+        "class": "handler_unavailable"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "rejected",
+        "class": "not_found"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "rejected",
+        "class": "not_found"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "rejected",
+        "class": "encoding_failure"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "control",
+      "outcome": {
+        "kind": "rejected",
+        "class": "encoding_failure"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "failure",
+        "class": "invalid_profile"
+      },
+      "same_incarnation": false,
+      "step": "stop_invalid"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "failure",
+        "class": "invalid_profile"
+      },
+      "same_incarnation": true,
+      "step": "stop_invalid"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "failure",
+        "class": "invalid_request"
+      },
+      "same_incarnation": false,
+      "step": "stop_invalid"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "failure",
+        "class": "invalid_request"
+      },
+      "same_incarnation": true,
+      "step": "stop_invalid"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "failure",
+        "class": "connect_failed"
+      },
+      "same_incarnation": false,
+      "step": "retry_bounded"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "failure",
+        "class": "connect_failed"
+      },
+      "same_incarnation": true,
+      "step": "retry_bounded"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "failure",
+        "class": "not_accepted"
+      },
+      "same_incarnation": false,
+      "step": "retry_bounded"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "failure",
+        "class": "not_accepted"
+      },
+      "same_incarnation": true,
+      "step": "retry_bounded"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "failure",
+        "class": "unknown_after_write"
+      },
+      "same_incarnation": false,
+      "step": "retry_bounded"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "failure",
+        "class": "unknown_after_write"
+      },
+      "same_incarnation": true,
+      "step": "retry_bounded"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "success"
+      },
+      "same_incarnation": false,
+      "step": "complete"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "success"
+      },
+      "same_incarnation": true,
+      "step": "complete"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_schema"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_schema"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_identity"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_identity"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_contract"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_contract"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_operation_result"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_operation_result"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "rejected",
+        "class": "frame_too_large"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "rejected",
+        "class": "frame_too_large"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "rejected",
+        "class": "log_too_large"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "rejected",
+        "class": "log_too_large"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "rejected",
+        "class": "peer_denied"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "rejected",
+        "class": "peer_denied"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "rejected",
+        "class": "handler_unavailable"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "rejected",
+        "class": "handler_unavailable"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "rejected",
+        "class": "not_found"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "rejected",
+        "class": "not_found"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "rejected",
+        "class": "encoding_failure"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "read_log",
+      "outcome": {
+        "kind": "rejected",
+        "class": "encoding_failure"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "failure",
+        "class": "invalid_profile"
+      },
+      "same_incarnation": false,
+      "step": "stop_invalid"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "failure",
+        "class": "invalid_profile"
+      },
+      "same_incarnation": true,
+      "step": "stop_invalid"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "failure",
+        "class": "invalid_request"
+      },
+      "same_incarnation": false,
+      "step": "stop_invalid"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "failure",
+        "class": "invalid_request"
+      },
+      "same_incarnation": true,
+      "step": "stop_invalid"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "failure",
+        "class": "connect_failed"
+      },
+      "same_incarnation": false,
+      "step": "retry_bounded"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "failure",
+        "class": "connect_failed"
+      },
+      "same_incarnation": true,
+      "step": "retry_bounded"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "failure",
+        "class": "not_accepted"
+      },
+      "same_incarnation": false,
+      "step": "retry_bounded"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "failure",
+        "class": "not_accepted"
+      },
+      "same_incarnation": true,
+      "step": "retry_bounded"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "failure",
+        "class": "unknown_after_write"
+      },
+      "same_incarnation": false,
+      "step": "retry_bounded"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "failure",
+        "class": "unknown_after_write"
+      },
+      "same_incarnation": true,
+      "step": "retry_bounded"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "success"
+      },
+      "same_incarnation": false,
+      "step": "complete"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "success"
+      },
+      "same_incarnation": true,
+      "step": "complete"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_schema"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_schema"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_identity"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_identity"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_contract"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_contract"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_operation_result"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "rejected",
+        "class": "invalid_operation_result"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "rejected",
+        "class": "frame_too_large"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "rejected",
+        "class": "frame_too_large"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "rejected",
+        "class": "log_too_large"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "rejected",
+        "class": "log_too_large"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "rejected",
+        "class": "peer_denied"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "rejected",
+        "class": "peer_denied"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "rejected",
+        "class": "handler_unavailable"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "rejected",
+        "class": "handler_unavailable"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "rejected",
+        "class": "not_found"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "rejected",
+        "class": "not_found"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "rejected",
+        "class": "encoding_failure"
+      },
+      "same_incarnation": false,
+      "step": "stop_rejected"
+    },
+    {
+      "command": "reconcile",
+      "outcome": {
+        "kind": "rejected",
+        "class": "encoding_failure"
+      },
+      "same_incarnation": true,
+      "step": "stop_rejected"
+    }
+  ],
+  "control_after_observe": [
+    {
+      "expected_sequence": 7,
+      "observed_sequence": 7,
+      "step": "resend_identical"
+    },
+    {
+      "expected_sequence": 7,
+      "observed_sequence": 8,
+      "step": "stop_superseded"
+    },
+    {
+      "expected_sequence": 7,
+      "observed_sequence": 9,
+      "step": "stop_superseded"
+    },
+    {
+      "expected_sequence": 7,
+      "observed_sequence": 6,
+      "step": "stop_unknown"
+    },
+    {
+      "expected_sequence": 0,
+      "observed_sequence": 0,
+      "step": "resend_identical"
+    }
+  ],
+  "refused": [
+    {
+      "name": "unknown dispatch is never blindly resent",
+      "command": "dispatch",
+      "outcome": {
+        "kind": "failure",
+        "class": "unknown_after_write"
+      },
+      "same_incarnation": true,
+      "forbidden_step": "resend_identical"
+    },
+    {
+      "name": "unknown dispatch never redispatches before recovery",
+      "command": "dispatch",
+      "outcome": {
+        "kind": "failure",
+        "class": "unknown_after_write"
+      },
+      "same_incarnation": true,
+      "forbidden_step": "resend_dispatch"
+    },
+    {
+      "name": "missing acceptance on a new incarnation never redispatches",
+      "command": "recover_dispatch",
+      "outcome": {
+        "kind": "rejected",
+        "class": "not_found"
+      },
+      "same_incarnation": false,
+      "forbidden_step": "resend_dispatch"
+    },
+    {
+      "name": "unknown control is never resent before observation",
+      "command": "control",
+      "outcome": {
+        "kind": "failure",
+        "class": "unknown_after_write"
+      },
+      "same_incarnation": true,
+      "forbidden_step": "resend_identical"
+    },
+    {
+      "name": "unknown is never reported as complete",
+      "command": "observe",
+      "outcome": {
+        "kind": "failure",
+        "class": "unknown_after_write"
+      },
+      "same_incarnation": true,
+      "forbidden_step": "complete"
+    }
+  ],
+  "refused_control_after_observe": [
+    {
+      "name": "a control whose expected sequence is behind is never resent",
+      "expected_sequence": 7,
+      "observed_sequence": 8,
+      "forbidden_step": "resend_identical"
+    },
+    {
+      "name": "an observation older than the control basis never licenses a resend",
+      "expected_sequence": 7,
+      "observed_sequence": 6,
+      "forbidden_step": "resend_identical"
+    }
+  ]
+}

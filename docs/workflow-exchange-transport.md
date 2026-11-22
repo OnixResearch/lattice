@@ -1,6 +1,6 @@
 # Bounded workflow exchange transport
 
-Lattice publishes a local Linux Unix-domain transport beside `lattice-workflow-contract`.
+Lattice publishes a local Linux transport beside `lattice-workflow-contract`. It serves over a Unix-domain socket, or over `AF_VSOCK` inside a microVM guest.
 
 ## Ownership
 
@@ -45,6 +45,14 @@ The server requires:
 
 The server checks peer credentials before request decoding. The socket path and allowed users remain operator authority inputs.
 
+`serve_listener` drives any `Listener` whose peers are Unix credentials, so supervisors and conformance tests can supply already-connected streams. `exchange_connected` is the matching client half for a stream the caller already connected.
+
+## Vsock guest service
+
+`lattice.workflow-vsock-transport-profile.v1` carries the same limits and non-claims as the Unix profile. It replaces the user-ID allowlist with a port and an ordered peer-CID allowlist. `serve_vsock` binds `VMADDR_CID_ANY:port` and admits only allowed peer CIDs. It then runs the same serve loop, frames and failure classes as the Unix service.
+
+See [Guest workflow exchange over vsock](workflow-exchange-guest-gateway.md) for the guest profile, the host gateway boundary, and evidence limits.
+
 ## Disconnects
 
 A failed connection before a complete write is not accepted. A failed or invalid response after a complete write has an unknown outcome.
@@ -52,6 +60,15 @@ A failed connection before a complete write is not accepted. A failed or invalid
 The client never converts unknown into failure or success. Reconciliation must name the same accepted execution.
 
 If dispatch acceptance is missing, `RecoverDispatch` carries the original admitted request. It returns only the exact linked acceptance or a closed rejection.
+
+## Reconnect and continuity rules
+
+The transport publishes two pure decisions for callers that reconnect:
+
+- `next_step` and `control_after_observe` (`lattice.workflow-exchange-recovery.v1`) name the only admissible step after each client outcome. An unknown dispatch is recovered, never resent blindly. A missing acceptance is redispatched only on the same endpoint incarnation. A control whose expected sequence is behind is never resent.
+- `continuity` (`lattice.workflow-observation-continuity.v1`) rejects an observation that changes identity, lowers the sequence, changes a terminal state or moves a log cursor backwards. It names every log stream with a gap.
+
+Both ship as checked-in fixtures (`exchange-recovery-fixtures-v1.json` and `continuity-fixtures-v1.json`) that consumers implement independently.
 
 ## Lattice application handler
 
