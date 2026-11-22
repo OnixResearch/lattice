@@ -1,0 +1,58 @@
+{
+  "schema": "lattice.fixture-qualification.v1",
+  "change": "admit-runbook-catalog-packs",
+  "kind": "local-verification",
+  "live_qualification": false,
+  "base_revision": "0862c017",
+  "recorded_on": "2026-11-21",
+  "contract": {
+    "pack_byte_drift": "whole-pack refusal; every drifted bundle is named pack_bytes_drift and every other bundle pack_refused",
+    "after_admission": "per-bundle: loader diagnostic code, pack_content_mismatch, identity_mismatch or catalog_conflict rejects only that bundle; the others install",
+    "network": "only lattice pack catalog-fetch with --confirm-fetch runs git; lock, catalog-install and catalog-list ran with the repository removed and PATH set to an empty directory",
+    "dependency_added": false
+  },
+  "tasks": {
+    "1.1": [
+      "tests/test_runbook_catalog_core.rs::seed_manifest_satisfies_the_contract_and_identity_covers_every_bundle_byte",
+      "tests/test_runbook_catalog_core.rs::pack_manifests_reject_traversal_duplicates_misplacement_and_symlinks"
+    ],
+    "2.1": [
+      "tests/test_runbook_catalog_cli.rs::fetch_lock_install_and_list_from_an_exact_commit_without_network_on_load",
+      "tests/test_runbook_catalog_cli.rs::fetch_refuses_inexact_sources_wrong_identity_and_symlink_members",
+      "tests/test_runbook_catalog_core.rs::tree_listings_admit_only_regular_files_inside_the_selected_pack"
+    ],
+    "2.2": [
+      "tests/test_runbook_catalog_cli.rs::tampered_bytes_refuse_the_pack_and_name_each_drifted_bundle",
+      "tests/test_runbook_catalog_core.rs::one_bad_bundle_is_rejected_with_its_diagnostic_while_the_other_installs",
+      "tests/test_runbook_catalog_cli.rs::fetch_lock_install_and_list_from_an_exact_commit_without_network_on_load (second install reports catalog_conflict and leaves bytes unchanged)"
+    ],
+    "2.3": [
+      "tests/test_runbook_catalog_core.rs::installation_grants_no_effect_authority"
+    ],
+    "3.1": [
+      "tests/fixtures/runbook-catalog (seed pack packs/seed-runbooks with two purpose-made bundles; bundle pins recomputed independently with b3sum and asserted equal to the loader by seed_manifest_satisfies_the_contract_and_identity_covers_every_bundle_byte)",
+      "docs/operation-packs.md (Runbook catalogs)",
+      "docs/workflow-template-bundles.md (Install from a runbook catalog)",
+      "CHANGELOG.md (Added)"
+    ]
+  },
+  "gates": [
+    {"command": "cargo test -p lattice --test test_runbook_catalog_core --test test_runbook_catalog_cli", "exit": 0, "result": "core 5 passed, cli 3 passed"},
+    {"command": "cargo test -p lattice --test test_operation_pack_core --test test_operation_pack_shell --test test_operation_pack_cli --test test_operation_pack_analyzers --test test_operation_pack_wasm_core --test test_operation_pack_component_shell --test test_workflow_templates", "exit": 0, "result": "9, 8, 4, 6, 8, 1 and 17 passed, 0 failed"},
+    {"command": "cargo test -p lattice --lib -- operation_pack workflow_template inet::route", "exit": 0, "result": "2 passed, 0 failed, 523 filtered out"},
+    {"command": "cargo test -p lattice --test test_cairn_specs --test test_traceability_marker_alignment", "exit": 0, "result": "3 passed and 2 passed"},
+    {"command": "cargo clippy -p lattice --all-targets --no-deps -- -D warnings", "exit": 0},
+    {"command": "cargo fmt -p lattice --check", "exit": 0},
+    {"command": "nickel typecheck cairn-policy/*.ncl policy/*.ncl profiles/*.ncl contracts/*.ncl builtins/*/*.ncl builtins/agent-evaluations/requests/*.ncl builtins/workflow-templates/*/*.ncl", "exit": 0},
+    {"command": "octet-precommit-check", "exit": 0, "result": "root 1052 accepted, 1052 current, 0 new, 0 stale; lattice-core 25 accepted, 25 current, 0 new, 0 stale; baselines unchanged, no re-key"},
+    {"command": "cairn validate --root . --policy cairn-policy/generated/cairn-policy.json", "exit": 0},
+    {"command": "cairn gate proposal|design|tasks admit-runbook-catalog-packs", "exit": 0, "result": "PASS"},
+    {"command": "gitleaks dir --redact on each changed path", "exit": 0}
+  ],
+  "non_claims": [
+    "local file:// fetching was exercised; https:// and ssh:// transports were not",
+    "per-bundle atomicity only; no transaction across bundles",
+    "the create-only absence check before rename is not atomic against a concurrent writer",
+    "a commit or pack identity proves exact bytes, not maintainer or source trust"
+  ]
+}

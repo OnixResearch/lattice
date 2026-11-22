@@ -14,6 +14,7 @@ const IMPORT_TOKEN: &[u8] = b"import";
 #[cfg(unix)]
 const EXECUTABLE_MODE_MASK: u32 = 0o111;
 
+pub mod catalog;
 pub mod component;
 pub mod execution;
 pub mod installation;
@@ -28,17 +29,7 @@ pub fn validate_manifest_contract(path: &std::path::Path) -> Result<(), super::E
 }
 
 pub fn load(root: &std::path::Path) -> Result<super::model::Candidate, super::Error> {
-    validate_root(root)?;
-    let manifest_path = root.join(MANIFEST_FILE);
-    let source = read_bounded_regular(&manifest_path, super::model::MAXIMUM_MANIFEST_BYTES)?;
-    let source_text = std::str::from_utf8(&source).map_err(|_| super::Error::Invalid("manifest UTF-8"))?;
-    if contains_import_token(source_text) {
-        return Err(super::Error::Invalid("manifest import"));
-    }
-    let value = crate::nickel::evaluate_source(source_text).map_err(|error| super::Error::Nickel(error.to_string()))?;
-    let decoded = serde_json::from_value::<super::model::Manifest>(value)
-        .map_err(|_| super::Error::Invalid("strict manifest schema"))?;
-    let manifest = super::validation::validate_manifest(decoded)?;
+    let manifest = load_manifest(root)?;
     let declared_paths = manifest
         .contents
         .iter()
@@ -184,6 +175,20 @@ pub fn load_registry(path: &std::path::Path) -> Result<super::registry::Catalog,
     let value = crate::nickel::evaluate_source(text).map_err(|error| super::Error::Nickel(error.to_string()))?;
     let catalog = serde_json::from_value(value).map_err(|_| super::Error::Invalid("registry schema"))?;
     super::registry::validate_catalog(catalog)
+}
+
+/// Read, evaluate and validate only `manifest.ncl` of a pack root; content is not measured.
+pub fn load_manifest(root: &std::path::Path) -> Result<super::model::Manifest, super::Error> {
+    validate_root(root)?;
+    let source = read_bounded_regular(&root.join(MANIFEST_FILE), super::model::MAXIMUM_MANIFEST_BYTES)?;
+    let source_text = std::str::from_utf8(&source).map_err(|_| super::Error::Invalid("manifest UTF-8"))?;
+    if contains_import_token(source_text) {
+        return Err(super::Error::Invalid("manifest import"));
+    }
+    let value = crate::nickel::evaluate_source(source_text).map_err(|error| super::Error::Nickel(error.to_string()))?;
+    let decoded = serde_json::from_value::<super::model::Manifest>(value)
+        .map_err(|_| super::Error::Invalid("strict manifest schema"))?;
+    super::validation::validate_manifest(decoded)
 }
 
 pub fn platform_label() -> String {

@@ -149,5 +149,6 @@ fn manifest(
         licenses,
         probe: None,
         required_non_claims: crate::operation_pack::model::REQUIRED_NON_CLAIMS.map(str::to_string).to_vec(),
+        workflow_bundles: Vec::new(),
     })
 }

@@ -9,9 +9,11 @@
 //! r[impl lattice.operation_packs.registry]
 //! r[impl lattice.operation_packs.doctor]
 //! r[impl lattice.operation_packs.verification]
+//! r[impl lattice.operation_packs.runbook_catalog]
 
 pub mod admission;
 pub mod analyzer;
+pub mod catalog;
 pub mod cli;
 pub mod doctor;
 pub mod identity;

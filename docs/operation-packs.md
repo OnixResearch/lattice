@@ -31,6 +31,7 @@ The manifest declares these items:
 - analyzer scopes, views, output contracts, retention, sensitivity, and non-claims
 - passive skill bodies, references, supported hosts, trust state, and routing cases
 - exact dependencies, licenses, admission policy, release metadata, and non-claims
+- optional workflow-template bundles, described in [Runbook catalogs](#runbook-catalogs)
 
 Authoritative text is ASCII. This rule rejects ambiguous Unicode normalization at the admission boundary.
 
@@ -300,6 +301,96 @@ adapters and durable stores: completion, cancellation, duplicate denial,
 unsettled-Started recovery, cleanup observations, and parent-before-effect
 attempt ordering. It deliberately does not require result equivalence. A
 failed proof is not waived by metadata-only doctor output.
+
+## Runbook catalogs
+
+A runbook catalog is a git repository of reviewed workflow-template bundles. Each published set of bundles is a content-addressed operation pack. An operator admits an exact commit and pack identity, then installs the bundles into the local `workflow-templates/` catalog that **Browse Workflow Templates** reads.
+
+### Catalog repository layout
+
+```text
+<catalog repository>/
+  packs/<pack-name>/
+    manifest.ncl                         # operation-pack manifest
+    workflow-templates/<bundle-id>/
+      manifest.ncl                       # workflow-template bundle manifest
+      workflow.ncl
+      orchestration.ncl                  # optional
+      assets/...                         # optional and declared
+```
+
+The retained seed catalog is [`tests/fixtures/runbook-catalog`](../tests/fixtures/runbook-catalog). It holds the pack `packs/seed-runbooks` with two purpose-made bundles.
+
+### Declaring bundles in a pack
+
+Every bundle file, including the bundle's own `manifest.ncl`, is one pack content item with role `workflow_bundle` and a path `workflow-templates/<bundle-id>/<member>`. The manifest also lists each bundle in `workflow_bundles`:
+
+```nickel
+workflow_bundles = [
+  { id = "hello-runbook", bundle_identity = "b3:<workflow-template loader identity>" },
+],
+```
+
+Lattice rejects the whole manifest for a duplicate bundle id, an id that is not lowercase ASCII letters, digits and `-`, a `workflow_bundle` item outside a declared bundle directory, another role under `workflow-templates/`, or a declared bundle without its `manifest.ncl` item. The usual pack rules also apply: no absolute paths, parent traversal, symlinks, undeclared files, or changed bytes.
+
+A pack with workflow bundles and no operations may omit operations, runtimes and executable content. Such a catalog-only pack declares an empty `allowed_capabilities`.
+
+The pack identity covers every bundle byte. Each file's BLAKE3 identity and length is part of the content projection. The `workflow_bundles` declarations join the manifest identity only when present, so packs without bundles keep their identity. Bundle manifest bytes are pinned exactly, so every field in them, including fields that later schema versions add, is covered.
+
+A pack holds at most 128 content items, so split a larger catalog into several packs.
+
+### Fetch, lock, install and list
+
+`catalog-fetch` is the only pack command that contacts a repository, and it does so only with `--confirm-fetch`:
+
+```sh
+lattice pack catalog-fetch \
+  --repository https://example.invalid/runbooks.git \
+  --commit <full 40- or 64-character commit> \
+  --subdirectory packs/seed-runbooks \
+  --pack-identity b3:<expected pack identity> \
+  --destination /absolute/new/pack-directory \
+  --confirm-fetch
+```
+
+The command accepts only `file://`, `https://` and `ssh://` locators and a full lowercase commit object name. It refuses branches, tags, abbreviations and transport helpers. It runs `git` as a bounded process with a cleared environment and an isolated configuration. It forwards only `PATH`, `SSL_CERT_FILE`, `SSL_CERT_DIR` and `SSH_AUTH_SOCK`, and it never uses a credential helper.
+
+The command fetches the commit into a private staging repository and lists its tree. It refuses a symlink or submodule member. It writes regular files create-only and loads the result with the strict local pack loader. When `--pack-identity` is given, it checks that identity. It then renames the tree into the new destination. Any failure removes the staging directory and leaves the destination absent.
+
+After the fetch, every step reads local bytes only:
+
+```sh
+lattice pack lock --pack /absolute/pack --confirm-trust-local \
+  --allow-license AGPL-3.0-or-later --destination /absolute/pack.lock.json --confirm-create
+lattice pack catalog-install --pack /absolute/pack --lock /absolute/pack.lock.json \
+  --confirm-trust-local --allow-license AGPL-3.0-or-later \
+  --catalog /absolute/config-directory/workflow-templates
+lattice pack catalog-list --catalog /absolute/config-directory/workflow-templates
+```
+
+Without `--confirm-create`, `catalog-install` prints each bundle's decision and writes nothing.
+
+### Installation contract
+
+Installation uses two levels of refusal:
+
+- **Whole-pack refusal for pack byte drift.** Before admission, Lattice measures every bundle file against the pack declaration. If any file drifted, the pack is no longer the locked pack, and Lattice installs nothing. The report names each drifted bundle as `pack_bytes_drift` and every other bundle as `pack_refused`. Structural defects also refuse the whole pack: an invalid manifest, a duplicate id, traversal, a symlink, or an undeclared file. This is the safer contract. A tree that differs from its locked identity has an untrusted origin, so its other bundles are not trusted either.
+- **Per-bundle decisions after admission.** Lattice decides each bundle independently. The workflow-template loader, [the same loader that reads the local catalog](workflow-template-bundles.md), must validate the bundle. A loader diagnostic, such as a compatibility mismatch or a stale bundle-internal pin, rejects only that bundle and keeps the loader's code. The loader-measured bytes must equal the pack declaration (`pack_content_mismatch`). The loader identity must equal the declared `bundle_identity` (`identity_mismatch`). An existing `<catalog>/<bundle-id>` entry of any kind is a `catalog_conflict`, and Lattice never replaces it. The other bundles still install.
+
+Each admitted bundle is copied from verified pack bytes into a new staging directory next to the catalog, `.lattice-catalog-<bundle-id>.staging`. Lattice writes the copy through a capability directory: create-only, with no symlink following. It syncs every file and directory. The loader then checks the staged copy again against the pack declaration, and Lattice renames the bundle into the catalog only if its id is still absent. Each bundle appears whole or not at all. The installation is not a transaction across bundles. The command exits non-zero when any bundle is rejected or conflicts, and the report lists every outcome.
+
+### Authority
+
+Fetching, locking, installing and listing grant no effect authority (`"grants_authority": false`). An installed bundle is ordinary local catalog content. Preview and save follow [the workflow-template rules](workflow-template-bundles.md). Running the saved workflow still requires the operator's reviewed standalone profile from `lattice authority inspect`. Without one, the run is refused before any effect.
+
+### Publishing a catalog
+
+1. Author each bundle under `packs/<pack>/workflow-templates/<bundle-id>/` and pin its files in the bundle manifest (see [Regenerate reviewed identities](workflow-template-bundles.md#regenerate-reviewed-identities)).
+2. For every file, add a `workflow_bundle` content item with its `nix hash file --type blake3 --base16` identity (prefixed `b3:`) and byte length.
+3. Add each bundle to `workflow_bundles`. To read the loader identity of a reviewed bundle, run `catalog-install` without `--confirm-create`. A mismatched pin is reported with `observed_identity`. Review the bytes before you copy that value.
+4. Commit, record the full commit and the pack identity from `lattice pack inspect`, and publish both to operators.
+
+Runbook catalogs add these non-claims to the pack non-claims. A commit or pack identity proves exact bytes, not maintainer or source trust. A fetch does not prove that the repository will keep serving that commit. Installation does not prove workflow safety or correctness, and it grants no authority.
 
 ## Reference and license boundary
 

@@ -15,8 +15,13 @@ pub fn content_identity(bytes: &[u8]) -> String {
     format!("b3:{}", blake3::hash(bytes).to_hex())
 }
 
+/// Workflow-bundle declarations join the projection only when present, so the identity of every
+/// pack without them is unchanged.
 pub fn manifest_identity(manifest: &super::model::Manifest) -> Result<String, super::Error> {
-    hash_serializable(MANIFEST_DOMAIN, &authoritative_manifest(manifest))
+    if manifest.workflow_bundles.is_empty() {
+        return hash_serializable(MANIFEST_DOMAIN, &authoritative_manifest(manifest));
+    }
+    hash_serializable(MANIFEST_DOMAIN, &(authoritative_manifest(manifest), &manifest.workflow_bundles))
 }
 
 pub fn pack_identity(manifest: &super::model::Manifest) -> Result<String, super::Error> {

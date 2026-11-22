@@ -147,6 +147,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         licenses: vec!["AGPL-3.0-or-later".to_string()],
         probe: None,
         required_non_claims: lattice::operation_pack::model::REQUIRED_NON_CLAIMS.map(str::to_string).to_vec(),
+        workflow_bundles: Vec::new(),
     };
     let manifest = lattice::operation_pack::validate_manifest(manifest)?;
     println!("{}", serde_json::to_string_pretty(&manifest)?);

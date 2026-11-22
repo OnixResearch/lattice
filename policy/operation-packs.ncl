@@ -82,6 +82,12 @@ let Probe = {
   effectful | Bool,
   uses_production_credentials | Bool,
 } in
+# A runbook-catalog bundle: every file is a `workflow_bundle` content item under
+# `workflow-templates/<id>/`, and `bundle_identity` pins the workflow-template loader identity.
+let WorkflowBundle = {
+  id | String,
+  bundle_identity | Identity,
+} in
 let ManifestContract = {
   schema = "lattice.operation-pack-manifest.v1",
   pack_id | String,
@@ -98,6 +104,7 @@ let ManifestContract = {
   licenses | Array String,
   probe | optional | Probe,
   required_non_claims | Array String,
+  workflow_bundles | optional | Array WorkflowBundle,
 } in
 let LockContract = {
   schema = "lattice.operation-pack-lock.v1",

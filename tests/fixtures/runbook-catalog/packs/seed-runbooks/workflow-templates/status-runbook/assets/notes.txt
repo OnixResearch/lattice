@@ -1,0 +1,2 @@
+Seed runbook-catalog fixture note.
+This asset is declared, pinned and never executed.

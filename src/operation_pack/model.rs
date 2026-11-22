@@ -57,6 +57,7 @@ pub enum ContentRole {
     WasmComponent,
     WitSource,
     MantleBundle,
+    WorkflowBundle,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -218,6 +219,8 @@ pub struct Manifest {
     pub licenses: Vec<String>,
     pub probe: Option<ProbeManifest>,
     pub required_non_claims: Vec<String>,
+    #[serde(default = "Vec::new", skip_serializing_if = "Vec::is_empty")]
+    pub workflow_bundles: Vec<super::catalog::WorkflowBundleDeclaration>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -145,6 +145,7 @@ fn manifest() -> pack::Manifest {
         licenses: vec!["AGPL-3.0-or-later".to_string()],
         probe: None,
         required_non_claims: pack::REQUIRED_NON_CLAIMS.iter().map(|value| (*value).to_string()).collect(),
+        workflow_bundles: Vec::new(),
     }
 }
 

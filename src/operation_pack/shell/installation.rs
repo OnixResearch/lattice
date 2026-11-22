@@ -220,7 +220,7 @@ fn write_file_create_only(path: &std::path::Path, bytes: &[u8]) -> Result<(), su
         .map_err(|_| super::super::Error::Io("file parent sync"))
 }
 
-fn validate_directory(path: &std::path::Path) -> Result<(), super::super::Error> {
+pub(super) fn validate_directory(path: &std::path::Path) -> Result<(), super::super::Error> {
     if !path.is_absolute() {
         return Err(super::super::Error::Invalid("directory must be absolute"));
     }
@@ -231,7 +231,7 @@ fn validate_directory(path: &std::path::Path) -> Result<(), super::super::Error>
     Ok(())
 }
 
-fn safe_file_name(path: &std::path::Path) -> Result<&str, super::super::Error> {
+pub(super) fn safe_file_name(path: &std::path::Path) -> Result<&str, super::super::Error> {
     let name = path
         .file_name()
         .and_then(std::ffi::OsStr::to_str)
@@ -242,11 +242,11 @@ fn safe_file_name(path: &std::path::Path) -> Result<&str, super::super::Error> {
     Ok(name)
 }
 
-fn remove_staging(path: &std::path::Path) -> Result<(), super::super::Error> {
+pub(super) fn remove_staging(path: &std::path::Path) -> Result<(), super::super::Error> {
     std::fs::remove_dir_all(path).map_err(|_| super::super::Error::Io("staging cleanup"))
 }
 
-fn sync_directory(path: &std::path::Path) -> Result<(), super::super::Error> {
+pub(super) fn sync_directory(path: &std::path::Path) -> Result<(), super::super::Error> {
     std::fs::File::open(path)
         .and_then(|file| file.sync_all())
         .map_err(|_| super::super::Error::Io("directory sync"))

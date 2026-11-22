@@ -65,6 +65,24 @@ interfaces.
   activation planning and start re-verify bound values, content, revision and
   identity (`bound_content_drift`). A schema 1 manifest that names `mode` or
   `params`, even as `null`, is refused.
+- Git-backed runbook catalogs admitted through content-addressed operation
+  packs (Lattice #29). A pack can carry workflow-template bundles as
+  `workflow_bundle` content under `workflow-templates/<bundle-id>/`, pinned by
+  per-file identities and a declared loader `bundle_identity`; the pack
+  identity covers every bundle byte, and packs without bundles keep their
+  identity. `lattice pack catalog-fetch` is the only networked step: it
+  fetches one full commit from a `file://`, `https://` or `ssh://` repository
+  through bounded `git` with a cleared environment, refuses symlink and
+  submodule members and an unexpected `--pack-identity`, and publishes a
+  verified tree create-only. `lattice pack catalog-install` reads local bytes
+  only: pack byte drift refuses the whole pack while naming every drifted
+  bundle; after admission each bundle is decided independently (loader
+  diagnostics such as compatibility, `identity_mismatch`,
+  `pack_content_mismatch`, `catalog_conflict`) and the good ones are staged,
+  re-verified and renamed into the catalog one at a time. Installation grants
+  no effect authority. `lattice pack catalog-list` lists a catalog through the
+  workflow-template loader. A seed catalog fixture is retained in
+  `tests/fixtures/runbook-catalog`. See `docs/operation-packs.md`.
 - Bounded same-attempt repair and the Kiln #61 budget lineage for
   implementation attempts (Lattice #6). The v3 request accepts two optional
   fields; without them a request keeps its bytes, identity and profile

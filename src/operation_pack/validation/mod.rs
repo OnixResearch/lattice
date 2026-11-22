@@ -38,6 +38,7 @@ pub fn validate_manifest(mut manifest: super::model::Manifest) -> Result<super::
     validate_top_level(&manifest)?;
     normalize(&mut manifest)?;
     validate_contents(&manifest)?;
+    super::catalog::validate_declarations(&manifest)?;
     validate_runtimes(&manifest)?;
     validate_operations(&manifest)?;
     super::wasm::validate_method_closure(&manifest)?;
@@ -59,10 +60,14 @@ fn validate_top_level(manifest: &super::model::Manifest) -> Result<(), super::Er
     if manifest.contents.is_empty() || manifest.contents.len() > super::model::MAXIMUM_CONTENT_ITEMS {
         return Err(super::Error::Invalid("content count"));
     }
-    if manifest.operations.is_empty() || manifest.operations.len() > super::model::MAXIMUM_OPERATIONS {
+    // A catalog-only pack carries workflow bundles and no operation, runtime or executable content.
+    let is_catalog_pack = manifest.operations.is_empty() && !manifest.workflow_bundles.is_empty();
+    if (manifest.operations.is_empty() && !is_catalog_pack)
+        || manifest.operations.len() > super::model::MAXIMUM_OPERATIONS
+    {
         return Err(super::Error::Invalid("operation count"));
     }
-    if manifest.runtimes.is_empty() || manifest.runtimes.len() > super::model::MAXIMUM_RUNTIMES {
+    if (manifest.runtimes.is_empty() && !is_catalog_pack) || manifest.runtimes.len() > super::model::MAXIMUM_RUNTIMES {
         return Err(super::Error::Invalid("runtime count"));
     }
     if manifest.analyzers.len() > super::model::MAXIMUM_ANALYZERS
@@ -94,6 +99,7 @@ fn normalize(manifest: &mut super::model::Manifest) -> Result<(), super::Error> 
     manifest.analyzers.sort_by(|left, right| left.id.cmp(&right.id));
     manifest.skills.sort_by(|left, right| left.name.cmp(&right.name));
     manifest.dependencies.sort_by(|left, right| left.pack_id.cmp(&right.pack_id));
+    manifest.workflow_bundles.sort_by(|left, right| left.id.cmp(&right.id));
     sort_unique(&mut manifest.platforms)?;
     sort_unique(&mut manifest.licenses)?;
     sort_unique(&mut manifest.required_non_claims)?;

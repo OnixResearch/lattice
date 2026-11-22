@@ -152,6 +152,12 @@ Copy the exact output into the matching manifest binding. Repeat this step for t
 
 The loader rejects stale, uppercase, prefixed, malformed, or unsupported identity values. Recalculate an identity only after you inspect the changed bytes.
 
+## Install from a runbook catalog
+
+Bundles can also come from a git-hosted runbook catalog. An operation pack carries them. Use `lattice pack catalog-fetch` to retrieve an exact commit, then `lattice pack lock`. Use `lattice pack catalog-install --catalog <config directory>/workflow-templates` to admit the bundles into this directory. Each bundle is verified with this loader and installed create-only. Installation never replaces an existing bundle directory and grants no authority.
+
+`lattice pack catalog-list` lists this directory with the same loader. The loader itself still reads only local files. See [Runbook catalogs](operation-packs.md#runbook-catalogs).
+
 ## Preview in the TUI
 
 1. Press `Ctrl-P`.

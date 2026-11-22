@@ -8,6 +8,8 @@
     reason = "public CLI names retain explicit pack terminology for stable help and API output"
 )]
 
+pub mod catalog;
+
 #[derive(clap::Args, Debug)]
 pub struct CommandArgs {
     #[command(subcommand)]
@@ -40,6 +42,13 @@ pub enum Command {
     RegistryPromote(RegistryPromoteArgs),
     /// Check one pack integration without ordinary effects.
     Doctor(DoctorArgs),
+    /// Fetch one pack tree at an exact catalog repository commit; the only networked pack command.
+    CatalogFetch(catalog::FetchArgs),
+    /// Preview or install admitted pack workflow bundles into a local `workflow-templates/`
+    /// catalog.
+    CatalogInstall(catalog::InstallArgs),
+    /// List the bundles and diagnostics of one local `workflow-templates/` catalog.
+    CatalogList(catalog::ListArgs),
 }
 
 #[derive(clap::Args, Debug)]
@@ -251,6 +260,9 @@ fn run_inner(app_config: &crate::config::AppConfig, args: &CommandArgs) -> Resul
         Command::RegistryRestore(args) => registry_restore_command(args),
         Command::RegistryPromote(args) => registry_promote_command(args),
         Command::Doctor(args) => doctor_command(app_config, args),
+        Command::CatalogFetch(args) => catalog::fetch_command(app_config, args),
+        Command::CatalogInstall(args) => catalog::install_command(args),
+        Command::CatalogList(args) => catalog::list_command(args),
     }
 }
 
