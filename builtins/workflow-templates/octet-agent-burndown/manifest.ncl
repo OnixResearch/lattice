@@ -2,6 +2,14 @@
 let ContentIdentity = String in
 let FileBinding = { path | String, blake3 | ContentIdentity } in
 let AssetBinding = { path | String, media_kind | String, blake3 | ContentIdentity, required | Bool } in
+let ParamTarget = { node | String, shell_env | String } in
+let ParamDeclaration = {
+  name | String,
+  type | { kind | String, .. },
+  required | Bool,
+  default | optional | Dyn,
+  bindings | Array ParamTarget,
+} in
 let Compatibility = {
   workflow_schema | Number,
   orchestration_schema | optional | Number,
@@ -15,6 +23,8 @@ let WorkflowTemplateManifest = {
   display_name | String,
   description | String,
   category | String,
+  mode | String,
+  params | Array ParamDeclaration,
   workflow | FileBinding,
   orchestration | optional | FileBinding,
   assets | Array AssetBinding,
@@ -23,11 +33,14 @@ let WorkflowTemplateManifest = {
   non_claims | Array String,
 } in
 ({
-  schema_version = 1,
+  schema_version = 2,
   id = "octet-agent-burndown",
   display_name = "Octet agent burn-down",
   description = "Run one visible no-disabled Octet refactor round with at most one Pi agent.",
   category = "guarded-agents",
+  # Pi edits the repository; the guarded authority pins the root, so it is not a parameter.
+  mode = "mutating",
+  params = [],
   workflow = {
     path = "workflow.ncl",
     blake3 = "1dadbc1aa533861862ce29f1baba5eb309961793895bd927d8ef65bf78000885",

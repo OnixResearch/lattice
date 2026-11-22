@@ -2,6 +2,14 @@
 let ContentIdentity = String in
 let FileBinding = { path | String, blake3 | ContentIdentity } in
 let AssetBinding = { path | String, media_kind | String, blake3 | ContentIdentity, required | Bool } in
+let ParamTarget = { node | String, shell_env | String } in
+let ParamDeclaration = {
+  name | String,
+  type | { kind | String, .. },
+  required | Bool,
+  default | optional | Dyn,
+  bindings | Array ParamTarget,
+} in
 let Compatibility = {
   workflow_schema | Number,
   orchestration_schema | optional | Number,
@@ -15,6 +23,8 @@ let WorkflowTemplateManifest = {
   display_name | String,
   description | String,
   category | String,
+  mode | String,
+  params | Array ParamDeclaration,
   workflow | FileBinding,
   orchestration | optional | FileBinding,
   assets | Array AssetBinding,
@@ -23,14 +33,25 @@ let WorkflowTemplateManifest = {
   non_claims | Array String,
 } in
 ({
-  schema_version = 1,
+  schema_version = 2,
   id = "agent-evaluation-catalog-review",
   display_name = "Agent evaluation catalog review",
   description = "Validate and display the built-in identity-bound evaluation catalog without executing trials.",
   category = "agent-evaluation",
+  # A shell command is never provably read-only, so this inert check is classified mutating.
+  mode = "mutating",
+  params = [
+    {
+      name = "catalog_root",
+      type = { kind = "relative_path", max_bytes = 256 },
+      required = false,
+      default = "builtins/agent-evaluations",
+      bindings = [{ node = "Validate evaluation catalog", shell_env = "LATTICE_PARAM_CATALOG_ROOT" }],
+    },
+  ],
   workflow = {
     path = "workflow.ncl",
-    blake3 = "073c8849e64b76e658bb41481a5cefe7824bfe4c258a737def47f43358c84ab2",
+    blake3 = "f9f3217fcbe705d00014b4d8b536f3019da77f761d9b65122f68d12c816a8ce7",
   },
   assets = [],
   compatibility = {

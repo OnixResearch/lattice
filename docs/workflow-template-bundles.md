@@ -32,12 +32,17 @@ workflow-templates/<bundle-id>/
 
 `manifest.ncl` uses a typed Nickel contract. It declares these values:
 
+- `schema_version = 2`;
 - stable bundle metadata;
+- a required `mode`, `"read_only"` or `"mutating"`;
+- a required `params` list of typed parameters, which can be empty;
 - the workflow path and BLAKE3 identity;
 - one optional orchestration path and BLAKE3 identity;
 - every support asset path, media kind, BLAKE3 identity, and required state;
 - workflow, orchestration, node, runtime, and feature compatibility;
 - safe operator notes and non-claims.
+
+The manifest identity is the BLAKE3 identity of the manifest bytes, so it covers `mode` and every parameter declaration.
 
 The authoring contract is [`policy/workflow-template-bundle.ncl`](../policy/workflow-template-bundle.ncl).
 
@@ -46,6 +51,78 @@ The loader accepts local regular files only. It rejects absolute paths, parent t
 The loader does not retrieve network content. It does not execute a workflow or asset.
 
 One invalid bundle produces one safe diagnostic. Other valid bundles remain available.
+
+## Mode
+
+`mode` is the upper bound on what the bundle's workflow may do. The loader computes the least mode that admits every node and rejects a `read_only` bundle whose workflow needs `mutating` with `mode_violation`. Save and start planning repeat the same check.
+
+The classification is conservative. A node counts as read-only only when it is provably so:
+
+| Node | Class |
+| --- | --- |
+| Condition, merge, approval | Pure: no external effect |
+| File `read`, image input | Read-only: a bounded read through an operator-configured root |
+| File `write` or `append` | Mutating |
+| Shell, operation, HTTP of any method, agent | Mutating |
+| Subworkflow | Mutating: the child workflow is outside the bundle |
+
+A shell command is never provably read-only, so every bundle with a shell node is `mutating`, including the built-in catalog review and shell preview. The TUI browser marks each bundle's mode, and a `mutating` bundle shows a red warning when selected.
+
+## Parameters
+
+Each `params` entry is a closed record:
+
+```nickel
+{
+  name = "catalog_root",
+  type = { kind = "relative_path", max_bytes = 256 },
+  required = false,
+  default = "builtins/agent-evaluations",
+  bindings = [{ node = "Validate evaluation catalog", shell_env = "LATTICE_PARAM_CATALOG_ROOT" }],
+}
+```
+
+- `name` is lowercase ASCII, digits, and `_`, at most 64 bytes, and unique.
+- `type` is one of:
+  - `{ kind = "bool" }`;
+  - `{ kind = "integer", min, max }`, inclusive;
+  - `{ kind = "enum", values }`, with 1 to 32 unique lowercase tokens;
+  - `{ kind = "relative_path", max_bytes }`, with 1 to 256 bytes.
+  No type accepts free-form text.
+- A required parameter has no `default`. An optional parameter must have a `default` that satisfies its type.
+- `bindings` lists 1 to 8 targets. Each names a shell node by its label, which must match exactly one node, and the environment variable it receives. Labels are used because Nickel import renumbers node identities. The key must start with `LATTICE_PARAM_`, so a parameter can never set `PATH` or another ambient variable.
+
+A bundle declares at most 16 parameters. Unknown fields and other kinds are rejected.
+
+A `relative_path` value uses only ASCII letters, digits, `.`, `_`, `-`, and `/`. Its components are nonempty, never `..`, and never start with `-`. An `enum` value is one of the declared tokens. These values contain no whitespace, quote, or shell metacharacter.
+
+### Binding without shell interpolation
+
+A value reaches the workflow only as the environment value of each declared shell node. It is never spliced into command text. The loader requires each bound command to read the variable only in the exact double-quoted form `"${LATTICE_PARAM_NAME}"`. A bare `$NAME`, an unquoted `${NAME}`, or an operator form such as `${NAME:-x}` is rejected, so the shell passes the value as one argument without word splitting or globbing.
+
+The template workflow must hold each optional parameter's rendered default under its key and must not hold a required parameter's key. Binding the defaults therefore reproduces the reviewed workflow exactly.
+
+### Resolution and identity
+
+`lattice::workflow_template::params::resolve(declared, supplied)` is the pure check for supplied values. It rejects unknown names, wrong types, out-of-bounds values, and missing required values. Its diagnostic names only a declared parameter and never echoes a supplied value. The returned `params::Resolved` holds every value sorted by name and a BLAKE3 identity over each name, value kind, and value.
+
+`lattice::workflow_template::bind(template, supplied)` resolves values against a catalog template. It writes them into a copy of the workflow and rebinds an optional orchestration to the new workflow revision. Then it re-runs the template's admission checks: workflow validation, compatibility, mode, orchestration binding, and guarded authority. The bound bundle's identity is BLAKE3 over the template identity and the resolved-value identity.
+
+Parameters cannot widen effect authority. Binding changes only declared environment values, so node kinds, commands, resources, and abilities stay as reviewed. `lattice authority inspect` on the saved bound workflow lists the same grants as the template, under the bound workflow revision.
+
+### Built-in migration
+
+All four built-in bundles use schema 2 and `mode = "mutating"`.
+
+- `agent-evaluation-catalog-review` declares `catalog_root`, a `relative_path` that defaults to `builtins/agent-evaluations`. Its command reads it as `--root "${LATTICE_PARAM_CATALOG_ROOT}"`.
+- `cairn-agent-drain` and `octet-agent-burndown` keep `--root .` fixed and declare no parameters. The guarded authority check pins the root, the exact command set, an empty environment, and the agent workspace. A path parameter there would change where an agent may edit, so it is not a sound parameter.
+- `shell-preview` declares no parameters.
+
+## Schema 1 compatibility
+
+A schema 1 manifest has neither `mode` nor `params`. It still loads as a `mutating` bundle with no parameters. Its manifest bytes are unchanged, so its manifest and template identities are unchanged. This is the conservative reading of a manifest that declared no limit, and it keeps catalogs copied by an earlier `--init` loadable without edits.
+
+A schema 1 manifest that declares `mode` or `params` fails with `unsupported_schema`. A schema 2 manifest without either field fails with `invalid_manifest`. Any other schema version fails with `unsupported_schema`. To declare a mode or parameters, migrate the manifest to schema 2.
 
 ## Regenerate reviewed identities
 
@@ -63,11 +140,13 @@ The loader rejects stale, uppercase, prefixed, malformed, or unsupported identit
 
 1. Press `Ctrl-P`.
 2. Select **Browse Workflow Templates**.
-3. Use the arrow keys to select a bundle.
+3. Use the arrow keys to select a bundle. The browser shows its mode and each parameter's default or `required`.
 4. Press `Enter` to preview it.
 5. Press `Esc` to restore the prior workflow.
 6. Press `Enter` again to retain the preview as an unsaved draft.
 7. Use the normal explicit save action only after you inspect the workflow.
+
+The TUI supplies no parameter values. Preview binds every optional parameter to its default and shows `mode=` in its status. A bundle with a required parameter cannot be previewed in the TUI. A product integration must bind it with `bind`.
 
 Preview does not write the store. It does not create an orchestration instance, run, budget reservation, credential lookup, agent call, or node effect.
 
@@ -75,15 +154,17 @@ If the current canvas has unsaved changes, Lattice refuses replacement. Save or 
 
 ## Save and start boundaries
 
-A saved workflow must have the exact previewed revision. A same-name workflow with different content is a conflict, not overwrite authority.
+Save and start accept only a bound bundle. `save_draft` fails with `ParamsUnbound` for an unbound catalog template, and activation planning blocks with `ParamsUnbound` or `ModeViolation`.
+
+A saved workflow must have the exact previewed revision. A same-name workflow with different content is a conflict, not overwrite authority. This includes the same template bound to different values.
 
 An optional orchestration remains an inert draft after preview and workflow save. A product integration can start it only through the workflow-template activation port.
 
-The integration must call `start_orchestration_draft_with_execution` with exact admission facts, an admitted actor, and an authorized `ProductExecution`. The port records the exact bundle, workflow, orchestration, policy, and actor identities before dispatch.
+The integration must call `start_orchestration_draft_with_execution` with exact admission facts, an admitted actor, and an authorized `ProductExecution`. The port records the exact bundle, workflow, orchestration, policy, and actor identities before dispatch. The recorded bundle identity is the bound identity, so it commits to the resolved values.
 
 The ordinary `orchestration start` CLI remains a separate route. It does not establish workflow-template origin or a bundle activation receipt.
 
-Activation admission rechecks the saved workflow revision, policy, actor, runtime, effects, credentials, triggers, and positive budgets. Drift or a missing fact stops before instance creation or dispatch.
+Activation admission rechecks the bound values, the mode, the saved workflow revision, policy, actor, runtime, effects, credentials, triggers, and positive budgets. Drift or a missing fact stops before instance creation or dispatch.
 
 Selecting, previewing, or saving a template cannot start orchestration or approve a proposal.
 

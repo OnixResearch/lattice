@@ -73,6 +73,11 @@ fn load_builtin(directory: &tempfile::TempDir) -> lattice::workflow_template::Va
     catalog.bundles.into_iter().next().expect("built-in bundle exists")
 }
 
+fn load_bound(directory: &tempfile::TempDir) -> lattice::workflow_template::ValidatedBundle {
+    lattice::workflow_template::bind(&load_builtin(directory), &std::collections::BTreeMap::new())
+        .expect("built-in defaults bind")
+}
+
 fn pure_validation_input() -> BundleValidationInput {
     let mut workflow =
         lattice::engine::Workflow::new(PURE_WORKFLOW_NAME, lattice::engine::workflow::WorkflowTimestamp::epoch());
@@ -100,6 +105,8 @@ fn pure_validation_input() -> BundleValidationInput {
             },
             operator_notes: Vec::new(),
             non_claims: Vec::new(),
+            mode: Some(lattice::workflow_template::BundleMode::Mutating),
+            params: Some(Vec::new()),
         },
         files: vec![BundleFile {
             path: PURE_WORKFLOW_FILE.to_string(),
@@ -410,7 +417,7 @@ fn initialization_is_complete_and_preserves_existing_targets() {
 #[test]
 fn application_planning_is_deterministic_idempotent_and_conflict_safe() {
     let directory = initialized_root();
-    let bundle = load_builtin(&directory);
+    let bundle = load_bound(&directory);
     let database = directory.path().join("catalog.redb");
     let store = lattice::store::Store::new(&database).expect("template store creates");
 
@@ -448,7 +455,7 @@ fn application_planning_is_deterministic_idempotent_and_conflict_safe() {
 #[test]
 fn activation_requires_explicit_exact_admission() {
     let directory = initialized_root();
-    let bundle = orchestration_bundle(load_builtin(&directory));
+    let bundle = orchestration_bundle(load_bound(&directory));
     let mut facts = admitted_activation(&bundle);
     facts.explicit_start_requested = false;
     assert_eq!(lattice::workflow_template::plan_activation(&bundle, &facts), ActivationPlan::PreviewOnly);
@@ -476,7 +483,7 @@ fn activation_requires_explicit_exact_admission() {
 #[test]
 fn activation_fails_closed_for_drift_and_every_missing_authority_fact() {
     let directory = initialized_root();
-    let bundle = orchestration_bundle(load_builtin(&directory));
+    let bundle = orchestration_bundle(load_bound(&directory));
     let mut drifted = admitted_activation(&bundle);
     drifted.saved_workflow_revision = None;
     assert_eq!(
@@ -503,7 +510,7 @@ fn activation_fails_closed_for_drift_and_every_missing_authority_fact() {
 #[tokio::test]
 async fn exact_activation_records_identities_before_one_admitted_dispatch() {
     let directory = initialized_root();
-    let bundle = orchestration_bundle(load_builtin(&directory));
+    let bundle = orchestration_bundle(load_bound(&directory));
     let store = lattice::store::Store::new(directory.path().join("admitted-activation.redb"))
         .expect("admitted activation store creates");
     lattice::workflow_template::save_draft(&store, &bundle).expect("exact workflow draft saves");
@@ -542,7 +549,7 @@ async fn exact_activation_records_identities_before_one_admitted_dispatch() {
 #[tokio::test]
 async fn blocked_activation_creates_no_instance_run_or_activation_receipt() {
     let directory = initialized_root();
-    let bundle = orchestration_bundle(load_builtin(&directory));
+    let bundle = orchestration_bundle(load_bound(&directory));
     let store = lattice::store::Store::new(directory.path().join("blocked-activation.redb"))
         .expect("blocked activation store creates");
     let mut facts = admitted_activation(&bundle);
@@ -596,7 +603,8 @@ fn existing_node_templates_and_direct_format_routes_remain_compatible() {
 #[test]
 fn tui_preview_is_unsaved_and_cancel_restores_prior_state() {
     let directory = initialized_root();
-    let bundle = orchestration_bundle(load_builtin(&directory));
+    let template = load_builtin(&directory);
+    let bundle = orchestration_bundle(load_bound(&directory));
     let config = lattice::config::AppConfig {
         data_dir: directory.path().join("tui-state"),
         ..lattice::config::AppConfig::default()
@@ -610,7 +618,7 @@ fn tui_preview_is_unsaved_and_cancel_restores_prior_state() {
     let orchestration_count = store.list_orchestrations().expect("preview orchestration count reads").len();
     let activation_receipt =
         lattice::workflow_template::activation_receipt(&bundle, ACTOR).expect("preview receipt identity computes");
-    app.set_workflow_templates(vec![bundle]);
+    app.set_workflow_templates(vec![template]);
 
     app.open_workflow_template_browser();
     app.confirm_workflow_template_browser();

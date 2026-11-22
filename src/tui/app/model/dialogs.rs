@@ -62,9 +62,8 @@ impl WorkflowTemplateBrowserState {
 
 #[derive(Debug, Clone)]
 pub struct WorkflowTemplateDraft {
-    pub bundle: crate::workflow_template::ContentIdentity,
-    pub workflow: crate::orchestration::WorkflowRevisionRef,
-    pub orchestration: Option<crate::orchestration::DefinitionRevision>,
+    /// The previewed bundle, bound to exact parameter values.
+    pub bundle: crate::workflow_template::ValidatedBundle,
 }
 
 impl WorkflowBrowserState {

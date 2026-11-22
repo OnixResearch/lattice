@@ -1,4 +1,7 @@
-pub const CURRENT_BUNDLE_SCHEMA_VERSION: u32 = 1;
+/// Schema 2 requires `mode` and `params`.
+pub const CURRENT_BUNDLE_SCHEMA_VERSION: u32 = 2;
+/// Schema 1 has neither field and loads as `mutating` with no parameters.
+pub const LEGACY_BUNDLE_SCHEMA_VERSION: u32 = 1;
 pub const CURRENT_WORKFLOW_SCHEMA_VERSION: u32 = 1;
 pub const CURRENT_ORCHESTRATION_SCHEMA_VERSION: u32 = 1;
 pub const MAX_CATALOG_BUNDLES: usize = 64;
@@ -82,6 +85,22 @@ pub struct BundleManifest {
     pub compatibility: CompatibilityRequirements,
     pub operator_notes: Vec<String>,
     pub non_claims: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mode: Option<super::classification::BundleMode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub params: Option<Vec<super::params::ParamDeclaration>>,
+}
+
+impl BundleManifest {
+    /// The effective mode. A legacy schema-1 manifest is conservatively `mutating`.
+    pub fn mode(&self) -> super::classification::BundleMode {
+        self.mode.unwrap_or(super::classification::BundleMode::Mutating)
+    }
+
+    /// The declared parameters. A legacy schema-1 manifest declares none.
+    pub fn params(&self) -> &[super::params::ParamDeclaration] {
+        self.params.as_deref().unwrap_or_default()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -135,6 +154,8 @@ pub struct ValidatedBundle {
     pub orchestration_revision: Option<crate::orchestration::DefinitionRevision>,
     pub orchestration: Option<crate::orchestration::Definition>,
     pub file_identities: Vec<(String, ContentIdentity)>,
+    /// `None` for a catalog template; `Some` once [`super::bind`] bound exact values.
+    pub params: Option<super::params::Bound>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -160,6 +181,13 @@ pub enum DiagnosticCode {
     SymlinkRejected,
     NonRegularFile,
     NickelEvaluation,
+    InvalidParamDeclaration,
+    UnknownParam,
+    ParamTypeMismatch,
+    ParamOutOfBounds,
+    MissingParam,
+    ParamsUnbound,
+    ModeViolation,
 }
 
 impl DiagnosticCode {
@@ -186,6 +214,13 @@ impl DiagnosticCode {
             Self::SymlinkRejected => "symlink_rejected",
             Self::NonRegularFile => "non_regular_file",
             Self::NickelEvaluation => "nickel_evaluation",
+            Self::InvalidParamDeclaration => "invalid_param_declaration",
+            Self::UnknownParam => "unknown_param",
+            Self::ParamTypeMismatch => "param_type_mismatch",
+            Self::ParamOutOfBounds => "param_out_of_bounds",
+            Self::MissingParam => "missing_param",
+            Self::ParamsUnbound => "params_unbound",
+            Self::ModeViolation => "mode_violation",
         }
     }
 }
@@ -235,55 +270,4 @@ pub enum ApplicationPlan {
     Conflict(DiagnosticCode),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ActivationFacts {
-    pub explicit_save_requested: bool,
-    pub explicit_start_requested: bool,
-    pub saved_workflow_revision: Option<crate::orchestration::WorkflowRevisionRef>,
-    pub current_orchestration_revision: Option<crate::orchestration::DefinitionRevision>,
-    pub runtime_admitted: bool,
-    pub effects_admitted: bool,
-    pub credentials_admitted: bool,
-    pub triggers_admitted: bool,
-    pub positive_budgets_admitted: bool,
-    pub actor_authority_admitted: bool,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ActivationPlan {
-    PreviewOnly,
-    SaveWorkflow {
-        bundle: ContentIdentity,
-        workflow: crate::orchestration::WorkflowRevisionRef,
-    },
-    StartOrchestration {
-        bundle: ContentIdentity,
-        workflow: crate::orchestration::WorkflowRevisionRef,
-        orchestration: crate::orchestration::DefinitionRevision,
-    },
-    Blocked(ActivationBlock),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct ActivationReceipt {
-    pub identity: ContentIdentity,
-    pub bundle: ContentIdentity,
-    pub workflow: crate::orchestration::WorkflowRevisionRef,
-    pub orchestration: crate::orchestration::DefinitionRevision,
-    pub authority_policy: crate::orchestration::AuthorityPolicyIdentity,
-    pub actor: String,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ActivationBlock {
-    WorkflowNotSaved,
-    WorkflowDrift,
-    OrchestrationMissing,
-    OrchestrationDrift,
-    RuntimeNotAdmitted,
-    EffectsNotAdmitted,
-    CredentialsNotAdmitted,
-    TriggersNotAdmitted,
-    BudgetsNotAdmitted,
-    AuthorityNotAdmitted,
-}
+include!("model/activation.rs");

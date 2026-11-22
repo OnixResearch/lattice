@@ -61,9 +61,9 @@ let catalog_timeout_secs = 60 in
   configs = [{
     node_id = catalog_node_id,
     kind = "shell",
-    command = "lattice evaluation catalog --root builtins/agent-evaluations --output json",
+    command = "lattice evaluation catalog --root \"${LATTICE_PARAM_CATALOG_ROOT}\" --output json",
     cwd = [],
-    env = [],
+    env = [{ key = "LATTICE_PARAM_CATALOG_ROOT", value = "builtins/agent-evaluations" }],
     secret_env = [],
     http_method = "",
     url = "",

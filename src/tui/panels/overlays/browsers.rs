@@ -51,16 +51,16 @@ pub(in crate::tui::panels) fn render_workflow_template_browser(
             "workflow only"
         };
         lines.push(Line::styled(
-            format!("{prefix}{} [{}] — {orchestration}", template.manifest.display_name, template.manifest.category),
+            format!(
+                "{prefix}{} [{}] — {orchestration} — {}",
+                template.manifest.display_name,
+                template.manifest.category,
+                template.manifest.mode().as_str()
+            ),
             style,
         ));
         if is_selected {
-            lines.push(Line::styled(template.manifest.description.clone(), Style::new().fg(Color::Gray)));
-            lines
-                .push(Line::styled(format!("bundle {}", template.identity.as_str()), Style::new().fg(Color::DarkGray)));
-            for claim in &template.manifest.non_claims {
-                lines.push(Line::styled(format!("non-claim: {claim}"), Style::new().fg(Color::DarkGray)));
-            }
+            lines.extend(selected_template_details(template));
         }
     }
     if app.workflow_templates.is_empty() && app.workflow_template_browser.message.is_none() {
@@ -68,6 +68,31 @@ pub(in crate::tui::panels) fn render_workflow_template_browser(
     }
     lines.truncate(usize::from(inner.height));
     Paragraph::new(lines).render(inner, buf);
+}
+
+/// Description, a mutating warning, declared parameters, identity, and non-claims; never commands.
+fn selected_template_details(template: &crate::workflow_template::ValidatedBundle) -> Vec<Line<'static>> {
+    let mut lines = vec![Line::styled(
+        template.manifest.description.clone(),
+        Style::new().fg(Color::Gray),
+    )];
+    if template.manifest.mode() == crate::workflow_template::BundleMode::Mutating {
+        lines.push(Line::styled("mode: mutating — may change repositories or hosts", Style::new().fg(Color::Red)));
+    }
+    for param in template.manifest.params() {
+        let requirement = match &param.default {
+            Some(default) => format!("default {}", crate::workflow_template::params::render(default)),
+            None => "required".to_string(),
+        };
+        lines.push(Line::styled(format!("param {}: {requirement}", param.name), Style::new().fg(Color::Gray)));
+    }
+    lines.push(Line::styled(format!("bundle {}", template.identity.as_str()), Style::new().fg(Color::DarkGray)));
+    for claim in &template.manifest.non_claims {
+        lines.push(Line::styled(format!("non-claim: {claim}"), Style::new().fg(Color::DarkGray)));
+    }
+    debug_assert!(lines.len() > template.manifest.params().len());
+    debug_assert!(lines.len() > template.manifest.non_claims.len());
+    lines
 }
 
 pub(in crate::tui::panels) fn render_workflow_browser(app: &crate::tui::app::State, area: Rect, buf: &mut Buffer) {

@@ -22,36 +22,14 @@ pub fn validate_bundle(
     let workflow = input.workflow.ok_or_else(|| {
         diagnostic(&bundle, super::model::DiagnosticCode::InvalidWorkflow, "workflow content is invalid")
     })?;
-    if !crate::workflow_validation::validate_workflow(&workflow).is_empty() {
-        return Err(diagnostic(&bundle, super::model::DiagnosticCode::InvalidWorkflow, "workflow validation failed"));
-    }
-    validate_declared_compatibility(&input.manifest.compatibility, &workflow, &bundle)?;
-    let workflow_revision = crate::orchestration::workflow_revision(&workflow)
-        .map_err(|_| diagnostic(&bundle, super::model::DiagnosticCode::InvalidWorkflow, "workflow identity failed"))?;
-
-    let (orchestration, orchestration_revision) = validate_orchestration(
-        input.manifest.orchestration.is_some(),
-        input.orchestration,
-        &workflow_revision,
-        &bundle,
-    )?;
-    if input
-        .manifest
-        .compatibility
-        .feature_ids
-        .iter()
-        .any(|feature| feature == crate::guarded::authority::GUARDED_FEATURE_ID)
-    {
-        crate::guarded::authority::validate_bundle(&input.manifest.id, &workflow, orchestration.as_ref()).map_err(
-            |_| {
-                diagnostic(
-                    &bundle,
-                    super::model::DiagnosticCode::IncompatibleContent,
-                    "guarded workflow authority validation failed",
-                )
-            },
-        )?;
-    }
+    let content = admit_content(&input.manifest, workflow, input.orchestration, &bundle)?;
+    super::params::validate_bindings(input.manifest.params(), &content.workflow).map_err(|_| {
+        diagnostic(
+            &bundle,
+            super::model::DiagnosticCode::InvalidParamDeclaration,
+            "bundle parameter binding is invalid",
+        )
+    })?;
     let manifest_identity = super::model::ContentIdentity::from_bytes(&input.manifest_bytes);
     let identity = bundle_identity(&manifest_identity, &file_identities);
     debug_assert!(total_bytes <= super::model::MAX_BUNDLE_BYTES);
@@ -61,11 +39,12 @@ pub fn validate_bundle(
         identity,
         manifest_identity,
         manifest: input.manifest,
-        workflow_revision,
-        workflow,
-        orchestration_revision,
-        orchestration,
+        workflow_revision: content.workflow_revision,
+        workflow: content.workflow,
+        orchestration_revision: content.orchestration_revision,
+        orchestration: content.orchestration,
         file_identities,
+        params: None,
     })
 }
 
@@ -74,13 +53,7 @@ fn validate_manifest_shape(
     bundle: &str,
 ) -> Result<(), super::model::Diagnostic> {
     let manifest = &input.manifest;
-    if manifest.schema_version != super::model::CURRENT_BUNDLE_SCHEMA_VERSION {
-        return Err(diagnostic(
-            bundle,
-            super::model::DiagnosticCode::UnsupportedSchema,
-            "bundle schema is unsupported",
-        ));
-    }
+    validate_schema_fields(manifest, bundle)?;
     if !valid_identifier(&manifest.id) || !valid_identifier(&manifest.category) {
         return Err(diagnostic(bundle, super::model::DiagnosticCode::InvalidIdentifier, "bundle identity is invalid"));
     }
@@ -122,7 +95,13 @@ fn validate_manifest_shape(
     {
         return Err(diagnostic(bundle, super::model::DiagnosticCode::LimitExceeded, "bundle note exceeds its limit"));
     }
-    debug_assert_eq!(manifest.schema_version, super::model::CURRENT_BUNDLE_SCHEMA_VERSION);
+    super::params::validate_declarations(manifest.params()).map_err(|_| {
+        diagnostic(
+            bundle,
+            super::model::DiagnosticCode::InvalidParamDeclaration,
+            "bundle parameter declaration is invalid",
+        )
+    })?;
     debug_assert!(input.manifest_bytes.len() <= super::model::MAX_FILE_BYTES);
     Ok(())
 }
@@ -255,5 +234,6 @@ fn validate_files(
 }
 
 include!("core/compatibility.rs");
+include!("core/binding.rs");
 include!("core/planning.rs");
 include!("core/path.rs");

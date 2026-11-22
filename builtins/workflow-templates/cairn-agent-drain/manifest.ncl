@@ -2,6 +2,14 @@
 let ContentIdentity = String in
 let FileBinding = { path | String, blake3 | ContentIdentity } in
 let AssetBinding = { path | String, media_kind | String, blake3 | ContentIdentity, required | Bool } in
+let ParamTarget = { node | String, shell_env | String } in
+let ParamDeclaration = {
+  name | String,
+  type | { kind | String, .. },
+  required | Bool,
+  default | optional | Dyn,
+  bindings | Array ParamTarget,
+} in
 let Compatibility = {
   workflow_schema | Number,
   orchestration_schema | optional | Number,
@@ -15,6 +23,8 @@ let WorkflowTemplateManifest = {
   display_name | String,
   description | String,
   category | String,
+  mode | String,
+  params | Array ParamDeclaration,
   workflow | FileBinding,
   orchestration | optional | FileBinding,
   assets | Array AssetBinding,
@@ -23,11 +33,14 @@ let WorkflowTemplateManifest = {
   non_claims | Array String,
 } in
 ({
-  schema_version = 1,
+  schema_version = 2,
   id = "cairn-agent-drain",
   display_name = "Cairn agent drain",
   description = "Run one visible, validated Cairn drain round with at most one Pi agent.",
   category = "guarded-agents",
+  # Pi edits the repository; the guarded authority pins the root, so it is not a parameter.
+  mode = "mutating",
+  params = [],
   workflow = {
     path = "workflow.ncl",
     blake3 = "3dc4092a5cea6db8dd2368b86bf55711e9ac9f5a8d1226d1b7723b3ceec8fcff",

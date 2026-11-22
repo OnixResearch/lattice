@@ -36,6 +36,28 @@ interfaces.
   attempt, which export and inventory never act on; recovery and inventory
   refuse any other first-schema record alike as malformed or crossed.
   Single-shot attempts behave as before.
+- Typed `params` and a required `mode` for workflow-template bundle
+  manifests (Lattice #27). Schema 2 manifests declare `mode = "read_only"`
+  or `"mutating"` and a closed list of parameters typed `bool`, `integer`,
+  `enum` or `relative_path`, each with bounds, a default or `required`, and
+  1 to 8 `LATTICE_PARAM_*` environment targets on shell nodes. The pure
+  `workflow_template::params::resolve` rejects unknown names, wrong types,
+  out-of-bounds values and missing required values without echoing a value,
+  and returns the values with a BLAKE3 identity. `workflow_template::bind`
+  writes them only as environment values and re-runs bundle admission. It
+  rebinds an optional orchestration and returns a bundle whose identity
+  covers the template and the values. Commands may read a bound variable
+  only as `"${NAME}"`, and binding never changes a node kind, command or
+  `authority inspect` grant. Modes are classified conservatively: only file
+  reads and image inputs are read-only, so any shell, operation, HTTP, agent,
+  subworkflow or file write is mutating. A `read_only` bundle with such a
+  node fails with `mode_violation`. Save and start require a bound bundle
+  (`ParamsUnbound`) and an admitted mode (`ModeViolation`), and the TUI
+  browser marks each bundle's mode. The four built-in bundles move to schema
+  2 as `mutating`. The catalog review's `--root` becomes the typed
+  `catalog_root` parameter, and the guarded bundles keep their pinned
+  `--root .`. Schema 1 manifests still load as `mutating` without
+  parameters; see `docs/workflow-template-bundles.md`.
 - Bounded same-attempt repair and the Kiln #61 budget lineage for
   implementation attempts (Lattice #6). The v3 request accepts two optional
   fields; without them a request keeps its bytes, identity and profile

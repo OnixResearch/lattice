@@ -82,18 +82,17 @@ impl State {
         };
         let current_revision = crate::orchestration::workflow_revision(&self.workflow)
             .map_err(|_| "workflow-template draft identity is invalid".to_string())?;
-        if current_revision != draft.workflow {
+        let bundle = &draft.bundle;
+        if current_revision != bundle.workflow_revision {
             return Err("workflow-template draft differs from the previewed revision".to_string());
         }
-        let bundle = self
-            .workflow_templates
-            .iter()
-            .find(|bundle| {
-                bundle.identity == draft.bundle
-                    && bundle.workflow_revision == draft.workflow
-                    && bundle.orchestration_revision == draft.orchestration
-            })
-            .ok_or_else(|| "workflow-template draft source is unavailable".to_string())?;
+        let is_source_available = bundle
+            .params
+            .as_ref()
+            .is_some_and(|bound| self.workflow_templates.iter().any(|template| template.identity == bound.template));
+        if !is_source_available {
+            return Err("workflow-template draft source is unavailable".to_string());
+        }
         crate::workflow_template::save_draft(store, bundle).map_err(|error| error.to_string())?;
         self.workflow = store
             .load_workflow(&self.workflow.meta.name)

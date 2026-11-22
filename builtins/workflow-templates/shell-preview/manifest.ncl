@@ -10,6 +10,14 @@ let AssetBinding = {
   blake3 | ContentIdentity,
   required | Bool,
 } in
+let ParamTarget = { node | String, shell_env | String } in
+let ParamDeclaration = {
+  name | String,
+  type | { kind | String, .. },
+  required | Bool,
+  default | optional | Dyn,
+  bindings | Array ParamTarget,
+} in
 let Compatibility = {
   workflow_schema | Number,
   orchestration_schema | optional | Number,
@@ -23,6 +31,8 @@ let WorkflowTemplateManifest = {
   display_name | String,
   description | String,
   category | String,
+  mode | String,
+  params | Array ParamDeclaration,
   workflow | FileBinding,
   orchestration | optional | FileBinding,
   assets | Array AssetBinding,
@@ -30,7 +40,7 @@ let WorkflowTemplateManifest = {
   operator_notes | Array String,
   non_claims | Array String,
 } in
-let bundle_schema_version = 1 in
+let bundle_schema_version = 2 in
 let workflow_schema_version = 1 in
 (
   {
@@ -39,6 +49,9 @@ let workflow_schema_version = 1 in
     display_name = "Shell preview",
     description = "Preview one fixed shell node as an unsaved workflow draft.",
     category = "examples",
+    # A shell command is never provably read-only.
+    mode = "mutating",
+    params = [],
     workflow = {
       path = "workflow.ncl",
       blake3 = "ac10d0357c3fe251f711f81de82735f7eb4b5bd0c9f8a83059137462e260e6c1",

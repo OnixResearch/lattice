@@ -46,6 +46,9 @@ pub fn save_draft(
     store: &crate::store::Store,
     bundle: &super::model::ValidatedBundle,
 ) -> Result<super::model::ApplicationPlan, Error> {
+    if bundle.params.is_none() {
+        return Err(Error::ParamsUnbound);
+    }
     let facts = application_facts(store, bundle)?;
     let plan = super::core::plan_application(bundle, &facts);
     match &plan {

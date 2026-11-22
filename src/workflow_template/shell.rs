@@ -5,6 +5,7 @@ pub enum Error {
     RootUnavailable,
     Store(crate::store::StoreError),
     ApplicationConflict,
+    ParamsUnbound,
     ActivationBlocked(super::model::ActivationBlock),
     Orchestration(crate::orchestration::Error),
 }
@@ -15,6 +16,7 @@ impl std::fmt::Display for Error {
             Self::RootUnavailable => formatter.write_str("workflow-template root is unavailable"),
             Self::Store(error) => write!(formatter, "workflow-template store operation failed: {error}"),
             Self::ApplicationConflict => formatter.write_str("workflow-template content conflicts with stored content"),
+            Self::ParamsUnbound => formatter.write_str("workflow-template parameters are not bound"),
             Self::ActivationBlocked(block) => write!(formatter, "workflow-template activation blocked: {block:?}"),
             Self::Orchestration(error) => write!(formatter, "workflow-template orchestration failed: {error}"),
         }

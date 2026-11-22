@@ -7,6 +7,8 @@ Lattice includes two local workflow-template bundles for visible, bounded coding
 
 Each bundle contains a typed Nickel workflow, orchestration definition, role prompt, manifest, and exact BLAKE3 bindings. The bundle loader rejects changed bytes, undeclared files, unsafe paths, symbolic links, incompatible node kinds, and invalid authority shapes.
 
+Both manifests use schema 2 with `mode = "mutating"` and `params = []`. The agent edits the selected repository, and shell commands are never classified as read-only. The repository root stays fixed at `.`: the guarded authority check pins the root, commands, empty environment, and agent workspace. A root parameter would change where the agent may edit, so it is not a sound parameter. See [workflow-template bundles](workflow-template-bundles.md#mode).
+
 ## Round model
 
 Each round is one immutable acyclic workflow. It has discovery or a probe, one agent node, validation, post-measurement, and a pure progress decision.

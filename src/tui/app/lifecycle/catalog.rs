@@ -93,29 +93,36 @@ impl State {
                 Some("Save or discard current workflow changes before template preview".to_string());
             return;
         }
-        let Some(bundle) = self.selected_workflow_template().cloned() else {
+        let Some(template) = self.selected_workflow_template().cloned() else {
             self.workflow_template_browser.message = Some("Selected workflow template is unavailable".to_string());
             return;
+        };
+        // The TUI supplies no values: optional parameters take their declared defaults, and a
+        // template with a required parameter is refused here and must be bound by its caller.
+        let bundle = match crate::workflow_template::bind(&template, &std::collections::BTreeMap::new()) {
+            Ok(bundle) => bundle,
+            Err(diagnostic) => {
+                self.workflow_template_browser.message =
+                    Some(format!("Template parameters need values: {}", diagnostic.message));
+                return;
+            }
         };
         self.workflow_template_browser.prior_workflow = Some(self.workflow.clone());
         self.workflow_template_browser.prior_dirty = self.dirty;
         self.workflow = bundle.workflow.clone();
         self.dirty = true;
-        self.workflow_template_draft = Some(WorkflowTemplateDraft {
-            bundle: bundle.identity.clone(),
-            workflow: bundle.workflow_revision.clone(),
-            orchestration: bundle.orchestration_revision.clone(),
-        });
         self.workflow_template_browser.step = WorkflowTemplateBrowseStep::Preview;
         self.workflow_template_browser.message = Some(format!(
-            "Preview only: {} │ orchestration={} │ no effects",
+            "Preview only: {} │ mode={} │ orchestration={} │ no effects",
             bundle.manifest.display_name,
+            bundle.manifest.mode().as_str(),
             if bundle.orchestration.is_some() {
                 "present"
             } else {
                 "none"
             },
         ));
+        self.workflow_template_draft = Some(WorkflowTemplateDraft { bundle });
         self.sync_graph_state();
         debug_assert!(self.dirty);
         debug_assert!(self.workflow_template_draft.is_some());

@@ -25,7 +25,7 @@ Use this command to validate the catalog:
 lattice evaluation catalog --root builtins/agent-evaluations --output json
 ```
 
-The `agent-evaluation-catalog-review` workflow bundle runs this inert catalog check. It does not start a trial.
+The `agent-evaluation-catalog-review` workflow bundle runs this inert catalog check. It does not start a trial. Its typed `catalog_root` parameter selects the relative catalog root and defaults to `builtins/agent-evaluations`; see [workflow-template parameters](workflow-template-bundles.md#parameters).
 
 ## Planning
 
