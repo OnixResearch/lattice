@@ -7,6 +7,7 @@ pub const OMP_REVISION: &str = "e325ffc73ab86e03bdd20a91b77d8e2b3964c906";
 pub const OMP_RESULT_SCHEMA: &str = "lattice.omp-jsonl-observation.v1";
 
 pub(crate) mod profile;
+pub mod stop;
 mod stream;
 
 /// Operator-admitted executable bytes, not an executable-name compatibility claim.
@@ -181,6 +182,26 @@ fn observation(raw: &[u8], session_id: String, event_count: u64, terminal: Termi
 
 #[cfg(test)]
 mod tests;
+
+/// The reviewed argv, the bounded process, the host capture, the JSONL
+/// normalization and the completion admission of [`run`], over a scripted
+/// executable without the sandbox, broker or byte pins. Tests only: it
+/// lets shell tests drive a fake OMP through the same observation path.
+#[cfg(test)]
+pub(crate) fn run_scripted(
+    request: &super::Request,
+    profile: &Profile,
+    cancellation: &std::sync::atomic::AtomicBool,
+) -> Result<RunResult, super::Error> {
+    let mut selected = request.clone();
+    selected.args = profile::arguments(request, profile);
+    selected.require_isolation = false;
+    selected.sandbox_program = None;
+    let argv_blake3 = argument_identity(&selected.args)?;
+    let config = crate::process::core::RuntimeConfig::default();
+    let outcome = dispatch(&selected, &profile.base_identity, &config, cancellation)?;
+    Ok(finish_profile(&selected, profile, outcome, argv_blake3, None))
+}
 
 fn blocked(profile: &Profile, reason: &str) -> RunResult {
     RunResult {

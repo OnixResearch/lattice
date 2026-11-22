@@ -1,3 +1,10 @@
+/// The blocker of a worker the host stopped at its deadline.
+pub(super) const DEADLINE_BLOCKER: &str = "worker exceeded its admitted deadline; termination observed";
+/// The blocker of a worker the host stopped at its output limit.
+pub(super) const OUTPUT_LIMIT_BLOCKER: &str = "worker exceeded its admitted output limit; termination observed";
+/// The prefix of a non-zero exit's blocker, followed by `{status:?}`.
+pub(super) const EXIT_BLOCKER_PREFIX: &str = "worker exited with status ";
+
 pub(super) fn run(
     request: &super::Request,
     config: &crate::process::core::RuntimeConfig,
@@ -156,11 +163,9 @@ fn stopped_output(
             stdout: output.stdout,
             stderr: output.stderr,
         },
-        crate::agent_node::runtime::host::ProcessError::Timeout => {
-            failed(output, "worker exceeded its admitted deadline; termination observed")
-        }
+        crate::agent_node::runtime::host::ProcessError::Timeout => failed(output, DEADLINE_BLOCKER),
         crate::agent_node::runtime::host::ProcessError::OutputLimitExceeded { .. } => {
-            failed(output, "worker exceeded its admitted output limit; termination observed")
+            failed(output, OUTPUT_LIMIT_BLOCKER)
         }
         crate::agent_node::runtime::host::ProcessError::Execution { phase, termination } => {
             interrupted(root, super::ProcessFailure { phase, termination }, output)
@@ -178,7 +183,7 @@ fn successful_output(
     output: crate::agent_node::ProcessOutput,
 ) -> Result<crate::agent_node::ProcessOutput, super::Outcome> {
     if output.status_code != Some(0) {
-        let blocker = format!("worker exited with status {:?}", output.status_code);
+        let blocker = format!("{EXIT_BLOCKER_PREFIX}{:?}", output.status_code);
         return Err(failed(output, &blocker));
     }
     Ok(output)

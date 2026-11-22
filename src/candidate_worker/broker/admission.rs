@@ -51,7 +51,8 @@ fn validate_endpoint(endpoint: &str) -> Result<(), String> {
     Ok(())
 }
 
-pub(super) fn executable(value: &super::Executable) -> Result<std::path::PathBuf, String> {
+/// The canonical Nix store path of `value` when its bytes are its pin.
+pub(crate) fn executable(value: &super::Executable) -> Result<std::path::PathBuf, String> {
     if !super::super::result::is_blake3(&value.blake3) || !value.path.is_absolute() {
         return Err("runtime executable byte identity is invalid".into());
     }

@@ -2,6 +2,8 @@
 
 // r[impl lattice.implementation_attempt.lineage.scenario.usage]
 
+pub mod operator;
+
 /// The usage phase a charge is attributed to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]

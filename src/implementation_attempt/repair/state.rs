@@ -42,6 +42,9 @@ pub enum Authority {
     /// The managed agent revision no longer permits an effect, or its
     /// lifecycle could not be read.
     ManagedRevision,
+    /// The standalone operator's effect-authority profile no longer grants
+    /// the OMP repair worker, or the admission expired.
+    EffectAuthority,
 }
 
 /// The terminal disposition of a repair loop. None of them is acceptance.

@@ -1,5 +1,54 @@
 //! The bounded worker step of one admitted attempt, after its intent.
 
+fn timeout_secs(request: &super::super::Request, now_ms: u64) -> Result<u64, String> {
+    let remaining_ms =
+        request.expires_at_ms.checked_sub(now_ms).ok_or("admission expired before a bounded worker step")?;
+    let timeout_secs = request.envelope.budget.max_seconds.min(remaining_ms / 1000);
+    if timeout_secs == 0 {
+        return Err("admission expires before a bounded worker step".into());
+    }
+    Ok(timeout_secs)
+}
+
+/// The bounded worker request of an admitted attempt: its re-admitted
+/// workspace boundary, the pinned program and sandbox, and a deadline
+/// within the envelope's seconds and the admission's expiry.
+pub(in super::super) fn worker_request(
+    request: &super::super::Request,
+) -> Result<crate::candidate_worker::Request, String> {
+    request.validate(super::super::now_ms()?)?;
+    let boundary = crate::candidate_capture::admit_workspace_boundary(
+        &request.workspace_root,
+        &request.read_paths,
+        &request.write_paths,
+        false,
+        false,
+    )
+    .map_err(|error| error.to_string())?;
+    Ok(build_worker(request, boundary, timeout_secs(request, super::super::now_ms()?)?))
+}
+
+fn build_worker(
+    request: &super::super::Request,
+    boundary: crate::candidate_capture::WorkspaceBoundary,
+    timeout_secs: u64,
+) -> crate::candidate_worker::Request {
+    crate::candidate_worker::Request {
+        work_id: request.envelope.work_id.clone(),
+        attempt_id: request.envelope.attempt_id.clone(),
+        fence: request.envelope.fence.to_string(),
+        workspace_id: request.envelope.workspace_id.clone(),
+        program: request.program.clone(),
+        args: Vec::new(),
+        boundary,
+        require_isolation: true,
+        sandbox_program: Some(request.sandbox_program.clone()),
+        broker: None,
+        timeout_secs,
+        output_limit_bytes: request.output_limit_bytes,
+    }
+}
+
 pub(in super::super) struct WorkerStep {
     pub(in super::super) worker: crate::candidate_worker::Request,
     pub(in super::super) profile: crate::candidate_worker::omp::Profile,
@@ -76,12 +125,7 @@ impl WorkerStep {
     }
 
     fn observe(mut self, cancellation: &std::sync::atomic::AtomicBool) -> Result<(), String> {
-        let reference = self.profile.model_broker.credential.as_ref();
-        if reference.is_some_and(|value| value.provider != "env" || value.field.is_some()) {
-            return Err("standalone model broker requires an explicit env credential reference".into());
-        }
-        let keys: Vec<String> = reference.map(|value| value.key.clone()).into_iter().collect();
-        let credentials = crate::credentials::EnvironmentCredentialProvider::from_current_env(&keys);
+        let credentials = credentials(&self.profile)?;
         let started_epoch_ms = super::super::now_ms().ok();
         let result = self.run_worker(cancellation, &credentials)?;
         let window = super::super::binding::usage::WorkerWindow {
@@ -96,6 +140,19 @@ impl WorkerStep {
         let retained = crate::candidate_worker::AttemptResult::from_outcome(&outcome);
         retained.validate().map_err(|error| error.to_string())
     }
+}
+
+/// The host-only environment credential of the standalone model broker; any
+/// other credential reference is refused before launch.
+pub(in super::super) fn credentials(
+    profile: &crate::candidate_worker::omp::Profile,
+) -> Result<crate::credentials::EnvironmentCredentialProvider, String> {
+    let reference = profile.model_broker.credential.as_ref();
+    if reference.is_some_and(|value| value.provider != "env" || value.field.is_some()) {
+        return Err("standalone model broker requires an explicit env credential reference".into());
+    }
+    let keys: Vec<String> = reference.map(|value| value.key.clone()).into_iter().collect();
+    Ok(crate::credentials::EnvironmentCredentialProvider::from_current_env(&keys))
 }
 
 pub(in super::super) async fn execute(execution: WorkerStep, directory: &std::path::Path) -> Result<(), String> {

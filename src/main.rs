@@ -522,7 +522,9 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
         return Ok(run_doctor_command(&config_path, doctor_args));
     }
     if let Some(CliCommand::ImplementationAttempt(attempt_args)) = &args.command {
-        return lattice::implementation_attempt::cli::run_command(attempt_args)
+        // Only a `run` of a repair-policy request reads the configuration,
+        // for its operator effect-authority profile.
+        return lattice::implementation_attempt::cli::run_command(attempt_args, &config_path)
             .await
             .map(|()| ExitCode::SUCCESS)
             .map_err(|message| lattice::error::Error::Config { message });

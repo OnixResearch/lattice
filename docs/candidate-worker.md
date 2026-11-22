@@ -490,7 +490,8 @@ remains the fence authority across them.
 | `export_revoked` | `true` | `export-candidate` of a managed attempt that executed, after its session, pinned revision or qualification was revoked; nothing is exported |
 | `lineage_blocked` | `false` | The request's Kiln budget lineage reports a blocker or serving backpressure; only the closure marker is written ([repair and lineage](#bounded-same-attempt-repair-and-budget-lineage)) |
 | `lineage_exhausted` | `false` | The request's Kiln budget lineage cannot cover the first step; only the closure marker is written |
-| `repair_ports_unavailable` | `false` | The request has a repair policy but the embedder supplied no worker and check ports, as the standalone CLI never does; only the closure marker is written |
+| `repair_ports_unavailable` | `false` | The request has a repair policy but no worker and check ports: an embedder supplied none, or the standalone CLI was given no `--repair-checks` catalog or one it does not admit (then with `check_catalog`); only the closure marker is written ([standalone operator repair](#standalone-operator-repair)) |
+| `repair_authority_denied` | `false` | The standalone CLI's operator `effect_authority` profile does not grant the exact repair worker and check effects of this request, with `authority_refusal` (`unavailable`, `invalid`, `expired` or `not_granted`); only the closure marker is written and nothing is launched |
 | `repair_outcome_unknown` | `true` | `export-candidate` of a repair attempt that executed but retains no `repair/disposition.json`, such as a controller lost between a step record and the disposition; the outcome stays unknown and nothing is exported ([repaired candidates](#exporting-repaired-candidates)) |
 | `repair_not_candidate` | `true` | `export-candidate` of a repair attempt whose retained disposition is not `correct_candidate` or `repaired_candidate`; nothing is exported |
 | `repair_disposition_invalid` | `true` | `export-candidate` of a repair attempt whose retained disposition is malformed, belongs to other request bytes, or contradicts this attempt, fence, envelope, execution binding or its own revision and step records; nothing is exported |
@@ -601,8 +602,11 @@ aggregate budgets must cover one such step. A policy cannot be combined with
 with a policy is a domain-separated BLAKE3 of its single-shot revision and the
 policy identity, so a changed policy is a new revision of the same definition.
 
-The standalone CLI has no ports for repair and refuses such a request as
-`repair_ports_unavailable`. An embedder passes `Ports::repair` to
+Without embedder ports the standalone CLI uses its operator ports, only for a
+catalog and profile that admit them
+([standalone operator repair](#standalone-operator-repair)); otherwise it
+refuses such a request as `repair_ports_unavailable` or
+`repair_authority_denied`. An embedder passes `Ports::repair` to
 `run_command_with_ports` with a `WorkerPort` (one step in the attempt
 workspace), a `CheckPort` (one declared check of one candidate revision) and
 a clock; the loop runs synchronously on the calling task. Both ports receive
@@ -753,9 +757,90 @@ ledger.
 
 Qualification is fixture-level: the tests in
 `src/implementation_attempt/cli/tests/repair.rs` drive the real `run` and
-`recover` shell with a fixture worker, check port and clock. No OMP process,
-check executor, model endpoint or Kiln lineage has been exercised, and the
-pinned OMP route remains single-shot.
+`recover` shell with a fixture worker, check port and clock, and those in
+`src/implementation_attempt/cli/tests/repair/operator.rs` drive the
+operator ports with a scripted fake OMP executable and catalog checks
+without bubblewrap. No real OMP, model endpoint, sandboxed check or Kiln
+lineage has been exercised.
+
+#### Standalone operator repair
+
+`lattice implementation-attempt run --repair-checks CATALOG` runs a request
+with a repair policy through the operator ports when no embedder supplied
+repair ports. They grant nothing themselves and are never used for a request
+without a policy, which keeps its bytes and behaviour and reads no
+configuration or catalog.
+
+- **Worker:** each step launches the pinned OMP once through the single-shot
+  route (`candidate_worker::omp::run`): the same re-admitted workspace
+  boundary, bubblewrap provider, byte pins, reviewed argv and attempt-local
+  broker with the host-only `env` credential. The step's OMP base is the
+  workspace's current snapshot (the parent revision) and a repair's prompt is
+  the admitted prompt plus the parent revision and the admitted failure
+  classes only. Its deadline is the loop's remaining time rounded up to whole
+  seconds within the admission's own bound, so a worker that runs to it
+  returns past the elapsed bound and the step is `budget_exhausted`
+  (`elapsed`), never checked. A persisted cancellation request is polled
+  during the step. Raw events and the launcher observation are written once
+  as `repair/omp-step-N.jsonl` and `repair/omp-step-N.json` before the step
+  record.
+- **Outcomes:** `exited` for an observed exit (a completed candidate or no
+  change is status 0) and for a host stop at the deadline or output limit
+  (status 137), `cancelled` for a cancelled step, and `unknown` for anything
+  else: a launch blocked before spawn, a stop without an exit status, a write
+  outside the boundary, an interrupted or unknown teardown and an incomplete
+  OMP terminal stream. `unknown` ends the loop as `uncertain`
+  (`worker_outcome`), which inventory never reports as stopped, and nothing
+  is retried. A launcher that panics is a lost controller: the step intent
+  stays without a record, and recovery reports the outcome unknown without a
+  second launch.
+- **Checks:** the catalog (`lattice.implementation-attempt-check-catalog.v1`,
+  at most 64 KiB, 16 entries sorted by name, 32 arguments of at most 4 KiB
+  each) is operator input read outside the attempt workspace:
+
+  ```json
+  {"schema":"lattice.implementation-attempt-check-catalog.v1",
+   "sandbox":{"path":"/nix/store/...-bubblewrap/bin/bwrap","blake3":"<64 hex>"},
+   "checks":[{"name":"unit","program":{"path":"/nix/store/.../bin/unit","blake3":"<64 hex>"},
+              "args":["--all"],"failure_class":"test"}]}
+  ```
+
+  Every program and the sandbox must be an absolute Nix store path whose
+  bytes have the pinned BLAKE3. A check's `configuration` is the
+  domain-separated BLAKE3 of its entry and the policy's `check_executor` that
+  of the executor profile (schema, route, sandbox pin and the 1 MiB output
+  bound), so the policy, and through it the worker profile revision, names
+  exactly these processes. Each check runs once through the candidate
+  worker's generic bubblewrap route with its read-only copy as root, the
+  worker's read and write paths mounted read-only, no write path, a cleared
+  environment, a private network, no broker or credential, and stdout and
+  stderr bounded to 1 MiB each. An exit observed on an unchanged copy decides
+  it: zero passes and non-zero fails with the entry's class; anything else is
+  an unknown outcome. A missing catalog is `repair_ports_unavailable`; one
+  that is unreadable, oversized, malformed, unpinned, byte-mismatched, inside
+  the workspace or not exactly the policy's is `repair_ports_unavailable` with
+  `check_catalog`.
+- **Authority:** the `effect_authority` profile of the application
+  configuration (`--config`) must hold both tuples below, with
+  `workflow_revision` `blake3:<worker_profile>` and the operator repair
+  machine identity; `prepare` of a request with a policy prints these
+  requirements as `repair_authority`, in the form `authority inspect` prints,
+  for the [operator-profile steps](choregraph-effect-authority.md#standalone-operator-profile):
+
+  | Effect | `node_id` | `operation` | `resource` | `ability` |
+  |---|---|---|---|---|
+  | OMP repair worker | 1 | `lattice/agent` | `lattice://agent/1` | `agent/execute` |
+  | Catalog checks | 2 | `lattice/shell` | `lattice://process/2` | `process/execute` |
+
+  Without both, the run is refused as `repair_authority_denied` before the
+  fence record, with no step intent. Before every step's intent, under the
+  fence lock, the same profile is evaluated again and must keep its admitted
+  identity and grants, and the admission must not have expired; otherwise the
+  loop ends as `authority_withdrawn` with cause `effect_authority`.
+
+Export, inventory and recovery read these attempts like any other repair
+attempt. The tests run the fake OMP and the checks without bubblewrap or
+broker; the sandboxed routes are the single-shot route's.
 
 #### Exporting repaired candidates
 

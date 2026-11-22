@@ -119,7 +119,8 @@ impl Fixture {
             argv.extend(["--revision-store", Self::text(&self.store)]);
         }
         let cli = <AttemptCli as clap::Parser>::try_parse_from(argv).map_err(|error| error.to_string())?;
-        super::super::run_command(&cli.args).await
+        // No configuration: only a repair-policy `run` would read it.
+        super::super::run_command(&cli.args, &self.state.join("absent-config.ncl")).await
     }
 
     /// Desire and prepare `request`'s revision; returns its definition and revision.

@@ -20,7 +20,7 @@ pub(super) enum First<'a> {
 pub(super) struct Ready<'a> {
     pub(super) guard: Guard,
     pub(super) worker: crate::candidate_worker::Request,
-    pub(super) repair: Option<super::super::repair::Ports<'a>>,
+    pub(super) repair: super::super::repair::admission::Admitted<'a>,
     pub(super) session: super::super::session::revision::Admitted,
 }
 
@@ -56,9 +56,10 @@ impl super::Context {
     pub(super) fn admit_first<'a>(
         &self,
         repair: Option<super::super::repair::Ports<'a>>,
+        operator: Option<super::super::repair::operator::Standalone<'a>>,
         revisions: Revisions<'_>,
     ) -> Result<First<'a>, String> {
-        let worker = super::worker_request(&self.request)?;
+        let worker = super::super::session::launch::worker_request(&self.request)?;
         super::super::session::revision::require_named(revisions, &self.request)?;
         let guard = self.lock()?;
         if self.reconcile(revisions)? == Reconciled::OtherWork {
@@ -67,7 +68,7 @@ impl super::Context {
         if self.directory.join(super::super::session::intent::FILE).exists() {
             return Ok(First::Retained(guard));
         }
-        match self.gate(&guard, repair, revisions) {
+        match self.gate(&guard, repair, operator, revisions) {
             Ok((repair, session)) => Ok(First::Admitted(Box::new(Ready {
                 guard,
                 worker,
@@ -143,9 +144,10 @@ impl super::Context {
         &self,
         guard: &Guard,
         repair: Option<super::super::repair::Ports<'a>>,
+        operator: Option<super::super::repair::operator::Standalone<'a>>,
         revisions: Revisions<'_>,
-    ) -> Result<(Option<super::super::repair::Ports<'a>>, super::super::session::revision::Admitted), Stop> {
-        let repair = super::super::repair::admit(&self.request, repair)?;
+    ) -> Result<(super::super::repair::admission::Admitted<'a>, super::super::session::revision::Admitted), Stop> {
+        let repair = super::super::repair::admission::admit(&self.request, repair, operator)?;
         guard.record(&self.request.envelope, &self.directory).map_err(fence_stop)?;
         let session =
             super::super::session::revision::admit(revisions, &self.request, &self.directory, &self.identity)?;
@@ -192,7 +194,7 @@ pub(in super::super) fn lost_after_pin(
     store: &std::path::Path,
 ) -> Result<(), String> {
     let context = super::Context::load(request_path, state)?;
-    match context.admit_first(None, super::super::session::revision::Store(Some(store)))? {
+    match context.admit_first(None, None, super::super::session::revision::Store(Some(store)))? {
         First::Retained(_) => Err("the attempt directory already holds an intent".into()),
         First::Admitted(_) => Ok(()),
     }
@@ -224,6 +226,6 @@ impl Paused {
         ports: super::super::Ports<'_>,
         revisions: super::super::session::revision::Store<'_>,
     ) -> Result<(), String> {
-        self.0.first_run(ports, revisions).await
+        self.0.first_run(ports, None, revisions).await
     }
 }

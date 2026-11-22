@@ -1,47 +1,3 @@
-fn timeout_secs(request: &super::Request, now_ms: u64) -> Result<u64, String> {
-    let remaining_ms =
-        request.expires_at_ms.checked_sub(now_ms).ok_or("admission expired before a bounded worker step")?;
-    let timeout_secs = request.envelope.budget.max_seconds.min(remaining_ms / 1000);
-    if timeout_secs == 0 {
-        return Err("admission expires before a bounded worker step".into());
-    }
-    Ok(timeout_secs)
-}
-
-fn worker_request(request: &super::Request) -> Result<crate::candidate_worker::Request, String> {
-    request.validate(super::now_ms()?)?;
-    let boundary = crate::candidate_capture::admit_workspace_boundary(
-        &request.workspace_root,
-        &request.read_paths,
-        &request.write_paths,
-        false,
-        false,
-    )
-    .map_err(|error| error.to_string())?;
-    Ok(build_worker(request, boundary, timeout_secs(request, super::now_ms()?)?))
-}
-
-fn build_worker(
-    request: &super::Request,
-    boundary: crate::candidate_capture::WorkspaceBoundary,
-    timeout_secs: u64,
-) -> crate::candidate_worker::Request {
-    crate::candidate_worker::Request {
-        work_id: request.envelope.work_id.clone(),
-        attempt_id: request.envelope.attempt_id.clone(),
-        fence: request.envelope.fence.to_string(),
-        workspace_id: request.envelope.workspace_id.clone(),
-        program: request.program.clone(),
-        args: Vec::new(),
-        boundary,
-        require_isolation: true,
-        sandbox_program: Some(request.sandbox_program.clone()),
-        broker: None,
-        timeout_secs,
-        output_limit_bytes: request.output_limit_bytes,
-    }
-}
-
 // r[impl lattice.execution_binding.recovery]
 // r[impl lattice.execution_binding.recovery.scenario.lost_acknowledgement]
 pub(super) fn recover_existing(
@@ -143,9 +99,10 @@ impl Context {
         super::artifacts::private_directory(&self.directory)
     }
 
-    async fn run(
+    async fn run<'a>(
         self,
-        ports: Option<super::Ports<'_>>,
+        ports: Option<super::Ports<'a>>,
+        operator: Option<super::repair::operator::Standalone<'a>>,
         revisions: super::session::revision::Store<'_>,
     ) -> Result<(), String> {
         if let Some(refused) = self.superseded(revisions) {
@@ -156,7 +113,7 @@ impl Context {
             self.create_directories()?;
             return recover_existing(&self.request, &self.state, &self.directory, &self.identity, revisions);
         };
-        self.first_run(ports, revisions).await
+        self.first_run(ports, operator, revisions).await
     }
 
     /// A first run, once no intent was seen: its admission
@@ -166,9 +123,10 @@ impl Context {
     /// retained one and nothing is admitted; a session this run pinned is
     /// abandoned on every path that ends before its intent.
     // r[impl lattice.implementation_attempt.consumer.scenario.fence_lock]
-    async fn first_run(
+    async fn first_run<'a>(
         self,
-        ports: super::Ports<'_>,
+        ports: super::Ports<'a>,
+        operator: Option<super::repair::operator::Standalone<'a>>,
         revisions: super::session::revision::Store<'_>,
     ) -> Result<(), String> {
         let super::Ports {
@@ -176,7 +134,7 @@ impl Context {
             serving,
             repair,
         } = ports;
-        let (guard, worker, repair, session) = match self.admit_first(repair, revisions)? {
+        let (guard, worker, repair, session) = match self.admit_first(repair, operator, revisions)? {
             admission::First::Retained(guard) => {
                 drop(guard);
                 return recover_existing(&self.request, &self.state, &self.directory, &self.identity, revisions);
@@ -214,20 +172,25 @@ impl Context {
             return Err(error);
         }
         let receipt = super::binding::usage::WorkerReceipt::new(admitted, self.identity.clone());
-        let Some(repair) = repair else {
-            let binding_identity = receipt.admitted().binding_identity.clone();
-            self.single_shot(worker, store, receipt, serving).await?;
-            super::session::revision::close(revisions, &self.request, &recorded)?;
-            let store =
-                crate::store::Store::new(self.directory.join("candidate.redb")).map_err(|error| error.to_string())?;
-            println!("{}", super::recovery::recover(&store, &self.request, &self.directory, &binding_identity)?);
-            return Ok(());
+        let ports = match repair {
+            super::repair::admission::Admitted::SingleShot => {
+                let binding_identity = receipt.admitted().binding_identity.clone();
+                self.single_shot(worker, store, receipt, serving).await?;
+                super::session::revision::close(revisions, &self.request, &recorded)?;
+                let store = crate::store::Store::new(self.directory.join("candidate.redb"))
+                    .map_err(|error| error.to_string())?;
+                println!("{}", super::recovery::recover(&store, &self.request, &self.directory, &binding_identity)?);
+                return Ok(());
+            }
+            super::repair::admission::Admitted::Supplied(ports) => Ok(ports),
+            super::repair::admission::Admitted::Operator(granted) => Err(granted),
         };
         let authority = super::repair::Authority {
             compute,
             admitted: receipt.admitted().clone(),
             revisions,
             recorded: recorded.clone(),
+            operator: None,
         };
         let run = super::repair::Run {
             request: &self.request,
@@ -238,7 +201,10 @@ impl Context {
             store,
             authority,
         };
-        let observation = super::repair::execute(run, repair)?;
+        let observation = match ports {
+            Ok(ports) => super::repair::execute(run, ports)?,
+            Err(granted) => super::repair::operator::execute(run, *granted)?,
+        };
         super::session::revision::close(revisions, &self.request, &recorded)?;
         println!("{observation}");
         Ok(())
@@ -268,13 +234,24 @@ impl Context {
 pub(super) mod admission;
 
 /// `None` reconciles retained evidence only; ports are used only to admit,
-/// revalidate and gate a first dispatch. `revisions` names the optional
-/// agent revision store.
+/// revalidate and gate a first dispatch. `operator` is the standalone CLI's
+/// repair ports, used only for a repair policy without embedder ports.
+/// `revisions` names the optional agent revision store.
 pub(super) async fn run(
     request_path: &std::path::Path,
     state: &std::path::Path,
     ports: Option<super::Ports<'_>>,
     revisions: super::session::revision::Store<'_>,
 ) -> Result<(), String> {
-    Context::load(request_path, state)?.run(ports, revisions).await
+    run_with(request_path, state, ports, None, revisions).await
+}
+
+pub(super) async fn run_with<'a>(
+    request_path: &std::path::Path,
+    state: &std::path::Path,
+    ports: Option<super::Ports<'a>>,
+    operator: Option<super::repair::operator::Standalone<'a>>,
+    revisions: super::session::revision::Store<'_>,
+) -> Result<(), String> {
+    Context::load(request_path, state)?.run(ports, operator, revisions).await
 }

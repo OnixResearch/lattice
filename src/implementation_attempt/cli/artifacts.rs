@@ -164,3 +164,41 @@ pub(super) fn verify_events(
     }
     Ok(())
 }
+
+fn normalized_request(request_path: &std::path::Path) -> Result<(super::Request, Vec<u8>), String> {
+    let (mut request, _) = load_request(request_path)?;
+    let baseline = crate::candidate_capture::workspace(&request.workspace_root).map_err(|error| error.to_string())?;
+    request.omp.base_identity = crate::candidate::snapshot_identity(&baseline).map_err(|error| error.to_string())?;
+    request.envelope.worker_profile = request.worker_profile_identity()?;
+    request.admitted_envelope = request.envelope.identity();
+    super::binding::normalize_primary_route(&mut request)?;
+    request.validate(super::now_ms()?)?;
+    let bytes = serde_json::to_vec_pretty(&request).map_err(|error| error.to_string())?;
+    Ok((request, bytes))
+}
+
+/// `prepare`: write the normalized request once and print its identities,
+/// without executing anything or granting authority. A request with a
+/// repair policy also prints `repair_authority`, the standalone operator
+/// profile requirements of its repair worker and checks, in the form
+/// `authority inspect` prints.
+// r[impl lattice.implementation_attempt.operator_repair.scenario.authority]
+pub(super) fn prepare(request_path: &std::path::Path, output: &std::path::Path) -> Result<(), String> {
+    let (request, bytes) = normalized_request(request_path)?;
+    if !write_once(output, &bytes)? {
+        return Err("prepared request output already exists".into());
+    }
+    let mut printed = serde_json::json!({"request":output,"identity":request.admitted_envelope,
+        "worker_request":blake3::hash(&bytes).to_hex().to_string(),
+        "worker_profile":request.envelope.worker_profile,"admitted":false});
+    if request.repair.is_some()
+        && let Some(fields) = printed.as_object_mut()
+    {
+        let requirements =
+            crate::implementation_attempt::repair::step::operator::requirements(&request.envelope.worker_profile);
+        let requirements = serde_json::to_value(requirements).map_err(|error| error.to_string())?;
+        fields.insert("repair_authority".to_owned(), requirements);
+    }
+    println!("{printed}");
+    Ok(())
+}

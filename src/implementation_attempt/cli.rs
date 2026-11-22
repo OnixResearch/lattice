@@ -35,6 +35,10 @@ pub enum Command {
         /// Agent revision store; without it the attempt is unmanaged.
         #[arg(long)]
         revision_store: Option<std::path::PathBuf>,
+        /// Operator check catalog of a repair policy's checks; without it a
+        /// repair request is refused as `repair_ports_unavailable`.
+        #[arg(long)]
+        repair_checks: Option<std::path::PathBuf>,
     },
     Recover {
         #[arg(long)]
@@ -223,21 +227,37 @@ pub(crate) fn now_ms() -> Result<u64, String> {
 // r[impl lattice.implementation_attempt.consumer]
 // r[impl lattice.execution_binding.port_boundary.scenario.unavailable]
 // r[impl lattice.serving_binding.port_boundary.scenario.unavailable]
-pub async fn run_command(args: &CommandArgs) -> Result<(), String> {
+/// The standalone CLI. A `run` of a request with a repair policy uses the
+/// operator ports (`repair::operator`): the pinned OMP worker and the
+/// `--repair-checks` catalog, only while the `effect_authority` profile of
+/// the application configuration at `config` grants their exact effects.
+pub async fn run_command(args: &CommandArgs, config: &std::path::Path) -> Result<(), String> {
     let ports = Ports {
         compute: &mut crate::execution_binding::UnavailableComputePort,
         serving: Box::new(crate::execution_binding::serving::UnavailableOwner),
         repair: None,
     };
-    run_command_with_ports(args, ports).await
+    let Command::Run {
+        request,
+        state,
+        revision_store,
+        repair_checks,
+    } = &args.command
+    else {
+        return run_command_with_ports(args, ports).await;
+    };
+    let operator = repair::operator::Standalone::pinned(config, repair_checks.as_deref());
+    let revisions = session::revision::Store(revision_store.as_deref());
+    execution::run_with(request, state, Some(ports), Some(operator), revisions).await
 }
 
 /// Embedder-supplied read-only ports of one run.
 pub struct Ports<'a> {
     pub compute: &'a mut dyn crate::execution_binding::ComputeAllocationPort,
     pub serving: Box<dyn crate::execution_binding::serving::OwnerPort>,
-    /// Worker, check and clock ports of a repair-policy request; the
-    /// standalone CLI supplies none, so such a request is refused there.
+    /// Worker, check and clock ports of a repair-policy request. Without
+    /// them the standalone CLI uses its operator ports instead
+    /// (`repair::operator`), and an embedder's request is refused.
     pub repair: Option<repair::Ports<'a>>,
 }
 
@@ -248,11 +268,12 @@ pub struct Ports<'a> {
 pub async fn run_command_with_ports(args: &CommandArgs, mut ports: Ports<'_>) -> Result<(), String> {
     match &args.command {
         Command::Cancel { request, state } => cancellation::request(request, state),
-        Command::Prepare { request, output } => prepare(request, output),
+        Command::Prepare { request, output } => artifacts::prepare(request, output),
         Command::Run {
             request,
             state,
             revision_store,
+            ..
         } => execution::run(request, state, Some(ports), session::revision::Store(revision_store.as_deref())).await,
         Command::Recover {
             request,
@@ -271,30 +292,4 @@ pub async fn run_command_with_ports(args: &CommandArgs, mut ports: Ports<'_>) ->
             revision_store,
         } => export::run(request, state, output_parent, session::revision::Store(revision_store.as_deref())),
     }
-}
-
-fn normalized_request(request_path: &std::path::Path) -> Result<(Request, Vec<u8>), String> {
-    let (mut request, _) = artifacts::load_request(request_path)?;
-    let baseline = crate::candidate_capture::workspace(&request.workspace_root).map_err(|error| error.to_string())?;
-    request.omp.base_identity = crate::candidate::snapshot_identity(&baseline).map_err(|error| error.to_string())?;
-    request.envelope.worker_profile = request.worker_profile_identity()?;
-    request.admitted_envelope = request.envelope.identity();
-    binding::normalize_primary_route(&mut request)?;
-    request.validate(now_ms()?)?;
-    let bytes = serde_json::to_vec_pretty(&request).map_err(|error| error.to_string())?;
-    Ok((request, bytes))
-}
-
-fn prepare(request_path: &std::path::Path, output: &std::path::Path) -> Result<(), String> {
-    let (request, bytes) = normalized_request(request_path)?;
-    if !artifacts::write_once(output, &bytes)? {
-        return Err("prepared request output already exists".into());
-    }
-    println!(
-        "{}",
-        serde_json::json!({"request":output,"identity":request.admitted_envelope,
-        "worker_request":blake3::hash(&bytes).to_hex().to_string(),
-        "worker_profile":request.envelope.worker_profile,"admitted":false})
-    );
-    Ok(())
 }

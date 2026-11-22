@@ -137,16 +137,15 @@ impl<'a, 'p> Driver<'a, 'p> {
         // The step intent is created under the fence lock after a recheck; a
         // newer fence, or another attempt at this one, ends the loop before
         // this spawn. Every later step also rechecks the execution binding
-        // and the managed revision under that lock.
+        // and the managed revision under that lock, and with the standalone
+        // operator's ports every step rechecks the operator's grant.
         let request = self.frame.request;
         let records = self.frame.records;
         let guard = super::super::session::fencing::Guard::acquire(self.frame.state_root, &request.envelope.work_id)?;
         if !guard.is_current(&request.envelope)? {
             return Ok(Next::Stop(Disposition::FenceSuperseded));
         }
-        if step.iteration > 1
-            && let Some(withdrawal) = self.recheck_authority(step.iteration)
-        {
+        if let Some(withdrawal) = self.recheck_authority(step.iteration) {
             let cause = withdrawal.cause;
             self.withdrawal = Some(withdrawal);
             return Ok(Next::Stop(Disposition::AuthorityWithdrawn { cause }));

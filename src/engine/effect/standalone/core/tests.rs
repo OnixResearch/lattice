@@ -199,3 +199,72 @@ fn semantic_edits_revoke_pinned_identity_but_source_formatting_does_not() {
         assert_eq!(check_binding(&changed, &binding(&original), RUN, NOW), Err(ProfileError::BindingMismatch));
     }
 }
+
+fn agent_grant(node_id: u64) -> Grant {
+    Grant {
+        node_id,
+        operation: "lattice/agent".to_owned(),
+        resource: format!("{AGENT_RESOURCE_PREFIX}{node_id}"),
+        ability: "agent/execute".to_owned(),
+    }
+}
+
+// r[verify lattice.implementation_attempt.operator_repair.scenario.authority]
+#[test]
+fn a_subject_is_granted_only_its_exact_identities_and_tuple_before_expiry() {
+    let mut granting = profile();
+    granting.grants.push(agent_grant(1));
+    let admitted = admit(granting, NOW).unwrap();
+    let wanted = agent_grant(1);
+    let subject = Subject {
+        workflow_revision: &admitted.profile.workflow_revision,
+        machine_identity: &admitted.profile.machine_identity,
+        grant: &wanted,
+    };
+    assert_eq!(check_subject(&admitted, subject, NOW), Ok(()));
+    assert_eq!(check_subject(&admitted, subject, EXPIRY), Err(ProfileError::Expired));
+    let other_workflow = authority::blake3_reference(b"test-workflow", &["other"]);
+    let other_machine = authority::blake3_reference(b"test-machine", &["other"]);
+    let process = Grant {
+        node_id: 1,
+        operation: "lattice/shell".to_owned(),
+        resource: format!("{PROCESS_RESOURCE_PREFIX}1"),
+        ability: "process/execute".to_owned(),
+    };
+    let other_node = agent_grant(2);
+    let mut open = agent_grant(1);
+    open.resource.push('*');
+    let refused = [
+        Subject {
+            workflow_revision: &other_workflow,
+            ..subject
+        },
+        Subject {
+            machine_identity: &other_machine,
+            ..subject
+        },
+        Subject {
+            grant: &process,
+            ..subject
+        },
+        Subject {
+            grant: &other_node,
+            ..subject
+        },
+        Subject {
+            grant: &open,
+            ..subject
+        },
+    ];
+    for subject in refused {
+        assert_eq!(check_subject(&admitted, subject, NOW), Err(ProfileError::BindingMismatch), "{subject:?}");
+    }
+    // A profile without the tuple grants nothing for it, whatever else it holds.
+    let without = admit(profile(), NOW).unwrap();
+    let subject = Subject {
+        workflow_revision: &without.profile.workflow_revision,
+        machine_identity: &without.profile.machine_identity,
+        grant: &wanted,
+    };
+    assert_eq!(check_subject(&without, subject, NOW), Err(ProfileError::BindingMismatch));
+}

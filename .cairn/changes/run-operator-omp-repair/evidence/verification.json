@@ -1,0 +1,51 @@
+{
+  "schema": "lattice.fixture-qualification.v1",
+  "change": "run-operator-omp-repair",
+  "kind": "local-verification",
+  "live_qualification": false,
+  "base_revision": "7fb6dc473c2cd7ae23282f515c741d398e885fcf",
+  "integration_head": null,
+  "recorded_on": "2026-11-22",
+  "note": "Uncommitted worktree on 7fb6dc47; the integrating agent records the integration head. All gates ran inside `nix develop . --option builders ''`. The fake OMP executable and the catalog checks run without bubblewrap or broker in the tests; no real OMP, model endpoint, sandboxed check or Kiln lineage was exercised.",
+  "tasks": {
+    "1.1": [
+      "src/implementation_attempt/repair/step/operator/tests.rs (4 tests)",
+      "src/candidate_worker/omp/stop.rs::tests::every_launcher_failure_text_has_its_termination_and_nothing_else_does",
+      "src/engine/effect/standalone/core/tests.rs::a_subject_is_granted_only_its_exact_identities_and_tuple_before_expiry"
+    ],
+    "1.2": [
+      "src/implementation_attempt/repair/checks/catalog/tests.rs (3 tests)"
+    ],
+    "2.1": [
+      "src/implementation_attempt/cli/tests/repair/operator.rs::without_an_exact_grant_or_catalog_nothing_is_launched_and_only_the_closure_marker_is_written",
+      "src/implementation_attempt/cli/tests/repair/operator.rs::a_profile_withdrawn_during_the_run_ends_it_before_the_next_intent",
+      "src/implementation_attempt/cli/tests/repair/operator.rs::the_catalog_is_admitted_only_pinned_bounded_and_outside_the_workspace",
+      "src/implementation_attempt/cli/tests/repair/operator.rs::without_a_repair_policy_the_operator_ports_change_nothing"
+    ],
+    "2.2": [
+      "src/implementation_attempt/cli/tests/repair/operator.rs::a_granted_operator_repairs_after_one_failing_check_and_exports_it",
+      "src/implementation_attempt/cli/tests/repair/operator.rs::repairs_stop_at_the_iteration_bound",
+      "src/implementation_attempt/cli/tests/repair/operator.rs::a_crash_is_an_exit_a_signal_is_unknown_and_neither_is_retried_blindly",
+      "src/implementation_attempt/cli/tests/repair/operator.rs::a_worker_that_runs_to_its_deadline_exhausts_the_elapsed_bound",
+      "src/implementation_attempt/cli/tests/repair/operator.rs::a_persisted_cancellation_stops_the_running_worker",
+      "src/implementation_attempt/cli/tests/repair/operator.rs::a_newer_fence_stops_the_operator_loop_before_its_next_step_intent",
+      "src/implementation_attempt/cli/tests/repair/operator.rs::a_controller_lost_after_a_step_intent_recovers_without_a_second_launch"
+    ],
+    "3.1": [
+      "docs/candidate-worker.md (refusal table rows; repair ports paragraph; qualification note; Standalone operator repair)",
+      "CHANGELOG.md (first ### Added item)"
+    ]
+  },
+  "checks": {
+    "cargo_test_lib": {"command": "cargo test -p lattice --lib", "exit": 0, "passed": 580, "failed": 0, "ignored": 8},
+    "cargo_test_focused": {"command": "cargo test -p lattice --lib -- implementation_attempt standalone candidate_worker", "exit": 0, "passed": 195, "failed": 0, "ignored": 7},
+    "integration": {"command": "cargo test -p lattice --test test_implementation_attempt_refusals --test test_worker_inventory", "exit": 0, "passed": [6, 10], "failed": 0},
+    "clippy": {"command": "cargo clippy -p lattice --all-targets --no-deps -- -D warnings", "exit": 0},
+    "fmt": {"command": "cargo fmt -p lattice --check", "exit": 0},
+    "octet": {"command": "octet-precommit-check", "exit": 0, "status": "warning-only", "baseline": {"accepted": 1052, "current_accepted": 1052, "new": 0, "stale": 0}},
+    "cairn_validate": {"command": "cairn validate --root .", "exit": 0},
+    "cairn_gates": {"command": "cairn gate <proposal|design|tasks> run-operator-omp-repair --root . --policy cairn-policy/generated/cairn-policy.json", "exit": {"proposal": 0, "design": 0, "tasks": 0}},
+    "gitleaks": {"command": "/nix/store/sbrzys45a04nfn0k88qab2jzd1vfwr3i-gitleaks-8.30.1/bin/gitleaks dir --no-banner --redact <path>, for every changed and untracked path", "paths": 45, "exit": 0, "leaks": 0}
+  },
+  "not_run": ["scripts/check.rs", "nix flake check"]
+}

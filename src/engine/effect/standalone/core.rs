@@ -175,6 +175,33 @@ pub fn check_binding<'a>(
         .ok_or(ProfileError::BindingMismatch)
 }
 
+/// An effect outside a Choregraph workflow that a profile may grant: the
+/// exact workflow-revision and machine identities its host derives, and the
+/// one closed grant tuple the profile must hold for it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Subject<'a> {
+    pub workflow_revision: &'a str,
+    pub machine_identity: &'a str,
+    pub grant: &'a Grant,
+}
+
+/// Check that `admitted` grants exactly `subject`'s effect at `now_ms`.
+/// Nothing else in the profile substitutes for it.
+// r[impl lattice.implementation_attempt.operator_repair.scenario.authority]
+pub fn check_subject(admitted: &AdmittedProfile, subject: Subject<'_>, now_ms: u64) -> Result<(), ProfileError> {
+    let profile = &admitted.profile;
+    if now_ms >= profile.expires_at_unix_ms {
+        return Err(ProfileError::Expired);
+    }
+    let is_bound = profile.workflow_revision == subject.workflow_revision
+        && profile.machine_identity == subject.machine_identity
+        && subject.grant.contract_id().is_some();
+    if !is_bound || !profile.grants.iter().any(|grant| grant == subject.grant) {
+        return Err(ProfileError::BindingMismatch);
+    }
+    Ok(())
+}
+
 fn is_blake3_reference(value: &str) -> bool {
     value.strip_prefix(BLAKE3_PREFIX).is_some_and(|hex| {
         hex.len() == BLAKE3_HEX_BYTES && hex.bytes().all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))

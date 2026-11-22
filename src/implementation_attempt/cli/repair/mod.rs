@@ -1,18 +1,23 @@
 //! Shell of the bounded same-attempt repair loop.
 //!
-//! The embedder supplies a [`WorkerPort`] that runs one bounded worker step in
-//! the attempt workspace, a [`CheckPort`] that runs one declared check, and a
-//! clock. The shell owns everything else: the frozen policy and lineage, the
+//! A [`WorkerPort`] runs one bounded worker step in the attempt workspace, a
+//! [`CheckPort`] runs one declared check, and a clock reads time. An
+//! embedder supplies them, or the standalone CLI supplies its operator
+//! ports ([`operator`]): the pinned OMP worker and the operator's check
+//! catalog, used only while the operator's effect-authority profile grants
+//! them. The shell owns everything else: the frozen policy and lineage, the
 //! host-derived candidate of every step, the immutable copy of it each check
 //! runs against, the deadlines, the check invocations, the charges and the
-//! retained records. The standalone CLI supplies no ports, so a request with
-//! a repair policy is refused there before any effect.
+//! retained records. Without ports a request with a repair policy is refused
+//! before any effect.
 
 // r[impl lattice.implementation_attempt.repair.scenario.absent]
 // r[impl lattice.implementation_attempt.lineage.scenario.exhausted]
 
+pub(super) mod admission;
 mod evidence;
 mod materialized;
+pub mod operator;
 mod records;
 mod steps;
 
@@ -66,6 +71,9 @@ pub(super) struct Authority<'a> {
     pub(super) admitted: lattice_core::execution_binding::admission::bound::Admitted,
     pub(super) revisions: super::session::revision::Store<'a>,
     pub(super) recorded: super::session::intent::Recorded,
+    /// The standalone operator's grant, rechecked before every step's
+    /// intent; `None` for embedder-supplied ports.
+    pub(super) operator: Option<operator::Grant>,
 }
 
 /// Refuse a malformed policy or lineage, or a policy over served routes.
@@ -101,38 +109,6 @@ fn first_reservation(request: &super::Request) -> Result<crate::implementation_a
             model_requests: step_model_requests,
             tool_invocations: 0,
         }),
-    }
-}
-
-/// Before the fence record: the lineage must admit the first step, and a
-/// repair policy needs embedder ports. Each refusal is typed; the caller
-/// settles it under the per-work lock, which closes the attempt-fence.
-pub(super) fn admit<'a>(
-    request: &super::Request,
-    ports: Option<Ports<'a>>,
-) -> Result<Option<Ports<'a>>, super::refusal::deferred::Stop> {
-    debug_assert!(request.validate_binding().is_ok(), "admission follows request validation");
-    if let Some(lineage) = &request.lineage {
-        let next = first_reservation(request)?;
-        debug_assert!(next.model_requests > 0, "a step reserves at least one model request");
-        let drawn = crate::implementation_attempt::lineage::Draws::default();
-        if let Err(refusal) = lineage.gate(&drawn, &next) {
-            let reason = match refusal {
-                crate::implementation_attempt::lineage::Refusal::Exhausted { .. } => {
-                    super::refusal::Reason::LineageExhausted
-                }
-                _ => super::refusal::Reason::LineageBlocked,
-            };
-            let pending = super::refusal::deferred::Pending::lineage(reason, &refusal);
-            return Err(super::refusal::deferred::Stop::Refused(pending));
-        }
-    }
-    match (&request.repair, ports) {
-        (None, _) => Ok(None),
-        (Some(_), Some(ports)) => Ok(Some(ports)),
-        (Some(_), None) => Err(super::refusal::deferred::Stop::Refused(super::refusal::deferred::Pending::new(
-            super::refusal::Reason::RepairPortsUnavailable,
-        ))),
     }
 }
 

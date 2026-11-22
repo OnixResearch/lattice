@@ -47,8 +47,12 @@ pub(super) enum Reason {
     /// Kiln's budget lineage cannot cover the first step; refused before any
     /// write.
     LineageExhausted,
-    /// A repair policy needs embedder-supplied worker and check ports.
+    /// A repair policy needs embedder-supplied worker and check ports, or
+    /// the standalone CLI's admitted operator check catalog.
     RepairPortsUnavailable,
+    /// The operator's effect-authority profile does not grant the exact
+    /// repair worker and check effects of this request.
+    RepairAuthorityDenied,
     /// The repair attempt executed, but no disposition is retained: its
     /// outcome is unknown and nothing is exported.
     RepairOutcomeUnknown,
@@ -98,7 +102,11 @@ impl Reason {
             }
             Self::RepairPortsUnavailable => {
                 "implementation request is refused: its repair policy needs embedder-supplied worker and check \
-                 ports; nothing was dispatched"
+                 ports or an admitted operator check catalog; nothing was dispatched"
+            }
+            Self::RepairAuthorityDenied => {
+                "implementation request is refused: the operator's effect-authority profile does not grant its \
+                 repair worker and check effects; nothing was dispatched"
             }
             Self::RepairOutcomeUnknown => {
                 "implementation attempt executed, but no repair disposition is retained; outcome unknown; retain \
@@ -134,7 +142,8 @@ impl Reason {
             | Self::RevisionBlocked
             | Self::LineageBlocked
             | Self::LineageExhausted
-            | Self::RepairPortsUnavailable => false,
+            | Self::RepairPortsUnavailable
+            | Self::RepairAuthorityDenied => false,
         }
     }
 }

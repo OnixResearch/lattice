@@ -4,6 +4,8 @@ pub mod core;
 mod shell;
 
 pub use shell::OperatorRunContextSource;
+pub use shell::SubjectRefusal;
+pub use shell::check_subject;
 
 /// Read-only requirements for authoring a profile, not an admitted grant or receipt.
 #[derive(Debug, Clone, serde::Serialize)]

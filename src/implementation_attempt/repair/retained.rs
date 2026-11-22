@@ -66,7 +66,9 @@ pub struct StepRecord {
     pub verdict: Option<super::checks::Verdict>,
 }
 
-/// The authority a later step found withdrawn before its intent.
+/// The authority a step found withdrawn before its intent: the binding or
+/// managed revision before a later step, or the standalone operator's grant
+/// before any step.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Withdrawal {

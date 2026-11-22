@@ -19,6 +19,7 @@ use crate::implementation_attempt::repair::step::WorkerOutcome;
 
 mod export;
 mod forged;
+mod operator;
 
 const EXECUTOR: &str = "7777777777777777777777777777777777777777777777777777777777777777";
 const UNIT_CONFIG: &[u8] = b"unit-config";

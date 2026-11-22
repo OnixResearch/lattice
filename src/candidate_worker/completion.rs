@@ -1,3 +1,6 @@
+/// The blocker of a worker that changed a path outside its write boundary.
+pub(super) const WRITE_BOUNDARY_BLOCKER: &str = "worker changed a path outside its admitted write boundary";
+
 type Snapshot = std::collections::BTreeMap<String, Vec<u8>>;
 
 pub(super) fn finish(
@@ -45,7 +48,7 @@ fn produced(
 ) -> super::Outcome {
     if !receipt.changed_paths.iter().all(|path| within_write_paths(path, &request.boundary.write_paths)) {
         return super::Outcome::Failed {
-            blocker: "worker changed a path outside its admitted write boundary".to_string(),
+            blocker: WRITE_BOUNDARY_BLOCKER.to_string(),
             stdout: output.stdout,
             stderr: output.stderr,
         };

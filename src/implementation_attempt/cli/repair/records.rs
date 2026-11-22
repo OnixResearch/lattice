@@ -5,7 +5,9 @@
 //! with one `disposition.json`. Records are write-once: a replay with other
 //! content is refused, and recovery reads only the retained disposition.
 //! Each check's transient copy of the candidate, `check-N-<check>/`, is
-//! removed after the check.
+//! removed after the check. The standalone operator's OMP worker also
+//! retains each launched step's raw events and launcher observation as
+//! `omp-step-N.jsonl` and `omp-step-N.json` before its step record.
 
 // r[impl lattice.implementation_attempt.repair.scenario.dispositions]
 
@@ -32,10 +34,15 @@ impl Retained {
     /// The records of `directory` without creating anything.
     pub(super) fn at(directory: &std::path::Path, identity: &str) -> Self {
         Self {
-            root: directory.join(DIRECTORY),
+            root: Self::root(directory),
             cancel_request: directory.join("cancel.request"),
             identity: identity.to_owned(),
         }
+    }
+
+    /// The records directory of `directory`.
+    pub(super) fn root(directory: &std::path::Path) -> std::path::PathBuf {
+        directory.join(DIRECTORY)
     }
 
     /// Write `value` once as `name`; an identical replay is accepted.

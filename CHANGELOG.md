@@ -9,6 +9,25 @@ interfaces.
 
 ### Added
 
+- Standalone operator repair (Lattice #6). `lattice implementation-attempt
+  run --repair-checks CATALOG` runs a request with a repair policy through
+  operator ports when no embedder supplies repair ports: one pinned OMP step
+  per iteration through the single-shot workspace boundary and OMP launcher,
+  and each declared check as one bounded process of the operator's pinned
+  Nix store catalog through the candidate worker's bubblewrap route on its
+  read-only copy, with a cleared environment, a private network, no broker
+  and bounded output. The ports are used only while the configuration's
+  `effect_authority` profile grants `lattice://agent/1` and
+  `lattice://process/2` for the request's worker profile revision; otherwise
+  the run is refused before any launch as `repair_ports_unavailable` (with
+  `check_catalog`) or the new `repair_authority_denied`, and a grant withdrawn
+  mid-run ends the loop as `authority_withdrawn` (`effect_authority`). OMP
+  exits and host stops are `exited`, cancellation `cancelled`, and every other
+  launcher outcome `unknown`; each step retains `repair/omp-step-N.{jsonl,json}`.
+  `prepare` prints the profile requirements as `repair_authority`.
+  `implementation_attempt::cli::run_command` now takes the configuration path,
+  and `candidate_worker::omp::stop` classifies a failed launch. Requests
+  without a repair policy are unchanged.
 - Export and inventory of repaired candidates (Lattice #6).
   `implementation-attempt export-candidate` exports the exact final candidate
   revision of a retained `correct_candidate` or `repaired_candidate` repair

@@ -40,6 +40,27 @@ impl Pending {
         }
     }
 
+    /// `repair_ports_unavailable` of the standalone CLI: no catalog, or the
+    /// reason it was not admitted as `check_catalog`.
+    // r[impl lattice.implementation_attempt.operator_repair.scenario.checks]
+    pub(in super::super) fn catalog(
+        error: Option<crate::implementation_attempt::repair::checks::catalog::Error>,
+    ) -> Self {
+        Self {
+            reason: Reason::RepairPortsUnavailable,
+            detail: error.map(|error| ("check_catalog", serde_json::json!(error))),
+        }
+    }
+
+    /// `repair_authority_denied` with why the profile grants nothing.
+    // r[impl lattice.implementation_attempt.operator_repair.scenario.authority]
+    pub(in super::super) fn authority(refusal: crate::engine::effect::standalone::SubjectRefusal) -> Self {
+        Self {
+            reason: Reason::RepairAuthorityDenied,
+            detail: Some(("authority_refusal", serde_json::json!(refusal))),
+        }
+    }
+
     pub(in super::super) const fn reason(&self) -> Reason {
         self.reason
     }

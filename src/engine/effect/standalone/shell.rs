@@ -119,6 +119,46 @@ impl crate::engine::effect::dispatch::ScopeSnapshotProvider for UnscopedSnapshot
     }
 }
 
+/// Why the operator profile does not grant one subject's effect now.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SubjectRefusal {
+    /// No profile is selected, or it could not be evaluated.
+    Unavailable,
+    /// The selected profile is malformed or not admissible.
+    Invalid,
+    Expired,
+    /// The profile names other identities or lacks the exact grant.
+    NotGranted,
+}
+
+/// Evaluate the operator profile at `path` now and check that it grants
+/// exactly `subject`'s effect; returns the evaluated profile identity. It
+/// grants nothing itself.
+// r[impl lattice.implementation_attempt.operator_repair.scenario.authority]
+pub fn check_subject(
+    path: Option<&std::path::Path>,
+    subject: super::core::Subject<'_>,
+) -> Result<String, SubjectRefusal> {
+    let path = path.filter(|path| path.is_absolute()).ok_or(SubjectRefusal::Unavailable)?;
+    let value = crate::nickel::evaluate_file(path).map_err(|_| SubjectRefusal::Unavailable)?;
+    let profile = serde_json::from_value(value).map_err(|_| SubjectRefusal::Invalid)?;
+    let now = observe_unix_millis().map_err(|_| SubjectRefusal::Unavailable)?;
+    let admitted = super::core::admit(profile, now).map_err(|error| match error {
+        super::core::ProfileError::Expired => SubjectRefusal::Expired,
+        super::core::ProfileError::InvalidProfile | super::core::ProfileError::BindingMismatch => {
+            SubjectRefusal::Invalid
+        }
+    })?;
+    super::core::check_subject(&admitted, subject, now).map_err(|error| match error {
+        super::core::ProfileError::Expired => SubjectRefusal::Expired,
+        super::core::ProfileError::InvalidProfile | super::core::ProfileError::BindingMismatch => {
+            SubjectRefusal::NotGranted
+        }
+    })?;
+    Ok(admitted.identity)
+}
+
 fn load_profile(
     path: &std::path::Path,
 ) -> Result<(super::core::AdmittedProfile, u64), crate::engine::effect::dispatch::Error> {

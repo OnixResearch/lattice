@@ -9,6 +9,8 @@
 
 // r[impl lattice.implementation_attempt.repair.scenario.bypass]
 
+pub mod catalog;
+
 /// What the host check port asks for: one declared check of one revision.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
