@@ -8,7 +8,7 @@ impl crate::workflow_template::inputs::Admitted {
     /// and before the first node runs. The bound workflow then runs as a snapshot under the
     /// saved workflow's name, and its run, detail, and replay records are written as for any run.
     pub async fn run_with_app_config(
-        &self,
+        self,
         store: &crate::store::Store,
         app_config: &crate::config::AppConfig,
     ) -> Result<super::super::HeadlessRunSummary, super::super::HeadlessRunError> {
@@ -28,7 +28,7 @@ impl crate::workflow_template::inputs::Admitted {
 
     /// Run the bound workflow with an explicit effect authority source.
     pub async fn run_with_authority_provider(
-        &self,
+        self,
         store: &crate::store::Store,
         authority_provider: &dyn crate::engine::effect::execution::RunContextProvider,
     ) -> Result<super::super::HeadlessRunSummary, super::super::HeadlessRunError> {
@@ -38,19 +38,21 @@ impl crate::workflow_template::inputs::Admitted {
 
 async fn execute(
     store: &crate::store::Store,
-    admitted: &crate::workflow_template::inputs::Admitted,
+    admitted: crate::workflow_template::inputs::Admitted,
     authority_provider: &dyn crate::engine::effect::execution::RunContextProvider,
     executor_factory: impl FnOnce() -> crate::engine::executor::Executor,
 ) -> Result<super::super::HeadlessRunSummary, super::super::HeadlessRunError> {
     // r[impl lattice.workflow_templates.run_inputs.start]
-    // A run with inputs is a start path: drifted bound content never reserves a run id.
-    crate::workflow_template::inputs::reverify_admitted(admitted).map_err(|error| {
+    // A run with inputs is a start path: drifted bound content never reserves a run id. The
+    // refusal is a fatal diagnostic like an authority-context failure; a dedicated category
+    // would change `HeadlessRunError` or `WorkflowDiagnosticCode`, outside this change.
+    crate::workflow_template::inputs::reverify_admitted(&admitted).map_err(|error| {
         super::super::HeadlessRunError::Validation(vec![super::authority_context_diagnostic(error.to_string())])
     })?;
-    let workflow = admitted.bundle.workflow().clone();
-    let workflow_name = admitted.identity.workflow.workflow_name.clone();
+    let (workflow, identity) = admitted.into_run_parts();
+    let workflow_name = identity.workflow.workflow_name.clone();
     debug_assert_eq!(workflow.meta.name, workflow_name);
-    let run_id = store.reserve_run_with_inputs(&admitted.identity)?;
+    let run_id = store.reserve_run_with_inputs(&identity)?;
     let outcome = super::run_workflow_snapshot_with_executor_factory(
         super::ProductRunRequest {
             store,

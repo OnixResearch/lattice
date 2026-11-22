@@ -8,6 +8,13 @@ const TEMPLATE_BINDINGS: redb::TableDefinition<&str, &[u8]> =
     redb::TableDefinition::new("workflow_template_bindings_v1");
 const RUN_INPUTS: redb::TableDefinition<u64, &[u8]> = redb::TableDefinition::new("run_inputs_v1");
 
+/// The persisted shape of `RunInputRecord`, borrowing the identity it records.
+#[derive(serde::Serialize)]
+struct RunInputRecordRef<'a> {
+    run_id: crate::engine::RunId,
+    inputs: &'a crate::workflow_template::inputs::InputIdentity,
+}
+
 fn db_error(error: impl std::fmt::Display) -> crate::store::StoreError {
     crate::store::StoreError::Db(error.to_string())
 }
@@ -86,20 +93,16 @@ impl crate::store::Store {
     }
 
     // r[impl lattice.workflow_templates.run_inputs.record]
-    /// Reserve a run id and record its admitted input identity in one transaction.
-    ///
-    /// This is the first store write of a run with inputs, after every input check passed.
+    /// Reserve a run id and record its admitted input identity in one transaction, after every
+    /// input check passed and before the first node runs.
     pub fn reserve_run_with_inputs(
         &self,
         inputs: &crate::workflow_template::inputs::InputIdentity,
     ) -> Result<crate::engine::RunId, crate::store::StoreError> {
         let transaction = self.db.begin_write().map_err(db_error)?;
         let run_id = crate::store::reserve_run_id(&transaction)?;
-        let record = crate::workflow_template::inputs::RunInputRecord {
-            run_id,
-            inputs: inputs.clone(),
-        };
-        let data = crate::store::serialize(&record)?;
+        // Serializes exactly as `RunInputRecord` without copying the identity.
+        let data = crate::store::serialize(&RunInputRecordRef { run_id, inputs })?;
         {
             let mut table = transaction.open_table(RUN_INPUTS).map_err(table_error)?;
             if table.insert(run_id.0, data.as_slice()).map_err(db_error)?.is_some() {
@@ -109,7 +112,7 @@ impl crate::store::Store {
             }
         }
         transaction.commit().map_err(db_error)?;
-        debug_assert_eq!(record.run_id, run_id);
+        debug_assert!(!data.is_empty());
         Ok(run_id)
     }
 

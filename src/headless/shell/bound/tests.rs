@@ -25,12 +25,12 @@ fn admitted(
         workflow_name: REVIEW,
         saved: Some(saved.workflow()),
         binding: Some(&binding),
-        catalog: std::slice::from_ref(template),
+        template: Some(template),
     };
     crate::workflow_template::inputs::admit(facts, &raw).expect("inputs admit")
 }
 
-fn refused(store: &crate::store::Store, admitted: &crate::workflow_template::inputs::Admitted) -> String {
+fn refused(store: &crate::store::Store, admitted: crate::workflow_template::inputs::Admitted) -> String {
     let provider = crate::engine::effect::execution::UnavailableRunContextSource;
     let runtime = tokio::runtime::Builder::new_current_thread().build().expect("runtime builds");
     match runtime.block_on(admitted.run_with_authority_provider(store, &provider)) {
@@ -49,17 +49,16 @@ fn drifted_bound_content_never_reserves_a_run() {
     assert!(crate::workflow_template::inputs::reverify_admitted(&intact).is_ok());
 
     let mut tampered = intact.clone();
-    let node = tampered.bundle.workflow.graph.nodes().next().expect("node").id;
-    if let Some(crate::engine::workflow::NodeConfig::Shell { env, .. }) =
-        tampered.bundle.workflow.configs.get_mut(&node.0)
-    {
+    let workflow = &mut tampered.bundle_mut().workflow;
+    let node = workflow.graph.nodes().next().expect("node").id;
+    if let Some(crate::engine::workflow::NodeConfig::Shell { env, .. }) = workflow.configs.get_mut(&node.0) {
         env.insert(KEY.to_owned(), "fixtures/other".to_owned());
     }
-    assert!(refused(&store, &tampered).starts_with("bound_content_drift"), "tampered content is refused");
+    assert!(refused(&store, tampered).starts_with("bound_content_drift"), "tampered content is refused");
 
-    let mut swapped = intact.clone();
-    swapped.bundle = admitted(&template, "fixtures/other").bundle;
-    assert!(refused(&store, &swapped).starts_with("bound_content_drift"), "a mismatched identity is refused");
+    let mut swapped = intact;
+    *swapped.bundle_mut() = admitted(&template, "fixtures/other").bundle().clone();
+    assert!(refused(&store, swapped).starts_with("bound_content_drift"), "a mismatched identity is refused");
 
     assert!(store.list_runs(4).expect("runs list").is_empty(), "no run record");
     assert!(store.load_run_inputs(crate::engine::RunId(0)).expect("inputs read").is_none(), "no input record");

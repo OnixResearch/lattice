@@ -19,12 +19,7 @@ fn admit(
 ) -> Result<lattice::workflow_template::inputs::Admitted, InputError> {
     let cli = args(cli);
     let file = file.map(|json| fixture.input_file("inputs.json", json));
-    let store = fixture.store();
-    match lattice::workflow_template::admit_saved_inputs(
-        &store,
-        fixture::BUNDLE,
-        &fixture.request(&cli, file.as_deref()),
-    ) {
+    match fixture.admit_inputs(&fixture.store(), fixture::BUNDLE, &cli, file.as_deref()) {
         Ok(admitted) => Ok(admitted),
         Err(lattice::workflow_template::Error::Inputs(error)) => Err(error),
         Err(other) => panic!("unexpected shell failure: {other}"),
@@ -42,7 +37,7 @@ fn probe_env(workflow: &lattice::engine::Workflow) -> BTreeMap<String, String> {
 fn param_code(result: Result<lattice::workflow_template::inputs::Admitted, InputError>) -> ParamErrorCode {
     match result {
         Err(InputError::Param(error)) => error.code,
-        other => panic!("expected a parameter refusal, got {:?}", other.map(|admitted| admitted.identity)),
+        other => panic!("expected a parameter refusal, got {:?}", other.map(|admitted| admitted.identity().clone())),
     }
 }
 
@@ -53,7 +48,7 @@ fn each_type_binds_from_both_sources_into_the_bound_revision() {
     let fixture = Fixture::new();
     let admitted = admit(&fixture, &["enabled=true", "count=5", "target=a/b-1.txt"], Some(r#"{"format": "json"}"#))
         .expect("typed inputs admit");
-    let env = probe_env(admitted.bundle.workflow());
+    let env = probe_env(admitted.bundle().workflow());
     let expected = [
         ("ENABLED", "true"),
         ("COUNT", "5"),
@@ -63,7 +58,7 @@ fn each_type_binds_from_both_sources_into_the_bound_revision() {
     for (key, value) in expected {
         assert_eq!(env.get(&format!("LATTICE_PARAM_{key}")).map(String::as_str), Some(value));
     }
-    let names = admitted.identity.params.iter().map(|param| (param.name.as_str(), param.kind)).collect::<Vec<_>>();
+    let names = admitted.identity().params.iter().map(|param| (param.name.as_str(), param.kind)).collect::<Vec<_>>();
     let kinds = [
         ("count", InputKind::Integer),
         ("enabled", InputKind::Bool),
@@ -71,22 +66,22 @@ fn each_type_binds_from_both_sources_into_the_bound_revision() {
         ("target", InputKind::RelativePath),
     ];
     assert_eq!(names, kinds);
-    assert!(admitted.identity.params.iter().all(|param| param.supplied));
+    assert!(admitted.identity().params.iter().all(|param| param.supplied));
 
     let saved = fixture.store().load_workflow(fixture::BUNDLE).expect("store reads").expect("saved workflow");
     let saved_revision = lattice::orchestration::workflow_revision(&saved).expect("revision");
-    assert_ne!(admitted.identity.workflow, saved_revision, "inputs change the bound revision");
+    assert_ne!(admitted.identity().workflow, saved_revision, "inputs change the bound revision");
     let json_only =
         admit(&fixture, &[], Some(r#"{"format": "text", "count": 1, "enabled": false}"#)).expect("JSON types admit");
-    assert_eq!(json_only.identity.workflow, saved_revision, "the saved values reproduce the saved revision");
-    let defaults = json_only.identity.params.iter().filter(|param| !param.supplied).map(|param| param.name.as_str());
+    assert_eq!(json_only.identity().workflow, saved_revision, "the saved values reproduce the saved revision");
+    let defaults = json_only.identity().params.iter().filter(|param| !param.supplied).map(|param| param.name.as_str());
     assert_eq!(defaults.collect::<Vec<_>>(), ["target"]);
 
     let again =
         admit(&fixture, &["format=json", "target=a/b-1.txt"], Some(r#"{"enabled": true, "count": 5}"#)).unwrap();
-    assert_eq!(again.identity, admitted.identity, "the identity covers values, not their source");
+    assert_eq!(again.identity(), admitted.identity(), "the identity covers values, not their source");
     let grants = |workflow| lattice::engine::effect::standalone::inspect_workflow(workflow).expect("inspects").grants;
-    assert_eq!(grants(admitted.bundle.workflow()), grants(&saved), "inputs never change grants");
+    assert_eq!(grants(admitted.bundle().workflow()), grants(&saved), "inputs never change grants");
 }
 
 // r[verify lattice.workflow_templates.run_inputs.scenario.refused]
@@ -147,10 +142,11 @@ fn wrong_unknown_missing_and_duplicate_inputs_are_refused_without_echo() {
 
 // r[verify lattice.workflow_templates.run_inputs.secrets]
 #[test]
-fn secret_like_values_names_and_credential_targets_are_refused() {
+fn token_shaped_paths_are_refused_and_ordinary_refs_admit() {
     let fixture = Fixture::new();
-    let token = "Ab1".repeat(11);
-    for value in ["ghp_0123456789abcdefABCD", "dir/AKIAIOSFODNN7EXAMPLE", token.as_str()] {
+    let shaped = "aB3dE5fG7hJ9kL1mN3pQ".repeat(2);
+    let github = format!("ghp_{shaped}");
+    for value in [github.as_str(), "dir/AKIAIOSFODNN7EXAMPLE", shaped.as_str()] {
         let refused = admit(&fixture, &["format=json", &format!("target={value}")], None).unwrap_err();
         assert_eq!(refused, InputError::SecretLike {
             param: "target".into(),
@@ -158,46 +154,16 @@ fn secret_like_values_names_and_credential_targets_are_refused() {
         });
         assert!(!refused.to_string().contains(value));
     }
-    admit(
-        &fixture,
-        &[
-            "format=json",
-            "target=src/ghp_/0123456789abcdef0123456789abcdef01234567",
-        ],
-        None,
-    )
-    .expect("short prefixes and lowercase hex are ordinary paths");
-
-    let template = fixture::catalog_template(&fixture.catalog);
-    let declared = template.manifest().params().to_vec();
-    let supplied = BTreeMap::new();
-    lattice::workflow_template::inputs::screen(&declared, template.workflow(), &supplied).expect("fixture is clean");
-    let mut named = declared.clone();
-    named[0].name = "api_token".into();
-    let by_name = lattice::workflow_template::inputs::screen(&named, template.workflow(), &supplied).unwrap_err();
-    assert_eq!(by_name, InputError::SecretLike {
-        param: "api_token".into(),
-        reason: SecretReason::Name
-    });
-    let mut keyed = declared.clone();
-    keyed[0].bindings[0].shell_env = "LATTICE_PARAM_PRIVATE_KEY".into();
-    let by_key = lattice::workflow_template::inputs::screen(&keyed, template.workflow(), &supplied).unwrap_err();
-    assert!(matches!(by_key, InputError::SecretLike {
-        reason: SecretReason::Name,
-        ..
-    }));
-
-    let mut credentialed = template.workflow().clone();
-    let probe = credentialed.graph.nodes().find(|node| node.label == fixture::PROBE).expect("probe").id;
-    let mut refs = lattice::credentials::NodeCredentialRefs::default();
-    let reference = lattice::credentials::SecretRef::new("env", "UPSTREAM", None);
-    refs.env.insert("LATTICE_PARAM_TARGET".into(), reference);
-    credentialed.set_node_credentials(probe, refs);
-    let target = lattice::workflow_template::inputs::screen(&declared, &credentialed, &supplied).unwrap_err();
-    assert_eq!(target, InputError::SecretLike {
-        param: "target".into(),
-        reason: SecretReason::CredentialTarget
-    });
+    for value in [
+        "dependabot/npm_and_yarn/express-4.18.2",
+        ".github/workflows/pypi-publish.yml",
+        "scripts/hf_upload_model.py",
+        "data/ASIA_PACIFIC_REGIONS.csv",
+        "feature/PROJ-1234-add-retry-to-upload-client",
+        "src/ghp_/0123456789abcdef0123456789abcdef01234567",
+    ] {
+        admit(&fixture, &["format=json", &format!("target={value}")], None).expect(value);
+    }
 }
 
 // r[verify lattice.workflow_templates.run_inputs.retained]
@@ -214,49 +180,86 @@ fn only_an_exact_retained_parameterized_template_accepts_inputs() {
 
     let fixture = Fixture::new();
     std::fs::write(fixture.catalog.join(fixture::BUNDLE).join("manifest.ncl"), "{}").expect("catalog edit");
-    assert_eq!(admit(&fixture, &["format=json"], None).unwrap_err(), InputError::TemplateUnavailable);
+    let load = admit(&fixture, &["format=json"], None).unwrap_err();
+    assert!(
+        matches!(load, InputError::TemplateLoad(_)),
+        "the bound bundle's load diagnostic is surfaced: {load}"
+    );
 
     let unparameterized = Fixture::with_params("[]");
     assert_eq!(admit(&unparameterized, &["format=json"], None).unwrap_err(), InputError::NotParameterized);
     assert_eq!(admit(&unparameterized, &[], Some("{}")).unwrap_err(), InputError::NotParameterized);
 
-    let unsaved = Fixture::new();
-    let store = unsaved.store();
-    let mut copy = store.load_workflow(fixture::BUNDLE).unwrap().unwrap();
-    copy.meta.name = "hand-saved".into();
-    copy.catalog_revision = None;
-    store.save_workflow(&copy).expect("plain save");
+    let gated = Fixture::gated();
+    assert_eq!(admit(&gated, &["format=json"], None).unwrap_err(), InputError::ApprovalGate);
+
+    let other = Fixture::new();
+    let store = other.store();
     let cli = args(&["format=json"]);
-    let refused = lattice::workflow_template::admit_saved_inputs(&store, "hand-saved", &unsaved.request(&cli, None));
-    assert!(matches!(refused, Err(lattice::workflow_template::Error::Inputs(InputError::NotParameterized))));
-    let missing = lattice::workflow_template::admit_saved_inputs(&store, "absent", &unsaved.request(&cli, None));
+    let missing = other.admit_inputs(&store, "absent", &cli, None);
     assert!(matches!(missing, Err(lattice::workflow_template::Error::Inputs(InputError::WorkflowNotFound))));
 }
 
-#[test]
-fn the_input_file_must_be_a_bounded_regular_file() {
-    let fixture = Fixture::new();
-    let store = fixture.store();
-    let cli = Vec::new();
-    let oversized = format!("{{\"format\": \"json\", \"pad\": \"{}\"}}", " ".repeat(65_536));
-    let oversized = fixture.input_file("oversized.json", &oversized);
-    let missing = fixture.dir.path().join("missing.json");
-    for path in [oversized.as_path(), missing.as_path(), fixture.dir.path()] {
-        let refused =
-            lattice::workflow_template::admit_saved_inputs(&store, fixture::BUNDLE, &fixture.request(&cli, Some(path)));
-        assert!(matches!(refused, Err(lattice::workflow_template::Error::InputFile)), "{}", path.display());
+const REVIEW: &str = "agent-evaluation-catalog-review";
+
+fn builtin_root() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("builtins/workflow-templates")
+}
+
+/// The built-in catalog review bound to its defaults. Exact re-saves use it because a
+/// re-saved bundle must match the stored workflow's authoring exactly.
+fn review_bound() -> lattice::workflow_template::ValidatedBundle {
+    let catalog = lattice::workflow_template::load_catalog(&builtin_root()).expect("built-in catalog loads");
+    let template = catalog.bundles.into_iter().find(|bundle| bundle.manifest().id == REVIEW).expect("review");
+    lattice::workflow_template::bind(&template, &BTreeMap::new()).expect("defaults bind")
+}
+
+fn admit_review(store: &lattice::store::Store) -> Result<lattice::workflow_template::inputs::Admitted, InputError> {
+    let cli = args(&["catalog_root=fixtures/catalog"]);
+    let raw = lattice::workflow_template::InputRequest { cli: &cli, file: None }.read().expect("inputs read");
+    match lattice::workflow_template::admit_saved_inputs(store, REVIEW, &builtin_root(), &raw) {
+        Ok(admitted) => Ok(admitted),
+        Err(lattice::workflow_template::Error::Inputs(error)) => Err(error),
+        Err(other) => panic!("unexpected shell failure: {other}"),
     }
-    let bounded = fixture.input_file("bounded.json", r#"{"format": "json"}"#);
-    lattice::workflow_template::admit_saved_inputs(&store, fixture::BUNDLE, &fixture.request(&cli, Some(&bounded)))
-        .expect("a bounded regular file is read");
+}
+
+// r[verify lattice.workflow_templates.run_inputs.retained]
+#[test]
+fn a_workflow_saved_without_a_retained_binding_is_told_to_save_again() {
+    let bound = review_bound();
+    let upgraded = tempfile::tempdir().expect("upgraded store directory");
+    let store = lattice::store::Store::new(upgraded.path().join("lattice.redb")).expect("store opens");
+    // What `save_draft` wrote before bindings were retained: the bound workflow alone.
+    store.save_workflow_cas(bound.workflow(), None).expect("a save from before bindings were retained");
+    let error = admit_review(&store).unwrap_err();
+    assert_eq!(error, InputError::BindingMissing);
+    assert!(error.to_string().contains("save it again from its bundle"));
+
+    let plan = lattice::workflow_template::save_draft(&store, &bound).expect("saving again succeeds");
+    assert!(matches!(plan, lattice::workflow_template::ApplicationPlan::ExactAlreadyPresent { .. }));
+    admit_review(&store).expect("inputs admit after saving again");
 }
 
 #[test]
-fn approval_gates_are_detected_for_refusal() {
-    let fixture = Fixture::new();
-    let template = fixture::catalog_template(&fixture.catalog);
-    assert!(!lattice::workflow_template::inputs::has_approval_gate(template.workflow()));
-    let mut gated = template.workflow().clone();
-    lattice::tui::authoring::node::create_approval(&mut gated, "gate", "review-gate", "operator").expect("gate adds");
-    assert!(lattice::workflow_template::inputs::has_approval_gate(&gated));
+fn an_exact_resave_replaces_a_stale_binding() {
+    let bound = review_bound();
+    let directory = tempfile::tempdir().expect("store directory");
+    let store = lattice::store::Store::new(directory.path().join("lattice.redb")).expect("store opens");
+    lattice::workflow_template::save_draft(&store, &bound).expect("first save");
+    let current = store.load_workflow_template_binding(REVIEW).unwrap().expect("binding retained");
+    let mut stale = current.clone();
+    stale.workflow.content_hash = lattice::orchestration::workflow_revision(&lattice::engine::Workflow::new(
+        REVIEW,
+        lattice::engine::workflow::WorkflowTimestamp::epoch(),
+    ))
+    .expect("revision")
+    .content_hash;
+    store.save_workflow_template_binding(&stale).expect("stale binding writes");
+    assert_eq!(admit_review(&store).unwrap_err(), InputError::SavedWorkflowDrift);
+
+    let plan = lattice::workflow_template::save_draft(&store, &bound).expect("exact save");
+    assert!(matches!(plan, lattice::workflow_template::ApplicationPlan::ExactAlreadyPresent { .. }));
+    assert_eq!(store.load_workflow_template_binding(REVIEW).unwrap(), Some(current));
+    admit_review(&store).expect("the replaced binding admits");
 }

@@ -10,6 +10,7 @@ pub use core::inspect;
 
 pub use format::render_json;
 pub use format::render_text;
+pub use identity::authority_inputs;
 pub use identity::inspect_with_inputs;
 pub use identity::safe_inputs;
 pub use model::BudgetSettlementState;

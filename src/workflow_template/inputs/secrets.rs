@@ -1,21 +1,24 @@
 //! The secret-like input rule. Pure.
 //!
-//! Parameter types already exclude free text, but a relative path or enum token can still
-//! carry a token-shaped string. Run inputs are never a secret channel; credential references
-//! are. The rule refuses:
+//! Parameter types already exclude free text, but a `relative_path` value is caller text over
+//! letters, digits, `.`, `_`, `-` and `/`, so it can still carry a token. Run inputs are never a
+//! secret channel; credential references are. The rule applies only to `relative_path`
+//! parameters. A `bool` or bounded `integer` cannot carry a credential, and an `enum` value is
+//! one of the reviewed manifest tokens, like a default. It refuses:
 //!
-//! - a declared parameter whose name, or whose binding key after `LATTICE_PARAM_`, has a secret
-//!   word as an `_`-separated word (see [`SECRET_WORDS`]) or a qualifier followed by `key` (see
-//!   [`KEY_QUALIFIERS`]);
-//! - a declared binding whose target node binds the same environment key to a credential reference;
-//! - a supplied text value with a `/`-separated component that starts with a known credential
-//!   prefix followed by at least [`MIN_PREFIXED_SUFFIX_BYTES`] bytes, or that is at least
-//!   [`TOKEN_SHAPE_MIN_BYTES`] bytes of only ASCII letters, digits, `_` and `-` mixing uppercase,
-//!   lowercase and digits.
+//! - a `relative_path` parameter whose name, or whose binding key after `LATTICE_PARAM_`, has a
+//!   secret word as an `_`-separated word (see [`SECRET_WORDS`]) or a qualifier followed by `key`
+//!   (see [`KEY_QUALIFIERS`]), ignoring ASCII case;
+//! - a supplied `relative_path` value with a `/`-separated component that is a known provider
+//!   token: its prefix followed by at least that format's minimum suffix drawn only from that
+//!   format's alphabet (see [`TOKEN_FORMATS`]);
+//! - a supplied `relative_path` value with a run between separators (`/`, `-`, `_`, `.`) of at
+//!   least [`TOKEN_RUN_MIN_BYTES`] ASCII letters and digits that mixes uppercase, lowercase and
+//!   digits.
 //!
-//! Every declared parameter is checked by name and target, because binding writes every
-//! declared target, defaults included. Only supplied values are checked by value; defaults
-//! are reviewed manifest bytes.
+//! A binding into a credential-bound key cannot occur: every target key starts with
+//! `LATTICE_PARAM_`, and #27's `validate_targets` refuses any node credential key with that
+//! prefix at load.
 
 pub const SECRET_WORDS: [&str; 17] = [
     "token",
@@ -46,56 +49,105 @@ pub const KEY_QUALIFIERS: [&str; 8] = [
     "client",
     "encryption",
 ];
-pub const CREDENTIAL_PREFIXES: [&str; 24] = [
-    "ghp_",
-    "gho_",
-    "ghu_",
-    "ghs_",
-    "ghr_",
-    "github_pat_",
-    "glpat-",
-    "xoxa-",
-    "xoxb-",
-    "xoxp-",
-    "xoxr-",
-    "xoxs-",
-    "sk-",
-    "sk_live_",
-    "sk_test_",
-    "rk_live_",
-    "AKIA",
-    "ASIA",
-    "AIza",
-    "ya29.",
-    "npm_",
-    "pypi-",
-    "hf_",
-    "eyJ",
+
+/// A random run of this many letters and digits with mixed classes is token-shaped.
+///
+/// Real tokens are long separator-free runs: base62 and base64 keys are 20 to 100 or more
+/// characters. Words in refs and paths (`PROJ`, `1234`, `Safari15`) are short runs between
+/// separators. A 20-character mixed-class run is uncommon in a path and covers the shortest
+/// provider tokens.
+pub const TOKEN_RUN_MIN_BYTES: usize = 20;
+
+/// The alphabet of a provider token's suffix after its prefix.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TokenAlphabet {
+    /// ASCII letters and digits.
+    Alphanumeric,
+    /// Uppercase ASCII letters and digits.
+    UpperAlphanumeric,
+    /// Letters, digits and `_`.
+    AlphanumericUnderscore,
+    /// Letters, digits and `-`.
+    AlphanumericDash,
+    /// Letters, digits, `-` and `_`.
+    Base64Url,
+    /// Letters, digits, `-`, `_` and `.`.
+    Base64UrlDot,
+}
+
+/// One provider token format: its prefix, the minimum suffix length, and the suffix alphabet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TokenFormat {
+    pub prefix: &'static str,
+    pub min_suffix_bytes: usize,
+    pub alphabet: TokenAlphabet,
+}
+
+const fn format(prefix: &'static str, min_suffix_bytes: usize, alphabet: TokenAlphabet) -> TokenFormat {
+    TokenFormat {
+        prefix,
+        min_suffix_bytes,
+        alphabet,
+    }
+}
+
+pub const TOKEN_FORMATS: [TokenFormat; 26] = [
+    format("ghp_", 30, TokenAlphabet::Alphanumeric),
+    format("gho_", 30, TokenAlphabet::Alphanumeric),
+    format("ghu_", 30, TokenAlphabet::Alphanumeric),
+    format("ghs_", 30, TokenAlphabet::Alphanumeric),
+    format("ghr_", 30, TokenAlphabet::Alphanumeric),
+    format("github_pat_", 40, TokenAlphabet::AlphanumericUnderscore),
+    format("glpat-", 20, TokenAlphabet::Base64Url),
+    format("xoxa-", 20, TokenAlphabet::AlphanumericDash),
+    format("xoxb-", 20, TokenAlphabet::AlphanumericDash),
+    format("xoxp-", 20, TokenAlphabet::AlphanumericDash),
+    format("xoxr-", 20, TokenAlphabet::AlphanumericDash),
+    format("xoxs-", 20, TokenAlphabet::AlphanumericDash),
+    format("sk-proj-", 40, TokenAlphabet::Base64Url),
+    format("sk-svcacct-", 40, TokenAlphabet::Base64Url),
+    format("sk-", 32, TokenAlphabet::Alphanumeric),
+    format("sk_live_", 20, TokenAlphabet::Alphanumeric),
+    format("sk_test_", 20, TokenAlphabet::Alphanumeric),
+    format("rk_live_", 20, TokenAlphabet::Alphanumeric),
+    format("AKIA", 16, TokenAlphabet::UpperAlphanumeric),
+    format("ASIA", 16, TokenAlphabet::UpperAlphanumeric),
+    format("AIza", 30, TokenAlphabet::Base64Url),
+    format("ya29.", 20, TokenAlphabet::Base64UrlDot),
+    format("npm_", 30, TokenAlphabet::Alphanumeric),
+    format("pypi-", 50, TokenAlphabet::Base64Url),
+    format("hf_", 30, TokenAlphabet::Alphanumeric),
+    format("eyJ", 30, TokenAlphabet::Base64UrlDot),
 ];
-pub const MIN_PREFIXED_SUFFIX_BYTES: usize = 8;
-pub const TOKEN_SHAPE_MIN_BYTES: usize = 32;
 
 // r[impl lattice.workflow_templates.run_inputs.secrets]
-/// Refuse secret-like parameter names, binding keys, credential-bearing targets, and supplied
-/// values. The diagnostic names only the declared parameter.
+/// Refuse secret-like `relative_path` parameter names, binding keys, and supplied values. The
+/// diagnostic names only the declared parameter.
 pub fn screen(
     declared: &[super::super::params::ParamDeclaration],
-    workflow: &crate::engine::Workflow,
     supplied: &std::collections::BTreeMap<String, super::super::params::ParamValue>,
 ) -> Result<(), super::InputError> {
-    for declaration in declared {
+    let caller_text = declared
+        .iter()
+        .filter(|declaration| matches!(declaration.value_type, super::super::params::ParamType::RelativePath { .. }));
+    for declaration in caller_text {
+        // #27's `validate_targets` refuses a credential key with this prefix, so no target can
+        // receive a credential.
+        debug_assert!(
+            declaration
+                .bindings
+                .iter()
+                .all(|target| target.shell_env.starts_with(super::super::params::PARAM_ENV_PREFIX))
+        );
         let refuse = |reason| super::InputError::SecretLike {
             param: declaration.name.clone(),
             reason,
         };
-        let keys = declaration.bindings.iter().map(|target| {
+        let mut keys = declaration.bindings.iter().map(|target| {
             target.shell_env.strip_prefix(super::super::params::PARAM_ENV_PREFIX).unwrap_or(&target.shell_env)
         });
-        if is_secret_identifier(&declaration.name) || keys.clone().any(is_secret_identifier) {
+        if is_secret_identifier(&declaration.name) || keys.any(is_secret_identifier) {
             return Err(refuse(super::SecretReason::Name));
-        }
-        if declaration.bindings.iter().any(|target| binds_credential(workflow, target)) {
-            return Err(refuse(super::SecretReason::CredentialTarget));
         }
         if let Some(super::super::params::ParamValue::Text(value)) = supplied.get(&declaration.name)
             && is_secret_value(value)
@@ -103,99 +155,59 @@ pub fn screen(
             return Err(refuse(super::SecretReason::Value));
         }
     }
-    debug_assert!(supplied.keys().all(|name| declared.iter().any(|declaration| &declaration.name == name)));
     Ok(())
 }
 
 /// Whether an identifier has a secret word, or a qualifier followed by `key`, as `_`-separated
 /// words, ignoring ASCII case.
 pub fn is_secret_identifier(identifier: &str) -> bool {
-    let lowered = identifier.to_ascii_lowercase();
-    let words = lowered.split('_').collect::<Vec<_>>();
-    let has_secret_word = words.iter().any(|word| SECRET_WORDS.contains(word));
-    let has_qualified_key = words.windows(2).any(|pair| KEY_QUALIFIERS.contains(&pair[0]) && pair[1] == "key");
-    has_secret_word || has_qualified_key
+    let mut previous: Option<&str> = None;
+    for word in identifier.split('_') {
+        let is_secret_word = SECRET_WORDS.iter().any(|secret| word.eq_ignore_ascii_case(secret));
+        let is_qualified_key = word.eq_ignore_ascii_case("key")
+            && previous
+                .is_some_and(|qualifier| KEY_QUALIFIERS.iter().any(|known| qualifier.eq_ignore_ascii_case(known)));
+        if is_secret_word || is_qualified_key {
+            return true;
+        }
+        previous = Some(word);
+    }
+    false
 }
 
-/// Whether a text value has a credential-prefixed or token-shaped `/`-separated component.
+/// Whether a value has a provider-token component or a token-shaped run.
 pub fn is_secret_value(value: &str) -> bool {
-    value.split('/').any(|component| {
-        let is_prefixed = CREDENTIAL_PREFIXES.iter().any(|prefix| {
-            component.starts_with(prefix) && component.len() >= prefix.len().saturating_add(MIN_PREFIXED_SUFFIX_BYTES)
-        });
-        is_prefixed || is_token_shaped(component)
+    value.split('/').any(|component| is_provider_token(component) || has_token_shaped_run(component))
+}
+
+fn is_provider_token(component: &str) -> bool {
+    TOKEN_FORMATS.iter().any(|token| {
+        component.strip_prefix(token.prefix).is_some_and(|suffix| {
+            suffix.len() >= token.min_suffix_bytes && suffix.bytes().all(|byte| in_alphabet(token.alphabet, byte))
+        })
     })
 }
 
-fn is_token_shaped(component: &str) -> bool {
-    let bytes = component.as_bytes();
-    let has_token_alphabet = bytes.iter().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'));
-    let has_mixed_classes = bytes.iter().any(u8::is_ascii_uppercase)
-        && bytes.iter().any(u8::is_ascii_lowercase)
-        && bytes.iter().any(u8::is_ascii_digit);
-    bytes.len() >= TOKEN_SHAPE_MIN_BYTES && has_token_alphabet && has_mixed_classes
+const fn in_alphabet(alphabet: TokenAlphabet, byte: u8) -> bool {
+    match alphabet {
+        TokenAlphabet::Alphanumeric => byte.is_ascii_alphanumeric(),
+        TokenAlphabet::UpperAlphanumeric => byte.is_ascii_uppercase() || byte.is_ascii_digit(),
+        TokenAlphabet::AlphanumericUnderscore => byte.is_ascii_alphanumeric() || byte == b'_',
+        TokenAlphabet::AlphanumericDash => byte.is_ascii_alphanumeric() || byte == b'-',
+        TokenAlphabet::Base64Url => byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'),
+        TokenAlphabet::Base64UrlDot => byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'),
+    }
 }
 
-/// Whether any node with the target's label binds its environment key to a credential reference.
-fn binds_credential(workflow: &crate::engine::Workflow, target: &super::super::params::ParamTarget) -> bool {
-    workflow.graph.nodes().filter(|node| node.label == target.node).any(|node| {
-        workflow
-            .node_credentials(node.id)
-            .is_some_and(|credentials| credentials.env.contains_key(&target.shell_env))
+fn has_token_shaped_run(component: &str) -> bool {
+    component.split(['-', '_', '.']).any(|run| {
+        let bytes = run.as_bytes();
+        let has_mixed_classes = bytes.iter().any(u8::is_ascii_uppercase)
+            && bytes.iter().any(u8::is_ascii_lowercase)
+            && bytes.iter().any(u8::is_ascii_digit);
+        bytes.len() >= TOKEN_RUN_MIN_BYTES && bytes.iter().all(u8::is_ascii_alphanumeric) && has_mixed_classes
     })
 }
 
 #[cfg(test)]
-mod tests {
-    #[test]
-    fn secret_identifiers_are_word_matched() {
-        for name in [
-            "api_token",
-            "github_pat",
-            "db_password",
-            "api_key",
-            "PRIVATE_KEY",
-            "auth",
-            "client_secret",
-        ] {
-            assert!(super::is_secret_identifier(name), "{name}");
-        }
-        for name in [
-            "catalog_root",
-            "author",
-            "sort_key",
-            "tokenizer",
-            "path",
-            "count",
-            "format",
-        ] {
-            assert!(!super::is_secret_identifier(name), "{name}");
-        }
-    }
-
-    #[test]
-    fn credential_prefixes_and_token_shapes_are_secret_values() {
-        let shaped = "Ab1".repeat(11);
-        for value in [
-            "ghp_0123456789abcdef",
-            "dir/github_pat_0123456789",
-            "AKIAIOSFODNN7EXAMPLE",
-            "xoxb-12345678",
-            "sk-proj-abcdefgh",
-            shaped.as_str(),
-        ] {
-            assert!(super::is_secret_value(value), "{value}");
-        }
-        let lower_hex = "0123456789abcdef0123456789abcdef01234567";
-        for value in [
-            "builtins/agent-evaluations",
-            "src/ghp_",
-            "sk-a",
-            lower_hex,
-            "Readme.md",
-            "a/B/c1",
-        ] {
-            assert!(!super::is_secret_value(value), "{value}");
-        }
-    }
-}
+mod tests;

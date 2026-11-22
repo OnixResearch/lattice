@@ -15,9 +15,13 @@ fn admit_ok(
     store: &lattice::store::Store,
     cli: &[&str],
 ) -> lattice::workflow_template::inputs::Admitted {
-    let cli = args(cli);
-    lattice::workflow_template::admit_saved_inputs(store, fixture::BUNDLE, &fixture.request(&cli, None))
-        .expect("inputs admit")
+    fixture.admit_inputs(store, fixture::BUNDLE, &args(cli), None).expect("inputs admit")
+}
+
+/// An identity without its report's prefix, `b3:` in `runs show` and `blake3:` in `authority`.
+fn hex(identity: &serde_json::Value) -> &str {
+    let text = identity.as_str().expect("identity is text");
+    text.split_once(':').map_or(text, |(_, hex)| hex)
 }
 
 fn stdout_of(output: &std::process::Output) -> String {
@@ -40,6 +44,7 @@ async fn a_bound_run_records_its_input_identity_and_shows_it_without_values() {
     let store = fixture.store();
     let admitted = admit_ok(&fixture, &store, &["format=json", "count=3", &format!("target={DISTINCT_VALUE}")]);
     let provider = common::authority::TestRunContextProvider::new();
+    let identity = admitted.identity().clone();
     let summary = admitted.run_with_authority_provider(&store, &provider).await.expect("bound run completes");
     assert_eq!(summary.status, lattice::headless::HeadlessRunStatus::Succeeded);
     assert!(fixture.marker.exists(), "the admitted run reached its node effects");
@@ -52,7 +57,7 @@ async fn a_bound_run_records_its_input_identity_and_shows_it_without_values() {
     assert!(printed, "the probe received each value as one argument");
     let recorded = store.load_run_inputs(summary.run_id).unwrap().expect("inputs recorded");
     assert_eq!(recorded.run_id, summary.run_id);
-    assert_eq!(recorded.inputs, admitted.identity);
+    assert_eq!(recorded.inputs, identity);
     drop(store);
 
     let report = lattice::run::shell::inspect_path(&fixture.store_path(), summary.run_id).expect("run inspects");
@@ -62,9 +67,12 @@ async fn a_bound_run_records_its_input_identity_and_shows_it_without_values() {
     for rendered in [&json, &text] {
         assert!(!rendered.contains("zzdistinctzz") && !rendered.contains(fixture::BUNDLE), "content is omitted");
     }
+    assert!(text.contains(&format!("inputs template=b3:{} ", identity.template.as_str())), "{text}");
+    assert!(text.contains("content=omitted\ninput count kind=integer supplied=true\n"), "{text}");
+    assert!(text.contains("input enabled kind=bool supplied=false\n"), "{text}");
     let inputs = report.inputs.expect("inputs shown");
-    assert_eq!(inputs.values, format!("b3:{}", admitted.identity.values.as_str()));
-    assert_eq!(inputs.workflow_revision, format!("b3:{}", admitted.identity.workflow.content_hash.as_str()));
+    assert_eq!(inputs.values, format!("b3:{}", identity.values.as_str()));
+    assert_eq!(inputs.workflow_revision, format!("b3:{}", identity.workflow.content_hash.as_str()));
     let shown = inputs.params.iter().map(|param| (param.name.as_str(), param.supplied)).collect::<Vec<_>>();
     assert_eq!(shown, [("count", true), ("enabled", false), ("format", true), ("target", true)]);
 
@@ -137,9 +145,10 @@ fn authority_inspect_with_inputs_reports_the_bound_revision_that_runs() {
     assert_ne!(bound["workflow_revision"], saved["workflow_revision"]);
     assert_eq!(bound["grants"], saved["grants"], "inputs never change grants");
     assert_eq!(
-        bound["inputs"]["workflow_revision"].as_str().map(|value| &value[3..]),
-        bound["workflow_revision"].as_str().map(|value| &value[7..])
+        bound["inputs"]["workflow_revision"], bound["workflow_revision"],
+        "one hash renders one way in one report"
     );
+    assert!(bound["workflow_revision"].as_str().is_some_and(|revision| revision.starts_with("blake3:")));
 
     let profile = lattice::engine::effect::standalone::core::Profile {
         schema: bound["schema"].as_str().unwrap().into(),
@@ -184,7 +193,11 @@ fn authority_inspect_with_inputs_reports_the_bound_revision_that_runs() {
     let summary: serde_json::Value = serde_json::from_slice(&run.stdout).unwrap();
     let shown = fixture.cli(&["runs", "show", &summary["run_id"].to_string(), "--output", "json"]);
     let shown: serde_json::Value = serde_json::from_slice(&shown.stdout).unwrap();
-    assert_eq!(shown["inputs"], bound["inputs"], "the run records the inspected input identity");
+    for key in ["template", "bound", "workflow_revision", "values"] {
+        assert_eq!(hex(&shown["inputs"][key]), hex(&bound["inputs"][key]), "the run records the inspected {key}");
+        assert!(shown["inputs"][key].as_str().is_some_and(|value| value.starts_with("b3:")));
+    }
+    assert_eq!(shown["inputs"]["params"], bound["inputs"]["params"]);
 }
 
 // r[verify lattice.workflow_templates.run_inputs.scenario.inputless]
@@ -232,4 +245,33 @@ fn inputless_runs_keep_identity_records_and_output_bytes() {
         "workflow_name",
     ];
     assert_eq!(keys, expected_keys);
+}
+
+struct FailingAuthority;
+
+impl lattice::engine::effect::execution::RunContextProvider for FailingAuthority {
+    fn load(
+        &self,
+        _run_id: lattice::engine::RunId,
+        _store: Option<lattice::store::Store>,
+    ) -> Result<lattice::engine::effect::execution::RunContext, lattice::engine::effect::execution::Error> {
+        Err(lattice::engine::effect::execution::Error::AuthoritySource)
+    }
+}
+
+// r[verify lattice.workflow_templates.run_inputs.record]
+#[tokio::test]
+async fn an_orphaned_input_record_is_never_listed_or_shown_as_a_run() {
+    let fixture = Fixture::new();
+    let store = fixture.store();
+    let admitted = admit_ok(&fixture, &store, &["format=json"]);
+    let failed = admitted.run_with_authority_provider(&store, &FailingAuthority).await;
+    assert!(matches!(failed, Err(lattice::headless::HeadlessRunError::Validation(_))), "{failed:?}");
+    let orphan = lattice::engine::RunId(0);
+    assert!(store.load_run_inputs(orphan).unwrap().is_some(), "the reserved id keeps its input record");
+    assert!(store.list_runs(8).unwrap().is_empty(), "the orphan is never listed as a run");
+    assert_eq!(store.next_run_id().unwrap(), lattice::engine::RunId(1), "its id is never reused");
+    drop(store);
+    let shown = lattice::run::shell::inspect_path(&fixture.store_path(), orphan);
+    assert!(matches!(shown, Err(lattice::run::shell::Error::NotFound(id)) if id == orphan));
 }

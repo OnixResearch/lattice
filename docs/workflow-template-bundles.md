@@ -232,17 +232,19 @@ An `--input` value takes the declared type of its parameter. A `bool` takes exac
 
 The saved workflow does not copy the declarations. It retains which template it was bound from, by identity, when it is saved. A run with inputs then rebinds through that template:
 
-1. Load the saved workflow and its retained binding. Without a binding, or when the template declares no parameters, any `--input` or `--input-file` is refused. A workflow saved before bindings were retained has none; save it again from the bundle.
+1. Load the saved workflow and its retained binding. A workflow saved before bindings were retained has none and is refused with `no retained workflow-template binding; save it again from its bundle`.
 2. Require the saved workflow's current revision to equal the retained revision. A workflow edited or re-saved by another route is refused with a drift diagnostic.
-3. Load the `workflow-templates/` catalog next to `config.ncl` and require the bundle with the retained template identity. A changed or removed bundle is refused. Re-save the workflow from the reviewed bundle to adopt a new version.
-4. Type the values, check them with `params::resolve`, apply the secret rule, and bind them with `workflow_template::bind`. That repeats the template's full admission.
+3. Load only the bundle directory the binding names, `workflow-templates/<bundle-id>/` next to `config.ncl`, with the catalog's single-bundle loader, and require the retained template identity. Other bundles are not read, so a catalog over its 64-directory limit still works. A bundle that fails to load is refused with its load diagnostic; a changed bundle is refused as unavailable. Re-save the workflow from the reviewed bundle to adopt a new version.
+4. Refuse a template that declares no parameters. Type the values, apply the secret rule, and bind them with `workflow_template::bind`, which resolves them with `params::resolve` and repeats the template's full admission.
 5. Treat the run as a start boundary: call `reverify` on the bound bundle, as save and start do, and require the recorded input identity to name exactly that bundle, revision, and values. Drift refuses with `bound_content_drift`.
+
+`--input-file` is opened without blocking (`O_NONBLOCK` on Unix) and refused unless the opened handle is a regular file, so a FIFO or device fails at once. `lattice run` reads its inputs before it opens the store, so a refused input file never holds the store.
 
 Inputs are a full binding of the template's declarations, not an overlay on the saved values. An omitted optional parameter takes its declared default, and an omitted required parameter fails, even if the saved workflow holds a value for it.
 
 A workflow with an approval gate refuses inputs. Resume reloads the saved workflow revision, which a bound run does not have.
 
-Every check above runs before Lattice reserves a run id, writes a run or input record, or runs a node. A diagnostic names at most a declared parameter. It never echoes a supplied value or an undeclared name.
+Every check above runs before Lattice reserves a run id, writes a run or input record, or runs a node. A diagnostic names at most a declared parameter. It never echoes a supplied value or an undeclared name. Admitted inputs are a value only `admit` constructs.
 
 ### Recorded identity
 
@@ -260,21 +262,23 @@ The run reserves its run id and records its input identity in one store transact
 }
 ```
 
-It omits the workflow and bundle names, as the rest of the report does. It shows one value identity instead of per-value digests. A caller that holds the values reproduces it with `params::resolve`. Most declared values come from small domains such as `bool`, an enum, or a bounded integer, so a digest of one value would not hide it. An input record that does not belong to the run makes the report invalid with `inputs_identity_mismatch`.
+It omits the workflow and bundle names, as the rest of the report does. It shows one value identity instead of per-value digests. A caller that holds the values reproduces it with `params::resolve`. The values are omitted from the output, not hidden: the shown identities are unsalted BLAKE3, so anyone with the catalog can enumerate low-entropy inputs such as a `bool`, an enum, or a bounded integer and match them. An input record that does not belong to the run makes the report invalid with `inputs_identity_mismatch`.
+
+An input record is written with its run id reservation. If the run then fails before its run record is written, for example when its authority context cannot load, the record stays with that id. `runs show` reports the id as not found, run listings never include it, and the id is never reused.
 
 ### Authority inspection
 
-`lattice authority inspect NAME` accepts the same `--input` and `--input-file`. It admits them as a run does, without writing state, and prints the grants of the bound workflow revision with the same `inputs` object. Inputs never change grants, but the bound revision differs from the saved one, so a standalone authority profile written from this output authorizes exactly the inspected values. Other values need a new inspection.
+`lattice authority inspect NAME` accepts the same `--input` and `--input-file`. It admits them as a run does, without writing state, and prints the grants of the bound workflow revision with the same `inputs` object. Inside `authority inspect`, the `inputs` identities use the report's `blake3:` prefix, so the bound workflow revision renders exactly as the top-level `workflow_revision`; `runs show` uses `b3:` throughout. Inputs never change grants, but the bound revision differs from the saved one, so a standalone authority profile written from this output authorizes exactly the inspected values. Other values need a new inspection.
 
 ### Secret-like inputs
 
-Run inputs are never a secret channel. Credential references remain the only secret path. The parameter types already exclude free text, and the rule below also refuses token-shaped values:
+Run inputs are never a secret channel. Credential references remain the only secret path. The rule applies only to `relative_path` parameters, the only type that carries caller text. A `bool` or bounded `integer` cannot carry a credential, and an `enum` value is one of the reviewed manifest tokens, like a default, so names such as `max_tokens` or `auth_mode` on those types are allowed. For a `relative_path` parameter, the rule refuses:
 
-- A declared parameter whose name, or whose binding key after `LATTICE_PARAM_`, has one of these `_`-separated words, ignoring case: `token`, `tokens`, `secret`, `secrets`, `password`, `passwords`, `passwd`, `passphrase`, `credential`, `credentials`, `apikey`, `privatekey`, `auth`, `bearer`, `cookie`, `pat`, or `otp`. A qualifier `api`, `private`, `access`, `secret`, `session`, `signing`, `client`, or `encryption` followed by `key` is also refused.
-- A declared binding whose target node binds the same environment key to a credential reference.
-- A supplied text value with a `/`-separated component that starts with a known credential prefix, such as `ghp_`, `github_pat_`, `glpat-`, `xoxb-`, `sk-`, `AKIA`, `AIza`, or `eyJ`, followed by at least 8 more bytes. A component of at least 32 bytes of only ASCII letters, digits, `_`, and `-` that mixes uppercase, lowercase, and digits is also refused.
+- a name, or a binding key after `LATTICE_PARAM_`, with one of these `_`-separated words, ignoring case: `token`, `tokens`, `secret`, `secrets`, `password`, `passwords`, `passwd`, `passphrase`, `credential`, `credentials`, `apikey`, `privatekey`, `auth`, `bearer`, `cookie`, `pat`, or `otp`; or a qualifier `api`, `private`, `access`, `secret`, `session`, `signing`, `client`, or `encryption` followed by `key`;
+- a supplied value with a `/`-separated component in a known provider token format: the provider prefix followed by at least that format's minimum suffix, drawn only from that format's characters. Examples are `ghp_` with 30 letters and digits, `github_pat_` with 40 of letters, digits and `_`, `xoxb-` with 20 of letters, digits and `-`, `sk-proj-` with 40 base64url characters, `AKIA` with 16 uppercase letters and digits, and `pypi-` with 50 base64url characters;
+- a supplied value with a run of at least 20 ASCII letters and digits between separators (`/`, `-`, `_`, `.`) that mixes uppercase, lowercase, and digits.
 
-Every declared parameter is checked by name and target, because binding writes every declared target, defaults included. Only supplied values are checked by value; defaults are reviewed manifest bytes. The rule is a pattern check. It does not prove that an accepted value is not sensitive.
+Refs and paths such as `dependabot/npm_and_yarn/express-4.18.2`, `.github/workflows/pypi-publish.yml`, `data/ASIA_PACIFIC_REGIONS.csv`, and `feature/PROJ-1234-add-retry-to-upload-client` are accepted. Defaults are reviewed manifest bytes and are not checked by value. A binding into a credential-bound key cannot occur, because every target key starts with `LATTICE_PARAM_` and no node may bind such a key as a credential. The rule is a pattern check. It does not prove that an accepted value is not sensitive, and it does not catch every token format.
 
 ### Runs without inputs
 

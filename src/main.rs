@@ -150,13 +150,24 @@ struct InputArgs {
     input_file: Option<PathBuf>,
 }
 
+/// Raw inputs read before any store is opened, and the catalog to bind them through.
+struct ReadInputs<'a> {
+    catalog_root: &'a Path,
+    raw: std::collections::BTreeMap<String, lattice::workflow_template::inputs::RawInput>,
+}
+
 impl InputArgs {
-    fn request<'a>(&'a self, catalog_root: &'a Path) -> lattice::workflow_template::InputRequest<'a> {
-        lattice::workflow_template::InputRequest {
+    /// Read the inputs, or `None` when no input flag was given.
+    fn read<'a>(&self, catalog_root: &'a Path) -> Result<Option<ReadInputs<'a>>, lattice::workflow_template::Error> {
+        let request = lattice::workflow_template::InputRequest {
             cli: &self.inputs,
             file: self.input_file.as_deref(),
-            catalog_root,
+        };
+        if !request.is_present() {
+            return Ok(None);
         }
+        let raw = request.read()?;
+        Ok(Some(ReadInputs { catalog_root, raw }))
     }
 }
 
@@ -1151,15 +1162,18 @@ struct InputAuthorityInspection<'a> {
 fn run_authority_command(app_config: &config::AppConfig, catalog_root: &Path, args: &AuthorityCommandArgs) -> ExitCode {
     let AuthorityCliCommand::Inspect { workflow_name, input } = &args.command;
     let store_path = config::store_path(&app_config.data_dir);
-    let request = input.request(catalog_root);
     let result = (|| -> Result<String, String> {
-        if request.is_present() {
-            let admitted =
-                lattice::workflow_template::admit_saved_inputs_read_only(&store_path, workflow_name, &request)
-                    .map_err(|error| error.to_string())?;
-            let inspection = lattice::engine::effect::standalone::inspect_workflow(admitted.bundle.workflow())
+        if let Some(read) = input.read(catalog_root).map_err(|error| error.to_string())? {
+            let admitted = lattice::workflow_template::admit_saved_inputs_read_only(
+                &store_path,
+                workflow_name,
+                read.catalog_root,
+                &read.raw,
+            )
+            .map_err(|error| error.to_string())?;
+            let inspection = lattice::engine::effect::standalone::inspect_workflow(admitted.bundle().workflow())
                 .map_err(|error| format!("{error:?}"))?;
-            let inputs = lattice::run::inspection::safe_inputs(&admitted.identity);
+            let inputs = lattice::run::inspection::authority_inputs(admitted.identity());
             let output = InputAuthorityInspection {
                 inspection: &inspection,
                 inputs,
@@ -1247,20 +1261,20 @@ fn run_repair_command(app_config: &config::AppConfig) -> ExitCode {
     ExitCode::SUCCESS
 }
 
-/// Admit inputs when any were given, then reserve the run; without inputs, the run path and
+/// Admit inputs when any were read, then reserve the run; without inputs, the run path and
 /// its records are unchanged. `None` means a failure was already reported.
 async fn execute_headless_run(
     store: &Store,
     app_config: &config::AppConfig,
-    catalog_root: &Path,
     args: &RunCommandArgs,
+    inputs: Option<ReadInputs<'_>>,
 ) -> Option<Result<lattice::headless::HeadlessRunSummary, headless::HeadlessRunError>> {
-    let request = args.input.request(catalog_root);
-    if request.is_present() {
+    if let Some(read) = inputs {
         // Every input check runs before a run id is reserved or any record is written.
-        let admitted = lattice::workflow_template::admit_saved_inputs(store, &args.workflow, &request)
-            .inspect_err(|error| eprintln!("Run failed: {error}"))
-            .ok()?;
+        let admitted =
+            lattice::workflow_template::admit_saved_inputs(store, &args.workflow, read.catalog_root, &read.raw)
+                .inspect_err(|error| eprintln!("Run failed: {error}"))
+                .ok()?;
         return Some(admitted.run_with_app_config(store, app_config).await);
     }
     let run_id = store.next_run_id().inspect_err(|error| eprintln!("Run failed: {error}")).ok()?;
@@ -1268,6 +1282,14 @@ async fn execute_headless_run(
 }
 
 async fn run_headless_command(app_config: &config::AppConfig, catalog_root: &Path, args: &RunCommandArgs) -> ExitCode {
+    // Read inputs before opening the store, so a refused input file never holds its lock.
+    let inputs = match args.input.read(catalog_root) {
+        Ok(inputs) => inputs,
+        Err(error) => {
+            eprintln!("Run failed: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
     let store = match open_store(app_config) {
         Ok(store) => store,
         Err(error) => {
@@ -1275,7 +1297,7 @@ async fn run_headless_command(app_config: &config::AppConfig, catalog_root: &Pat
             return ExitCode::FAILURE;
         }
     };
-    let Some(result) = execute_headless_run(&store, app_config, catalog_root, args).await else {
+    let Some(result) = execute_headless_run(&store, app_config, args, inputs).await else {
         return ExitCode::FAILURE;
     };
 

@@ -1,28 +1,27 @@
 //! Admit raw inputs for one saved workflow against its retained template. Pure.
 
 // r[impl lattice.workflow_templates.run_inputs]
-/// Type, check, screen, and bind raw inputs for a saved workflow.
+/// Type, screen, and bind raw inputs for a saved workflow.
 ///
 /// The saved workflow must still have the exact revision retained when it was saved from a
-/// bundle, and the catalog must still hold that exact template identity. Inputs are typed by
-/// its declarations, resolved by `params::resolve`, screened by [`super::screen`], and bound by
-/// [`super::super::bind`], which repeats full bundle admission. Any failure happens before a
-/// caller reserves a run, writes a record, or runs a node.
+/// bundle, and the bundle loaded from the binding's directory must still have that exact
+/// template identity. Inputs are typed by its declarations, screened by [`super::screen`], and
+/// bound by [`super::super::bind`], which resolves them once and repeats full bundle admission.
+/// Any failure happens before a caller reserves a run, writes a record, or runs a node.
 pub fn admit(
     facts: super::SavedFacts<'_>,
     raw: &std::collections::BTreeMap<String, super::RawInput>,
 ) -> Result<super::Admitted, super::InputError> {
     let saved = facts.saved.ok_or(super::InputError::WorkflowNotFound)?;
-    let binding = facts.binding.ok_or(super::InputError::NotParameterized)?;
+    let binding = facts.binding.ok_or(super::InputError::BindingMissing)?;
     let saved_revision =
         crate::orchestration::workflow_revision(saved).map_err(|_| super::InputError::SavedWorkflowDrift)?;
     if saved_revision != binding.workflow || saved.meta.name != facts.workflow_name {
         return Err(super::InputError::SavedWorkflowDrift);
     }
     let template = facts
-        .catalog
-        .iter()
-        .find(|bundle| bundle.manifest().id == binding.bundle && bundle.identity() == &binding.template)
+        .template
+        .filter(|bundle| bundle.manifest().id == binding.bundle && bundle.identity() == &binding.template)
         .ok_or(super::InputError::TemplateUnavailable)?;
     let declared = template.manifest().params();
     if declared.is_empty() {
@@ -32,15 +31,29 @@ pub fn admit(
         return Err(super::InputError::ApprovalGate);
     }
     let supplied = typed_values(declared, raw)?;
-    let resolved = super::super::params::resolve(declared, &supplied).map_err(super::InputError::Param)?;
-    super::screen(declared, template.workflow(), &supplied)?;
-    let bundle = super::super::bind(template, &supplied).map_err(super::InputError::Bind)?;
+    super::screen(declared, &supplied)?;
+    let bundle = super::super::bind(template, &supplied).map_err(|diagnostic| {
+        // Name the refused parameter, which the bundle diagnostic does not carry.
+        super::super::params::resolve(declared, &supplied)
+            .map_or_else(super::InputError::Param, |_| super::InputError::Bind(diagnostic))
+    })?;
     if bundle.workflow().meta.name != facts.workflow_name {
         return Err(super::InputError::SavedWorkflowDrift);
     }
-    let identity = input_identity(&bundle, &resolved, declared, &supplied);
+    // `bind` always records the values it resolved.
+    let Some(bound) = bundle.params() else {
+        return Err(super::InputError::TemplateUnavailable);
+    };
+    let identity = super::InputIdentity {
+        bundle: binding.bundle.clone(),
+        template: template.identity().clone(),
+        bound: bundle.identity().clone(),
+        workflow: bundle.workflow_revision().clone(),
+        values: bound.resolved.identity().clone(),
+        params: input_names(declared, &supplied),
+    };
     debug_assert_eq!(identity.params.len(), declared.len());
-    debug_assert!(bundle.params().is_some_and(|bound| bound.resolved == resolved));
+    debug_assert_eq!(bound.template, identity.template);
     Ok(super::Admitted { bundle, identity })
 }
 
@@ -54,17 +67,13 @@ pub fn reverify_admitted(admitted: &super::Admitted) -> Result<(), super::InputE
     let bundle = &admitted.bundle;
     super::super::reverify(bundle).map_err(super::InputError::Bind)?;
     let identity = &admitted.identity;
-    let bound = bundle.params().ok_or(super::InputError::Bind(super::super::model::Diagnostic {
-        bundle: identity.bundle.clone(),
-        code: super::super::model::DiagnosticCode::ParamsUnbound,
-        message: "bundle parameters are not bound",
-    }))?;
     let identity_checks = [
         identity.bundle == bundle.manifest().id,
-        identity.template == bound.template,
         identity.bound == *bundle.identity(),
         identity.workflow == *bundle.workflow_revision(),
-        identity.values == *bound.resolved.identity(),
+        bundle
+            .params()
+            .is_some_and(|bound| identity.template == bound.template && identity.values == *bound.resolved.identity()),
     ];
     if identity_checks.contains(&false) {
         return Err(super::InputError::Bind(super::super::model::Diagnostic {
@@ -77,12 +86,11 @@ pub fn reverify_admitted(admitted: &super::Admitted) -> Result<(), super::InputE
     Ok(())
 }
 
-fn input_identity(
-    bundle: &super::super::model::ValidatedBundle,
-    resolved: &super::super::params::Resolved,
+/// Every declared parameter with its kind and whether the caller supplied it, sorted by name.
+fn input_names(
     declared: &[super::super::params::ParamDeclaration],
     supplied: &std::collections::BTreeMap<String, super::super::params::ParamValue>,
-) -> super::InputIdentity {
+) -> Vec<super::InputName> {
     let mut params = declared
         .iter()
         .map(|declaration| super::InputName {
@@ -93,16 +101,7 @@ fn input_identity(
         .collect::<Vec<_>>();
     params.sort_by(|left, right| left.name.cmp(&right.name));
     debug_assert!(params.windows(2).all(|pair| pair[0].name < pair[1].name));
-    let template = bundle.params().map_or_else(|| bundle.identity().clone(), |bound| bound.template.clone());
-    debug_assert_ne!(&template, bundle.identity());
-    super::InputIdentity {
-        bundle: bundle.manifest().id.clone(),
-        template,
-        bound: bundle.identity().clone(),
-        workflow: bundle.workflow_revision().clone(),
-        values: resolved.identity().clone(),
-        params,
-    }
+    params
 }
 
 /// Type each raw value by its declaration. An undeclared name is refused without echoing it.

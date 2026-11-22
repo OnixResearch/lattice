@@ -33,7 +33,6 @@ pub enum RawInput {
 pub struct RetainedBinding {
     pub bundle: String,
     pub template: super::model::ContentIdentity,
-    pub bound: super::model::ContentIdentity,
     pub workflow: crate::orchestration::WorkflowRevisionRef,
 }
 
@@ -44,7 +43,6 @@ pub fn retained_binding(bundle: &super::model::ValidatedBundle) -> Option<Retain
     Some(RetainedBinding {
         bundle: bundle.manifest().id.clone(),
         template: bound.template.clone(),
-        bound: bundle.identity().clone(),
         workflow: bundle.workflow_revision().clone(),
     })
 }
@@ -85,7 +83,7 @@ pub struct InputName {
 pub struct InputIdentity {
     pub bundle: String,
     pub template: super::model::ContentIdentity,
-    /// BLAKE3 over the template identity and `values`.
+    /// BLAKE3 over the template identity, `values`, and the bound workflow revision.
     pub bound: super::model::ContentIdentity,
     /// The bound workflow revision that runs and that `authority inspect` reports.
     pub workflow: crate::orchestration::WorkflowRevisionRef,
@@ -108,21 +106,45 @@ pub struct SavedFacts<'a> {
     pub workflow_name: &'a str,
     pub saved: Option<&'a crate::engine::Workflow>,
     pub binding: Option<&'a RetainedBinding>,
-    pub catalog: &'a [super::model::ValidatedBundle],
+    /// The bundle loaded from the directory the binding names, if any.
+    pub template: Option<&'a super::model::ValidatedBundle>,
 }
 
 /// A bundle bound to admitted inputs, and their content-omitting identity.
+///
+/// Only [`admit`] constructs one, so holding one means every input check ran. A run still
+/// re-verifies it with [`reverify_admitted`] before it reserves a run id.
 #[derive(Debug, Clone)]
 pub struct Admitted {
-    pub bundle: super::model::ValidatedBundle,
-    pub identity: InputIdentity,
+    bundle: super::model::ValidatedBundle,
+    identity: InputIdentity,
+}
+
+impl Admitted {
+    pub fn bundle(&self) -> &super::model::ValidatedBundle {
+        &self.bundle
+    }
+
+    pub fn identity(&self) -> &InputIdentity {
+        &self.identity
+    }
+
+    /// The bound workflow to run and the identity to record, without copying the workflow.
+    pub(crate) fn into_run_parts(self) -> (crate::engine::Workflow, InputIdentity) {
+        (self.bundle.workflow, self.identity)
+    }
+
+    /// Tamper with the bound bundle to test start re-verification.
+    #[cfg(test)]
+    pub(crate) fn bundle_mut(&mut self) -> &mut super::model::ValidatedBundle {
+        &mut self.bundle
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SecretReason {
     Name,
     Value,
-    CredentialTarget,
 }
 
 /// A safe input diagnostic. It never echoes a supplied value or an undeclared name.
@@ -132,9 +154,11 @@ pub enum InputError {
     MalformedFile,
     DuplicateInput,
     WorkflowNotFound,
+    BindingMissing,
     NotParameterized,
     SavedWorkflowDrift,
     TemplateUnavailable,
+    TemplateLoad(super::model::Diagnostic),
     ApprovalGate,
     Param(super::params::ParamError),
     SecretLike { param: String, reason: SecretReason },
@@ -148,6 +172,9 @@ impl std::fmt::Display for InputError {
             Self::MalformedFile => formatter.write_str("--input-file must hold one JSON object of input values"),
             Self::DuplicateInput => formatter.write_str("an input name is supplied more than once"),
             Self::WorkflowNotFound => formatter.write_str("saved workflow not found"),
+            Self::BindingMissing => {
+                formatter.write_str("no retained workflow-template binding; save it again from its bundle")
+            }
             Self::NotParameterized => formatter.write_str("saved workflow declares no parameters; inputs are refused"),
             Self::SavedWorkflowDrift => {
                 formatter.write_str("saved workflow no longer matches the template binding it was saved with")
@@ -155,13 +182,18 @@ impl std::fmt::Display for InputError {
             Self::TemplateUnavailable => {
                 formatter.write_str("the exact workflow-template bundle this workflow was saved from is unavailable")
             }
+            Self::TemplateLoad(diagnostic) => write!(
+                formatter,
+                "the workflow-template bundle this workflow was saved from failed to load: {}: {}",
+                diagnostic.code.as_str(),
+                diagnostic.message
+            ),
             Self::ApprovalGate => formatter.write_str("inputs are refused for a workflow with an approval gate"),
             Self::Param(error) => error.fmt(formatter),
             Self::SecretLike { param, reason } => {
                 let what = match reason {
                     SecretReason::Name => "its name",
                     SecretReason::Value => "its value",
-                    SecretReason::CredentialTarget => "its binding target",
                 };
                 write!(
                     formatter,

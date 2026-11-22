@@ -33,6 +33,8 @@ pub struct Fixture {
     pub catalog: PathBuf,
     pub state: PathBuf,
     pub marker: PathBuf,
+    /// The bound bundle the fixture saved, for exact re-saves.
+    pub saved: lattice::workflow_template::ValidatedBundle,
 }
 
 /// The template workflow: a bound probe and an unbound marker whose effect proves a node ran.
@@ -63,8 +65,8 @@ fn manifest(workflow_pin: &str, params: &str) -> String {
   assets = [],
   compatibility = {{
     workflow_schema = 1,
-    node_kinds = ["shell"],
-    runtime_kinds = ["shell"],
+    node_kinds = ["shell", "approval"],
+    runtime_kinds = ["shell", "approval"],
     feature_ids = ["lattice.workflow-template-bundle.v1"],
   }},
   operator_notes = [],
@@ -106,28 +108,43 @@ impl Fixture {
     }
 
     pub fn with_params(params: &str) -> Self {
+        Self::with_workflow(params, template_workflow)
+    }
+
+    /// The fixture whose template also holds an approval gate.
+    pub fn gated() -> Self {
+        Self::with_workflow(PARAMS, |marker| {
+            let mut workflow = template_workflow(marker);
+            lattice::tui::authoring::node::create_approval(&mut workflow, "gate", "review-gate", "operator")
+                .expect("gate adds");
+            workflow
+        })
+    }
+
+    pub fn with_workflow(params: &str, workflow: impl FnOnce(&Path) -> Workflow) -> Self {
         let dir = tempfile::tempdir().expect("fixture directory");
         let catalog = dir.path().join("workflow-templates");
         let state = dir.path().join("state");
         let marker = dir.path().join("marker");
         std::fs::create_dir_all(&state).expect("state directory");
-        write_bundle(&catalog, &template_workflow(&marker), params);
+        write_bundle(&catalog, &workflow(&marker), params);
+        let template = catalog_template(&catalog);
+        let supplied = if template.manifest().params().is_empty() {
+            std::collections::BTreeMap::new()
+        } else {
+            [("format".to_string(), lattice::workflow_template::ParamValue::Text(SAVED_FORMAT.into()))].into()
+        };
+        let saved = lattice::workflow_template::bind(&template, &supplied).expect("fixture binds");
         let fixture = Self {
             config: dir.path().join("config.ncl"),
             dir,
             catalog,
             state,
             marker,
+            saved,
         };
         fixture.write_config(None);
-        let template = catalog_template(&fixture.catalog);
-        let supplied = if template.manifest().params().is_empty() {
-            std::collections::BTreeMap::new()
-        } else {
-            [("format".to_string(), lattice::workflow_template::ParamValue::Text(SAVED_FORMAT.into()))].into()
-        };
-        let bound = lattice::workflow_template::bind(&template, &supplied).expect("fixture binds");
-        lattice::workflow_template::save_draft(&fixture.store(), &bound).expect("bound workflow saves");
+        lattice::workflow_template::save_draft(&fixture.store(), &fixture.saved).expect("bound workflow saves");
         fixture
     }
 
@@ -148,16 +165,16 @@ impl Fixture {
         lattice::store::Store::new(self.store_path()).expect("store opens")
     }
 
-    pub fn request<'a>(
-        &'a self,
-        cli: &'a [String],
-        file: Option<&'a Path>,
-    ) -> lattice::workflow_template::InputRequest<'a> {
-        lattice::workflow_template::InputRequest {
-            cli,
-            file,
-            catalog_root: &self.catalog,
-        }
+    /// Read the inputs, then admit them against the fixture catalog.
+    pub fn admit_inputs(
+        &self,
+        store: &lattice::store::Store,
+        workflow_name: &str,
+        cli: &[String],
+        file: Option<&Path>,
+    ) -> Result<lattice::workflow_template::inputs::Admitted, lattice::workflow_template::Error> {
+        let raw = lattice::workflow_template::InputRequest { cli, file }.read()?;
+        lattice::workflow_template::admit_saved_inputs(store, workflow_name, &self.catalog, &raw)
     }
 
     pub fn input_file(&self, name: &str, json: &str) -> PathBuf {

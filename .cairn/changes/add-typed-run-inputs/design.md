@@ -12,7 +12,7 @@ Base: Lattice integration `99e65721`: published `0862c017` plus Lattice #6, #27 
 
 ### Decision: Retain the template binding by identity, rebind through the catalog
 
-**Choice:** `save_draft` writes a `RetainedBinding` keyed by the saved workflow name: bundle id, template identity, bound identity and saved workflow revision. A run with inputs loads the saved workflow and binding, requires the saved revision to equal the retained one, loads the catalog, and requires the bundle with the retained template identity. It then calls `bind(template, supplied)`.
+**Choice:** `save_draft` writes a `RetainedBinding` keyed by the saved workflow name: bundle id, template identity and saved workflow revision. A run with inputs loads the saved workflow and binding, requires the saved revision to equal the retained one, loads only `workflow-templates/<bundle-id>/` with the catalog's single-bundle loader, and requires the retained template identity. It then calls `bind(template, supplied)`. A missing binding is its own refusal, `no retained workflow-template binding; save it again from its bundle`, and a bundle that fails to load surfaces its value-free load diagnostic.
 
 **Rationale:** The acceptance requires binding through #27's `resolve` and `bind`, and `bind` takes a catalog template. Equal template identity means equal manifest and workflow bytes, so the declarations are exactly the reviewed ones. The revision check makes sure the saved workflow is still that template's output, not an operator edit. Copying declarations into the store would create a second, unreviewed source for them.
 
@@ -36,9 +36,9 @@ Base: Lattice integration `99e65721`: published `0862c017` plus Lattice #6, #27 
 
 ### Decision: Secret rule
 
-**Choice:** Every declared parameter is refused if its name or binding key suffix has a secret word or a qualified `key` as an `_`-separated word, or if a target node binds that key to a credential reference. A supplied text value is refused if a `/`-component starts with a known credential prefix followed by 8 or more bytes, or is a 32-byte-or-longer `[A-Za-z0-9_-]` component mixing uppercase, lowercase and digits.
+**Choice:** Only `relative_path` parameters, the only type that carries caller text, are screened. Their name or binding key suffix is refused if it has a secret word or a qualified `key` as an `_`-separated word, compared case-insensitively in place. A supplied value is refused if a `/`-component is a known provider token (its prefix followed by at least that format's minimum suffix, 16 to 50 bytes, drawn only from that format's alphabet), or if a run between `/`, `-`, `_` and `.` has at least 20 letters and digits mixing uppercase, lowercase and digits. `bool`, `integer` and `enum` parameters are never screened. A binding into a credential-bound key cannot occur, because #27's `validate_targets` refuses `LATTICE_PARAM_*` credential keys; a `debug_assert!` documents it.
 
-**Rationale:** Types exclude free text, but a relative path can still hold a token. Name and target checks cover every declaration because `bind` writes every target. Defaults are reviewed manifest bytes, so values are checked only when supplied. Lowercase hex, such as a commit id, stays allowed.
+**Rationale:** Types exclude free text, but a relative path can still hold a token. A bare prefix match refused ordinary refs such as `dependabot/npm_and_yarn/...` and `.github/workflows/pypi-publish.yml`, and a whole-component shape refused ticket-style branches such as `feature/PROJ-1234-add-retry-to-upload-client`. Real tokens are long separator-free runs in a fixed alphabet, so each format is matched on its own alphabet and length and the generic shape on runs between separators. `bool` and `integer` cannot carry a credential, and enum values are reviewed manifest tokens, like defaults, so names such as `max_tokens` or `auth_mode` on them do not block inputs. Lowercase hex, such as a commit id, stays allowed.
 
 ### Decision: Record identity in a separate table, reserved with the run id
 
@@ -72,9 +72,10 @@ Base: Lattice integration `99e65721`: published `0862c017` plus Lattice #6, #27 
 
 ## Tests
 
-- `tests/test_run_inputs.rs`: every type from both sources and the bound revision and grants; wrong type, bounds, unknown, missing, duplicate and malformed inputs without echo; secret values, names, binding keys and credential targets; drift, removed template, unparameterized and hand-saved workflows; missing, oversized and non-regular input files; approval detection.
-- `tests/test_run_inputs_records.rs`: a bound run reaching its effect with its input record and a value-free `runs show`, with the mismatch diagnostic; CLI refusals leaving no effect, run id or record; `authority inspect` with inputs producing a profile that runs exactly those values and denies others; inputless runs matching a hand-saved workflow in summary bytes, report and authority output.
-- Unit tests in `inputs/parsing.rs` and `inputs/secrets.rs`; `src/headless/shell/bound/tests.rs` refuses tampered bound content and a swapped bundle with `bound_content_drift` before any run id, run record or input record.
+- `tests/test_run_inputs.rs`: every type from both sources and the bound revision and grants; wrong type, bounds, unknown, missing, duplicate and malformed inputs without echo; token-shaped paths refused and ordinary refs admitted; drift, a failing bundle load, unparameterized and approval-gated templates; a missing binding on the upgrade path; an exact re-save replacing a stale binding.
+- `tests/test_run_inputs_sources.rs`: the exactly-64 KiB boundary, missing and directory input files, a FIFO refused promptly with the store untouched, and a catalog over its 64-directory limit.
+- `tests/test_run_inputs_records.rs`: a bound run reaching its effect with its input record, a value-free `runs show` in JSON and text, and the mismatch diagnostic; CLI refusals leaving no effect, run id or record; `authority inspect` with inputs rendering the bound revision with its own prefix and producing a profile that runs exactly those values and denies others; inputless runs matching a hand-saved workflow; an orphaned input record never listed or shown.
+- Unit tests in `inputs/parsing.rs` and `inputs/secrets/tests.rs` (every provider family, the generic run shape, the review's false positives, and type-scoped screening); `src/headless/shell/bound/tests.rs` refuses tampered bound content and a swapped bundle with `bound_content_drift` before any run id, run record or input record.
 
 ## Risks / Trade-offs
 
