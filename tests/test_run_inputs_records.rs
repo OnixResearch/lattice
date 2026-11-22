@@ -38,6 +38,8 @@ fn timeless(report: &str) -> serde_json::Value {
 
 // r[verify lattice.workflow_templates.run_inputs.record]
 // r[verify lattice.workflow_templates.run_inputs.inspection]
+// r[verify lattice.workflow_templates.run_inputs.record.scenario.recorded]
+// r[verify lattice.workflow_templates.run_inputs.inspection.scenario.omitted]
 #[tokio::test]
 async fn a_bound_run_records_its_input_identity_and_shows_it_without_values() {
     let fixture = Fixture::new();
@@ -125,6 +127,7 @@ fn refused_inputs_stop_before_any_effect_run_id_or_record() {
 }
 
 // r[verify lattice.workflow_templates.run_inputs.authority]
+// r[verify lattice.workflow_templates.run_inputs.authority.scenario.bound]
 #[test]
 fn authority_inspect_with_inputs_reports_the_bound_revision_that_runs() {
     let fixture = Fixture::new();

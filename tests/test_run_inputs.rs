@@ -141,6 +141,7 @@ fn wrong_unknown_missing_and_duplicate_inputs_are_refused_without_echo() {
 }
 
 // r[verify lattice.workflow_templates.run_inputs.secrets]
+// r[verify lattice.workflow_templates.run_inputs.secrets.scenario.screened]
 #[test]
 fn token_shaped_paths_are_refused_and_ordinary_refs_admit() {
     let fixture = Fixture::new();
@@ -167,6 +168,7 @@ fn token_shaped_paths_are_refused_and_ordinary_refs_admit() {
 }
 
 // r[verify lattice.workflow_templates.run_inputs.retained]
+// r[verify lattice.workflow_templates.run_inputs.retained.scenario.exact]
 #[test]
 fn only_an_exact_retained_parameterized_template_accepts_inputs() {
     let plain = Fixture::new();

@@ -40,6 +40,7 @@ fn refused(store: &crate::store::Store, admitted: crate::workflow_template::inpu
 }
 
 // r[verify lattice.workflow_templates.run_inputs.start]
+// r[verify lattice.workflow_templates.run_inputs.start.scenario.drift]
 #[test]
 fn drifted_bound_content_never_reserves_a_run() {
     let directory = tempfile::tempdir().expect("store directory");
