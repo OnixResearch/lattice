@@ -42,6 +42,21 @@ interfaces.
   for bound attempts. Without the new fields, requests and broker profiles keep
   their bytes, identities and behaviour. Evidence: Q0 and Q1 over Unix sockets
   with a scripted model; no VM, vsock, live model or second host.
+- Application checkpoint restart (Lattice #12). A workflow-exchange route
+  bound by `lattice.application-checkpoint-binding.v1` with checkpoint
+  `workflow-node-boundary-v1` publishes `lattice.application-checkpoint-manifest.v1`
+  manifests at completed-node boundaries and synchronously before every
+  effect reservation, so every effect that may have run is named as uncertain
+  by a committed manifest; sensitive outputs are never written. `lattice
+  application-checkpoint restore|inspect` admits a committed manifest under
+  Kiln's opaque admission reference into a fresh state root: uncertain nodes
+  are adopted as `Unknown` and never replayed, sibling manifests can only add
+  uncertainty, budget and cancellation, and the
+  `lattice.application-restart-receipt.v1` receipt distinguishes application
+  restart, VM continuation and fresh retry. Without a binding the hook is
+  absent and restore refuses with `checkpoint_unavailable`. Fixtures are under
+  `fixtures/application-checkpoint/`. Evidence: Q0 and a Q1 two-root restart
+  after SIGKILL on one host; no cross-host, VM, live-model or native-ARM claim.
 - Standalone operator repair (Lattice #6). `lattice implementation-attempt
   run --repair-checks CATALOG` runs a request with a repair policy through
   operator ports when no embedder supplies repair ports: one pinned OMP step

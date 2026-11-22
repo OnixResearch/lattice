@@ -74,6 +74,8 @@ maintained topic documents by the question they answer.
   guest listener, handler profile v2, reconnect rules, and continuity fixtures.
 - [Durable workflow exchange application](workflow-exchange-application.md):
   handler profiles, durable admission, lifecycle, and logs.
+- [Application checkpoints and restart](application-checkpoint.md): node-boundary
+  checkpoint publication, restore admission, carry-forward and restart receipts.
 - [Workflow exchange consumer compatibility](workflow-exchange-consumer-compatibility.md):
   the pinned consumer boundary and licensing record.
 - [Compose surface pane binding](compose-surface-pane-binding.md): the optional
