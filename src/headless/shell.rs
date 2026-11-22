@@ -1,5 +1,7 @@
 //! Imperative shell for one persisted product workflow run.
 
+mod bound;
+
 #[derive(Debug, Clone)]
 pub struct OwnedRunRequest {
     pub workflow_name: String,

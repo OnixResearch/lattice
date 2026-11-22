@@ -51,19 +51,34 @@ pub fn save_draft(
     }
     super::core::reverify(bundle).map_err(|_| Error::BoundContentDrift)?;
     let facts = application_facts(store, bundle)?;
+    debug_assert_eq!(facts.orchestration.is_some(), bundle.orchestration.is_some());
     let plan = super::core::plan_application(bundle, &facts);
+    debug_assert!(!matches!(plan, super::model::ApplicationPlan::Preview { .. }));
     match &plan {
         super::model::ApplicationPlan::Conflict(_) => Err(Error::ApplicationConflict),
-        super::model::ApplicationPlan::ExactAlreadyPresent { .. } => Ok(plan),
+        super::model::ApplicationPlan::ExactAlreadyPresent { .. } => {
+            retain_binding(store, bundle)?;
+            Ok(plan)
+        }
         super::model::ApplicationPlan::CreateDraft { .. } => {
             // CreateDraft may only lack the orchestration; never rewrite an exact workflow.
             if matches!(&facts.workflow, super::model::ExistingContent::Missing) {
                 store.save_workflow_cas(&bundle.workflow, None)?;
             }
+            retain_binding(store, bundle)?;
             Ok(plan)
         }
         super::model::ApplicationPlan::Preview { .. } => Ok(plan),
     }
+}
+
+// r[impl lattice.workflow_templates.run_inputs.retained]
+/// Retain which exact template, by identity, the saved workflow was bound from, so a later
+/// `lattice run --input` can bind new values through the same template.
+fn retain_binding(store: &crate::store::Store, bundle: &super::model::ValidatedBundle) -> Result<(), Error> {
+    let binding = super::inputs::retained_binding(bundle).ok_or(Error::ParamsUnbound)?;
+    store.save_workflow_template_binding(&binding)?;
+    Ok(())
 }
 
 pub async fn start_orchestration_draft(

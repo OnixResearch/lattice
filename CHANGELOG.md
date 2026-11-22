@@ -90,6 +90,27 @@ interfaces.
   `lattice pack catalog-list` lists a catalog through the workflow-template
   loader. A seed catalog fixture is retained in
   `tests/fixtures/runbook-catalog`. See `docs/operation-packs.md`.
+- Typed `--input` values for `lattice run` and `lattice authority inspect`
+  (Lattice #28). `--input NAME=VALUE` is repeatable and `--input-file PATH`
+  holds one JSON object; a name may appear only once across both. Saving a
+  bound workflow-template bundle now retains its template binding by
+  identity, and a run with inputs rebinds through that exact template with
+  `params::resolve` and `workflow_template::bind`, then passes the same
+  bound-content re-verification as start (`bound_content_drift`). Inputs are
+  refused for a workflow without a retained parameterized template, after the
+  saved workflow or the catalog template drifted, or for a workflow with an
+  approval gate. Wrong, unknown, missing, duplicate and secret-like inputs
+  fail before a run id is reserved, a record is written or a node runs, and
+  diagnostics never echo a value. Secret-like means a secret word in a
+  parameter name or binding key, a binding into a credential-bound key, or a
+  credential-prefixed or token-shaped value; credential references remain the
+  only secret path. The run records its input identity (template, bound
+  identity, bound workflow revision, value identity, names and kinds, no
+  values) in the same transaction that reserves its run id. `runs show`
+  displays it in an `inputs` object, and `authority inspect` with the same
+  inputs reports the grants of the bound revision. Runs without inputs keep
+  their identity, records and output bytes; see
+  `docs/workflow-template-bundles.md#run-inputs`.
 - Bounded same-attempt repair and the Kiln #61 budget lineage for
   implementation attempts (Lattice #6). The v3 request accepts two optional
   fields; without them a request keeps its bytes, identity and profile

@@ -9,6 +9,8 @@ pub enum Error {
     BoundContentDrift,
     ActivationBlocked(super::model::ActivationBlock),
     Orchestration(crate::orchestration::Error),
+    Inputs(super::inputs::InputError),
+    InputFile,
 }
 
 impl std::fmt::Display for Error {
@@ -21,6 +23,12 @@ impl std::fmt::Display for Error {
             Self::BoundContentDrift => formatter.write_str("workflow-template bound content no longer verifies"),
             Self::ActivationBlocked(block) => write!(formatter, "workflow-template activation blocked: {block:?}"),
             Self::Orchestration(error) => write!(formatter, "workflow-template orchestration failed: {error}"),
+            Self::Inputs(error) => write!(formatter, "workflow inputs refused: {error}"),
+            Self::InputFile => write!(
+                formatter,
+                "--input-file must be a readable regular file of at most {} bytes",
+                super::inputs::MAX_INPUT_FILE_BYTES
+            ),
         }
     }
 }
@@ -42,3 +50,4 @@ impl From<crate::orchestration::Error> for Error {
 include!("shell/loading.rs");
 include!("shell/capture.rs");
 include!("shell/activation.rs");
+include!("shell/inputs.rs");

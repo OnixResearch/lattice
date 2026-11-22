@@ -5,6 +5,8 @@ use redb::ReadableDatabase as _;
 const RUNS: redb::TableDefinition<u64, &[u8]> = redb::TableDefinition::new("runs");
 const RUN_DETAILS: redb::TableDefinition<u64, &[u8]> = redb::TableDefinition::new("run_details");
 const RUN_REPLAY_EVENTS: redb::TableDefinition<u64, &[u8]> = redb::TableDefinition::new("run_replay_events");
+/// Written only by runs bound to inputs; an older store has no such table.
+const RUN_INPUTS: redb::TableDefinition<u64, &[u8]> = redb::TableDefinition::new("run_inputs_v1");
 const ORCHESTRATION_INSTANCES: redb::TableDefinition<&str, &[u8]> =
     redb::TableDefinition::new("orchestration_instances");
 const ORCHESTRATION_EVENTS: redb::TableDefinition<&str, &[u8]> = redb::TableDefinition::new("orchestration_events");
@@ -94,6 +96,19 @@ impl ReadOnlyStore {
         self.load_by_u64(RUN_REPLAY_EVENTS, run_id.0)
     }
 
+    fn load_inputs(
+        &self,
+        run_id: crate::engine::RunId,
+    ) -> Result<Option<crate::workflow_template::inputs::RunInputRecord>, crate::store::StoreError> {
+        let transaction = self.database.begin_read().map_err(store_db_error)?;
+        let table = match transaction.open_table(RUN_INPUTS) {
+            Ok(table) => table,
+            Err(redb::TableError::TableDoesNotExist(_)) => return Ok(None),
+            Err(error) => return Err(store_table_error(error)),
+        };
+        deserialize_optional(table.get(run_id.0).map_err(store_db_error)?)
+    }
+
     fn load_instance(
         &self,
         instance_id: &crate::orchestration::InstanceId,
@@ -174,6 +189,7 @@ pub fn inspect_path(
     let record = store.load_run(run_id)?.ok_or(Error::NotFound(run_id))?;
     let details = store.load_details(run_id)?;
     let replay_events = store.load_replay(run_id)?;
+    let inputs = store.load_inputs(run_id)?;
     let orchestration_instance = load_owner_instance(&store, &record.owner)?;
     let orchestration_events = match &orchestration_instance {
         Some(instance) => store.load_events(&instance.id)?,
@@ -183,12 +199,13 @@ pub fn inspect_path(
         instance,
         events: &orchestration_events,
     });
-    let result = super::inspection::inspect(super::inspection::Input {
+    let input = super::inspection::Input {
         record: &record,
         details: details.as_ref(),
         replay_events: replay_events.as_deref(),
         orchestration,
-    });
+    };
+    let result = super::inspection::inspect_with_inputs(input, inputs.as_ref());
     debug_assert_eq!(result.run_id, run_id.0);
     Ok(result)
 }

@@ -77,6 +77,7 @@ pub enum DiagnosticCode {
     DispatchBindingDuplicate,
     DispatchFactMismatch,
     DispatchTerminalConflict,
+    InputsIdentityMismatch,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -147,6 +148,17 @@ pub struct SafeOrchestrationEvidence {
     pub budget: SafeBudgetEvidence,
 }
 
+/// The content-omitting identity of a run's typed inputs: declared names and kinds, and
+/// BLAKE3 identities. No value, workflow name, or bundle name is shown.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct SafeInputs {
+    pub template: String,
+    pub bound: String,
+    pub workflow_revision: String,
+    pub values: String,
+    pub params: Vec<crate::workflow_template::inputs::InputName>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Report {
     pub schema_version: u32,
@@ -155,10 +167,17 @@ pub struct Report {
     pub workflow_identity: String,
     pub lifecycle: SafeLifecycle,
     pub owner: SafeOwner,
+    /// Present only for a run bound to `--input` values, so inputless reports keep their bytes.
+    #[serde(default = "no_inputs", skip_serializing_if = "Option::is_none")]
+    pub inputs: Option<SafeInputs>,
     pub details: SafeDetails,
     pub replay: SafeReplay,
     pub orchestration: Option<SafeOrchestrationEvidence>,
     pub diagnostic_codes: Vec<DiagnosticCode>,
+}
+
+const fn no_inputs() -> Option<SafeInputs> {
+    None
 }
 
 pub struct OrchestrationInput<'a> {

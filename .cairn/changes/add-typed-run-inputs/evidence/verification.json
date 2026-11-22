@@ -1,0 +1,65 @@
+{
+  "schema": "lattice.fixture-qualification.v1",
+  "change": "add-typed-run-inputs",
+  "kind": "local-verification",
+  "live_qualification": false,
+  "base_revision": "99e65721",
+  "base_note": "integration: 0862c017 plus #6, #27 with its review fix (a3270147), #29 with its review fix, and the #29 accessor test commit; #28 first verified on 034ae2d1 as 95c16630",
+  "recorded_on": "2026-11-21",
+  "issue": "OnixResearch/lattice#28",
+  "tasks": {
+    "1.1": [
+      "tests/test_run_inputs.rs::each_type_binds_from_both_sources_into_the_bound_revision",
+      "tests/test_run_inputs.rs::wrong_unknown_missing_and_duplicate_inputs_are_refused_without_echo",
+      "tests/test_run_inputs.rs::secret_like_values_names_and_credential_targets_are_refused",
+      "tests/test_run_inputs.rs::approval_gates_are_detected_for_refusal",
+      "src/workflow_template/inputs/parsing.rs::tests::both_sources_merge_and_any_repeated_name_is_refused",
+      "src/workflow_template/inputs/secrets.rs::tests::secret_identifiers_are_word_matched",
+      "src/workflow_template/inputs/secrets.rs::tests::credential_prefixes_and_token_shapes_are_secret_values"
+    ],
+    "1.2": [
+      "tests/test_run_inputs.rs::only_an_exact_retained_parameterized_template_accepts_inputs",
+      "tests/test_run_inputs.rs::the_input_file_must_be_a_bounded_regular_file"
+    ],
+    "1.3": [
+      "tests/test_run_inputs_records.rs::a_bound_run_records_its_input_identity_and_shows_it_without_values",
+      "tests/test_run_inputs_records.rs::refused_inputs_stop_before_any_effect_run_id_or_record",
+      "tests/test_run_inputs_records.rs::authority_inspect_with_inputs_reports_the_bound_revision_that_runs",
+      "tests/test_run_inputs_records.rs::inputless_runs_keep_identity_records_and_output_bytes"
+    ],
+    "1.4": [
+      "src/headless/shell/bound/tests.rs::drifted_bound_content_never_reserves_a_run"
+    ],
+    "2.1": [
+      "docs/workflow-template-bundles.md",
+      "docs/choregraph-effect-authority.md",
+      "README.md",
+      "CHANGELOG.md"
+    ]
+  },
+  "gates": {
+    "focused_integration_tests": {
+      "command": "cargo test -p lattice --no-fail-fast with --test for test_run_inputs, test_run_inputs_records, test_workflow_template_*, test_workflow_templates, test_runbook_catalog_*, test_operation_pack_*, test_traceability_*, test_run_inspection, test_headless, test_cli_inspection_boundaries, test_run_store_recovery, test_store, test_standalone_effect_authority, test_native_http_authority, test_guarded_agent_templates, test_agent_evaluation_core",
+      "exit": 0,
+      "binaries": 60,
+      "passed": 289,
+      "passed_by_owner": { "run_inputs_28": 10, "workflow_templates_27": 34, "runbook_catalog_and_operation_pack_29": 50 },
+      "failed": 0
+    },
+    "lib_tests": { "command": "cargo test -p lattice --no-fail-fast --lib", "exit": 0, "passed": 548, "failed": 0 },
+    "clippy": { "command": "cargo clippy -p lattice --all-targets --no-deps -- -D warnings", "exit": 0 },
+    "fmt": { "command": "cargo fmt -p lattice --check", "exit": 0 },
+    "octet_precommit_check": {
+      "exit": 0,
+      "root": { "status": "warning-only", "accepted_total": 1052, "current_total": 1052, "new_total": 0, "stale_total": 0 },
+      "lattice_core": { "status": "warning-only", "accepted_total": 25, "current_total": 25, "new_total": 0, "stale_total": 0 },
+      "baseline_rekeyed": false
+    },
+    "gitleaks": { "version": "8.28.0", "scope": "33 paths changed or added against 99e65721, copied to one scan directory", "exit": 0, "leaks": 0 }
+  },
+  "non_claims": [
+    "Local tests do not prove remote publication or hosted CI results.",
+    "The secret rule is a pattern check; it does not prove an accepted value is not sensitive.",
+    "A further #27 grammar fix, if any, is not covered by these results."
+  ]
+}

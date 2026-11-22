@@ -165,6 +165,12 @@ cargo run --locked -- --config "$demo/config.ncl" runs show RUN_ID --output json
 `runs show` is a read-only, content-omitting report. It exposes execution and
 replay metadata without dumping arbitrary workflow text or node output.
 
+A workflow saved from a parameterized workflow-template bundle also takes typed
+per-run values, `run NAME --input NAME=VALUE` or `--input-file inputs.json`.
+`authority inspect` takes the same inputs and reports the grants of the bound
+revision, and `runs show` lists the input names and identities, never the
+values. See [run inputs](docs/workflow-template-bundles.md#run-inputs).
+
 Omit the subcommand to open the TUI in an interactive terminal:
 
 ```sh

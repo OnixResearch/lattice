@@ -3,6 +3,7 @@ use redb::ReadableTable as _;
 
 mod authoring;
 mod ingress;
+mod inputs;
 mod timing;
 
 impl crate::store::Store {

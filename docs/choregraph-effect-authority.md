@@ -46,6 +46,13 @@ Review the workflow commands and the reported `schema`, `workflow_revision`,
 not create missing stores, grant authority, or execute work. A changed workflow
 needs new inspection and an explicitly reviewed replacement profile.
 
+A workflow saved from a parameterized workflow-template bundle can run with
+typed `--input` values, which bind a different workflow revision. Pass the same
+`--input` and `--input-file` arguments to `authority inspect`; it then reports
+the grants of that bound revision with an `inputs` identity object. A profile
+written from it authorizes only those values. See
+[run inputs](workflow-template-bundles.md#run-inputs).
+
 After review, this example grants exactly those requirements for one hour:
 
 ```sh

@@ -3,6 +3,7 @@
 pub mod classification;
 pub mod core;
 pub mod init;
+pub mod inputs;
 pub mod model;
 pub mod params;
 pub mod shell;

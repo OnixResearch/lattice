@@ -133,6 +133,31 @@ struct RunCommandArgs {
     /// Output format for the run summary
     #[arg(long, value_enum, default_value_t = RunOutputFormat::Text)]
     output: RunOutputFormat,
+
+    #[command(flatten)]
+    input: InputArgs,
+}
+
+/// Typed inputs for a saved workflow retained from a parameterized workflow-template bundle.
+#[derive(clap::Args, Debug)]
+struct InputArgs {
+    /// Typed input NAME=VALUE for a declared parameter; repeatable
+    #[arg(long = "input", value_name = "NAME=VALUE")]
+    inputs: Vec<String>,
+
+    /// JSON object of typed inputs; a name may appear only once across both sources
+    #[arg(long, value_name = "PATH")]
+    input_file: Option<PathBuf>,
+}
+
+impl InputArgs {
+    fn request<'a>(&'a self, catalog_root: &'a Path) -> lattice::workflow_template::InputRequest<'a> {
+        lattice::workflow_template::InputRequest {
+            cli: &self.inputs,
+            file: self.input_file.as_deref(),
+            catalog_root,
+        }
+    }
 }
 
 #[derive(clap::Args, Debug)]
@@ -165,6 +190,9 @@ enum AuthorityCliCommand {
     Inspect {
         /// Saved workflow name to inspect
         workflow_name: String,
+
+        #[command(flatten)]
+        input: InputArgs,
     },
 }
 
@@ -510,7 +538,7 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
         return Ok(run_runs_command(&app_config, runs_args));
     }
     if let Some(CliCommand::Authority(authority_args)) = &args.command {
-        return Ok(run_authority_command(&app_config, authority_args));
+        return Ok(run_authority_command(&app_config, &workflow_templates_root(&config_path), authority_args));
     }
     if let Some(CliCommand::Operation(operation_args)) = &args.command {
         return Ok(lattice::operation::cli::run(&app_config, operation_args));
@@ -542,7 +570,9 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
     info!(config = ?config_path, data_dir = ?app_config.data_dir, "starting lattice");
 
     match args.command {
-        Some(CliCommand::Run(run_args)) => Ok(run_headless_command(&app_config, &run_args).await),
+        Some(CliCommand::Run(run_args)) => {
+            Ok(run_headless_command(&app_config, &workflow_templates_root(&config_path), &run_args).await)
+        }
         Some(CliCommand::Runs(_)) => unreachable!("runs command returns before data-directory side effects"),
         Some(CliCommand::Authority(_)) => {
             unreachable!("authority inspection returns before data-directory side effects")
@@ -1102,11 +1132,41 @@ fn orchestration_failure(message: &str) -> ExitCode {
     ExitCode::FAILURE
 }
 
+/// The `workflow-templates/` catalog next to `config.ncl`.
+fn workflow_templates_root(config_path: &Path) -> PathBuf {
+    config_path.parent().unwrap_or_else(|| Path::new(".")).join("workflow-templates")
+}
+
+/// `authority inspect` output for a workflow bound to inputs: the grants of the bound revision
+/// and the content-omitting identity of the inputs.
+#[derive(serde::Serialize)]
+struct InputAuthorityInspection<'a> {
+    #[serde(flatten)]
+    inspection: &'a lattice::engine::effect::standalone::ProfileInspection,
+    inputs: lattice::run::inspection::SafeInputs,
+}
+
 // r[impl lattice.standalone_effect_authority.hosts.scenario.inspect]
-fn run_authority_command(app_config: &config::AppConfig, args: &AuthorityCommandArgs) -> ExitCode {
-    let AuthorityCliCommand::Inspect { workflow_name } = &args.command;
+// r[impl lattice.workflow_templates.run_inputs.authority]
+fn run_authority_command(app_config: &config::AppConfig, catalog_root: &Path, args: &AuthorityCommandArgs) -> ExitCode {
+    let AuthorityCliCommand::Inspect { workflow_name, input } = &args.command;
+    let store_path = config::store_path(&app_config.data_dir);
+    let request = input.request(catalog_root);
     let result = (|| -> Result<String, String> {
-        let workflow = Store::load_workflow_read_only(&config::store_path(&app_config.data_dir), workflow_name)
+        if request.is_present() {
+            let admitted =
+                lattice::workflow_template::admit_saved_inputs_read_only(&store_path, workflow_name, &request)
+                    .map_err(|error| error.to_string())?;
+            let inspection = lattice::engine::effect::standalone::inspect_workflow(admitted.bundle.workflow())
+                .map_err(|error| format!("{error:?}"))?;
+            let inputs = lattice::run::inspection::safe_inputs(&admitted.identity);
+            let output = InputAuthorityInspection {
+                inspection: &inspection,
+                inputs,
+            };
+            return serde_json::to_string_pretty(&output).map_err(|error| error.to_string());
+        }
+        let workflow = Store::load_workflow_read_only(&store_path, workflow_name)
             .map_err(|error| error.to_string())?
             .ok_or_else(|| format!("workflow not found: {workflow_name}"))?;
         let inspection =
@@ -1187,7 +1247,27 @@ fn run_repair_command(app_config: &config::AppConfig) -> ExitCode {
     ExitCode::SUCCESS
 }
 
-async fn run_headless_command(app_config: &config::AppConfig, args: &RunCommandArgs) -> ExitCode {
+/// Admit inputs when any were given, then reserve the run; without inputs, the run path and
+/// its records are unchanged. `None` means a failure was already reported.
+async fn execute_headless_run(
+    store: &Store,
+    app_config: &config::AppConfig,
+    catalog_root: &Path,
+    args: &RunCommandArgs,
+) -> Option<Result<lattice::headless::HeadlessRunSummary, headless::HeadlessRunError>> {
+    let request = args.input.request(catalog_root);
+    if request.is_present() {
+        // Every input check runs before a run id is reserved or any record is written.
+        let admitted = lattice::workflow_template::admit_saved_inputs(store, &args.workflow, &request)
+            .inspect_err(|error| eprintln!("Run failed: {error}"))
+            .ok()?;
+        return Some(admitted.run_with_app_config(store, app_config).await);
+    }
+    let run_id = store.next_run_id().inspect_err(|error| eprintln!("Run failed: {error}")).ok()?;
+    Some(headless::run_saved_workflow_with_app_config(store, &args.workflow, run_id, app_config).await)
+}
+
+async fn run_headless_command(app_config: &config::AppConfig, catalog_root: &Path, args: &RunCommandArgs) -> ExitCode {
     let store = match open_store(app_config) {
         Ok(store) => store,
         Err(error) => {
@@ -1195,15 +1275,11 @@ async fn run_headless_command(app_config: &config::AppConfig, args: &RunCommandA
             return ExitCode::FAILURE;
         }
     };
-    let run_id = match store.next_run_id() {
-        Ok(run_id) => run_id,
-        Err(error) => {
-            eprintln!("Run failed: {error}");
-            return ExitCode::FAILURE;
-        }
+    let Some(result) = execute_headless_run(&store, app_config, catalog_root, args).await else {
+        return ExitCode::FAILURE;
     };
 
-    match headless::run_saved_workflow_with_app_config(&store, &args.workflow, run_id, app_config).await {
+    match result {
         Ok(summary) => {
             match args.output {
                 RunOutputFormat::Text => println!("{}", headless::render_run_summary_text(&summary)),

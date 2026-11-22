@@ -180,6 +180,8 @@ Save and start accept only a bound bundle. `save_draft` fails with `ParamsUnboun
 
 A saved workflow must have the exact previewed revision. A same-name workflow with different content is a conflict, not overwrite authority. This includes the same template bound to different values.
 
+Saving a bound bundle also retains its template binding in the store, keyed by the saved workflow name: the bundle id, the template identity, the bound identity, and the saved workflow revision. `save_draft` writes it only after `reverify` passes and the plan is `CreateDraft` or `ExactAlreadyPresent`. A later save of the same name replaces it. `lattice run --input` uses this binding.
+
 An optional orchestration remains an inert draft after preview and workflow save. A product integration can start it only through the workflow-template activation port.
 
 The integration must call `start_orchestration_draft_with_execution` with exact admission facts, an admitted actor, and an authorized `ProductExecution`. The port records the exact bundle, workflow, orchestration, policy, and actor identities before dispatch. The recorded bundle identity is the bound identity, so it commits to the resolved values.
@@ -189,6 +191,71 @@ The ordinary `orchestration start` CLI remains a separate route. It does not est
 Activation admission rechecks the bound values, the mode, the saved workflow revision, policy, actor, runtime, effects, credentials, triggers, and positive budgets. Drift or a missing fact stops before instance creation or dispatch.
 
 Selecting, previewing, or saving a template cannot start orchestration or approve a proposal.
+
+## Run inputs
+
+A saved workflow retained from a parameterized bundle accepts typed values per run:
+
+```text
+lattice run agent-evaluation-catalog-review --input catalog_root=fixtures/catalog
+lattice run NAME --input count=3 --input-file inputs.json --output json
+```
+
+`--input NAME=VALUE` is repeatable. `--input-file PATH` holds one JSON object of at most 64 KiB, such as `{"enabled": true, "format": "json"}`. A name may appear only once across both sources, including within one source; a repeat fails with `an input name is supplied more than once`.
+
+An `--input` value takes the declared type of its parameter. A `bool` takes exactly `true` or `false`, and an `integer` takes a canonical decimal such as `-3`, not `+3`, `03`, or `3.0`. An `enum` or `relative_path` takes the text. A JSON value keeps its JSON type, so `"true"` for a `bool` is a wrong type.
+
+### How a saved workflow carries its parameters
+
+The saved workflow does not copy the declarations. It retains which template it was bound from, by identity, when it is saved. A run with inputs then rebinds through that template:
+
+1. Load the saved workflow and its retained binding. Without a binding, or when the template declares no parameters, any `--input` or `--input-file` is refused. A workflow saved before bindings were retained has none; save it again from the bundle.
+2. Require the saved workflow's current revision to equal the retained revision. A workflow edited or re-saved by another route is refused with a drift diagnostic.
+3. Load the `workflow-templates/` catalog next to `config.ncl` and require the bundle with the retained template identity. A changed or removed bundle is refused. Re-save the workflow from the reviewed bundle to adopt a new version.
+4. Type the values, check them with `params::resolve`, apply the secret rule, and bind them with `workflow_template::bind`. That repeats the template's full admission.
+5. Treat the run as a start boundary: call `reverify` on the bound bundle, as save and start do, and require the recorded input identity to name exactly that bundle, revision, and values. Drift refuses with `bound_content_drift`.
+
+Inputs are a full binding of the template's declarations, not an overlay on the saved values. An omitted optional parameter takes its declared default, and an omitted required parameter fails, even if the saved workflow holds a value for it.
+
+A workflow with an approval gate refuses inputs. Resume reloads the saved workflow revision, which a bound run does not have.
+
+Every check above runs before Lattice reserves a run id, writes a run or input record, or runs a node. A diagnostic names at most a declared parameter. It never echoes a supplied value or an undeclared name.
+
+### Recorded identity
+
+The run reserves its run id and records its input identity in one store transaction. The identity holds the bundle id, the template identity, the bound identity, the bound workflow revision, the `params::Resolved` value identity over every name, kind, and value, and each declared name with its kind and whether it was supplied. It holds no value. The bound workflow then runs under the saved workflow's name, and its run, detail, and replay records are written as for any run.
+
+`runs show` adds an `inputs` object only for such a run:
+
+```json
+"inputs": {
+  "template": "b3:…",
+  "bound": "b3:…",
+  "workflow_revision": "b3:…",
+  "values": "b3:…",
+  "params": [{ "name": "catalog_root", "kind": "relative_path", "supplied": true }]
+}
+```
+
+It omits the workflow and bundle names, as the rest of the report does. It shows one value identity instead of per-value digests. A caller that holds the values reproduces it with `params::resolve`. Most declared values come from small domains such as `bool`, an enum, or a bounded integer, so a digest of one value would not hide it. An input record that does not belong to the run makes the report invalid with `inputs_identity_mismatch`.
+
+### Authority inspection
+
+`lattice authority inspect NAME` accepts the same `--input` and `--input-file`. It admits them as a run does, without writing state, and prints the grants of the bound workflow revision with the same `inputs` object. Inputs never change grants, but the bound revision differs from the saved one, so a standalone authority profile written from this output authorizes exactly the inspected values. Other values need a new inspection.
+
+### Secret-like inputs
+
+Run inputs are never a secret channel. Credential references remain the only secret path. The parameter types already exclude free text, and the rule below also refuses token-shaped values:
+
+- A declared parameter whose name, or whose binding key after `LATTICE_PARAM_`, has one of these `_`-separated words, ignoring case: `token`, `tokens`, `secret`, `secrets`, `password`, `passwords`, `passwd`, `passphrase`, `credential`, `credentials`, `apikey`, `privatekey`, `auth`, `bearer`, `cookie`, `pat`, or `otp`. A qualifier `api`, `private`, `access`, `secret`, `session`, `signing`, `client`, or `encryption` followed by `key` is also refused.
+- A declared binding whose target node binds the same environment key to a credential reference.
+- A supplied text value with a `/`-separated component that starts with a known credential prefix, such as `ghp_`, `github_pat_`, `glpat-`, `xoxb-`, `sk-`, `AKIA`, `AIza`, or `eyJ`, followed by at least 8 more bytes. A component of at least 32 bytes of only ASCII letters, digits, `_`, and `-` that mixes uppercase, lowercase, and digits is also refused.
+
+Every declared parameter is checked by name and target, because binding writes every declared target, defaults included. Only supplied values are checked by value; defaults are reviewed manifest bytes. The rule is a pattern check. It does not prove that an accepted value is not sensitive.
+
+### Runs without inputs
+
+Without `--input` and `--input-file`, `lattice run` and `authority inspect` take the same path as before. They do not read the retained binding or the catalog and do not write an input record. The run identity, run record, summary, and report bytes are unchanged.
 
 ## Identity and claim boundary
 

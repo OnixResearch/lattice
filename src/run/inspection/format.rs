@@ -18,6 +18,9 @@ pub fn render_text(result: &super::model::Report) -> String {
         result.lifecycle.cache_hits,
     ));
     output.push_str(&owner_text(&result.owner));
+    if let Some(inputs) = &result.inputs {
+        output.push_str(&inputs_text(inputs));
+    }
     output.push_str(&format!(
         "details state={} nodes={} values=omitted errors=omitted\n",
         evidence_label(result.details.state),
@@ -217,5 +220,28 @@ fn diagnostic_label(code: super::model::DiagnosticCode) -> &'static str {
         super::model::DiagnosticCode::DispatchBindingDuplicate => "dispatch_binding_duplicate",
         super::model::DiagnosticCode::DispatchFactMismatch => "dispatch_fact_mismatch",
         super::model::DiagnosticCode::DispatchTerminalConflict => "dispatch_terminal_conflict",
+        super::model::DiagnosticCode::InputsIdentityMismatch => "inputs_identity_mismatch",
     }
+}
+
+fn inputs_text(inputs: &super::model::SafeInputs) -> String {
+    let mut output = format!(
+        "inputs template={} bound={} workflow_revision={} values={} params={} content=omitted\n",
+        inputs.template,
+        inputs.bound,
+        inputs.workflow_revision,
+        inputs.values,
+        inputs.params.len(),
+    );
+    for param in &inputs.params {
+        let kind = match param.kind {
+            crate::workflow_template::inputs::InputKind::Bool => "bool",
+            crate::workflow_template::inputs::InputKind::Integer => "integer",
+            crate::workflow_template::inputs::InputKind::Enum => "enum",
+            crate::workflow_template::inputs::InputKind::RelativePath => "relative_path",
+        };
+        output.push_str(&format!("input {} kind={kind} supplied={}\n", param.name, param.supplied));
+    }
+    debug_assert!(output.ends_with('\n'));
+    output
 }

@@ -60,6 +60,7 @@ pub fn inspect(input: super::model::Input<'_>) -> super::model::Report {
             terminal: input.record.finished_epoch_ms.is_some(),
         },
         owner,
+        inputs: None,
         details,
         replay,
         orchestration,
