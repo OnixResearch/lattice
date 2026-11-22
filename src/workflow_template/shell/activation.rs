@@ -49,6 +49,7 @@ pub fn save_draft(
     if bundle.params.is_none() {
         return Err(Error::ParamsUnbound);
     }
+    super::core::reverify(bundle).map_err(|_| Error::BoundContentDrift)?;
     let facts = application_facts(store, bundle)?;
     let plan = super::core::plan_application(bundle, &facts);
     match &plan {
@@ -89,7 +90,7 @@ pub async fn start_orchestration_draft_with_execution(
         .map_err(Error::Orchestration)
 }
 
-fn admit_activation(
+pub(crate) fn admit_activation(
     store: &crate::store::Store,
     bundle: &super::model::ValidatedBundle,
     facts: &super::model::ActivationFacts,

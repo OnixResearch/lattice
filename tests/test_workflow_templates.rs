@@ -34,6 +34,7 @@ const WORKFLOW_TEMPLATE_ROOT: &str = "workflow-templates";
 const BUILTIN_BUNDLE_ID: &str = "shell-preview";
 const MANIFEST_FILE_NAME: &str = "manifest.ncl";
 const WORKFLOW_FILE_NAME: &str = "workflow.ncl";
+const ORCHESTRATION_FILE_NAME: &str = "orchestration.ncl";
 const EXTRA_FILE_NAME: &str = "extra.txt";
 const MALFORMED_BUNDLE_ID: &str = "malformed";
 const ESCAPE_BUNDLE_ID: &str = "escape";
@@ -117,14 +118,15 @@ fn pure_validation_input() -> BundleValidationInput {
     }
 }
 
-fn orchestration_bundle(
-    mut bundle: lattice::workflow_template::ValidatedBundle,
-) -> lattice::workflow_template::ValidatedBundle {
+/// The built-in template with a declared orchestration, admitted by `validate_bundle` and bound
+/// to its defaults. Bundle content is immutable after admission, so it cannot be patched in.
+fn orchestration_bundle(directory: &tempfile::TempDir) -> lattice::workflow_template::ValidatedBundle {
+    let template = load_builtin(directory);
     let definition = Definition {
         schema_version: lattice::orchestration::current_schema_version(),
         id: DefinitionId::try_from_text(DEFINITION_ID).expect("definition identity fixture is valid"),
         objective: "Review the exact template workflow".to_string(),
-        workflow: bundle.workflow_revision.clone(),
+        workflow: template.workflow_revision().clone(),
         completion: CompletionPolicy::RunSucceeded,
         retry: None,
         budgets: BudgetPolicy {
@@ -159,19 +161,40 @@ fn orchestration_bundle(
             retain_safe_summaries: true,
         },
     };
-    let revision =
-        lattice::orchestration::definition_revision(&definition).expect("orchestration fixture revision is valid");
-    bundle.orchestration = Some(definition);
-    bundle.orchestration_revision = Some(revision);
-    bundle
+    let workflow_path = directory.path().join(WORKFLOW_TEMPLATE_ROOT).join(BUILTIN_BUNDLE_ID).join(WORKFLOW_FILE_NAME);
+    let workflow_bytes = std::fs::read(workflow_path).expect("built-in workflow reads");
+    let orchestration_bytes = b"captured orchestration bytes".to_vec();
+    let mut manifest = template.manifest().clone();
+    manifest.orchestration = Some(FileBinding {
+        path: ORCHESTRATION_FILE_NAME.to_string(),
+        blake3: ContentIdentity::from_bytes(&orchestration_bytes),
+    });
+    let validated = lattice::workflow_template::validate_bundle(BundleValidationInput {
+        manifest_bytes: b"orchestration fixture manifest".to_vec(),
+        manifest,
+        files: vec![
+            BundleFile {
+                path: WORKFLOW_FILE_NAME.to_string(),
+                bytes: workflow_bytes,
+            },
+            BundleFile {
+                path: ORCHESTRATION_FILE_NAME.to_string(),
+                bytes: orchestration_bytes,
+            },
+        ],
+        workflow: Some(template.workflow().clone()),
+        orchestration: Some(definition),
+    })
+    .expect("orchestration fixture validates");
+    lattice::workflow_template::bind(&validated, &std::collections::BTreeMap::new()).expect("fixture binds")
 }
 
 fn admitted_activation(bundle: &lattice::workflow_template::ValidatedBundle) -> ActivationFacts {
     ActivationFacts {
         explicit_save_requested: false,
         explicit_start_requested: true,
-        saved_workflow_revision: Some(bundle.workflow_revision.clone()),
-        current_orchestration_revision: bundle.orchestration_revision.clone(),
+        saved_workflow_revision: Some(bundle.workflow_revision().clone()),
+        current_orchestration_revision: bundle.orchestration_revision().cloned(),
         runtime_admitted: true,
         effects_admitted: true,
         credentials_admitted: true,
@@ -188,11 +211,11 @@ fn fresh_built_in_bundle_loads_with_exact_identities() {
     let directory = initialized_root();
     let bundle = load_builtin(&directory);
 
-    assert_eq!(bundle.manifest.id, BUILTIN_BUNDLE_ID);
-    assert_eq!(bundle.file_identities.len(), EXPECTED_BOUND_FILE_COUNT);
-    assert_eq!(bundle.workflow.meta.name, BUILTIN_BUNDLE_ID);
-    assert!(bundle.orchestration.is_none());
-    assert_eq!(bundle.identity.as_str().len(), blake3::OUT_LEN.saturating_mul(HEX_CHARS_PER_BYTE));
+    assert_eq!(bundle.manifest().id, BUILTIN_BUNDLE_ID);
+    assert_eq!(bundle.file_identities().len(), EXPECTED_BOUND_FILE_COUNT);
+    assert_eq!(bundle.workflow().meta.name, BUILTIN_BUNDLE_ID);
+    assert!(bundle.orchestration().is_none());
+    assert_eq!(bundle.identity().as_str().len(), blake3::OUT_LEN.saturating_mul(HEX_CHARS_PER_BYTE));
 }
 
 // r[verify lattice.workflow_templates.core.scenario.plan]
@@ -270,7 +293,7 @@ fn malformed_bundle_is_isolated_from_valid_catalog_entries() {
         .expect("catalog with malformed bundle loads");
 
     assert_eq!(catalog.bundles.len(), ONE_ROUND as usize);
-    assert_eq!(catalog.bundles[0].manifest.id, BUILTIN_BUNDLE_ID);
+    assert_eq!(catalog.bundles[0].manifest().id, BUILTIN_BUNDLE_ID);
     assert_eq!(catalog.diagnostics.len(), ONE_ROUND as usize);
     assert_eq!(catalog.diagnostics[0].bundle, MALFORMED_BUNDLE_ID);
     assert_eq!(catalog.diagnostics[0].code, DiagnosticCode::NickelEvaluation);
@@ -435,7 +458,7 @@ fn application_planning_is_deterministic_idempotent_and_conflict_safe() {
     ));
 
     let mut conflicting = store
-        .load_workflow(&bundle.workflow.meta.name)
+        .load_workflow(&bundle.workflow().meta.name)
         .expect("stored draft loads")
         .expect("stored draft exists");
     conflicting.meta.description = "operator changed content".to_string();
@@ -455,7 +478,7 @@ fn application_planning_is_deterministic_idempotent_and_conflict_safe() {
 #[test]
 fn activation_requires_explicit_exact_admission() {
     let directory = initialized_root();
-    let bundle = orchestration_bundle(load_bound(&directory));
+    let bundle = orchestration_bundle(&directory);
     let mut facts = admitted_activation(&bundle);
     facts.explicit_start_requested = false;
     assert_eq!(lattice::workflow_template::plan_activation(&bundle, &facts), ActivationPlan::PreviewOnly);
@@ -483,7 +506,7 @@ fn activation_requires_explicit_exact_admission() {
 #[test]
 fn activation_fails_closed_for_drift_and_every_missing_authority_fact() {
     let directory = initialized_root();
-    let bundle = orchestration_bundle(load_bound(&directory));
+    let bundle = orchestration_bundle(&directory);
     let mut drifted = admitted_activation(&bundle);
     drifted.saved_workflow_revision = None;
     assert_eq!(
@@ -510,7 +533,7 @@ fn activation_fails_closed_for_drift_and_every_missing_authority_fact() {
 #[tokio::test]
 async fn exact_activation_records_identities_before_one_admitted_dispatch() {
     let directory = initialized_root();
-    let bundle = orchestration_bundle(load_bound(&directory));
+    let bundle = orchestration_bundle(&directory);
     let store = lattice::store::Store::new(directory.path().join("admitted-activation.redb"))
         .expect("admitted activation store creates");
     lattice::workflow_template::save_draft(&store, &bundle).expect("exact workflow draft saves");
@@ -535,7 +558,7 @@ async fn exact_activation_records_identities_before_one_admitted_dispatch() {
 
     assert_eq!(store.list_orchestrations().expect("admitted orchestrations list").len(), 1);
     assert_eq!(store.list_runs(PREVIEW_RUN_RECORD_LIMIT).expect("admitted runs list").len(), 1);
-    assert_eq!(instance.definition_revision, bundle.orchestration_revision.clone().expect("revision exists"));
+    assert_eq!(instance.definition_revision, bundle.orchestration_revision().cloned().expect("revision exists"));
     assert_eq!(
         store
             .load_workflow_template_activation(&receipt.identity)
@@ -549,7 +572,7 @@ async fn exact_activation_records_identities_before_one_admitted_dispatch() {
 #[tokio::test]
 async fn blocked_activation_creates_no_instance_run_or_activation_receipt() {
     let directory = initialized_root();
-    let bundle = orchestration_bundle(load_bound(&directory));
+    let bundle = orchestration_bundle(&directory);
     let store = lattice::store::Store::new(directory.path().join("blocked-activation.redb"))
         .expect("blocked activation store creates");
     let mut facts = admitted_activation(&bundle);
@@ -604,7 +627,7 @@ fn existing_node_templates_and_direct_format_routes_remain_compatible() {
 fn tui_preview_is_unsaved_and_cancel_restores_prior_state() {
     let directory = initialized_root();
     let template = load_builtin(&directory);
-    let bundle = orchestration_bundle(load_bound(&directory));
+    let bundle = orchestration_bundle(&directory);
     let config = lattice::config::AppConfig {
         data_dir: directory.path().join("tui-state"),
         ..lattice::config::AppConfig::default()

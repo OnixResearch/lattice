@@ -15,7 +15,8 @@ r[lattice.workflow_templates.params.scenario.bounds]
 #### Scenario: Unsafe declarations fail at load
 r[lattice.workflow_templates.params.scenario.declaration]
 - GIVEN a manifest parameter with a duplicate or invalid name, inconsistent bounds, a required default, a missing or out-of-bounds optional default, an open or unknown type shape, or a target key outside `LATTICE_PARAM_`
-- OR a target command that reads its variable other than as `"${KEY}"`, or a template environment that does not hold the rendered default
+- OR a target shell node whose command is not one simple command of space-separated safe literals and whole-word `"${KEY}"` references to its bound keys, whose first word is a reference, an assignment or an argument-executing program, or that contains `-exec`, `-execdir`, `-ok` or `-c`
+- OR a node that binds a `LATTICE_PARAM_*` key as a credential, or a template environment that does not hold the rendered default
 - WHEN the loader validates the bundle, including after its workflow is re-pinned
 - THEN the bundle MUST be rejected with `invalid_param_declaration` and other bundles MUST remain available
 
@@ -26,6 +27,7 @@ r[lattice.workflow_templates.params.scenario.binding]
 - THEN the bound workflow MUST differ from the template only in the declared environment values, and each shell command MUST receive a value as one unchanged argument
 - AND authority inspection of the bound workflow MUST list the same grants as the template under the bound workflow revision
 - AND save and start MUST refuse an unbound template
+- AND a bound bundle whose workflow, values, revision or mode differ from what `bind` admitted MUST be refused at save, activation planning and start with `bound_content_drift` or `mode_violation` before any store write or dispatch, and bundle content MUST NOT be writable outside the crate
 
 #### Scenario: Built-in bundles are migrated
 r[lattice.workflow_templates.params.scenario.migration]
@@ -54,4 +56,4 @@ r[lattice.workflow_templates.mode.scenario.compatibility]
 - GIVEN a schema 1 manifest without `mode` or `params`
 - WHEN it is loaded
 - THEN it MUST load as `mutating` with no parameters and MUST bind to its defaults
-- AND a schema 1 manifest with either field MUST fail with `unsupported_schema`, a schema 2 manifest without either field MUST fail with `invalid_manifest`, and another schema version or mode value MUST be rejected
+- AND a schema 1 manifest that has either key, including with a `null` value, MUST fail with `unsupported_schema`, a schema 2 manifest without either field MUST fail with `invalid_manifest`, and another schema version or mode value MUST be rejected

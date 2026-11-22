@@ -5,6 +5,26 @@ struct AdmittedContent {
     orchestration_revision: Option<crate::orchestration::DefinitionRevision>,
 }
 
+/// Field presence in the evaluated manifest, before deserialization turns `null` into absence.
+///
+/// A schema 1 manifest that has a `mode` or `params` key, even with a `null` value, is refused.
+pub(crate) fn check_legacy_fields(
+    evaluated: &serde_json::Value,
+    bundle: &str,
+) -> Result<(), super::model::Diagnostic> {
+    let is_legacy = evaluated.get("schema_version").and_then(serde_json::Value::as_u64)
+        == Some(u64::from(super::model::LEGACY_BUNDLE_SCHEMA_VERSION));
+    let has_new_field = evaluated.get("mode").is_some() || evaluated.get("params").is_some();
+    if is_legacy && has_new_field {
+        return Err(diagnostic(
+            bundle,
+            super::model::DiagnosticCode::UnsupportedSchema,
+            "bundle schema 1 cannot declare mode or params; use schema 2",
+        ));
+    }
+    Ok(())
+}
+
 /// Schema 2 requires `mode` and `params`. Schema 1 is the documented compatibility path:
 /// it may carry neither field and loads as `mutating` with no parameters.
 fn validate_schema_fields(
@@ -102,13 +122,15 @@ pub fn bind(
         definition
     });
     let content = admit_content(&template.manifest, workflow, orchestration, bundle)?;
-    let identity = super::params::bound_identity(&template.identity, &resolved);
+    super::params::validate_bound(declared, &resolved, &content.workflow)
+        .map_err(|error| param_diagnostic(bundle, &error))?;
+    let identity = super::params::bound_identity(&template.identity, &resolved, &content.workflow_revision);
     debug_assert_eq!(content.workflow.configs.len(), template.workflow.configs.len());
     Ok(super::model::ValidatedBundle {
         identity,
         manifest_identity: template.manifest_identity.clone(),
         manifest: template.manifest.clone(),
-        workflow_revision: content.workflow_revision,
+        workflow_revision: content.workflow_revision.clone(),
         workflow: content.workflow,
         orchestration_revision: content.orchestration_revision,
         orchestration: content.orchestration,
@@ -116,8 +138,49 @@ pub fn bind(
         params: Some(super::params::Bound {
             template: template.identity.clone(),
             resolved,
+            workflow_revision: content.workflow_revision,
         }),
     })
+}
+
+/// Re-verify a bound bundle at a save or start boundary.
+///
+/// The recorded values must still resolve and still be the values in the workflow. The content
+/// must pass full admission again, its recomputed revision must equal the recorded and bound
+/// revisions, and the bound identity must commit to exactly these values and that revision.
+pub fn reverify(bundle: &super::model::ValidatedBundle) -> Result<(), super::model::Diagnostic> {
+    let label = bundle.manifest.id.as_str();
+    let drift = |message: &'static str| diagnostic(label, super::model::DiagnosticCode::BoundContentDrift, message);
+    let bound = bundle.params.as_ref().ok_or_else(|| {
+        diagnostic(label, super::model::DiagnosticCode::ParamsUnbound, "bundle parameters are not bound")
+    })?;
+    let declared = bundle.manifest.params();
+    let recorded = bound
+        .resolved
+        .values()
+        .iter()
+        .map(|param| (param.name.clone(), param.value.clone()))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let resolved =
+        super::params::resolve(declared, &recorded).map_err(|_| drift("bound parameter values no longer resolve"))?;
+    if resolved != bound.resolved {
+        return Err(drift("bound parameter values differ"));
+    }
+    super::params::validate_bound(declared, &resolved, &bundle.workflow)
+        .map_err(|_| drift("bound workflow does not hold the resolved values"))?;
+    let content = admit_content(&bundle.manifest, bundle.workflow.clone(), bundle.orchestration.clone(), label)?;
+    if content.workflow_revision != bundle.workflow_revision || content.workflow_revision != bound.workflow_revision {
+        return Err(drift("bound workflow revision differs"));
+    }
+    if content.orchestration_revision != bundle.orchestration_revision {
+        return Err(drift("bound orchestration revision differs"));
+    }
+    if super::params::bound_identity(&bound.template, &resolved, &content.workflow_revision) != bundle.identity {
+        return Err(drift("bound identity differs"));
+    }
+    debug_assert_eq!(bundle.workflow_revision, bound.workflow_revision);
+    debug_assert!(bundle.manifest.params().len() == resolved.values().len());
+    Ok(())
 }
 
 fn param_diagnostic(bundle: &str, error: &super::params::ParamError) -> super::model::Diagnostic {

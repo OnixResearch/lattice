@@ -415,7 +415,7 @@ fn reviewed_catalog_workflow_bundle_loads_without_bundle_diagnostics() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("builtins/workflow-templates");
     let catalog = lattice::workflow_template::load_catalog(&root).expect("workflow-template catalog");
     assert!(
-        catalog.bundles.iter().any(|bundle| bundle.manifest.id == "agent-evaluation-catalog-review"),
+        catalog.bundles.iter().any(|bundle| bundle.manifest().id == "agent-evaluation-catalog-review"),
         "diagnostics: {:?}",
         catalog.diagnostics
     );

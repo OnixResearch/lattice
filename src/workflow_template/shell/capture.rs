@@ -202,6 +202,7 @@ fn parse_manifest(bytes: &[u8], safe_name: &str) -> Result<super::model::BundleM
             "bundle manifest evaluation failed",
         )
     })?;
+    super::core::check_legacy_fields(&value, safe_name)?;
     let manifest = serde_json::from_value(value).map_err(|_| {
         super::core::diagnostic(
             safe_name,

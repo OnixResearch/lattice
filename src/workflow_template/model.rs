@@ -144,19 +144,23 @@ pub struct BundleValidationInput {
     pub orchestration: Option<crate::orchestration::Definition>,
 }
 
+/// Admitted bundle content. Fields are crate-private so admitted and bound content cannot be
+/// changed after admission; read them through the same-named accessors.
 #[derive(Debug, Clone)]
 pub struct ValidatedBundle {
-    pub identity: ContentIdentity,
-    pub manifest_identity: ContentIdentity,
-    pub manifest: BundleManifest,
-    pub workflow_revision: crate::orchestration::WorkflowRevisionRef,
-    pub workflow: crate::engine::Workflow,
-    pub orchestration_revision: Option<crate::orchestration::DefinitionRevision>,
-    pub orchestration: Option<crate::orchestration::Definition>,
-    pub file_identities: Vec<(String, ContentIdentity)>,
+    pub(crate) identity: ContentIdentity,
+    pub(crate) manifest_identity: ContentIdentity,
+    pub(crate) manifest: BundleManifest,
+    pub(crate) workflow_revision: crate::orchestration::WorkflowRevisionRef,
+    pub(crate) workflow: crate::engine::Workflow,
+    pub(crate) orchestration_revision: Option<crate::orchestration::DefinitionRevision>,
+    pub(crate) orchestration: Option<crate::orchestration::Definition>,
+    pub(crate) file_identities: Vec<(String, ContentIdentity)>,
     /// `None` for a catalog template; `Some` once [`super::bind`] bound exact values.
-    pub params: Option<super::params::Bound>,
+    pub(crate) params: Option<super::params::Bound>,
 }
+
+include!("model/bundle.rs");
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiagnosticCode {
@@ -188,6 +192,7 @@ pub enum DiagnosticCode {
     MissingParam,
     ParamsUnbound,
     ModeViolation,
+    BoundContentDrift,
 }
 
 impl DiagnosticCode {
@@ -221,6 +226,7 @@ impl DiagnosticCode {
             Self::MissingParam => "missing_param",
             Self::ParamsUnbound => "params_unbound",
             Self::ModeViolation => "mode_violation",
+            Self::BoundContentDrift => "bound_content_drift",
         }
     }
 }

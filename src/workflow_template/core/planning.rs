@@ -4,11 +4,8 @@ pub fn plan_application(
 ) -> super::model::ApplicationPlan {
     debug_assert!(!bundle.manifest.id.is_empty());
     debug_assert!(!bundle.workflow_revision.content_hash.as_str().is_empty());
-    if bundle.params.is_none() {
-        return super::model::ApplicationPlan::Conflict(super::model::DiagnosticCode::ParamsUnbound);
-    }
-    if !super::classification::admits(bundle.manifest.mode(), &bundle.workflow) {
-        return super::model::ApplicationPlan::Conflict(super::model::DiagnosticCode::ModeViolation);
+    if let Err(diagnostic) = reverify(bundle) {
+        return super::model::ApplicationPlan::Conflict(diagnostic.code);
     }
     let Ok(workflow_identity) =
         super::model::ContentIdentity::try_from_hex(bundle.workflow_revision.content_hash.as_str())
@@ -76,11 +73,12 @@ pub fn plan_activation(
     if !facts.explicit_save_requested && !facts.explicit_start_requested {
         return super::model::ActivationPlan::PreviewOnly;
     }
-    if bundle.params.is_none() {
-        return super::model::ActivationPlan::Blocked(super::model::ActivationBlock::ParamsUnbound);
-    }
-    if !super::classification::admits(bundle.manifest.mode(), &bundle.workflow) {
-        return super::model::ActivationPlan::Blocked(super::model::ActivationBlock::ModeViolation);
+    if let Err(diagnostic) = reverify(bundle) {
+        return super::model::ActivationPlan::Blocked(match diagnostic.code {
+            super::model::DiagnosticCode::ParamsUnbound => super::model::ActivationBlock::ParamsUnbound,
+            super::model::DiagnosticCode::ModeViolation => super::model::ActivationBlock::ModeViolation,
+            _ => super::model::ActivationBlock::BoundContentDrift,
+        });
     }
     if facts.explicit_save_requested && !facts.explicit_start_requested {
         return super::model::ActivationPlan::SaveWorkflow {

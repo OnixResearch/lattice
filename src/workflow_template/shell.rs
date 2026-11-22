@@ -6,6 +6,7 @@ pub enum Error {
     Store(crate::store::StoreError),
     ApplicationConflict,
     ParamsUnbound,
+    BoundContentDrift,
     ActivationBlocked(super::model::ActivationBlock),
     Orchestration(crate::orchestration::Error),
 }
@@ -17,6 +18,7 @@ impl std::fmt::Display for Error {
             Self::Store(error) => write!(formatter, "workflow-template store operation failed: {error}"),
             Self::ApplicationConflict => formatter.write_str("workflow-template content conflicts with stored content"),
             Self::ParamsUnbound => formatter.write_str("workflow-template parameters are not bound"),
+            Self::BoundContentDrift => formatter.write_str("workflow-template bound content no longer verifies"),
             Self::ActivationBlocked(block) => write!(formatter, "workflow-template activation blocked: {block:?}"),
             Self::Orchestration(error) => write!(formatter, "workflow-template orchestration failed: {error}"),
         }

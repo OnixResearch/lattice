@@ -30,7 +30,7 @@ fn builtin(id: &str) -> ValidatedBundle {
     builtin_catalog()
         .bundles
         .into_iter()
-        .find(|bundle| bundle.manifest.id == id)
+        .find(|bundle| bundle.manifest().id == id)
         .expect("built-in bundle exists")
 }
 
@@ -43,15 +43,15 @@ fn root(value: &str) -> BTreeMap<String, ParamValue> {
 }
 
 fn shell<'a>(bundle: &'a ValidatedBundle, label: &str) -> (&'a str, &'a std::collections::HashMap<String, String>) {
-    let node = bundle.workflow.graph.nodes().find(|node| node.label == label).expect("labelled node exists");
-    match bundle.workflow.configs.get(&node.id.0) {
+    let node = bundle.workflow().graph.nodes().find(|node| node.label == label).expect("labelled node exists");
+    match bundle.workflow().configs.get(&node.id.0) {
         Some(lattice::engine::workflow::NodeConfig::Shell { command, env, .. }) => (command, env),
         _ => panic!("bound node is a shell node"),
     }
 }
 
 fn grants(bundle: &ValidatedBundle) -> Vec<lattice::engine::effect::standalone::core::Grant> {
-    lattice::engine::effect::standalone::inspect_workflow(&bundle.workflow)
+    lattice::engine::effect::standalone::inspect_workflow(bundle.workflow())
         .expect("authority inspection succeeds")
         .grants
 }
@@ -61,30 +61,42 @@ fn grants(bundle: &ValidatedBundle) -> Vec<lattice::engine::effect::standalone::
 fn built_in_bundles_are_schema_two_mutating_and_bind_their_defaults_exactly() {
     let catalog = builtin_catalog();
     assert!(catalog.diagnostics.is_empty(), "diagnostics: {:?}", catalog.diagnostics);
-    let ids = catalog.bundles.iter().map(|bundle| bundle.manifest.id.as_str()).collect::<Vec<_>>();
+    let ids = catalog.bundles.iter().map(|bundle| bundle.manifest().id.as_str()).collect::<Vec<_>>();
     assert_eq!(ids, BUILTIN_IDS);
     for template in &catalog.bundles {
-        assert_eq!(template.manifest.schema_version, lattice::workflow_template::CURRENT_BUNDLE_SCHEMA_VERSION);
-        assert_eq!(template.manifest.mode, Some(BundleMode::Mutating));
-        let required = lattice::workflow_template::classification::required_mode(&template.workflow);
+        let manifest = template.manifest();
+        assert_eq!(manifest.schema_version, lattice::workflow_template::CURRENT_BUNDLE_SCHEMA_VERSION);
+        assert_eq!(manifest.mode, Some(BundleMode::Mutating));
+        let required = lattice::workflow_template::classification::required_mode(template.workflow());
         assert_eq!(required, BundleMode::Mutating);
-        assert!(template.params.is_none(), "catalog entries are unbound templates");
+        assert!(template.params().is_none(), "catalog entries are unbound templates");
         let bound = lattice::workflow_template::bind(template, &BTreeMap::new()).expect("defaults bind");
-        assert_eq!(bound.workflow.configs, template.workflow.configs, "defaults reproduce the reviewed workflow");
-        assert_eq!(bound.workflow_revision, template.workflow_revision);
-        assert_eq!(bound.orchestration_revision, template.orchestration_revision);
-        assert_ne!(bound.identity, template.identity);
-        let bound_params = bound.params.as_ref().expect("bound values are recorded");
-        assert_eq!(bound_params.template, template.identity);
-        let expected = lattice::workflow_template::params::bound_identity(&template.identity, &bound_params.resolved);
-        assert_eq!(bound.identity, expected);
+        let reviewed = &template.workflow().configs;
+        assert_eq!(&bound.workflow().configs, reviewed, "defaults reproduce the reviewed workflow");
+        assert_eq!(bound.workflow_revision(), template.workflow_revision());
+        assert_eq!(bound.orchestration_revision(), template.orchestration_revision());
+        assert_ne!(bound.identity(), template.identity());
+        let bound_params = bound.params().expect("bound values are recorded");
+        assert_eq!(&bound_params.template, template.identity());
+        assert_eq!(&bound_params.workflow_revision, bound.workflow_revision());
+        let expected = lattice::workflow_template::params::bound_identity(
+            template.identity(),
+            &bound_params.resolved,
+            bound.workflow_revision(),
+        );
+        assert_eq!(bound.identity(), &expected);
+        assert!(lattice::workflow_template::reverify(&bound).is_ok());
     }
-    let review = catalog.bundles.iter().find(|bundle| bundle.manifest.id == CATALOG_REVIEW).expect("catalog review");
-    let names = review.manifest.params().iter().map(|param| param.name.as_str()).collect::<Vec<_>>();
+    let review = catalog
+        .bundles
+        .iter()
+        .find(|bundle| bundle.manifest().id == CATALOG_REVIEW)
+        .expect("catalog review");
+    let names = review.manifest().params().iter().map(|param| param.name.as_str()).collect::<Vec<_>>();
     assert_eq!(names, [CATALOG_PARAM]);
-    assert_eq!(review.manifest.params()[0].default, Some(ParamValue::Text(CATALOG_DEFAULT.into())));
-    let guarded = catalog.bundles.iter().filter(|bundle| bundle.manifest.category == "guarded-agents");
-    assert!(guarded.clone().count() == 2 && guarded.into_iter().all(|bundle| bundle.manifest.params().is_empty()));
+    assert_eq!(review.manifest().params()[0].default, Some(ParamValue::Text(CATALOG_DEFAULT.into())));
+    let guarded = catalog.bundles.iter().filter(|bundle| bundle.manifest().category == "guarded-agents");
+    assert!(guarded.clone().count() == 2 && guarded.into_iter().all(|bundle| bundle.manifest().params().is_empty()));
 }
 
 // r[verify lattice.workflow_templates.params.scenario.binding]
@@ -102,15 +114,15 @@ fn values_bind_only_into_declared_environment_and_never_widen_grants() {
     assert_eq!(env.get(CATALOG_ENV).map(String::as_str), Some("fixtures/catalog"));
     assert_eq!(env.len(), template_env.len());
 
-    assert_ne!(other.workflow_revision, defaults.workflow_revision, "the revision binds the resolved value");
-    assert_ne!(other.identity, defaults.identity, "the bound identity drifts with the value");
+    assert_ne!(other.workflow_revision(), defaults.workflow_revision(), "the revision binds the resolved value");
+    assert_ne!(other.identity(), defaults.identity(), "the bound identity drifts with the value");
     let again = lattice::workflow_template::bind(&template, &root("fixtures/catalog")).expect("same value binds");
-    assert_eq!(again.identity, other.identity);
-    assert_eq!(again.workflow_revision, other.workflow_revision);
+    assert_eq!(again.identity(), other.identity());
+    assert_eq!(again.workflow_revision(), other.workflow_revision());
 
     assert_eq!(grants(&other), grants(&template), "parameters never add or widen grants");
-    let inspected = lattice::engine::effect::standalone::inspect_workflow(&other.workflow).expect("inspection");
-    assert_eq!(inspected.workflow_revision, format!("blake3:{}", other.workflow_revision.content_hash));
+    let inspected = lattice::engine::effect::standalone::inspect_workflow(other.workflow()).expect("inspection");
+    assert_eq!(inspected.workflow_revision, format!("blake3:{}", other.workflow_revision().content_hash));
 
     assert!(lattice::workflow_template::bind(&other, &BTreeMap::new()).is_err(), "a bound bundle cannot rebind");
 }

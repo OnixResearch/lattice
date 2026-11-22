@@ -5,10 +5,12 @@
 //! nodes, never as command text.
 
 mod binding;
+mod grammar;
 mod resolution;
 
 pub use binding::apply;
 pub use binding::validate_bindings;
+pub use binding::validate_bound;
 pub use resolution::render;
 pub use resolution::resolve;
 pub use resolution::validate_declarations;
@@ -106,6 +108,8 @@ impl Resolved {
 pub struct Bound {
     pub template: super::model::ContentIdentity,
     pub resolved: Resolved,
+    /// The workflow revision the values produced; the bound identity commits to it.
+    pub workflow_revision: crate::orchestration::WorkflowRevisionRef,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -174,12 +178,18 @@ fn resolved_identity(values: &[ResolvedParam]) -> super::model::ContentIdentity 
     super::model::ContentIdentity::from_bytes(hasher.finalize().as_bytes())
 }
 
-/// The identity of a template bundle bound to exact resolved values.
-pub fn bound_identity(template: &super::model::ContentIdentity, resolved: &Resolved) -> super::model::ContentIdentity {
+/// The identity of a template bundle bound to exact resolved values and the workflow revision
+/// they produced.
+pub fn bound_identity(
+    template: &super::model::ContentIdentity,
+    resolved: &Resolved,
+    workflow_revision: &crate::orchestration::WorkflowRevisionRef,
+) -> super::model::ContentIdentity {
     let mut hasher = blake3::Hasher::new();
     update_terminated(&mut hasher, BOUND_IDENTITY_DOMAIN.as_bytes());
     update_terminated(&mut hasher, template.as_str().as_bytes());
     update_terminated(&mut hasher, resolved.identity().as_str().as_bytes());
+    update_terminated(&mut hasher, workflow_revision.content_hash.as_str().as_bytes());
     super::model::ContentIdentity::from_bytes(hasher.finalize().as_bytes())
 }
 

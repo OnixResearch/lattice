@@ -6,6 +6,8 @@ pub mod init;
 pub mod model;
 pub mod params;
 pub mod shell;
+#[cfg(test)]
+mod tests;
 
 pub use core::*;
 

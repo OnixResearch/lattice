@@ -98,15 +98,31 @@ A `relative_path` value uses only ASCII letters, digits, `.`, `_`, `-`, and `/`.
 
 ### Binding without shell interpolation
 
-A value reaches the workflow only as the environment value of each declared shell node. It is never spliced into command text. The loader requires each bound command to read the variable only in the exact double-quoted form `"${LATTICE_PARAM_NAME}"`. A bare `$NAME`, an unquoted `${NAME}`, or an operator form such as `${NAME:-x}` is rejected, so the shell passes the value as one argument without word splitting or globbing.
+A value reaches the workflow only as the environment value of each declared shell node. It is never spliced into command text, and it can never choose the program.
+
+Every shell node that receives a value must be one simple command in a strict grammar:
+
+- words are separated by spaces;
+- each word is either a literal over ASCII letters, digits, and `-`, `_`, `.`, `/`, `=`, `:`, `,`, `+`, `@`, `%`, or exactly `"${LATTICE_PARAM_NAME}"` as a whole word for a key bound to that node;
+- the first word is a literal program without `=`, so it is never a reference or an environment assignment;
+- the first word's basename is not an argument-executing program: `sh`, `bash`, `dash`, `zsh`, `ksh`, `fish`, `eval`, `exec`, `env`, `xargs`, `command`, `builtin`, `source`, `.`, `nohup`, `timeout`, `nice`, `ionice`, `setsid`, `stdbuf`, `taskset`, `chrt`, `sudo`, `doas`, `su`, `runuser`, `busybox`, `time`, `watch`, `parallel`, `find`, or `git`;
+- no word is `-exec`, `-execdir`, `-ok`, or `-c`.
+
+The literal alphabet excludes `$`, backticks, quotes, backslashes, `;`, `|`, `&`, `<`, `>`, `(`, `)`, `{`, `}`, `*`, `?`, `[`, `~`, `#`, whitespace other than the separating space, newline, and NUL. A bound command therefore has no command substitution, arithmetic, here-document, redirection, glob, or control operator. The shell passes each value as one argument without word splitting or globbing.
+
+No shell node in a bundle may bind a `LATTICE_PARAM_*` key as a credential (`secret_env`), so a credential can never shadow a value at execution.
 
 The template workflow must hold each optional parameter's rendered default under its key and must not hold a required parameter's key. Binding the defaults therefore reproduces the reviewed workflow exactly.
+
+Non-claim: the grammar fixes the program and keeps values out of shell syntax, but a program that interprets its own arguments as code (a script interpreter, a template engine, a query language) can still turn a value into code. Reviewers must not bind parameters into such programs.
 
 ### Resolution and identity
 
 `lattice::workflow_template::params::resolve(declared, supplied)` is the pure check for supplied values. It rejects unknown names, wrong types, out-of-bounds values, and missing required values. Its diagnostic names only a declared parameter and never echoes a supplied value. The returned `params::Resolved` holds every value sorted by name and a BLAKE3 identity over each name, value kind, and value.
 
-`lattice::workflow_template::bind(template, supplied)` resolves values against a catalog template. It writes them into a copy of the workflow and rebinds an optional orchestration to the new workflow revision. Then it re-runs the template's admission checks: workflow validation, compatibility, mode, orchestration binding, and guarded authority. The bound bundle's identity is BLAKE3 over the template identity and the resolved-value identity.
+`lattice::workflow_template::bind(template, supplied)` resolves values against a catalog template. It writes them into a copy of the workflow and rebinds an optional orchestration to the new workflow revision. Then it re-runs the template's admission checks: workflow validation, compatibility, mode, orchestration binding, guarded authority, and the binding grammar. The bound bundle's identity is BLAKE3 over the template identity, the resolved-value identity, and the bound workflow revision.
+
+`ValidatedBundle` content is read-only outside Lattice; read it through `identity()`, `manifest()`, `workflow()`, `workflow_revision()`, `orchestration()`, `orchestration_revision()`, `file_identities()`, and `params()`. `save_draft`, activation planning, and start call `reverify`, which re-resolves the recorded values, checks that the workflow still holds them, repeats full content admission, and checks that the recomputed revision and identity equal the bound ones. Any difference refuses with `bound_content_drift` (`BoundContentDrift`) before a store write or dispatch.
 
 Parameters cannot widen effect authority. Binding changes only declared environment values, so node kinds, commands, resources, and abilities stay as reviewed. `lattice authority inspect` on the saved bound workflow lists the same grants as the template, under the bound workflow revision.
 
@@ -122,7 +138,7 @@ All four built-in bundles use schema 2 and `mode = "mutating"`.
 
 A schema 1 manifest has neither `mode` nor `params`. It still loads as a `mutating` bundle with no parameters. Its manifest bytes are unchanged, so its manifest and template identities are unchanged. This is the conservative reading of a manifest that declared no limit, and it keeps catalogs copied by an earlier `--init` loadable without edits.
 
-A schema 1 manifest that declares `mode` or `params` fails with `unsupported_schema`. A schema 2 manifest without either field fails with `invalid_manifest`. Any other schema version fails with `unsupported_schema`. To declare a mode or parameters, migrate the manifest to schema 2.
+A schema 1 manifest that names `mode` or `params`, even as `null`, fails with `unsupported_schema`; the loader checks key presence before deserializing. A schema 2 manifest without either field fails with `invalid_manifest`. Any other schema version fails with `unsupported_schema`. To declare a mode or parameters, migrate the manifest to schema 2.
 
 ## Regenerate reviewed identities
 

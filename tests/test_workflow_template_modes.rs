@@ -70,7 +70,7 @@ fn file_read(workflow: &mut lattice::engine::Workflow) {
 
 fn validate(input: lattice::workflow_template::BundleValidationInput) -> Result<BundleMode, DiagnosticCode> {
     lattice::workflow_template::validate_bundle(input)
-        .map(|bundle| bundle.manifest.mode())
+        .map(|bundle| bundle.manifest().mode())
         .map_err(|diagnostic| diagnostic.code)
 }
 
@@ -127,7 +127,7 @@ fn schema_one_loads_as_mutating_and_mixed_schemas_fail_clearly() {
     let mut legacy = input(None, shell());
     legacy.manifest.schema_version = lattice::workflow_template::LEGACY_BUNDLE_SCHEMA_VERSION;
     let legacy = lattice::workflow_template::validate_bundle(legacy).expect("schema 1 manifests load");
-    assert_eq!((legacy.manifest.mode(), legacy.manifest.params().len()), (BundleMode::Mutating, 0));
+    assert_eq!((legacy.manifest().mode(), legacy.manifest().params().len()), (BundleMode::Mutating, 0));
     assert!(lattice::workflow_template::bind(&legacy, &BTreeMap::new()).is_ok());
 
     let mut legacy_with_mode = input(Some(BundleMode::Mutating), shell());
@@ -141,7 +141,7 @@ fn schema_one_loads_as_mutating_and_mixed_schemas_fail_clearly() {
     future.manifest.schema_version = lattice::workflow_template::CURRENT_BUNDLE_SCHEMA_VERSION + 1;
     assert_eq!(validate(future), Err(DiagnosticCode::UnsupportedSchema));
 
-    let mut manifest = serde_json::to_value(&legacy.manifest).expect("manifest serializes");
+    let mut manifest = serde_json::to_value(legacy.manifest()).expect("manifest serializes");
     manifest["schema_version"] = serde_json::json!(2);
     manifest["params"] = serde_json::json!([]);
     manifest["mode"] = serde_json::json!("readonly");
@@ -162,7 +162,7 @@ fn save_and_start_require_bound_values_and_an_admitted_mode() {
     let facts = lattice::workflow_template::ActivationFacts {
         explicit_save_requested: true,
         explicit_start_requested: true,
-        saved_workflow_revision: Some(template.workflow_revision.clone()),
+        saved_workflow_revision: Some(template.workflow_revision().clone()),
         current_orchestration_revision: None,
         runtime_admitted: true,
         effects_admitted: true,
@@ -185,16 +185,13 @@ fn save_and_start_require_bound_values_and_an_admitted_mode() {
     assert!(matches!(error, lattice::workflow_template::Error::ParamsUnbound));
     assert!(store.list_workflows().expect("workflows list").is_empty());
 
-    let mut bound = lattice::workflow_template::bind(&template, &BTreeMap::new()).expect("defaults bind");
+    let bound = lattice::workflow_template::bind(&template, &BTreeMap::new()).expect("defaults bind");
     assert!(matches!(
         lattice::workflow_template::plan_application(&bound, &missing),
         ApplicationPlan::CreateDraft { .. }
     ));
-    bound.manifest.mode = Some(BundleMode::ReadOnly);
-    let violation = ActivationPlan::Blocked(ActivationBlock::ModeViolation);
-    assert_eq!(lattice::workflow_template::plan_activation(&bound, &facts), violation);
-    let conflict = ApplicationPlan::Conflict(DiagnosticCode::ModeViolation);
-    assert_eq!(lattice::workflow_template::plan_application(&bound, &missing), conflict);
+    // Tampering with bound content after `bind` is covered by the crate-internal
+    // `workflow_template::tests`; fields are not writable from outside the crate.
 }
 
 fn copy_bundle(source: &str, target: &Path) {

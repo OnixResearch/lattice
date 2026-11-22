@@ -391,27 +391,27 @@ fn built_in_guarded_bundles_load_without_model_calls_and_bind_exact_authority() 
         lattice::guarded::authority::CAIRN_BUNDLE_ID,
         lattice::guarded::authority::OCTET_BUNDLE_ID,
     ] {
-        let bundle = catalog.bundles.iter().find(|bundle| bundle.manifest.id == id).expect("guarded bundle");
+        let bundle = catalog.bundles.iter().find(|bundle| bundle.manifest().id == id).expect("guarded bundle");
         assert!(
             bundle
-                .manifest
+                .manifest()
                 .compatibility
                 .feature_ids
                 .iter()
                 .any(|feature| feature == lattice::guarded::authority::GUARDED_FEATURE_ID)
         );
-        lattice::guarded::authority::validate_bundle(id, &bundle.workflow, bundle.orchestration.as_ref())
+        lattice::guarded::authority::validate_bundle(id, bundle.workflow(), bundle.orchestration())
             .expect("guarded authority");
         assert_eq!(
             bundle
-                .workflow
+                .workflow()
                 .configs
                 .values()
                 .filter(|config| matches!(config, lattice::engine::workflow::NodeConfig::Agent(_)))
                 .count(),
             1
         );
-        assert!(bundle.manifest.non_claims.iter().any(|claim| claim.contains("exact reviewed local bytes")));
+        assert!(bundle.manifest().non_claims.iter().any(|claim| claim.contains("exact reviewed local bytes")));
     }
 }
 
@@ -425,11 +425,11 @@ fn guarded_authority_rejects_second_agents_fallbacks_commands_retries_and_budget
     let bundle = catalog
         .bundles
         .iter()
-        .find(|bundle| bundle.manifest.id == lattice::guarded::authority::OCTET_BUNDLE_ID)
+        .find(|bundle| bundle.manifest().id == lattice::guarded::authority::OCTET_BUNDLE_ID)
         .expect("Octet bundle");
-    let orchestration = bundle.orchestration.as_ref().expect("Octet orchestration");
+    let orchestration = bundle.orchestration().expect("Octet orchestration");
 
-    let mut second_agent = bundle.workflow.clone();
+    let mut second_agent = bundle.workflow().clone();
     second_agent.add_agent_node(
         "prohibited second agent",
         lattice::agent_node::Target::Pi,
@@ -445,7 +445,7 @@ fn guarded_authority_rejects_second_agents_fallbacks_commands_retries_and_budget
         Err(lattice::guarded::authority::Error::InvalidAgent)
     );
 
-    let mut fallback = bundle.workflow.clone();
+    let mut fallback = bundle.workflow().clone();
     let agent_id = fallback
         .configs
         .iter()
@@ -467,7 +467,7 @@ fn guarded_authority_rejects_second_agents_fallbacks_commands_retries_and_budget
         Err(lattice::guarded::authority::Error::InvalidAgent)
     );
 
-    let mut hidden_push = bundle.workflow.clone();
+    let mut hidden_push = bundle.workflow().clone();
     let shell = hidden_push
         .configs
         .values_mut()
@@ -493,7 +493,7 @@ fn guarded_authority_rejects_second_agents_fallbacks_commands_retries_and_budget
     assert_eq!(
         lattice::guarded::authority::validate_bundle(
             lattice::guarded::authority::OCTET_BUNDLE_ID,
-            &bundle.workflow,
+            bundle.workflow(),
             Some(&retry),
         ),
         Err(lattice::guarded::authority::Error::AutomaticRetry)
@@ -504,7 +504,7 @@ fn guarded_authority_rejects_second_agents_fallbacks_commands_retries_and_budget
     assert_eq!(
         lattice::guarded::authority::validate_bundle(
             lattice::guarded::authority::OCTET_BUNDLE_ID,
-            &bundle.workflow,
+            bundle.workflow(),
             Some(&expanded),
         ),
         Err(lattice::guarded::authority::Error::InvalidBudget)
@@ -520,11 +520,11 @@ fn guarded_authority_rejects_credentials_roots_self_approval_and_missing_positiv
     let bundle = catalog
         .bundles
         .iter()
-        .find(|bundle| bundle.manifest.id == lattice::guarded::authority::OCTET_BUNDLE_ID)
+        .find(|bundle| bundle.manifest().id == lattice::guarded::authority::OCTET_BUNDLE_ID)
         .expect("Octet bundle");
-    let orchestration = bundle.orchestration.as_ref().expect("Octet orchestration");
+    let orchestration = bundle.orchestration().expect("Octet orchestration");
 
-    let mut credentialed = bundle.workflow.clone();
+    let mut credentialed = bundle.workflow().clone();
     credentialed.credentials.insert(0, lattice::credentials::NodeCredentialRefs::default());
     assert_eq!(
         lattice::guarded::authority::validate_bundle(
@@ -535,7 +535,7 @@ fn guarded_authority_rejects_credentials_roots_self_approval_and_missing_positiv
         Err(lattice::guarded::authority::Error::InvalidTrigger)
     );
 
-    let mut broader_root = bundle.workflow.clone();
+    let mut broader_root = bundle.workflow().clone();
     let shell = broader_root
         .configs
         .values_mut()
@@ -559,7 +559,7 @@ fn guarded_authority_rejects_credentials_roots_self_approval_and_missing_positiv
     assert_eq!(
         lattice::guarded::authority::validate_bundle(
             lattice::guarded::authority::OCTET_BUNDLE_ID,
-            &bundle.workflow,
+            bundle.workflow(),
             Some(&self_approved),
         ),
         Err(lattice::guarded::authority::Error::InvalidAuthority)
@@ -570,7 +570,7 @@ fn guarded_authority_rejects_credentials_roots_self_approval_and_missing_positiv
     assert_eq!(
         lattice::guarded::authority::validate_bundle(
             lattice::guarded::authority::OCTET_BUNDLE_ID,
-            &bundle.workflow,
+            bundle.workflow(),
             Some(&missing_budget),
         ),
         Err(lattice::guarded::authority::Error::InvalidBudget)
@@ -581,7 +581,7 @@ fn guarded_authority_rejects_credentials_roots_self_approval_and_missing_positiv
     assert_eq!(
         lattice::guarded::authority::validate_bundle(
             lattice::guarded::authority::OCTET_BUNDLE_ID,
-            &bundle.workflow,
+            bundle.workflow(),
             Some(&monetary),
         ),
         Err(lattice::guarded::authority::Error::InvalidBudget)

@@ -41,6 +41,7 @@ pub struct ActivationReceipt {
 pub enum ActivationBlock {
     ParamsUnbound,
     ModeViolation,
+    BoundContentDrift,
     WorkflowNotSaved,
     WorkflowDrift,
     OrchestrationMissing,

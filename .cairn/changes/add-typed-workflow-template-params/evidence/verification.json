@@ -44,27 +44,149 @@
     "focused_integration_tests": {
       "command": "cargo test -p lattice --no-fail-fast --test test_workflow_template_params --test test_workflow_template_binding --test test_workflow_template_modes --test test_workflow_templates --test test_guarded_agent_templates --test test_agent_evaluation_core --test test_cli_inspection_boundaries",
       "exit": 0,
-      "passed": { "params": 5, "binding": 4, "modes": 5, "workflow_templates": 17, "guarded": 19, "agent_evaluation_core": 12, "cli_inspection_boundaries": 1 },
+      "passed": {
+        "params": 5,
+        "binding": 4,
+        "modes": 5,
+        "workflow_templates": 17,
+        "guarded": 19,
+        "agent_evaluation_core": 12,
+        "cli_inspection_boundaries": 1
+      },
       "failed": 0
     },
-    "lib_tests": { "command": "cargo test -p lattice --no-fail-fast --lib -- workflow_template tui", "exit": 0, "passed": 144, "ignored": 1, "failed": 0 },
-    "clippy": { "command": "cargo clippy -p lattice --all-targets --no-deps -- -D warnings", "exit": 0 },
-    "fmt": { "command": "cargo fmt -p lattice --check", "exit": 0 },
+    "lib_tests": {
+      "command": "cargo test -p lattice --no-fail-fast --lib -- workflow_template tui",
+      "exit": 0,
+      "passed": 144,
+      "ignored": 1,
+      "failed": 0
+    },
+    "clippy": {
+      "command": "cargo clippy -p lattice --all-targets --no-deps -- -D warnings",
+      "exit": 0
+    },
+    "fmt": {
+      "command": "cargo fmt -p lattice --check",
+      "exit": 0
+    },
     "runtime_nickel_typecheck": {
       "command": "nickel typecheck cairn-policy/*.ncl policy/*.ncl profiles/*.ncl contracts/*.ncl builtins/*/*.ncl builtins/agent-evaluations/requests/*.ncl builtins/workflow-templates/*/*.ncl",
       "exit": 0
     },
     "octet_precommit_check": {
       "exit": 0,
-      "root": { "status": "warning-only", "accepted_total": 1052, "current_total": 1052, "new_total": 0, "stale_total": 0 },
-      "lattice_core": { "status": "warning-only", "accepted_total": 25, "current_total": 25, "new_total": 0, "stale_total": 0 },
+      "root": {
+        "status": "warning-only",
+        "accepted_total": 1052,
+        "current_total": 1052,
+        "new_total": 0,
+        "stale_total": 0
+      },
+      "lattice_core": {
+        "status": "warning-only",
+        "accepted_total": 25,
+        "current_total": 25,
+        "new_total": 0,
+        "stale_total": 0
+      },
       "baseline_rekeyed": false
     },
-    "gitleaks": { "version": "8.28.0", "scope": "41 changed or added paths, copied to one scan directory", "exit": 0, "leaks": 0 }
+    "gitleaks": {
+      "version": "8.28.0",
+      "scope": "41 changed or added paths, copied to one scan directory",
+      "exit": 0,
+      "leaks": 0
+    }
   },
   "non_claims": [
     "Local tests do not prove remote publication or hosted CI results.",
     "The quoting check is lexical; command bytes remain operator-reviewed.",
     "relative_path is lexical and does not resolve symbolic links."
-  ]
+  ],
+  "review": {
+    "reviewer": "ParamsReview (independent security-weighted review)",
+    "reviewed_commit": "034ae2d1",
+    "findings": {
+      "P1_parameter_chooses_program": {
+        "fix": "src/workflow_template/params/grammar.rs: every shell node that receives a value is one simple command of space-separated safe literals and whole-word \"${LATTICE_PARAM_*}\" references to its bound keys; the first word is a literal without '=' whose basename is not an argument-executing program; -exec, -execdir, -ok and -c are denied",
+        "catalog_review_binding": "lattice evaluation catalog --root \"${LATTICE_PARAM_CATALOG_ROOT}\" --output json passes the grammar unchanged",
+        "tests": [
+          "src/workflow_template/params/grammar.rs::tests (4 tests: passing simple command, command position and assignments, every forbidden construct, every denied program by basename and path)",
+          "tests/test_workflow_template_review.rs::a_value_can_never_choose_the_program_or_reach_shell_syntax (reviewer example, command position, denied program, denied word, redirection, control operator, passing command)"
+        ],
+        "non_claim": "A program that interprets its own arguments as code can still turn a value into code; reviewers must not bind parameters into such programs."
+      },
+      "P2_credential_shadowing": {
+        "fix": "any LATTICE_PARAM_* key in a node's credential (secret_env) bindings is refused at load and at bind",
+        "tests": [
+          "tests/test_workflow_template_review.rs::credentials_never_shadow_parameter_values"
+        ]
+      },
+      "P2_bound_content_mutable": {
+        "fix": "ValidatedBundle fields are pub(crate) with same-named read accessors; the bound identity commits to the bound workflow revision; reverify runs at save_draft, plan_application, plan_activation and start (admit_activation)",
+        "tests": [
+          "src/workflow_template/tests.rs::untampered_bound_content_reverifies",
+          "src/workflow_template/tests.rs::tampered_bound_content_is_refused_at_every_boundary (command, environment value, recomputed revision, recorded values, mode; each refused by reverify, plan_application, plan_activation, save_draft and admit_activation, and nothing is saved)"
+        ]
+      },
+      "P2_schema_one_null": {
+        "fix": "check_legacy_fields refuses a schema 1 manifest with a mode or params key, including null, before deserialization",
+        "tests": [
+          "tests/test_workflow_template_review.rs::schema_one_manifests_may_not_name_mode_or_params_even_as_null"
+        ]
+      }
+    },
+    "api_changes": [
+      "ValidatedBundle fields are crate-private; read via identity(), manifest_identity(), manifest(), workflow_revision(), workflow(), orchestration_revision(), orchestration(), file_identities(), params()",
+      "params::Bound gains workflow_revision; params::bound_identity takes the bound workflow revision as a third argument",
+      "new pub fn workflow_template::reverify; params::validate_bound; DiagnosticCode::BoundContentDrift; ActivationBlock::BoundContentDrift; shell Error::BoundContentDrift",
+      "params::resolve and workflow_template::bind signatures unchanged"
+    ],
+    "gates": {
+      "focused_integration_tests": {
+        "exit": 0,
+        "passed": {
+          "params": 5,
+          "binding": 4,
+          "modes": 5,
+          "review": 3,
+          "workflow_templates": 17,
+          "guarded": 19,
+          "agent_evaluation_core": 12,
+          "cli_inspection_boundaries": 1
+        },
+        "failed": 0
+      },
+      "lib_tests": {
+        "command": "cargo test -p lattice --no-fail-fast --lib -- workflow_template tui",
+        "exit": 0,
+        "passed": 149,
+        "ignored": 1,
+        "failed": 0
+      },
+      "clippy": {
+        "exit": 0
+      },
+      "fmt": {
+        "exit": 0
+      },
+      "octet_precommit_check": {
+        "exit": 0,
+        "root": {
+          "accepted_total": 1052,
+          "current_total": 1052,
+          "new_total": 0,
+          "stale_total": 0
+        },
+        "lattice_core": {
+          "accepted_total": 25,
+          "current_total": 25,
+          "new_total": 0,
+          "stale_total": 0
+        },
+        "baseline_rekeyed": false
+      }
+    }
+  }
 }

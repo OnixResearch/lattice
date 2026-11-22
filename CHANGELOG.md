@@ -57,7 +57,14 @@ interfaces.
   2 as `mutating`. The catalog review's `--root` becomes the typed
   `catalog_root` parameter, and the guarded bundles keep their pinned
   `--root .`. Schema 1 manifests still load as `mutating` without
-  parameters; see `docs/workflow-template-bundles.md`.
+  parameters; see `docs/workflow-template-bundles.md`. A shell node that
+  receives a value must be one simple command of safe literals and whole-word
+  `"${NAME}"` references, with a literal, non-argument-executing program and
+  no `-exec`, `-execdir`, `-ok` or `-c`. A `LATTICE_PARAM_*` credential key is
+  refused. `ValidatedBundle` content is read through accessors only, and save,
+  activation planning and start re-verify bound values, content, revision and
+  identity (`bound_content_drift`). A schema 1 manifest that names `mode` or
+  `params`, even as `null`, is refused.
 - Bounded same-attempt repair and the Kiln #61 budget lineage for
   implementation attempts (Lattice #6). The v3 request accepts two optional
   fields; without them a request keeps its bytes, identity and profile
