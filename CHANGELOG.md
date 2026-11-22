@@ -9,6 +9,21 @@ interfaces.
 
 ### Added
 
+- Export and inventory of repaired candidates (Lattice #6).
+  `implementation-attempt export-candidate` exports the exact final candidate
+  revision of a retained `correct_candidate` or `repaired_candidate` repair
+  disposition after the single-shot export's request, intent, output and
+  revision-seam checks (a revoked revision is still `export_revoked`). The
+  named revision must be the last recorded one at the iteration its kind
+  implies, every recorded revision must re-derive from this attempt and fence
+  through its parent chain, and its step record must record a pass; the
+  workspace must still capture to its receipt. New `dispatched:true` refusals:
+  `repair_outcome_unknown` (no retained disposition, never guessed),
+  `repair_not_candidate` and `repair_disposition_invalid` (malformed, crossed
+  or contradicted records). `inspect` reports a retained repair disposition as
+  `terminal_observed` with its kind instead of
+  `dispatch_recorded_outcome_unknown`, within `lattice.worker-inventory.v3`.
+  Single-shot attempts behave as before.
 - Bounded same-attempt repair and the Kiln #61 budget lineage for
   implementation attempts (Lattice #6). The v3 request accepts two optional
   fields; without them a request keeps its bytes, identity and profile

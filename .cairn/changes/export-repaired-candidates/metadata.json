@@ -1,0 +1,11 @@
+{
+  "depends_on": [
+    "bound-same-attempt-repair",
+    "publish-worker-inventory-v3"
+  ],
+  "workflow_profile": {
+    "id": "spec-driven",
+    "source": "change_create",
+    "version": 1
+  }
+}

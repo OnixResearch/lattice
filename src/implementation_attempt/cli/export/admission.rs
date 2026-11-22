@@ -18,10 +18,12 @@ pub(super) fn load(
     let output = destination(&request, request_path, &state, &workspace, output_parent)?;
     let directory = super::super::artifacts::directory(&state, &request);
     private_directory(&directory)?;
-    let recorded = check_intent(&request, &directory, &bytes)?;
+    let identity = blake3::hash(&bytes).to_hex().to_string();
+    let recorded = check_intent(&request, &directory, &identity)?;
     super::super::session::revision::exportable(revisions, &request, &recorded)?;
     Ok(super::Admitted {
         request,
+        identity,
         workspace,
         output,
         directory,
@@ -104,12 +106,11 @@ fn checked_parent(path: &std::path::Path) -> Result<std::path::PathBuf, String> 
 fn check_intent(
     request: &super::super::Request,
     directory: &std::path::Path,
-    bytes: &[u8],
+    identity: &str,
 ) -> Result<super::super::session::intent::Recorded, String> {
-    let identity = blake3::hash(bytes).to_hex().to_string();
     let session = super::super::session::revision::identifier(request);
     let subject = super::super::session::intent::Subject {
-        request_identity: &identity,
+        request_identity: identity,
         session: &session,
     };
     match super::super::session::intent::read(directory, subject)? {

@@ -17,6 +17,8 @@ use crate::implementation_attempt::repair::step::Report as StepReport;
 use crate::implementation_attempt::repair::step::Request as StepRequest;
 use crate::implementation_attempt::repair::step::WorkerOutcome;
 
+mod export;
+
 const EXECUTOR: &str = "7777777777777777777777777777777777777777777777777777777777777777";
 const UNIT_CONFIG: &[u8] = b"unit-config";
 const START_EPOCH_MS: i64 = 1_000_000;
@@ -443,13 +445,18 @@ async fn a_first_candidate_that_passes_is_correct_and_recovery_never_reruns() {
         super::super::session::revision::Store(None),
     )
     .expect("inventory");
-    // Inventory v3 does not read repair records: the instance stays conservative.
-    let lifecycle = &inventory["instance"]["lifecycle"]["state"];
-    assert_eq!(lifecycle, "dispatch_recorded_outcome_unknown", "{inventory}");
-    assert!(
-        inventory["instance"]["wait_reasons"].to_string().contains("dispatch_outcome_unknown"),
-        "{inventory}"
+    // r[verify lattice.implementation_attempt.repair_export.scenario.inventory]
+    // Inventory v3 reports the retained disposition as the terminal result.
+    let instance = &inventory["instance"];
+    assert_eq!(
+        instance["lifecycle"],
+        serde_json::json!({"state": "terminal_observed", "disposition": "correct_candidate"})
     );
+    assert_eq!(
+        (instance["liveness"]["state"].clone(), instance["liveness"]["unknown_cause"].clone()),
+        ("exited".into(), serde_json::Value::Null)
+    );
+    assert_eq!(instance["wait_reasons"], serde_json::json!([]), "{inventory}");
     let mut idle = FixtureWorker::new(Vec::new());
     let mut checks = FixtureChecks::admitted();
     run(&path, &fixture.state, &mut idle, &mut checks).await.expect("a duplicate run reconciles");

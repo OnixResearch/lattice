@@ -20,13 +20,7 @@ type StepRequest = crate::implementation_attempt::repair::step::Request;
 type Verdict = crate::implementation_attempt::repair::checks::Verdict;
 
 /// One host-derived candidate revision.
-#[derive(Debug, Clone, serde::Serialize)]
-struct Revision {
-    iteration: u32,
-    revision: String,
-    parent: Option<String>,
-    receipt: crate::candidate::CandidateReceipt,
-}
+type Revision = crate::implementation_attempt::repair::revision::Record;
 
 /// A candidate revision and the captured tree its checks copy.
 struct Candidate {

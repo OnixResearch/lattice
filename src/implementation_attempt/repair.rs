@@ -17,6 +17,7 @@
 // r[impl lattice.implementation_attempt.repair.scenario.policy]
 
 pub mod checks;
+pub mod exportable;
 pub mod revision;
 pub mod state;
 pub mod step;

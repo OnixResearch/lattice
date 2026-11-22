@@ -54,7 +54,7 @@ fn bound_receipt<'a>(
     Ok(receipt)
 }
 
-fn receipt_matches(receipt: &crate::candidate::CandidateReceipt, request: &super::super::Request) -> bool {
+pub(super) fn receipt_matches(receipt: &crate::candidate::CandidateReceipt, request: &super::super::Request) -> bool {
     receipt.work_id == request.envelope.work_id
         && receipt.attempt_id == request.envelope.attempt_id
         && receipt.fence == request.envelope.fence.to_string()
@@ -125,7 +125,7 @@ fn expected_unchanged(
     .map_err(|error| error.to_string())
 }
 
-fn payload(
+pub(super) fn payload(
     workspace: &std::path::Path,
     snapshot: std::collections::BTreeMap<String, Vec<u8>>,
     receipt: Vec<u8>,

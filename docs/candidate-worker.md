@@ -491,6 +491,9 @@ remains the fence authority across them.
 | `lineage_blocked` | `false` | The request's Kiln budget lineage reports a blocker or serving backpressure; only the closure marker is written ([repair and lineage](#bounded-same-attempt-repair-and-budget-lineage)) |
 | `lineage_exhausted` | `false` | The request's Kiln budget lineage cannot cover the first step; only the closure marker is written |
 | `repair_ports_unavailable` | `false` | The request has a repair policy but the embedder supplied no worker and check ports, as the standalone CLI never does; only the closure marker is written |
+| `repair_outcome_unknown` | `true` | `export-candidate` of a repair attempt that executed but retains no `repair/disposition.json`, such as a controller lost between a step record and the disposition; the outcome stays unknown and nothing is exported ([repaired candidates](#exporting-repaired-candidates)) |
+| `repair_not_candidate` | `true` | `export-candidate` of a repair attempt whose retained disposition is not `correct_candidate` or `repaired_candidate`; nothing is exported |
+| `repair_disposition_invalid` | `true` | `export-candidate` of a repair attempt whose retained disposition is malformed, belongs to other request bytes, or contradicts this attempt, fence, envelope, execution binding or its own revision and step records; nothing is exported |
 
 The three agent-revision reasons also carry `revision_refusal`, the
 lifecycle's own refusal (its `code` is, for example, `session_revoked`), and
@@ -551,9 +554,12 @@ Produced receipts still reject empty changes. Kiln must independently validate
 both already-satisfied policies and execute actual acceptance before terminal
 completion; no empty PR or remote landing is inferred.
 
-`export-candidate` reads only a complete retained result. It rechecks the frozen
-request, native receipt or explicitly admitted unchanged observation, workspace
-identity, and retained changed-file bytes before exporting. The output parent
+`export-candidate` reads only a complete retained result, or for a repair
+attempt a passing retained disposition
+([exporting repaired candidates](#exporting-repaired-candidates)). It rechecks
+the frozen request, native receipt or explicitly admitted unchanged
+observation, workspace identity, and retained changed-file bytes before
+exporting. The output parent
 must already exist, be canonical and absolute, be owned by the dispatcher user
 and group, and not overlap the workspace, state, or request. The command creates
 `ATTEMPT-FENCE/` with mode `0750`; files use `0640` plus source executable bits.
@@ -691,9 +697,9 @@ written once to `repair/disposition.json` after the attempt's
 `Scope::Attempt` usage observation, and printed. Recovery and a duplicate
 `run` print the retained disposition; without one the outcome is unknown and
 nothing runs again. No disposition is acceptance: Kiln #46 keeps independent
-verification. `export-candidate` and `inspect` do not yet read repair records,
-so a repaired candidate is not exported and its instance is not projected from
-its disposition.
+verification. `export-candidate` exports the candidate of a passing
+disposition and `inspect` projects every retained disposition
+([exporting repaired candidates](#exporting-repaired-candidates)).
 
 Usage is attributed per phase (`preparation`, `edit`, `check`, `repair`) with
 the existing `UsageProvenance`. A worker step is charged the larger of its
@@ -738,6 +744,55 @@ Qualification is fixture-level: the tests in
 `recover` shell with a fixture worker, check port and clock. No OMP process,
 check executor, model endpoint or Kiln lineage has been exercised, and the
 pinned OMP route remains single-shot.
+
+#### Exporting repaired candidates
+
+A repair attempt has no native attempt result, so `export-candidate` and
+`inspect` read its retained disposition instead. Export first runs the same
+checks as a single-shot export: the request, envelope and binding validation,
+the persisted intent of the exact request bytes, the attempt-fence directory
+and output parent, and, for a managed attempt, the revision seam, which
+refuses a revoked session, pinned revision or qualification as
+`export_revoked`. An attempt refused or blocked before dispatch has no
+candidate. Then it reads `repair/disposition.json` of the exact request:
+
+- none retained, for example after a controller was lost between a step
+  record and the disposition, is `repair_outcome_unknown`; the outcome stays
+  unknown and is never guessed;
+- an unreadable or malformed record, or one of other request bytes, is
+  `repair_disposition_invalid`;
+- any disposition other than `correct_candidate` and `repaired_candidate` is
+  `repair_not_candidate`;
+- a passing disposition must name the last recorded revision, at iteration 1
+  for `correct_candidate` and `repairs + 1` for `repaired_candidate`, equal to
+  the recorded step count. Every recorded revision must re-derive from this
+  envelope, attempt and fence, its iteration, its parent (the revision before
+  it) and its receipt's candidate and diff identities. The record must name
+  this envelope and execution binding, the final receipt must be a produced
+  receipt of this work, attempt, fence, workspace and base, and
+  `repair/step-N.json` of that iteration must record the same revision with a
+  `passed` verdict. Anything else is `repair_disposition_invalid`.
+
+The workspace must still capture to the final receipt's candidate identity,
+the tree the checks' read-only copies were written from; otherwise nothing is
+exported. The output is the single-shot layout: the workspace snapshot,
+`host-receipt.json` with the final revision's host-derived receipt and
+`native-observation.json` with the retained disposition, replayed exactly.
+All three refusals report `dispatched:true`. Single-shot attempts are
+exported exactly as before.
+
+[Worker inventory](worker-inventory.md#instance-observation) reports a retained
+disposition as `terminal_observed` with the disposition's `kind`, for example
+`correct_candidate` or `budget_exhausted`. Without one the instance stays
+`dispatch_recorded_outcome_unknown`; a malformed or crossed record is an
+error.
+
+The shell tests in `src/implementation_attempt/cli/tests/repair/export.rs`
+drive fixture repair runs through `run`, `export-candidate` and `inspect`,
+including a revision revoked after the run; the pure tests in
+`src/implementation_attempt/repair/exportable/tests.rs` cover the revision
+chain. The same non-claims apply. An export is not acceptance: Kiln #46 still
+verifies the exported candidate independently.
 
 
 The scoped broker extends the previously published Lattice worker route at

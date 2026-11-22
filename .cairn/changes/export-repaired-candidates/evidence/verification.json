@@ -1,0 +1,77 @@
+{
+  "schema": "lattice.fixture-qualification.v1",
+  "change": "export-repaired-candidates",
+  "kind": "local-verification",
+  "live_qualification": false,
+  "base_revision": "0862c01706cdc66fabedcf7f6db98554c5a2a15b",
+  "integration_head": null,
+  "recorded_on": "2026-11-21",
+  "note": "Uncommitted worktree on base 0862c017; the integrating agent records the integration head.",
+  "tasks": {
+    "1.1": [
+      "src/implementation_attempt/repair/exportable/tests.rs::a_passing_disposition_names_its_exact_last_revision",
+      "src/implementation_attempt/repair/exportable/tests.rs::non_passing_dispositions_name_no_candidate",
+      "src/implementation_attempt/repair/exportable/tests.rs::contradicted_or_crossed_records_name_no_candidate"
+    ],
+    "2.1": [
+      "src/implementation_attempt/cli/tests/repair/export.rs::the_exact_correct_and_repaired_candidate_revisions_are_exported",
+      "src/implementation_attempt/cli/tests/repair/export.rs::a_non_passing_disposition_is_refused_and_inventory_reports_it",
+      "src/implementation_attempt/cli/tests/repair/export.rs::missing_malformed_crossed_and_contradicted_dispositions_are_refused",
+      "src/implementation_attempt/cli/tests/repair/export.rs::a_revoked_revision_refuses_the_export_of_a_repaired_candidate",
+      "src/implementation_attempt/cli/export/tests.rs (3 single-shot tests, unchanged, passing)",
+      "tests/test_implementation_attempt_refusals.rs (6 tests)"
+    ],
+    "2.2": [
+      "src/implementation_attempt/cli/tests/repair.rs::a_first_candidate_that_passes_is_correct_and_recovery_never_reruns",
+      "src/implementation_attempt/cli/tests/repair/export.rs::a_non_passing_disposition_is_refused_and_inventory_reports_it",
+      "src/implementation_attempt/cli/tests/repair/export.rs::missing_malformed_crossed_and_contradicted_dispositions_are_refused",
+      "tests/test_worker_inventory.rs (10 tests)"
+    ],
+    "3.1": [
+      "docs/candidate-worker.md (refusal table; Exporting repaired candidates)",
+      "docs/worker-inventory.md (lifecycle table; disposition tokens; wait-reason note)",
+      "CHANGELOG.md"
+    ]
+  },
+  "inventory": {
+    "contract": "lattice.worker-inventory.v3, unchanged schema and enumerations",
+    "consumer": "Kiln 4899d149 crates/kiln-adapter-lattice/src/worker_inventory.rs: LifecycleDto::TerminalObserved { disposition: String } is decoded without validating the string; lifecycle() requires liveness exited for terminal_observed; validate_instance() requires no instance wait reasons for terminal_observed. Read from source; Kiln was not built or run.",
+    "projection": "a retained repair disposition of the exact request is terminal_observed with the disposition kind, liveness exited, no wait reasons, cancelled as observed_terminated; none retained stays dispatch_recorded_outcome_unknown with dispatch_outcome_unknown; malformed or crossed is an error",
+    "v4_needed_for": "publishing the revision, repair count, bound, cause or defect, or a structural repair/single-shot distinction (a typed terminal_observed.repair object, which Kiln's deny_unknown_fields DTO rejects in v3)",
+    "captures": {
+      "command": "LATTICE_INVENTORY_CAPTURE_DIR=DIR cargo test --locked -p lattice --lib -- capture_ --test-threads 1",
+      "reference": "same command on a git archive of 0862c017 with a separate target directory",
+      "files": 16,
+      "same_file_names": true,
+      "byte_identical": 5,
+      "changed_after_normalizing": 0,
+      "normalized_fields": ["observed_at_epoch_ms (all levels)", "instance incarnation", "instance state_digest"],
+      "result": "no capture change; no capture covers a repair attempt"
+    }
+  },
+  "refusals": {
+    "added": ["repair_outcome_unknown", "repair_not_candidate", "repair_disposition_invalid"],
+    "dispatched": true,
+    "consumer": "Kiln 4899d149 crates/kiln-adapter-lattice/src/worker_settlement.rs classify_refusal returns Retain for any reason outside NOT_DISPATCHED_REASONS or with dispatched:true. Read from source."
+  },
+  "checks": [
+    {"command": "cargo test -p lattice --lib -- implementation_attempt", "exit": 0, "passed": 130, "failed": 0},
+    {"command": "cargo test -p lattice --lib -- inspect worker_inventory export refusal", "exit": 0, "passed": 27, "failed": 0},
+    {"command": "cargo test -p lattice --test test_worker_inventory", "exit": 0, "passed": 10, "failed": 0},
+    {"command": "cargo test -p lattice --test test_implementation_attempt_refusals", "exit": 0, "passed": 6, "failed": 0},
+    {"command": "LATTICE_INVENTORY_CAPTURE_DIR=... cargo test --locked -p lattice --lib -- capture_ --test-threads 1", "exit": 0, "passed": 5, "failed": 0},
+    {"command": "cargo clippy -p lattice --all-targets --no-deps -- -D warnings", "exit": 0},
+    {"command": "cargo fmt -p lattice --check", "exit": 0},
+    {"command": "octet-precommit-check", "exit": 0, "root": {"status": "warning-only", "accepted": 1052, "current": 1052, "new": 0, "stale": 0}, "lattice_core": {"status": "warning-only", "accepted": 25, "current": 25, "new": 0, "stale": 0}, "baseline_rekeyed": false},
+    {"command": "cairn validate --root .", "exit": 0},
+    {"command": "cairn gate proposal export-repaired-candidates --root . --policy cairn-policy/generated/cairn-policy.json", "exit": 0, "verdict": "PASS"},
+    {"command": "cairn gate design export-repaired-candidates --root . --policy cairn-policy/generated/cairn-policy.json", "exit": 0, "verdict": "PASS"},
+    {"command": "cairn gate tasks export-repaired-candidates --root . --policy cairn-policy/generated/cairn-policy.json", "exit": 0, "verdict": "PASS", "task_done": 5},
+    {"command": "gitleaks 8.28.0 dir --no-banner --redact on each of the 24 changed or new paths", "exit": 0, "leaks": 0}
+  ],
+  "non_claims": [
+    "Fixture repair runs only: no OMP process, check executor, model endpoint or Kiln lineage was exercised.",
+    "Kiln's v3 reader and refusal classifier were read at 4899d149, not executed against a repair inventory document.",
+    "An export is not acceptance; Kiln #46 keeps independent verification."
+  ]
+}

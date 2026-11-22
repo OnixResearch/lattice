@@ -13,6 +13,17 @@ pub struct Input<'a> {
     pub diff_identity: &'a str,
 }
 
+/// One recorded host-derived candidate revision, as a step record and the
+/// retained disposition carry it.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Record {
+    pub iteration: u32,
+    pub revision: String,
+    pub parent: Option<String>,
+    pub receipt: crate::candidate::CandidateReceipt,
+}
+
 /// Domain-separated BLAKE3 identity of `input`.
 #[must_use]
 pub fn identity(input: Input<'_>) -> String {

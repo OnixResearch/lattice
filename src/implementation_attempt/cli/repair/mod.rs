@@ -15,6 +15,9 @@ mod materialized;
 mod records;
 mod steps;
 
+/// Why no retained disposition of the exact request was read.
+pub(super) type Unretained = records::Unretained;
+
 /// One bounded worker step of the attempt.
 pub trait WorkerPort {
     /// Run `request` in `workspace` and stop it within `deadline`, the time
@@ -204,6 +207,42 @@ pub(super) fn recover(
     identity: &str,
 ) -> Result<serde_json::Value, String> {
     records::Retained::at(directory, identity).disposition(request)
+}
+
+/// The retained disposition of this exact request, with a typed reason when
+/// none is read. It only reads.
+pub(super) fn retained(
+    request: &super::Request,
+    directory: &std::path::Path,
+    identity: &str,
+) -> Result<serde_json::Value, Unretained> {
+    records::Retained::at(directory, identity).retained(request)
+}
+
+/// The retained record of step `iteration`, if it is readable JSON.
+pub(super) fn step_record(directory: &std::path::Path, identity: &str, iteration: u32) -> Option<serde_json::Value> {
+    records::Retained::at(directory, identity).step(iteration)
+}
+
+/// The disposition inventory v3 publishes for a repair attempt: the kind of
+/// its retained disposition, or `None` while none is retained. A malformed or
+/// crossed record is an error, never a guessed state.
+// r[impl lattice.implementation_attempt.repair_export.scenario.inventory]
+pub(super) fn terminal_label(
+    request: &super::Request,
+    directory: &std::path::Path,
+    identity: &str,
+) -> Result<Option<String>, String> {
+    let observation = match retained(request, directory, identity) {
+        Ok(observation) => observation,
+        Err(Unretained::Missing) => return Ok(None),
+        Err(unretained @ (Unretained::Malformed | Unretained::Crossed)) => return Err(unretained.message().into()),
+    };
+    let value = observation.get("disposition").ok_or(Unretained::Malformed.message())?;
+    let _: crate::implementation_attempt::repair::state::Disposition =
+        serde::Deserialize::deserialize(value).map_err(|_| Unretained::Malformed.message())?;
+    let label = value.get("kind").and_then(serde_json::Value::as_str).ok_or(Unretained::Malformed.message())?;
+    Ok(Some(label.to_owned()))
 }
 
 fn observe(clock: &dyn crate::operation::shell::Clock) -> Option<u64> {

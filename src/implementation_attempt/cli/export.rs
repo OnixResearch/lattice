@@ -1,11 +1,14 @@
 mod admission;
 mod content;
 mod publication;
+mod repaired;
 #[cfg(test)]
 mod tests;
 
 struct Admitted {
     request: super::Request,
+    /// BLAKE3 of the exact request bytes.
+    identity: String,
     workspace: std::path::PathBuf,
     output: std::path::PathBuf,
     directory: std::path::PathBuf,
@@ -34,9 +37,13 @@ fn execute(
     revisions: super::session::revision::Store<'_>,
 ) -> Result<serde_json::Value, String> {
     let inputs = admission::load(request_path, state, output_parent, revisions)?;
-    let retained = admission::retained(&inputs)?;
-    let payload = content::load(&inputs, &retained)?;
-    publication::write(&inputs.output, &payload, &retained.observation)?;
+    let (payload, observation) = if inputs.request.repair.is_some() {
+        repaired::load(&inputs)?
+    } else {
+        let retained = admission::retained(&inputs)?;
+        (content::load(&inputs, &retained)?, retained.observation)
+    };
+    publication::write(&inputs.output, &payload, &observation)?;
     Ok(serde_json::json!({
         "schema": "lattice.implementation-candidate-export.v1",
         "candidate_root": inputs.output,

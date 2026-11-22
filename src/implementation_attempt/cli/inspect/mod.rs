@@ -179,7 +179,13 @@ fn instance(
         super::session::intent::Recorded::inventory_admission,
     );
     let pinned = lattice_core::execution_binding::projection::lineage::pinned(retained.lifecycle, &session, admission);
-    let disposition = terminal_disposition(directory, &request.envelope.attempt_id)?;
+    // A repair attempt has no native attempt result; its retained disposition
+    // is its terminal result.
+    let disposition = if request.repair.is_some() {
+        super::repair::terminal_label(request, directory, request_identity)?
+    } else {
+        terminal_disposition(directory, &request.envelope.attempt_id)?
+    };
     let pairs = identities.iter().map(|(name, identity)| (*name, identity.as_str())).collect::<Vec<_>>();
     debug_assert!(identities.len() <= NAMED_ARTIFACTS.len());
     debug_assert_eq!(present(super::binding::ADMITTED_FILE), admitted.is_some());

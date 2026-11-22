@@ -226,8 +226,23 @@ admitted binding's values, unchanged. v2 added `definition_identity`,
 | `admitted_not_dispatched` | Binding only, no intent |
 | `binding_rejected_before_dispatch` | Intent and binding refusal |
 | `revision_blocked_before_dispatch` | Intent and `revision-block.json`: the managed session's effect check (`seam::effect`) was blocked right before spawn, so the worker never started |
-| `dispatch_recorded_outcome_unknown` | Intent without a terminal result |
-| `terminal_observed` | Published terminal result, with its `disposition` |
+| `dispatch_recorded_outcome_unknown` | Intent without a terminal result: no published native result, or, for an attempt with a repair policy, no retained `repair/disposition.json` |
+| `terminal_observed` | Published terminal result, with its `disposition`; for an attempt with a repair policy, its retained repair disposition |
+
+`disposition` is a token. A single-shot attempt publishes its native
+candidate disposition (`produced`, `failed`, `blocked`, `cancelled` or
+`unknown`). An attempt with a repair policy has no native result, so its
+retained `repair/disposition.json` of the exact request is its terminal
+result, and `disposition` is that record's `kind`: `correct_candidate`,
+`repaired_candidate`, `budget_exhausted`, `cancelled`, `uncertain`,
+`not_repairable`, `checks_rejected`, `lineage_blocked`, `kiln_owned`,
+`fence_superseded` or `authority_withdrawn`. Only the kind is published;
+the revision, repair count, bound, cause and defect stay in the retained
+record, which `recover` prints. A repair `cancelled` is observed termination
+like a single-shot one. A malformed record, or one of other request bytes,
+is an error, never a guessed state. This is the existing v3 shape: Kiln's v3
+reader at `4899d149` decodes `disposition` as an open string, so no schema or
+enumeration changes.
 
 ### Liveness
 
@@ -287,11 +302,11 @@ missing repair port are not wait reasons. Lattice refuses such a request
 before its fence record and intent, writing only the attempt-fence's closure
 marker (`lineage_blocked`, `lineage_exhausted`,
 `repair_ports_unavailable`), and Kiln owns waiting for its lineage. A repair
-loop's exhausted bound is a terminal disposition, not a wait. Inventory v3
-does not read repair records yet: an attempt run with a repair policy has no
-native attempt result, so its instance stays `dispatch_recorded_outcome_unknown`
-with the `dispatch_outcome_unknown` reason even after its disposition is
-retained ([candidate worker](candidate-worker.md#bounded-same-attempt-repair-and-budget-lineage)).
+loop's exhausted bound is a terminal disposition, not a wait. An attempt run
+with a repair policy stays `dispatch_recorded_outcome_unknown` with the
+`dispatch_outcome_unknown` reason only until its disposition is retained;
+from then on it is `terminal_observed` with no wait reason
+([candidate worker](candidate-worker.md#exporting-repaired-candidates)).
 
 - Reasons are sorted by code in the order of the table above (not
   alphabetically), then by subject. They are deduplicated and bounded to 32,
