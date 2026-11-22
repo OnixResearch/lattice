@@ -28,7 +28,7 @@ impl ApplicationHandler {
         binding: crate::checkpoint::CheckpointBinding,
     ) -> Result<Self, ApplicationError> {
         crate::checkpoint::validate_binding(&binding).map_err(|_| ApplicationError::Profile)?;
-        let matching = self.profile.routes.iter().filter(|route| binds_route(&binding, route)).count();
+        let matching = self.profile.routes().iter().filter(|route| binds_route(&binding, route)).count();
         if matching != 1 {
             return Err(ApplicationError::Route);
         }
@@ -64,9 +64,7 @@ impl ApplicationHandler {
             crate::checkpoint::Admission::Idempotent(receipt) => return Ok(receipt),
             crate::checkpoint::Admission::Fresh(admitted) => admitted,
         };
-        let route = crate::workflow_exchange::select_route(&self.profile, &admitted.workflow_request)
-            .map_err(|_| Refusal::CrossedRoute)?
-            .clone();
+        let route = self.profile.select_route(&admitted.workflow_request).map_err(|_| Refusal::CrossedRoute)?.clone();
         let workflow = self
             .store
             .load_workflow(&route.workflow_name)
