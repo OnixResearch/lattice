@@ -17,7 +17,7 @@
 pub(super) mod admission;
 mod evidence;
 mod materialized;
-pub mod operator;
+pub(crate) mod operator;
 mod records;
 mod steps;
 

@@ -43,7 +43,8 @@ pub enum Authority {
     /// lifecycle could not be read.
     ManagedRevision,
     /// The standalone operator's effect-authority profile no longer grants
-    /// the OMP repair worker, or the admission expired.
+    /// both the OMP worker and the check tuples with its admitted identity,
+    /// or the admission expired.
     EffectAuthority,
 }
 

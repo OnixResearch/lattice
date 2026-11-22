@@ -4,16 +4,20 @@
 //! worker's generic bubblewrap route, on the read-only copy of the candidate
 //! the loop materialized for it: a cleared environment, a private network,
 //! no model broker and no credential, no write path, and bounded output.
-//! Only an exit observed on an unchanged copy decides the check.
+//! Before each check the operator's grant and the admission are rechecked
+//! and its deadline is capped by the admission's expiry. Only an exit
+//! observed on an unchanged copy decides the check.
 
 // r[impl lattice.implementation_attempt.operator_repair.scenario.checks]
+// r[impl lattice.implementation_attempt.operator_repair.scenario.authority]
 
 type Pins = crate::implementation_attempt::repair::checks::catalog::Pins;
 type CatalogError = crate::implementation_attempt::repair::checks::catalog::Error;
 type Observation = crate::implementation_attempt::repair::checks::Observation;
+type CheckOutcome = crate::implementation_attempt::repair::checks::Outcome;
 
 /// Runs one check process; the shell owns everything around it.
-pub trait Execute: Send {
+pub(crate) trait Execute: Send {
     fn execute(
         &mut self,
         check: &crate::candidate_worker::Request,
@@ -25,7 +29,7 @@ pub trait Execute: Send {
 /// (`candidate_worker::run`), the same workspace provider the OMP worker
 /// uses, without a broker.
 #[derive(Debug, Clone, Copy, Default)]
-pub struct Sandboxed;
+pub(crate) struct Sandboxed;
 
 impl Execute for Sandboxed {
     fn execute(
@@ -39,8 +43,10 @@ impl Execute for Sandboxed {
     }
 }
 
-/// Read the operator's catalog at `path`, outside `workspace`, verify every
-/// pinned executable's bytes, and admit it for `policy`.
+/// Read the operator's catalog at `path`, outside `workspace`, admit it for
+/// `policy`, and verify every pinned executable's bytes. The file is opened
+/// without following links and without blocking, and must be a bounded
+/// regular file, so a FIFO cannot stall the per-work lock.
 pub(in crate::implementation_attempt::cli) fn load(
     path: &std::path::Path,
     workspace: &std::path::Path,
@@ -52,22 +58,41 @@ pub(in crate::implementation_attempt::cli) fn load(
         return Err(CatalogError::Workspace);
     }
     debug_assert!(canonical.is_absolute() && root.is_absolute(), "canonical paths are absolute");
-    let metadata = std::fs::symlink_metadata(&canonical).map_err(|_| CatalogError::Unavailable)?;
-    let limit_bytes = u64::try_from(crate::implementation_attempt::repair::checks::catalog::MAX_CATALOG_BYTES)
-        .map_err(|_| CatalogError::Oversized)?;
-    if metadata.len() > limit_bytes {
-        return Err(CatalogError::Oversized);
-    }
-    let bytes = super::super::super::artifacts::read_bounded(
-        &canonical,
-        crate::implementation_attempt::repair::checks::catalog::MAX_CATALOG_BYTES,
-    )
-    .map_err(|_| CatalogError::Unavailable)?;
+    let bytes = read(&canonical)?;
     let catalog = crate::implementation_attempt::repair::checks::catalog::parse(&bytes)?;
-    verify(&catalog)?;
     catalog.admit(policy)?;
+    verify(&catalog)?;
     debug_assert_eq!(catalog.checks.len(), policy.checks.len(), "an admitted catalog holds the policy's checks");
     Ok(catalog)
+}
+
+/// The bytes of the regular file at `path`, at most the catalog bound.
+fn read(path: &std::path::Path) -> Result<Vec<u8>, CatalogError> {
+    use std::io::Read as _;
+    use std::os::unix::fs::OpenOptionsExt as _;
+    let limit_bytes = crate::implementation_attempt::repair::checks::catalog::MAX_CATALOG_BYTES;
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+        .open(path)
+        .map_err(|_| CatalogError::Unavailable)?;
+    let metadata = file.metadata().map_err(|_| CatalogError::Unavailable)?;
+    debug_assert!(limit_bytes > 0, "the catalog bound admits a catalog");
+    if !metadata.is_file() {
+        return Err(CatalogError::Unavailable);
+    }
+    let length_bytes = usize::try_from(metadata.len()).map_err(|_| CatalogError::Oversized)?;
+    if length_bytes > limit_bytes {
+        return Err(CatalogError::Oversized);
+    }
+    let probe = u64::try_from(limit_bytes).map_err(|_| CatalogError::Oversized)?.saturating_add(1);
+    let mut bytes = Vec::with_capacity(length_bytes);
+    file.take(probe).read_to_end(&mut bytes).map_err(|_| CatalogError::Unavailable)?;
+    debug_assert!(bytes.len() <= limit_bytes.saturating_add(1), "the read is bounded by its probe");
+    if bytes.len() > limit_bytes {
+        return Err(CatalogError::Oversized);
+    }
+    Ok(bytes)
 }
 
 /// Every pinned executable resolves inside the Nix store to its bytes.
@@ -80,59 +105,71 @@ fn verify(catalog: &Pins) -> Result<(), CatalogError> {
     }
 }
 
+/// What the catalog check port of one run is bound to.
+pub(in crate::implementation_attempt::cli::repair) struct Frame<'a, 'r> {
+    pub(in crate::implementation_attempt::cli::repair) request: &'r super::super::super::Request,
+    pub(in crate::implementation_attempt::cli::repair) catalog: Pins,
+    pub(in crate::implementation_attempt::cli::repair) grant: super::Grant,
+    /// The run's records, read for a persisted cancellation request.
+    pub(in crate::implementation_attempt::cli::repair) cancel: super::super::records::Retained,
+    pub(in crate::implementation_attempt::cli::repair) execute: &'a mut dyn Execute,
+}
+
 /// The catalog check port of one repair run.
-pub(in crate::implementation_attempt::cli) struct CatalogPort<'a, 'r> {
-    request: &'r super::super::super::Request,
-    catalog: Pins,
-    execute: &'a mut dyn Execute,
+pub(in crate::implementation_attempt::cli::repair) struct CatalogPort<'a, 'r> {
+    frame: Frame<'a, 'r>,
 }
 
 impl<'a, 'r> CatalogPort<'a, 'r> {
-    pub(in crate::implementation_attempt::cli) fn new(
-        request: &'r super::super::super::Request,
-        catalog: Pins,
-        execute: &'a mut dyn Execute,
-    ) -> Self {
-        Self {
-            request,
-            catalog,
-            execute,
-        }
+    pub(in crate::implementation_attempt::cli::repair) fn new(frame: Frame<'a, 'r>) -> Self {
+        Self { frame }
     }
+}
 
-    /// The bounded process of `entry` on `candidate`: the paths the worker
-    /// could see, read-only, no write path, network, broker or credential.
-    fn process(
-        &self,
-        entry: &crate::implementation_attempt::repair::checks::catalog::Entry,
-        candidate: &std::path::Path,
-        deadline: std::time::Duration,
-    ) -> Result<crate::candidate_worker::Request, String> {
-        let sandbox = crate::candidate_worker::broker::admission::executable(&self.catalog.sandbox)?;
-        let program = crate::candidate_worker::broker::admission::executable(&entry.program)?;
-        let mut read_paths = self.request.read_paths.clone();
-        read_paths.extend(self.request.write_paths.iter().cloned());
-        read_paths.sort();
-        read_paths.dedup();
-        let boundary = crate::candidate_capture::admit_workspace_boundary(candidate, &read_paths, &[], false, false)
-            .map_err(|error| error.to_string())?;
-        let envelope = &self.request.envelope;
-        let admitted_secs = envelope.budget.max_seconds;
-        Ok(crate::candidate_worker::Request {
-            work_id: envelope.work_id.clone(),
-            attempt_id: envelope.attempt_id.clone(),
-            fence: envelope.fence.to_string(),
-            workspace_id: envelope.workspace_id.clone(),
-            program: path_text(program)?,
-            args: entry.args.clone(),
-            boundary,
-            require_isolation: true,
-            sandbox_program: Some(path_text(sandbox)?),
-            broker: None,
-            timeout_secs: crate::implementation_attempt::repair::step::operator::timeout_secs(deadline, admitted_secs),
-            output_limit_bytes: crate::implementation_attempt::repair::checks::catalog::OUTPUT_LIMIT_BYTES,
-        })
+/// The bounded process of `entry` on `candidate`: the request's read paths
+/// that exist in the copy, read-only, and no write path, network, broker or
+/// credential. Its deadline is the loop's, within the envelope's seconds and
+/// the admission's remaining whole seconds.
+fn process(
+    request: &super::super::super::Request,
+    sandbox: &crate::candidate_worker::broker::Executable,
+    entry: &crate::implementation_attempt::repair::checks::catalog::Entry,
+    candidate: &std::path::Path,
+    deadline: std::time::Duration,
+) -> Result<crate::candidate_worker::Request, String> {
+    debug_assert!(entry.program.path.is_absolute(), "a pinned program path is absolute");
+    debug_assert!(!candidate.as_os_str().is_empty(), "a check runs on its copy");
+    let sandbox = crate::candidate_worker::broker::admission::executable(sandbox)?;
+    let program = crate::candidate_worker::broker::admission::executable(&entry.program)?;
+    let read_paths: Vec<String> =
+        request.read_paths.iter().filter(|path| candidate.join(path.as_str()).exists()).cloned().collect();
+    let boundary = crate::candidate_capture::admit_workspace_boundary(candidate, &read_paths, &[], false, false)
+        .map_err(|error| error.to_string())?;
+    let remaining_ms = request
+        .expires_at_ms
+        .checked_sub(super::super::super::now_ms()?)
+        .ok_or("admission expired before a check")?;
+    let admitted_secs = request.envelope.budget.max_seconds.min(remaining_ms / 1000);
+    let timeout_secs = crate::implementation_attempt::repair::step::operator::timeout_secs(deadline, admitted_secs);
+    if timeout_secs == 0 {
+        return Err("admission expires before a bounded check".into());
     }
+    debug_assert!(timeout_secs <= request.envelope.budget.max_seconds, "within the envelope's seconds");
+    let envelope = &request.envelope;
+    Ok(crate::candidate_worker::Request {
+        work_id: envelope.work_id.clone(),
+        attempt_id: envelope.attempt_id.clone(),
+        fence: envelope.fence.to_string(),
+        workspace_id: envelope.workspace_id.clone(),
+        program: path_text(program)?,
+        args: entry.args.clone(),
+        boundary,
+        require_isolation: true,
+        sandbox_program: Some(path_text(sandbox)?),
+        broker: None,
+        timeout_secs,
+        output_limit_bytes: crate::implementation_attempt::repair::checks::catalog::OUTPUT_LIMIT_BYTES,
+    })
 }
 
 fn path_text(path: std::path::PathBuf) -> Result<String, String> {
@@ -146,8 +183,15 @@ impl super::super::CheckPort for CatalogPort<'_, '_> {
         candidate: &std::path::Path,
         deadline: std::time::Duration,
     ) -> Observation {
-        let executor = self.catalog.executor();
-        let Some(entry) = self.catalog.entry(&invocation.check).cloned() else {
+        let Frame {
+            request,
+            catalog,
+            grant,
+            cancel,
+            execute,
+        } = &mut self.frame;
+        let executor = catalog.executor();
+        let Some(entry) = catalog.entry(&invocation.check) else {
             // The admitted catalog holds every declared check; any other is
             // reported as run by no admitted configuration.
             return Observation {
@@ -155,16 +199,25 @@ impl super::super::CheckPort for CatalogPort<'_, '_> {
                 configuration: String::new(),
                 revision: invocation.revision.clone(),
                 executor,
-                outcome: crate::implementation_attempt::repair::checks::Outcome::Unknown,
+                outcome: CheckOutcome::Unknown,
             };
         };
-        let cancellation = std::sync::atomic::AtomicBool::new(false);
-        let outcome = self
-            .process(&entry, candidate, deadline)
-            .and_then(|process| self.execute.execute(&process, &cancellation))
-            .map_or(crate::implementation_attempt::repair::checks::Outcome::Unknown, |observed| {
-                crate::implementation_attempt::repair::checks::catalog::outcome(&observed, &entry.failure_class)
-            });
+        // A withdrawn grant, an expired admission or a cancellation leaves
+        // the check unrun and its outcome unknown.
+        let is_current = grant.recheck(request).is_none() && !cancel.is_cancel_requested();
+        let outcome = if is_current {
+            process(request, &catalog.sandbox, entry, candidate, deadline)
+                .and_then(|process| {
+                    super::polled(|cancellation| execute.execute(&process, cancellation), &|| {
+                        cancel.is_cancel_requested()
+                    })
+                })
+                .map_or(CheckOutcome::Unknown, |observed| {
+                    crate::implementation_attempt::repair::checks::catalog::outcome(&observed, &entry.failure_class)
+                })
+        } else {
+            CheckOutcome::Unknown
+        };
         Observation {
             check: invocation.check.clone(),
             configuration: entry.configuration(),

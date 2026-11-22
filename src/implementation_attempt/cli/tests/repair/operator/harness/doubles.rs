@@ -40,7 +40,8 @@ pub(in super::super) enum Profile {
     NoCatalog,
 }
 
-const CHECK: &str = "read -r source < src/lib.txt; test \"$source\" = fixed";
+/// The default check: passes exactly when `src/lib.txt` reads `fixed`.
+pub(in super::super) const CHECK: &str = "read -r source < src/lib.txt; test \"$source\" = fixed";
 pub(super) const TERMINAL: [&str; 5] = [
     r#"{"type":"session","version":3,"id":"fake-session","cwd":"/workspace"}"#,
     r#"{"type":"agent_start"}"#,
@@ -54,6 +55,8 @@ pub(super) const TERMINAL: [&str; 5] = [
 pub(super) struct Scripted {
     pub(super) launches: Arc<AtomicU32>,
     pub(super) after: Arc<Mutex<Option<Hook>>>,
+    /// Runs once, at the start of the first repair launch.
+    pub(super) before_repair: Arc<Mutex<Option<Hook>>>,
     pub(super) is_lost: Arc<AtomicBool>,
 }
 
@@ -64,7 +67,12 @@ impl crate::implementation_attempt::cli::repair::operator::Launch for Scripted {
         profile: &crate::candidate_worker::omp::Profile,
         cancellation: &std::sync::atomic::AtomicBool,
     ) -> Result<crate::candidate_worker::omp::RunResult, String> {
-        self.launches.fetch_add(1, Ordering::SeqCst);
+        let launch = self.launches.fetch_add(1, Ordering::SeqCst);
+        if launch > 0
+            && let Some(mut before) = self.before_repair.lock().expect("hook").take()
+        {
+            before();
+        }
         let result = crate::candidate_worker::omp::run_scripted(worker, profile, cancellation);
         assert!(!self.is_lost.load(Ordering::SeqCst), "controller lost after the OMP step");
         if let Some(mut after) = self.after.lock().expect("hook").take() {
@@ -78,6 +86,8 @@ impl crate::implementation_attempt::cli::repair::operator::Launch for Scripted {
 /// generic route without the sandbox.
 pub(super) struct Unsandboxed {
     pub(super) runs: Arc<AtomicU32>,
+    /// Runs once, after the first check.
+    pub(super) after: Arc<Mutex<Option<Hook>>>,
 }
 
 impl crate::implementation_attempt::cli::repair::operator::checks::Execute for Unsandboxed {
@@ -93,7 +103,11 @@ impl crate::implementation_attempt::cli::repair::operator::checks::Execute for U
         process.require_isolation = false;
         process.sandbox_program = None;
         let config = crate::process::core::RuntimeConfig::default();
-        crate::candidate_worker::run(&process, &config, cancellation).map_err(|error| error.to_string())
+        let outcome = crate::candidate_worker::run(&process, &config, cancellation).map_err(|error| error.to_string());
+        if let Some(mut after) = self.after.lock().expect("hook").take() {
+            after();
+        }
+        outcome
     }
 }
 
@@ -111,14 +125,14 @@ fn store_shell() -> crate::candidate_worker::broker::Executable {
     crate::candidate_worker::broker::Executable { path: shell, blake3 }
 }
 
-/// The operator catalog of one `unit` check that passes exactly when
-/// `src/lib.txt` reads `fixed`.
-pub(super) fn catalog() -> serde_json::Value {
+/// The operator catalog of one `unit` check running `check` in the pinned
+/// Nix store shell.
+pub(super) fn catalog(check: &str) -> serde_json::Value {
     let shell = store_shell();
     serde_json::json!({
         "schema": crate::implementation_attempt::repair::checks::catalog::SCHEMA,
         "sandbox": shell,
-        "checks": [{"name": "unit", "program": shell, "args": ["-c", CHECK], "failure_class": "test"}],
+        "checks": [{"name": "unit", "program": shell, "args": ["-c", check], "failure_class": "test"}],
     })
 }
 

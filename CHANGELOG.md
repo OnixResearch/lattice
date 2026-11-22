@@ -18,16 +18,21 @@ interfaces.
   read-only copy, with a cleared environment, a private network, no broker
   and bounded output. The ports are used only while the configuration's
   `effect_authority` profile grants `lattice://agent/1` and
-  `lattice://process/2` for the request's worker profile revision; otherwise
-  the run is refused before any launch as `repair_ports_unavailable` (with
-  `check_catalog`) or the new `repair_authority_denied`, and a grant withdrawn
-  mid-run ends the loop as `authority_withdrawn` (`effect_authority`). OMP
-  exits and host stops are `exited`, cancellation `cancelled`, and every other
-  launcher outcome `unknown`; each step retains `repair/omp-step-N.{jsonl,json}`.
-  `prepare` prints the profile requirements as `repair_authority`.
-  `implementation_attempt::cli::run_command` now takes the configuration path,
-  and `candidate_worker::omp::stop` classifies a failed launch. Requests
-  without a repair policy are unchanged.
+  `lattice://process/2` for the request's worker profile revision, checked
+  before the fence record, before every step's intent and before every
+  check; otherwise the run is refused before any launch as
+  `repair_ports_unavailable` (with `check_catalog`) or the new
+  `repair_authority_denied`, a grant withdrawn before a step ends the loop as
+  `authority_withdrawn` with the additive cause `effect_authority`, and one
+  withdrawn before a check leaves it unrun and unknown. Each step launches on
+  the tree the previous step left, so a workspace changed between steps is
+  blocked. OMP exits, signal deaths inside the sandbox (`128 + N`) and host
+  stops are `exited`, cancellation `cancelled`, and every other launcher
+  outcome, including a stop at a deadline the admission capped, `unknown`;
+  check statuses of 126 and above are unknown, not failures. Each step
+  retains `repair/omp-step-N.{jsonl,json}`, and `prepare` prints the profile
+  requirements as `repair_authority`. Requests without a repair policy are
+  unchanged.
 - Export and inventory of repaired candidates (Lattice #6).
   `implementation-attempt export-candidate` exports the exact final candidate
   revision of a retained `correct_candidate` or `repaired_candidate` repair
@@ -427,6 +432,9 @@ interfaces.
 
 ### Changed
 
+- Breaking: `implementation_attempt::cli::run_command` takes the
+  application configuration path, read only by a `run` of a request with a
+  repair policy for its operator `effect_authority` profile (Lattice #6).
 - Breaking: `agent-revision admit-session` refuses a request's own attempt
   session (its envelope identity) before any state change, with
   `attempt_session: … admitted only by lattice implementation-attempt run`,

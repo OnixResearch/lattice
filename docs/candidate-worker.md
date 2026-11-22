@@ -435,8 +435,8 @@ session: `agent-revision admit-session` refuses it before any state change
 (see [agent revisions](agent-revisions.md#attempt-seam)).
 
 A typed refusal at steps 3 to 7 (`lineage_blocked`, `lineage_exhausted`,
-`repair_ports_unavailable`, `stale_fence`, `crossed_attempt`,
-`revision_not_admitted`) is settled before the lock is released: the run
+`repair_ports_unavailable`, `repair_authority_denied`, `stale_fence`,
+`crossed_attempt`, `revision_not_admitted`) is settled before the lock is released: the run
 exclusively creates the attempt-fence's closure marker,
 `closed-before-execution:<request identity>:<blake3(work_id)>`, the same
 content recovery writes, then prints the refusal with `dispatched:false`.
@@ -625,14 +625,17 @@ the shell:
    unreadable clock, the elapsed bound, the iteration bound, the aggregate
    budgets and the lineage, in that order;
 3. under the fence lock, rechecks that the attempt is still recorded at its
-   fence and that no higher fence is recorded and, for every step after the
-   first, re-observes the execution binding and the managed revision through
-   the same checks as the pre-spawn revalidation and revision permit, then
-   writes `repair/step-N.intent` once before the worker effect. A failed fence
-   check ends the loop as `fence_superseded`; a binding that is no longer
-   current, a blocked managed session or a revision seam that cannot answer
-   ends it as `authority_withdrawn` with its `cause` (`execution_binding` or
-   `managed_revision`). That step never spawns. Both are post-dispatch
+   fence and that no higher fence is recorded; with the standalone operator
+   ports, rechecks the operator's grant for every step
+   ([standalone operator repair](#standalone-operator-repair)); for every
+   step after the first, re-observes the execution binding and the managed
+   revision through the same checks as the pre-spawn revalidation and
+   revision permit; then writes `repair/step-N.intent` once before the
+   worker effect. A failed fence check ends the loop as `fence_superseded`;
+   a binding that is no longer current, a blocked managed session, a
+   revision seam that cannot answer or a withdrawn operator grant ends it as
+   `authority_withdrawn` with its `cause` (`execution_binding`,
+   `managed_revision` or `effect_authority`). That step never spawns. Both are post-dispatch
    outcomes, retained and printed like any other disposition, because the
    attempt's intent exists and earlier steps may have had effects. They are
    never refusals, never report `dispatched:false` and write neither
@@ -775,25 +778,34 @@ configuration or catalog.
   route (`candidate_worker::omp::run`): the same re-admitted workspace
   boundary, bubblewrap provider, byte pins, reviewed argv and attempt-local
   broker with the host-only `env` credential. The step's OMP base is the
-  workspace's current snapshot (the parent revision) and a repair's prompt is
-  the admitted prompt plus the parent revision and the admitted failure
-  classes only. Its deadline is the loop's remaining time rounded up to whole
-  seconds within the admission's own bound, so a worker that runs to it
-  returns past the elapsed bound and the step is `budget_exhausted`
-  (`elapsed`), never checked. A persisted cancellation request is polled
-  during the step. Raw events and the launcher observation are written once
-  as `repair/omp-step-N.jsonl` and `repair/omp-step-N.json` before the step
+  expected tree: the admitted base for the first step, then the workspace
+  the previous exited step left. The launcher refuses any other workspace,
+  so a workspace changed between steps blocks the launch and the step is
+  `unknown`. A repair's prompt is the admitted prompt plus the parent
+  revision, "the previous step produced no new candidate" after a
+  `no_candidate` failure, and the other failed check classes only. Its
+  deadline is the loop's remaining time rounded up to whole seconds, so when
+  the elapsed bound is the limit a worker that runs to it returns past the
+  bound and the step is `budget_exhausted` (`elapsed`), never checked. When
+  the admission's expiry caps the deadline below that (`deadline_capped` in
+  the step record), a stop at the capped deadline is `unknown`, never
+  checked. A persisted cancellation request is polled during the step. Raw
+  events and the launcher observation are written once as
+  `repair/omp-step-N.jsonl` and `repair/omp-step-N.json` before the step
   record.
 - **Outcomes:** `exited` for an observed exit (a completed candidate or no
-  change is status 0) and for a host stop at the deadline or output limit
-  (status 137), `cancelled` for a cancelled step, and `unknown` for anything
-  else: a launch blocked before spawn, a stop without an exit status, a write
-  outside the boundary, an interrupted or unknown teardown and an incomplete
-  OMP terminal stream. `unknown` ends the loop as `uncertain`
-  (`worker_outcome`), which inventory never reports as stopped, and nothing
-  is retried. A launcher that panics is a lost controller: the step intent
-  stays without a record, and recovery reports the outcome unknown without a
-  second launch.
+  change is status 0) and for a host stop at an uncapped deadline or the
+  output limit (status 137); a signal death inside the sandbox is an observed
+  exit with bubblewrap's `128 + N` status. `cancelled` is a cancelled step,
+  and `unknown` is anything else: a launch blocked before spawn, a stop
+  without an exit status (bubblewrap itself killed), a write outside the
+  boundary, an interrupted or unknown teardown and an incomplete OMP
+  terminal stream. `unknown` ends the loop as `uncertain` (`worker_outcome`),
+  which inventory never reports as stopped, and nothing is retried. A
+  launcher that panics is a lost controller: the step intent stays without a
+  record, and recovery reports the outcome unknown without a second launch.
+  A `SIGINT` or `SIGTERM` to `run` ends the controller the same way, unlike a
+  single-shot run; use `implementation-attempt cancel` for a clean stop.
 - **Checks:** the catalog (`lattice.implementation-attempt-check-catalog.v1`,
   at most 64 KiB, 16 entries sorted by name, 32 arguments of at most 4 KiB
   each) is operator input read outside the attempt workspace:
@@ -806,20 +818,34 @@ configuration or catalog.
   ```
 
   Every program and the sandbox must be an absolute Nix store path whose
-  bytes have the pinned BLAKE3. A check's `configuration` is the
-  domain-separated BLAKE3 of its entry and the policy's `check_executor` that
-  of the executor profile (schema, route, sandbox pin and the 1 MiB output
-  bound), so the policy, and through it the worker profile revision, names
-  exactly these processes. Each check runs once through the candidate
-  worker's generic bubblewrap route with its read-only copy as root, the
-  worker's read and write paths mounted read-only, no write path, a cleared
-  environment, a private network, no broker or credential, and stdout and
-  stderr bounded to 1 MiB each. An exit observed on an unchanged copy decides
-  it: zero passes and non-zero fails with the entry's class; anything else is
-  an unknown outcome. A missing catalog is `repair_ports_unavailable`; one
-  that is unreadable, oversized, malformed, unpinned, byte-mismatched, inside
-  the workspace or not exactly the policy's is `repair_ports_unavailable` with
-  `check_catalog`.
+  bytes have the pinned BLAKE3; the catalog is opened without following
+  links or blocking and must be a regular file. A check's `configuration` is
+  the domain-separated BLAKE3 of its entry and the policy's `check_executor`
+  that of the executor profile (schema, route, sandbox pin and the 1 MiB
+  output bound). The pins cover the entry executable's bytes only: inside
+  the sandbox, interpreters and tools it resolves through shebangs or
+  `PATH=/usr/bin:/bin` come from the host's read-only system mounts (`/usr`,
+  `/bin`, `/lib*`, and on NixOS `/run/current-system/sw/bin`), which the
+  shared candidate-worker sandbox provides and no identity frames, so a host
+  upgrade can change what a check runs. Pin a self-contained store program
+  (for example a store script with absolute store shebangs and paths) to
+  avoid that. Before each check the operator's grant and the admission are
+  rechecked and a persisted cancellation request is read; any of them stops
+  the check unrun with an unknown outcome. Each check runs once through the
+  candidate worker's generic bubblewrap route with its read-only copy as
+  root, the request's read paths that exist in the copy mounted read-only,
+  no write path, a cleared environment, a private network, no broker or
+  credential, stdout and stderr bounded to 1 MiB each, and a deadline within
+  the admission's remaining seconds. An exit observed on an unchanged copy
+  decides it: zero passes and a status from 1 to 125 fails with the entry's
+  class. A cannot-execute (126), not-found (127) or signal (`128 + N`)
+  status and anything else is an unknown outcome, so the loop ends
+  `uncertain` (`check_outcome`) instead of spending repairs on an
+  infrastructure fault; a bubblewrap setup failure exits 1 and cannot be told
+  apart from a failing check. A missing catalog is `repair_ports_unavailable`;
+  one that is unreadable, not a regular file, oversized, malformed, unpinned,
+  byte-mismatched, inside the workspace or not exactly the policy's is
+  `repair_ports_unavailable` with `check_catalog`.
 - **Authority:** the `effect_authority` profile of the application
   configuration (`--config`) must hold both tuples below, with
   `workflow_revision` `blake3:<worker_profile>` and the operator repair
@@ -834,13 +860,20 @@ configuration or catalog.
 
   Without both, the run is refused as `repair_authority_denied` before the
   fence record, with no step intent. Before every step's intent, under the
-  fence lock, the same profile is evaluated again and must keep its admitted
-  identity and grants, and the admission must not have expired; otherwise the
-  loop ends as `authority_withdrawn` with cause `effect_authority`.
+  fence lock, and before every check, the same profile is evaluated once
+  again and must keep its admitted identity and both grants, and the
+  admission must not have expired; otherwise a step ends the loop as
+  `authority_withdrawn` with cause `effect_authority`, and a check is unrun
+  and unknown.
 
-Export, inventory and recovery read these attempts like any other repair
-attempt. The tests run the fake OMP and the checks without bubblewrap or
-broker; the sandboxed routes are the single-shot route's.
+Every refusal here closes the attempt-fence for good, like the other
+pre-intent refusals: a configuration that does not load, an unreadable or
+mistyped `--repair-checks` path or a profile that cannot be evaluated
+leaves only the closure marker, and the attempt must be dispatched again
+as a new attempt. Export, inventory and recovery read these attempts like
+any other repair attempt. The tests run the fake OMP and the checks without
+bubblewrap or broker, so `PinnedOmp` and the sandboxed check route
+(`checks::Sandboxed`) are not exercised by any test.
 
 #### Exporting repaired candidates
 

@@ -113,10 +113,16 @@ fn only_an_exit_on_an_unchanged_copy_decides_a_check() {
     };
     let exited = failed("worker exited with status Some(1)");
     assert_eq!(super::outcome(&exited, "test"), Check::Failed { class: "test".into() });
+    let last_verdict = failed("worker exited with status Some(125)");
+    assert_eq!(super::outcome(&last_verdict, "test"), Check::Failed { class: "test".into() });
     for unknown in [
         failed("worker exceeded its admitted deadline; termination observed"),
         failed("worker exceeded its admitted output limit; termination observed"),
         failed("worker exited with status None"),
+        // Cannot execute, not found, and a signal death inside the sandbox.
+        failed("worker exited with status Some(126)"),
+        failed("worker exited with status Some(127)"),
+        failed("worker exited with status Some(137)"),
         Outcome::Blocked {
             blocker: "sandbox".into(),
         },

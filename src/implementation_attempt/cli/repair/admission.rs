@@ -46,7 +46,7 @@ pub(in super::super) fn admit<'a>(
     match (&request.repair, ports, operator) {
         (None, _, _) => Ok(Admitted::SingleShot),
         (Some(_), Some(ports), _) => Ok(Admitted::Supplied(ports)),
-        (Some(_), None, Some(operator)) => match super::operator::admit(request, operator) {
+        (Some(policy), None, Some(operator)) => match super::operator::admit(request, policy, operator) {
             Ok(granted) => Ok(Admitted::Operator(Box::new(granted))),
             Err(super::operator::Refusal::Ports(error)) => Err(Stop::Refused(Pending::catalog(error))),
             Err(super::operator::Refusal::Authority(refusal)) => Err(Stop::Refused(Pending::authority(refusal))),

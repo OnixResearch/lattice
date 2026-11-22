@@ -308,11 +308,12 @@ would refuse a new session of this profile's revision: nothing or another
 revision is selected, or this revision or the selection's qualification is
 revoked. An unmanaged profile never carries it.
 
-A Kiln budget lineage blocker, serving backpressure or exhaustion and a
-missing repair port are not wait reasons. Lattice refuses such a request
-before its fence record and intent, writing only the attempt-fence's closure
-marker (`lineage_blocked`, `lineage_exhausted`,
-`repair_ports_unavailable`), and Kiln owns waiting for its lineage. A repair
+A Kiln budget lineage blocker, serving backpressure or exhaustion, a
+missing repair port and a missing operator grant are not wait reasons.
+Lattice refuses such a request before its fence record and intent, writing
+only the attempt-fence's closure marker (`lineage_blocked`,
+`lineage_exhausted`, `repair_ports_unavailable`,
+`repair_authority_denied`), and Kiln owns waiting for its lineage. A repair
 loop's exhausted bound is a terminal disposition, not a wait. An attempt run
 with a repair policy stays `dispatch_recorded_outcome_unknown` with the
 `dispatch_outcome_unknown` reason until its complete records prove its

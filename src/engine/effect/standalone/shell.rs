@@ -132,15 +132,19 @@ pub enum SubjectRefusal {
     NotGranted,
 }
 
-/// Evaluate the operator profile at `path` now and check that it grants
-/// exactly `subject`'s effect; returns the evaluated profile identity. It
-/// grants nothing itself.
+/// Evaluate the operator profile at `path` once, now, and check that it
+/// grants exactly every one of `subjects`' effects; returns the evaluated
+/// profile identity. It grants nothing itself.
 // r[impl lattice.implementation_attempt.operator_repair.scenario.authority]
-pub fn check_subject(
+pub fn check_subjects(
     path: Option<&std::path::Path>,
-    subject: super::core::Subject<'_>,
+    subjects: &[super::core::Subject<'_>],
 ) -> Result<String, SubjectRefusal> {
+    if subjects.is_empty() {
+        return Err(SubjectRefusal::NotGranted);
+    }
     let path = path.filter(|path| path.is_absolute()).ok_or(SubjectRefusal::Unavailable)?;
+    debug_assert!(path.is_absolute(), "only an absolute profile is evaluated");
     let value = crate::nickel::evaluate_file(path).map_err(|_| SubjectRefusal::Unavailable)?;
     let profile = serde_json::from_value(value).map_err(|_| SubjectRefusal::Invalid)?;
     let now = observe_unix_millis().map_err(|_| SubjectRefusal::Unavailable)?;
@@ -150,12 +154,15 @@ pub fn check_subject(
             SubjectRefusal::Invalid
         }
     })?;
-    super::core::check_subject(&admitted, subject, now).map_err(|error| match error {
-        super::core::ProfileError::Expired => SubjectRefusal::Expired,
-        super::core::ProfileError::InvalidProfile | super::core::ProfileError::BindingMismatch => {
-            SubjectRefusal::NotGranted
-        }
-    })?;
+    for subject in subjects {
+        super::core::check_subject(&admitted, *subject, now).map_err(|error| match error {
+            super::core::ProfileError::Expired => SubjectRefusal::Expired,
+            super::core::ProfileError::InvalidProfile | super::core::ProfileError::BindingMismatch => {
+                SubjectRefusal::NotGranted
+            }
+        })?;
+    }
+    debug_assert!(!admitted.identity.is_empty(), "an admitted profile has an identity");
     Ok(admitted.identity)
 }
 

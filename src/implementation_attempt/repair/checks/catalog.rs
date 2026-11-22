@@ -28,8 +28,14 @@ const STORE_PREFIX: &str = "/nix/store/";
 const CONFIGURATION_DOMAIN: &str = "lattice.implementation-attempt-check-catalog.v1 configuration";
 const EXECUTOR_DOMAIN: &str = "lattice.implementation-attempt-check-catalog.v1 executor";
 /// The launch the executor identity frames: the generic bubblewrap route
-/// with a cleared environment, a private network and no broker.
-const EXECUTOR_ROUTE: &str = "candidate-worker-bubblewrap;clearenv;unshare-net;no-broker;read-only-copy";
+/// with a cleared environment, a private network, no broker, and the host's
+/// read-only system mounts, which the pins do not cover.
+const EXECUTOR_ROUTE: &str =
+    "candidate-worker-bubblewrap;clearenv;unshare-net;no-broker;read-only-copy;host-system-ro-mounts";
+/// Statuses from this one up are the shell's cannot-execute (126), not-found
+/// (127) and `128 + N` signal statuses, which bubblewrap also reports for a
+/// signal death inside the sandbox: infrastructure, never the check's verdict.
+const FIRST_INFRASTRUCTURE_STATUS: i32 = 126;
 
 /// One declared check's pinned process.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -175,20 +181,25 @@ fn is_pinned(executable: &crate::candidate_worker::broker::Executable) -> bool {
 }
 
 /// The check outcome of one launcher observation. Only an exit observed on
-/// an unchanged copy decides: zero passes and non-zero fails with the
-/// entry's class. A copy the check changed, a stop at the deadline or output
+/// an unchanged copy decides: zero passes and a non-zero status below 126
+/// fails with the entry's class. A cannot-execute, not-found or signal
+/// status, a copy the check changed, a stop at the deadline or output
 /// limit, a stop without an exit status, cancellation and anything the
-/// launcher could not observe are unknown.
+/// launcher could not observe are unknown. A bubblewrap setup failure exits
+/// 1 like a failing check; it cannot be told apart from the status alone.
 #[must_use]
 pub fn outcome(observed: &crate::candidate_worker::Outcome, failure_class: &str) -> super::Outcome {
     let stop = crate::candidate_worker::omp::stop::of(observed);
     let outcome = match (observed, stop) {
         (crate::candidate_worker::Outcome::Unchanged { .. }, _) => super::Outcome::Passed,
-        (_, Some(crate::candidate_worker::omp::stop::Termination::Exited { status_code: Some(_) })) => {
-            super::Outcome::Failed {
-                class: failure_class.to_owned(),
-            }
-        }
+        (
+            _,
+            Some(crate::candidate_worker::omp::stop::Termination::Exited {
+                status_code: Some(code),
+            }),
+        ) if code < FIRST_INFRASTRUCTURE_STATUS => super::Outcome::Failed {
+            class: failure_class.to_owned(),
+        },
         _ => super::Outcome::Unknown,
     };
     debug_assert!(super::super::is_name(failure_class), "an admitted entry's failure class");

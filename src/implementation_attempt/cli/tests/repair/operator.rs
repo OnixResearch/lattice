@@ -15,6 +15,7 @@ mod harness;
 
 use harness::Behaviour;
 use harness::Operated;
+use harness::Options;
 use harness::Profile;
 
 type Reason = super::super::super::refusal::Reason;
@@ -74,7 +75,7 @@ async fn repairs_stop_at_the_iteration_bound() {
 }
 
 #[tokio::test]
-async fn a_crash_is_an_exit_a_signal_is_unknown_and_neither_is_retried_blindly() {
+async fn a_crash_and_a_signal_death_in_the_sandbox_are_exits_and_neither_is_retried_blindly() {
     let crashed = Operated::new("attempt-operator-crashed", 2, 60_000);
     crashed.script(&[Behaviour::Exit(3)]);
     crashed.run().await.expect("the loop reaches a disposition");
@@ -88,14 +89,20 @@ async fn a_crash_is_an_exit_a_signal_is_unknown_and_neither_is_retried_blindly()
     assert_eq!(step["worker_outcome"], serde_json::json!({"kind": "exited", "code": 3}));
     assert_eq!((crashed.launches(), crashed.check_runs()), (1, 0));
     super::export::Seen::Terminal.assert(super::export::inventory(&crashed.path, &crashed.fixture.state), "exit");
+    // The fake reports a killed child as 128 + 9, as bubblewrap reports a
+    // signal death inside the sandbox: an observed exit.
     let killed = Operated::new("attempt-operator-killed", 2, 60_000);
     killed.script(&[Behaviour::Killed]);
     killed.run().await.expect("the loop reaches a disposition");
     let observation = killed.disposition();
-    assert_eq!(observation["disposition"], serde_json::json!({"kind": "uncertain", "cause": "worker_outcome"}));
-    assert_eq!(killed.launches(), 1, "an uncertain step is never retried");
-    // Inventory reports observed stops only.
-    super::export::Seen::Unknown.assert(super::export::inventory(&killed.path, &killed.fixture.state), "signal");
+    assert_eq!(
+        observation["disposition"],
+        serde_json::json!({"kind": "not_repairable", "classes": ["no_candidate"]})
+    );
+    let step = harness::json(&killed.directory().join("repair/omp-step-1.json"));
+    assert_eq!(step["worker_outcome"], serde_json::json!({"kind": "exited", "code": 137}), "{step}");
+    assert_eq!((killed.launches(), killed.check_runs()), (1, 0), "nothing is retried or checked");
+    super::export::Seen::Terminal.assert(super::export::inventory(&killed.path, &killed.fixture.state), "signal");
 }
 
 #[tokio::test]
@@ -172,7 +179,8 @@ async fn a_profile_withdrawn_during_the_run_ends_it_before_the_next_intent() {
     let operated = Operated::new("attempt-operator-withdrawn", 2, 60_000);
     operated.script(&[Behaviour::Write("still broken"), Behaviour::Write("fixed")]);
     let rewrite = operated.profile_writer(Profile::WorkerOnly);
-    operated.after_launch(Box::new(rewrite));
+    // Withdrawn after step 1's check and before step 2's intent.
+    operated.after_check(Box::new(rewrite));
     operated.run().await.expect("the loop reaches a disposition");
     let observation = operated.disposition();
     assert_eq!(
@@ -223,7 +231,13 @@ fn the_catalog_is_admitted_only_pinned_bounded_and_outside_the_workspace() {
     assert_eq!(load(&unpinned).map(|_| ()), Err(Error::Unpinned));
     let mut mismatched = operated.catalog.clone();
     mismatched["checks"][0]["program"]["blake3"] = "0".repeat(64).into();
-    assert_eq!(load(&mismatched).map(|_| ()), Err(Error::Mismatched));
+    // The cheap policy match runs before any executable is hashed.
+    assert_eq!(load(&mismatched).map(|_| ()), Err(Error::Unmatched));
+    let path = operated.fixture.root.join("mismatched-catalog.json");
+    std::fs::write(&path, serde_json::to_vec(&mismatched).expect("bytes")).expect("catalog");
+    let named = harness::policy(&mismatched);
+    let loaded = super::super::super::repair::operator::checks::load(&path, workspace, &named);
+    assert_eq!(loaded.map(|_| ()), Err(Error::Mismatched), "pinned identities, other bytes");
     let mut oversized = operated.catalog.clone();
     oversized["checks"][0]["args"] =
         serde_json::json!(vec!["x".repeat(crate::implementation_attempt::repair::checks::catalog::MAX_ARG_BYTES); 20]);
@@ -250,4 +264,107 @@ async fn without_a_repair_policy_the_operator_ports_change_nothing() {
     assert_eq!(harness::tree(&plain.directory()), harness::tree(&with_operator.directory()));
     assert!(!with_operator.directory().join("repair").exists());
     assert_eq!(with_operator.launches(), 0, "the single-shot route never uses the operator launcher");
+}
+
+/// The run is checked, unchecked or uncertain; nothing is exported.
+fn assert_unexported(operated: &Operated, name: &str) {
+    let parent = super::export::output_parent(&operated.fixture.root, name);
+    assert!(super::export::export(&operated.path, &operated.fixture.state, &parent).is_err(), "{name}");
+    assert!(super::export::is_empty(&parent), "{name}");
+}
+
+#[tokio::test]
+async fn a_grant_withdrawn_during_a_worker_runs_none_of_its_checks() {
+    let operated = Operated::new("attempt-operator-unchecked", 2, 60_000);
+    operated.script(&[Behaviour::Write("fixed")]);
+    let rewrite = operated.profile_writer(Profile::WorkerOnly);
+    operated.after_launch(Box::new(rewrite));
+    operated.run().await.expect("the loop reaches a disposition");
+    let observation = operated.disposition();
+    assert_eq!(observation["disposition"], serde_json::json!({"kind": "uncertain", "cause": "check_outcome"}));
+    assert_eq!((operated.launches(), operated.check_runs()), (1, 0), "no check runs without the grant");
+    assert_unexported(&operated, "unchecked");
+}
+
+#[tokio::test]
+async fn an_admission_that_expires_before_the_checks_runs_none_of_them() {
+    let operated = Operated::with("attempt-operator-expired", Options {
+        expires_in_ms: Some(4_000),
+        ..Options::default()
+    });
+    operated.script(&[Behaviour::Write("fixed")]);
+    // The worker returns before the admission expires; the expiry passes
+    // before its candidate's checks.
+    operated.after_launch(Box::new(|| std::thread::sleep(std::time::Duration::from_millis(4_500))));
+    operated.run().await.expect("the loop reaches a disposition");
+    let observation = operated.disposition();
+    assert_eq!(observation["disposition"], serde_json::json!({"kind": "uncertain", "cause": "check_outcome"}));
+    assert_eq!(operated.check_runs(), 0, "no check runs after the admission expired");
+    assert_unexported(&operated, "expired");
+}
+
+#[tokio::test]
+async fn a_worker_stopped_at_a_deadline_the_admission_capped_is_uncertain() {
+    // A late start: the admission expires long before the elapsed bound.
+    let operated = Operated::with("attempt-operator-late", Options {
+        expires_in_ms: Some(3_000),
+        ..Options::default()
+    });
+    operated.script(&[Behaviour::Spin]);
+    operated.run().await.expect("the loop reaches a disposition");
+    let observation = operated.disposition();
+    assert_eq!(observation["disposition"], serde_json::json!({"kind": "uncertain", "cause": "worker_outcome"}));
+    let step = harness::json(&operated.directory().join("repair/omp-step-1.json"));
+    assert_eq!(step["deadline_capped"], true, "{step}");
+    assert_eq!(step["worker_outcome"], serde_json::json!({"kind": "unknown"}), "{step}");
+    assert_eq!(operated.check_runs(), 0, "the partial tree is never checked");
+}
+
+#[tokio::test]
+async fn a_workspace_changed_between_steps_blocks_the_next_launch() {
+    let operated = Operated::new("attempt-operator-drift", 2, 60_000);
+    operated.script(&[Behaviour::Write("still broken"), Behaviour::Write("fixed")]);
+    let workspace = operated.fixture.workspace.clone();
+    operated.before_repair(Box::new(move || {
+        std::fs::write(workspace.join("src/lib.txt"), "edited outside the attempt").expect("outside edit");
+    }));
+    operated.run().await.expect("the loop reaches a disposition");
+    let observation = operated.disposition();
+    assert_eq!(observation["disposition"], serde_json::json!({"kind": "uncertain", "cause": "worker_outcome"}));
+    let step = harness::json(&operated.directory().join("repair/omp-step-2.json"));
+    assert_eq!(step["launcher_outcome"], "blocked", "{step}");
+    let count = std::fs::read_to_string(operated.fixture.root.join("omp-count")).expect("counter");
+    assert_eq!(count.trim(), "1", "the fake OMP never ran on the changed workspace");
+    assert_unexported(&operated, "drift");
+}
+
+#[tokio::test]
+async fn checks_that_cannot_run_or_die_by_a_signal_are_unknown_not_failed() {
+    for (index, check) in ["/bin/sh -c 'kill -9 $$'; exit $?", "exit 127"].into_iter().enumerate() {
+        let operated = Operated::with(&format!("attempt-operator-infrastructure-{index}"), Options {
+            check,
+            ..Options::default()
+        });
+        operated.script(&[Behaviour::Write("fixed")]);
+        operated.run().await.expect("the loop reaches a disposition");
+        let observation = operated.disposition();
+        assert_eq!(
+            observation["disposition"],
+            serde_json::json!({"kind": "uncertain", "cause": "check_outcome"}),
+            "{check}"
+        );
+        assert_eq!((operated.launches(), operated.check_runs()), (1, 1), "no repair is spent on it: {check}");
+    }
+}
+
+#[tokio::test]
+async fn nested_paths_missing_from_the_copy_do_not_stop_the_checks() {
+    let operated = Operated::with("attempt-operator-nested", Options {
+        paths: Some((vec!["out", "src"], vec!["out/reports", "src"])),
+        ..Options::default()
+    });
+    operated.script(&[Behaviour::Write("fixed")]);
+    operated.run().await.expect("the loop reaches a disposition");
+    assert_eq!(operated.disposition()["disposition"]["kind"], "correct_candidate");
+    assert_eq!(operated.check_runs(), 1);
 }

@@ -20,15 +20,15 @@ r[lattice.implementation_attempt.operator_repair.scenario.authority]
 - GIVEN a repair request whose configuration selects no profile, or whose profile is expired, names another worker profile revision or lacks the worker or check tuple
 - WHEN `run` admits it
 - THEN it MUST be refused as `repair_authority_denied` with `dispatched:false` before the fence record, writing only the attempt-fence's closure marker and no step intent, and no OMP or check process MUST start
-- AND a profile that stops granting, changes identity, or an admission that expires during the run MUST end the loop as `authority_withdrawn` with cause `effect_authority` before the next step's intent
+- AND a profile that stops granting, changes identity, or an admission that expires during the run MUST end the loop as `authority_withdrawn` with cause `effect_authority` before the next step's intent, and MUST leave every later check unrun with an unknown outcome, so a candidate checked after the grant or admission lapsed is never passed or exported
 
 #### Scenario: Worker outcomes keep the loop's classes
 
 r[lattice.implementation_attempt.operator_repair.scenario.outcomes]
 - GIVEN a launched OMP step
-- WHEN it exits, is stopped at its deadline or output limit, is cancelled through a persisted request, is killed without an exit status, is blocked before spawn, or ends with an incomplete terminal stream or an unknown teardown
-- THEN an observed exit or host stop MUST be `exited`, cancellation MUST be `cancelled`, and every other outcome MUST be `unknown`, so the loop ends `uncertain` without retrying it
-- AND a worker that runs to its deadline MUST end the loop as `budget_exhausted` (`elapsed`) unchecked, the iteration bound MUST stop further steps, a newer fence MUST end it as `fence_superseded`, and inventory MUST report only observed stops
+- WHEN it exits, dies by a signal inside the sandbox, is stopped at its deadline or output limit, is cancelled through a persisted request, is killed without an exit status, is blocked before spawn (including a workspace that is not the tree the previous step left), or ends with an incomplete terminal stream or an unknown teardown
+- THEN an observed exit, a signal death reported as `128 + N`, and a host stop at an uncapped deadline or the output limit MUST be `exited`, cancellation MUST be `cancelled`, and every other outcome, including a stop at a deadline the admission's expiry capped, MUST be `unknown`, so the loop ends `uncertain` without retrying or checking it
+- AND a worker that runs to an uncapped deadline MUST end the loop as `budget_exhausted` (`elapsed`) unchecked, the iteration bound MUST stop further steps, a newer fence MUST end it as `fence_superseded`, and inventory MUST report only observed stops
 
 #### Scenario: Catalog checks are pinned, bounded and isolated
 
@@ -36,7 +36,7 @@ r[lattice.implementation_attempt.operator_repair.scenario.checks]
 - GIVEN an operator check catalog
 - WHEN `run` admits a repair request
 - THEN a missing catalog MUST keep the `repair_ports_unavailable` refusal, and an unreadable, oversized, malformed, unpinned, byte-mismatched catalog, one inside the attempt workspace, or one whose executor and check configurations differ from the policy's MUST be refused as `repair_ports_unavailable` with its `check_catalog` reason before any launch
-- AND each check MUST run with a cleared environment, a private network, no broker or credential, no write path and bounded output, and only an exit observed on an unchanged copy MUST decide it
+- AND each check MUST run with a cleared environment, a private network, no broker or credential, no write path, bounded output and a deadline within the admission's expiry, only on the request's read paths present in its copy, and only an exit observed on an unchanged copy MUST decide it: a status from 1 to 125 fails with the entry's class, and a cannot-execute, not-found or signal status is unknown
 
 #### Scenario: A controller lost after a step intent never relaunches
 

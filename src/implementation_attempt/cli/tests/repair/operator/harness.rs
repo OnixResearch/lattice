@@ -13,6 +13,33 @@ pub(super) use doubles::Behaviour;
 pub(super) use doubles::Profile;
 
 type Request = crate::implementation_attempt::cli::Request;
+type Hook = Box<dyn FnMut() + Send>;
+
+/// How one attempt is admitted.
+pub(super) struct Options {
+    pub(super) iterations: u32,
+    pub(super) elapsed_ms: u64,
+    pub(super) profile: Profile,
+    /// The admission expires this long after the fixture is built.
+    pub(super) expires_in_ms: Option<u64>,
+    /// The `unit` check's shell script.
+    pub(super) check: &'static str,
+    /// Read and write paths other than `src`; their directories are created.
+    pub(super) paths: Option<(Vec<&'static str>, Vec<&'static str>)>,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            iterations: 2,
+            elapsed_ms: 60_000,
+            profile: Profile::Granting,
+            expires_in_ms: None,
+            check: doubles::CHECK,
+            paths: None,
+        }
+    }
+}
 
 /// One operator-repair attempt of a fresh fixture.
 pub(super) struct Operated {
@@ -26,17 +53,31 @@ pub(super) struct Operated {
     catalog_path: Option<std::path::PathBuf>,
     launches: Arc<AtomicU32>,
     check_runs: Arc<AtomicU32>,
-    after: Arc<Mutex<Option<doubles::Hook>>>,
+    after: Arc<Mutex<Option<Hook>>>,
+    before_repair: Arc<Mutex<Option<Hook>>>,
+    after_check: Arc<Mutex<Option<Hook>>>,
     is_lost: Arc<AtomicBool>,
 }
 
+fn now_ms() -> u64 {
+    let observed = crate::operation::shell::Clock::observe_epoch_millis(&crate::operation::shell::SystemClock);
+    u64::try_from(observed).expect("clock")
+}
+
 impl Operated {
-    pub(super) fn new(attempt: &str, max_iterations: u32, max_elapsed_ms: u64) -> Self {
-        Self::build(attempt, max_iterations, max_elapsed_ms, Profile::Granting)
+    pub(super) fn new(attempt: &str, iterations: u32, elapsed_ms: u64) -> Self {
+        Self::with(attempt, Options {
+            iterations,
+            elapsed_ms,
+            ..Options::default()
+        })
     }
 
     pub(super) fn with_profile(attempt: &str, profile: Profile) -> Self {
-        Self::build(attempt, 2, 60_000, profile)
+        Self::with(attempt, Options {
+            profile,
+            ..Options::default()
+        })
     }
 
     /// A granting run given `catalog` while its policy names the pinned one.
@@ -47,28 +88,39 @@ impl Operated {
         operated
     }
 
-    fn build(attempt: &str, max_iterations: u32, max_elapsed_ms: u64, profile: Profile) -> Self {
+    pub(super) fn with(attempt: &str, options: Options) -> Self {
         let fixture = super::super::Fixture::new();
-        let catalog = doubles::catalog();
+        let catalog = doubles::catalog(options.check);
         let script = fixture.root.join("fake-omp");
         let mut request = super::super::super::host_local();
         request.envelope.attempt_id = attempt.into();
         request.envelope.work_id = format!("work-{attempt}");
         request.program = script.to_str().expect("script path").to_owned();
-        let policy = doubles::policy(&catalog, max_iterations, max_elapsed_ms);
+        if let Some(expires_in_ms) = options.expires_in_ms {
+            request.expires_at_ms = now_ms() + expires_in_ms;
+            request.omp.model_broker.expires_at_ms = request.expires_at_ms;
+        }
+        if let Some((read, write)) = &options.paths {
+            for path in write {
+                std::fs::create_dir_all(fixture.workspace.join(path)).expect("declared directory");
+            }
+            request.read_paths = read.iter().map(|path| (*path).to_owned()).collect();
+            request.write_paths = write.iter().map(|path| (*path).to_owned()).collect();
+        }
+        let policy = doubles::policy(&catalog, options.iterations, options.elapsed_ms);
         let request = super::super::readmit(request, &fixture.workspace, Some(policy), None);
         let path = fixture.write(&request);
         let catalog_path = fixture.root.join("catalog.json");
         std::fs::write(&catalog_path, serde_json::to_vec(&catalog).expect("catalog bytes")).expect("catalog");
         let profile_path = fixture.root.join("authority.ncl");
-        doubles::write_profile(&profile_path, &request.envelope.worker_profile, profile);
+        doubles::write_profile(&profile_path, &request.envelope.worker_profile, options.profile);
         let config_text = format!(
             "{{ data_dir = \"{}\", effect_authority = \"{}\", default_timeout_secs = 60, shell = \"sh\" }}\n",
             fixture.root.join("data").display(),
             profile_path.display(),
         );
         std::fs::write(fixture.root.join("config.ncl"), config_text).expect("config");
-        let config = match profile {
+        let config = match options.profile {
             Profile::Unconfigured => fixture.root.join("missing-config.ncl"),
             _ => fixture.root.join("config.ncl"),
         };
@@ -80,16 +132,20 @@ impl Operated {
             script,
             config,
             profile: profile_path,
-            catalog_path: (!matches!(profile, Profile::NoCatalog)).then_some(catalog_path),
+            catalog_path: (!matches!(options.profile, Profile::NoCatalog)).then_some(catalog_path),
             launches: Arc::new(AtomicU32::new(0)),
             check_runs: Arc::new(AtomicU32::new(0)),
             after: Arc::new(Mutex::new(None)),
+            before_repair: Arc::new(Mutex::new(None)),
+            after_check: Arc::new(Mutex::new(None)),
             is_lost: Arc::new(AtomicBool::new(false)),
         }
     }
 
     /// Write the fake OMP: launch `n` does `behaviours[n - 1]`, then prints
-    /// a completed terminal stream; a launch beyond them exits 99.
+    /// a completed terminal stream; a launch beyond them exits 99. A killed
+    /// child is reported as `128 + N`, as bubblewrap reports a signal death
+    /// inside the sandbox.
     pub(super) fn script(&self, behaviours: &[Behaviour]) {
         use std::os::unix::fs::PermissionsExt;
         let counter = self.fixture.root.join("omp-count");
@@ -100,7 +156,7 @@ impl Operated {
             let action = match behaviour {
                 Behaviour::Write(text) => format!("printf '%s' '{text}' > src/lib.txt"),
                 Behaviour::Exit(code) => format!("exit {code}"),
-                Behaviour::Killed => "kill -9 $$".to_owned(),
+                Behaviour::Killed => "/bin/sh -c 'kill -9 $$'; exit $?".to_owned(),
                 Behaviour::Spin => "while :; do :; done".to_owned(),
             };
             cases.push_str(&format!("{}) {action} ;;\n", index + 1));
@@ -127,10 +183,12 @@ impl Operated {
             launch: Box::new(doubles::Scripted {
                 launches: self.launches.clone(),
                 after: self.after.clone(),
+                before_repair: self.before_repair.clone(),
                 is_lost: self.is_lost.clone(),
             }),
             execute: Box::new(doubles::Unsandboxed {
                 runs: self.check_runs.clone(),
+                after: self.after_check.clone(),
             }),
             clock: &crate::operation::shell::SystemClock,
         };
@@ -176,8 +234,19 @@ impl Operated {
     }
 
     /// Run `hook` once, after the first launch's OMP step.
-    pub(super) fn after_launch(&self, hook: Box<dyn FnMut() + Send>) {
+    pub(super) fn after_launch(&self, hook: Hook) {
         *self.after.lock().expect("hook") = Some(hook);
+    }
+
+    /// Run `hook` once, at the start of the first repair launch, after its
+    /// step intent and before the launcher captures the workspace.
+    pub(super) fn before_repair(&self, hook: Hook) {
+        *self.before_repair.lock().expect("hook") = Some(hook);
+    }
+
+    /// Run `hook` once, after the first check.
+    pub(super) fn after_check(&self, hook: Hook) {
+        *self.after_check.lock().expect("hook") = Some(hook);
     }
 
     /// Every launch panics after its OMP step, as a lost controller.
@@ -218,6 +287,11 @@ pub(super) fn single_shot(attempt: &str) -> Operated {
     operated.request = request;
     operated.catalog_path = None;
     operated
+}
+
+/// The policy that names `catalog`'s executor and checks.
+pub(super) fn policy(catalog: &serde_json::Value) -> crate::implementation_attempt::repair::Policy {
+    doubles::policy(catalog, 2, 60_000)
 }
 
 pub(super) fn json(path: &std::path::Path) -> serde_json::Value {

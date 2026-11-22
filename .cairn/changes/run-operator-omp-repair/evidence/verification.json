@@ -47,5 +47,42 @@
     "cairn_gates": {"command": "cairn gate <proposal|design|tasks> run-operator-omp-repair --root . --policy cairn-policy/generated/cairn-policy.json", "exit": {"proposal": 0, "design": 0, "tasks": 0}},
     "gitleaks": {"command": "/nix/store/sbrzys45a04nfn0k88qab2jzd1vfwr3i-gitleaks-8.30.1/bin/gitleaks dir --no-banner --redact <path>, for every changed and untracked path", "paths": 45, "exit": 0, "leaks": 0}
   },
-  "not_run": ["scripts/check.rs", "nix flake check"]
+  "not_run": ["scripts/check.rs", "nix flake check"],
+  "review_1": {
+    "source": "agent://OmpPortReview, review of 9f5e948b against 7fb6dc47, verdict: incorrect, no P0 or P1",
+    "base_revision": "9f5e948b",
+    "findings": {
+      "F1": {"severity": "P2", "finding": "catalog checks ran after the grant or admission lapsed", "resolution": "CatalogPort rechecks Grant::recheck (both tuples, identity, admission expiry) and a persisted cancellation before every check, leaving it unrun and unknown, and caps each check's deadline at the admission's remaining whole seconds", "tests": ["src/implementation_attempt/cli/tests/repair/operator.rs::a_grant_withdrawn_during_a_worker_runs_none_of_its_checks", "src/implementation_attempt/cli/tests/repair/operator.rs::an_admission_that_expires_before_the_checks_runs_none_of_them"]},
+      "F2": {"severity": "P2", "finding": "each step's OMP base was read from the live workspace", "resolution": "OmpPort keeps an expected base, the admitted base and then the tree each exited step left, and passes it as profile.base_identity, so the launcher blocks a workspace changed between steps", "tests": ["src/implementation_attempt/cli/tests/repair/operator.rs::a_workspace_changed_between_steps_blocks_the_next_launch"]},
+      "F3": {"severity": "P3", "finding": "the never-checked deadline claim was false under an admission cap", "resolution": "step::operator::is_capped; a deadline stop of a capped worker is unknown (deadline_capped in the step record); docs corrected", "tests": ["src/implementation_attempt/repair/step/operator/tests.rs::a_deadline_the_admission_capped_is_never_checkable", "src/implementation_attempt/cli/tests/repair/operator.rs::a_worker_stopped_at_a_deadline_the_admission_capped_is_uncertain"]},
+      "F4": {"severity": "P3", "finding": "the killed-worker test asserted a status bubblewrap cannot produce; infrastructure check failures counted as the entry's class", "resolution": "the fake reports a killed child as 128 + N like bubblewrap and the test asserts an observed exit 137; check statuses 126 and above are unknown; documented that a bubblewrap setup failure (exit 1) cannot be told apart", "tests": ["src/implementation_attempt/cli/tests/repair/operator.rs::a_crash_and_a_signal_death_in_the_sandbox_are_exits_and_neither_is_retried_blindly", "src/implementation_attempt/cli/tests/repair/operator.rs::checks_that_cannot_run_or_die_by_a_signal_are_unknown_not_failed", "src/implementation_attempt/repair/checks/catalog/tests.rs::only_an_exit_on_an_unchanged_copy_decides_a_check"]},
+      "F5": {"severity": "P3", "finding": "nested read or write paths missing from the copy made every check unknown", "resolution": "checks mount only the request's read paths present in the copy", "tests": ["src/implementation_attempt/cli/tests/repair/operator.rs::nested_paths_missing_from_the_copy_do_not_stop_the_checks"]},
+      "F6": {"severity": "P3", "finding": "pinned checks still resolve host tools", "resolution": "docs narrowed to 'pins the entry executable's bytes' with the reason (the shared candidate-worker sandbox mounts the host's read-only system paths and changing candidate_worker::Request would re-key Octet's baseline), and the executor route string now names host-system-ro-mounts"},
+      "F7": {"severity": "P3", "finding": "repair prompt after no_candidate", "resolution": "every repair step gets repair text; no_candidate is phrased 'the previous step produced no new candidate'; other failed classes kept", "tests": ["src/implementation_attempt/repair/step/operator/tests.rs::every_repair_prompt_carries_only_its_parent_and_what_the_previous_step_did"]}
+    },
+    "notes": {
+      "1": "one profile evaluation per admission and per recheck (standalone::check_subjects)",
+      "2": "raw events are written from the owned RunResult without a copy",
+      "3": "no per-check entry clone",
+      "5": "the policy match runs before executables are hashed",
+      "6": "the catalog is opened with O_NOFOLLOW|O_NONBLOCK and must be a bounded regular file by fstat",
+      "7": "Launch, PinnedOmp, Standalone, checks::Execute and Sandboxed are pub(crate); operator::admit takes the policy, so the unreachable missing-policy refusal is gone",
+      "8": "stale docs fixed in candidate-worker.md, worker-inventory.md, Grant::recheck and Authority::EffectAuthority",
+      "9": "Kiln e77b8e6a (read-only clone) has no reader of repair-observation causes or authority_withdrawn; effect_authority is additive and the observation schema stays v2",
+      "10": "the breaking run_command(args, config) change is under CHANGELOG ### Changed",
+      "11": "checks poll the persisted cancellation request like the worker; SIGINT and SIGTERM still end the operator controller as a lost controller, documented, because the loop runs synchronously on the calling task",
+      "12": "documented that a configuration, catalog or profile error closes the attempt-fence"
+    },
+    "checks": {
+      "cargo_test_lib": {"exit": 0, "passed": 587, "failed": 0, "ignored": 8},
+      "cargo_test_focused": {"exit": 0, "passed": 202, "failed": 0, "ignored": 7},
+      "integration": {"exit": 0, "passed": [6, 10], "failed": 0},
+      "clippy": {"exit": 0},
+      "fmt": {"exit": 0},
+      "octet": {"exit": 0, "status": "warning-only", "baseline": {"accepted": 1052, "current_accepted": 1052, "new": 0, "stale": 0}},
+      "cairn_validate": {"exit": 0},
+      "cairn_gates": {"exit": {"proposal": 0, "design": 0, "tasks": 0}},
+      "gitleaks": {"command": "gitleaks 8.30.1 dir --no-banner --redact <path>, every path changed since 7fb6dc47 and every untracked path", "paths": 47, "exit": 0, "leaks": 0}
+    }
+  }
 }

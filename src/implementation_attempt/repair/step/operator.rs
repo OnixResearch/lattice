@@ -70,41 +70,71 @@ pub fn requirements(worker_profile: &str) -> crate::engine::effect::standalone::
     }
 }
 
-/// The prompt of one step: the admitted prompt for the first step; for a
-/// repair, the admitted prompt with the parent revision and the admitted
-/// failure classes only, never a transcript or check output.
+/// The prompt of one step: the admitted prompt for the first step; for every
+/// repair, the admitted prompt with the parent revision and what the loop
+/// recorded of the previous step only (`no_candidate` as "produced no new
+/// candidate", other admitted classes as failed check classes), never a
+/// transcript or check output.
+// r[impl lattice.implementation_attempt.operator_repair.scenario.repaired]
 #[must_use]
 pub fn prompt(admitted: &str, step: &super::Request) -> String {
-    let Some(parent) = step.parent.as_deref().filter(|_| step.phase == super::Phase::Repair) else {
+    if step.phase != super::Phase::Repair {
         return admitted.to_owned();
-    };
+    }
     debug_assert!(!step.failures.is_empty(), "a repair names its admitted failure classes");
-    format!(
-        "{admitted}\n\nRepair step {iteration}: the candidate revision {parent} in this workspace failed the \
-         admitted check classes {classes}. Repair it in place.",
-        iteration = step.iteration,
-        classes = step.failures.join(", "),
-    )
+    let mut text = format!("{admitted}\n\nRepair step {} of the same attempt.", step.iteration);
+    if let Some(parent) = step.parent.as_deref() {
+        text.push_str(&format!(" The workspace holds candidate revision {parent}."));
+    }
+    if step.failures.iter().any(|class| class == super::super::NO_CANDIDATE) {
+        text.push_str(" The previous step produced no new candidate.");
+    }
+    let classes: Vec<&str> = step
+        .failures
+        .iter()
+        .map(String::as_str)
+        .filter(|class| *class != super::super::NO_CANDIDATE)
+        .collect();
+    if !classes.is_empty() {
+        text.push_str(&format!(" That candidate failed the admitted check classes {}.", classes.join(", ")));
+    }
+    text.push_str(" Repair it in place.");
+    text
 }
 
 /// The worker deadline in whole seconds: the time left before the elapsed
 /// bound, rounded up, within the admission's own bound `admitted_secs`.
-/// Rounding up lets a worker that runs to its deadline return at or past
-/// the elapsed bound, which the loop then classifies as `budget_exhausted`
-/// (`elapsed`) without checking the step.
+/// When the elapsed bound is the limit, a worker that runs to its deadline
+/// returns at or past it, and the loop classifies the step `budget_exhausted`
+/// (`elapsed`) without checking it. When the admission's bound is smaller,
+/// the deadline is capped ([`is_capped`]) and such a stop is uncertain.
 #[must_use]
 pub fn timeout_secs(deadline: std::time::Duration, admitted_secs: u64) -> u64 {
+    rounded_secs(deadline).min(admitted_secs)
+}
+
+/// Whether the admission's bound capped the worker below the rounded-up
+/// elapsed deadline.
+#[must_use]
+pub fn is_capped(deadline: std::time::Duration, admitted_secs: u64) -> bool {
+    admitted_secs < rounded_secs(deadline)
+}
+
+fn rounded_secs(deadline: std::time::Duration) -> u64 {
     let partial_secs = u64::from(deadline.subsec_nanos() > 0);
-    deadline.as_secs().saturating_add(partial_secs).min(admitted_secs)
+    deadline.as_secs().saturating_add(partial_secs)
 }
 
 /// The loop's worker outcome of one launcher observation. Only an observed
 /// stop is `exited` or `cancelled`; a launch the launcher blocked, an
 /// interrupted or unknown teardown, an incomplete OMP terminal stream, a
-/// write outside the boundary and a stop without an exit status are
-/// `unknown`, so the loop ends `uncertain` and never retries them.
+/// write outside the boundary, a stop without an exit status and, when the
+/// admission capped the deadline (`is_capped`), a stop at that deadline are
+/// `unknown`, so the loop ends `uncertain` and never retries or checks them.
+/// A signal death inside the sandbox is an observed exit with bubblewrap's
+/// `128 + N` status.
 #[must_use]
-pub fn outcome(observed: &crate::candidate_worker::Outcome) -> super::WorkerOutcome {
+pub fn outcome(observed: &crate::candidate_worker::Outcome, is_capped: bool) -> super::WorkerOutcome {
     let stop = crate::candidate_worker::omp::stop::of(observed);
     let is_failed = matches!(observed, crate::candidate_worker::Outcome::Failed { .. });
     debug_assert!(stop.is_none() || is_failed, "only a failed outcome has a stop");
@@ -118,6 +148,9 @@ pub fn outcome(observed: &crate::candidate_worker::Outcome) -> super::WorkerOutc
                 status_code: Some(code),
             }),
         ) => super::WorkerOutcome::Exited { code },
+        (_, Some(crate::candidate_worker::omp::stop::Termination::Deadline)) if is_capped => {
+            super::WorkerOutcome::Unknown
+        }
         (
             _,
             Some(
