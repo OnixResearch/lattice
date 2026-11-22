@@ -38,10 +38,19 @@ interfaces.
   enforces the binding deadline on the host clock, and passes each request
   through Kiln's `lattice.vm-effect-authority.v1` (`Admit` before one upstream
   call with the host-only credential, `Settle` after it). A lost settlement
-  stays `uncertain` and is never retried. `inspect` reports `vm-guest` facts
-  for bound attempts. Without the new fields, requests and broker profiles keep
-  their bytes, identities and behaviour. Evidence: Q0 and Q1 over Unix sockets
-  with a scripted model; no VM, vsock, live model or second host.
+  stays `uncertain` and is never retried. Forwarded model requests are
+  numbered per attempt rather than per broker run: repair step `n` starts at
+  `(n - 1) * max_requests`, so one host gateway serves every repair step of a
+  VM-bound attempt and refuses reused indices. Indices only increase, and they
+  can have gaps. The gateway rereads the host clock after the C3 `Admit`; at or
+  past the binding deadline it never calls the upstream, settles `cancelled`
+  and refuses with `deadline`. `inspect` reports `vm-guest` facts for bound
+  attempts. Implementation attempts always report `checkpoint: unavailable` in
+  `inspect`, and a VM binding that requests `application_checkpoint` mobility
+  for an attempt is refused. Without the new fields, requests and broker
+  profiles keep their bytes, identities and behaviour. Evidence: Q0 and Q1
+  over Unix sockets with a scripted model; no VM, vsock, live model or second
+  host.
 - Application checkpoint restart (Lattice #12). A workflow-exchange route
   bound by `lattice.application-checkpoint-binding.v1` with checkpoint
   `workflow-node-boundary-v1` publishes `lattice.application-checkpoint-manifest.v1`
