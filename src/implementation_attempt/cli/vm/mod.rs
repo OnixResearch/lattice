@@ -39,6 +39,12 @@ pub(super) fn validate(request: &super::Request) -> Result<(), String> {
         deadline_unix_ms: None,
     })
     .map_err(|refusal| refusal.to_string())?;
+    // An attempt has no node-boundary checkpoint hooks: it never restores.
+    if binding.requested_mobility == crate::vm_profile::Mobility::ApplicationCheckpoint {
+        return Err("an implementation attempt offers no application checkpoint; `application_checkpoint` \
+                    mobility is refused"
+            .into());
+    }
     if forwarded.binding != admitted.binding_identity || forwarded.vsock_port != profile.gateway.model_vsock_port {
         return Err("forwarding model broker names another VM binding or gateway port".into());
     }

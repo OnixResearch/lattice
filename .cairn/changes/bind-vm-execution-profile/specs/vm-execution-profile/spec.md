@@ -50,7 +50,13 @@ r[lattice.vm_profile.request.scenario.crossed]
 r[lattice.vm_profile.request.scenario.inspect]
 - GIVEN a bound request
 - WHEN `implementation-attempt inspect` projects its profile facts
-- THEN `isolation` MUST be `vm-guest`, `network` MUST be `host-gateway-model-broker` and `checkpoint` MUST be the profile's checkpoint profile, or `unavailable` for `none`; an unbound request MUST keep its existing facts
+- THEN `isolation` MUST be `vm-guest` and `network` MUST be `host-gateway-model-broker`, and `checkpoint` MUST be `unavailable` because the attempt route has no node-boundary checkpoint hooks, whatever checkpoint profile its VM execution profile declares; an unbound request MUST keep its existing facts
+
+#### Scenario: No application checkpoint for attempts
+r[lattice.vm_profile.request.scenario.no_checkpoint]
+- GIVEN a bound request whose binding asks for `application_checkpoint` mobility, even under a profile that offers it
+- WHEN it is validated
+- THEN it MUST be refused before any effect, because an attempt without checkpoint hooks never advertises or restores an application checkpoint
 
 ### Requirement: Forwarded model broker
 r[lattice.vm_profile.forwarded_upstream] A broker profile MAY carry `forwarded: { schema: "lattice.model-broker-forwarded-upstream.v1", vsock_port, binding }`. A forwarding broker MUST send each admitted request as one `{ binding, request_index, body }` frame on a new AF_VSOCK connection to CID 2 at `vsock_port`, and MUST accept only a reply for that index: `{ status, body }`, `{ refused: code }` or `{ uncertain: true }`. It MUST NOT resend any request.

@@ -3,6 +3,8 @@
 // r[verify lattice.vm_profile.request]
 
 type Request = super::super::Request;
+/// The expected refusal fragment and the change that provokes it.
+type Case = (&'static str, fn(&mut Request));
 
 fn fixture<T: serde::de::DeserializeOwned>(relative: &str) -> T {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/vm-profile").join(relative);
@@ -70,7 +72,7 @@ fn an_absent_binding_keeps_request_bytes_and_a_bound_one_keeps_the_profile_revis
 #[test]
 fn crossed_bindings_and_missing_forwarding_are_refused_before_effect() {
     let other = format!("b3:{}", "6".repeat(64));
-    let cases: [(&str, fn(&mut Request)); 12] = [
+    let cases: [Case; 12] = [
         ("network", |request| request.network = None),
         ("network", |request| request.network = Some(true)),
         ("crossed_envelope", |request| {
@@ -110,9 +112,25 @@ fn crossed_bindings_and_missing_forwarding_are_refused_before_effect() {
     assert!(error.contains("no model credential"), "{error}");
 }
 
+/// An attempt has no node-boundary hooks: a binding that asks to move it by
+/// application checkpoint is refused, even when its profile offers that mode.
+// r[verify lattice.vm_profile.request.scenario.no_checkpoint]
+#[test]
+fn an_attempt_binding_that_asks_for_application_checkpoint_mobility_is_refused() {
+    let mut request = bound();
+    let profile = request.vm_profile.as_ref().expect("profile");
+    assert!(profile.mobility.contains(&crate::vm_profile::Mobility::ApplicationCheckpoint));
+    let binding = request.vm_binding.as_mut().expect("binding");
+    binding.requested_mobility = crate::vm_profile::Mobility::ApplicationCheckpoint;
+    let identity = crate::vm_profile::binding_identity(binding).expect("binding identity");
+    request.omp.model_broker.forwarded.as_mut().expect("forwarded").binding = identity;
+    let error = request.validate(1).expect_err("application checkpoint mobility");
+    assert!(error.contains("offers no application checkpoint"), "{error}");
+}
+
 // r[verify lattice.vm_profile.request.scenario.inspect]
 #[test]
-fn inspect_reports_guest_facts_only_when_bound() {
+fn inspect_reports_guest_facts_and_no_checkpoint_when_bound() {
     let readiness = crate::execution_binding::serving::readiness::observe(
         None,
         "attempt",
@@ -131,8 +149,6 @@ fn inspect_reports_guest_facts_only_when_bound() {
     assert_eq!(local["checkpoint"]["support"], "unavailable");
     assert_eq!(guest["isolation"]["value"], "vm-guest");
     assert_eq!(guest["network"]["value"], "host-gateway-model-broker");
-    assert_eq!(guest["checkpoint"]["value"], "workflow-node-boundary-v1");
-    let mut pinned = bound_request;
-    pinned.vm_profile = Some(fixture("execution-profile/admitted-pinned.json"));
-    assert_eq!(facts(&pinned)["checkpoint"]["support"], "unavailable");
+    // The profile declares `workflow-node-boundary-v1`, but an attempt has no hooks.
+    assert_eq!(guest["checkpoint"]["support"], "unavailable");
 }

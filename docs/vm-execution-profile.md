@@ -95,6 +95,8 @@ request bytes, identity and behaviour are unchanged. When either is present,
 validation requires:
 
 - `vm_binding`, `vm_profile` and `omp.model_broker.forwarded` all present;
+- a requested mobility other than `application_checkpoint`: the attempt route
+  has no node-boundary checkpoint hooks, so it never restores from one;
 - `network: false` declared explicitly;
 - the binding admitted against the profile, `admitted_envelope`, the
   envelope's `attempt_id` and `fence`, and a requested mode the profile offers;
@@ -104,8 +106,8 @@ validation requires:
 
 A broker profile with `forwarded` but no binding is refused. With a binding,
 `implementation-attempt inspect` reports `isolation: vm-guest` and
-`network: host-gateway-model-broker`. It reports `checkpoint` as the profile's
-checkpoint profile, or `unavailable` when that is `none`.
+`network: host-gateway-model-broker`. It always reports `checkpoint` as
+`unavailable`, whatever checkpoint profile the VM execution profile declares.
 
 ## C3 `lattice.vm-effect-authority.v1`
 
