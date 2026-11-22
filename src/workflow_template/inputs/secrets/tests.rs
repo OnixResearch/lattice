@@ -106,6 +106,8 @@ fn generated_base64url_secrets_are_refused() {
 
 #[test]
 fn ordinary_refs_and_repo_paths_are_not_secret_values() {
+    // A literal of this kebab-case name trips gitleaks' GitLab PAT rule, so assemble it.
+    let glpat_runbook = format!("docs/runbooks/glpat-{}", "rotation-for-ci-runners.md");
     for value in [
         "dependabot/npm_and_yarn/express-4.18.2",
         ".github/workflows/pypi-publish.yml",
@@ -127,6 +129,9 @@ fn ordinary_refs_and_repo_paths_are_not_secret_values() {
         "Readme.md",
         "a/B/c1",
         "AKIA/ASIA",
+        "deploy/xapp-onboarder-deployment/values.yaml",
+        glpat_runbook.as_str(),
+        "ops/xoxb-notifier-service-config/values.yaml",
     ] {
         assert!(!super::is_secret_value(value), "{value}");
     }

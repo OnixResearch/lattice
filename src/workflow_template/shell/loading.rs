@@ -69,7 +69,15 @@ fn load_one_bundle(
             "bundle directory could not be opened",
         )
     })?;
-    let captured = capture_files(&bundle_dir, safe_name)?;
+    load_bundle_dir(&bundle_dir, safe_name)
+}
+
+/// Capture, parse, and validate one already opened bundle directory.
+fn load_bundle_dir(
+    bundle_dir: &cap_std::fs::Dir,
+    safe_name: &str,
+) -> Result<super::model::ValidatedBundle, super::model::Diagnostic> {
+    let captured = capture_files(bundle_dir, safe_name)?;
     let manifest_bytes = captured
         .get(MANIFEST_FILE_NAME)
         .ok_or_else(|| {

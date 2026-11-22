@@ -52,7 +52,9 @@ fn read_input_file(path: &std::path::Path) -> Result<Vec<u8>, Error> {
 
 /// Load only the bundle directory the binding names, surfacing its load diagnostic.
 ///
-/// Like the catalog loader, a symlinked bundle directory is refused rather than followed.
+/// Like the catalog loader, a symlinked bundle directory is refused rather than followed. The
+/// directory is opened with `O_NOFOLLOW`, so the check and the open are one step; the opened
+/// handle is then compared with the entry, which also covers the non-`openat2` fallback.
 fn load_bound_bundle(
     catalog_root: &std::path::Path,
     binding: &super::inputs::RetainedBinding,
@@ -61,18 +63,68 @@ fn load_bound_bundle(
         .map_err(|_| Error::Inputs(super::inputs::InputError::TemplateUnavailable))?;
     let directory = std::ffi::OsString::from(&binding.bundle);
     let label = safe_directory_label(&directory);
-    let entry = root
-        .symlink_metadata(&directory)
-        .map_err(|_| Error::Inputs(super::inputs::InputError::TemplateUnavailable))?;
-    if entry.file_type().is_symlink() {
-        return Err(Error::Inputs(super::inputs::InputError::TemplateLoad(super::core::diagnostic(
-            &label,
-            super::model::DiagnosticCode::SymlinkRejected,
-            "bundle directory is a symlink",
-        ))));
+    let refuse = |code, message| {
+        Error::Inputs(super::inputs::InputError::TemplateLoad(super::core::diagnostic(&label, code, message)))
+    };
+    let symlink = || refuse(super::model::DiagnosticCode::SymlinkRejected, "bundle directory is a symlink");
+    let bundle_dir = open_dir_nofollow(&root, &directory).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::NotFound {
+            Error::Inputs(super::inputs::InputError::TemplateUnavailable)
+        } else if is_symlink_refusal(&error) {
+            symlink()
+        } else {
+            refuse(super::model::DiagnosticCode::FileAccess, "bundle directory could not be opened")
+        }
+    })?;
+    if !is_same_entry(&root, &directory, &bundle_dir) {
+        return Err(symlink());
     }
-    load_one_bundle(&root, &directory, &label)
-        .map_err(|diagnostic| Error::Inputs(super::inputs::InputError::TemplateLoad(diagnostic)))
+    debug_assert!(bundle_dir.dir_metadata().is_ok_and(|metadata| metadata.is_dir()));
+    let bundle = load_bundle_dir(&bundle_dir, &label)
+        .map_err(|diagnostic| Error::Inputs(super::inputs::InputError::TemplateLoad(diagnostic)))?;
+    debug_assert_eq!(bundle.manifest().id, binding.bundle);
+    Ok(bundle)
+}
+
+/// Open a directory entry of `root` without following a symlink in its final component.
+fn open_dir_nofollow(root: &cap_std::fs::Dir, name: &std::ffi::OsString) -> std::io::Result<cap_std::fs::Dir> {
+    let mut options = cap_std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use cap_std::fs::OpenOptionsExt as _;
+        options.custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW);
+    }
+    let file = root.open_with(name, &options)?;
+    Ok(cap_std::fs::Dir::from_std_file(file.into_std()))
+}
+
+/// `O_NOFOLLOW` fails with `ELOOP` on a symlink, and `O_DIRECTORY` with `ENOTDIR` on a link to
+/// a file.
+fn is_symlink_refusal(error: &std::io::Error) -> bool {
+    #[cfg(unix)]
+    {
+        matches!(error.raw_os_error(), Some(libc::ELOOP | libc::ENOTDIR))
+    }
+    #[cfg(not(unix))]
+    {
+        error.kind() == std::io::ErrorKind::NotADirectory
+    }
+}
+
+/// Whether the opened handle is still the entry itself: not a symlink, same device and inode.
+fn is_same_entry(root: &cap_std::fs::Dir, name: &std::ffi::OsString, opened: &cap_std::fs::Dir) -> bool {
+    let (Ok(entry), Ok(handle)) = (root.symlink_metadata(name), opened.dir_metadata()) else {
+        return false;
+    };
+    #[cfg(unix)]
+    let is_same_inode = {
+        use cap_std::fs::MetadataExt as _;
+        entry.dev() == handle.dev() && entry.ino() == handle.ino()
+    };
+    #[cfg(not(unix))]
+    let is_same_inode = true;
+    !entry.file_type().is_symlink() && handle.is_dir() && is_same_inode
 }
 
 fn admit_loaded(

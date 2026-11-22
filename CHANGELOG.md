@@ -126,7 +126,9 @@ interfaces.
   rule applies to `relative_path` parameters only: a secret word in the name
   or binding key, a value component or stem in a known provider token format,
   or a random-looking piece of 20 or more letters and digits that mixes
-  classes and has no word-length lowercase runs.
+  classes and has no word-length lowercase runs. It is a pattern check: names
+  of short `-`/`_`-joined pieces can be refused, and a token behind long
+  lowercase words can be missed.
   Credential references remain the only secret path. The run records its
   input identity (template, bound identity, bound workflow revision, value
   identity, names and kinds, no values) in the same transaction that reserves
