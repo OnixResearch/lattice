@@ -116,3 +116,104 @@ r[lattice.workflow_templates.compatibility.scenario.cli]
 - GIVEN an existing workflow or orchestration definition is imported, run, validated, started, inspected, or replayed through current CLI commands
 - WHEN no workflow-template bundle is selected
 - THEN Lattice MUST retain the same validation, persistence, execution, evidence, and exit behavior
+
+### Requirement: Typed workflow-template parameters
+r[lattice.workflow_templates.params] A schema 2 workflow-template manifest MUST declare a closed list of typed parameters. Each parameter MUST name a type from `bool`, `integer`, `enum` and `relative_path` with its bounds, either be required without a default or optional with an in-bounds default, and name 1 to 8 shell-node environment targets prefixed `LATTICE_PARAM_`. A pure resolution function MUST reject unknown names, wrong types, out-of-bounds values and missing required values with a diagnostic that names at most a declared parameter and never a supplied value. It MUST return every value with a BLAKE3 identity. Binding MUST write values only as declared environment values, MUST NOT change command text, node kinds or effect grants, and MUST readmit the bound workflow and any orchestration rebound to its exact revision. The bound identity MUST cover the template identity and the resolved-value identity.
+
+#### Scenario: Values outside declared bounds are rejected
+r[lattice.workflow_templates.params.scenario.bounds]
+- GIVEN a manifest that declares typed parameters with bounds and defaults
+- WHEN a caller supplies an undeclared name, a value of another type, a value outside its bounds, a relative path with a parent, absolute, option-like or metacharacter component, or omits a required value
+- THEN resolution MUST fail with the matching safe diagnostic and MUST NOT echo the supplied value
+- AND equal resolved values MUST have equal identities, and any changed value MUST change the identity
+
+#### Scenario: Unsafe declarations fail at load
+r[lattice.workflow_templates.params.scenario.declaration]
+- GIVEN a manifest parameter with a duplicate or invalid name, inconsistent bounds, a required default, a missing or out-of-bounds optional default, an open or unknown type shape, or a target key outside `LATTICE_PARAM_`
+- OR a target shell node whose command is not one simple command of space-separated safe literals and whole-word `"${KEY}"` references to its bound keys, whose first word is a reference, an assignment, a shell, an argument-executing builtin or a denied wrapper, any of whose later literal words names a shell (all by basename and ignoring ASCII case), or that contains `-exec`, `-execdir`, `-ok`, `-okdir` or `-c`
+- OR a node that binds a `LATTICE_PARAM_*` key as a credential, or a template environment that does not hold the rendered default
+- OR a target shell node with a `{{…}}` expression in its `cwd` or `env`
+- OR a target shell node whose static env or credential bindings have a `BASH_FUNC_*` or `%%` key or a `BASH_ENV`, `SSH_CLIENT`, `SSH2_CLIENT`, `SHLVL`, `HOME`, `SHELLOPTS`, `BASHOPTS` or `PS4` key, or whose static env has a value containing `$` or a backtick; `ENV` MUST stay allowed
+- WHEN the loader validates the bundle, including after its workflow is re-pinned, or the template is bound, or a bound bundle is re-verified
+- THEN the bundle MUST be rejected with `invalid_param_declaration`, `param_target_expression` for the expression case or `param_target_env` for the environment case (`bound_content_drift` when re-verified), and other bundles MUST remain available
+- AND a value MUST NOT take the command-name position of the bound command and MUST NOT be parsed by the shell as shell syntax; the deny list is defense in depth and MUST NOT be claimed to stop a program that executes its own arguments
+
+#### Scenario: Values bind as environment values without widening grants
+r[lattice.workflow_templates.params.scenario.binding]
+- GIVEN a validated catalog template and accepted values
+- WHEN the template is bound
+- THEN the bound workflow MUST differ from the template only in the declared environment values and, when those values change the expanded graph, in its source association's state, which becomes `MaterializedFork`; each shell command MUST receive a value as one unchanged argument
+- AND authority inspection of the bound workflow MUST list the same grants as the template under the bound workflow revision
+- AND save and start MUST refuse an unbound template
+- AND a bound bundle whose workflow, values, revision or mode differ from what `bind` admitted MUST be refused at save, activation planning and start before any store write or dispatch, with `mode_violation` for a mode failure and `bound_content_drift` for any other failure at every entry point, and bundle content MUST NOT be writable outside the crate
+
+#### Scenario: Built-in bundles are migrated
+r[lattice.workflow_templates.params.scenario.migration]
+- GIVEN the four built-in bundles
+- WHEN they are loaded and bound to their defaults
+- THEN every bundle MUST use schema 2 and `mutating`, the agent-evaluation catalog review MUST declare `catalog_root` for its `--root`, the guarded bundles MUST keep their pinned root without parameters, and binding the defaults MUST reproduce each reviewed workflow and orchestration revision
+
+### Requirement: Declared bundle mode
+r[lattice.workflow_templates.mode] A schema 2 manifest MUST declare `mode` as `read_only` or `mutating`. Lattice MUST classify effects conservatively: only condition, merge and approval nodes are pure, only file reads and image inputs are read-only, and every other node, including shell, operation, HTTP of any method, agent, subworkflow and file write or append, is mutating. A `read_only` bundle whose workflow needs `mutating` MUST fail admission at load, at save and at start. The TUI MUST mark every bundle's mode.
+
+#### Scenario: Effects are classified conservatively
+r[lattice.workflow_templates.mode.scenario.classification]
+- GIVEN shell, HTTP, file read, file write, file append and image input nodes
+- WHEN Lattice classifies them
+- THEN only the file read and image input MUST be read-only
+
+#### Scenario: A read-only bundle with a mutating effect is refused
+r[lattice.workflow_templates.mode.scenario.enforced]
+- GIVEN a `read_only` bundle whose workflow contains a mutating node
+- WHEN it is loaded, or a bound bundle whose mode no longer admits its workflow is planned for save or start
+- THEN load MUST fail with `mode_violation`, and planning MUST return a `ModeViolation` conflict or block before any store write or dispatch
+- AND the same workflow under `mutating`, and a file-read-only workflow under `read_only`, MUST load
+
+#### Scenario: Schema 1 manifests keep a compatibility path
+r[lattice.workflow_templates.mode.scenario.compatibility]
+- GIVEN a schema 1 manifest without `mode` or `params`
+- WHEN it is loaded
+- THEN it MUST load as `mutating` with no parameters and MUST bind to its defaults
+- AND a schema 1 manifest that has either key, including with a `null` value, MUST fail with `unsupported_schema`, a schema 2 manifest without either field MUST fail with `invalid_manifest`, and another schema version or mode value MUST be rejected
+
+### Requirement: Typed run inputs for saved template workflows
+r[lattice.workflow_templates.run_inputs] `lattice run NAME` and `lattice authority inspect NAME` MUST accept repeatable `--input NAME=VALUE` and one `--input-file PATH` holding a JSON object. A name repeated within or across both sources MUST be refused. Inputs MUST be typed by the declarations of the exact template the saved workflow was retained from, checked by `params::resolve`, screened by the secret rule, and bound by `workflow_template::bind`, which repeats full bundle admission. Every input failure MUST happen before a run id is reserved, any run record is written, or any node runs, and its diagnostic MUST NOT echo a supplied value or an undeclared name.
+
+#### Scenario: Each declared type binds from either source
+r[lattice.workflow_templates.run_inputs.scenario.typed]
+- GIVEN a saved workflow retained from a template declaring `bool`, `integer`, `enum` and `relative_path` parameters
+- WHEN `--input` text values and `--input-file` JSON values are supplied
+- THEN text MUST take the declared type (`true`/`false`, a canonical decimal integer, or text) and JSON values MUST keep their JSON type
+- AND the bound workflow MUST hold each value in its declared environment target under a bound workflow revision, with the same effect grants as the saved workflow
+- AND equal values from different sources MUST give the same input identity
+
+#### Scenario: Wrong, unknown, missing and duplicate inputs are refused before any effect
+r[lattice.workflow_templates.run_inputs.scenario.refused]
+- GIVEN a parameterized saved workflow
+- WHEN a value has the wrong type or is out of bounds, a name is undeclared, a required value is missing, a name repeats, an argument is not `NAME=VALUE`, or the file is not one JSON object
+- THEN the command MUST fail with a safe diagnostic
+- AND no node MUST run, no run id MUST be reserved, and no run or input record MUST be written
+
+#### Scenario: Inputless runs are unchanged
+r[lattice.workflow_templates.run_inputs.scenario.inputless]
+- GIVEN a saved workflow run without `--input` or `--input-file`
+- WHEN it runs, is inspected with `runs show`, or is inspected with `authority inspect`
+- THEN its run identity, run record, summary bytes, report shape and authority output MUST equal those of the same workflow saved without a template, and no input record MUST exist
+
+### Requirement: Retained template binding
+r[lattice.workflow_templates.run_inputs.retained] Saving a bound bundle MUST retain, keyed by the saved workflow name, the bundle id, the template identity and the saved workflow revision. A run with inputs MUST load only the bundle directory the binding names. Inputs MUST be refused with a distinct missing-binding refusal when no binding is retained, and MUST be refused when the template declares no parameters, when the saved workflow revision no longer equals the retained revision, when that bundle fails to load (surfacing its value-free diagnostic) or no longer has the retained template identity, or when the workflow has an approval gate. `--input-file` MUST be opened without blocking and refused unless it is a regular file of at most 64 KiB, and `lattice run` MUST read its inputs before opening the store.
+
+### Requirement: Run inputs re-verify at the start boundary
+r[lattice.workflow_templates.run_inputs.start] A run with inputs is a start path. Before its run id is reserved or its input record is written, the bound bundle MUST pass the same `reverify` as save and start, and the recorded input identity MUST name exactly that bundle id, template, bound identity, workflow revision and value identity. Any difference MUST refuse the run with `bound_content_drift` and MUST leave no run id, run record or input record.
+
+### Requirement: Recorded input identity
+r[lattice.workflow_templates.run_inputs.record] A run with inputs MUST reserve its run id and record its input identity in one store transaction after every input check passed. The identity MUST hold the bundle id, template identity, bound identity, bound workflow revision, the `params::Resolved` value identity, and each declared name with its kind and whether it was supplied. It MUST NOT hold a value.
+
+### Requirement: Content-omitting input inspection
+r[lattice.workflow_templates.run_inputs.inspection] `runs show` MUST show a recorded input identity as declared names, kinds, supplied flags and BLAKE3 identities only, without a value, workflow name or bundle name, with the report's own identity prefix. An input record that does not belong to the run MUST make the report invalid with `inputs_identity_mismatch`. The identities are unsalted, so the documentation MUST state that values are omitted, not hidden.
+
+### Requirement: Authority inspection of bound inputs
+r[lattice.workflow_templates.run_inputs.authority] `authority inspect` with the same inputs as a run MUST admit them the same way without writing state and MUST report the grants of the bound workflow revision with the content-omitting input identity, rendering the bound workflow revision exactly as the report's top-level `workflow_revision`, so a profile written from it authorizes exactly that bound revision.
+
+### Requirement: Secret-like inputs are refused
+r[lattice.workflow_templates.run_inputs.secrets] Run inputs MUST NOT carry secrets; credential references remain the only secret path. For `relative_path` parameters only, a name or binding key suffix with a secret word or a qualified `key` as an `_`-separated word, a supplied value component (or its stem before `.`, for formats without `.`) in a known provider token format (its prefix and at least its minimum suffix from its own alphabet, with the format's required digits or classes), and a supplied value with a `.`-separated piece that, without `-` and `_`, has at least 20 letters and digits of mixed classes whose lowercase runs average under 3 bytes MUST be refused naming only the parameter. `bool`, `integer` and `enum` parameters MUST NOT be screened. Ordinary refs, repository paths and CamelCase identifier file names whose words are three or more letters SHOULD be accepted; names built from short pieces joined by `-` or `_`, or from one- and two-letter words with digits, MAY be refused, and a token joined behind long lowercase words MAY be accepted. The rule is a pattern check, not a proof.
