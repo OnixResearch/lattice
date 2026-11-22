@@ -71,7 +71,7 @@ fn installation_never_exceeds_the_loader_catalog_limit() {
     let loaded = lattice::workflow_template::load_catalog(&catalog).expect("catalog");
     assert!(loaded.diagnostics.iter().all(|diagnostic| diagnostic.code.as_str() != "limit_exceeded"));
     assert!(
-        loaded.bundles.iter().any(|bundle| bundle.manifest.id == HELLO),
+        loaded.bundles.iter().any(|bundle| bundle.manifest().id == HELLO),
         "existing and new bundles stay visible"
     );
 

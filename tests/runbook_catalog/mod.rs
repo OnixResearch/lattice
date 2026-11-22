@@ -109,7 +109,7 @@ pub fn loader_identities(pack: &Path) -> BTreeMap<String, String> {
     catalog
         .bundles
         .iter()
-        .map(|bundle| (bundle.manifest.id.clone(), format!("b3:{}", bundle.identity.as_str())))
+        .map(|bundle| (bundle.manifest().id.clone(), format!("b3:{}", bundle.identity().as_str())))
         .collect()
 }
 

@@ -171,17 +171,17 @@ async fn installation_grants_no_effect_authority() {
     assert!(report.is_complete());
     assert!(!report.grants_authority);
     let loaded = lattice::workflow_template::load_catalog(&catalog).expect("installed catalog");
-    let bundle = loaded.bundles.iter().find(|bundle| bundle.manifest.id == HELLO).expect("installed bundle");
+    let bundle = loaded.bundles.iter().find(|bundle| bundle.manifest().id == HELLO).expect("installed bundle");
 
     let inspection =
-        lattice::engine::effect::standalone::inspect_workflow(&bundle.workflow).expect("authority requirements");
+        lattice::engine::effect::standalone::inspect_workflow(bundle.workflow()).expect("authority requirements");
     assert!(!inspection.grants.is_empty(), "the installed workflow still needs a reviewed authority profile");
     let store = lattice::store::Store::new(root.path().join("state.redb")).expect("store");
-    store.save_workflow(&bundle.workflow).expect("saved workflow");
+    store.save_workflow(bundle.workflow()).expect("saved workflow");
     let run = store.next_run_id().expect("run id");
     let summary = lattice::headless::run_saved_workflow_with_authority_provider(
         &store,
-        &bundle.workflow.meta.name,
+        &bundle.workflow().meta.name,
         run,
         &lattice::engine::effect::execution::UnavailableRunContextSource,
     )

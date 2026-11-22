@@ -165,7 +165,7 @@ fn fetch_lock_install_and_list_from_an_exact_commit_without_network_on_load() {
     assert_eq!(report["network_accessed"], false);
     let loaded = lattice::workflow_template::load_catalog(&catalog).expect("installed catalog");
     assert!(loaded.diagnostics.is_empty(), "{:?}", loaded.diagnostics);
-    let ids = loaded.bundles.iter().map(|bundle| bundle.manifest.id.as_str()).collect::<Vec<_>>();
+    let ids = loaded.bundles.iter().map(|bundle| bundle.manifest().id.as_str()).collect::<Vec<_>>();
     assert_eq!(ids, [HELLO, STATUS]);
     let config_directory = catalog.parent().expect("config directory");
     assert!(
