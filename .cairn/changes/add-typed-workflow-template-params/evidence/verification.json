@@ -340,5 +340,48 @@
         "baseline_rekeyed": false
       }
     }
+  },
+  "review_6": {
+    "source": "Lattice #28 testing (RunInputs), confirmed in code by Main; plus the final verification of c3c4a503 (ParamsVerify) P3",
+    "base_commit": "c3c4a503",
+    "findings": {
+      "bound_source_association": {
+        "defect": "bind copied the template's RetainedEntrySnapshot association unchanged; save_workflow_cas reconciled the stored copy to MaterializedFork for non-default values, so application_facts saw the saved workflow as Conflicting: a re-save returned ApplicationConflict and start (admit_activation, which requires Exact) was blocked; the pure plan_activation does not read the store and was not affected (inferred from code, not reproduced before the fix)",
+        "fix": "bind runs crate::authoring::reconcile_materialized on the bound workflow before computing the revision and identity; reverify requires the association to be a fixed point of that reconciliation; workflow_revision does not cover authoring (workflow_to_portable omits it), so bound revisions and identities are unchanged",
+        "tests": [
+          "tests/test_workflow_template_binding.rs::non_default_values_fork_the_source_association_and_resave_exactly (default stays RetainedEntrySnapshot; non-default is MaterializedFork; first save CreateDraft, second ExactAlreadyPresent; stored authoring equals the bundle's; application_facts is Exact for activation; reverify passes)",
+          "src/workflow_template/tests.rs::a_tampered_source_association_is_drift"
+        ]
+      },
+      "P3_static_suffix_case": {
+        "fix": "strip_static_suffix cuts a trailing -static compared with eq_ignore_ascii_case",
+        "tests": ["src/workflow_template/params/grammar.rs::tests::shells_are_matched_in_any_case_and_any_word (Bash-Static and Zsh-Static as first and later word)"]
+      }
+    },
+    "api_changes": [],
+    "environment": {
+      "note": "Gates ran in the inherited Lattice dev-shell environment (IN_NIX_SHELL=impure) because nix develop was blocked by another session's host nix GC lock. Main runs the authoritative check.rs, Octet and flake gates in the branch's own dev shell on the final head.",
+      "cargo": "/nix/store/6vrrjl1mckj4g5pj9p5d8minyr0mfhqg-rust-minimal-1.99.0-nightly-2026-07-17/bin/cargo",
+      "octet_precommit_check": "/nix/store/b83f2w89irvzlkg74gw37kbnwgqgcr3c-octet-precommit-check/bin/octet-precommit-check",
+      "cairn": "/nix/store/z36v6jnf03wiqjsv1g6k8ll5qyb2h91k-cairn/bin/cairn",
+      "gitleaks": "/nix/store/n57sbg8d4nvxqa40nl9a5dib1smpqim3-gitleaks-8.28.0/bin/gitleaks"
+    },
+    "gates": {
+      "focused_integration_tests": {
+        "exit": 0,
+        "passed": { "params": 5, "binding": 5, "modes": 5, "review": 6, "workflow_templates": 17, "guarded": 19, "agent_evaluation_core": 12 },
+        "failed": 0
+      },
+      "test_source_authoring": { "exit": 0, "passed": 7, "ignored": 25, "ignored_reason": "requires the exact captured native worker (host qualification)" },
+      "lib_tests": { "command": "cargo test -p lattice --no-fail-fast --lib -- workflow_template", "exit": 0, "passed": 16, "failed": 0 },
+      "clippy": { "exit": 0 },
+      "fmt": { "exit": 0 },
+      "octet_precommit_check": {
+        "exit": 0,
+        "root": { "accepted_total": 1052, "current_total": 1052, "new_total": 0, "stale_total": 0 },
+        "lattice_core": { "accepted_total": 25, "current_total": 25, "new_total": 0, "stale_total": 0 },
+        "baseline_rekeyed": false
+      }
+    }
   }
 }

@@ -188,6 +188,29 @@ fn a_non_mode_admission_failure_is_drift_in_reverify() {
 }
 
 #[test]
+fn a_tampered_source_association_is_drift() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("builtins/workflow-templates");
+    let catalog = super::load_catalog(&root).expect("built-in catalog loads");
+    let template = catalog
+        .bundles
+        .into_iter()
+        .find(|bundle| bundle.manifest.id == "agent-evaluation-catalog-review")
+        .expect("catalog review");
+    let values = std::collections::BTreeMap::from([(
+        "catalog_root".to_owned(),
+        super::ParamValue::Text("fixtures/catalog".into()),
+    )]);
+    let mut bound = super::bind(&template, &values).expect("non-default value binds");
+    assert!(super::reverify(&bound).is_ok());
+    if let Some(association) = bound.workflow.authoring.as_mut() {
+        association.state = crate::authoring::AssociationState::RetainedEntrySnapshot;
+    }
+    let refused = super::reverify(&bound).expect_err("association no longer matches the bound graph");
+    assert_eq!(refused.code, super::DiagnosticCode::BoundContentDrift);
+    assert_eq!(refused.message, "bound workflow source association differs");
+}
+
+#[test]
 fn bind_refuses_a_parameter_credential() {
     let mut template = template();
     add_param_credential(&mut template.workflow);

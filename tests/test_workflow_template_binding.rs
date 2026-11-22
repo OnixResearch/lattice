@@ -165,3 +165,33 @@ fn bound_values_reach_the_process_as_one_unchanged_argument() {
         assert_eq!(String::from_utf8_lossy(&output.stdout), format!("[--root][{value}]"));
     }
 }
+
+fn association_state(bundle: &ValidatedBundle) -> Option<lattice::authoring::AssociationState> {
+    bundle.workflow().authoring.as_ref().map(|association| association.state.clone())
+}
+
+// r[verify lattice.workflow_templates.params.scenario.binding]
+#[test]
+fn non_default_values_fork_the_source_association_and_resave_exactly() {
+    let template = builtin(CATALOG_REVIEW);
+    let defaults = lattice::workflow_template::bind(&template, &BTreeMap::new()).expect("defaults bind");
+    assert_eq!(association_state(&defaults), Some(lattice::authoring::AssociationState::RetainedEntrySnapshot));
+    let other = lattice::workflow_template::bind(&template, &root("fixtures/catalog")).expect("value binds");
+    assert_eq!(association_state(&other), Some(lattice::authoring::AssociationState::MaterializedFork));
+    assert_eq!(other.workflow_revision(), &other.params().expect("bound").workflow_revision);
+    assert!(lattice::workflow_template::reverify(&other).is_ok());
+
+    let directory = tempfile::tempdir().expect("store directory");
+    let store = lattice::store::Store::new(directory.path().join("resave.redb")).expect("store opens");
+    let first = lattice::workflow_template::save_draft(&store, &other).expect("first save");
+    assert!(matches!(first, lattice::workflow_template::ApplicationPlan::CreateDraft { .. }));
+    let second = lattice::workflow_template::save_draft(&store, &other).expect("re-save");
+    assert!(matches!(second, lattice::workflow_template::ApplicationPlan::ExactAlreadyPresent { .. }));
+    let stored = store.load_workflow(&other.workflow().meta.name).expect("load").expect("stored workflow");
+    assert_eq!(stored.authoring, other.workflow().authoring, "the bundle carries what the store persists");
+    let facts = lattice::workflow_template::application_facts(&store, &other).expect("facts");
+    assert!(
+        matches!(facts.workflow, lattice::workflow_template::ExistingContent::Exact(_)),
+        "activation admission sees the saved workflow as exact"
+    );
+}

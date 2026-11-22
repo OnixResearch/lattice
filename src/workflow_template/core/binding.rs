@@ -113,8 +113,13 @@ pub fn bind(
     }
     let declared = template.manifest.params();
     let resolved = super::params::resolve(declared, supplied).map_err(|error| param_diagnostic(bundle, &error))?;
-    let workflow = super::params::apply(declared, &resolved, &template.workflow)
+    let mut workflow = super::params::apply(declared, &resolved, &template.workflow)
         .map_err(|error| param_diagnostic(bundle, &error))?;
+    // Carry exactly what the store persists: a `MaterializedFork` association when the values
+    // change the expanded graph, and the unchanged association otherwise.
+    crate::authoring::reconcile_materialized(&mut workflow).map_err(|_| {
+        diagnostic(bundle, super::model::DiagnosticCode::InvalidWorkflow, "workflow source association failed")
+    })?;
     let revision = crate::orchestration::workflow_revision(&workflow)
         .map_err(|_| diagnostic(bundle, super::model::DiagnosticCode::InvalidWorkflow, "workflow identity failed"))?;
     let orchestration = template.orchestration.clone().map(|mut definition| {
@@ -146,7 +151,8 @@ pub fn bind(
 /// Re-verify a bound bundle at a save or start boundary.
 ///
 /// It compares, in order: the recorded values re-resolve to the same `Resolved`; the workflow
-/// still holds them and passes the target checks; the content passes full admission again; the
+/// still holds them and passes the target checks; reconciling its source association leaves it
+/// unchanged, as `bind` and the store reconcile it; the content passes full admission again; the
 /// recomputed workflow revision equals the recorded and bound revisions; the recomputed
 /// orchestration revision equals the recorded one; the template identity recomputed from the
 /// manifest and file identities equals the bound template; and the bound identity recomputed
@@ -171,6 +177,12 @@ pub fn reverify(bundle: &super::model::ValidatedBundle) -> Result<(), super::mod
     }
     super::params::validate_bound(declared, &resolved, &bundle.workflow)
         .map_err(|_| drift("bound workflow does not hold the resolved values"))?;
+    let mut reconciled = bundle.workflow.clone();
+    crate::authoring::reconcile_materialized(&mut reconciled)
+        .map_err(|_| drift("bound workflow source association is invalid"))?;
+    if reconciled.authoring != bundle.workflow.authoring {
+        return Err(drift("bound workflow source association differs"));
+    }
     // A mode failure keeps `mode_violation`; every other admission failure is drift.
     let content = admit_content(&bundle.manifest, bundle.workflow.clone(), bundle.orchestration.clone(), label)
         .map_err(|error| match error.code {

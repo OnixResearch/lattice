@@ -128,10 +128,19 @@ fn names_any(word: &str, names: &[&str]) -> bool {
 /// `bash-static`).
 fn names_shell(word: &str) -> bool {
     let basename = word.rsplit('/').next().unwrap_or(word);
-    let unpacked = basename.strip_suffix("-static").or_else(|| basename.strip_suffix("-STATIC")).unwrap_or(basename);
+    let unpacked = strip_static_suffix(basename);
     let unversioned =
         unpacked.trim_end_matches(|character: char| character.is_ascii_digit() || matches!(character, '.' | '-' | '_'));
     !unversioned.is_empty() && names_any(unversioned, SHELLS)
+}
+
+/// Cut a trailing `-static`, compared ignoring ASCII case (`bash-static`, `Bash-Static`).
+fn strip_static_suffix(basename: &str) -> &str {
+    const SUFFIX: &str = "-static";
+    match basename.len().checked_sub(SUFFIX.len()) {
+        Some(at) if basename.is_char_boundary(at) && basename[at..].eq_ignore_ascii_case(SUFFIX) => &basename[..at],
+        _ => basename,
+    }
 }
 
 #[cfg(test)]
@@ -201,6 +210,8 @@ mod tests {
             "zsh-static",
             "mksh-static",
             "bash-5.2-static",
+            "Bash-Static",
+            "Zsh-Static",
             "hush",
             "osh",
             "ysh",

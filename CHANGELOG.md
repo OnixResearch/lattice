@@ -80,7 +80,10 @@ interfaces.
   unbound bundle is refused with `ParamsUnbound`; for a bound bundle a mode
   failure is `mode_violation` and anything else is
   `bound_content_drift`. A schema 1 manifest that names `mode` or
-  `params`, even as `null`, is refused.
+  `params`, even as `null`, is refused. `bind` reconciles the bound
+  workflow's source association as the store does, so a bundle bound to
+  non-default values carries `MaterializedFork` and re-saves and activates
+  as exact instead of conflicting with its own saved copy.
 - Git-backed runbook catalogs admitted through content-addressed operation
   packs (Lattice #29). A pack can carry workflow-template bundles as
   `workflow_bundle` content under `workflow-templates/<bundle-id>/`, pinned by
