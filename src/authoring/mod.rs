@@ -6,6 +6,7 @@
 mod captured;
 pub mod cli;
 pub mod construction;
+pub mod divergence;
 pub mod shell;
 
 pub use crate::workflow_template::ContentIdentity;
@@ -240,21 +241,11 @@ fn construction_identity(workflow: &crate::engine::Workflow) -> Result<ContentId
         ),
     )
 }
-/// Whether the workflow no longer equals the expansion its source association recorded, so
-/// reconciliation would mark the association a materialized fork. `None` without an association.
-pub fn diverges_from_expansion(workflow: &crate::engine::Workflow) -> Result<Option<bool>, &'static str> {
-    let Some(association) = workflow.authoring.as_ref() else {
-        return Ok(None);
-    };
-    association.validate()?;
-    Ok(Some(expanded_identity(workflow)? != association.expanded_artifact))
-}
-
 /// Shared rule for graph mutation, typed editing, saving and exporting.
 /// No inverse compiler or source rewrite is attempted, including after a revert.
 // r[impl lattice.source_authoring.fork]
 pub fn reconcile_materialized(workflow: &mut crate::engine::Workflow) -> Result<(), &'static str> {
-    if diverges_from_expansion(workflow)? == Some(true) {
+    if divergence::diverges_from_expansion(workflow)? == Some(true) {
         workflow.authoring.as_mut().ok_or("source association disappeared")?.state = AssociationState::MaterializedFork;
     }
     Ok(())
