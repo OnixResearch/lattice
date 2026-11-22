@@ -200,24 +200,27 @@ fn only_an_exact_retained_parameterized_template_accepts_inputs() {
     assert!(matches!(missing, Err(lattice::workflow_template::Error::Inputs(InputError::WorkflowNotFound))));
 }
 
-const REVIEW: &str = "agent-evaluation-catalog-review";
-
-fn builtin_root() -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("builtins/workflow-templates")
+/// The fixture template bound to a value for every parameter, none of them its default.
+fn non_default_bound(fixture: &Fixture) -> lattice::workflow_template::ValidatedBundle {
+    use lattice::workflow_template::ParamValue;
+    let template = fixture::catalog_template(&fixture.catalog);
+    let supplied = [
+        ("enabled".to_string(), ParamValue::Bool(true)),
+        ("count".to_string(), ParamValue::Integer(4)),
+        ("format".to_string(), ParamValue::Text("json".into())),
+        ("target".to_string(), ParamValue::Text("reports/nightly".into())),
+    ]
+    .into();
+    let bound = lattice::workflow_template::bind(&template, &supplied).expect("non-default values bind");
+    assert_ne!(bound.workflow_revision(), fixture.saved.workflow_revision(), "the binding is not the default");
+    bound
 }
 
-/// The built-in catalog review bound to its defaults. Exact re-saves use it because a
-/// re-saved bundle must match the stored workflow's authoring exactly.
-fn review_bound() -> lattice::workflow_template::ValidatedBundle {
-    let catalog = lattice::workflow_template::load_catalog(&builtin_root()).expect("built-in catalog loads");
-    let template = catalog.bundles.into_iter().find(|bundle| bundle.manifest().id == REVIEW).expect("review");
-    lattice::workflow_template::bind(&template, &BTreeMap::new()).expect("defaults bind")
-}
-
-fn admit_review(store: &lattice::store::Store) -> Result<lattice::workflow_template::inputs::Admitted, InputError> {
-    let cli = args(&["catalog_root=fixtures/catalog"]);
-    let raw = lattice::workflow_template::InputRequest { cli: &cli, file: None }.read().expect("inputs read");
-    match lattice::workflow_template::admit_saved_inputs(store, REVIEW, &builtin_root(), &raw) {
+fn admit_in(
+    fixture: &Fixture,
+    store: &lattice::store::Store,
+) -> Result<lattice::workflow_template::inputs::Admitted, InputError> {
+    match fixture.admit_inputs(store, fixture::BUNDLE, &args(&["format=text", "count=2"]), None) {
         Ok(admitted) => Ok(admitted),
         Err(lattice::workflow_template::Error::Inputs(error)) => Err(error),
         Err(other) => panic!("unexpected shell failure: {other}"),
@@ -227,39 +230,36 @@ fn admit_review(store: &lattice::store::Store) -> Result<lattice::workflow_templ
 // r[verify lattice.workflow_templates.run_inputs.retained]
 #[test]
 fn a_workflow_saved_without_a_retained_binding_is_told_to_save_again() {
-    let bound = review_bound();
+    let fixture = Fixture::new();
+    let bound = non_default_bound(&fixture);
     let upgraded = tempfile::tempdir().expect("upgraded store directory");
     let store = lattice::store::Store::new(upgraded.path().join("lattice.redb")).expect("store opens");
     // What `save_draft` wrote before bindings were retained: the bound workflow alone.
     store.save_workflow_cas(bound.workflow(), None).expect("a save from before bindings were retained");
-    let error = admit_review(&store).unwrap_err();
+    let error = admit_in(&fixture, &store).unwrap_err();
     assert_eq!(error, InputError::BindingMissing);
     assert!(error.to_string().contains("save it again from its bundle"));
 
     let plan = lattice::workflow_template::save_draft(&store, &bound).expect("saving again succeeds");
     assert!(matches!(plan, lattice::workflow_template::ApplicationPlan::ExactAlreadyPresent { .. }));
-    admit_review(&store).expect("inputs admit after saving again");
+    admit_in(&fixture, &store).expect("inputs admit after saving again");
 }
 
 #[test]
 fn an_exact_resave_replaces_a_stale_binding() {
-    let bound = review_bound();
+    let fixture = Fixture::new();
+    let bound = non_default_bound(&fixture);
     let directory = tempfile::tempdir().expect("store directory");
     let store = lattice::store::Store::new(directory.path().join("lattice.redb")).expect("store opens");
     lattice::workflow_template::save_draft(&store, &bound).expect("first save");
-    let current = store.load_workflow_template_binding(REVIEW).unwrap().expect("binding retained");
+    let current = store.load_workflow_template_binding(fixture::BUNDLE).unwrap().expect("binding retained");
     let mut stale = current.clone();
-    stale.workflow.content_hash = lattice::orchestration::workflow_revision(&lattice::engine::Workflow::new(
-        REVIEW,
-        lattice::engine::workflow::WorkflowTimestamp::epoch(),
-    ))
-    .expect("revision")
-    .content_hash;
+    stale.workflow.content_hash = fixture.saved.workflow_revision().content_hash.clone();
     store.save_workflow_template_binding(&stale).expect("stale binding writes");
-    assert_eq!(admit_review(&store).unwrap_err(), InputError::SavedWorkflowDrift);
+    assert_eq!(admit_in(&fixture, &store).unwrap_err(), InputError::SavedWorkflowDrift);
 
     let plan = lattice::workflow_template::save_draft(&store, &bound).expect("exact save");
     assert!(matches!(plan, lattice::workflow_template::ApplicationPlan::ExactAlreadyPresent { .. }));
-    assert_eq!(store.load_workflow_template_binding(REVIEW).unwrap(), Some(current));
-    admit_review(&store).expect("the replaced binding admits");
+    assert_eq!(store.load_workflow_template_binding(fixture::BUNDLE).unwrap(), Some(current));
+    admit_in(&fixture, &store).expect("the replaced binding admits");
 }

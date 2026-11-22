@@ -110,6 +110,24 @@
       "gitleaks": { "version": "8.28.0", "scope": "12 paths changed or added against 2b66cc3d", "exit": 0, "leaks": 0 }
     }
   },
+  "review_3": {
+    "base_revision": "bf7e6548",
+    "change": "The BindingMissing upgrade path and the ExactAlreadyPresent replacement of a stale binding now use the run-inputs fixture bound to a non-default value for every parameter, which re-saves exactly after #27's bind reconciliation.",
+    "tests": [
+      "tests/test_run_inputs.rs::a_workflow_saved_without_a_retained_binding_is_told_to_save_again",
+      "tests/test_run_inputs.rs::an_exact_resave_replaces_a_stale_binding"
+    ],
+    "environment": "Inherited Lattice dev-shell environment, as in review_2, because `nix develop` was blocked by the host GC lock.",
+    "gates": {
+      "focused_integration_tests": { "command": "cargo test -p lattice --no-fail-fast --test 'test_run_inputs*' --test 'test_workflow_template_*' --test test_workflow_templates --test test_source_authoring", "exit": 0, "test_files": 9, "result_lines": 10, "passed": 63, "failed": 0, "passed_by_owner": { "run_inputs_28": 17, "workflow_templates_27": 38, "source_authoring": 8 } },
+      "lib_tests": { "command": "cargo test -p lattice --no-fail-fast --lib", "exit": 0, "passed": 560, "ignored": 8, "failed": 0 },
+      "clippy": { "exit": 0 },
+      "fmt": { "exit": 0 },
+      "octet_precommit_check": { "exit": 1, "root": { "accepted_total": 1052, "current_total": 1054, "new_total": 2, "stale_total": 0 }, "lattice_core": "25/25, 0 new", "new_findings_outside_this_change": ["bool_naming src/workflow_template/core/binding.rs:184 `forked`", "excessive_file_length src/authoring/mod.rs (304 lines)"], "baseline_rekeyed": false },
+      "cairn_validate": { "exit": 0, "valid": true },
+      "gitleaks": { "version": "8.28.0", "scope": "the 2 paths changed against bf7e6548", "exit": 0, "leaks": 0 }
+    }
+  },
   "non_claims": [
     "Local tests do not prove remote publication or hosted CI results.",
     "The secret rule is a pattern check; it does not prove an accepted value is not sensitive.",
