@@ -51,19 +51,31 @@ interfaces.
   profiles keep their bytes, identities and behaviour. Evidence: Q0 and Q1
   over Unix sockets with a scripted model; no VM, vsock, live model or second
   host.
-- Application checkpoint restart (Lattice #12). A workflow-exchange route
-  bound by `lattice.application-checkpoint-binding.v1` with checkpoint
-  `workflow-node-boundary-v1` publishes `lattice.application-checkpoint-manifest.v1`
-  manifests at completed-node boundaries and synchronously before every
-  effect reservation, so every effect that may have run is named as uncertain
-  by a committed manifest; sensitive outputs are never written. `lattice
-  application-checkpoint restore|inspect` admits a committed manifest under
-  Kiln's opaque admission reference into a fresh state root: uncertain nodes
-  are adopted as `Unknown` and never replayed, sibling manifests can only add
-  uncertainty, budget and cancellation, and the
+- Application checkpoint restart (Lattice #12). `lattice workflow-exchange
+  serve --checkpoint-binding <json>` binds one route with a
+  `lattice.application-checkpoint-binding.v1` whose checkpoint is
+  `workflow-node-boundary-v1`. The route publishes
+  `lattice.application-checkpoint-manifest.v1` manifests at completed-node
+  boundaries and synchronously before every effect reservation, so every effect
+  that may have run is named as uncertain by a committed manifest; sensitive
+  outputs are never written. Manifests carry only the measured `elapsed_ms`
+  budget; model requests and cost stay with the host's per-binding budget
+  ledger. `runtime.lattice_revision` includes a digest of the checkpoint,
+  restore and exchange sources. `lattice application-checkpoint restore`
+  only adopts: it admits a committed manifest under Kiln's opaque admission
+  reference into a fresh state root, and the serving exchange runs adopted
+  executions, observable and cancellable through the same exchange. Uncertain
+  nodes are adopted as `Unknown` and never replayed, and sibling manifests can
+  only add uncertainty, budget and cancellation. The restart request carries
+  Kiln's required `cancellation_requested`, ORed into admission, so a Cancel
+  acknowledged after the last checkpoint survives a restart. Restore refuses a
+  target binding with a different deadline (`carry_forward`) or attempt
+  binding (`crossed_binding`), and commits the adoption only after every check
+  and the workspace write, so a refused restore adopts nothing. The
   `lattice.application-restart-receipt.v1` receipt distinguishes application
-  restart, VM continuation and fresh retry. Without a binding the hook is
-  absent and restore refuses with `checkpoint_unavailable`. Fixtures are under
+  restart, VM continuation and fresh retry; `application-checkpoint inspect`
+  reads a checkpoint root. Without a binding the hook is absent and restore
+  refuses with `checkpoint_unavailable`. Fixtures are under
   `fixtures/application-checkpoint/`. Evidence: Q0 and a Q1 two-root restart
   after SIGKILL on one host; no cross-host, VM, live-model or native-ARM claim.
 - Standalone operator repair (Lattice #6). `lattice implementation-attempt
