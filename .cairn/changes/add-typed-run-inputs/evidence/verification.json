@@ -41,6 +41,14 @@
       "tests/test_run_inputs_records.rs::authority_inspect_with_inputs_reports_the_bound_revision_that_runs",
       "tests/test_run_inputs_records.rs::an_orphaned_input_record_is_never_listed_or_shown_as_a_run"
     ],
+    "1.6": [
+      "src/workflow_template/inputs/secrets/tests.rs::each_provider_token_family_is_refused (glpat- with '.', xapp-, stems hf_<token>.txt and AKIA<...>.json)",
+      "src/workflow_template/inputs/secrets/tests.rs::generated_base64url_secrets_are_refused (2000 each at 32, 43 and 64 characters)",
+      "src/workflow_template/inputs/secrets/tests.rs::ordinary_refs_and_repo_paths_are_not_secret_values (CamelCase paths, ticket branches, review strings)",
+      "tests/test_run_inputs_sources.rs::an_edited_or_replaced_valid_bundle_is_unavailable",
+      "tests/test_run_inputs_sources.rs::a_symlinked_bundle_directory_is_refused_like_the_catalog",
+      "tests/test_run_inputs_sources.rs::saved_workflow_drift_is_reported_before_a_bundle_load_failure"
+    ],
     "2.1": [
       "docs/workflow-template-bundles.md",
       "docs/choregraph-effect-authority.md",
@@ -83,6 +91,23 @@
       "cairn_validate": { "exit": 0, "valid": true },
       "cairn_workflow_status": { "exit": 0, "valid": true, "issues": 0 },
       "gitleaks": { "version": "8.28.0", "scope": "22 paths changed or added against 81834fd0", "exit": 0, "leaks": 0 }
+    }
+  },
+  "review_2": {
+    "review": "agent://RunInputsReview verification of 1e356129",
+    "base_revision": "2b66cc3d",
+    "findings_fixed": ["D1 CamelCase paths refused and base64url secrets missed", "D2 glpat- excluded '.', xapp- missing", "D3 retained binding docs", "D4 edited or replaced valid bundle tests", "symlinked bundle directory", "drift reported before bundle load", "optional: prefix formats match a component stem"],
+    "token_shape": "A '.'-separated piece, without '-' and '_', of at least 20 letters and digits mixing classes whose lowercase runs average under 3 bytes. On 40,000 simulated uniform base64url strings per length it refused 98.0% at 32, 99.2% at 43 and 99.8% at 64 characters; the test requires at least 96%, 98% and 99% of 2000 deterministic samples. A 0.4 class-change-rate rule was rejected because it refused digit-heavy CamelCase names.",
+    "environment": "Gates ran in the inherited Lattice dev-shell environment (IN_NIX_SHELL=impure, cargo/rustfmt/clippy nightly-2026-07-17 from /nix/store/6vrrjl1mckj4g5pj9p5d8minyr0mfhqg-rust-minimal-1.99.0-nightly-2026-07-17) because `nix develop` was blocked by the host nix-daemon GC lock. octet-precommit-check: /nix/store/b83f2w89irvzlkg74gw37kbnwgqgcr3c-octet-precommit-check. cairn: /nix/store/z36v6jnf03wiqjsv1g6k8ll5qyb2h91k-cairn. gitleaks: /nix/store/n57sbg8d4nvxqa40nl9a5dib1smpqim3-gitleaks-8.28.0.",
+    "gates": {
+      "focused_integration_tests": { "exit": 0, "binaries": 61, "passed": 299, "failed": 0, "passed_by_owner": { "run_inputs_28": 17, "workflow_templates_27": 37, "runbook_catalog_and_operation_pack_29": 50 } },
+      "lib_tests": { "command": "cargo test -p lattice --no-fail-fast --lib", "exit": 0, "passed": 559, "ignored": 8, "failed": 0 },
+      "clippy": { "exit": 0 },
+      "fmt": { "exit": 0 },
+      "octet_precommit_check": { "exit": 0, "root": "1052/1052, 0 new, 0 stale", "lattice_core": "25/25, 0 new", "baseline_rekeyed": false },
+      "cairn_validate": { "exit": 0, "valid": true },
+      "cairn_workflow_status": { "exit": 0, "valid": true, "issues": 0 },
+      "gitleaks": { "version": "8.28.0", "scope": "12 paths changed or added against 2b66cc3d", "exit": 0, "leaks": 0 }
     }
   },
   "non_claims": [

@@ -124,8 +124,9 @@ interfaces.
   duplicate and secret-like inputs fail before a run id is reserved, a record
   is written or a node runs, and diagnostics never echo a value. The secret
   rule applies to `relative_path` parameters only: a secret word in the name
-  or binding key, a value component in a known provider token format, or a
-  separator-free run of 20 or more mixed-class letters and digits.
+  or binding key, a value component or stem in a known provider token format,
+  or a random-looking piece of 20 or more letters and digits that mixes
+  classes and has no word-length lowercase runs.
   Credential references remain the only secret path. The run records its
   input identity (template, bound identity, bound workflow revision, value
   identity, names and kinds, no values) in the same transaction that reserves

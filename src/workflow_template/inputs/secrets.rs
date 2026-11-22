@@ -9,12 +9,12 @@
 //! - a `relative_path` parameter whose name, or whose binding key after `LATTICE_PARAM_`, has a
 //!   secret word as an `_`-separated word (see [`SECRET_WORDS`]) or a qualifier followed by `key`
 //!   (see [`KEY_QUALIFIERS`]), ignoring ASCII case;
-//! - a supplied `relative_path` value with a `/`-separated component that is a known provider
-//!   token: its prefix followed by at least that format's minimum suffix drawn only from that
-//!   format's alphabet (see [`TOKEN_FORMATS`]);
-//! - a supplied `relative_path` value with a run between separators (`/`, `-`, `_`, `.`) of at
-//!   least [`TOKEN_RUN_MIN_BYTES`] ASCII letters and digits that mixes uppercase, lowercase and
-//!   digits.
+//! - a supplied `relative_path` value with a `/`-separated component, or its stem before the first
+//!   `.`, that is a known provider token: its prefix followed by at least that format's minimum
+//!   suffix drawn only from that format's alphabet (see [`TOKEN_FORMATS`]);
+//! - a supplied `relative_path` value with a `.`-separated piece that, without its `-` and `_`, has
+//!   at least [`TOKEN_RUN_MIN_BYTES`] letters and digits, mixes uppercase, lowercase and digits,
+//!   and has lowercase runs averaging under [`WORD_RUN_MEAN_BYTES`] bytes.
 //!
 //! A binding into a credential-bound key cannot occur: every target key starts with
 //! `LATTICE_PARAM_`, and #27's `validate_targets` refuses any node credential key with that
@@ -50,13 +50,21 @@ pub const KEY_QUALIFIERS: [&str; 8] = [
     "encryption",
 ];
 
-/// A random run of this many letters and digits with mixed classes is token-shaped.
+/// A random-looking piece has at least this many letters and digits.
 ///
-/// Real tokens are long separator-free runs: base62 and base64 keys are 20 to 100 or more
-/// characters. Words in refs and paths (`PROJ`, `1234`, `Safari15`) are short runs between
-/// separators. A 20-character mixed-class run is uncommon in a path and covers the shortest
+/// Base62 and base64url keys are 20 to 100 or more characters, so 20 covers the shortest
 /// provider tokens.
 pub const TOKEN_RUN_MIN_BYTES: usize = 20;
+
+/// Lowercase runs averaging at least this many bytes are words, not random characters.
+///
+/// Identifier words make lowercase runs of three or more bytes (`OAuth2AuthorizationServerConfig`
+/// averages 6.25, `SHA256DigestComputation` 7.5). In a uniform base62 or base64url string a
+/// lowercase byte is followed by another with probability 26/62, so lowercase runs average
+/// about 1.7 bytes. Measured on 40,000 uniform base64url strings each, the rule refuses about
+/// 98.0% at 32 characters, 99.2% at 43 and 99.8% at 64. A CamelCase name made mostly of
+/// one- and two-letter words with digits can still match.
+pub const WORD_RUN_MEAN_BYTES: usize = 3;
 
 /// The alphabet of a provider token's suffix after its prefix.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,14 +99,15 @@ const fn format(prefix: &'static str, min_suffix_bytes: usize, alphabet: TokenAl
     }
 }
 
-pub const TOKEN_FORMATS: [TokenFormat; 26] = [
+pub const TOKEN_FORMATS: [TokenFormat; 27] = [
     format("ghp_", 30, TokenAlphabet::Alphanumeric),
     format("gho_", 30, TokenAlphabet::Alphanumeric),
     format("ghu_", 30, TokenAlphabet::Alphanumeric),
     format("ghs_", 30, TokenAlphabet::Alphanumeric),
     format("ghr_", 30, TokenAlphabet::Alphanumeric),
     format("github_pat_", 40, TokenAlphabet::AlphanumericUnderscore),
-    format("glpat-", 20, TokenAlphabet::Base64Url),
+    format("glpat-", 20, TokenAlphabet::Base64UrlDot),
+    format("xapp-", 20, TokenAlphabet::AlphanumericDash),
     format("xoxa-", 20, TokenAlphabet::AlphanumericDash),
     format("xoxb-", 20, TokenAlphabet::AlphanumericDash),
     format("xoxp-", 20, TokenAlphabet::AlphanumericDash),
@@ -180,9 +189,18 @@ pub fn is_secret_value(value: &str) -> bool {
     value.split('/').any(|component| is_provider_token(component) || has_token_shaped_run(component))
 }
 
+/// Whether a component is a provider token. A format whose alphabet has no `.` also matches the
+/// component's stem before its first `.`, so `hf_<token>.txt` is refused; a format whose
+/// alphabet has `.` (`glpat-`, `ya29.`, `eyJ`) matches the whole component.
 fn is_provider_token(component: &str) -> bool {
+    let stem = component.split('.').next().unwrap_or(component);
     TOKEN_FORMATS.iter().any(|token| {
-        component.strip_prefix(token.prefix).is_some_and(|suffix| {
+        let candidate = if in_alphabet(token.alphabet, b'.') {
+            component
+        } else {
+            stem
+        };
+        candidate.strip_prefix(token.prefix).is_some_and(|suffix| {
             suffix.len() >= token.min_suffix_bytes && suffix.bytes().all(|byte| in_alphabet(token.alphabet, byte))
         })
     })
@@ -199,14 +217,61 @@ const fn in_alphabet(alphabet: TokenAlphabet, byte: u8) -> bool {
     }
 }
 
+/// Whether a `.`-separated piece, read without its `-` and `_`, is a random-looking run.
+///
+/// Base64url secrets put `-` and `_` anywhere, so those separators are dropped rather than split
+/// on; `.` still separates an extension. A piece is token-shaped when it has at least
+/// [`TOKEN_RUN_MIN_BYTES`] letters and digits, mixes uppercase, lowercase and digits, and its
+/// lowercase runs average under [`WORD_RUN_MEAN_BYTES`] bytes.
 fn has_token_shaped_run(component: &str) -> bool {
-    component.split(['-', '_', '.']).any(|run| {
-        let bytes = run.as_bytes();
-        let has_mixed_classes = bytes.iter().any(u8::is_ascii_uppercase)
-            && bytes.iter().any(u8::is_ascii_lowercase)
-            && bytes.iter().any(u8::is_ascii_digit);
-        bytes.len() >= TOKEN_RUN_MIN_BYTES && bytes.iter().all(u8::is_ascii_alphanumeric) && has_mixed_classes
+    component.split('.').any(|piece| {
+        let mut shape = RunShape::default();
+        let is_alphanumeric = piece.bytes().filter(|byte| !matches!(byte, b'-' | b'_')).all(|byte| shape.push(byte));
+        is_alphanumeric && shape.is_token_shaped()
     })
+}
+
+/// Byte-class counts of one piece, read in order.
+#[derive(Default)]
+struct RunShape {
+    length_bytes: usize,
+    uppercase_bytes: usize,
+    lowercase_bytes: usize,
+    digit_bytes: usize,
+    lowercase_runs: usize,
+    is_after_lowercase: bool,
+}
+
+impl RunShape {
+    /// Count one byte; `false` for a byte outside letters and digits.
+    fn push(&mut self, byte: u8) -> bool {
+        let is_lowercase = byte.is_ascii_lowercase();
+        if is_lowercase && !self.is_after_lowercase {
+            self.lowercase_runs = self.lowercase_runs.saturating_add(1);
+        }
+        self.is_after_lowercase = is_lowercase;
+        self.length_bytes = self.length_bytes.saturating_add(1);
+        let class = if byte.is_ascii_uppercase() {
+            &mut self.uppercase_bytes
+        } else if is_lowercase {
+            &mut self.lowercase_bytes
+        } else if byte.is_ascii_digit() {
+            &mut self.digit_bytes
+        } else {
+            return false;
+        };
+        *class = class.saturating_add(1);
+        true
+    }
+
+    /// Words in identifiers make lowercase runs of three or more bytes on average (`Builder`,
+    /// `Config`, `Sha`); a random base62 or base64url run averages about 1.7.
+    fn is_token_shaped(&self) -> bool {
+        let has_mixed_classes = self.uppercase_bytes > 0 && self.lowercase_bytes > 0 && self.digit_bytes > 0;
+        let is_word_free = self.lowercase_bytes < self.lowercase_runs.saturating_mul(WORD_RUN_MEAN_BYTES);
+        debug_assert!(self.lowercase_runs <= self.lowercase_bytes);
+        self.length_bytes >= TOKEN_RUN_MIN_BYTES && has_mixed_classes && is_word_free
+    }
 }
 
 #[cfg(test)]

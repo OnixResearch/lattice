@@ -11,6 +11,7 @@ mod secrets;
 
 pub use admission::admit;
 pub use admission::has_approval_gate;
+pub use admission::is_current;
 pub use admission::reverify_admitted;
 pub use parsing::collect;
 pub use secrets::screen;

@@ -16,7 +16,7 @@ const STORE_FILE: &str = "lattice.redb";
 
 /// Every type: optional `enabled` bool, optional `count` integer 1..=5, required `format` enum,
 /// and optional `target` relative path.
-const PARAMS: &str = r#"[
+pub const PARAMS: &str = r#"[
     { name = "enabled", type = { kind = "bool" }, required = false, default = false,
       bindings = [{ node = "probe", shell_env = "LATTICE_PARAM_ENABLED" }] },
     { name = "count", type = { kind = "integer", min = 1, max = 5 }, required = false, default = 1,

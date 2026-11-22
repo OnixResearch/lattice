@@ -1,5 +1,10 @@
 //! Admit raw inputs for one saved workflow against its retained template. Pure.
 
+/// Whether the saved workflow still has the exact revision its binding retained.
+pub fn is_current(saved: &crate::engine::Workflow, binding: &super::RetainedBinding) -> bool {
+    crate::orchestration::workflow_revision(saved).is_ok_and(|revision| revision == binding.workflow)
+}
+
 // r[impl lattice.workflow_templates.run_inputs]
 /// Type, screen, and bind raw inputs for a saved workflow.
 ///
@@ -14,9 +19,7 @@ pub fn admit(
 ) -> Result<super::Admitted, super::InputError> {
     let saved = facts.saved.ok_or(super::InputError::WorkflowNotFound)?;
     let binding = facts.binding.ok_or(super::InputError::BindingMissing)?;
-    let saved_revision =
-        crate::orchestration::workflow_revision(saved).map_err(|_| super::InputError::SavedWorkflowDrift)?;
-    if saved_revision != binding.workflow || saved.meta.name != facts.workflow_name {
+    if !is_current(saved, binding) || saved.meta.name != facts.workflow_name {
         return Err(super::InputError::SavedWorkflowDrift);
     }
     let template = facts

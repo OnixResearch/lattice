@@ -51,6 +51,8 @@ fn read_input_file(path: &std::path::Path) -> Result<Vec<u8>, Error> {
 }
 
 /// Load only the bundle directory the binding names, surfacing its load diagnostic.
+///
+/// Like the catalog loader, a symlinked bundle directory is refused rather than followed.
 fn load_bound_bundle(
     catalog_root: &std::path::Path,
     binding: &super::inputs::RetainedBinding,
@@ -59,9 +61,18 @@ fn load_bound_bundle(
         .map_err(|_| Error::Inputs(super::inputs::InputError::TemplateUnavailable))?;
     let directory = std::ffi::OsString::from(&binding.bundle);
     let label = safe_directory_label(&directory);
-    load_one_bundle(&root, &directory, &label).map_err(|diagnostic| {
-        Error::Inputs(super::inputs::InputError::TemplateLoad(diagnostic))
-    })
+    let entry = root
+        .symlink_metadata(&directory)
+        .map_err(|_| Error::Inputs(super::inputs::InputError::TemplateUnavailable))?;
+    if entry.file_type().is_symlink() {
+        return Err(Error::Inputs(super::inputs::InputError::TemplateLoad(super::core::diagnostic(
+            &label,
+            super::model::DiagnosticCode::SymlinkRejected,
+            "bundle directory is a symlink",
+        ))));
+    }
+    load_one_bundle(&root, &directory, &label)
+        .map_err(|diagnostic| Error::Inputs(super::inputs::InputError::TemplateLoad(diagnostic)))
 }
 
 fn admit_loaded(
@@ -71,10 +82,13 @@ fn admit_loaded(
     catalog_root: &std::path::Path,
     raw: &std::collections::BTreeMap<String, super::inputs::RawInput>,
 ) -> Result<super::inputs::Admitted, Error> {
-    // Without a saved workflow or binding, refuse before reading the catalog.
+    // Load the bundle only for a saved workflow that still matches its binding, so a missing
+    // binding or saved-workflow drift is reported as such, never hidden by a load failure.
     let template = match (saved, binding) {
-        (Some(_), Some(binding)) => Some(load_bound_bundle(catalog_root, binding)?),
-        (None, _) | (_, None) => None,
+        (Some(saved), Some(binding)) if super::inputs::is_current(saved, binding) => {
+            Some(load_bound_bundle(catalog_root, binding)?)
+        }
+        (Some(_) | None, Some(_) | None) => None,
     };
     let facts = super::inputs::SavedFacts {
         workflow_name,

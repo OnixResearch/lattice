@@ -72,3 +72,60 @@ fn a_catalog_over_its_directory_limit_still_binds_the_retained_bundle() {
     let admitted = fixture.admit_inputs(&store, fixture::BUNDLE, &args(&["format=json"]), None);
     assert!(admitted.is_ok(), "only the retained bundle directory is loaded: {admitted:?}");
 }
+
+fn refusal(fixture: &Fixture) -> lattice::workflow_template::inputs::InputError {
+    let store = fixture.store();
+    match fixture.admit_inputs(&store, fixture::BUNDLE, &args(&["format=json"]), None) {
+        Err(lattice::workflow_template::Error::Inputs(error)) => error,
+        other => panic!("expected an input refusal, got {other:?}"),
+    }
+}
+
+// r[verify lattice.workflow_templates.run_inputs.retained]
+#[test]
+fn an_edited_or_replaced_valid_bundle_is_unavailable() {
+    let edited = Fixture::new();
+    let mut workflow = fixture::template_workflow(&edited.marker);
+    workflow.add_shell_node("extra", "true");
+    fixture::write_bundle(&edited.catalog, &workflow, fixture::PARAMS);
+    fixture::catalog_template(&edited.catalog);
+    assert_eq!(refusal(&edited), lattice::workflow_template::inputs::InputError::TemplateUnavailable);
+
+    let replaced = Fixture::new();
+    let mut other =
+        lattice::engine::Workflow::new(fixture::BUNDLE, lattice::engine::workflow::WorkflowTimestamp::epoch());
+    other.add_shell_node("other", "true");
+    fixture::write_bundle(&replaced.catalog, &other, "[]");
+    fixture::catalog_template(&replaced.catalog);
+    assert_eq!(refusal(&replaced), lattice::workflow_template::inputs::InputError::TemplateUnavailable);
+}
+
+#[cfg(unix)]
+#[test]
+fn a_symlinked_bundle_directory_is_refused_like_the_catalog() {
+    let fixture = Fixture::new();
+    let bundle = fixture.catalog.join(fixture::BUNDLE);
+    let moved = fixture.dir.path().join("elsewhere");
+    std::fs::rename(&bundle, &moved).expect("bundle moves");
+    std::os::unix::fs::symlink(&moved, &bundle).expect("symlink");
+    let listed = lattice::workflow_template::load_catalog(&fixture.catalog).expect("catalog reads");
+    assert!(listed.bundles.is_empty(), "the catalog loader skips a symlinked bundle");
+    let refused = refusal(&fixture);
+    let lattice::workflow_template::inputs::InputError::TemplateLoad(diagnostic) = refused else {
+        panic!("a symlinked bundle is refused with its diagnostic, got {refused:?}");
+    };
+    assert_eq!(diagnostic.code, lattice::workflow_template::DiagnosticCode::SymlinkRejected);
+}
+
+#[test]
+fn saved_workflow_drift_is_reported_before_a_bundle_load_failure() {
+    let fixture = Fixture::new();
+    let store = fixture.store();
+    let mut edited = store.load_workflow(fixture::BUNDLE).unwrap().unwrap();
+    let marker = edited.graph.nodes().find(|node| node.label == "marker").expect("marker").id;
+    edited.configs.insert(marker.0, lattice::engine::workflow::NodeConfig::shell("true"));
+    store.save_workflow(&edited).expect("operator edit saves");
+    drop(store);
+    std::fs::write(fixture.catalog.join(fixture::BUNDLE).join("manifest.ncl"), "{}").expect("bundle breaks");
+    assert_eq!(refusal(&fixture), lattice::workflow_template::inputs::InputError::SavedWorkflowDrift);
+}

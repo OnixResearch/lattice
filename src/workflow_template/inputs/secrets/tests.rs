@@ -30,17 +30,32 @@ fn secret_identifiers_are_word_matched_ignoring_case() {
     }
 }
 
+/// A deterministic uniform base64url string, from a xorshift generator.
+fn base64url(state: &mut u64, length: usize) -> String {
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    (0..length)
+        .map(|_| {
+            *state ^= *state << 13;
+            *state ^= *state >> 7;
+            *state ^= *state << 17;
+            char::from(ALPHABET[usize::from(state.to_le_bytes()[0] & 63)])
+        })
+        .collect()
+}
+
 #[test]
 fn each_provider_token_family_is_refused() {
+    // Synthetic tokens are assembled at runtime so no literal looks like a credential.
     let tokens = [
         format!("ghp_{}", alnum(36)),
         format!("gho_{}", alnum(36)),
         format!("ghs_{}", alnum(36)),
         format!("dir/github_pat_11{}_{}", alnum(20), alnum(59)),
         format!("glpat-{}", alnum(20)),
-        // Synthetic tokens are assembled at runtime so no literal looks like a credential.
+        format!("glpat-{}.01.{}", alnum(27), "0a1b2c3d4"),
         format!("xoxb-{}-{}-{}", "1".repeat(10), "2".repeat(13), alnum(24)),
         format!("xoxp-1234567890-{}", alnum(20)),
+        format!("xapp-1-A{}-{}-{}", "0".repeat(10), "3".repeat(13), "c4".repeat(32)),
         format!("sk-proj-{}-{}_{}", alnum(30), alnum(20), alnum(20)),
         format!("sk-{}", alnum(48)),
         format!("sk_live_{}", alnum(24)),
@@ -53,6 +68,8 @@ fn each_provider_token_family_is_refused() {
         format!("pypi-AgEIcHlwaS5vcmc{}", alnum(60)),
         format!("hf_{}", alnum(34)),
         format!("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.{}", alnum(20)),
+        format!("tokens/hf_{}.txt", alnum(34)),
+        "creds/AKIAIOSFODNN7EXAMPLE.json".to_owned(),
     ];
     for token in &tokens {
         assert!(super::is_secret_value(token), "{token}");
@@ -60,7 +77,7 @@ fn each_provider_token_family_is_refused() {
 }
 
 #[test]
-fn a_long_mixed_class_run_is_token_shaped() {
+fn random_runs_are_token_shaped() {
     for value in [
         alnum(20),
         format!("out/{}", alnum(40)),
@@ -77,6 +94,17 @@ fn a_long_mixed_class_run_is_token_shaped() {
 }
 
 #[test]
+fn generated_base64url_secrets_are_refused() {
+    // Expected refusal is about 98.0%, 99.2% and 99.8% (see `WORD_RUN_MEAN_BYTES`).
+    const SAMPLES: usize = 2000;
+    let mut state = 0x9e37_79b9_7f4a_7c15_u64;
+    for (length, minimum_refused) in [(32, 1920), (43, 1960), (64, 1980)] {
+        let refused = (0..SAMPLES).filter(|_| super::is_secret_value(&base64url(&mut state, length))).count();
+        assert!(refused >= minimum_refused, "{refused} of {SAMPLES} at {length} characters");
+    }
+}
+
+#[test]
 fn ordinary_refs_and_repo_paths_are_not_secret_values() {
     for value in [
         "dependabot/npm_and_yarn/express-4.18.2",
@@ -87,6 +115,12 @@ fn ordinary_refs_and_repo_paths_are_not_secret_values() {
         "npm_and_yarn",
         "feature/PROJ-1234-add-retry-to-upload-client",
         "bugfix/ABC-123-Fix-login-timeout-Safari15",
+        "src/OAuth2AuthorizationServerConfig.java",
+        "Jackson2ObjectMapperBuilder.java",
+        "AmazonS3ClientBuilder.java",
+        "X509CertificateValidator.cs",
+        "CustomerControllerV2.java",
+        "SHA256DigestComputation.swift",
         "builtins/agent-evaluations",
         "src/ghp_",
         "sk-a",
