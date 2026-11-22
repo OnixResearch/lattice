@@ -235,8 +235,7 @@ fn json_name(identity: &Identity) -> String {
     format!("{}{JSON_SUFFIX}", super::core::identity_hex(identity))
 }
 
-/// Facts of the running binary. The revision is the executor/restore source digest, so a
-/// separately built binary from the same source on another architecture reports the same value.
+/// Facts of the running binary; the revision is the source digest every build of it shares.
 pub fn local_runtime(environment: Option<String>) -> Result<LocalRuntime, Refusal> {
     static BINARY: std::sync::LazyLock<Option<String>> = std::sync::LazyLock::new(|| {
         let executable = std::env::current_exe().ok()?;
@@ -250,9 +249,10 @@ pub fn local_runtime(environment: Option<String>) -> Result<LocalRuntime, Refusa
         architecture: std::env::consts::ARCH.to_string(),
         runtime: CheckpointRuntime {
             lattice_revision: format!(
-                "lattice-{}-runtime-{}",
+                "lattice-{}-runtime-{}-checkpoint-{}",
                 env!("CARGO_PKG_VERSION"),
-                env!("LATTICE_RUNTIME_IMPLEMENTATION_BLAKE3")
+                env!("LATTICE_RUNTIME_IMPLEMENTATION_BLAKE3"),
+                env!("LATTICE_CHECKPOINT_IMPLEMENTATION_BLAKE3")
             ),
             lattice_binary_blake3: binary,
             environment,
