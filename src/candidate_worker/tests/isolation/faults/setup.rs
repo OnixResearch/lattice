@@ -80,6 +80,7 @@ fn profile(root: &std::path::Path, endpoint: &str) -> omp::Profile {
             expires_at_ms: super::super::super::super::broker::admission::now_ms().expect("clock")
                 + PROFILE_LIFETIME_MS,
             max_requests: 1,
+            forwarded: None,
         },
     }
 }

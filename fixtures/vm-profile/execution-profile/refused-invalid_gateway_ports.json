@@ -1,0 +1,38 @@
+{
+  "schema": "lattice.vm-execution-profile.v1",
+  "architecture": "x86_64",
+  "vmm": {
+    "kind": "cloud-hypervisor",
+    "version": "54.0"
+  },
+  "guest_manifest_schema": "kiln.lattice-worker-guest.v1",
+  "guest_network": "none",
+  "gateway": {
+    "exchange_vsock_port": 10242,
+    "model_vsock_port": 10242,
+    "host_peer_cid": 2,
+    "exchange_transport_schema": "lattice.workflow-vsock-transport-profile.v1"
+  },
+  "mobility": [
+    "pinned",
+    "stopped_transfer",
+    "application_checkpoint"
+  ],
+  "checkpoint": "workflow-node-boundary-v1",
+  "deadline_authority": "host",
+  "resources": {
+    "vcpus": 2,
+    "memory_mib": 2048,
+    "workspace_mib": 4096
+  },
+  "devices": [
+    "virtio-blk-raw",
+    "vsock"
+  ],
+  "non_claims": [
+    "vm execution profile admission does not prove cross-host mobility",
+    "vm execution profile admission does not prove live migration",
+    "vm execution profile admission does not qualify a production placement authority",
+    "vm execution profile admission does not prove a live model endpoint"
+  ]
+}

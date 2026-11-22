@@ -35,7 +35,7 @@ impl super::ModelRequestGate for super::OwnerGate<'_> {
 /// Model, provider usage and response identity reported by an OpenAI-style
 /// chat-completion body or its server-sent event stream. Absent facts stay
 /// absent; nothing is inferred from the request.
-pub(super) fn response_facts(body: &str) -> crate::execution_binding::serving::gate::ResponseFacts {
+pub(crate) fn response_facts(body: &str) -> crate::execution_binding::serving::gate::ResponseFacts {
     let mut facts = crate::execution_binding::serving::gate::ResponseFacts {
         model: None,
         input_tokens: None,

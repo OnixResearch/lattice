@@ -94,6 +94,7 @@ pub(super) fn profile_facts(
     debug_assert_eq!(request.admitted_envelope, request.envelope.identity());
     let declared = lattice_core::execution_binding::projection::Offered::Declared;
     let model_routes = request.execution_binding.model_routes.clone();
+    let (checkpoint, network, isolation) = vm_facts(request.vm_profile.as_ref());
     lattice_core::execution_binding::projection::inventory::project_profile(
         &lattice_core::execution_binding::projection::inventory::ProfileInput {
             owner: lattice_core::execution_binding::projection::inventory::ProfileOwner::ImplementationAttempt,
@@ -107,10 +108,10 @@ pub(super) fn profile_facts(
             inputs: declared("workspace-snapshot"),
             outputs: declared("candidate-receipt"),
             sessions: declared("single-shot-no-session"),
-            checkpoint: lattice_core::execution_binding::projection::Offered::Unavailable,
+            checkpoint,
             workspace: declared("admitted-read-write-paths"),
-            network: declared("attempt-local-model-broker"),
-            isolation: declared("required-sandbox"),
+            network: declared(network),
+            isolation: declared(isolation),
             deadline_secs: lattice_core::execution_binding::projection::Offered::Declared(
                 request.envelope.budget.max_seconds,
             ),
@@ -123,6 +124,29 @@ pub(super) fn profile_facts(
         },
     )
     .map_err(|defect| format!("worker profile facts are unsupported: {defect:?}"))
+}
+
+/// Checkpoint, network and isolation facts: a VM-bound attempt runs as a
+/// guest whose only model route is the host gateway, and offers the
+/// checkpoint profile its VM execution profile declares.
+// r[impl lattice.vm_profile.request.scenario.inspect]
+fn vm_facts(
+    profile: Option<&crate::vm_profile::ExecutionProfile>,
+) -> (lattice_core::execution_binding::projection::Offered<&'static str>, &'static str, &'static str) {
+    let Some(profile) = profile else {
+        return (
+            lattice_core::execution_binding::projection::Offered::Unavailable,
+            "attempt-local-model-broker",
+            "required-sandbox",
+        );
+    };
+    let checkpoint = match profile.checkpoint {
+        crate::vm_profile::Checkpoint::NotOffered => lattice_core::execution_binding::projection::Offered::Unavailable,
+        crate::vm_profile::Checkpoint::WorkflowNodeBoundaryV1 => {
+            lattice_core::execution_binding::projection::Offered::Declared(profile.checkpoint.token())
+        }
+    };
+    (checkpoint, "host-gateway-model-broker", "vm-guest")
 }
 
 const NAMED_ARTIFACTS: [&str; 7] = [

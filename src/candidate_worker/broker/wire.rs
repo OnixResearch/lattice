@@ -16,6 +16,9 @@ pub(super) struct Handler<'a> {
     pub requests: u32,
     /// Request evidence that could not be retained; it fails the broker.
     pub failure: Option<String>,
+    /// The host gateway of a forwarding (VM guest) broker; `None` calls the
+    /// profile's endpoint directly.
+    pub forwarding: Option<super::forwarded::Target>,
 }
 
 impl Handler<'_> {
@@ -85,6 +88,8 @@ impl Handler<'_> {
         // authorization and upstream interpretations.
         let body = serde_json::to_string(&value).map_err(|_| ())?;
         let timeout_secs = self.timeout_secs()?;
+        // A forwarding broker never resolves a credential.
+        let forwarding = self.forwarding_route()?;
         let credential = self
             .profile
             .credential
@@ -98,7 +103,20 @@ impl Handler<'_> {
         };
         let ticket = self.gate.admit(checks).ok_or(())?;
         debug_assert!(checks.is_within_budget && checks.is_current, "no gate admits outside the broker checks");
+        let request_index = self.requests;
         self.requests += 1;
+        if let Some((target, binding)) = forwarding {
+            let exchange = super::forwarded::Call {
+                target: &target,
+                binding: &binding,
+                request_index,
+                body,
+                timeout: std::time::Duration::from_secs(timeout_secs),
+                stopped: self.stopped,
+            }
+            .run();
+            return self.settle_forwarded(ticket, exchange);
+        }
         let mut request = crate::http::HttpRequestPlan {
             method: "POST".into(),
             url: self.profile.endpoint.clone(),

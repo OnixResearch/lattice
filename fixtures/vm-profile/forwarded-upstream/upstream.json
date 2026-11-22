@@ -1,0 +1,11 @@
+{
+  "schema": "lattice.model-gateway-upstream.v1",
+  "endpoint": "https://model.example/v1/chat/completions",
+  "model": "admitted-model",
+  "credential": {
+    "provider": "env",
+    "key": "LATTICE_MODEL_GATEWAY_TOKEN",
+    "field": null
+  },
+  "max_requests": 4
+}

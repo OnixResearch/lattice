@@ -48,6 +48,8 @@ maintained topic documents by the question they answer.
   metadata-only receipts.
 - [Candidate worker boundary](candidate-worker.md): the bounded command route and
   its non-claims.
+- [VM execution profile](vm-execution-profile.md): the guest attempt binding,
+  forwarded model broker and host model gateway with its Kiln effect authority.
 - [Structured input projection](structured-input-projection.md): bounded agent
   input projection.
 - [Secretspec credentials](secretspec-credentials.md): credential references and

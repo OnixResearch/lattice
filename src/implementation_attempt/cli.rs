@@ -11,6 +11,7 @@ pub mod repair;
 mod session;
 #[cfg(test)]
 mod tests;
+mod vm;
 
 // r[impl lattice.execution_binding.profile_facts.scenario.unsupported]
 // r[impl lattice.execution_binding.persistence.scenario.changed_binding]
@@ -142,6 +143,10 @@ pub struct Request {
     // r[impl lattice.agent_revisions.workflow.attempt.scenario.absent]
     #[serde(default = "absent", skip_serializing_if = "Option::is_none")]
     pub workflow_agent: Option<super::WorkflowAgent>,
+    #[serde(default = "absent", skip_serializing_if = "Option::is_none")]
+    pub vm_binding: Option<crate::vm_profile::AttemptBinding>,
+    #[serde(default = "absent", skip_serializing_if = "Option::is_none")]
+    pub vm_profile: Option<crate::vm_profile::ExecutionProfile>,
 }
 
 /// An absent optional coordinator field.
@@ -188,7 +193,7 @@ impl Request {
         if self.workflow_agent.as_ref().is_some_and(|pair| !pair.is_well_formed()) {
             return Err("workflow-agent definition or revision is malformed".into());
         }
-        repair::validate(self)?;
+        repair::validate(self).and_then(|()| vm::validate(self))?;
         binding::validate_request(self)
     }
 

@@ -77,6 +77,17 @@ pub(super) fn with_route<T>(
     cancellation: &std::sync::atomic::AtomicBool,
     run: impl FnOnce(super::super::Request) -> T,
 ) -> Result<(T, bool), String> {
+    // A VM-bound broker reaches its host gateway before anything else, so a
+    // guest without one never starts a worker or falls back to a host route.
+    let forwarding = match &profile.forwarded {
+        Some(forwarded) => {
+            super::admission::validate(profile)?;
+            let target = super::forwarded::Target::of(forwarded);
+            super::forwarded::probe(&target)?;
+            Some(target)
+        }
+        None => None,
+    };
     let executables = super::admission::admit(&mut request, profile)?;
     debug_assert!(!request.boundary.network);
     debug_assert!(request.require_isolation);
@@ -98,6 +109,7 @@ pub(super) fn with_route<T>(
         deadline,
         requests: 0,
         failure: None,
+        forwarding,
     };
     std::thread::scope(|scope| {
         let worker = std::thread::Builder::new()

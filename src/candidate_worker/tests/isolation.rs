@@ -51,6 +51,7 @@ fn omp_worker_produces_a_sandboxed_candidate() {
             sandbox_blake3: std::env::var("LATTICE_BWRAP_BLAKE3").expect("reviewed sandbox bytes"),
             expires_at_ms: super::super::broker::admission::now_ms().expect("clock") + 120_000,
             max_requests: 8,
+            forwarded: None,
         },
     };
     let observed = omp::run(

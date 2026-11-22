@@ -1,0 +1,7 @@
+{
+  "kind": "admit",
+  "binding": "b3:2e8903d9b5fad28bfb9efcd7756952f91d35eb99ea9ab7baf7e7489159a0ade9",
+  "request_index": 0,
+  "model": "admitted-model",
+  "route": "primary"
+}

@@ -1,14 +1,18 @@
 //! Attempt-local model broker. Credentials and outbound networking stay on the host.
+//! In a VM guest the broker forwards every admitted request over vsock to the
+//! host model gateway (`forwarded`) and holds no credential at all.
 // r[impl lattice.candidate_worker.model_broker]
 // r[impl lattice.candidate_worker.model_broker.scenario.enforcement]
 // r[impl lattice.candidate_worker.model_broker.scenario.denial]
 
 pub(crate) mod admission;
 #[cfg(unix)]
+mod forwarded;
+#[cfg(unix)]
 mod host;
 #[cfg(all(test, unix))]
 mod isolation_tests;
-mod serving;
+pub(crate) mod serving;
 #[cfg(test)]
 mod tests;
 #[cfg(unix)]
@@ -18,6 +22,7 @@ pub const SCHEMA: &str = "lattice.candidate-model-broker.v1";
 pub const PORT: u16 = 41001;
 pub const SOCKET: &str = "/run/lattice-model.sock";
 pub const MODEL_CONFIG: &str = "/tmp/omp-home/.omp/agent/models.yml";
+pub const FORWARDED_SCHEMA: &str = "lattice.model-broker-forwarded-upstream.v1";
 
 /// Immutable runtime artifact. A byte identity is not source/build provenance.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -25,6 +30,18 @@ pub const MODEL_CONFIG: &str = "/tmp/omp-home/.omp/agent/models.yml";
 pub struct Executable {
     pub path: std::path::PathBuf,
     pub blake3: String,
+}
+
+/// The guest broker's host gateway (C4): every admitted request is forwarded
+/// over AF_VSOCK to `VMADDR_CID_HOST` at `vsock_port`, framed with the
+/// binding identity. A forwarding profile carries no credential.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Forwarded {
+    pub schema: String,
+    pub vsock_port: crate::vm_profile::VsockPort,
+    /// `b3:` identity of the request's `lattice.vm-attempt-binding.v1`.
+    pub binding: String,
 }
 
 /// Installed by the trusted dispatcher, never obtained from model output.
@@ -40,6 +57,15 @@ pub struct Profile {
     pub sandbox_blake3: String,
     pub expires_at_ms: u64,
     pub max_requests: u32,
+    /// Present only in a VM guest; absent, the profile serializes and behaves
+    /// exactly as before.
+    #[serde(default = "local", skip_serializing_if = "Option::is_none")]
+    pub forwarded: Option<Forwarded>,
+}
+
+/// A broker that calls its endpoint directly: no forwarded gateway.
+const fn local() -> Option<Forwarded> {
+    None
 }
 
 /// Only a running host broker can construct this mount grant.
@@ -117,6 +143,14 @@ pub trait ModelRequestGate: Send {
 /// Permission for one upstream call; served routes carry their producer ticket.
 #[derive(Debug)]
 pub struct GateTicket(Option<Box<crate::execution_binding::serving::gate::Ticket>>);
+
+impl GateTicket {
+    /// A ticket of a gate without a serving-owner producer ticket.
+    #[must_use]
+    pub(crate) const fn unserved() -> Self {
+        Self(None)
+    }
+}
 
 /// A route without a serving declaration: the broker's own checks decide,
 /// no serving port is called and no request record is written.

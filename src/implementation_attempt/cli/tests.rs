@@ -70,6 +70,7 @@ pub(super) fn request(
                 sandbox_blake3: "c".repeat(64),
                 expires_at_ms: u64::MAX,
                 max_requests: 1,
+                forwarded: None,
             },
         },
         output_limit_bytes: 4096,
@@ -87,6 +88,8 @@ pub(super) fn request(
         repair: None,
         lineage: None,
         workflow_agent: None,
+        vm_binding: None,
+        vm_profile: None,
     };
     request.execution_binding.model_routes = lattice_core::execution_binding::request::RouteDeclaration::Routes {
         routes: vec![super::binding::primary_route(&request).expect("primary route identity")],

@@ -1,0 +1,11 @@
+{
+  "workflow_profile": {
+    "id": "spec-driven",
+    "source": "change_create",
+    "version": 1
+  },
+  "depends_on": [
+    "execute-admitted-implementation-attempt",
+    "bind-model-serving-admission"
+  ]
+}

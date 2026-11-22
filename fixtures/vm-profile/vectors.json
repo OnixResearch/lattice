@@ -1,0 +1,27 @@
+{
+  "framing": "BLAKE3(u64be(len(domain)) || domain || u64be(len(json)) || json), rendered b3:<64 hex>; domain is the schema string; json is the compact encoding with fields in declaration order and absent optional fields omitted",
+  "profile": {
+    "fixture": "execution-profile/admitted.json",
+    "domain": "lattice.vm-execution-profile.v1",
+    "canonical": "{\"schema\":\"lattice.vm-execution-profile.v1\",\"architecture\":\"x86_64\",\"vmm\":{\"kind\":\"cloud-hypervisor\",\"version\":\"54.0\"},\"guest_manifest_schema\":\"kiln.lattice-worker-guest.v1\",\"guest_network\":\"none\",\"gateway\":{\"exchange_vsock_port\":10242,\"model_vsock_port\":10243,\"host_peer_cid\":2,\"exchange_transport_schema\":\"lattice.workflow-vsock-transport-profile.v1\"},\"mobility\":[\"pinned\",\"stopped_transfer\",\"application_checkpoint\"],\"checkpoint\":\"workflow-node-boundary-v1\",\"deadline_authority\":\"host\",\"resources\":{\"vcpus\":2,\"memory_mib\":2048,\"workspace_mib\":4096},\"devices\":[\"virtio-blk-raw\",\"vsock\"],\"non_claims\":[\"vm execution profile admission does not prove cross-host mobility\",\"vm execution profile admission does not prove live migration\",\"vm execution profile admission does not qualify a production placement authority\",\"vm execution profile admission does not prove a live model endpoint\"]}",
+    "identity": "b3:13ecd0a47c1bc8a16d9580ee5e01ca2b83d5dc4d0266a126c39418496f48354d"
+  },
+  "pinned_profile": {
+    "fixture": "execution-profile/admitted-pinned.json",
+    "domain": "lattice.vm-execution-profile.v1",
+    "canonical": "{\"schema\":\"lattice.vm-execution-profile.v1\",\"architecture\":\"x86_64\",\"vmm\":{\"kind\":\"cloud-hypervisor\",\"version\":\"54.0\"},\"guest_manifest_schema\":\"kiln.lattice-worker-guest.v1\",\"guest_network\":\"none\",\"gateway\":{\"exchange_vsock_port\":10242,\"model_vsock_port\":10243,\"host_peer_cid\":2,\"exchange_transport_schema\":\"lattice.workflow-vsock-transport-profile.v1\"},\"mobility\":[\"pinned\"],\"checkpoint\":\"none\",\"deadline_authority\":\"host\",\"resources\":{\"vcpus\":2,\"memory_mib\":2048,\"workspace_mib\":4096},\"devices\":[\"virtio-blk-raw\",\"vsock\"],\"non_claims\":[\"vm execution profile admission does not prove cross-host mobility\",\"vm execution profile admission does not prove live migration\",\"vm execution profile admission does not qualify a production placement authority\",\"vm execution profile admission does not prove a live model endpoint\"]}",
+    "identity": "b3:552819585aa12d16c30e9a46d376e69dbdb32c4629c7540b55d1053b71d5a387"
+  },
+  "binding": {
+    "fixture": "attempt-binding/admitted.json",
+    "domain": "lattice.vm-attempt-binding.v1",
+    "canonical": "{\"schema\":\"lattice.vm-attempt-binding.v1\",\"profile\":\"b3:13ecd0a47c1bc8a16d9580ee5e01ca2b83d5dc4d0266a126c39418496f48354d\",\"guest_image\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"environment\":\"2222222222222222222222222222222222222222222222222222222222222222\",\"envelope\":\"3333333333333333333333333333333333333333333333333333333333333333\",\"attempt_id\":\"attempt-vm-1\",\"fence\":7,\"execution\":\"4444444444444444444444444444444444444444444444444444444444444444\",\"workspace\":{\"identity\":\"5555555555555555555555555555555555555555555555555555555555555555\",\"generation\":3},\"requested_mobility\":\"stopped_transfer\",\"deadline_unix_ms\":1798761600000}",
+    "identity": "b3:2e8903d9b5fad28bfb9efcd7756952f91d35eb99ea9ab7baf7e7489159a0ade9"
+  },
+  "drain_dispositions": {
+    "pinned": "pinned",
+    "stopped_transfer": "migrated",
+    "live_precopy": "migrated",
+    "application_checkpoint": "checkpointed"
+  }
+}

@@ -15,6 +15,7 @@ pub(crate) fn profile() -> Profile {
         sandbox_blake3: "b".repeat(64),
         expires_at_ms: u64::MAX,
         max_requests: 1,
+        forwarded: None,
     }
 }
 
@@ -133,6 +134,7 @@ mod transport {
             deadline: Instant::now() + Duration::from_secs(5),
             requests: 0,
             failure: None,
+            forwarding: None,
         };
         let denied = request("/v1/chat/completions", r#"{"model":"ungranted-model"}"#);
         assert!(exchange(&mut handler, denied.as_bytes()).starts_with("HTTP/1.1 403"));
@@ -169,6 +171,7 @@ mod transport {
             deadline: Instant::now() + Duration::from_secs(5),
             requests: 0,
             failure: None,
+            forwarding: None,
         };
         for invalid in [
             request("/v1/models", r#"{"model":"admitted-model"}"#),
@@ -202,11 +205,264 @@ mod transport {
             deadline: Instant::now() + Duration::from_secs(5),
             requests: 0,
             failure: None,
+            forwarding: None,
         };
         assert!(
             exchange(&mut handler, request("/v1/chat/completions", r#"{"model":"admitted-model"}"#).as_bytes())
                 .starts_with("HTTP/1.1 403")
         );
         assert_eq!(credentials.0.load(Ordering::SeqCst), 0);
+    }
+
+    /// Guest side of C4: the real `wire::Handler` forwarding over a Unix
+    /// socket standing in for the Cloud Hypervisor vsock endpoint.
+    // r[verify lattice.vm_profile.forwarded_upstream]
+    mod forwarding {
+        use std::io::Write;
+        use std::sync::atomic::AtomicBool;
+        use std::sync::atomic::Ordering;
+        use std::time::Duration;
+        use std::time::Instant;
+
+        use crate::model_gateway::tests as harness;
+
+        const GATEWAY_PORT: crate::vm_profile::VsockPort = crate::vm_profile::VsockPort(10243);
+
+        fn forwarding_profile() -> super::super::Profile {
+            let mut profile = super::super::profile();
+            profile.model = harness::MODEL.into();
+            profile.max_requests = 4;
+            profile.forwarded = Some(super::super::Forwarded {
+                schema: super::super::FORWARDED_SCHEMA.into(),
+                vsock_port: GATEWAY_PORT,
+                binding: harness::binding_identity(),
+            });
+            profile
+        }
+
+        fn worker_request() -> String {
+            super::request("/v1/chat/completions", &serde_json::json!({"model": harness::MODEL}).to_string())
+        }
+
+        /// Records how each admitted call settled.
+        #[derive(Default)]
+        struct Recorder(Vec<String>);
+
+        impl super::super::ModelRequestGate for Recorder {
+            fn admit(
+                &mut self,
+                checks: crate::execution_binding::serving::gate::Checks,
+            ) -> Option<super::super::GateTicket> {
+                (checks.is_exact_model && checks.is_within_budget && checks.is_current)
+                    .then(super::super::GateTicket::unserved)
+            }
+
+            fn settle(
+                &mut self,
+                _: super::super::GateTicket,
+                upstream: crate::execution_binding::serving::gate::Upstream,
+            ) -> Result<bool, String> {
+                self.0.push(format!("{upstream:?}"));
+                Ok(true)
+            }
+
+            fn exhausted(&mut self) -> Result<(), String> {
+                Ok(())
+            }
+        }
+
+        struct Flags {
+            cancellation: AtomicBool,
+            stopped: AtomicBool,
+        }
+
+        fn flags() -> Flags {
+            Flags {
+                cancellation: AtomicBool::new(false),
+                stopped: AtomicBool::new(false),
+            }
+        }
+
+        fn handler<'a>(
+            profile: &'a super::super::Profile,
+            credentials: &'a super::Credentials,
+            gate: &'a mut dyn super::super::ModelRequestGate,
+            flags: &'a Flags,
+            gateway: &std::path::Path,
+            within: Duration,
+        ) -> super::super::wire::Handler<'a> {
+            super::super::wire::Handler {
+                profile,
+                credentials,
+                gate,
+                cancellation: &flags.cancellation,
+                stopped: &flags.stopped,
+                deadline: Instant::now() + within,
+                requests: 0,
+                failure: None,
+                forwarding: Some(super::super::forwarded::Target::Unix(gateway.to_path_buf())),
+            }
+        }
+
+        // r[verify lattice.vm_profile.forwarded_upstream.scenario.credential]
+        #[test]
+        fn guest_broker_reaches_the_upstream_only_through_the_host_gateway_without_a_credential() {
+            let directory = tempfile::tempdir().expect("scratch");
+            let authority =
+                harness::Authority::start(directory.path(), "authority.sock", harness::admitting("host-a", 0, 4));
+            let upstream = harness::Upstream::start(harness::response_body());
+            let gateway_stopped = AtomicBool::new(false);
+            let mut gateway =
+                harness::gateway(&authority, &upstream, &gateway_stopped, &harness::fixed_clock, std::process::id());
+            let socket = directory.path().join("vsock.sock_10243");
+            let listener = crate::model_gateway::shell::listen(&socket).expect("gateway listener");
+            let profile = forwarding_profile();
+            let credentials = super::Credentials(std::sync::atomic::AtomicUsize::new(0));
+            let mut recorder = Recorder::default();
+            let flags = flags();
+            let (admitted, denied) = std::thread::scope(|scope| {
+                let served = scope.spawn(|| gateway.serve(&listener));
+                let mut guest = handler(&profile, &credentials, &mut recorder, &flags, &socket, Duration::from_secs(5));
+                let admitted = super::exchange(&mut guest, worker_request().as_bytes());
+                let other = super::request("/v1/chat/completions", r#"{"model":"other"}"#);
+                let denied = super::exchange(&mut guest, other.as_bytes());
+                assert_eq!(guest.requests, 1);
+                gateway_stopped.store(true, Ordering::Release);
+                served.join().expect("gateway join").expect("gateway serve");
+                (admitted, denied)
+            });
+            assert!(admitted.starts_with("HTTP/1.1 200"), "{admitted}");
+            assert!(admitted.contains("Content-Type: application/json"), "{admitted}");
+            assert!(!admitted.contains(harness::CANARY));
+            assert!(denied.starts_with("HTTP/1.1 403"), "{denied}");
+            assert_eq!(credentials.0.load(Ordering::SeqCst), 0, "the guest resolves no credential");
+            assert_eq!(upstream.calls(), 1);
+            let headers = upstream.headers.lock().expect("headers").join("");
+            assert!(headers.contains(&format!("Bearer {}", harness::CANARY)));
+            assert!(!headers.contains("worker-controlled"));
+            assert_eq!(recorder.0.len(), 1);
+            assert!(recorder.0[0].starts_with("Responded"), "{:?}", recorder.0);
+        }
+
+        enum Behavior {
+            Reply(crate::model_gateway::core::ForwardedResponse),
+            Close,
+            Hold(Duration),
+        }
+
+        /// A stand-in gateway that answers one forwarded frame as scripted.
+        fn stand_in(socket: &std::path::Path, behavior: Behavior) -> std::thread::JoinHandle<()> {
+            let listener = std::os::unix::net::UnixListener::bind(socket).expect("stand-in socket");
+            std::thread::spawn(move || {
+                let (mut stream, _) = listener.accept().expect("one forwarded call");
+                let frame = lattice_workflow_transport::read_frame(&mut stream, 1 << 24).expect("C4 frame");
+                let request: crate::model_gateway::core::ForwardedRequest =
+                    serde_json::from_slice(&frame).expect("C4 request");
+                assert_eq!(request.request_index, 0);
+                assert_eq!(request.binding, harness::binding_identity());
+                match behavior {
+                    Behavior::Reply(reply) => {
+                        let frame = lattice_workflow_transport::encode_frame(&reply, 1 << 24).expect("reply");
+                        stream.write_all(&frame).expect("reply written");
+                    }
+                    Behavior::Close => drop(stream),
+                    Behavior::Hold(duration) => std::thread::sleep(duration),
+                }
+            })
+        }
+
+        // r[verify lattice.vm_profile.forwarded_upstream.scenario.settlement]
+        #[test]
+        fn forwarded_replies_keep_the_direct_route_settlement_semantics() {
+            let refused = crate::model_gateway::core::ForwardedResponse::Refused(crate::model_gateway::core::Refused {
+                request_index: 0,
+                refused: crate::model_gateway::core::ForwardedRefusal::Deadline,
+            });
+            let uncertain =
+                crate::model_gateway::core::ForwardedResponse::Uncertain(crate::model_gateway::core::Uncertain {
+                    request_index: 0,
+                    uncertain: true,
+                });
+            let crossed =
+                crate::model_gateway::core::ForwardedResponse::Responded(crate::model_gateway::core::Responded {
+                    request_index: 5,
+                    status: 200,
+                    body: "{}".into(),
+                });
+            let cases = [
+                (Behavior::Reply(refused), Duration::from_secs(5), false, "TransportFailed"),
+                (Behavior::Reply(uncertain), Duration::from_secs(5), false, "TransportFailed"),
+                (Behavior::Reply(crossed), Duration::from_secs(5), false, "TransportFailed"),
+                (Behavior::Close, Duration::from_secs(5), false, "TransportFailed"),
+                (Behavior::Hold(Duration::from_secs(3)), Duration::from_millis(1_500), false, "TimedOut"),
+                (Behavior::Hold(Duration::from_secs(3)), Duration::from_secs(5), true, "Cancelled"),
+            ];
+            for (case, (behavior, within, is_cancelled, settled)) in cases.into_iter().enumerate() {
+                let directory = tempfile::tempdir().expect("scratch");
+                let socket = directory.path().join("vsock.sock_10243");
+                let gateway = stand_in(&socket, behavior);
+                let profile = forwarding_profile();
+                let credentials = super::Credentials(std::sync::atomic::AtomicUsize::new(0));
+                let mut recorder = Recorder::default();
+                let flags = flags();
+                let response = std::thread::scope(|scope| {
+                    if is_cancelled {
+                        scope.spawn(|| {
+                            std::thread::sleep(Duration::from_millis(300));
+                            flags.stopped.store(true, Ordering::Release);
+                        });
+                    }
+                    let mut guest = handler(&profile, &credentials, &mut recorder, &flags, &socket, within);
+                    super::exchange(&mut guest, worker_request().as_bytes())
+                });
+                gateway.join().expect("stand-in");
+                assert!(response.starts_with("HTTP/1.1 403"), "case {case}: {response}");
+                assert_eq!(recorder.0, [settled], "case {case}");
+                assert_eq!(credentials.0.load(Ordering::SeqCst), 0);
+            }
+        }
+
+        #[test]
+        fn a_forwarding_profile_never_holds_a_credential() {
+            let profile = forwarding_profile();
+            super::super::admission::validate(&profile).expect("forwarding profile");
+            let mut credentialed = profile.clone();
+            credentialed.credential = Some(crate::credentials::SecretRef::new("env", "MODEL_TOKEN", None));
+            assert!(super::super::admission::validate(&credentialed).is_err());
+            let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/vm-profile/forwarded-upstream");
+            let read = |name: &str| -> super::super::Profile {
+                serde_json::from_slice(&std::fs::read(root.join(name)).expect(name)).expect(name)
+            };
+            super::super::admission::validate(&read("broker-profile.json")).expect("published forwarding profile");
+            for name in ["refused-broker-credential.json", "refused-broker-vsock-port.json"] {
+                assert!(super::super::admission::validate(&read(name)).is_err(), "{name}");
+            }
+            // Absent forwarding serializes exactly as before.
+            let direct = serde_json::to_value(super::super::profile()).expect("profile");
+            assert!(direct.get("forwarded").is_none());
+        }
+
+        // r[verify lattice.vm_profile.forwarded_upstream.scenario.no_fallback]
+        #[test]
+        fn a_vm_bound_broker_without_a_host_gateway_never_starts_the_worker() {
+            let root = tempfile::tempdir().expect("workspace");
+            let request = crate::candidate_worker::tests::request(root.path(), "true");
+            let profile = forwarding_profile();
+            let credentials = super::Credentials(std::sync::atomic::AtomicUsize::new(0));
+            let mut gate = super::super::DirectRoute;
+            let cancellation = AtomicBool::new(false);
+            let started = AtomicBool::new(false);
+            let services = super::super::Services {
+                credentials: &credentials,
+                gate: &mut gate,
+            };
+            let refusal = super::super::with_route(request, &profile, services, &cancellation, |_| {
+                started.store(true, Ordering::Release);
+            })
+            .expect_err("no AF_VSOCK host gateway on this host");
+            assert!(refusal.contains("no host model gateway"), "{refusal}");
+            assert!(!started.load(Ordering::Acquire), "the worker never started");
+            assert_eq!(credentials.0.load(Ordering::SeqCst), 0);
+        }
     }
 }

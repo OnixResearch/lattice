@@ -17,10 +17,28 @@ pub(crate) fn validate(profile: &super::Profile) -> Result<(), String> {
     if !super::super::result::is_blake3(&profile.sandbox_blake3) {
         return Err("sandbox byte identity is invalid".into());
     }
+    if let Some(forwarded) = &profile.forwarded {
+        validate_forwarded(forwarded, profile)?;
+    }
     Ok(())
 }
 
-fn validate_model(model: &str) -> Result<(), String> {
+/// A forwarding broker holds no credential: the host gateway does.
+// r[impl lattice.vm_profile.forwarded_upstream.scenario.credential]
+fn validate_forwarded(forwarded: &super::Forwarded, profile: &super::Profile) -> Result<(), String> {
+    if profile.credential.is_some() {
+        return Err("forwarding model broker must not hold a credential; the host gateway does".into());
+    }
+    if forwarded.schema != super::FORWARDED_SCHEMA || !forwarded.vsock_port.is_concrete() {
+        return Err("forwarded model broker schema or vsock port is unsupported".into());
+    }
+    if !crate::vm_profile::is_identity(&forwarded.binding) {
+        return Err("forwarded model broker binding identity is invalid".into());
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_model(model: &str) -> Result<(), String> {
     if model.is_empty() || model.len() > 256 {
         return Err("model broker requires one bounded exact model".into());
     }
@@ -30,7 +48,7 @@ fn validate_model(model: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_endpoint(endpoint: &str) -> Result<(), String> {
+pub(crate) fn validate_endpoint(endpoint: &str) -> Result<(), String> {
     if endpoint.len() > crate::http::MAX_URL_BYTES {
         return Err("model endpoint exceeds its byte bound".into());
     }

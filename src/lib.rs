@@ -142,6 +142,7 @@ pub mod image_node;
 pub mod implementation_attempt;
 // r[impl lattice.pure_inet_profile.route]
 pub mod inet;
+pub mod model_gateway;
 pub mod n8n_json;
 pub mod nickel;
 pub mod node_kind_provider;
@@ -166,6 +167,7 @@ pub mod scheduler;
 pub mod store;
 pub mod triggers;
 pub mod tui;
+pub mod vm_profile;
 pub mod webhooks;
 pub mod workflow;
 pub mod workflow_exchange;

@@ -130,6 +130,7 @@ molten-orchestrator-codec = { path = "vendor-cargo-deps/aspen-render/source/code
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
+nix = { version = "0.31", default-features = false, features = ["socket", "user"] }
 
 [build-dependencies]
 blake3 = { workspace = true }

@@ -22,6 +22,26 @@ interfaces.
   (`lattice.workflow-observation-continuity.v1`) ship as the Kiln-facing
   fixtures `exchange-recovery-fixtures-v1.json` and `continuity-fixtures-v1.json`.
   Evidence is Q0/Q1 only: real `AF_VSOCK` is not exercised here.
+- VM execution profile and host model gateway (Lattice #10). New records:
+  `lattice.vm-execution-profile.v1`, authored in Nickel and admitted with
+  typed refusals (`live_precopy` is refused at this revision), and
+  `lattice.vm-attempt-binding.v1`, which names no placement. Their framed
+  BLAKE3 identities and positive and negative fixtures are published under
+  `fixtures/vm-profile/`. An implementation-attempt request may carry
+  `vm_binding` and `vm_profile`. When present, the request must declare
+  `network: false`, match its own envelope, attempt and fence, name a mode
+  the profile offers, and use a credential-free forwarding broker
+  (`lattice.model-broker-forwarded-upstream.v1`). That broker sends each
+  admitted request over vsock to the new `lattice model-gateway serve`, keeps
+  the direct route's settlement semantics, and blocks the worker before spawn
+  when no host gateway is reachable. The gateway serves only the VMM's PID,
+  enforces the binding deadline on the host clock, and passes each request
+  through Kiln's `lattice.vm-effect-authority.v1` (`Admit` before one upstream
+  call with the host-only credential, `Settle` after it). A lost settlement
+  stays `uncertain` and is never retried. `inspect` reports `vm-guest` facts
+  for bound attempts. Without the new fields, requests and broker profiles keep
+  their bytes, identities and behaviour. Evidence: Q0 and Q1 over Unix sockets
+  with a scripted model; no VM, vsock, live model or second host.
 - Standalone operator repair (Lattice #6). `lattice implementation-attempt
   run --repair-checks CATALOG` runs a request with a repair policy through
   operator ports when no embedder supplies repair ports: one pinned OMP step

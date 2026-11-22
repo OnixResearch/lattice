@@ -1,0 +1,5 @@
+{
+  "request_index": 0,
+  "status": 200,
+  "body": "{\"id\":\"resp-1\",\"model\":\"admitted-model\",\"choices\":[]}"
+}

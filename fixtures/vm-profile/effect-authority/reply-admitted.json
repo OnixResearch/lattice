@@ -1,0 +1,8 @@
+{
+  "kind": "admitted",
+  "placement_host": "host-a",
+  "placement_generation": 1,
+  "consumed_requests": 1,
+  "remaining_requests": 3,
+  "deadline_unix_ms": 1798761600000
+}

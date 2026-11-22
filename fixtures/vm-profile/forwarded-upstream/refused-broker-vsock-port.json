@@ -1,0 +1,22 @@
+{
+  "schema": "lattice.candidate-model-broker.v1",
+  "endpoint": "https://model.example/v1/chat/completions",
+  "model": "admitted-model",
+  "credential": null,
+  "relay": {
+    "path": "/nix/store/relay",
+    "blake3": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "shell": {
+    "path": "/nix/store/shell",
+    "blake3": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "sandbox_blake3": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "expires_at_ms": 1798761600000,
+  "max_requests": 4,
+  "forwarded": {
+    "schema": "lattice.model-broker-forwarded-upstream.v1",
+    "vsock_port": 0,
+    "binding": "b3:2e8903d9b5fad28bfb9efcd7756952f91d35eb99ea9ab7baf7e7489159a0ade9"
+  }
+}

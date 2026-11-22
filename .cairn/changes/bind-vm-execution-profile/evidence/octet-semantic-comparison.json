@@ -1,0 +1,144 @@
+{
+  "kind": "octet-semantic-comparison",
+  "change": "bind-vm-execution-profile",
+  "reference_revision": "5a8e1d51",
+  "reference_tree": "git archive 5a8e1d51 (pristine export)",
+  "comparison_fields": [
+    "identity_status",
+    "lint",
+    "group",
+    "severity",
+    "file",
+    "message",
+    "crate_name"
+  ],
+  "method": "unique stable IDs per run, compared as multisets of the comparison fields; candidate against the pristine reference run and against the committed baseline",
+  "why_ids_differ": "cargo-octet config_hash hashes the whole Cargo.toml; the S1 `nix` socket dependency hunk changes it, so every candidate stable ID differs from the baseline although the warning facts do not",
+  "scopes": [
+    {
+      "scope": "lattice",
+      "baseline": "octet-baseline.json",
+      "baseline_blake3": "68967a12a8a2f431db4cdb57c8da5dac358ba9c7f2f968b3d474de550c5221b0",
+      "baseline_findings": 1052,
+      "reference": {
+        "status": "warning-only",
+        "cargo": {
+          "classification": "success",
+          "code": 0
+        },
+        "metadata": {
+          "tool_name": "cargo-octet",
+          "tool_version": "0.1.0",
+          "rustc_version": "rustc 1.96.0-nightly (ac7f9ec7d 2026-03-20)",
+          "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu",
+          "profile_name": "workspace-metadata",
+          "profile_hash": "b3:d2ff43855d70abf076f3597c441f3c90718857d7ce696b2f7aa11a3d7f570959",
+          "config_hash": "b3:373a458321454dae9fcfee8b696e906f8dd0e978769601ea777ddfcd080ad018"
+        },
+        "baseline_counts": {
+          "accepted_total": 1052,
+          "accepted_current": 1052,
+          "current_total": 1052,
+          "new_total": 0,
+          "stale_total": 0
+        },
+        "unique_findings": 1052,
+        "reproduces_baseline_semantics": true
+      },
+      "candidate": {
+        "status": "lint-failure",
+        "cargo": {
+          "classification": "success",
+          "code": 0
+        },
+        "metadata": {
+          "tool_name": "cargo-octet",
+          "tool_version": "0.1.0",
+          "rustc_version": "rustc 1.96.0-nightly (ac7f9ec7d 2026-03-20)",
+          "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu",
+          "profile_name": "workspace-metadata",
+          "profile_hash": "b3:0a3ed6fc1277e5e2379e2c5caa1d455e0e81e9168cd24458d4c29f8b554ac377",
+          "config_hash": "b3:299713f9a4561a4d2235616467edb54ef170a601d7687ee8d89da53e1b30fc06"
+        },
+        "baseline_counts": {
+          "accepted_total": 1052,
+          "accepted_current": 0,
+          "current_total": 1052,
+          "new_total": 1052,
+          "stale_total": 1052
+        },
+        "unique_findings": 1052
+      },
+      "new_against_reference": [],
+      "resolved_against_reference": [],
+      "new_against_baseline": [],
+      "resolved_against_baseline": []
+    },
+    {
+      "scope": "lattice-core",
+      "baseline": "crates/lattice-core/octet-baseline.json",
+      "baseline_blake3": "1fdf29f4804d2ec72e72b8ee2c020d1097dbff4ab5029fae1d1dad0be1009bfe",
+      "baseline_findings": 25,
+      "reference": {
+        "status": "warning-only",
+        "cargo": {
+          "classification": "success",
+          "code": 0
+        },
+        "metadata": {
+          "tool_name": "cargo-octet",
+          "tool_version": "0.1.0",
+          "rustc_version": "rustc 1.96.0-nightly (ac7f9ec7d 2026-03-20)",
+          "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu",
+          "profile_name": "workspace-metadata",
+          "profile_hash": "b3:af60c63c1586dfb2fae270cc86569aaa3fa1e892daa8a5355e75d451d9995e12",
+          "config_hash": "b3:c6c36ad09022fd006010c778b568bfb3447c78c17434d701ba83a810caca723a"
+        },
+        "baseline_counts": {
+          "accepted_total": 25,
+          "accepted_current": 25,
+          "current_total": 25,
+          "new_total": 0,
+          "stale_total": 0
+        },
+        "unique_findings": 25,
+        "reproduces_baseline_semantics": true
+      },
+      "candidate": {
+        "status": "lint-failure",
+        "cargo": {
+          "classification": "success",
+          "code": 0
+        },
+        "metadata": {
+          "tool_name": "cargo-octet",
+          "tool_version": "0.1.0",
+          "rustc_version": "rustc 1.96.0-nightly (ac7f9ec7d 2026-03-20)",
+          "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu",
+          "profile_name": "workspace-metadata",
+          "profile_hash": "b3:9d7b338e8bb8791898c12a877917a2dede40f0c9798a10db4a9a55b7ce5b0392",
+          "config_hash": "b3:228833e8243ef15fa26e2dacd7c0feb99e2a656d6b38a1ee4f858dd65100778e"
+        },
+        "baseline_counts": {
+          "accepted_total": 25,
+          "accepted_current": 0,
+          "current_total": 25,
+          "new_total": 25,
+          "stale_total": 25
+        },
+        "unique_findings": 25
+      },
+      "new_against_reference": [],
+      "resolved_against_reference": [],
+      "new_against_baseline": [],
+      "resolved_against_baseline": []
+    }
+  ],
+  "plan_fixed_exceptions": [],
+  "new_findings_attributable_to_s1": [],
+  "new_findings_attributable_to_s1_total": 0,
+  "non_claims": [
+    "not a baseline migration and not a cohort admission",
+    "baselines were not rewritten"
+  ]
+}

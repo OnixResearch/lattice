@@ -107,6 +107,8 @@ enum CliCommand {
     Guarded(lattice::guarded::CommandArgs),
     /// Execute or reconcile one exact coordinator-admitted coding attempt
     ImplementationAttempt(lattice::implementation_attempt::cli::CommandArgs),
+    /// Serve a VM-bound attempt's forwarded model requests on the host
+    ModelGateway(lattice::model_gateway::CommandArgs),
     /// Prepare, promote, roll back and pin immutable agent revisions
     AgentRevision(lattice::agent_revision::CommandArgs),
     /// Inspect identity-bound agent evaluations and durable trial state
@@ -529,6 +531,11 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
             .map(|()| ExitCode::SUCCESS)
             .map_err(|message| lattice::error::Error::Config { message });
     }
+    if let Some(CliCommand::ModelGateway(gateway_args)) = &args.command {
+        return lattice::model_gateway::run_command(gateway_args)
+            .map(|()| ExitCode::SUCCESS)
+            .map_err(|message| lattice::error::Error::Config { message });
+    }
     if let Some(CliCommand::AgentRevision(revision_args)) = &args.command {
         return lattice::agent_revision::run_command(revision_args)
             .map(|()| ExitCode::SUCCESS)
@@ -633,6 +640,9 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
         Some(CliCommand::Guarded(_)) => unreachable!("guarded command returns before app config side effects"),
         Some(CliCommand::ImplementationAttempt(_)) => {
             unreachable!("implementation attempt returns before app config side effects")
+        }
+        Some(CliCommand::ModelGateway(_)) => {
+            unreachable!("model gateway returns before app config side effects")
         }
         Some(CliCommand::AgentRevision(_)) => {
             unreachable!("agent revision command returns before app config side effects")

@@ -58,6 +58,7 @@ fn bubblewrap_broker_allows_only_the_model_route_and_hides_host_capabilities() {
         sandbox_blake3: sandbox.blake3,
         expires_at_ms: admission::now_ms().expect("clock") + 30_000,
         max_requests: 1,
+        forwarded: None,
     };
     let credentials = crate::credentials::EnvironmentCredentialProvider::from_map(
         [("LATTICE_TEST_INFERENCE".into(), "host-inference-token".into())].into(),
