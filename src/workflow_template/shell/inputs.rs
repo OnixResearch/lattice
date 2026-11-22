@@ -70,7 +70,7 @@ fn load_bound_bundle(
     let bundle_dir = open_dir_nofollow(&root, &directory).map_err(|error| {
         if error.kind() == std::io::ErrorKind::NotFound {
             Error::Inputs(super::inputs::InputError::TemplateUnavailable)
-        } else if is_symlink_refusal(&error) {
+        } else if is_symlink_entry(&root, &directory) {
             symlink()
         } else {
             refuse(super::model::DiagnosticCode::FileAccess, "bundle directory could not be opened")
@@ -99,17 +99,10 @@ fn open_dir_nofollow(root: &cap_std::fs::Dir, name: &std::ffi::OsString) -> std:
     Ok(cap_std::fs::Dir::from_std_file(file.into_std()))
 }
 
-/// `O_NOFOLLOW` fails with `ELOOP` on a symlink, and `O_DIRECTORY` with `ENOTDIR` on a link to
-/// a file.
-fn is_symlink_refusal(error: &std::io::Error) -> bool {
-    #[cfg(unix)]
-    {
-        matches!(error.raw_os_error(), Some(libc::ELOOP | libc::ENOTDIR))
-    }
-    #[cfg(not(unix))]
-    {
-        error.kind() == std::io::ErrorKind::NotADirectory
-    }
+/// Whether the entry itself is a symlink. `O_NOFOLLOW` and `O_DIRECTORY` refuse a symlink with
+/// `ELOOP` or `ENOTDIR`, but `ENOTDIR` also means a plain file, so the entry decides the message.
+fn is_symlink_entry(root: &cap_std::fs::Dir, name: &std::ffi::OsString) -> bool {
+    root.symlink_metadata(name).is_ok_and(|metadata| metadata.file_type().is_symlink())
 }
 
 /// Whether the opened handle is still the entry itself: not a symlink, same device and inode.

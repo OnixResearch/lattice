@@ -117,6 +117,20 @@ fn a_symlinked_bundle_directory_is_refused_like_the_catalog() {
     assert_eq!(diagnostic.code, lattice::workflow_template::DiagnosticCode::SymlinkRejected);
 }
 
+#[cfg(unix)]
+#[test]
+fn a_plain_file_at_the_bundle_path_is_not_reported_as_a_symlink() {
+    let fixture = Fixture::new();
+    let bundle = fixture.catalog.join(fixture::BUNDLE);
+    std::fs::remove_dir_all(&bundle).expect("bundle directory removed");
+    std::fs::write(&bundle, b"not a bundle").expect("plain file");
+    let refused = refusal(&fixture);
+    let lattice::workflow_template::inputs::InputError::TemplateLoad(diagnostic) = refused else {
+        panic!("a plain file at the bundle path is refused with its diagnostic, got {refused:?}");
+    };
+    assert_eq!(diagnostic.code, lattice::workflow_template::DiagnosticCode::FileAccess);
+}
+
 #[test]
 fn saved_workflow_drift_is_reported_before_a_bundle_load_failure() {
     let fixture = Fixture::new();
