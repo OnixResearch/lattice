@@ -8,9 +8,7 @@
 use redb::ReadableDatabase as _;
 use redb::ReadableTable as _;
 
-/// Adopted application checkpoints, keyed by execution identity (Lattice #12).
-const WORKFLOW_EXCHANGE_ADOPTIONS: redb::TableDefinition<&str, &[u8]> =
-    redb::TableDefinition::new("workflow_exchange_adoptions_v1");
+mod adoption;
 
 impl super::Store {
     // r[impl lattice.workflow_interchange.application_admission]
@@ -167,98 +165,6 @@ impl super::Store {
                 .map_err(store_db_error)?;
         }
         transaction.commit().map_err(store_db_error)
-    }
-
-    // r[impl lattice.application_checkpoint.restore]
-    /// Atomically adopt a checkpoint into a store that holds no trace of the execution.
-    ///
-    /// An existing adoption for the execution is returned unchanged for the caller to classify;
-    /// any other existing execution, request or idempotency entry is a conflict.
-    pub fn adopt_workflow_exchange_checkpoint(
-        &self,
-        accepted: &lattice_workflow_contract::WorkflowAccepted,
-        build: impl FnOnce(
-            u64,
-        ) -> Result<
-            (crate::workflow_exchange::ExecutionRecord, crate::checkpoint::AdoptionRecord),
-            super::StoreError,
-        >,
-    ) -> Result<crate::checkpoint::AdoptionOutcome, super::StoreError> {
-        let transaction = self.db.begin_write().map_err(store_db_error)?;
-        let execution_identity = accepted.execution_identity.as_str();
-        let prior = {
-            let adoptions = transaction.open_table(WORKFLOW_EXCHANGE_ADOPTIONS).map_err(store_table_error)?;
-            adoptions
-                .get(execution_identity)
-                .map_err(store_db_error)?
-                .map(|value| super::deserialize::<crate::checkpoint::AdoptionRecord>(value.value()))
-                .transpose()?
-        };
-        if let Some(prior) = prior {
-            transaction.abort().map_err(store_db_error)?;
-            return Ok(crate::checkpoint::AdoptionOutcome::Existing(prior));
-        }
-        let is_occupied = {
-            let executions = transaction.open_table(super::WORKFLOW_EXCHANGE_EXECUTIONS).map_err(store_table_error)?;
-            let request_index =
-                transaction.open_table(super::WORKFLOW_EXCHANGE_REQUEST_INDEX).map_err(store_table_error)?;
-            let idempotency_index =
-                transaction.open_table(super::WORKFLOW_EXCHANGE_IDEMPOTENCY_INDEX).map_err(store_table_error)?;
-            executions.get(execution_identity).map_err(store_db_error)?.is_some()
-                || request_index.get(accepted.request_identity.as_str()).map_err(store_db_error)?.is_some()
-                || idempotency_index.get(accepted.idempotency_key.as_str()).map_err(store_db_error)?.is_some()
-        };
-        if is_occupied {
-            return Err(super::StoreError::Conflict(
-                "checkpoint adoption target already holds this execution".to_string(),
-            ));
-        }
-        let run_id = super::reserve_run_id(&transaction)?;
-        let (record, adoption) = build(run_id.0)?;
-        if record.accepted != *accepted || adoption.execution != accepted.execution_identity {
-            return Err(super::StoreError::Conflict(
-                "checkpoint adoption changed the adopted execution identity".to_string(),
-            ));
-        }
-        let record_bytes = super::serialize(&record)?;
-        let adoption_bytes = super::serialize(&adoption)?;
-        {
-            let mut executions =
-                transaction.open_table(super::WORKFLOW_EXCHANGE_EXECUTIONS).map_err(store_table_error)?;
-            executions.insert(execution_identity, record_bytes.as_slice()).map_err(store_db_error)?;
-            let mut request_index =
-                transaction.open_table(super::WORKFLOW_EXCHANGE_REQUEST_INDEX).map_err(store_table_error)?;
-            request_index.insert(record.request.identity.as_str(), execution_identity).map_err(store_db_error)?;
-            let mut idempotency_index =
-                transaction.open_table(super::WORKFLOW_EXCHANGE_IDEMPOTENCY_INDEX).map_err(store_table_error)?;
-            idempotency_index
-                .insert(record.request.idempotency_key.as_str(), execution_identity)
-                .map_err(store_db_error)?;
-            let mut adoptions = transaction.open_table(WORKFLOW_EXCHANGE_ADOPTIONS).map_err(store_table_error)?;
-            adoptions.insert(execution_identity, adoption_bytes.as_slice()).map_err(store_db_error)?;
-        }
-        transaction.commit().map_err(store_db_error)?;
-        Ok(crate::checkpoint::AdoptionOutcome::Adopted {
-            record: Box::new(record),
-            adoption: Box::new(adoption),
-        })
-    }
-
-    pub fn load_workflow_exchange_adoption(
-        &self,
-        execution_identity: &lattice_workflow_contract::Identity,
-    ) -> Result<Option<crate::checkpoint::AdoptionRecord>, super::StoreError> {
-        let transaction = self.db.begin_read().map_err(store_db_error)?;
-        let adoptions = match transaction.open_table(WORKFLOW_EXCHANGE_ADOPTIONS) {
-            Ok(table) => table,
-            Err(redb::TableError::TableDoesNotExist(_)) => return Ok(None),
-            Err(error) => return Err(store_table_error(error)),
-        };
-        adoptions
-            .get(execution_identity.as_str())
-            .map_err(store_db_error)?
-            .map(|value| super::deserialize(value.value()))
-            .transpose()
     }
 }
 

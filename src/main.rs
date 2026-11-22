@@ -224,6 +224,10 @@ enum WorkflowExchangeCliCommand {
         /// Typed Nickel workflow exchange handler profile
         #[arg(long)]
         profile: PathBuf,
+        /// `lattice.application-checkpoint-binding.v1` JSON enabling checkpoint publication and
+        /// the restart of adopted executions on its route
+        #[arg(long)]
+        checkpoint_binding: Option<PathBuf>,
     },
 }
 
@@ -2202,7 +2206,17 @@ fn run_protocol_command(app_config: &config::AppConfig, args: &lattice::protocol
 
 // r[impl lattice.workflow_interchange.application_command]
 fn run_workflow_exchange_command(app_config: &config::AppConfig, args: &WorkflowExchangeCommandArgs) -> ExitCode {
-    let WorkflowExchangeCliCommand::Serve { profile } = &args.command;
+    let WorkflowExchangeCliCommand::Serve {
+        profile,
+        checkpoint_binding,
+    } = &args.command;
+    let checkpoint = match checkpoint_binding.as_deref().map(lattice::checkpoint::cli::read_binding).transpose() {
+        Ok(checkpoint) => checkpoint,
+        Err(refused) => {
+            eprintln!("checkpoint binding refused: {refused}");
+            return ExitCode::FAILURE;
+        }
+    };
     let profile = match lattice::workflow_exchange::load_profile(profile) {
         Ok(profile) => profile,
         Err(error) => {
@@ -2217,7 +2231,7 @@ fn run_workflow_exchange_command(app_config: &config::AppConfig, args: &Workflow
             return ExitCode::FAILURE;
         }
     };
-    match lattice::workflow_exchange::serve(store, profile, app_config.effective_agent_runtime()) {
+    match lattice::workflow_exchange::serve(store, profile, app_config.effective_agent_runtime(), checkpoint) {
         Ok(report) => {
             println!(
                 "workflow exchange stopped after {} accepted connections, {} completed exchanges, {} denied peers, and {} failed exchanges",

@@ -100,6 +100,7 @@ pub fn adoption_record(admitted: &AdmittedCheckpoint) -> AdoptionRecord {
         cancellation_requested: admitted.cancellation_requested,
         binding: admitted.manifest.binding.clone(),
         environment: admitted.manifest.runtime.environment.clone(),
+        completed_nodes: admitted.outcomes.iter().map(|(node, _outcome)| node.clone()).collect(),
     }
 }
 
@@ -127,19 +128,18 @@ pub fn adopted_nodes(
 }
 
 // r[impl lattice.application_checkpoint.carry_forward]
-/// Independent oracle: the adopted record and adoption carry budget, deadline and cancellation
-/// forward unchanged, keep every uncertain node `Unknown`, and never reuse the producer's sequence.
+/// Independent oracle: the adopted record and adoption carry elapsed budget, deadline and every
+/// cancel (manifest, sibling or Kiln's request) forward, keep every uncertain node `Unknown`, and
+/// never reuse the producer's sequence.
 pub fn verify_carry_forward(
     admitted: &AdmittedCheckpoint,
     adoption: &AdoptionRecord,
     record: &crate::workflow_exchange::ExecutionRecord,
 ) -> Result<(), Refusal> {
     let manifest = &admitted.manifest;
-    let consumed_kept = adoption.consumed.model_requests >= manifest.consumed.model_requests
-        && adoption.consumed.cost_micros >= manifest.consumed.cost_micros
-        && adoption.consumed.elapsed_ms >= manifest.consumed.elapsed_ms;
-    let cancellation_kept =
-        !manifest.cancellation_requested || (adoption.cancellation_requested && record.cancellation_requested);
+    let consumed_kept = adoption.consumed.elapsed_ms >= manifest.consumed.elapsed_ms;
+    let must_cancel = manifest.cancellation_requested || admitted.cancellation_requested;
+    let cancellation_kept = !must_cancel || (adoption.cancellation_requested && record.cancellation_requested);
     let uncertain_unknown = admitted.uncertain.iter().all(|uncertain| {
         record
             .nodes

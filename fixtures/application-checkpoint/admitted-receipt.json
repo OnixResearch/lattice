@@ -1,6 +1,6 @@
 {
   "admission": "kiln-admission:test-1",
-  "checkpoint": "b3:17cef9c35be8f5c6b87824ece95979f0f1e0d605324bf266af22a2cc5700e7d9",
+  "checkpoint": "b3:0ce78b0e39082cd9f329804138bdd3fd1809fb83e97de5430c0d727e49988767",
   "kind": "application_restart",
   "restarted_incarnation": 1
 }

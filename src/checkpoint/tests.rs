@@ -204,11 +204,7 @@ impl Fixture {
             completed: &nodes,
             uncertain: &uncertain,
             workspace: &[],
-            consumed: Consumed {
-                model_requests: 3,
-                cost_micros: 40,
-                elapsed_ms: 1_000,
-            },
+            consumed: Consumed { elapsed_ms: 1_000 },
             cancellation_requested: false,
         })
         .expect("manifest builds");
@@ -222,6 +218,7 @@ impl Fixture {
                 request: record.request.identity.clone(),
                 execution: record.accepted.execution_identity.clone(),
                 binding: Some(identity('b')),
+                cancellation_requested: false,
             },
             marker: Some(CommitMarker { manifest: checkpoint }),
             manifest,
@@ -534,6 +531,9 @@ fn identical_restart_is_idempotent_and_other_prior_is_not_fresh() {
     let admitted = fixture.admitted();
     fixture.prior = Some(adoption_record(&admitted));
     assert!(matches!(fixture.admit(), Ok(Admission::Idempotent(receipt)) if receipt == admitted.receipt));
+    fixture.request.cancellation_requested = true;
+    assert_eq!(refused(&fixture), Refusal::TargetNotFresh, "a cancel the adoption lacks is not idempotent");
+    fixture.request.cancellation_requested = false;
     let mut prior = adoption_record(&admitted);
     prior.receipt.restarted_incarnation = 1;
     prior.receipt.admission = "kiln-admission:older".to_string();
@@ -571,14 +571,11 @@ fn older_checkpoint_keeps_newer_budget_cancellation_and_uncertainty() {
     let mut older = Fixture::new(&[NODE_A], &[]);
     let mut newer = Fixture::new(&[NODE_A], &[NODE_B]);
     newer.reseal(|manifest| {
-        manifest.consumed.model_requests = 9;
         manifest.consumed.elapsed_ms = 5_000;
         manifest.cancellation_requested = true;
     });
     older.siblings = vec![newer.manifest.clone()];
     let admitted = older.admitted();
-    assert_eq!(admitted.consumed.model_requests, 9);
-    assert_eq!(admitted.consumed.cost_micros, 40);
     assert_eq!(admitted.consumed.elapsed_ms, 5_000);
     assert!(admitted.cancellation_requested);
     assert_eq!(admitted.deadline_unix_ms, DEADLINE);
@@ -592,6 +589,46 @@ fn refuses_sibling_with_different_deadline() {
     sibling.deadline_unix_ms = DEADLINE - 1;
     fixture.siblings = vec![sibling];
     assert_eq!(refused(&fixture), Refusal::CarryForward);
+}
+
+// r[verify lattice.application_checkpoint.cancellation]
+/// A cancel Kiln acknowledged after a quiescent manifest exists only in the restart request; the
+/// restarted run must start cancelled. Dropping the OR in admission fails this test.
+#[test]
+fn restart_request_cancel_holds_over_an_uncancelled_manifest() {
+    let mut fixture = Fixture::new(&[NODE_A], &[]);
+    assert!(!fixture.manifest.cancellation_requested);
+    fixture.request.cancellation_requested = true;
+    let admitted = fixture.admitted();
+    assert!(admitted.cancellation_requested, "Kiln's cancel survives the restart");
+    let adoption = adoption_record(&admitted);
+    assert!(adoption.cancellation_requested);
+    let (completed, uncertain) = super::core::adopted_nodes(&admitted);
+    let adopted =
+        crate::workflow_exchange::adopt_checkpoint(&record(), &crate::workflow_exchange::CheckpointAdoption {
+            accepted: &admitted.manifest.execution.accepted,
+            sequence: admitted.manifest.execution.sequence,
+            cancellation_requested: admitted.cancellation_requested,
+            completed: &completed,
+            uncertain: &uncertain,
+        })
+        .expect("adoption");
+    assert!(adopted.cancellation_requested, "the adopted record starts cancelled");
+    assert_eq!(verify_carry_forward(&admitted, &adoption, &adopted), Ok(()));
+    let mut dropped = adopted;
+    dropped.cancellation_requested = false;
+    assert_eq!(verify_carry_forward(&admitted, &adoption, &dropped), Err(Refusal::CarryForward));
+}
+
+// r[verify lattice.application_checkpoint.cancellation]
+#[test]
+fn manifest_cancel_holds_when_the_restart_request_does_not_cancel() {
+    let mut fixture = Fixture::new(&[NODE_A], &[]);
+    fixture.reseal(|manifest| manifest.cancellation_requested = true);
+    assert!(!fixture.request.cancellation_requested);
+    let admitted = fixture.admitted();
+    assert!(admitted.cancellation_requested, "a cancel observed before publication survives");
+    assert!(adoption_record(&admitted).cancellation_requested);
 }
 
 /// Deliberately broken restore variants must each be caught by the independent oracle.

@@ -113,7 +113,10 @@ pub fn admit(input: &AdmissionInput<'_>) -> Result<Admission, Refusal> {
     }
     let outcomes = admit_node_objects(&manifest, input.node_objects)?;
     admit_workspace_objects(&manifest, input.workspace_objects)?;
-    let (uncertain, consumed, cancellation_requested) = carry_siblings(&manifest, input.siblings)?;
+    let (uncertain, consumed, carried_cancellation) = carry_siblings(&manifest, input.siblings)?;
+    // r[impl lattice.application_checkpoint.cancellation]
+    // A cancel Kiln acknowledged after the last publication lives only in Kiln's decision.
+    let cancellation_requested = carried_cancellation || request.cancellation_requested;
     let receipt = RestartReceipt {
         checkpoint: identity.clone(),
         kind: restart_kind(manifest.producing_incarnation, request.restarted_incarnation, true)?,
@@ -121,8 +124,11 @@ pub fn admit(input: &AdmissionInput<'_>) -> Result<Admission, Refusal> {
         admission: request.admission.clone(),
     };
     if let Some(prior) = input.prior {
-        if prior.receipt == receipt {
+        if prior.receipt == receipt && prior.cancellation_requested == cancellation_requested {
             return Ok(Admission::Idempotent(receipt));
+        }
+        if prior.receipt == receipt {
+            return Err(Refusal::TargetNotFresh);
         }
         if prior.receipt.restarted_incarnation >= request.restarted_incarnation {
             return Err(Refusal::StaleAdmission);
@@ -256,8 +262,6 @@ fn carry_siblings(manifest: &Manifest, siblings: &[Manifest]) -> Result<(Vec<Unc
         if sibling.deadline_unix_ms != manifest.deadline_unix_ms || sibling.binding != manifest.binding {
             return Err(Refusal::CarryForward);
         }
-        consumed.model_requests = consumed.model_requests.max(sibling.consumed.model_requests);
-        consumed.cost_micros = consumed.cost_micros.max(sibling.consumed.cost_micros);
         consumed.elapsed_ms = consumed.elapsed_ms.max(sibling.consumed.elapsed_ms);
         cancellation_requested |= sibling.cancellation_requested;
         let started = sibling

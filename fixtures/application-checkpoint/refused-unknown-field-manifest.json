@@ -12,9 +12,7 @@
     }
   ],
   "consumed": {
-    "cost_micros": 40,
-    "elapsed_ms": 1000,
-    "model_requests": 3
+    "elapsed_ms": 1000
   },
   "deadline_unix_ms": 4102444800000,
   "execution": {

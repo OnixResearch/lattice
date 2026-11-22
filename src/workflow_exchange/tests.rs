@@ -764,7 +764,8 @@ fn unix_service_composes_the_application_handler_and_bounded_transport() {
     profile.maximum_active_executions = 1;
     profile.transport.peers.allowed_user_ids = vec![nix::unistd::getuid().as_raw()];
     let client_profile = profile.transport.clone();
-    let server = std::thread::spawn(move || super::serve(store, profile, crate::agent_node::RuntimeOptions::default()));
+    let server =
+        std::thread::spawn(move || super::serve(store, profile, crate::agent_node::RuntimeOptions::default(), None));
     let ready_deadline = std::time::Instant::now() + SOCKET_READY_TIMEOUT;
     while !socket_path.exists() && !server.is_finished() && std::time::Instant::now() < ready_deadline {
         std::thread::sleep(std::time::Duration::from_millis(SOCKET_READY_DELAY_MILLISECONDS));

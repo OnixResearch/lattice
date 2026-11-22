@@ -42,15 +42,19 @@ fn selected_listener(profile: &VersionedHandlerProfile) -> HandlerListener {
 
 // r[impl lattice.workflow_interchange.application_command]
 // r[impl lattice.workflow_interchange.guest_listener]
+/// Serve one handler profile. With a checkpoint binding the bound route publishes checkpoints,
+/// and adopted executions that never started run here, observable and cancellable through this
+/// listener like fresh ones.
 #[cfg(target_os = "linux")]
 pub fn serve(
     store: crate::store::Store,
     profile: impl Into<VersionedHandlerProfile>,
     agent_runtime: crate::agent_node::RuntimeOptions,
+    checkpoint: Option<crate::checkpoint::CheckpointBinding>,
 ) -> Result<lattice_workflow_transport::ServeReport, ApplicationError> {
     let profile = profile.into();
     let listener = selected_listener(&profile);
-    let handler = ApplicationHandler::new(store, profile, agent_runtime)?;
+    let handler = served_handler(ApplicationHandler::new(store, profile, agent_runtime)?, checkpoint)?;
     let mut service = lattice_workflow_transport::WorkflowExchangeService::new(handler);
     let served = match &listener {
         HandlerListener::Unix { socket_path, transport } => {
@@ -62,9 +66,23 @@ pub fn serve(
         }
         HandlerListener::Vsock { transport } => lattice_workflow_transport::serve_vsock(transport, &mut service),
     };
-    let report = served.map_err(|_| ApplicationError::Transport)?;
     service.handler_mut().wait_for_workers();
-    Ok(report)
+    served.map_err(|_| ApplicationError::Transport)
+}
+
+// r[impl lattice.application_checkpoint.resume]
+/// Bind the served route's checkpoint and start the adopted executions before any connection.
+#[cfg(target_os = "linux")]
+fn served_handler(
+    handler: ApplicationHandler,
+    checkpoint: Option<crate::checkpoint::CheckpointBinding>,
+) -> Result<ApplicationHandler, ApplicationError> {
+    let mut handler = match checkpoint {
+        Some(binding) => handler.with_application_checkpoint(binding)?,
+        None => handler,
+    };
+    handler.resume_adopted()?;
+    Ok(handler)
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -72,6 +90,7 @@ pub fn serve(
     _store: crate::store::Store,
     _profile: impl Into<VersionedHandlerProfile>,
     _agent_runtime: crate::agent_node::RuntimeOptions,
+    _checkpoint: Option<crate::checkpoint::CheckpointBinding>,
 ) -> Result<lattice_workflow_transport::ServeReport, ApplicationError> {
     Err(ApplicationError::UnsupportedHost)
 }

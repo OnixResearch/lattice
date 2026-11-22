@@ -44,10 +44,11 @@ impl ApplicationHandler {
 
     // r[impl lattice.application_checkpoint.restore]
     // r[impl lattice.application_checkpoint.unavailable]
-    /// Restore a committed checkpoint under a Kiln admission into this handler's fresh store.
+    /// Adopt a committed checkpoint under a Kiln admission into this handler's fresh store.
     ///
-    /// Uncertain nodes are adopted as `Unknown` and nothing is scheduled; otherwise the remaining
-    /// nodes run on a worker that publishes this incarnation's own checkpoints.
+    /// Nothing runs here: the serving exchange starts the adopted execution
+    /// ([`Self::resume_adopted`]). Uncertain nodes are adopted as `Unknown`, so nothing is ever
+    /// scheduled for them. An identical restart is idempotent only while its adoption is present.
     pub fn restore_checkpoint(
         &mut self,
         source: &crate::checkpoint::CheckpointRoot,
@@ -61,21 +62,17 @@ impl ApplicationHandler {
             .filter(|binding| binding.checkpoint != crate::checkpoint::CheckpointProfile::None)
             .ok_or(Refusal::CheckpointUnavailable)?;
         let admitted = match crate::checkpoint::admit_from_root(source, request, &self.store, &binding, now_unix_ms)? {
-            crate::checkpoint::Admission::Idempotent(receipt) => return Ok(receipt),
+            crate::checkpoint::Admission::Idempotent(receipt) => {
+                self.store
+                    .load_workflow_exchange(&request.execution)
+                    .map_err(|_| Refusal::Store)?
+                    .ok_or(Refusal::Store)?;
+                return Ok(receipt);
+            }
             crate::checkpoint::Admission::Fresh(admitted) => admitted,
         };
-        let route = self.profile.select_route(&admitted.workflow_request).map_err(|_| Refusal::CrossedRoute)?.clone();
-        let workflow = self
-            .store
-            .load_workflow(&route.workflow_name)
-            .map_err(|_| Refusal::Store)?
-            .ok_or(Refusal::CrossedRoute)?;
-        let facts = super::super::worker::workflow_facts(&workflow).map_err(|_| Refusal::CrossedWorkflowRevision)?;
-        crate::workflow_exchange::validate_route(&route, &admitted.workflow_request, &facts)
-            .map_err(|_| Refusal::CrossedRoute)?;
-        let (workflow, revision) =
-            crate::workflow_exchange::instantiate_workflow(&route, &admitted.workflow_request, workflow)
-                .map_err(|_| Refusal::CrossedRoute)?;
+        let (route, workflow, revision) =
+            self.instantiated_route(&admitted.workflow_request).ok_or(Refusal::CrossedRoute)?;
         let adopted = crate::checkpoint::adopt(
             &crate::checkpoint::AdoptionTarget {
                 store: &self.store,
@@ -88,22 +85,62 @@ impl ApplicationHandler {
             },
             &admitted,
         )?;
-        let receipt = adopted.adoption.receipt.clone();
-        if adopted.record.state == DurableExecutionState::Queued {
-            let seed = crate::checkpoint::HookSeed {
-                incarnation: receipt.restarted_incarnation,
-                consumed: adopted.adoption.consumed,
-                cancellation_requested: adopted.adoption.cancellation_requested,
-                completed: admitted.outcomes.iter().map(|(node, _outcome)| node.clone()).collect(),
+        Ok(adopted.adoption.receipt)
+    }
+
+    // r[impl lattice.application_checkpoint.resume]
+    /// Start every adopted execution that never started, publishing under this handler's binding.
+    ///
+    /// The worker's `Queued` to `Running` transition is a compare-and-swap in the single-writer
+    /// store, so exactly one process runs an adopted execution. An adoption that cannot be
+    /// resumed here is recorded `Unknown`.
+    pub fn resume_adopted(&mut self) -> Result<(), ApplicationError> {
+        let Some(binding) = self.checkpoint.clone() else {
+            return Ok(());
+        };
+        let root = crate::checkpoint::CheckpointRoot::new(binding.root.clone());
+        for adoption in self.store.list_workflow_exchange_adoptions().map_err(|_| ApplicationError::Store)? {
+            let record = self.store.load_workflow_exchange(&adoption.execution).map_err(|_| ApplicationError::Store)?;
+            let Some(record) = record.filter(|record| record.state == DurableExecutionState::Queued) else {
+                continue;
             };
-            let is_cancelled = adopted.record.cancellation_requested;
-            self.spawn_worker(adopted.record, route, workflow, WorkerStart {
-                seed,
-                restored: adopted.steps,
-                is_cancelled,
-            });
+            let resumable = (record.handler_profile_identity == self.profile_identity)
+                .then(|| self.instantiated_route(&record.request))
+                .flatten()
+                .filter(|(route, _workflow, revision)| {
+                    binds_route(&binding, route) && *revision == record.workflow_revision
+                })
+                .zip(crate::checkpoint::adopted_steps(&root, &adoption).ok());
+            let Some(((route, workflow, _revision), restored)) = resumable else {
+                self.mark_execution_unknown(adoption.execution.as_str());
+                continue;
+            };
+            let start = WorkerStart {
+                seed: crate::checkpoint::HookSeed {
+                    incarnation: adoption.receipt.restarted_incarnation,
+                    consumed: adoption.consumed,
+                    cancellation_requested: adoption.cancellation_requested,
+                    completed: adoption.completed_nodes,
+                },
+                restored,
+                is_cancelled: record.cancellation_requested,
+            };
+            self.spawn_worker(record, route, workflow, start);
         }
-        Ok(receipt)
+        Ok(())
+    }
+
+    /// The route a request selects, with its saved workflow validated and instantiated.
+    fn instantiated_route(
+        &self,
+        request: &lattice_workflow_contract::WorkflowRequest,
+    ) -> Option<(WorkflowRoute, crate::engine::workflow::Workflow, lattice_workflow_contract::Identity)> {
+        let route = self.profile.select_route(request).ok()?.clone();
+        let workflow = self.store.load_workflow(&route.workflow_name).ok()??;
+        let facts = super::super::worker::workflow_facts(&workflow).ok()?;
+        crate::workflow_exchange::validate_route(&route, request, &facts).ok()?;
+        let (workflow, revision) = crate::workflow_exchange::instantiate_workflow(&route, request, workflow).ok()?;
+        Some((route, workflow, revision))
     }
 
     /// The handler's checkpoint binding when it binds `route`.

@@ -44,6 +44,7 @@ pub use restore::Adopted;
 pub use restore::AdoptionTarget;
 pub use restore::admit_from_root;
 pub use restore::adopt;
+pub use restore::adopted_steps;
 pub use restore::now_unix_ms;
 
 #[cfg(test)]

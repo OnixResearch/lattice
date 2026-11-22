@@ -13,7 +13,6 @@
 //! Restore shell: read a committed checkpoint, admit it, adopt it into a fresh target store.
 
 use std::collections::BTreeMap;
-use std::path::Path;
 
 use super::Admission;
 use super::AdmittedCheckpoint;
@@ -24,6 +23,10 @@ use super::CheckpointRoot;
 use super::Manifest;
 use super::Refusal;
 use super::RestartRequest;
+
+mod files;
+
+pub use files::adopted_steps;
 
 /// Read everything a restart names from `root` and the target store, then admit it.
 pub fn admit_from_root(
@@ -115,20 +118,17 @@ pub struct AdoptionTarget<'a> {
 pub struct Adopted {
     pub record: crate::workflow_exchange::ExecutionRecord,
     pub adoption: AdoptionRecord,
-    pub steps: Vec<crate::engine::executor::StepResult>,
 }
 
 // r[impl lattice.application_checkpoint.restore]
-/// Restore an admitted checkpoint into a fresh target store and verify it carried forward.
+/// Adopt an admitted checkpoint into a fresh target store; nothing runs here.
+///
+/// Every check, the carry-forward oracle and the workspace write happen before the store
+/// transaction commits, and the oracle runs again inside it, so a refused adoption leaves no
+/// record behind and a committed one is complete. Workspace files this call created are removed
+/// when the transaction fails.
 pub fn adopt(target: &AdoptionTarget<'_>, admitted: &AdmittedCheckpoint) -> Result<Adopted, Refusal> {
-    if target.binding.graph_identity != target.route.graph_identity
-        || target.binding.workflow_revision != target.route.workflow_revision
-    {
-        return Err(Refusal::CrossedRoute);
-    }
-    if !admitted.manifest.workspace_objects.is_empty() && target.binding.workspace.is_none() {
-        return Err(Refusal::WorkspacePath);
-    }
+    check_target(target, admitted)?;
     let steps = super::core::restored_steps(admitted)?;
     let context = crate::engine::effect::execution::RunContext::unavailable(
         crate::engine::RunId(0),
@@ -137,46 +137,60 @@ pub fn adopt(target: &AdoptionTarget<'_>, admitted: &AdmittedCheckpoint) -> Resu
     .map_err(|_| Refusal::CheckpointInvalid)?;
     crate::engine::effect::execution::Session::new_with_checkpoint(target.workflow, &context, &steps)
         .map_err(|_| Refusal::CheckpointInvalid)?;
-    carry_objects(target.source, &CheckpointRoot::new(target.binding.root.clone()), admitted)?;
-    let mut refusal = None;
-    let outcome = target.store.adopt_workflow_exchange_checkpoint(&admitted.manifest.execution.accepted, |run_id| {
-        build_adoption(target, admitted, run_id).map_err(|error| {
-            refusal = Some(error);
-            crate::store::StoreError::Conflict(format!("checkpoint adoption refused: {error}"))
-        })
-    });
-    let (record, adoption) = match outcome {
-        Ok(AdoptionOutcome::Adopted { record, adoption }) => (*record, *adoption),
-        Ok(AdoptionOutcome::Existing(_)) => return Err(Refusal::TargetNotFresh),
-        Err(_) => return Err(refusal.unwrap_or(Refusal::TargetNotFresh)),
-    };
-    super::core::verify_carry_forward(admitted, &adoption, &record)?;
-    if let Some(workspace) = &target.binding.workspace {
-        materialize_workspace(target.source, workspace, admitted)?;
+    let accepted = &admitted.manifest.execution.accepted;
+    let execution = &accepted.execution_identity;
+    if target.store.load_workflow_exchange(execution).map_err(|_| Refusal::Store)?.is_some() {
+        return Err(Refusal::TargetNotFresh);
     }
-    Ok(Adopted {
-        record,
-        adoption,
-        steps,
-    })
+    let (provisional, adoption) = build_adoption(target, admitted, 0)?;
+    super::core::verify_carry_forward(admitted, &adoption, &provisional)?;
+    files::carry_objects(target.source, &CheckpointRoot::new(target.binding.root.clone()), admitted)?;
+    let created = match &target.binding.workspace {
+        Some(workspace) => files::materialize_workspace(target.source, workspace, admitted)?,
+        None => Vec::new(),
+    };
+    let mut refusal = None;
+    let outcome = target.store.adopt_workflow_exchange_checkpoint(accepted, |run_id| {
+        build_adoption(target, admitted, run_id)
+            .and_then(|(record, adoption)| {
+                super::core::verify_carry_forward(admitted, &adoption, &record).map(|()| (record, adoption))
+            })
+            .map_err(|error| {
+                refusal = Some(error);
+                crate::store::StoreError::Conflict(format!("checkpoint adoption refused: {error}"))
+            })
+    });
+    match outcome {
+        Ok(AdoptionOutcome::Adopted { record, adoption }) => Ok(Adopted {
+            record: *record,
+            adoption: *adoption,
+        }),
+        Ok(AdoptionOutcome::Existing(_)) | Err(_) => {
+            for path in created {
+                let _removed = std::fs::remove_file(path);
+            }
+            Err(refusal.unwrap_or(Refusal::TargetNotFresh))
+        }
+    }
 }
 
-/// Copy the verified node outcome objects into the target root, so this incarnation's own
-/// manifests reference only objects present beside them.
-fn carry_objects(
-    source: &CheckpointRoot,
-    target: &CheckpointRoot,
-    admitted: &AdmittedCheckpoint,
-) -> Result<(), Refusal> {
-    if source == target {
-        return Ok(());
+// r[impl lattice.application_checkpoint.carry_forward]
+/// The target route and binding must reproduce the checkpoint's deadline and attempt binding: a
+/// restart never extends the deadline or moves the execution to another C2 binding.
+fn check_target(target: &AdoptionTarget<'_>, admitted: &AdmittedCheckpoint) -> Result<(), Refusal> {
+    if target.binding.graph_identity != target.route.graph_identity
+        || target.binding.workflow_revision != target.route.workflow_revision
+    {
+        return Err(Refusal::CrossedRoute);
     }
-    for (node, _outcome) in &admitted.outcomes {
-        let bytes = source.node_object(&node.outputs_object)?.ok_or(Refusal::ObjectMissing)?;
-        if super::core::identity_of_bytes(super::NODE_OUTPUTS_SCHEMA, &bytes)? != node.outputs_object {
-            return Err(Refusal::ObjectMismatch);
-        }
-        target.put_node_object(&node.outputs_object, &bytes)?;
+    if target.binding.deadline_unix_ms != admitted.deadline_unix_ms {
+        return Err(Refusal::CarryForward);
+    }
+    if target.binding.binding != admitted.manifest.binding {
+        return Err(Refusal::CrossedBinding);
+    }
+    if !admitted.manifest.workspace_objects.is_empty() && target.binding.workspace.is_none() {
+        return Err(Refusal::WorkspacePath);
     }
     Ok(())
 }
@@ -205,32 +219,6 @@ fn build_adoption(
     })
     .map_err(|_| Refusal::CrossedAdapter)?;
     Ok((record, super::core::adoption_record(admitted)))
-}
-
-/// Write verified workspace objects under `workspace`; existing different content is refused.
-fn materialize_workspace(
-    root: &CheckpointRoot,
-    workspace: &Path,
-    admitted: &AdmittedCheckpoint,
-) -> Result<(), Refusal> {
-    for object in &admitted.manifest.workspace_objects {
-        let bytes = root.workspace_object(&object.blake3)?.ok_or(Refusal::ObjectMissing)?;
-        if super::core::content_hex(&bytes) != object.blake3 {
-            return Err(Refusal::ObjectMismatch);
-        }
-        let target = workspace.join(&object.path);
-        if let Ok(existing) = std::fs::read(&target) {
-            if existing == bytes {
-                continue;
-            }
-            return Err(Refusal::WorkspacePath);
-        }
-        if let Some(parent) = target.parent() {
-            std::fs::create_dir_all(parent).map_err(|_| Refusal::Io)?;
-        }
-        std::fs::write(&target, &bytes).map_err(|_| Refusal::Io)?;
-    }
-    Ok(())
 }
 
 /// Wall-clock milliseconds for the advisory deadline check; Kiln's host clock stays authoritative.

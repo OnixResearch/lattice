@@ -191,7 +191,6 @@ impl NodeBoundaryHook {
         let elapsed = u64::try_from(self.started.elapsed().as_millis()).unwrap_or(u64::MAX);
         let consumed = Consumed {
             elapsed_ms: self.seed.consumed.elapsed_ms.saturating_add(elapsed),
-            ..self.seed.consumed
         };
         let uncertain = state.in_flight.union(&state.sensitive).copied().collect::<BTreeSet<_>>();
         let manifest = crate::checkpoint::build_manifest(&crate::checkpoint::ManifestInput {

@@ -29,7 +29,8 @@ pub struct CommandArgs {
 
 #[derive(clap::Subcommand, Debug)]
 enum Command {
-    /// Restore a committed checkpoint into this data directory's fresh store and run it on
+    /// Adopt a committed checkpoint into this data directory's fresh store; `workflow-exchange
+    /// serve --checkpoint-binding` on the same data directory then runs it
     Restore {
         /// Typed Nickel workflow exchange handler profile of the target
         #[arg(long)]
@@ -113,6 +114,13 @@ fn print<T: Serialize>(value: &T) -> Result<(), Refusal> {
     Ok(())
 }
 
+/// Read a `lattice.application-checkpoint-binding.v1` JSON file and validate it.
+pub fn read_binding(path: &Path) -> Result<CheckpointBinding, Refusal> {
+    let binding: CheckpointBinding = read_json(path)?;
+    super::validate_binding(&binding)?;
+    Ok(binding)
+}
+
 fn read_json<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, Refusal> {
     let bytes = std::fs::read(path).map_err(|error| {
         eprintln!("{}: {error}", path.display());
@@ -149,7 +157,6 @@ fn restore(
             .with_application_checkpoint(binding)
             .map_err(|_| Refusal::CrossedRoute)?;
     let receipt = handler.restore_checkpoint(&CheckpointRoot::new(source), &request, super::now_unix_ms())?;
-    handler.wait_for_workers();
     let record = store
         .load_workflow_exchange(&request.execution)
         .map_err(|_| Refusal::Store)?

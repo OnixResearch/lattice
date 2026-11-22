@@ -17,7 +17,10 @@ use lattice_workflow_contract::WorkflowAccepted;
 use serde::Deserialize;
 use serde::Serialize;
 
+mod adoption;
 mod refusal;
+pub use adoption::AdoptionOutcome;
+pub use adoption::AdoptionRecord;
 pub use refusal::Refusal;
 
 /// C8 manifest schema; also the manifest identity domain.
@@ -162,11 +165,11 @@ pub struct WorkspaceObject {
     pub bytes: u64,
 }
 
+/// Budget the manifest measures and carries. Model requests and cost are not measured at node
+/// boundaries; the host's per-binding budget ledger enforces them across restarts.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Consumed {
-    pub model_requests: u32,
-    pub cost_micros: u64,
     pub elapsed_ms: u64,
 }
 
@@ -236,6 +239,9 @@ pub struct RestartRequest {
     pub execution: Identity,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub binding: Option<Identity>,
+    /// Kiln's cancel decision; restart ORs it with the manifest's, so a cancel acknowledged after
+    /// the last publication still holds.
+    pub cancellation_requested: bool,
 }
 
 /// Binds one exchange route to an opaque C1 profile identity and its declared checkpoint.
@@ -256,33 +262,6 @@ pub struct CheckpointBinding {
     pub environment: Option<String>,
     pub deadline_unix_ms: u64,
     pub non_claims: Vec<String>,
-}
-
-/// Target-store record of one adopted checkpoint.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct AdoptionRecord {
-    pub schema: String,
-    pub execution: Identity,
-    pub receipt: RestartReceipt,
-    pub producing_incarnation: u32,
-    pub consumed: Consumed,
-    pub deadline_unix_ms: u64,
-    pub cancellation_requested: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub binding: Option<Identity>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub environment: Option<String>,
-}
-
-/// Result of one atomic adoption attempt in the target store.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum AdoptionOutcome {
-    Adopted {
-        record: Box<crate::workflow_exchange::ExecutionRecord>,
-        adoption: Box<AdoptionRecord>,
-    },
-    Existing(AdoptionRecord),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
