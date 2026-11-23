@@ -1304,6 +1304,47 @@ fn a_failed_workspace_write_leaves_no_restored_file() {
     assert_eq!(std::fs::read_to_string(workspace.join("z/b.txt")).expect("z/b.txt"), "second");
 }
 
+// r[verify lattice.application_checkpoint.restore]
+// r[verify lattice.application_checkpoint.workspace]
+/// Temporary files have a fixed-length name: a workspace file named close to the 255-byte limit
+/// restores, a temporary file an interrupted write left in the source workspace is never
+/// captured, and one left in the target workspace is removed by the next restore.
+#[test]
+fn long_names_restore_and_leftover_temporary_files_are_dropped() {
+    let long = format!("{}.txt", "n".repeat(246));
+    let files: &[(&str, &str)] = &[
+        ("a.txt", "first"),
+        (long.as_str(), "long"),
+        (".lattice-write.0123456789abcdef.tmp", "partial"),
+    ];
+    let run = completed_source(CheckpointProfile::WorkflowNodeBoundaryV1, Some(files));
+    let source_root = CheckpointRoot::new(&run.source.checkpoint);
+    let (checkpoint, manifest) = latest(&source_root);
+    let paths = manifest.workspace_objects.iter().map(|object| object.path.as_str()).collect::<Vec<_>>();
+    assert_eq!(paths, ["a.txt", long.as_str()], "a leftover temporary file is never captured");
+    let request = restart_request(&checkpoint, &manifest, 1, ADMISSION);
+    let mut target_root = root(
+        &run.directory.path().join("target"),
+        &run.effects,
+        &run.socket,
+        CheckpointProfile::WorkflowNodeBoundaryV1,
+    );
+    let workspace = run.directory.path().join("target-workspace");
+    std::fs::create_dir_all(&workspace).expect("target workspace");
+    std::fs::write(workspace.join(".lattice-write.00000000000000ff.tmp"), "partial").expect("leftover");
+    target_root.binding.workspace = Some(workspace.clone());
+
+    let (ok, report) = cli_restore(&target_root, &source_root, &request);
+    assert!(ok, "a file named close to the file-name limit restores: {report}");
+    let mut left = std::fs::read_dir(&workspace)
+        .expect("workspace")
+        .map(|entry| entry.expect("entry").file_name().to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    left.sort();
+    assert_eq!(left, ["a.txt", long.as_str()], "the leftover temporary file is removed");
+    assert_eq!(std::fs::read_to_string(workspace.join(&long)).expect("long name"), "long");
+}
+
 // r[verify lattice.application_checkpoint.hook]
 /// Without a declared checkpoint the route publishes nothing and reports `Unavailable`.
 #[test]

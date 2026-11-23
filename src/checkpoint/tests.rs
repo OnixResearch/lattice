@@ -460,7 +460,14 @@ fn refuses_missing_workspace_object_and_unsafe_paths() {
     assert_eq!(refused(&fixture), Refusal::ObjectMissing);
     fixture.workspace_objects.insert(digest.clone(), content);
     assert!(matches!(fixture.admit(), Ok(Admission::Fresh(_))));
-    for path in ["../escape", "/absolute", "a/./b", "a//b", ""] {
+    for path in [
+        "../escape",
+        "/absolute",
+        "a/./b",
+        "a//b",
+        "",
+        "a/.lattice-write.0123456789abcdef.tmp",
+    ] {
         let mut unsafe_path = Fixture::new(&[NODE_A], &[]);
         unsafe_path.reseal(|manifest| {
             manifest.workspace_objects = vec![WorkspaceObject {

@@ -97,7 +97,10 @@ interfaces.
   workspace file is written through a synced temporary file renamed into
   place, and a failed workspace write, including a failed directory fsync
   after the rename, removes the files the restore already wrote, so a
-  failure leaves no partial file at a restored path. The
+  failure leaves no partial file at a restored path. Temporary files are
+  named `.lattice-write.<16 hex>.tmp` whatever the target name, so a file
+  named close to the 255-byte limit restores; snapshots skip that name and
+  restore removes leftovers of it from the directories it writes to. The
   `lattice.application-restart-receipt.v1` receipt distinguishes application
   restart, VM continuation and fresh retry; `application-checkpoint inspect`
   reads a checkpoint root. Without a binding the hook is absent and restore

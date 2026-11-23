@@ -130,15 +130,30 @@ pub fn validate_admission_reference(reference: &str) -> Result<(), Refusal> {
     }
 }
 
+pub(super) const TEMPORARY_PREFIX: &str = ".lattice-write.";
+pub(super) const TEMPORARY_SUFFIX: &str = ".tmp";
+const TEMPORARY_HEX_DIGITS: usize = 16;
+
+/// The reserved leaf name of a sibling staging file used by a durable write.
+pub(super) fn is_temporary_name(name: &str) -> bool {
+    name.strip_prefix(TEMPORARY_PREFIX)
+        .and_then(|rest| rest.strip_suffix(TEMPORARY_SUFFIX))
+        .is_some_and(|digits| {
+            digits.len() == TEMPORARY_HEX_DIGITS && digits.bytes().all(|byte| byte.is_ascii_hexdigit())
+        })
+}
+
 // r[impl lattice.application_checkpoint.workspace]
-/// A workspace path is relative, normalized and free of parent or current-directory parts.
+/// A normalized relative workspace path without dot parts or reserved staging names.
 #[must_use]
 pub fn is_workspace_path(path: &str) -> bool {
     !path.is_empty()
         && path.len() <= super::MAXIMUM_WORKSPACE_PATH_BYTES
         && !path.starts_with('/')
         && !path.contains('\0')
-        && path.split('/').all(|part| !part.is_empty() && part != "." && part != "..")
+        && path
+            .split('/')
+            .all(|part| !part.is_empty() && part != "." && part != ".." && !is_temporary_name(part))
 }
 
 pub fn validate_manifest(manifest: &Manifest) -> Result<(), Refusal> {

@@ -44,7 +44,11 @@ With a binding, the worker:
 
 Every file is written to a temporary name, fsynced, renamed, its directory fsynced, then read
 back and compared. Objects come first, then the manifest, then the commit marker. A manifest
-without a marker is not admissible (`not_committed`).
+without a marker is not admissible (`not_committed`). Temporary files, here and in a restored
+workspace, use the reserved `.lattice-write.<16 hex>.tmp` name pattern in the target's directory,
+whatever the target's name. Workspace paths cannot use those names. A snapshot skips regular
+staging files, and `restore` removes them from the directories it writes to. Do not restore into
+a workspace another process is writing.
 
 Identities use the exchange framing: BLAKE3 over
 `u64be(len(domain)) ‖ domain ‖ u64be(len(json)) ‖ json`, rendered `b3:<64 hex>`, with the

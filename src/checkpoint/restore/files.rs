@@ -42,7 +42,8 @@ pub(super) fn carry_objects(
 
 /// Verify every workspace object against `workspace` first, then write the missing ones.
 ///
-/// Existing different content is refused before anything is written. Each file is written
+/// Existing different content is refused before anything is written. Temporary files an
+/// interrupted write left in the directories written to are removed first. Each file is written
 /// through a fsynced temporary file renamed into place, so no final path ever holds part of an
 /// object; when a write fails, the files this call already wrote are removed. Returns the files
 /// written.
@@ -64,9 +65,15 @@ pub(super) fn materialize_workspace(
             Err(_) => missing.push((target, bytes)),
         }
     }
+    remove_leftover_temporaries(&missing);
     let mut created = Vec::with_capacity(missing.len());
     for (target, bytes) in missing {
-        if let Err(refusal) = write_restored(target, &bytes, &mut created) {
+        // Recorded once placed and before its directory is synced, so a failed fsync removes it.
+        let placed = place_restored(&target, &bytes);
+        if placed.is_ok() {
+            created.push(target);
+        }
+        if let Err(refusal) = placed.and_then(|()| sync_last(&created)) {
             remove_created(&created);
             return Err(refusal);
         }
@@ -74,13 +81,25 @@ pub(super) fn materialize_workspace(
     Ok(created)
 }
 
-/// Place `target`, record it in `created` once it holds its complete content, then sync its
-/// directory, so a failed directory fsync still leaves the file to be removed.
-fn write_restored(target: PathBuf, bytes: &[u8], created: &mut Vec<PathBuf>) -> Result<(), Refusal> {
+fn remove_leftover_temporaries(missing: &[(PathBuf, Vec<u8>)]) {
+    let directories = missing
+        .iter()
+        .filter_map(|(target, _bytes)| target.parent())
+        .collect::<std::collections::BTreeSet<_>>();
+    for directory in directories {
+        crate::checkpoint::publish::remove_temporaries(directory);
+    }
+}
+
+/// Put `target` in place through a fsynced temporary file renamed into place.
+fn place_restored(target: &Path, bytes: &[u8]) -> Result<(), Refusal> {
     let directory = target.parent().ok_or(Refusal::WorkspacePath)?;
     let name = target.file_name().and_then(std::ffi::OsStr::to_str).ok_or(Refusal::WorkspacePath)?;
-    crate::checkpoint::publish::place_atomic(directory, name, bytes)?;
-    created.push(target);
+    crate::checkpoint::publish::place_atomic(directory, name, bytes)
+}
+
+/// Sync the directory of the file placed last, making its rename durable.
+fn sync_last(created: &[PathBuf]) -> Result<(), Refusal> {
     let directory = created.last().and_then(|placed| placed.parent()).ok_or(Refusal::WorkspacePath)?;
     crate::checkpoint::publish::sync_directory(directory)
 }

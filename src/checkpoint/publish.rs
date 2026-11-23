@@ -33,10 +33,13 @@ use super::WorkspaceObject;
 mod durable;
 mod hook;
 pub(super) use durable::place_atomic;
+pub(super) use durable::remove_temporaries;
 pub(super) use durable::sync_directory;
 use durable::write_atomic;
 pub use hook::HookSeed;
 pub use hook::NodeBoundaryHook;
+
+use super::core::is_temporary_name;
 
 const OBJECTS: &str = "objects";
 const WORKSPACE: &str = "workspace";
@@ -251,7 +254,8 @@ pub fn local_runtime(environment: Option<String>) -> Result<LocalRuntime, Refusa
     })
 }
 
-/// Snapshot regular files under `workspace` into the root. Symlinks and special files are refused.
+/// Snapshot regular files under `workspace` into the root. Symlinks and special files are refused;
+/// temporary files of an interrupted atomic write are skipped.
 pub fn snapshot_workspace(root: &CheckpointRoot, workspace: &Path) -> Result<Vec<WorkspaceObject>, Refusal> {
     let mut objects = Vec::new();
     let mut pending = vec![PathBuf::new()];
@@ -267,6 +271,9 @@ pub fn snapshot_workspace(root: &CheckpointRoot, workspace: &Path) -> Result<Vec
             }
             if !kind.is_file() {
                 return Err(Refusal::WorkspacePath);
+            }
+            if entry.file_name().to_str().is_some_and(is_temporary_name) {
+                continue;
             }
             let name = path.to_str().ok_or(Refusal::WorkspacePath)?.to_string();
             if !super::core::is_workspace_path(&name) || objects.len() >= super::MAXIMUM_WORKSPACE_OBJECTS {

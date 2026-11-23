@@ -72,7 +72,7 @@ r[lattice.application_checkpoint.portable.scenario.cross_isa]
 
 ### Requirement: Workspace objects
 
-r[lattice.application_checkpoint.workspace] Workspace objects MUST use relative normalized paths without parent or current-directory parts and MUST be verified by size and BLAKE3 before materialization.
+r[lattice.application_checkpoint.workspace] Workspace objects MUST use relative normalized paths without parent or current-directory parts or reserved `.lattice-write.<16 hex>.tmp` components and MUST be verified by size and BLAKE3 before materialization. Snapshots MUST NOT retain regular files under a reserved staging name. Restore writes MUST exclusively create a fixed-length sibling staging file so the target basename does not increase its length.
 
 #### Scenario: Unsafe path
 r[lattice.application_checkpoint.workspace.scenario.unsafe]
