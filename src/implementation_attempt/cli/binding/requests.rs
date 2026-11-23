@@ -93,9 +93,15 @@ impl crate::execution_binding::serving::Sink for RequestFiles {
 }
 
 impl crate::candidate_worker::broker::RequestEvidence for RequestFiles {
-    fn write_intent(&mut self, intent: &BrokeredIntent) -> Result<(), String> {
+    /// Create-only: an existing intent, identical or not, means the index was
+    /// already admitted once, so it is refused before any upstream contact.
+    fn create_intent(&mut self, intent: &BrokeredIntent) -> Result<(), String> {
         let bytes = serde_json::to_vec(intent).map_err(|error| error.to_string())?;
-        self.write(&intent.request_id, true, &bytes)
+        let name = file_name(&intent.request_id, true)?;
+        if super::super::artifacts::create_new(&self.directory.join(name), &bytes)? {
+            return Ok(());
+        }
+        Err("model request index was already admitted".to_owned())
     }
 
     fn write_record(&mut self, record: &BrokeredRecord) -> Result<(), String> {
@@ -111,10 +117,10 @@ pub(in super::super) fn recorded<'a>(
     files: &'a mut RequestFiles,
 ) -> crate::candidate_worker::broker::RecordedRoute<'a> {
     debug_assert!(admitted.serving.is_none(), "a served binding records through the serving gate");
-    crate::candidate_worker::broker::RecordedRoute {
-        context: lattice_core::execution_binding::serving::brokered::Context::new(admitted, super::PRIMARY_ROUTE),
-        evidence: files,
-    }
+    crate::candidate_worker::broker::RecordedRoute::new(
+        lattice_core::execution_binding::serving::brokered::Context::new(admitted, super::PRIMARY_ROUTE),
+        files,
+    )
 }
 
 fn file_name(request_id: &str, is_intent: bool) -> Result<String, String> {

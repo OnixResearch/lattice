@@ -23,4 +23,5 @@ r[lattice.serving_binding.brokered_evidence.scenario.charged]
 r[lattice.serving_binding.brokered_evidence.scenario.conflict]
 - GIVEN a second write of a brokered intent or record with different content, a record without its intent, a record whose request id, index, binding, attempt, fence or route crosses its intent or binding, brokered evidence under a served or no-model binding, or an unexpected file
 - WHEN the evidence is written or summarized
-- THEN the write MUST be refused and the summary MUST be refused, so no attempt usage is persisted and no draw is charged from it; identical duplicates MUST count once
+- THEN the write MUST be refused and the summary MUST be refused, so no attempt usage is persisted and no draw is charged from it; identical duplicate files read back on replay MUST count once
+- AND a broker admission for a request index at or below one its route already admitted, or whose brokered intent already exists, identical bytes included, MUST be refused before any ticket or upstream contact, so each index reaches upstream at most once and distinct indices count separately

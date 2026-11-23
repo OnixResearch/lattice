@@ -193,7 +193,10 @@ record; a record that cannot be retained fails the broker. Both bind the
 binding identity, attempt, fence and route name, and the broker's request
 index (`request_index`). The request id is the domain-separated BLAKE3 of the
 binding identity and that index, so it is unique per attempt across repair
-steps.
+steps. The intent is created, never overwritten: an index at or below one the
+route already admitted, or whose intent already exists, even with identical
+bytes, is refused before any upstream contact. So each index reaches
+upstream at most once, and identical files read back on replay count once.
 
 A brokered record is `completed` (with the response's provider-reported
 `prompt_tokens` and `completion_tokens` when both are present, and the

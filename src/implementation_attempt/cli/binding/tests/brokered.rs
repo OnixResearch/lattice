@@ -214,8 +214,18 @@ fn brokered_request_files_are_write_once_and_conflicts_fail_closed() {
         )
     };
     let mut files = super::super::requests::RequestFiles::new(&attempt.directory).expect("request files");
-    files.write_intent(&intent).expect("identical intent replay");
+    assert!(files.create_intent(&intent).is_err(), "an identical intent never admits a second contact");
     assert!(files.write_record(&record("uncertain-timed-out")).is_err(), "a different record is refused");
+    // A restarted broker over the retained files refuses the used index with
+    // nothing written, and still admits a fresh one.
+    {
+        let mut gate = super::super::requests::recorded(&attempt.admitted, &mut files);
+        assert!(gate.admit(OK, 0).is_none(), "a reused index is refused before upstream");
+        let ticket = gate.admit(OK, 1).expect("a fresh index");
+        gate.settle(ticket, responded()).expect("record retained");
+    }
+    let replayed = super::super::requests::coverage(&attempt.admitted, &attempt.directory).expect("re-read");
+    assert_eq!(replayed.observed_requests(None), Some(2), "each index counts once, distinct indices separately");
     // A record whose intent was never written is refused, and with it the
     // attempt usage: nothing is persisted or drawn from conflicting evidence.
     let orphan = lattice_core::execution_binding::serving::brokered::Record::settled(

@@ -198,12 +198,15 @@ const fn is_admitted(checks: crate::execution_binding::serving::gate::Checks) ->
 
 /// Durable, write-once brokered request evidence of one attempt.
 pub trait RequestEvidence: Send {
-    /// Persist and sync the dispatch intent before upstream contact.
-    fn write_intent(
+    /// Create and sync the dispatch intent before upstream contact. An intent
+    /// that already exists for its request, even with identical bytes, MUST
+    /// be refused: each request index admits at most one upstream contact.
+    fn create_intent(
         &mut self,
         intent: &lattice_core::execution_binding::serving::brokered::Intent,
     ) -> Result<(), String>;
-    /// Persist the terminal record after the upstream call ended.
+    /// Persist the terminal record after the upstream call ended; an
+    /// identical replay is accepted, a different one refused.
     fn write_record(
         &mut self,
         record: &lattice_core::execution_binding::serving::brokered::Record,
@@ -212,11 +215,28 @@ pub trait RequestEvidence: Send {
 
 /// A route without a serving declaration whose every relayed request leaves a
 /// synced intent before upstream contact and a terminal record after it. The
-/// broker's own checks decide; no serving port is called.
+/// broker's own checks decide; no serving port is called. Each request index
+/// is admitted at most once and only above every index admitted before.
 // r[impl lattice.serving_binding.brokered_evidence]
 pub struct RecordedRoute<'a> {
-    pub context: lattice_core::execution_binding::serving::brokered::Context,
-    pub evidence: &'a mut dyn RequestEvidence,
+    context: lattice_core::execution_binding::serving::brokered::Context,
+    evidence: &'a mut dyn RequestEvidence,
+    /// The highest request index this route admitted.
+    highest: Option<u32>,
+}
+
+impl<'a> RecordedRoute<'a> {
+    #[must_use]
+    pub fn new(
+        context: lattice_core::execution_binding::serving::brokered::Context,
+        evidence: &'a mut dyn RequestEvidence,
+    ) -> Self {
+        Self {
+            context,
+            evidence,
+            highest: None,
+        }
+    }
 }
 
 /// A route served through the serving-owner gate of one attempt.

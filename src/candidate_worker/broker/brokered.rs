@@ -10,18 +10,23 @@ type OutcomeClass = lattice_core::execution_binding::serving::record::OutcomeCla
 type Usage = lattice_core::execution_binding::serving::record::Usage;
 
 impl super::ModelRequestGate for super::RecordedRoute<'_> {
-    /// Only a request whose intent is durably retained reaches upstream; an
-    /// intent that cannot be written refuses it before any effect.
+    /// Only a request whose fresh intent is durably created reaches upstream.
+    /// An index at or below one this route admitted, an intent that already
+    /// exists (identical bytes included) or one that cannot be written
+    /// refuses the request before any effect, so no index reaches upstream
+    /// twice and identical records never hide a second contact.
     fn admit(
         &mut self,
         checks: crate::execution_binding::serving::gate::Checks,
         request_index: u32,
     ) -> Option<super::GateTicket> {
-        if !super::is_admitted(checks) {
+        let is_fresh = self.highest.is_none_or(|highest| request_index > highest);
+        if !super::is_admitted(checks) || !is_fresh {
             return None;
         }
         let intent = self.context.intent(u64::from(request_index));
-        self.evidence.write_intent(&intent).ok()?;
+        self.evidence.create_intent(&intent).ok()?;
+        self.highest = Some(request_index);
         debug_assert_eq!(intent.request_index, u64::from(request_index));
         Some(super::GateTicket(super::Permit::Recorded(Box::new(intent))))
     }

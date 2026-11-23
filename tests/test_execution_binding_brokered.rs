@@ -45,9 +45,11 @@ struct Evidence {
 }
 
 impl RequestEvidence for Evidence {
-    fn write_intent(&mut self, intent: &brokered::Intent) -> Result<(), String> {
-        if self.refuse_intents {
-            return Err("intent not retained".into());
+    /// Create-only, as `RequestFiles`: an existing intent is refused.
+    fn create_intent(&mut self, intent: &brokered::Intent) -> Result<(), String> {
+        let is_existing = self.intents.iter().any(|retained| retained.request_id == intent.request_id);
+        if self.refuse_intents || is_existing {
+            return Err("intent not created".into());
         }
         self.intents.push(intent.clone());
         Ok(())
@@ -130,10 +132,7 @@ fn summary(coverage: ModelRequestCoverage) -> brokered::Summary {
 fn a_complete_brokered_run_counts_every_relayed_request_without_attribution() {
     let admitted = primary();
     let mut evidence = Evidence::default();
-    let mut gate = RecordedRoute {
-        context: brokered::Context::new(&admitted, "primary"),
-        evidence: &mut evidence,
-    };
+    let mut gate = RecordedRoute::new(brokered::Context::new(&admitted, "primary"), &mut evidence);
     let ticket = gate.admit(OK, 0).expect("admitted");
     let refused = Checks {
         is_within_budget: false,
@@ -181,10 +180,7 @@ fn a_complete_brokered_run_counts_every_relayed_request_without_attribution() {
 fn an_unconfirmed_or_uncertain_request_is_never_an_exact_count() {
     let admitted = primary();
     let mut evidence = Evidence::default();
-    let mut gate = RecordedRoute {
-        context: brokered::Context::new(&admitted, "primary"),
-        evidence: &mut evidence,
-    };
+    let mut gate = RecordedRoute::new(brokered::Context::new(&admitted, "primary"), &mut evidence);
     relay(&mut gate, 0, Some(responded(Some((1, 1)))));
     // The controller is lost after the intent: no terminal record.
     relay(&mut gate, 1, None);
@@ -200,10 +196,7 @@ fn an_unconfirmed_or_uncertain_request_is_never_an_exact_count() {
 
     for upstream in [Upstream::TimedOut, Upstream::TransportFailed, Upstream::Cancelled] {
         let mut evidence = Evidence::default();
-        let mut gate = RecordedRoute {
-            context: brokered::Context::new(&admitted, "primary"),
-            evidence: &mut evidence,
-        };
+        let mut gate = RecordedRoute::new(brokered::Context::new(&admitted, "primary"), &mut evidence);
         relay(&mut gate, 0, Some(upstream));
         drop(gate);
         assert!(evidence.records[0].outcome.label.starts_with("uncertain-"));
@@ -221,10 +214,7 @@ fn an_unconfirmed_or_uncertain_request_is_never_an_exact_count() {
 fn brokered_evidence_conflicts_and_unretained_writes_fail_closed() {
     let admitted = primary();
     let mut evidence = Evidence::default();
-    let mut gate = RecordedRoute {
-        context: brokered::Context::new(&admitted, "primary"),
-        evidence: &mut evidence,
-    };
+    let mut gate = RecordedRoute::new(brokered::Context::new(&admitted, "primary"), &mut evidence);
     relay(&mut gate, 0, Some(responded(Some((1, 1)))));
     drop(gate);
     let (intents, records) = (evidence.intents, evidence.records);
@@ -268,21 +258,45 @@ fn brokered_evidence_conflicts_and_unretained_writes_fail_closed() {
         refuse_intents: true,
         ..Evidence::default()
     };
-    let mut gate = RecordedRoute {
-        context: brokered::Context::new(&admitted, "primary"),
-        evidence: &mut refusing,
-    };
+    let mut gate = RecordedRoute::new(brokered::Context::new(&admitted, "primary"), &mut refusing);
     assert!(gate.admit(OK, 0).is_none(), "no durable intent, no upstream contact");
     let mut unrecorded = Evidence {
         refuse_records: true,
         ..Evidence::default()
     };
-    let mut gate = RecordedRoute {
-        context: brokered::Context::new(&admitted, "primary"),
-        evidence: &mut unrecorded,
-    };
+    let mut gate = RecordedRoute::new(brokered::Context::new(&admitted, "primary"), &mut unrecorded);
     let ticket = gate.admit(OK, 0).expect("admitted");
     assert!(gate.settle(ticket, responded(None)).is_err(), "an unretained record fails the broker");
     drop(gate);
     assert_eq!((unrecorded.intents.len(), unrecorded.records.len()), (1, 0));
+}
+
+/// A request index reaches upstream at most once: the same route refuses an
+/// index at or below one it admitted, and a restarted route over retained
+/// evidence refuses an index whose intent exists, identical bytes included,
+/// before any ticket. Replayed files count each index once; distinct indices
+/// count separately.
+#[test]
+fn a_reused_request_index_is_refused_before_any_upstream_contact() {
+    let admitted = primary();
+    let mut evidence = Evidence::default();
+    let mut gate = RecordedRoute::new(brokered::Context::new(&admitted, "primary"), &mut evidence);
+    relay(&mut gate, 0, Some(responded(Some((1, 1)))));
+    relay(&mut gate, 2, Some(responded(Some((1, 1)))));
+    assert!(gate.admit(OK, 2).is_none(), "the same index is refused");
+    assert!(gate.admit(OK, 1).is_none(), "an index below one admitted is refused");
+    drop(gate);
+    assert_eq!(evidence.intents.len(), 2, "a refusal writes no intent, so nothing is sent");
+    // A restarted broker over the same evidence.
+    let mut restarted = RecordedRoute::new(brokered::Context::new(&admitted, "primary"), &mut evidence);
+    assert!(restarted.admit(OK, 0).is_none(), "an existing intent refuses its index");
+    relay(&mut restarted, 3, Some(responded(None)));
+    drop(restarted);
+    // A crash replay re-reads every file, duplicates included.
+    let intents = [evidence.intents.clone(), evidence.intents.clone()].concat();
+    let records = [evidence.records.clone(), evidence.records.clone()].concat();
+    let coverage = brokered::summarize(&admitted, &intents, &records).expect("replayed summary");
+    assert_eq!(coverage.observed_requests(None), Some(3), "each index counts once");
+    let indices: Vec<u64> = summary(coverage).requests.iter().map(|entry| entry.request_index).collect();
+    assert_eq!(indices, [0, 2, 3], "distinct indices count separately");
 }
