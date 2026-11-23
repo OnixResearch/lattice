@@ -51,9 +51,14 @@ pub struct RunResult {
     pub compatibility: Option<super::Compatibility>,
 }
 
-/// Run only the reviewed headless argv, without resume, interactive /loop,
-/// ambient extension discovery, or publisher credentials. The workspace provider
-/// remains mandatory. A byte pin must come from the operator's reviewed build.
+/// Runtime ports for launching one admitted OMP worker attempt.
+pub struct LaunchOptions<'a, 'b> {
+    pub config: &'a crate::process::core::RuntimeConfig,
+    pub cancellation: &'a std::sync::atomic::AtomicBool,
+    pub services: super::broker::Services<'b>,
+    pub launcher: &'a dyn super::sandbox::launcher::SandboxLauncher,
+}
+
 // r[impl lattice.candidate_worker.omp_jsonl]
 pub fn run(
     request: &super::Request,
@@ -62,31 +67,42 @@ pub fn run(
     cancellation: &std::sync::atomic::AtomicBool,
     services: super::broker::Services<'_>,
 ) -> Result<RunResult, super::Error> {
+    let options = LaunchOptions {
+        config,
+        cancellation,
+        services,
+        launcher: &super::sandbox::launcher::Direct,
+    };
+    run_with_launcher(request, profile, options)
+}
+
+/// Run the reviewed OMP profile through an explicit `SandboxLauncher`.
+pub fn run_with_launcher(
+    request: &super::Request,
+    profile: &Profile,
+    options: LaunchOptions<'_, '_>,
+) -> Result<RunResult, super::Error> {
     if let Err(reason) = profile::admit(request, profile) {
         return Ok(blocked(profile, reason));
     }
-    debug_assert!(!request.boundary.network);
-    debug_assert!(request.require_isolation);
+    debug_assert!(!request.boundary.network && request.require_isolation);
     let mut selected = request.clone();
     selected.args = profile::arguments(request, profile);
     let argv_blake3 = argument_identity(&selected.args)?;
-    let result = super::broker::with_route(selected, &profile.model_broker, services, cancellation, |selected| {
-        let compatibility = match compatible(&selected, profile) {
-            Ok(value) => Some(value),
-            Err(reason) => return Ok(blocked(profile, reason)),
-        };
-        let outcome = dispatch(&selected, &profile.base_identity, config, cancellation)?;
-        Ok(finish_profile(&selected, profile, outcome, argv_blake3, compatibility))
-    });
+    let (config, cancellation, launcher) = (options.config, options.cancellation, options.launcher);
+    let result =
+        super::broker::with_route(selected, &profile.model_broker, options.services, cancellation, |selected| {
+            let compatibility = match compatible(&selected, profile) {
+                Ok(value) => Some(value),
+                Err(reason) => return Ok(blocked(profile, reason)),
+            };
+            let outcome = dispatch(&selected, &profile.base_identity, config, cancellation, launcher)?;
+            Ok(finish_profile(&selected, profile, outcome, argv_blake3, compatibility))
+        });
     match result {
         Err(reason) => Ok(blocked(profile, &reason)),
-        Ok((result, is_stopped_cleanly)) => result.map(|result| {
-            if is_stopped_cleanly {
-                result
-            } else {
-                broker_failure(result)
-            }
-        }),
+        Ok((result, true)) => result,
+        Ok((result, false)) => result.map(broker_failure),
     }
 }
 
@@ -199,7 +215,8 @@ pub(crate) fn run_scripted(
     selected.sandbox_program = None;
     let argv_blake3 = argument_identity(&selected.args)?;
     let config = crate::process::core::RuntimeConfig::default();
-    let outcome = dispatch(&selected, &profile.base_identity, &config, cancellation)?;
+    let outcome =
+        dispatch(&selected, &profile.base_identity, &config, cancellation, &super::sandbox::launcher::Direct)?;
     Ok(finish_profile(&selected, profile, outcome, argv_blake3, None))
 }
 
@@ -232,13 +249,10 @@ fn dispatch(
     base_identity: &str,
     config: &crate::process::core::RuntimeConfig,
     cancellation: &std::sync::atomic::AtomicBool,
+    launcher: &dyn super::sandbox::launcher::SandboxLauncher,
 ) -> Result<super::Outcome, super::Error> {
     super::execution::run(request, config, cancellation, Some(base_identity), |process, config, cancellation| {
-        crate::process::shell::run_bounded_clear_environment_observed_with_cancellation(
-            process,
-            config,
-            Some(cancellation),
-        )
+        launcher.execute(process, config, cancellation)
     })
 }
 

@@ -9,6 +9,18 @@ interfaces.
 
 ### Added
 
+- Optional transient systemd service launcher for the candidate worker sandbox
+  (Lattice #30): `candidate_worker::sandbox::launcher::{SandboxLauncher, Direct,
+  Systemd}` and `candidate_worker::sandbox::systemd::{Bus, Config, plan_launch}`,
+  wired through `candidate_worker::{run_with_launcher,
+  run_and_publish_with_launcher}` and `candidate_worker::omp::run_with_launcher`.
+  Direct-child `bwrap` (`Direct`) remains the default for hosts without systemd.
+  `Systemd` launches byte-identical `bwrap` argv inside a transient service unit
+  (`ProtectKernelTunables=no`, `RestrictAddressFamilies=AF_UNIX AF_NETLINK`,
+  `KillMode=control-group`, `KillSignal=SIGKILL`) with a scoped
+  cancellation/deadline watchdog and synchronous `systemctl stop` teardown so
+  hardened dispatchers retain `ProtectKernelTunables=yes` and `AF_UNIX`-only
+  address families.
 - Guest workflow exchange over vsock (Lattice #11, Lattice side). The exchange
   transport serves through a `Listener` seam: the Unix path keeps its wire
   behaviour, and a new guest listener binds `VMADDR_CID_ANY:port` under

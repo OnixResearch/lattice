@@ -26,7 +26,7 @@ mod compatibility;
 mod completion;
 mod execution;
 mod result;
-mod sandbox;
+pub mod sandbox;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ProcessFailure {
@@ -92,18 +92,27 @@ pub enum Outcome {
     },
 }
 
-/// Run one worker and derive a candidate receipt from the actual workspace.
+/// Run one worker with the default direct-child launcher and derive a candidate
+/// receipt from the actual workspace.
 pub fn run(request: &Request, config: &RuntimeConfig, cancellation: &AtomicBool) -> Result<Outcome, Error> {
+    run_with_launcher(request, config, cancellation, &sandbox::launcher::Direct)
+}
+
+/// Run one worker through an explicit [`sandbox::launcher::SandboxLauncher`]
+/// and derive a candidate receipt from the actual workspace.
+pub fn run_with_launcher(
+    request: &Request,
+    config: &RuntimeConfig,
+    cancellation: &AtomicBool,
+    launcher: &dyn sandbox::launcher::SandboxLauncher,
+) -> Result<Outcome, Error> {
     execution::run(request, config, cancellation, None, |process, config, cancellation| {
-        crate::process::shell::run_bounded_clear_environment_observed_with_cancellation(
-            process,
-            config,
-            Some(cancellation),
-        )
+        launcher.execute(process, config, cancellation)
     })
 }
 
-/// Run one worker and durably publish a produced receipt.
+/// Run one worker with the default direct-child launcher and durably publish a
+/// produced receipt.
 pub fn run_and_publish(
     request: &Request,
     config: &RuntimeConfig,
@@ -112,6 +121,20 @@ pub fn run_and_publish(
 ) -> Result<Outcome, Error> {
     let compatibility = compatibility::observe(request);
     let outcome = run(request, config, cancellation)?;
+    Ok(publish_outcome(request, store, outcome, compatibility))
+}
+
+/// Run one worker through an explicit [`sandbox::launcher::SandboxLauncher`]
+/// and durably publish a produced receipt.
+pub fn run_and_publish_with_launcher(
+    request: &Request,
+    config: &RuntimeConfig,
+    cancellation: &AtomicBool,
+    store: &Store,
+    launcher: &dyn sandbox::launcher::SandboxLauncher,
+) -> Result<Outcome, Error> {
+    let compatibility = compatibility::observe(request);
+    let outcome = run_with_launcher(request, config, cancellation, launcher)?;
     Ok(publish_outcome(request, store, outcome, compatibility))
 }
 

@@ -10,7 +10,7 @@
     "profile_hash": "b3:0a3ed6fc1277e5e2379e2c5caa1d455e0e81e9168cd24458d4c29f8b554ac377",
     "config_hash": "b3:299713f9a4561a4d2235616467edb54ef170a601d7687ee8d89da53e1b30fc06"
   },
-  "baseline_hash": "b3:90076db7bf614b3d72c9fccbaff41993bc3b1b8157e7aea024af984192b90868",
+  "baseline_hash": "b3:77890602a69e2bea6e95fecda46d6beff559c06ebb6759783047e2aad11e0e03",
   "findings": [
     {
       "stable_id": "b3:00365717b09c09fa",
@@ -8164,19 +8164,6 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:97adf5f28c35b061",
-      "semantic_id": "b3:97adf5f28c35b061",
-      "identity_status": "computed",
-      "lint": "underscore_in_module_filename",
-      "group": "tigerstyle::naming",
-      "severity": "warning",
-      "file": "src/candidate_worker.rs",
-      "line": 1,
-      "column": 1,
-      "message": "module filename `candidate_worker.rs` contains an underscore; prefer `candidate/worker.rs`",
-      "crate_name": "lattice"
-    },
-    {
       "stable_id": "b3:97b2106591d5f40e",
       "semantic_id": "b3:97b2106591d5f40e",
       "identity_status": "computed",
@@ -12295,6 +12282,19 @@
       "line": 76,
       "column": 1,
       "message": "item name `ReplayArtifactView` repeats `replay` from ancestor path segment `replay`",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:e8b1d54fd6efb2e3",
+      "semantic_id": "b3:e8b1d54fd6efb2e3",
+      "identity_status": "computed",
+      "lint": "underscore_in_module_filename",
+      "group": "tigerstyle::naming",
+      "severity": "warning",
+      "file": "src/candidate_worker.rs",
+      "line": 1,
+      "column": 1,
+      "message": "module filename `candidate_worker.rs` contains an underscore; prefer `candidate/worker.rs`",
       "crate_name": "lattice"
     },
     {

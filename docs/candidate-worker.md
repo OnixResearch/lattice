@@ -32,6 +32,34 @@ this implementation does not grant shared-ref mutation authority.
 clear environment alone do not enforce filesystem or publication restrictions.
 Do not use that facility as an isolated coding-attempt qualification.
 
+### Optional transient systemd unit launcher
+
+By default, `candidate_worker::run` and `candidate_worker::omp::run` spawn
+`bwrap` as a direct child through `candidate_worker::sandbox::launcher::Direct`,
+which works on hosts without systemd.
+
+When a dispatcher runs in a hardened systemd unit (`ProtectKernelTunables=yes`,
+`RestrictAddressFamilies=AF_UNIX`), direct-child `bwrap` fails because
+`--unshare-net` needs `AF_NETLINK` to bring up private loopback and
+`--proc /proc` needs writable procfs mount setup. Callers can instead pass
+`candidate_worker::sandbox::launcher::Systemd` to
+`candidate_worker::run_with_launcher`,
+`candidate_worker::run_and_publish_with_launcher`, or
+`candidate_worker::omp::run_with_launcher`.
+
+`Systemd` launches the byte-identical `bwrap` command inside a transient systemd
+service unit (`--wait --pipe --collect --quiet --service-type=exec`) carrying
+only the properties `bwrap` needs (`ProtectKernelTunables=no`,
+`RestrictAddressFamilies=AF_UNIX AF_NETLINK`, `KillMode=control-group`,
+`KillSignal=SIGKILL`, `TimeoutStopSec`, and a crash-safety `RuntimeMaxSec`
+backstop). On cancellation, deadline, or output-limit stops, a scoped watchdog
+reconciles teardown synchronously with `systemctl stop <unit>` so inherited
+`--pipe` descriptors and sandbox descendants cannot outlive the stop; if
+teardown cannot be confirmed (`exit 0` or unit-not-loaded `exit 5`), the
+outcome fails closed as `Outcome::Interrupted` with unknown termination.
+Worker `bwrap` argv and `Compatibility::workspace_provider_identity` remain
+identical to direct-child launch.
+
 ## Explicit pinned OMP JSONL profile
 
 The selected reference is

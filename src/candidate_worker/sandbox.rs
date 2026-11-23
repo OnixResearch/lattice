@@ -1,3 +1,9 @@
+pub mod launcher;
+pub mod systemd;
+#[cfg(test)]
+mod tests;
+mod watchdog;
+
 const SYSTEM_BASES: [&str; 5] = ["/nix/store", "/usr", "/bin", "/lib", "/lib64"];
 const ENVIRONMENT: [&str; 16] = [
     "--unshare-user",
@@ -32,7 +38,7 @@ const PRIVATE_ROOT: [&str; 12] = [
     "/workspace",
 ];
 
-pub(super) fn command(request: &super::Request) -> Result<(String, Vec<String>), String> {
+pub fn command(request: &super::Request) -> Result<(String, Vec<String>), String> {
     let sandbox = provider(request)?;
     let root =
         std::fs::canonicalize(&request.boundary.root).map_err(|_| "workspace root is unavailable".to_string())?;
