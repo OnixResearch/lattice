@@ -322,7 +322,7 @@ impl Exchange {
             .expect("workflow exchange starts");
         wait_for("the exchange to listen", || {
             assert!(child.try_wait().expect("exchange status").is_none(), "the exchange exited early");
-            socket.exists()
+            socket.exists() && std::os::unix::net::UnixStream::connect(&socket).is_ok()
         });
         Self {
             child,

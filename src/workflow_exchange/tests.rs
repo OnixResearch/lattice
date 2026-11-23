@@ -767,13 +767,6 @@ fn unix_service_composes_the_application_handler_and_bounded_transport() {
     let server =
         std::thread::spawn(move || super::serve(store, profile, crate::agent_node::RuntimeOptions::default(), None));
     let ready_deadline = std::time::Instant::now() + SOCKET_READY_TIMEOUT;
-    while !socket_path.exists() && !server.is_finished() && std::time::Instant::now() < ready_deadline {
-        std::thread::sleep(std::time::Duration::from_millis(SOCKET_READY_DELAY_MILLISECONDS));
-    }
-    if !socket_path.exists() {
-        let finished = server.is_finished().then(|| server.join().map(|served| served.err()));
-        panic!("workflow exchange socket was not ready; finished server outcome: {finished:?}");
-    }
     let dispatch = new_request(ExchangeCommand::Dispatch {
         profile: contract,
         request,
@@ -783,7 +776,21 @@ fn unix_service_composes_the_application_handler_and_bounded_transport() {
         socket_path: &socket_path,
         profile: &client_profile,
     };
-    let response = UnixClient::new(endpoint).exchange(&dispatch).expect("Unix application exchange succeeds");
+    let client = UnixClient::new(endpoint);
+    let response = loop {
+        match client.exchange(&dispatch) {
+            Ok(response) => break response,
+            Err(ClientFailure::ConnectFailed)
+                if !server.is_finished() && std::time::Instant::now() < ready_deadline =>
+            {
+                std::thread::sleep(std::time::Duration::from_millis(SOCKET_READY_DELAY_MILLISECONDS));
+            }
+            Err(error) => {
+                let finished = server.is_finished().then(|| server.join().map(|served| served.err()));
+                panic!("Unix application exchange failed ({error:?}); finished server outcome: {finished:?}");
+            }
+        }
+    };
     assert!(matches!(
         response.result,
         ExchangeResult::Success(success) if matches!(success.as_ref(), ExchangeSuccess::Accepted(_))
