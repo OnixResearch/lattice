@@ -26,6 +26,10 @@
       # Keep Cairn's Artifact input at the revision Cairn locks, over anonymous
       # HTTPS, so the Lattice flake closure stays publicly acquirable.
       inputs.artifact.url = "git+https://github.com/OnixResearch/onix-artifact.git?rev=e41340bec587b6d049b5cc518ec7db925dde84be";
+      # r[impl lattice.repository_validation.radicle_bounded_exec_locks]
+      # Cairn takes Bounded Exec from GitHub. Lock the same reviewed revision
+      # from its admitted Radicle source instead, so no GitHub fallback is locked.
+      inputs.bounded-exec.url = "git+https://git.onix.computer/z2CpqLFpdP36fZXYUK5ZNWxMibpCo.git?rev=29dac88ecded94457572db3fdfaaaab95fa91525";
     };
     noble-lang = {
       # The exact Noble producer of the opt-in pure interaction-net profile
