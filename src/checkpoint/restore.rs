@@ -218,7 +218,7 @@ fn build_adoption(
         uncertain: &uncertain,
     })
     .map_err(|_| Refusal::CrossedAdapter)?;
-    Ok((record, super::core::adoption_record(admitted)))
+    Ok((record, super::core::adoption_record(admitted, target.binding.workspace.as_deref())))
 }
 
 /// Wall-clock milliseconds for the advisory deadline check; Kiln's host clock stays authoritative.

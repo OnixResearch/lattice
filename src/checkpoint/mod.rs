@@ -29,6 +29,7 @@ pub use core::identity_of_bytes;
 pub use core::is_workspace_path;
 pub use core::node_outputs_object;
 pub use core::restart_kind;
+pub use core::serves_adoption;
 pub use core::validate_admission_reference;
 pub use core::validate_binding;
 pub use core::validate_manifest;

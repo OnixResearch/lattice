@@ -21,6 +21,7 @@ mod adoption;
 mod refusal;
 pub use adoption::AdoptionOutcome;
 pub use adoption::AdoptionRecord;
+pub use adoption::RestoredWorkspace;
 pub use refusal::Refusal;
 
 /// C8 manifest schema; also the manifest identity domain.

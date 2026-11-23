@@ -8,6 +8,8 @@
 
 //! Target-store records of an adopted checkpoint.
 
+use std::path::PathBuf;
+
 use lattice_workflow_contract::Identity;
 use serde::Deserialize;
 use serde::Serialize;
@@ -31,9 +33,20 @@ pub struct AdoptionRecord {
     pub binding: Option<Identity>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub environment: Option<String>,
+    /// The workspace restore wrote into. Records written by `39936a19` lack it, and no serving
+    /// binding serves such a record.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace: Option<RestoredWorkspace>,
     /// Checkpoint-complete nodes, whose outcome objects the target checkpoint root holds; the
     /// serving exchange restores them when it starts the adopted execution.
     pub completed_nodes: Vec<CompletedNode>,
+}
+
+/// The restoring binding's `workspace`: `path` is `None` when that binding named none.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RestoredWorkspace {
+    pub path: Option<PathBuf>,
 }
 
 /// Result of one atomic adoption attempt in the target store.
@@ -43,5 +56,5 @@ pub enum AdoptionOutcome {
         record: Box<crate::workflow_exchange::ExecutionRecord>,
         adoption: Box<AdoptionRecord>,
     },
-    Existing(AdoptionRecord),
+    Existing(Box<AdoptionRecord>),
 }

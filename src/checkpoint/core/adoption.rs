@@ -87,9 +87,9 @@ pub fn admit_route(
     Ok(())
 }
 
-/// The adoption a target records for an admitted checkpoint.
+/// The adoption a target records for an admitted checkpoint restored into `workspace`.
 #[must_use]
-pub fn adoption_record(admitted: &AdmittedCheckpoint) -> AdoptionRecord {
+pub fn adoption_record(admitted: &AdmittedCheckpoint, workspace: Option<&std::path::Path>) -> AdoptionRecord {
     AdoptionRecord {
         schema: crate::checkpoint::ADOPTION_SCHEMA.to_string(),
         execution: admitted.manifest.execution.accepted.execution_identity.clone(),
@@ -100,8 +100,25 @@ pub fn adoption_record(admitted: &AdmittedCheckpoint) -> AdoptionRecord {
         cancellation_requested: admitted.cancellation_requested,
         binding: admitted.manifest.binding.clone(),
         environment: admitted.manifest.runtime.environment.clone(),
+        workspace: Some(crate::checkpoint::RestoredWorkspace {
+            path: workspace.map(std::path::Path::to_path_buf),
+        }),
         completed_nodes: admitted.outcomes.iter().map(|(node, _outcome)| node.clone()).collect(),
     }
+}
+
+// r[impl lattice.application_checkpoint.resume]
+/// The serving binding publishes the adopted execution's next checkpoints and runs it in its
+/// environment and workspace, so it must declare a checkpoint and reproduce the deadline, attempt
+/// binding, environment and workspace restore admitted and wrote into. An adoption without a
+/// recorded workspace (written by `39936a19`) is served by no binding.
+#[must_use]
+pub fn serves_adoption(binding: &crate::checkpoint::CheckpointBinding, adoption: &AdoptionRecord) -> bool {
+    binding.checkpoint != crate::checkpoint::CheckpointProfile::None
+        && binding.deadline_unix_ms == adoption.deadline_unix_ms
+        && binding.binding == adoption.binding
+        && binding.environment == adoption.environment
+        && adoption.workspace.as_ref().is_some_and(|restored| restored.path == binding.workspace)
 }
 
 /// Transition inputs for [`crate::workflow_exchange::adopt_checkpoint`].

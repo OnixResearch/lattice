@@ -518,7 +518,7 @@ fn refuses_stale_admission() {
     fixture.siblings = vec![newer];
     assert_eq!(refused(&fixture), Refusal::StaleAdmission);
     let mut fixture = Fixture::new(&[NODE_A], &[]);
-    let mut prior = adoption_record(&fixture.admitted());
+    let mut prior = adoption_record(&fixture.admitted(), None);
     prior.receipt.restarted_incarnation = 2;
     prior.receipt.admission = "kiln-admission:test-2".to_string();
     fixture.prior = Some(prior);
@@ -529,12 +529,12 @@ fn refuses_stale_admission() {
 fn identical_restart_is_idempotent_and_other_prior_is_not_fresh() {
     let mut fixture = Fixture::new(&[NODE_A], &[]);
     let admitted = fixture.admitted();
-    fixture.prior = Some(adoption_record(&admitted));
+    fixture.prior = Some(adoption_record(&admitted, None));
     assert!(matches!(fixture.admit(), Ok(Admission::Idempotent(receipt)) if receipt == admitted.receipt));
     fixture.request.cancellation_requested = true;
     assert_eq!(refused(&fixture), Refusal::TargetNotFresh, "a cancel the adoption lacks is not idempotent");
     fixture.request.cancellation_requested = false;
-    let mut prior = adoption_record(&admitted);
+    let mut prior = adoption_record(&admitted, None);
     prior.receipt.restarted_incarnation = 1;
     prior.receipt.admission = "kiln-admission:older".to_string();
     fixture.request.restarted_incarnation = 2;
@@ -601,7 +601,7 @@ fn restart_request_cancel_holds_over_an_uncancelled_manifest() {
     fixture.request.cancellation_requested = true;
     let admitted = fixture.admitted();
     assert!(admitted.cancellation_requested, "Kiln's cancel survives the restart");
-    let adoption = adoption_record(&admitted);
+    let adoption = adoption_record(&admitted, None);
     assert!(adoption.cancellation_requested);
     let (completed, uncertain) = super::core::adopted_nodes(&admitted);
     let adopted =
@@ -628,7 +628,7 @@ fn manifest_cancel_holds_when_the_restart_request_does_not_cancel() {
     assert!(!fixture.request.cancellation_requested);
     let admitted = fixture.admitted();
     assert!(admitted.cancellation_requested, "a cancel observed before publication survives");
-    assert!(adoption_record(&admitted).cancellation_requested);
+    assert!(adoption_record(&admitted, None).cancellation_requested);
 }
 
 /// Deliberately broken restore variants must each be caught by the independent oracle.
@@ -647,7 +647,7 @@ fn carry_forward_oracle_catches_dropped_cancellation_reset_budget_and_hidden_unc
         uncertain: &uncertain,
     })
     .expect("adoption");
-    let adoption = adoption_record(&admitted);
+    let adoption = adoption_record(&admitted, None);
     assert_eq!(verify_carry_forward(&admitted, &adoption, &adopted), Ok(()));
     assert_eq!(adopted.state, crate::workflow_exchange::DurableExecutionState::Unknown);
 
@@ -663,6 +663,32 @@ fn carry_forward_oracle_catches_dropped_cancellation_reset_budget_and_hidden_unc
     let mut replayed = adopted;
     replayed.nodes[1].state = NodeState::Pending;
     assert_eq!(verify_carry_forward(&admitted, &adoption, &replayed), Err(Refusal::CarryForward));
+}
+
+// r[verify lattice.application_checkpoint.resume]
+/// The serving binding must reproduce the environment and workspace restore used. An adoption
+/// written before the workspace was recorded (`39936a19`) is served under no binding.
+#[test]
+fn serving_binding_must_reproduce_the_restored_environment_and_workspace() {
+    let admitted = Fixture::new(&[NODE_A], &[]).admitted();
+    let served = binding();
+    let adoption = adoption_record(&admitted, None);
+    assert!(serves_adoption(&served, &adoption), "the restoring binding serves its adoption");
+    let mut other = served.clone();
+    other.environment = Some("other".to_string());
+    assert!(!serves_adoption(&other, &adoption), "another environment");
+    let mut other = served.clone();
+    other.workspace = Some(std::path::PathBuf::from("/workspace"));
+    assert!(!serves_adoption(&other, &adoption), "a workspace where restore used none");
+    let restored = adoption_record(&admitted, Some(std::path::Path::new("/workspace")));
+    assert!(serves_adoption(&other, &restored), "the workspace restore wrote into");
+    assert!(!serves_adoption(&served, &restored), "no workspace where restore used one");
+    let mut legacy = serde_json::to_value(&restored).expect("adoption JSON");
+    legacy.as_object_mut().expect("adoption object").remove("workspace");
+    let legacy: AdoptionRecord = serde_json::from_value(legacy).expect("a 39936a19 adoption still loads");
+    assert_eq!(legacy.workspace, None);
+    assert!(!serves_adoption(&other, &legacy), "an adoption without a recorded workspace fails closed");
+    assert!(!serves_adoption(&served, &legacy), "under every binding");
 }
 
 // r[verify lattice.application_checkpoint.restore]

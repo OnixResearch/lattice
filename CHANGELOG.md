@@ -68,7 +68,10 @@ interfaces.
   ones still `queued` behind the active-execution limit. `serve` binds its
   listener before starting any adopted execution, and records an adoption
   `Unknown` without running it when the serving binding declares no checkpoint
-  or differs from the adoption's deadline or attempt binding. Uncertain
+  or differs from the adoption's deadline, attempt binding, `environment` or
+  `workspace`. The adoption records the workspace path restore wrote into;
+  an adoption written by `39936a19` lacks it and is refused under every
+  binding, so it needs a fresh restore. Uncertain
   nodes are adopted as `Unknown` and never replayed, and sibling manifests can
   only add uncertainty, budget and cancellation. The restart request carries
   Kiln's required `cancellation_requested`, ORed into admission, so a Cancel

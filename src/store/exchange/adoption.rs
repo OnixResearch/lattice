@@ -44,7 +44,7 @@ impl crate::store::Store {
         };
         if let Some(prior) = prior {
             transaction.abort().map_err(super::store_db_error)?;
-            return Ok(crate::checkpoint::AdoptionOutcome::Existing(prior));
+            return Ok(crate::checkpoint::AdoptionOutcome::Existing(Box::new(prior)));
         }
         let is_occupied = {
             let executions = transaction

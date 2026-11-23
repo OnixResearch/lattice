@@ -39,6 +39,7 @@ pub use adoption::adopted_nodes;
 pub use adoption::adoption_record;
 pub use adoption::restart_kind;
 pub use adoption::restored_steps;
+pub use adoption::serves_adoption;
 pub use adoption::verify_carry_forward;
 pub use manifest::ManifestInput;
 pub use manifest::build_manifest;

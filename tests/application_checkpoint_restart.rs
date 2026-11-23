@@ -822,6 +822,26 @@ fn serving_without_a_checkpoint_runs_no_adoption() {
 }
 
 // r[verify lattice.application_checkpoint.resume]
+/// The restarted run's manifests take their runtime environment from the serving binding, so
+/// `serve` never runs an adoption under another environment than restore admitted.
+#[test]
+fn serving_under_another_environment_runs_no_adoption() {
+    serve_under_changed_binding(|binding| binding.environment = Some("other".to_string()));
+}
+
+// r[verify lattice.application_checkpoint.resume]
+/// The restarted run publishes its workspace from the serving binding, so `serve` never runs an
+/// adoption in another workspace than the one restore wrote into (here, none).
+#[test]
+fn serving_under_another_workspace_runs_no_adoption() {
+    serve_under_changed_binding(|binding| {
+        let workspace = binding.root.with_file_name("other-workspace");
+        std::fs::create_dir_all(&workspace).expect("other workspace");
+        binding.workspace = Some(workspace);
+    });
+}
+
+// r[verify lattice.application_checkpoint.resume]
 /// The listener binds before any adopted execution starts: the stale socket a SIGKILLed exchange
 /// leaves behind fails the bind, and that `serve` starts nothing though `b` is released. Once the
 /// stale socket is gone, `serve` runs the adoption.

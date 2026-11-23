@@ -124,7 +124,7 @@ r[lattice.application_checkpoint.restore.scenario.workspace_conflict]
 
 ### Requirement: Restarted runs through the exchange
 
-r[lattice.application_checkpoint.resume] `lattice workflow-exchange serve` MUST accept a checkpoint binding, publish checkpoints for its route, and start adopted executions that never started, observable and cancellable through the same listener and admission as a fresh dispatch. It MUST bind that listener before starting any adopted execution, so a bind failure starts none. It MUST start an adopted execution only when its binding declares a checkpoint and reproduces the adoption's deadline and attempt binding, and otherwise MUST record it `Unknown` without running it. Adopted executions MUST count against `maximum_active_executions`: at most that many MUST run, lowest run id first, and the rest MUST stay and observe as `queued` until a slot frees. A waiting adoption MUST accept a cancel, and once a slot frees it MUST start cancelled. Exactly one process MUST run an adopted execution, it MUST be started only when no node is uncertain, and one that was running when its process died MUST become `Unknown`.
+r[lattice.application_checkpoint.resume] `lattice workflow-exchange serve` MUST accept a checkpoint binding, publish checkpoints for its route, and start adopted executions that never started, observable and cancellable through the same listener and admission as a fresh dispatch. It MUST bind that listener before starting any adopted execution, so a bind failure starts none. It MUST start an adopted execution only when its binding declares a checkpoint and reproduces the adoption's deadline, attempt binding, environment and the workspace restore wrote into, and otherwise MUST record it `Unknown` without running it. The adoption MUST record that workspace; an adoption without it MUST be refused under every binding. Adopted executions MUST count against `maximum_active_executions`: at most that many MUST run, lowest run id first, and the rest MUST stay and observe as `queued` until a slot frees. A waiting adoption MUST accept a cancel, and once a slot frees it MUST start cancelled. Exactly one process MUST run an adopted execution, it MUST be started only when no node is uncertain, and one that was running when its process died MUST become `Unknown`.
 
 #### Scenario: Observe and cancel a restored execution
 r[lattice.application_checkpoint.resume.scenario.cancel]
@@ -141,7 +141,7 @@ r[lattice.application_checkpoint.resume.scenario.limit]
 #### Scenario: A serving binding that differs from the adoption
 r[lattice.application_checkpoint.resume.scenario.binding]
 - GIVEN an adoption restored under the target binding
-- WHEN `serve` runs with a later deadline, another attempt binding, or `checkpoint: "none"`
+- WHEN `serve` runs with a later deadline, another attempt binding, another environment, another workspace, or `checkpoint: "none"`
 - THEN the adopted execution MUST observe as `unknown` and run no effect.
 
 #### Scenario: A listener that cannot bind
