@@ -196,6 +196,47 @@ fn without_retained_evidence_or_a_retained_draw_the_reservation_is_charged() {
 }
 
 #[test]
+// r[verify lattice.serving_binding.brokered_evidence.scenario.conflict]
+fn a_record_renamed_away_from_its_request_id_is_not_evidence() {
+    let attempt = attempt();
+    relay(&attempt, vec![Some(responded())]);
+    let requests = attempt.directory.join("model-requests");
+    let record = std::fs::read_dir(&requests)
+        .expect("evidence")
+        .map(|entry| entry.expect("entry").path())
+        .find(|path| path.to_string_lossy().ends_with(".record.json"))
+        .expect("a record");
+    std::fs::rename(&record, requests.join("stray.record.json")).expect("rename the record");
+    let refused = super::super::requests::coverage(&attempt.admitted, &attempt.directory);
+    let message = refused.expect_err("a file that does not name its request is not evidence");
+    assert!(message.contains("does not name its request"), "{message}");
+}
+
+#[test]
+// r[verify lattice.implementation_attempt.observed_charge.scenario.replay]
+fn a_partial_loss_keeps_the_retained_draw_and_degrades_the_raw_projection() {
+    let attempt = attempt();
+    relay(&attempt, vec![Some(responded())]);
+    let coverage = persist(&attempt).expect("persisted before the result");
+    let frame = super::super::draw::SingleShot::of(&attempt.request).expect("lineage");
+    frame.retain(&attempt.directory, &coverage).expect("retained before the result");
+    let draw = frame.retained(&attempt.directory).expect("retained draw");
+    let requests = attempt.directory.join("model-requests");
+    let intent = std::fs::read_dir(&requests)
+        .expect("evidence")
+        .map(|entry| entry.expect("entry").path())
+        .find(|path| path.to_string_lossy().ends_with(".intent.json"))
+        .expect("an intent");
+    std::fs::remove_file(intent).expect("lose one intent");
+    let mut fields = serde_json::Map::new();
+    fields.insert("execution_binding".to_owned(), serde_json::Value::from("binding-identity"));
+    super::super::usage::attach(&mut fields, &attempt.request, &attempt.admitted, &attempt.directory)
+        .expect("a partial loss does not discard the draw");
+    assert_eq!(fields["budget_lineage"], draw, "the retained draw is replayed unchanged");
+    assert_eq!(fields["model_request_evidence"]["coverage"], "unknown", "the raw projection is not a charge");
+}
+
+#[test]
 fn brokered_request_files_are_write_once_and_conflicts_fail_closed() {
     let attempt = attempt();
     relay(&attempt, vec![Some(responded())]);
