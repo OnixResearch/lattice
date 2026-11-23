@@ -252,7 +252,8 @@
           || pkgs.lib.hasPrefix "${sourceRoot}/tests/" (toString path)
           || pkgs.lib.hasPrefix "${sourceRoot}/fixtures/" (toString path)
           || pkgs.lib.hasPrefix "${sourceRoot}/.cairn/specs/" (toString path)
-          || pkgs.lib.hasPrefix "${sourceRoot}/cairn-policy/" (toString path);
+          || pkgs.lib.hasPrefix "${sourceRoot}/cairn-policy/" (toString path)
+          || toString path == "${sourceRoot}/vendor-cargo-deps/basalt/tests/fixtures/oidc/github-claims.json";
         isAnimusCompileTimeAssetPath =
           path:
           pkgs.lib.hasPrefix "${sourceRoot}/vendor-cargo-deps/animus/config/" (toString path)
