@@ -26,6 +26,19 @@
 - [x] [serial] 5.2 Re-key Octet once and admit it by a semantic comparison against `main`: the first regeneration's nine new findings are fixed in code, and the second has 0 new findings and no raw increase per lint and file. Evidence: `evidence/octet-batch-admission.json`. r[lattice.implementation_attempt.observed_charge]
 - [x] [serial] 5.3 Run the full `scripts/check.rs`, `nix flake check` and the Cairn gates on the batch head. Evidence: `evidence/batch-integration.json` (`check_rs`, `flake_check`, `cairn`). r[lattice.implementation_attempt.observed_charge]
 
+## Phase 6: Review fixes (`769e04bc` review)
+
+The first candidate Octet observation against `main`'s baselines found two
+findings in this phase's own code, `ambiguous_params` and `private_bounds` in
+`binding/requests.rs`. Both were cleared in code — the name comparison is
+inline and the evidence trait carries `load`'s visibility — without an allow or
+a baseline edit.
+
+- [x] [serial] P1: `54870ff5` read the admission clock before the filesystem preparation of a check, so preparation could consume the remaining admission and the check still start. `process` now checks the pinned bytes and admits the candidate-copy boundary first and reads the bounded timeout afterwards, restoring the pre-refactor order. The temporal regression has no deterministic fixture: no test can make filesystem preparation advance the operator clock, and `an_admission_that_expires_before_the_checks_runs_none_of_them` still covers expiry before any check. r[lattice.implementation_attempt.operator_repair.scenario.checks]
+- [x] [serial] P2: a terminal record was admitted by suffix alone, so a renamed file could turn an unconfirmed request into an exact charge. `load` now compares each intent's and record's own request id with its canonical file name and refuses a mismatch. Test: `a_record_renamed_away_from_its_request_id_is_not_evidence`. r[lattice.serving_binding.brokered_evidence.scenario.conflict]
+- [x] [serial] P2: a record whose content or directory sync failed stayed readable, so settlement could keep a `host_measured` draw without a durable record. `write_once_durable` removes a file this call created when its sync fails; the broker then stops and the surviving intent reads as unconfirmed. No test can fail `sync_all` without a filesystem fault injector; the order is record-then-durable, and a failed write leaves no file. r[lattice.implementation_attempt.observed_charge.scenario.incomplete]
+- [x] [serial] P2: `recover` read the raw evidence summary with `?`, so one lost intent discarded an otherwise valid retained draw. It now degrades the raw projection to `unknown` with the conflict named and still replays the retained draw unchanged. Test: `a_partial_loss_keeps_the_retained_draw_and_degrades_the_raw_projection` (under `implementation_attempt::cli::binding::tests::brokered`). r[lattice.implementation_attempt.observed_charge.scenario.replay]
+
 Archiving waits on the dependency `bind-model-serving-admission`, whose task 5.2 waits on Kiln #49.
 
 Only checked tasks are complete.

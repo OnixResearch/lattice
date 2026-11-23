@@ -148,25 +148,39 @@ fn bounded_timeout_secs(
     Ok(timeout_secs)
 }
 
+/// What a check is prepared from, separate from the executor and cancel
+/// record its run needs.
+struct Preparation<'a> {
+    request: &'a super::super::super::Request,
+    sandbox: &'a crate::candidate_worker::broker::Executable,
+    clock: &'a dyn crate::operation::shell::Clock,
+}
+
 /// The bounded process of `entry` on `candidate`: the request's read paths
 /// that exist in the copy, read-only, and no write path, network, broker or
-/// credential, stopped after `timeout_secs`.
+/// credential. Compute the time bound only after checking the pinned bytes
+/// and admitting the candidate-copy boundary.
 fn process(
-    request: &super::super::super::Request,
-    sandbox: &crate::candidate_worker::broker::Executable,
+    preparation: Preparation<'_>,
     entry: &crate::implementation_attempt::repair::checks::catalog::Entry,
     candidate: &std::path::Path,
-    timeout_secs: u64,
+    deadline: std::time::Duration,
 ) -> Result<crate::candidate_worker::Request, String> {
     debug_assert!(entry.program.path.is_absolute(), "a pinned program path is absolute");
     debug_assert!(!candidate.as_os_str().is_empty(), "a check runs on its copy");
-    debug_assert!(timeout_secs > 0, "a bounded check has time to run");
+    let Preparation {
+        request,
+        sandbox,
+        clock,
+    } = preparation;
     let sandbox = crate::candidate_worker::broker::admission::executable(sandbox)?;
     let program = crate::candidate_worker::broker::admission::executable(&entry.program)?;
     let read_paths: Vec<String> =
         request.read_paths.iter().filter(|path| candidate.join(path.as_str()).exists()).cloned().collect();
     let boundary = crate::candidate_capture::admit_workspace_boundary(candidate, &read_paths, &[], false, false)
         .map_err(|error| error.to_string())?;
+    let timeout_secs = bounded_timeout_secs(request, deadline, clock)?;
+    debug_assert!(timeout_secs > 0, "a bounded check has time to run");
     let envelope = &request.envelope;
     Ok(crate::candidate_worker::Request {
         work_id: envelope.work_id.clone(),
@@ -219,8 +233,12 @@ impl super::super::CheckPort for CatalogPort<'_, '_> {
         // the check unrun and its outcome unknown.
         let is_current = grant.recheck(request, *clock).is_none() && !cancel.is_cancel_requested();
         let outcome = if is_current {
-            bounded_timeout_secs(request, deadline, *clock)
-                .and_then(|timeout_secs| process(request, &catalog.sandbox, entry, candidate, timeout_secs))
+            let preparation = Preparation {
+                request,
+                sandbox: &catalog.sandbox,
+                clock: *clock,
+            };
+            process(preparation, entry, candidate, deadline)
                 .and_then(|process| {
                     super::polled(|cancellation| execute.execute(&process, cancellation), &|| {
                         cancel.is_cancel_requested()

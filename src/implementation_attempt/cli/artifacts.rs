@@ -88,6 +88,31 @@ pub(super) fn create_new(path: &std::path::Path, bytes: &[u8]) -> Result<bool, S
     }
 }
 
+/// Create and fsync a new private file like [`write_once`], but a file this
+/// call created is removed when its content or directory sync fails: a
+/// readable terminal record that never became durable must not be read back as
+/// evidence. An existing file is compared and never removed.
+pub(super) fn write_once_durable(path: &std::path::Path, bytes: &[u8]) -> Result<bool, String> {
+    debug_assert!(path.is_absolute(), "evidence is written under an absolute attempt directory");
+    debug_assert!(path.file_name().is_some(), "a durable write names its file");
+    match create_once(path) {
+        Ok(file) => match sync_created_file(file, path, bytes) {
+            Ok(()) => Ok(true),
+            Err(error) => {
+                let _removed = std::fs::remove_file(path);
+                Err(error)
+            }
+        },
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            if read_bounded(path, bytes.len())? != bytes {
+                return Err("attempt state contains a different immutable binding".into());
+            }
+            Ok(false)
+        }
+        Err(error) => Err(error.to_string()),
+    }
+}
+
 pub(super) fn write_once(path: &std::path::Path, bytes: &[u8]) -> Result<bool, String> {
     if create_new(path, bytes)? {
         return Ok(true);

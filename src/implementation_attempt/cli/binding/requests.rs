@@ -74,7 +74,10 @@ impl RequestFiles {
 
     fn write(&self, request_id: &str, is_intent: bool, bytes: &[u8]) -> Result<(), String> {
         let name = file_name(request_id, is_intent)?;
-        super::super::artifacts::write_once(&self.directory.join(name), bytes)
+        // A record whose sync fails is removed: the broker stops, and the
+        // surviving intent then reads as an unconfirmed request, never as an
+        // exact charge from a file that was never durable.
+        super::super::artifacts::write_once_durable(&self.directory.join(name), bytes)
             .map(|_| ())
             .map_err(|_| "model request evidence already exists with different content".to_string())
     }
@@ -146,9 +149,46 @@ fn file_name(request_id: &str, is_intent: bool) -> Result<String, String> {
     Ok(format!("{digest}{suffix}"))
 }
 
+/// Retained evidence names the request it records, so its file name can be
+/// checked against that identity and not only its suffix.
+pub(in super::super) trait NamesRequest {
+    fn request_id(&self) -> &str;
+}
+
+impl NamesRequest for Intent {
+    fn request_id(&self) -> &str {
+        &self.request_id
+    }
+}
+
+impl NamesRequest for Record {
+    fn request_id(&self) -> &str {
+        &self.request_id
+    }
+}
+
+impl NamesRequest for BrokeredIntent {
+    fn request_id(&self) -> &str {
+        &self.request_id
+    }
+}
+
+impl NamesRequest for BrokeredRecord {
+    fn request_id(&self) -> &str {
+        &self.request_id
+    }
+}
+
+/// The canonical file name of `request_id` must equal the file read: a stray
+/// rename never turns retained evidence into a different request's charge.
+const MISNAMED: &str = "retained model request evidence does not name its request";
+
 /// Read retained intents and records; `None` when the directory is missing,
 /// which is no evidence at all.
-pub(in super::super) fn load<I: serde::de::DeserializeOwned, R: serde::de::DeserializeOwned>(
+pub(in super::super) fn load<
+    I: serde::de::DeserializeOwned + NamesRequest,
+    R: serde::de::DeserializeOwned + NamesRequest,
+>(
     attempt_directory: &std::path::Path,
 ) -> Result<Retained<I, R>, String> {
     let directory = attempt_directory.join(DIRECTORY);
@@ -171,9 +211,17 @@ pub(in super::super) fn load<I: serde::de::DeserializeOwned, R: serde::de::Deser
     for name in &names {
         let bytes = super::super::artifacts::read_bounded(&directory.join(name), MAX_FILE_BYTES)?;
         if name.ends_with(INTENT_SUFFIX) {
-            intents.push(serde_json::from_slice(&bytes).map_err(|_| "retained model request intent is malformed")?);
+            let intent: I = serde_json::from_slice(&bytes).map_err(|_| "retained model request intent is malformed")?;
+            if file_name(intent.request_id(), true)? != name.as_str() {
+                return Err(MISNAMED.into());
+            }
+            intents.push(intent);
         } else if name.ends_with(RECORD_SUFFIX) {
-            records.push(serde_json::from_slice(&bytes).map_err(|_| "retained model request record is malformed")?);
+            let record: R = serde_json::from_slice(&bytes).map_err(|_| "retained model request record is malformed")?;
+            if file_name(record.request_id(), false)? != name.as_str() {
+                return Err(MISNAMED.into());
+            }
+            records.push(record);
         } else {
             return Err("retained model request evidence has an unexpected file".into());
         }

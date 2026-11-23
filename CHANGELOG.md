@@ -531,6 +531,16 @@ interfaces.
     request index, `repair::step::Report` gains `observed_model_requests`
     (defaulting to `null`), and the operator `Launch` takes the step's broker
     gate.
+  - Retained request evidence counts only under its own canonical file name: an
+    intent or record copied to another name is refused before any charge, and a
+    terminal record whose content or directory sync fails is removed, so a
+    readable but never-durable record cannot prove an exact draw.
+  - Recovery replays a retained draw even when part of the ledger was lost: the
+    raw `model_requests` projection then degrades to `unknown` and records the
+    conflict in `model_request_evidence` instead of discarding the frozen draw.
+  - An operator check re-reads the admission clock after checking its pinned
+    executable bytes and admitting the candidate-copy boundary, so preparation
+    that consumes the remaining admission leaves the check unrun.
 - Breaking: `github_ci::exchange::exchange` takes the typed native
   `basalt::mantle::Request` that the stable holder will sign, and its
   `BasaltPolicyRef`, in place of the exact project and resource strings.

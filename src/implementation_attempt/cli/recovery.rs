@@ -25,20 +25,10 @@ pub(super) fn recover(
     // Retained request evidence is reported read-only; no serving port is called.
     // r[impl lattice.serving_binding.usage.scenario.dedup]
     let admitted = super::binding::load(directory, request)?.ok_or("retained result has no execution binding")?;
-    let model_requests = super::binding::requests::coverage(&admitted, directory)?;
     let mut projected = project(request, directory, &result, unchanged.as_ref());
     if let Some(fields) = projected.as_object_mut() {
         fields.insert("execution_binding".to_owned(), serde_json::Value::from(binding_identity));
-        fields.insert(
-            "model_requests".to_owned(),
-            serde_json::to_value(&model_requests).map_err(|error| error.to_string())?,
-        );
-        // The retained draw is replayed as retained, never derived again.
-        // r[impl lattice.implementation_attempt.lineage.scenario.usage]
-        // r[impl lattice.implementation_attempt.observed_charge.scenario.replay]
-        if let Some(draw) = super::binding::draw::SingleShot::of(request) {
-            fields.insert("budget_lineage".to_owned(), draw.retained(directory)?);
-        }
+        super::binding::usage::attach(fields, request, &admitted, directory)?;
     }
     Ok(projected)
 }

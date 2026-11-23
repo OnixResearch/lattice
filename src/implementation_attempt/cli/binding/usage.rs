@@ -28,6 +28,43 @@ pub(in super::super) struct WorkerReceipt {
     request_identity: String,
 }
 
+/// Attach a reconciled result's retained request coverage and frozen draw.
+///
+/// A partially lost ledger can still leave an exact draw. The raw projection
+/// then degrades to `unknown` and names the conflict; the retained draw is
+/// replayed unchanged and is never recalculated or reduced.
+// r[impl lattice.serving_binding.usage.scenario.dedup]
+// r[impl lattice.implementation_attempt.observed_charge.scenario.replay]
+pub(in super::super) fn attach(
+    fields: &mut serde_json::Map<String, serde_json::Value>,
+    request: &crate::implementation_attempt::cli::Request,
+    admitted: &lattice_core::execution_binding::admission::bound::Admitted,
+    directory: &std::path::Path,
+) -> Result<(), String> {
+    debug_assert!(directory.is_absolute(), "retained evidence lies under an absolute attempt directory");
+    debug_assert!(fields.contains_key("execution_binding"), "usage is attached to a bound projection");
+    let coverage = super::requests::coverage(admitted, directory);
+    let model_requests = coverage
+        .as_ref()
+        .map_or(lattice_core::execution_binding::serving::usage::ModelRequestCoverage::Unknown, Clone::clone);
+    fields.insert(
+        "model_requests".to_owned(),
+        serde_json::to_value(&model_requests).map_err(|error| error.to_string())?,
+    );
+    if let Err(conflict) = &coverage {
+        fields.insert(
+            "model_request_evidence".to_owned(),
+            serde_json::json!({"coverage": "unknown", "conflict": conflict}),
+        );
+    }
+    // The retained draw is replayed as retained, never derived again.
+    // r[impl lattice.implementation_attempt.lineage.scenario.usage]
+    if let Some(draw) = super::draw::SingleShot::of(request) {
+        fields.insert("budget_lineage".to_owned(), draw.retained(directory)?);
+    }
+    Ok(())
+}
+
 impl WorkerReceipt {
     pub(in super::super) fn new(
         admitted: lattice_core::execution_binding::admission::bound::Admitted,
