@@ -18,16 +18,7 @@ fn reviewed_legacy_migration_preserves_hashes_and_current_admission_reads_only_n
     let archived = b"reviewed archive bytes\n";
     fixture.write("cairn/specs/native-selection/spec.md", spec)?;
     fixture.write("cairn/archive/reviewed/receipt.txt", archived)?;
-    let rejected = fixture
-        .command()
-        .args([
-            "status",
-            "--root",
-            ".",
-            "--policy",
-            concat!(env!("CARGO_MANIFEST_DIR"), "/cairn-policy/generated/cairn-policy.json"),
-        ])
-        .output()?;
+    let rejected = fixture.command().args(["status", "--root", "."]).output()?;
     assert!(!rejected.status.success());
     assert!(String::from_utf8_lossy(&rejected.stderr).contains("cairn.lifecycle_directory.migration_required"));
 

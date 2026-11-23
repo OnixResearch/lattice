@@ -112,9 +112,12 @@
               fi
             done
 
-            command="''${1:-}"
-            case "$command" in
-              agent-receipt|change|doctor|validate|release-readiness|policy|probe|steel-orchestration|traceability|tracey|migrate|gate|sync|archive)
+            # Inject Lattice's policy only where the pinned Cairn's `cairn --help`
+            # usage accepts `--policy`; Cairn refuses an option a subcommand
+            # does not take. Other subcommands pass through unchanged.
+            subcommand="''${1:-} ''${2:-}"
+            case "$subcommand" in
+              "change create" | "steel-orchestration receipt" | "traceability coverage" | "traceability export" | "traceability verify" | "tracey coverage" | "policy " | doctor\ * | validate\ * | release-readiness\ * | migrate\ * | gate\ * | sync\ * | archive\ *)
                 if [ "$has_policy_arg" = false ]; then
                   exec "$cairn_bin" "$@" --policy "$policy_path"
                 fi
