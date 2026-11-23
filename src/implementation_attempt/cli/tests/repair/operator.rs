@@ -436,12 +436,13 @@ async fn a_grant_withdrawn_during_a_worker_runs_none_of_its_checks() {
 async fn an_admission_that_expires_before_the_checks_runs_none_of_them() {
     let operated = Operated::with("attempt-operator-expired", Options {
         expires_in_ms: Some(4_000),
+        is_clock_held: true,
         ..Options::default()
     });
     operated.script(&[Behaviour::Write("fixed")]);
-    // The worker returns before the admission expires; the expiry passes
-    // before its candidate's checks.
-    operated.after_launch(Box::new(|| std::thread::sleep(std::time::Duration::from_millis(4_500))));
+    // The worker returns before the admission expires; the held operator
+    // clock then passes the expiry before its candidate's checks.
+    operated.after_launch(operated.clock_advance(4_500));
     operated.run().await.expect("the loop reaches a disposition");
     let observation = operated.disposition();
     assert_eq!(

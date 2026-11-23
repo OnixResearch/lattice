@@ -7,6 +7,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::AtomicU32;
+use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 
 pub(super) use doubles::Behaviour;
@@ -30,7 +31,8 @@ pub(super) struct Options {
     /// Read and write paths other than `src`; their directories are created.
     pub(super) paths: Option<(Vec<&'static str>, Vec<&'static str>)>,
     /// Hold the operator's clock at the instant the fixture is built, so no
-    /// admission time passes however late the run is scheduled.
+    /// admission time passes however late the run is scheduled; only
+    /// [`Operated::clock_advance`] moves it.
     pub(super) is_clock_held: bool,
 }
 
@@ -68,15 +70,15 @@ pub(super) struct Operated {
     indices: Arc<Mutex<Vec<u32>>>,
     on_launch: Arc<Mutex<Option<doubles::IndexHook>>>,
     /// The operator's clock when it is held; otherwise the system clock.
-    held: Option<Held>,
+    held: Option<Arc<Held>>,
 }
 
-/// An operator clock that always reads the same instant.
-struct Held(u64);
+/// An operator clock that reads one instant until a test moves it.
+struct Held(AtomicU64);
 
 impl crate::operation::shell::Clock for Held {
     fn observe_epoch_millis(&self) -> i64 {
-        i64::try_from(self.0).expect("held clock")
+        i64::try_from(self.0.load(Ordering::SeqCst)).expect("held clock")
     }
 }
 
@@ -163,7 +165,7 @@ impl Operated {
             is_lost: Arc::new(AtomicBool::new(false)),
             indices: Arc::new(Mutex::new(Vec::new())),
             on_launch: Arc::new(Mutex::new(None)),
-            held: options.is_clock_held.then_some(Held(built_at_ms)),
+            held: options.is_clock_held.then(|| Arc::new(Held(AtomicU64::new(built_at_ms)))),
         }
     }
 
@@ -218,7 +220,7 @@ impl Operated {
                 after: self.after_check.clone(),
             }),
             clock: match &self.held {
-                Some(held) => held,
+                Some(held) => &**held,
                 None => &crate::operation::shell::SystemClock,
             },
         };
@@ -276,6 +278,14 @@ impl Operated {
     /// Run `hook` once, after the first launch's OMP step.
     pub(super) fn after_launch(&self, hook: Hook) {
         *self.after.lock().expect("hook") = Some(hook);
+    }
+
+    /// A hook that moves the held operator clock `by_ms` forward.
+    pub(super) fn clock_advance(&self, by_ms: u64) -> Hook {
+        let held = self.held.clone().expect("a held operator clock");
+        Box::new(move || {
+            held.0.fetch_add(by_ms, Ordering::SeqCst);
+        })
     }
 
     /// Run `hook` once, at the start of the first repair launch, after its
