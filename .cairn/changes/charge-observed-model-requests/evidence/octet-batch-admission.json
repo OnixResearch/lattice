@@ -1,0 +1,189 @@
+{
+  "kind": "octet-semantic-comparison",
+  "changes": [
+    "charge-observed-model-requests",
+    "align-cairn-main"
+  ],
+  "purpose": "the batch's one Octet re-key: Lattice #31 and the Cairn 317d3ff6 alignment (with its operator clock fixes) integrated on published main",
+  "reference_revision": "39936a1932377d1e7fe80cca191e8ae69f23b0cb",
+  "reference_observations": "cargo-octet check against the committed baselines on a pristine git-archive export of 39936a19; both runs reproduce the committed baselines exactly (IDs, semantic facts and metadata), 0 new and 0 stale",
+  "candidate_git_revision": "54870ff5ea5da087a57248a2c22faba6aacff1a0",
+  "regeneration": "native cargo-octet check --write-baseline on the candidate tree, root and -p lattice-core, each on its own target directory",
+  "comparison_fields": [
+    "identity_status",
+    "lint",
+    "group",
+    "severity",
+    "file",
+    "message",
+    "crate_name"
+  ],
+  "normalization": "the maintained conventions of scripts/octet_baseline_migration.rs, as in bind-vm-execution-profile/evidence/manifest-cohort-admission.json; the exact (lint, file, message, crate) and raw per-(lint, file) comparisons are recorded alongside",
+  "admission_rule": "0 semantically new findings and no raw increase per lint and file; removed findings are allowed",
+  "scopes": [
+    {
+      "scope": "lattice",
+      "baseline": "octet-baseline.json",
+      "reference": {
+        "raw_findings": 1346,
+        "unique_ids": 1044,
+        "baseline_counts": {
+          "baseline_hash": "b3:90076db7bf614b3d72c9fccbaff41993bc3b1b8157e7aea024af984192b90868",
+          "accepted_total": 1044,
+          "current_total": 1044,
+          "accepted_current": 1044,
+          "new_total": 0,
+          "stale_total": 0,
+          "new_finding_ids": [],
+          "stale_finding_ids": []
+        },
+        "ids_equal_committed_baseline": true,
+        "semantic_facts_equal_committed_baseline": true,
+        "metadata_equal_committed_baseline": true,
+        "baseline_blake3": "3cceef424f3930f44201078ad4f1d9ffbfc86aa00304d811763f9568c2e3cc68"
+      },
+      "regenerated": {
+        "command_exit": 0,
+        "status": "warning-only",
+        "exit_code": 0,
+        "raw_findings": 1346,
+        "unique_ids": 1044,
+        "config_hash": "b3:299713f9a4561a4d2235616467edb54ef170a601d7687ee8d89da53e1b30fc06",
+        "profile_hash": "b3:0a3ed6fc1277e5e2379e2c5caa1d455e0e81e9168cd24458d4c29f8b554ac377",
+        "baseline_blake3": "3cceef424f3930f44201078ad4f1d9ffbfc86aa00304d811763f9568c2e3cc68",
+        "byte_identical_to_reference_baseline": true
+      },
+      "metadata_changes": [],
+      "maintained_semantic_key": {
+        "semantically_new": 0,
+        "removed": 0,
+        "raw_increases": 0,
+        "raw_decreases": 0
+      },
+      "exact_message": {
+        "new": 0,
+        "removed": 0,
+        "raw_increases": 0
+      },
+      "per_lint_and_file_raw": {
+        "increased": 0,
+        "decreased": 0
+      }
+    },
+    {
+      "scope": "lattice-core",
+      "baseline": "crates/lattice-core/octet-baseline.json",
+      "reference": {
+        "raw_findings": 33,
+        "unique_ids": 25,
+        "baseline_counts": {
+          "baseline_hash": "b3:bbca59f62b6ec85b507114f88526fc17242c5f309f2c8900e1035cebd9aa1a71",
+          "accepted_total": 25,
+          "current_total": 25,
+          "accepted_current": 25,
+          "new_total": 0,
+          "stale_total": 0,
+          "new_finding_ids": [],
+          "stale_finding_ids": []
+        },
+        "ids_equal_committed_baseline": true,
+        "semantic_facts_equal_committed_baseline": true,
+        "metadata_equal_committed_baseline": true,
+        "baseline_blake3": "e147a270b9a3607f709bc7e5b9d15025e9f420dd4e0f9fd48604845140b5ef8d"
+      },
+      "regenerated": {
+        "command_exit": 0,
+        "status": "warning-only",
+        "exit_code": 0,
+        "raw_findings": 33,
+        "unique_ids": 25,
+        "config_hash": "b3:228833e8243ef15fa26e2dacd7c0feb99e2a656d6b38a1ee4f858dd65100778e",
+        "profile_hash": "b3:9d7b338e8bb8791898c12a877917a2dede40f0c9798a10db4a9a55b7ce5b0392",
+        "baseline_blake3": "e147a270b9a3607f709bc7e5b9d15025e9f420dd4e0f9fd48604845140b5ef8d",
+        "byte_identical_to_reference_baseline": true
+      },
+      "metadata_changes": [],
+      "maintained_semantic_key": {
+        "semantically_new": 0,
+        "removed": 0,
+        "raw_increases": 0,
+        "raw_decreases": 0
+      },
+      "exact_message": {
+        "new": 0,
+        "removed": 0,
+        "raw_increases": 0
+      },
+      "per_lint_and_file_raw": {
+        "increased": 0,
+        "decreased": 0
+      }
+    }
+  ],
+  "first_regeneration": {
+    "candidate_git_revision": "12a85181",
+    "semantically_new": 9,
+    "new_findings": [
+      {
+        "scope": "lattice",
+        "lint": "assertion_density",
+        "file": "src/candidate_worker/broker/brokered.rs",
+        "message": "function `terminal` has 0 assertion(s) in 37 lines (need 2+)"
+      },
+      {
+        "scope": "lattice",
+        "lint": "excessive_file_length",
+        "file": "src/execution_binding/serving/gate.rs",
+        "message": "source file is 305 lines (limit: 300)"
+      },
+      {
+        "scope": "lattice",
+        "lint": "unbounded_collection_growth",
+        "file": "src/execution_binding/serving/gate.rs",
+        "message": "collection grows in loop without a prior reservation or explicit local bound"
+      },
+      {
+        "scope": "lattice",
+        "lint": "excessive_file_length",
+        "file": "src/implementation_attempt/cli.rs",
+        "message": "source file is 304 lines (limit: 300)"
+      },
+      {
+        "scope": "lattice",
+        "lint": "raw_arithmetic_overflow",
+        "file": "src/implementation_attempt/cli/binding/requests.rs",
+        "message": "unprotected unsigned multiplication may overflow"
+      },
+      {
+        "scope": "lattice",
+        "lint": "module_file_count",
+        "file": "src/implementation_attempt/cli/repair/admission.rs",
+        "message": "module directory `src/implementation_attempt/cli/repair` contains 8 Rust source files (limit: 7)"
+      },
+      {
+        "scope": "lattice",
+        "lint": "too_many_parameters",
+        "file": "src/implementation_attempt/cli/repair/operator/checks.rs",
+        "message": "function has 6 parameters (limit: 5)"
+      },
+      {
+        "scope": "lattice-core",
+        "lint": "excessive_file_length",
+        "file": "crates/lattice-core/src/execution_binding/serving/brokered.rs",
+        "message": "source file is 357 lines (limit: 300)"
+      },
+      {
+        "scope": "lattice-core",
+        "lint": "excessive_file_length",
+        "file": "crates/lattice-core/src/execution_binding/serving/usage.rs",
+        "message": "source file is 326 lines (limit: 300)"
+      }
+    ],
+    "disposition": "not accepted; each fixed in code by the candidate's parent commit 'Keep #31 and the operator clock fix inside Octet limits' (54870ff5), with no behaviour change"
+  },
+  "admitted": true,
+  "non_claims": [
+    "Octet findings are warning-level structural observations; this comparison does not prove behaviour",
+    "the regenerated baselines are byte-identical to main's, so the committed baseline files do not change"
+  ]
+}
