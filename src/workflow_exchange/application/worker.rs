@@ -18,6 +18,10 @@ use super::EffectAuthorityMode;
 use super::ExecutionRecord;
 use super::WorkflowFacts;
 
+mod records;
+
+use records::Records;
+
 pub(super) struct WorkerInput {
     pub store: crate::store::Store,
     pub admitted: ExecutionRecord,
@@ -51,10 +55,11 @@ pub(super) fn run(input: WorkerInput) {
     // r[impl lattice.application_checkpoint.cancellation]
     // A run cancelled before it starts settles `cancelled` unrun: the ready frontier would fail it.
     if running.cancellation_requested || cancellation.load(std::sync::atomic::Ordering::Acquire) {
-        return settle(&store, &running, |_current| CompletionFacts {
+        let cancelled = CompletionFacts {
             cancelled: true,
             ..CompletionFacts::default()
-        });
+        };
+        return settle(&store, &running, &cancelled);
     }
     // r[impl lattice.application_checkpoint.hook]
     let Ok(hook) = crate::checkpoint::NodeBoundaryHook::for_route(&store, checkpoint.as_ref(), &running, seed) else {
@@ -82,43 +87,56 @@ pub(super) fn run(input: WorkerInput) {
     {
         tracing::warn!("application checkpoint observer stopped abnormally");
     }
-    settle(&store, &running, |current| completion_facts(&store, current, result));
+    let facts = completion_facts(&store, &running, result);
+    settle(&store, &running, &facts);
 }
 
-/// Mark `admitted` running. A Cancel that landed while it was still `Queued` fails this
-/// compare-and-swap; the reloaded record, `Queued` with `cancellation_requested`, is marked
-/// running instead, so the caller settles it `cancelled` rather than leaving it for `Unknown`.
-fn start_running(store: &crate::store::Store, admitted: &ExecutionRecord) -> Option<ExecutionRecord> {
-    let running = super::mark_running(admitted).ok()?;
-    if store.save_workflow_exchange_transition(admitted, &running).is_ok() {
-        return Some(running);
+/// Mark `admitted` running. A Cancel that lands while it is still `Queued` fails this
+/// compare-and-swap; while the reloaded record is a newer `Queued` one with
+/// `cancellation_requested`, it is marked running instead, however many Cancels race the
+/// transition, so the caller settles it `cancelled` rather than leaving it for `Unknown`.
+fn start_running(records: &impl Records, admitted: &ExecutionRecord) -> Option<ExecutionRecord> {
+    let mut current = admitted.clone();
+    loop {
+        let running = super::mark_running(&current).ok()?;
+        if records.swap(&current, &running) {
+            return Some(running);
+        }
+        current = reloaded_after_cancel(records, &current, super::DurableExecutionState::Queued)?;
     }
-    let current = store.load_workflow_exchange(&admitted.accepted.execution_identity).ok()??;
-    if current.state != super::DurableExecutionState::Queued || !current.cancellation_requested {
-        return None;
-    }
-    let running = super::mark_running(&current).ok()?;
-    store.save_workflow_exchange_transition(&current, &running).ok()?;
-    Some(running)
 }
 
 /// Record the run's terminal facts against the latest record, or `Unknown` if they do not apply.
-fn settle(
-    store: &crate::store::Store,
-    running: &ExecutionRecord,
-    facts: impl FnOnce(&ExecutionRecord) -> CompletionFacts,
-) {
-    let current = match store.load_workflow_exchange(&running.accepted.execution_identity) {
-        Ok(Some(current)) => current,
-        _ => return,
+/// A compare-and-swap lost to a Cancel is retried against the reloaded `Running` record.
+fn settle(records: &impl Records, running: &ExecutionRecord, facts: &CompletionFacts) {
+    let Some(mut current) = records.load(&running.accepted.execution_identity) else {
+        return;
     };
-    let next = match super::complete(&current, &facts(&current)) {
-        Ok(next) => next,
-        Err(_) => return mark_unknown(store, &current),
-    };
-    if store.save_workflow_exchange_transition(&current, &next).is_err() {
-        mark_unknown(store, &current);
+    loop {
+        let Ok(next) = super::complete(&current, facts) else {
+            return mark_unknown(records, &current);
+        };
+        if records.swap(&current, &next) {
+            return;
+        }
+        match reloaded_after_cancel(records, &current, super::DurableExecutionState::Running) {
+            Some(reloaded) => current = reloaded,
+            None => return mark_unknown(records, &current),
+        }
     }
+}
+
+/// The stored record when a Cancel replaced `stale` since it was read: still in `state`, with a
+/// later sequence and `cancellation_requested`. Each one needs another Cancel, so retries end.
+fn reloaded_after_cancel(
+    records: &impl Records,
+    stale: &ExecutionRecord,
+    state: super::DurableExecutionState,
+) -> Option<ExecutionRecord> {
+    records
+        .load(&stale.accepted.execution_identity)
+        .filter(|reloaded| reloaded.state == state && reloaded.cancellation_requested)
+        .filter(|reloaded| reloaded.sequence > stale.sequence)
 }
 
 /// The run's authority source and, for a checkpointed route, its hook's progress wiring.
@@ -218,17 +236,14 @@ fn stalled_on_cancellation(nodes: &[crate::store::RunNodeDetail]) -> bool {
         })
 }
 
-fn mark_unknown(store: &crate::store::Store, current: &ExecutionRecord) {
-    let Ok(latest) = store.load_workflow_exchange(&current.accepted.execution_identity) else {
-        return;
-    };
-    let Some(latest) = latest else {
+fn mark_unknown(records: &impl Records, current: &ExecutionRecord) {
+    let Some(latest) = records.load(&current.accepted.execution_identity) else {
         return;
     };
     let Ok(unknown) = super::mark_unknown(&latest) else {
         return;
     };
-    if store.save_workflow_exchange_transition(&latest, &unknown).is_err() {
+    if !records.swap(&latest, &unknown) {
         tracing::warn!("workflow exchange worker could not persist unknown state");
     }
 }
