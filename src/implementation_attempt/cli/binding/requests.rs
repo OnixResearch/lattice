@@ -78,30 +78,44 @@ impl RequestFiles {
             .map(|_| ())
             .map_err(|_| "model request evidence already exists with different content".to_string())
     }
+
+    /// Create-only: an existing intent, identical or not, means the request
+    /// was already admitted once, so it is refused before any upstream contact.
+    fn create(&self, request_id: &str, bytes: &[u8]) -> Result<(), String> {
+        let name = file_name(request_id, true)?;
+        if super::super::artifacts::create_new(&self.directory.join(name), bytes)? {
+            return Ok(());
+        }
+        Err("model request was already admitted".to_owned())
+    }
 }
 
 impl crate::execution_binding::serving::Sink for RequestFiles {
-    fn write_intent(&mut self, intent: &Intent) -> Result<(), String> {
+    fn create_intent(&mut self, intent: &Intent) -> Result<(), String> {
         let bytes = serde_json::to_vec(intent).map_err(|error| error.to_string())?;
-        self.write(&intent.request_id, true, &bytes)
+        self.create(&intent.request_id, &bytes)
     }
 
     fn write_record(&mut self, record: &Record) -> Result<(), String> {
         let bytes = serde_json::to_vec(record).map_err(|error| error.to_string())?;
         self.write(&record.request_id, false, &bytes)
     }
+
+    /// Read back from the retained files, so a restarted session continues
+    /// after every ordinal an earlier session used.
+    fn highest_ordinal(&self, route_name: &str) -> Result<u64, String> {
+        let attempt_directory = self.directory.parent().ok_or("model request evidence has no attempt directory")?;
+        let (intents, records) = load::<Intent, Record>(attempt_directory)?.unwrap_or_default();
+        let intents = intents.iter().filter(|intent| intent.route_name == route_name).map(|intent| intent.ordinal);
+        let records = records.iter().filter(|record| record.route_name == route_name).map(|record| record.ordinal);
+        Ok(intents.chain(records).max().unwrap_or(0))
+    }
 }
 
 impl crate::candidate_worker::broker::RequestEvidence for RequestFiles {
-    /// Create-only: an existing intent, identical or not, means the index was
-    /// already admitted once, so it is refused before any upstream contact.
     fn create_intent(&mut self, intent: &BrokeredIntent) -> Result<(), String> {
         let bytes = serde_json::to_vec(intent).map_err(|error| error.to_string())?;
-        let name = file_name(&intent.request_id, true)?;
-        if super::super::artifacts::create_new(&self.directory.join(name), &bytes)? {
-            return Ok(());
-        }
-        Err("model request index was already admitted".to_owned())
+        self.create(&intent.request_id, &bytes)
     }
 
     fn write_record(&mut self, record: &BrokeredRecord) -> Result<(), String> {

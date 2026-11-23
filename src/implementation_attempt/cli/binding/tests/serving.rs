@@ -129,6 +129,42 @@ fn missing_served_evidence_is_unknown_and_an_empty_retained_directory_is_zero() 
     assert_eq!(draw["usage"][0]["charged"]["model_requests"], ceiling, "the reservation is charged");
 }
 
+/// Two sessions of one binding and worker incarnation over the same retained
+/// files: the second continues after the first's ordinals, so its records
+/// never collapse into the first's, and a read-only replay counts both.
+// r[verify lattice.serving_binding.brokered_evidence.scenario.conflict]
+#[test]
+fn a_restarted_session_over_retained_files_continues_after_their_ordinals() {
+    let served = served();
+    let admitted = super::super::load(&served.directory, &served.request).expect("load").expect("binding");
+    let mut files = super::super::requests::RequestFiles::new(&served.directory).expect("request files");
+    for _ in 0..2 {
+        let mut port = crate::execution_binding::serving::FixtureOwner::default();
+        let session =
+            crate::execution_binding::serving::gate::Session::new(&admitted, "incarnation-a", &mut port, &mut files)
+                .expect("session over retained files");
+        let mut gate = crate::candidate_worker::broker::OwnerGate {
+            session,
+            route_name: super::super::PRIMARY_ROUTE.into(),
+        };
+        crate::candidate_worker::broker::ModelRequestGate::exhausted(&mut gate).expect("recorded");
+    }
+    let (_, records) = super::super::requests::load::<
+        lattice_core::execution_binding::serving::record::DispatchIntent,
+        lattice_core::execution_binding::serving::record::Observation,
+    >(&served.directory)
+    .expect("retained evidence")
+    .expect("evidence directory");
+    let ordinals: std::collections::BTreeSet<u64> = records.iter().map(|record| record.ordinal).collect();
+    assert_eq!(ordinals, [1, 2].into(), "the second session continued after the first");
+    let coverage = super::super::requests::coverage(&admitted, &served.directory).expect("replay");
+    assert_eq!(coverage, super::super::requests::coverage(&admitted, &served.directory).expect("replay again"));
+    let lattice_core::execution_binding::serving::usage::ModelRequestCoverage::Served(summary) = coverage else {
+        panic!("served coverage");
+    };
+    assert_eq!(summary.services[0].not_dispatched_requests, 2);
+}
+
 #[test]
 fn inspect_names_the_missing_port_and_shows_the_budget_refusal_once() {
     let served = served();

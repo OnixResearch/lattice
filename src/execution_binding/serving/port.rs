@@ -114,11 +114,18 @@ fn granted(
 }
 
 impl super::Sink for super::MemorySink {
-    fn write_intent(&mut self, intent: &super::Intent) -> Result<(), String> {
-        if is_new(&self.intents, intent, |existing| existing.request_id == intent.request_id)? {
-            self.intents.push(intent.clone());
+    fn create_intent(&mut self, intent: &super::Intent) -> Result<(), String> {
+        if self.intents.iter().any(|existing| existing.request_id == intent.request_id) {
+            return Err("model request intent already exists".into());
         }
+        self.intents.push(intent.clone());
         Ok(())
+    }
+
+    fn highest_ordinal(&self, route_name: &str) -> Result<u64, String> {
+        let intents = self.intents.iter().filter(|intent| intent.route_name == route_name).map(|intent| intent.ordinal);
+        let records = self.records.iter().filter(|record| record.route_name == route_name).map(|record| record.ordinal);
+        Ok(intents.chain(records).max().unwrap_or(0))
     }
 
     fn write_record(&mut self, record: &super::Record) -> Result<(), String> {

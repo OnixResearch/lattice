@@ -89,7 +89,11 @@ pub struct Session<'a> {
 }
 
 impl<'a> Session<'a> {
-    /// Build the producer profile and candidates of a binding's serving declaration.
+    /// Build the producer profile and candidates of a binding's serving
+    /// declaration. A session over retained evidence continues after the
+    /// highest retained ordinal of each route, so a restarted session never
+    /// reuses a request identity whose intent or record exists.
+    // r[impl lattice.serving_binding.brokered_evidence.scenario.conflict]
     pub fn new(
         admitted: &Admitted,
         worker_incarnation: &str,
@@ -99,6 +103,7 @@ impl<'a> Session<'a> {
         let declaration = admitted.serving.as_ref().ok_or("execution binding declares no served route")?;
         let context = super::receipt::Context::new(admitted, worker_incarnation, port.provenance())?;
         let mut routes = Vec::with_capacity(declaration.routes.len());
+        let mut ordinals = std::collections::BTreeMap::new();
         for route in &declaration.routes {
             routes.push(Served {
                 name: route.name.clone(),
@@ -106,6 +111,7 @@ impl<'a> Session<'a> {
                 envelope_tokens: lattice_core::execution_binding::serving::envelope::reserved_tokens(route),
                 candidate: super::draft::candidate(admitted, route)?,
             });
+            ordinals.insert(route.name.clone(), sink.highest_ordinal(&route.name)?);
         }
         debug_assert_eq!(routes.len(), declaration.routes.len());
         debug_assert!(!routes.is_empty(), "a validated declaration serves a route");
@@ -115,7 +121,7 @@ impl<'a> Session<'a> {
             privacy: super::draft::privacy(declaration.privacy),
             routes,
             newest: None,
-            ordinals: std::collections::BTreeMap::new(),
+            ordinals,
             overrun: lattice_core::execution_binding::serving::envelope::Overrun::new(declaration.stop_on_overrun),
             stops: Vec::new(),
             port,
@@ -219,7 +225,8 @@ impl<'a> Session<'a> {
     /// Persist the intent first; only then may the caller contact upstream.
     fn dispatch(&mut self, ticket: Ticket) -> Result<Decision, String> {
         let intent = self.context.intent(&ticket.slot, &ticket.selected, &ticket.permit);
-        self.sink.write_intent(&intent)?;
+        // Create-only: an existing intent refuses the request before upstream.
+        self.sink.create_intent(&intent)?;
         debug_assert_eq!(intent.request_id, ticket.slot.request_id);
         debug_assert!(intent.deployment_generation > 0, "producer generations are positive");
         Ok(Decision::Dispatch(Box::new(ticket)))

@@ -1062,3 +1062,68 @@ fn complete_served_evidence_counts_exactly_and_keeps_its_service() {
     let unconfirmed = summarize(&admitted, &sink.intents, &[]).expect("intent without record");
     assert_eq!(unconfirmed.observed_requests(None), None, "an intent without a record keeps the reservation");
 }
+
+/// Evidence that forgets the ordinals it holds, so a session restarts at
+/// ordinal 1 over retained intents.
+struct Forgetful<'a>(&'a mut MemorySink);
+
+impl lattice::execution_binding::serving::Sink for Forgetful<'_> {
+    fn create_intent(
+        &mut self,
+        intent: &lattice::execution_binding::core::serving::record::DispatchIntent,
+    ) -> Result<(), String> {
+        self.0.create_intent(intent)
+    }
+
+    fn write_record(&mut self, record: &RequestRecord) -> Result<(), String> {
+        self.0.write_record(record)
+    }
+
+    fn highest_ordinal(&self, _: &str) -> Result<u64, String> {
+        Ok(0)
+    }
+}
+
+/// Two sessions of one binding and worker incarnation over shared retained
+/// evidence. The second continues after the first's ordinals, so distinct
+/// contacts count exactly; an existing intent, identical bytes included, is
+/// refused before any upstream contact; and a read-only replay of the
+/// evidence counts the same.
+// r[verify lattice.serving_binding.brokered_evidence.scenario.conflict]
+#[test]
+fn a_restarted_session_never_reuses_an_ordinal_whose_intent_exists() {
+    use lattice::execution_binding::serving::Sink as _;
+    let admitted = bound("attempt-a", &[("primary", SHARED)]);
+    let ready = || snapshot(&[service(SHARED)]);
+    let mut port = FixtureOwner::new(vec![ready(), ready(), ready()], vec![grant(), grant(), grant()], vec![
+        current(SHARED),
+        current(SHARED),
+        current(SHARED),
+    ]);
+    let mut sink = MemorySink::default();
+    let mut first = Session::new(&admitted, "incarnation-a", &mut port, &mut sink).expect("first session");
+    let used = request(&mut first, "primary", OK, responded(10, 1));
+    drop(first);
+    let existing = sink.intents[0].clone();
+    assert!(sink.create_intent(&existing).is_err(), "an identical intent is never created twice");
+    // A session that cannot see the retained ordinals reaches its first
+    // ordinal's existing intent and is refused before any upstream contact.
+    let mut forgetful = Forgetful(&mut sink);
+    let mut blind = Session::new(&admitted, "incarnation-a", &mut port, &mut forgetful).expect("blind session");
+    assert!(blind.admit("primary", OK).is_err(), "a used ordinal is refused before dispatch");
+    drop(blind);
+    assert_eq!((sink.intents.len(), sink.records.len()), (1, 1), "the refusal wrote nothing");
+    // A restarted session continues after the retained ordinals.
+    let mut second = Session::new(&admitted, "incarnation-a", &mut port, &mut sink).expect("second session");
+    let next = request(&mut second, "primary", OK, responded(20, 2));
+    drop(second);
+    assert_eq!((used.ordinal, next.ordinal), (1, 2));
+    assert_ne!(used.request_id, next.request_id);
+    assert_eq!(next.outcome.class, OutcomeClass::Completed);
+    let coverage = summarize(&admitted, &sink.intents, &sink.records).expect("summary");
+    assert_eq!(coverage.observed_requests(None), Some(2), "two contacts count as two");
+    // Recovery only reads: re-reading every file, duplicates included, counts the same.
+    let intents = [sink.intents.clone(), sink.intents.clone()].concat();
+    let records = [sink.records.clone(), sink.records.clone()].concat();
+    assert_eq!(summarize(&admitted, &intents, &records), Ok(coverage));
+}

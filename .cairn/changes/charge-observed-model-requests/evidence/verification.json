@@ -75,6 +75,25 @@
       "fmt": {"command": "cargo fmt -p lattice -p lattice-core --check", "exit": 0}
     }
   },
+  "review_2": {
+    "reviewer": "Lattice31Review",
+    "P2": {
+      "finding": "a second Session::new for the same binding and worker incarnation restarted its ordinal at 1 and RequestFiles accepted the identical existing served intent, so both sessions could contact upstream while identical records collapsed into one counted request",
+      "fix": "served intents are created exclusively (Sink::create_intent: RequestFiles and MemorySink refuse any existing intent, identical bytes included, so Session::dispatch fails before any ticket); Session::new seeds each route's ordinal from Sink::highest_ordinal over the retained intents and records",
+      "decision": "a restarted session continues after the highest retained ordinal, as the brokered route continues after the highest admitted index; it never reuses an ordinal whose intent or record exists",
+      "tests": [
+        "tests/test_execution_binding_serving.rs::a_restarted_session_never_reuses_an_ordinal_whose_intent_exists",
+        "src/implementation_attempt/cli/binding/tests/serving.rs::a_restarted_session_over_retained_files_continues_after_their_ordinals"
+      ]
+    },
+    "checks": {
+      "cargo_test_focused": {"command": "cargo test -p lattice --lib -- implementation_attempt candidate_worker model_gateway execution_binding", "exit": 0, "passed": 226, "failed": 0, "ignored": 7},
+      "integration": {"command": "cargo test -p lattice --test test_execution_binding_brokered --test test_execution_binding_serving --test test_runbook_catalog_cli --test test_execution_binding_usage", "exit": 0, "passed": [4, 24, 3, 3], "failed": 0},
+      "lattice_core": {"command": "cargo test -p lattice-core", "exit": 0, "passed": 15, "failed": 0},
+      "clippy": {"command": "cargo clippy -p lattice -p lattice-core --all-targets --no-deps -- -D warnings", "exit": 0},
+      "fmt": {"command": "cargo fmt -p lattice -p lattice-core --check", "exit": 0}
+    }
+  },
   "kiln_compatibility": {
     "kiln_revision": "90a9fb64f27f6eeb05caf6e541a224265310ce86",
     "finding": "Kiln has no consumer of budget_lineage.usage[] (charged or provenance) at this revision, so neither host_measured provenance nor a charge below the reservation is refused. CHARGED_DIMENSIONS (crates/kiln-adapter-lattice/src/lineage.rs:33) gates only the request-side lineage it derives (lineage.rs:358-367, a positive held amount per charged dimension). The worker inventory decodes model_requests as opaque JSON (crates/kiln-adapter-lattice/src/worker_inventory.rs:591), worker_metrics.rs reports usage as NotInstrumented, and worker_settlement.rs:273 classify_observation reads only schema, envelope, dispatch_plan and status.",

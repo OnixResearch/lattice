@@ -179,7 +179,12 @@ attestation, capacity evidence, the replica and whether it changed, and the
 serving resource-consumer reference. Finally it records the snapshot identity,
 position and status, the admission record, the outcome class, label and
 exclusion detail, the counters, the evidence label and the Animus receipt
-identity. A different second write is refused.
+identity. A different second record is refused. A served intent is created,
+never overwritten: an existing intent, even with identical bytes, refuses its
+request before any upstream contact. A serving session numbers each route's
+requests after the highest ordinal its retained intents and records already
+hold, so a session restarted for the same binding and worker incarnation
+continues after the earlier session's requests and never reuses an ordinal.
 
 ### Brokered evidence without a serving declaration
 

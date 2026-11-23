@@ -25,3 +25,4 @@ r[lattice.serving_binding.brokered_evidence.scenario.conflict]
 - WHEN the evidence is written or summarized
 - THEN the write MUST be refused and the summary MUST be refused, so no attempt usage is persisted and no draw is charged from it; identical duplicate files read back on replay MUST count once
 - AND a broker admission for a request index at or below one its route already admitted, or whose brokered intent already exists, identical bytes included, MUST be refused before any ticket or upstream contact, so each index reaches upstream at most once and distinct indices count separately
+- AND a served dispatch whose intent already exists, identical bytes included, MUST be refused before any upstream contact, and a serving session MUST number each route's requests after the highest ordinal the retained intents and records hold, so a session restarted for the same binding and worker incarnation never reuses an ordinal and distinct contacts count separately

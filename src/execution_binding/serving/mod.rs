@@ -92,10 +92,16 @@ pub enum Current {
 
 /// Durable, write-once request evidence of one attempt.
 pub trait Sink: Send {
-    /// Persist the dispatch intent before upstream contact.
-    fn write_intent(&mut self, intent: &Intent) -> Result<(), String>;
-    /// Persist the request observation after refusal or the upstream call.
+    /// Create and persist the dispatch intent before upstream contact. An
+    /// intent that already exists for its request, even with identical
+    /// bytes, MUST be refused: each request reaches upstream at most once.
+    fn create_intent(&mut self, intent: &Intent) -> Result<(), String>;
+    /// Persist the request observation after refusal or the upstream call;
+    /// an identical replay is accepted, a different one refused.
     fn write_record(&mut self, record: &Record) -> Result<(), String>;
+    /// The highest ordinal any retained intent or record holds on
+    /// `route_name`, or `0` without one. A session continues after it.
+    fn highest_ordinal(&self, route_name: &str) -> Result<u64, String>;
 }
 
 /// The standalone CLI's port: every serving fact is unavailable.
