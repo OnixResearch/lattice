@@ -17,7 +17,7 @@ r[lattice.serving_binding.brokered_evidence.scenario.charged]
 - GIVEN retained brokered or served request evidence
 - WHEN the number of dispatched requests is read for the whole attempt, or for one broker run's request-index range
 - THEN it MUST be exact only when every intent in scope has a terminal record and none ended `uncertain`; otherwise, and for `unknown` or `no_model` coverage, there MUST be no exact count
-- AND served evidence MUST keep its per-service attribution and MUST give no count for an index range, and a retained empty `model-requests/` directory MUST count zero requests
+- AND served evidence MUST keep its per-service attribution and MUST give no count for an index range; only the `model-requests/` directory the broker pre-created and synced before it ran MAY prove a count, so a retained empty directory MUST count zero requests while a missing one MUST be `unknown`, never zero, for served and brokered attempts alike
 
 #### Scenario: Conflicting evidence fails closed
 r[lattice.serving_binding.brokered_evidence.scenario.conflict]

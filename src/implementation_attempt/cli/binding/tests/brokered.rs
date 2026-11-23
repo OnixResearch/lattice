@@ -146,6 +146,32 @@ fn one_intent_without_a_record_draws_the_reservation_with_unknown_provenance() {
     assert_eq!(usage(&draw)["charged"]["model_requests"], CEILING, "the reservation is charged");
 }
 
+/// Evidence lost after a request but before the draw is retained is
+/// `unknown` and draws the reservation; only the pre-created empty directory
+/// draws an exact zero.
+#[test]
+fn evidence_lost_before_the_draw_charges_the_reservation_and_an_empty_ledger_charges_zero() {
+    let lost = attempt();
+    relay(&lost, vec![Some(responded())]);
+    std::fs::remove_dir_all(lost.directory.join("model-requests")).expect("lose the evidence");
+    let coverage = persist(&lost).expect("persisted");
+    assert_eq!(coverage, Coverage::Unknown, "lost evidence is never zero");
+    let frame = super::super::super::repair::SingleShotDraw::of(&lost.request).expect("lineage");
+    frame.retain(&lost.directory, &coverage).expect("retained");
+    let draw = frame.retained(&lost.directory).expect("retained draw");
+    assert_eq!(usage(&draw)["provenance"], "unknown");
+    assert_eq!(usage(&draw)["charged"]["model_requests"], CEILING, "the reservation is charged");
+
+    let empty = attempt();
+    super::super::requests::RequestFiles::new(&empty.directory).expect("pre-created before the broker");
+    let coverage = persist(&empty).expect("persisted");
+    assert_eq!(coverage.observed_requests(None), Some(0));
+    frame.retain(&empty.directory, &coverage).expect("retained");
+    let draw = frame.retained(&empty.directory).expect("retained draw");
+    assert_eq!(usage(&draw)["provenance"], "host_measured");
+    assert_eq!(usage(&draw)["charged"]["model_requests"], 0, "no request reached upstream");
+}
+
 #[test]
 fn without_retained_evidence_or_a_retained_draw_the_reservation_is_charged() {
     let attempt = attempt();

@@ -86,6 +86,49 @@ fn ready_snapshot(model: &str) -> crate::execution_binding::serving::SnapshotRep
     }
 }
 
+/// A served attempt's evidence directory proves a count only while it is
+/// retained: pre-created and empty it is exactly zero, missing it is
+/// `unknown`, and the draw then charges the reservation.
+// r[verify lattice.serving_binding.brokered_evidence.scenario.charged]
+// r[verify lattice.implementation_attempt.observed_charge.scenario.incomplete]
+#[test]
+fn missing_served_evidence_is_unknown_and_an_empty_retained_directory_is_zero() {
+    let served = served();
+    let admitted = super::super::load(&served.directory, &served.request).expect("load").expect("binding");
+    let mut request = served.request.clone();
+    request.lineage = Some(crate::implementation_attempt::lineage::tests::binding(4, 4));
+    let frame = super::super::super::repair::SingleShotDraw::of(&request).expect("lineage");
+    let ceiling = request.omp.model_broker.max_requests;
+    let coverage =
+        |directory: &std::path::Path| super::super::requests::coverage(&admitted, directory).expect("coverage");
+    let missing = coverage(&served.directory);
+    assert_eq!(missing, lattice_core::execution_binding::serving::usage::ModelRequestCoverage::Unknown);
+    let mut files = super::super::requests::RequestFiles::new(&served.directory).expect("pre-created evidence");
+    let empty = coverage(&served.directory);
+    assert_eq!(empty.observed_requests(None), Some(0), "a retained empty directory proves no request");
+    assert_eq!(frame.draw(Some(&empty))["usage"][0]["charged"]["model_requests"], 0);
+    // A request is recorded, then the directory is lost before the draw.
+    let mut port = crate::execution_binding::serving::FixtureOwner::default();
+    {
+        let session =
+            crate::execution_binding::serving::gate::Session::new(&admitted, "incarnation-a", &mut port, &mut files)
+                .expect("session");
+        let mut gate = crate::candidate_worker::broker::OwnerGate {
+            session,
+            route_name: super::super::PRIMARY_ROUTE.into(),
+        };
+        crate::candidate_worker::broker::ModelRequestGate::exhausted(&mut gate).expect("recorded");
+    }
+    std::fs::remove_dir_all(served.directory.join("model-requests")).expect("lose the evidence");
+    let lost = coverage(&served.directory);
+    assert_eq!(lost, lattice_core::execution_binding::serving::usage::ModelRequestCoverage::Unknown);
+    assert_eq!(lost.observed_requests(None), None, "lost evidence is never zero");
+    let draw = frame.draw(Some(&lost));
+    assert_eq!(draw["usage"][0]["provenance"], "unknown");
+    assert_eq!(draw["usage"][0]["model_requests"], serde_json::Value::Null);
+    assert_eq!(draw["usage"][0]["charged"]["model_requests"], ceiling, "the reservation is charged");
+}
+
 #[test]
 fn inspect_names_the_missing_port_and_shows_the_budget_refusal_once() {
     let served = served();

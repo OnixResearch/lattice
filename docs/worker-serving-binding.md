@@ -213,9 +213,12 @@ existing `Scope::Attempt` `lattice.command-worker-usage.v1` observation:
 | Binding | `model_requests` coverage |
 |---|---|
 | No serving declaration, broker evidence retained | `{"brokered_unattributed": {"schema": "lattice.brokered-model-request-usage.v1", "is_count_complete": …, "dispatched_requests": …, "unconfirmed_requests": …, "uncertain_requests": …, "unknown_usage_requests": …, "known_input_tokens": …, "known_output_tokens": …, "requests": […]}}` |
-| No serving declaration, no `model-requests/` directory (an attempt from before #31) | `"unknown"`: unobserved, never zero |
+| No `model-requests/` directory, served or not (an attempt from before #31, or evidence lost) | `"unknown"`: unobserved, never zero |
 | No-model worker | `"no_model"`; no counters |
-| Served routes | `{"served": {"schema": "lattice.model-request-usage.v1", "is_complete": …, "services": […], "overrun": {…}}}` |
+| Served routes, evidence retained | `{"served": {"schema": "lattice.model-request-usage.v1", "is_complete": …, "services": […], "overrun": {…}}}` |
+
+Only the directory the broker created and synced before it ran proves a
+count: retained and empty it proves zero requests; missing, nothing.
 
 `brokered_unattributed` is measured and unattributed; `unknown` is
 unobserved. Its `is_count_complete` holds when every intent has a terminal

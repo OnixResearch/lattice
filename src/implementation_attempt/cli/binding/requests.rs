@@ -162,21 +162,28 @@ pub(in super::super) fn load<I: serde::de::DeserializeOwned, R: serde::de::Deser
     Ok(Some((intents, records)))
 }
 
-/// Summarize the retained evidence for #13; conflicts fail closed. A binding
-/// without a serving declaration and without the evidence directory, as an
-/// attempt run before brokered evidence existed, stays `unknown`.
+/// Summarize the retained evidence for #13; conflicts fail closed. Only the
+/// directory the broker pre-creates can prove a count, zero included: without
+/// it the coverage is `unknown`, served or not (`no_model` stays `no_model`),
+/// so lost evidence is never charged as zero requests.
+// r[impl lattice.serving_binding.brokered_evidence.scenario.charged]
 pub(in super::super) fn coverage(
     admitted: &Admitted,
     attempt_directory: &std::path::Path,
 ) -> Result<lattice_core::execution_binding::serving::usage::ModelRequestCoverage, String> {
     let summary = if admitted.serving.is_some() {
-        let (intents, records) = load::<Intent, Record>(attempt_directory)?.unwrap_or_default();
-        lattice_core::execution_binding::serving::usage::summarize(admitted, &intents, &records)
+        match load::<Intent, Record>(attempt_directory)? {
+            Some((intents, records)) => {
+                lattice_core::execution_binding::serving::usage::summarize(admitted, &intents, &records)
+            }
+            None => Ok(lattice_core::execution_binding::serving::usage::ModelRequestCoverage::Unknown),
+        }
     } else {
         match load::<BrokeredIntent, BrokeredRecord>(attempt_directory)? {
             Some((intents, records)) => {
                 lattice_core::execution_binding::serving::brokered::summarize(admitted, &intents, &records)
             }
+            // No evidence: `unknown`, or `no_model` for a no-model binding.
             None => lattice_core::execution_binding::serving::usage::summarize(admitted, &[], &[]),
         }
     };
