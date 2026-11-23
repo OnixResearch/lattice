@@ -13,7 +13,7 @@
 
 - [x] [serial] Run focused behavior regressions for real request/response, malformed input, body/header bounds, redirects, timeout, cancellation and TLS rejection. r[lattice.native_http.bounds] r[lattice.native_http.security] r[lattice.native_http.cancellation]
 - [x] [serial] Exercise actual standalone authorized and denied local HTTP execution; record observed output and no-request evidence. r[lattice.native_http.authority]
-- [ ] [serial] Parent runs coordinated checks and lifecycle closeout using observed evidence, never marking runtime tasks from structural gates alone. r[lattice.native_http.authority]
+- [x] [serial] Parent runs coordinated checks and lifecycle closeout using observed evidence, never marking runtime tasks from structural gates alone. r[lattice.native_http.authority]
 
 ## Observed verification boundary
 
@@ -23,6 +23,9 @@ unchanged repository Cargo configuration. All 143 resolved registry package
 identities matched the existing product lock. A real TCP API smoke observed
 `GET /smoke`, HTTP 201, and exact body `native` (six bytes). See
 `evidence/native-transport-observations.json` for source BLAKE3 identities,
-commands, setup failures, and scope. This does not exercise the full library,
-standalone authority path, or coordinated product gates; those tasks stay open.
+commands, setup failures, and scope.
+
+Coordinated closeout at `08f07749` observed:
+- `cargo test --locked --test test_native_http_transport --test test_native_http_authority`: 9/9 transport tests and 1/1 standalone CLI authority test passed (`actual_cli_authorized_http_reaches_server_and_missing_authority_does_not`).
+- `scripts/check.rs` exited 0, `octet-precommit-check` exited 0 (0 new / 0 stale), and `cairn validate --strict --policy cairn-policy/generated/cairn-policy.json` reported 0 findings.
 

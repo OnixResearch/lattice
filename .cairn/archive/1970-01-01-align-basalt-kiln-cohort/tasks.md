@@ -14,5 +14,10 @@
 
 - [x] [serial] Run `cargo check -p lattice --all-targets`, the focused library tests (authority, OIDC, GitHub CI, effect authority, operation shell, workflow exchange) and the integration tests (Choregraph effect authority, GitHub CI Mantle, headless, role-protocol authority). r[lattice.repository_validation.basalt_cohort]
 - [x] [serial] Run `cargo clippy -p lattice --no-deps --all-targets -- -D warnings`. r[lattice.repository_validation.basalt_cohort]
-- [ ] [serial] Re-key Octet once in the relocation integration. r[lattice.repository_validation.basalt_cohort]
+- [x] [serial] Re-key Octet once in the relocation integration. r[lattice.repository_validation.basalt_cohort]
 - [x] [serial] Re-sync at published Basalt `main` `fac0d7f1`. Confirm that its Rust code equals the candidate's (only doc-comment wording differs), update `SOURCE` and the README pin, and rerun `cargo check -p lattice --all-targets` and the exchange tests. r[lattice.repository_validation.basalt_cohort.scenario.provenance]
+
+## Closeout verification
+
+- Octet baselines were admitted for the relocation cohort in `ab38ab89` (`octet-baseline.json` and `crates/lattice-core/octet-baseline.json`).
+- Re-verified at `08f07749`: `octet-precommit-check` exited 0 (0 new / 0 stale on `lattice` and `lattice-core`), `scripts/check.rs` exited 0, and `cairn validate --strict` reported 0 findings.
