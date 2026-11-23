@@ -1,0 +1,55 @@
+{
+  "schema": "lattice.fixture-qualification.v1",
+  "change": "align-cairn-main",
+  "kind": "local-verification",
+  "live_qualification": false,
+  "base_revision": "5a8e1d51",
+  "recorded_on": "2026-11-23",
+  "producer": {
+    "repository": "https://github.com/OnixResearch/cairn.git",
+    "commit": "317d3ff648f01a5ea1572e6126f4dd71bc7afa99",
+    "native_binary": "/nix/store/nc498h43kyxsh3yfbrypqjprg9pzh2qs-cairn-0.2.1/bin/cairn"
+  },
+  "lock_delta": {
+    "cairn": ["47ea1b867c44b026c030b535f9a1041950c482a0", "317d3ff648f01a5ea1572e6126f4dd71bc7afa99"],
+    "renamed": "cairn/slotcar -> cairn/octet (same revision 2f8213a88781d9d38bb81319d06a50805d48ccd3 and narHash)",
+    "added": ["cairn/bounded-exec", "cairn/cap-root", "cairn/durable-file-publication", "cairn/kiln-core", "cairn/mantle-build-contract"],
+    "inputs_outside_cairn_changed": []
+  },
+  "policy": {
+    "snapshots": "contracts.ncl and upstream-default.ncl copied verbatim from 317d3ff6; their imports are identical at that revision",
+    "export_check": "policy fresh (exit 0)",
+    "generated_blake3": "d920b75e88d06b624c8b3ec4705b5a0f7f5d5ea2295de626e5e31da175874c37",
+    "delta": "the 18 changed JSON paths and values equal Cairn's own generated-policy delta from 5e1fe08d to 317d3ff6, all under generated_agent_workflow_policy and the gate receipt keys; Lattice-owned fields are unchanged",
+    "readiness_catalog": "readiness and drain-plan-readiness are filed under command_class readiness",
+    "old_snapshot_rejected": "the 9082e1ae binary refused the 5e1fe08d-snapshot policy: policy has invalid field generated_agent_workflow_policy",
+    "malformed_gate_lists_refused_at_export": ["[]", "string", "[\"\"]", "[\"  \"]", "duplicate", "[1]", "null element", "null", "non-object policy", "absent list"]
+  },
+  "gates": {
+    "validate": {"exit": 0, "valid": true, "issues": 0},
+    "doctor": {"exit": 0, "valid": true, "issues": 0},
+    "change_gates": {"run": 108, "failed": 0},
+    "traceability_coverage": {"exit": 1, "missing": 87, "dangling": 435, "note": "identical to the 47ea1b86 binary on main (87 missing, 432 dangling) plus this change's three markers"},
+    "implementation_ready": {"exit": 0, "active_change_count": 36}
+  },
+  "release_readiness": {
+    "inputs_exit": 0,
+    "exit": 0,
+    "verdict": "fail",
+    "repository_gate_summary": "consumer-selected-gates",
+    "failing_checks": ["traceability_coverage", "mcp_agent_smoke", "preserves_corpus_freshness"],
+    "comparison": "same verdict, checks and gate list as the 47ea1b86 receipt; not byte-identical, because each binary refuses the other's policy and Cairn reworded repository_gate_summary.note"
+  },
+  "tests": {
+    "command": "cargo test --all-features --locked --no-fail-fast --test outcome_machine_lifecycle --test test_release_readiness_integration --test test_repository_validation --test test_traceability_policy --test test_render_workflow",
+    "exit": 0,
+    "passed": {"outcome_machine_lifecycle": 1, "test_release_readiness_integration": 16, "test_render_workflow": 14, "test_repository_validation": 1, "test_traceability_policy": 6},
+    "clock_tests": {"runs": 5, "passed_each": 2, "load_average": "29-67"},
+    "repair_module": {"passed": 49, "failed": 0}
+  },
+  "not_run": ["scripts/check.rs", "nix flake check"],
+  "non_claims": [
+    "local Cairn gates and focused tests are not the full repository gate run",
+    "the release-readiness verdict remains fail and authorizes no release"
+  ]
+}
