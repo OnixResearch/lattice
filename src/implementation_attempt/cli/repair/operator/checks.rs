@@ -128,26 +128,13 @@ impl<'a, 'r> CatalogPort<'a, 'r> {
     }
 }
 
-/// The bounded process of `entry` on `candidate`: the request's read paths
-/// that exist in the copy, read-only, and no write path, network, broker or
-/// credential. Its deadline is the loop's, within the envelope's seconds and
-/// the admission's remaining whole seconds on `clock`.
-fn process(
+/// A check's timeout: the loop's `deadline`, within the envelope's seconds
+/// and the admission's remaining whole seconds on `clock`, and never zero.
+fn bounded_timeout_secs(
     request: &super::super::super::Request,
-    sandbox: &crate::candidate_worker::broker::Executable,
-    entry: &crate::implementation_attempt::repair::checks::catalog::Entry,
-    candidate: &std::path::Path,
     deadline: std::time::Duration,
     clock: &dyn crate::operation::shell::Clock,
-) -> Result<crate::candidate_worker::Request, String> {
-    debug_assert!(entry.program.path.is_absolute(), "a pinned program path is absolute");
-    debug_assert!(!candidate.as_os_str().is_empty(), "a check runs on its copy");
-    let sandbox = crate::candidate_worker::broker::admission::executable(sandbox)?;
-    let program = crate::candidate_worker::broker::admission::executable(&entry.program)?;
-    let read_paths: Vec<String> =
-        request.read_paths.iter().filter(|path| candidate.join(path.as_str()).exists()).cloned().collect();
-    let boundary = crate::candidate_capture::admit_workspace_boundary(candidate, &read_paths, &[], false, false)
-        .map_err(|error| error.to_string())?;
+) -> Result<u64, String> {
     let remaining_ms = request
         .expires_at_ms
         .checked_sub(super::super::super::epoch_ms(clock)?)
@@ -158,6 +145,28 @@ fn process(
         return Err("admission expires before a bounded check".into());
     }
     debug_assert!(timeout_secs <= request.envelope.budget.max_seconds, "within the envelope's seconds");
+    Ok(timeout_secs)
+}
+
+/// The bounded process of `entry` on `candidate`: the request's read paths
+/// that exist in the copy, read-only, and no write path, network, broker or
+/// credential, stopped after `timeout_secs`.
+fn process(
+    request: &super::super::super::Request,
+    sandbox: &crate::candidate_worker::broker::Executable,
+    entry: &crate::implementation_attempt::repair::checks::catalog::Entry,
+    candidate: &std::path::Path,
+    timeout_secs: u64,
+) -> Result<crate::candidate_worker::Request, String> {
+    debug_assert!(entry.program.path.is_absolute(), "a pinned program path is absolute");
+    debug_assert!(!candidate.as_os_str().is_empty(), "a check runs on its copy");
+    debug_assert!(timeout_secs > 0, "a bounded check has time to run");
+    let sandbox = crate::candidate_worker::broker::admission::executable(sandbox)?;
+    let program = crate::candidate_worker::broker::admission::executable(&entry.program)?;
+    let read_paths: Vec<String> =
+        request.read_paths.iter().filter(|path| candidate.join(path.as_str()).exists()).cloned().collect();
+    let boundary = crate::candidate_capture::admit_workspace_boundary(candidate, &read_paths, &[], false, false)
+        .map_err(|error| error.to_string())?;
     let envelope = &request.envelope;
     Ok(crate::candidate_worker::Request {
         work_id: envelope.work_id.clone(),
@@ -210,7 +219,8 @@ impl super::super::CheckPort for CatalogPort<'_, '_> {
         // the check unrun and its outcome unknown.
         let is_current = grant.recheck(request, *clock).is_none() && !cancel.is_cancel_requested();
         let outcome = if is_current {
-            process(request, &catalog.sandbox, entry, candidate, deadline, *clock)
+            bounded_timeout_secs(request, deadline, *clock)
+                .and_then(|timeout_secs| process(request, &catalog.sandbox, entry, candidate, timeout_secs))
                 .and_then(|process| {
                     super::polled(|cancellation| execute.execute(&process, cancellation), &|| {
                         cancel.is_cancel_requested()

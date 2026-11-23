@@ -103,7 +103,7 @@ fn a_complete_brokered_run_draws_exactly_its_requests_as_observed_and_replays_th
         panic!("brokered coverage, got {coverage:?}");
     };
     assert_eq!((summary.dispatched_requests, summary.is_count_complete), (3, true));
-    let frame = super::super::super::repair::SingleShotDraw::of(&attempt.request).expect("lineage");
+    let frame = super::super::draw::SingleShot::of(&attempt.request).expect("lineage");
     frame.retain(&attempt.directory, &coverage).expect("retained before the result");
     let draw = frame.retained(&attempt.directory).expect("retained draw");
     assert_eq!(usage(&draw)["model_requests"], 3);
@@ -138,7 +138,7 @@ fn one_intent_without_a_record_draws_the_reservation_with_unknown_provenance() {
         panic!("brokered coverage, got {coverage:?}");
     };
     assert_eq!((summary.dispatched_requests, summary.unconfirmed_requests), (2, 1));
-    let frame = super::super::super::repair::SingleShotDraw::of(&attempt.request).expect("lineage");
+    let frame = super::super::draw::SingleShot::of(&attempt.request).expect("lineage");
     frame.retain(&attempt.directory, &coverage).expect("retained");
     let draw = frame.retained(&attempt.directory).expect("retained draw");
     assert_eq!(usage(&draw)["model_requests"], serde_json::Value::Null, "unknown, never zero");
@@ -156,7 +156,7 @@ fn evidence_lost_before_the_draw_charges_the_reservation_and_an_empty_ledger_cha
     std::fs::remove_dir_all(lost.directory.join("model-requests")).expect("lose the evidence");
     let coverage = persist(&lost).expect("persisted");
     assert_eq!(coverage, Coverage::Unknown, "lost evidence is never zero");
-    let frame = super::super::super::repair::SingleShotDraw::of(&lost.request).expect("lineage");
+    let frame = super::super::draw::SingleShot::of(&lost.request).expect("lineage");
     frame.retain(&lost.directory, &coverage).expect("retained");
     let draw = frame.retained(&lost.directory).expect("retained draw");
     assert_eq!(usage(&draw)["provenance"], "unknown");
@@ -178,7 +178,7 @@ fn without_retained_evidence_or_a_retained_draw_the_reservation_is_charged() {
     // No broker created the evidence directory: an attempt from before #31.
     let coverage = persist(&attempt).expect("persisted");
     assert_eq!(coverage, Coverage::Unknown, "missing evidence is unobserved, not zero");
-    let frame = super::super::super::repair::SingleShotDraw::of(&attempt.request).expect("lineage");
+    let frame = super::super::draw::SingleShot::of(&attempt.request).expect("lineage");
     relay(&attempt, vec![Some(responded())]);
     // Complete evidence without a retained draw is never derived into a lower draw.
     let draw = frame.retained(&attempt.directory).expect("ceiling");
@@ -191,7 +191,7 @@ fn without_retained_evidence_or_a_retained_draw_the_reservation_is_charged() {
     other.lineage = Some(crate::implementation_attempt::lineage::tests::binding(5, 4));
     let coverage = super::super::requests::coverage(&attempt.admitted, &attempt.directory).expect("coverage");
     frame.retain(&attempt.directory, &coverage).expect("retained");
-    let crossed = super::super::super::repair::SingleShotDraw::of(&other).expect("other lineage");
+    let crossed = super::super::draw::SingleShot::of(&other).expect("other lineage");
     assert!(crossed.retained(&attempt.directory).is_err(), "a crossed draw is refused");
 }
 

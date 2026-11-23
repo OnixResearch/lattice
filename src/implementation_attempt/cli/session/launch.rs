@@ -59,7 +59,7 @@ pub(in super::super) struct WorkerStep {
     pub(in super::super) receipt: super::super::binding::usage::WorkerReceipt,
     pub(in super::super) serving: Box<dyn crate::execution_binding::serving::OwnerPort>,
     /// The lineage draw to retain before the result, when the request has a lineage.
-    pub(in super::super) draw: Option<super::super::repair::SingleShotDraw>,
+    pub(in super::super) draw: Option<super::super::binding::draw::SingleShot>,
 }
 
 impl WorkerStep {
@@ -136,11 +136,11 @@ impl WorkerStep {
 
     fn observe(mut self, cancellation: &std::sync::atomic::AtomicBool) -> Result<(), String> {
         let credentials = credentials(&self.profile)?;
-        let started_epoch_ms = super::super::now_ms().ok();
+        let started_epoch_ms = super::super::epoch_ms(&crate::operation::shell::SystemClock).ok();
         let result = self.run_worker(cancellation, &credentials)?;
         let window = super::super::binding::usage::WorkerWindow {
             started_epoch_ms,
-            finished_epoch_ms: super::super::now_ms().ok(),
+            finished_epoch_ms: super::super::epoch_ms(&crate::operation::shell::SystemClock).ok(),
         };
         self.retain_events(&result)?;
         // The attempt usage observation and the lineage draw precede the

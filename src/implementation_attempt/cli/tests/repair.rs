@@ -884,10 +884,10 @@ fn absent_policy_and_lineage_keep_request_bytes_and_revision_and_a_policy_moves_
 #[test]
 fn a_single_shot_attempt_with_a_lineage_reports_its_conservative_draw() {
     let mut request = super::host_local();
-    assert!(super::super::repair::SingleShotDraw::of(&request).is_none(), "no lineage, no draw");
+    assert!(super::super::binding::draw::SingleShot::of(&request).is_none(), "no lineage, no draw");
     let lineage = crate::implementation_attempt::lineage::tests::binding(4, 4);
     request.lineage = Some(lineage.clone());
-    let frame = super::super::repair::SingleShotDraw::of(&request).expect("draw frame");
+    let frame = super::super::binding::draw::SingleShot::of(&request).expect("draw frame");
     let directory = tempfile::tempdir().expect("attempt directory");
     // Nothing retained: the broker ceiling, unknown.
     let draw = frame.retained(directory.path()).expect("draw");

@@ -104,6 +104,17 @@ pub trait Sink: Send {
     fn highest_ordinal(&self, route_name: &str) -> Result<u64, String>;
 }
 
+/// The highest retained ordinal of each declared route. A session over
+/// retained evidence continues after it, so a restarted session never reuses
+/// a request identity whose intent or record exists.
+// r[impl lattice.serving_binding.brokered_evidence.scenario.conflict]
+fn retained_ordinals(
+    sink: &dyn Sink,
+    routes: &[lattice_core::execution_binding::serving::Route],
+) -> Result<std::collections::BTreeMap<String, u64>, String> {
+    routes.iter().map(|route| Ok((route.name.clone(), sink.highest_ordinal(&route.name)?))).collect()
+}
+
 /// The standalone CLI's port: every serving fact is unavailable.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct UnavailableOwner;

@@ -36,7 +36,7 @@ pub(super) fn recover(
         // The retained draw is replayed as retained, never derived again.
         // r[impl lattice.implementation_attempt.lineage.scenario.usage]
         // r[impl lattice.implementation_attempt.observed_charge.scenario.replay]
-        if let Some(draw) = super::repair::SingleShotDraw::of(request) {
+        if let Some(draw) = super::binding::draw::SingleShot::of(request) {
             fields.insert("budget_lineage".to_owned(), draw.retained(directory)?);
         }
     }

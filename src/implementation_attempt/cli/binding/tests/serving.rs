@@ -97,7 +97,7 @@ fn missing_served_evidence_is_unknown_and_an_empty_retained_directory_is_zero() 
     let admitted = super::super::load(&served.directory, &served.request).expect("load").expect("binding");
     let mut request = served.request.clone();
     request.lineage = Some(crate::implementation_attempt::lineage::tests::binding(4, 4));
-    let frame = super::super::super::repair::SingleShotDraw::of(&request).expect("lineage");
+    let frame = super::super::draw::SingleShot::of(&request).expect("lineage");
     let ceiling = request.omp.model_broker.max_requests;
     let coverage =
         |directory: &std::path::Path| super::super::requests::coverage(&admitted, directory).expect("coverage");

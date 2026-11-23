@@ -217,7 +217,8 @@ fn instance(
         serving_readiness: &profile.serving_readiness,
         pinned: &pinned,
     };
-    let observed_at_epoch_ms = i64::try_from(super::now_ms()?).map_err(|error| error.to_string())?;
+    let observed_at_epoch_ms =
+        i64::try_from(super::epoch_ms(&crate::operation::shell::SystemClock)?).map_err(|error| error.to_string())?;
     lattice_core::execution_binding::projection::retained::project_instance(&state, observed_at_epoch_ms)
         .map_err(|defect| format!("retained attempt state is inconsistent: {defect:?}"))
 }

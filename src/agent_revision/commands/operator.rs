@@ -38,7 +38,7 @@ pub fn check(request: &Request, session: &str) -> Result<(), AdmitRefusal> {
 /// attempt session opens no store.
 pub(crate) fn admit(request: &Request, store: &std::path::Path, session: &str) -> Result<Decision, String> {
     check(request, session).map_err(|refusal| refusal.to_string())?;
-    request.validate(crate::implementation_attempt::cli::now_ms()?)?;
+    request.validate(crate::implementation_attempt::cli::epoch_ms(&crate::operation::shell::SystemClock)?)?;
     let decision = super::super::seam::admit(&super::open(store)?, request, session)?;
     debug_assert_ne!(session, request.envelope.identity());
     Ok(decision)

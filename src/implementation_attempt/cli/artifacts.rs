@@ -172,7 +172,7 @@ fn normalized_request(request_path: &std::path::Path) -> Result<(super::Request,
     request.envelope.worker_profile = request.worker_profile_identity()?;
     request.admitted_envelope = request.envelope.identity();
     super::binding::normalize_primary_route(&mut request)?;
-    request.validate(super::now_ms()?)?;
+    request.validate(super::epoch_ms(&crate::operation::shell::SystemClock)?)?;
     let bytes = serde_json::to_vec_pretty(&request).map_err(|error| error.to_string())?;
     Ok((request, bytes))
 }

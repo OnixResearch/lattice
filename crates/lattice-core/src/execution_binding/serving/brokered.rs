@@ -16,6 +16,8 @@
 // r[impl lattice.serving_binding.brokered_evidence]
 // r[impl lattice.serving_binding.brokered_evidence.scenario.unattributed]
 
+mod ledger;
+
 pub const INTENT_SCHEMA: &str = "lattice.brokered-model-request-dispatch.v1";
 pub const RECORD_SCHEMA: &str = "lattice.brokered-model-request-observation.v1";
 pub const USAGE_SCHEMA: &str = "lattice.brokered-model-request-usage.v1";
@@ -193,14 +195,14 @@ pub fn summarize(
     if is_empty && matches!(admitted.model_routes, super::super::request::RouteDeclaration::NoModel {}) {
         return Ok(super::usage::ModelRequestCoverage::NoModel);
     }
-    let intents = super::usage::unique(
+    let intents = super::record::unique(
         intents,
-        |intent| check(admitted, (&intent.schema, INTENT_SCHEMA), &owner_of_intent(intent)),
+        |intent| ledger::check(admitted, (&intent.schema, INTENT_SCHEMA), &ledger::owner_of_intent(intent)),
         super::usage::Conflict::ConflictingIntent,
     )?;
-    let records = super::usage::unique(
+    let records = super::record::unique(
         records,
-        |record| check_record(admitted, record),
+        |record| ledger::check_record(admitted, record),
         super::usage::Conflict::ConflictingRecord,
     )?;
     let mut entries = Vec::with_capacity(intents.len().min(MAX_REQUESTS));
@@ -209,149 +211,16 @@ pub fn summarize(
         if intent.request_index != record.request_index || intent.route_name != record.route_name {
             return Err(super::usage::Conflict::ConflictingIntent);
         }
-        entries.push(recorded(record));
+        entries.push(ledger::recorded(record));
     }
     for intent in intents.values().filter(|intent| !records.contains_key(intent.request_id.as_str())) {
-        entries.push(unconfirmed(intent));
+        entries.push(ledger::unconfirmed(intent));
     }
     if entries.len() > MAX_REQUESTS {
         return Err(super::usage::Conflict::Bound);
     }
     entries.sort_by_key(|entry| entry.request_index);
-    let summary = tally(entries)?;
+    let summary = ledger::tally(entries)?;
     debug_assert_eq!(usize::try_from(summary.dispatched_requests).ok(), Some(summary.requests.len()));
     Ok(super::usage::ModelRequestCoverage::BrokeredUnattributed(Box::new(summary)))
-}
-
-/// Binding identity, attempt, fence, route, request id and request index.
-type Owner<'a> = (&'a str, &'a str, u64, &'a str, &'a str, u64);
-
-const fn owner_of_intent(intent: &Intent) -> Owner<'_> {
-    (
-        intent.binding_identity.as_str(),
-        intent.attempt_id.as_str(),
-        intent.fence,
-        intent.route_name.as_str(),
-        intent.request_id.as_str(),
-        intent.request_index,
-    )
-}
-
-fn check_record(admitted: &Admitted, record: &Record) -> Result<(), super::record::Mismatch> {
-    let owner = (
-        record.binding_identity.as_str(),
-        record.attempt_id.as_str(),
-        record.fence,
-        record.route_name.as_str(),
-        record.request_id.as_str(),
-        record.request_index,
-    );
-    check(admitted, (&record.schema, RECORD_SCHEMA), &owner)?;
-    let is_settled = match record.outcome.class {
-        super::record::OutcomeClass::Completed => true,
-        super::record::OutcomeClass::Uncertain => record.usage == super::record::Usage::UNKNOWN,
-        super::record::OutcomeClass::NotDispatched | super::record::OutcomeClass::ResponseRejected => false,
-    };
-    require(is_settled, super::record::Mismatch::Inconsistent)
-}
-
-/// The evidence belongs to this binding, a declared route and its own index.
-fn check(admitted: &Admitted, schema: (&str, &str), owner: &Owner<'_>) -> Result<(), super::record::Mismatch> {
-    let (binding_identity, attempt_id, fence, route_name, request, request_index) = *owner;
-    require(schema.0 == schema.1, super::record::Mismatch::Schema)?;
-    super::record::check_owner(admitted, (binding_identity, attempt_id, fence))?;
-    let super::super::request::RouteDeclaration::Routes { routes } = &admitted.model_routes else {
-        return Err(super::record::Mismatch::UndeclaredRoute);
-    };
-    require(routes.iter().any(|route| route.name == route_name), super::record::Mismatch::UndeclaredRoute)?;
-    require(request == request_id(binding_identity, request_index), super::record::Mismatch::Crossed {
-        field: "request_id",
-    })
-}
-
-impl super::usage::HasRequest for Intent {
-    fn request_id(&self) -> &str {
-        &self.request_id
-    }
-}
-
-impl super::usage::HasRequest for Record {
-    fn request_id(&self) -> &str {
-        &self.request_id
-    }
-}
-
-fn require(condition: bool, mismatch: super::record::Mismatch) -> Result<(), super::record::Mismatch> {
-    if condition { Ok(()) } else { Err(mismatch) }
-}
-
-fn recorded(record: &Record) -> Entry {
-    Entry {
-        request_id: record.request_id.clone(),
-        request_index: record.request_index,
-        route_name: record.route_name.clone(),
-        class: match record.outcome.class {
-            super::record::OutcomeClass::Completed => super::usage::EntryClass::Completed,
-            super::record::OutcomeClass::Uncertain => super::usage::EntryClass::Uncertain,
-            super::record::OutcomeClass::NotDispatched => super::usage::EntryClass::NotDispatched,
-            super::record::OutcomeClass::ResponseRejected => super::usage::EntryClass::ResponseRejected,
-        },
-        outcome: record.outcome.label.clone(),
-        usage: record.usage,
-        provider_receipt_identity: record.provider_receipt_identity.clone(),
-    }
-}
-
-fn unconfirmed(intent: &Intent) -> Entry {
-    Entry {
-        request_id: intent.request_id.clone(),
-        request_index: intent.request_index,
-        route_name: intent.route_name.clone(),
-        class: super::usage::EntryClass::DispatchUnconfirmed,
-        outcome: "dispatch-unconfirmed".to_owned(),
-        usage: super::record::Usage::UNKNOWN,
-        provider_receipt_identity: None,
-    }
-}
-
-fn tally(requests: Vec<Entry>) -> Result<Summary, super::usage::Conflict> {
-    let add = |total: u64, amount: u64| total.checked_add(amount).ok_or(super::usage::Conflict::Overflow);
-    let mut summary = Summary {
-        schema: USAGE_SCHEMA.to_owned(),
-        is_count_complete: false,
-        dispatched_requests: 0,
-        unconfirmed_requests: 0,
-        uncertain_requests: 0,
-        unknown_usage_requests: 0,
-        known_input_tokens: 0,
-        known_output_tokens: 0,
-        requests: Vec::new(),
-    };
-    for entry in &requests {
-        summary.dispatched_requests = add(summary.dispatched_requests, 1)?;
-        match entry.class {
-            super::usage::EntryClass::DispatchUnconfirmed => {
-                summary.unconfirmed_requests = add(summary.unconfirmed_requests, 1)?;
-            }
-            super::usage::EntryClass::Uncertain => summary.uncertain_requests = add(summary.uncertain_requests, 1)?,
-            super::usage::EntryClass::NotDispatched
-            | super::usage::EntryClass::Completed
-            | super::usage::EntryClass::ResponseRejected => {}
-        }
-        let super::record::Usage {
-            input_tokens: super::record::Counter::Known(input),
-            output_tokens: super::record::Counter::Known(output),
-            origin: super::record::UsageOrigin::ProviderReported,
-        } = entry.usage
-        else {
-            summary.unknown_usage_requests = add(summary.unknown_usage_requests, 1)?;
-            continue;
-        };
-        summary.known_input_tokens = add(summary.known_input_tokens, input)?;
-        summary.known_output_tokens = add(summary.known_output_tokens, output)?;
-    }
-    summary.is_count_complete = summary.unconfirmed_requests == 0 && summary.uncertain_requests == 0;
-    summary.requests = requests;
-    debug_assert!(summary.unknown_usage_requests <= summary.dispatched_requests);
-    Ok(summary)
 }

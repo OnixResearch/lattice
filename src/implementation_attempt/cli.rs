@@ -224,10 +224,6 @@ impl Request {
     }
 }
 
-pub(crate) fn now_ms() -> Result<u64, String> {
-    epoch_ms(&crate::operation::shell::SystemClock)
-}
-
 /// `clock`'s current epoch milliseconds.
 pub(crate) fn epoch_ms(clock: &dyn crate::operation::shell::Clock) -> Result<u64, String> {
     u64::try_from(clock.observe_epoch_millis()).map_err(|error| error.to_string())

@@ -60,42 +60,38 @@ impl super::ModelRequestGate for super::RecordedRoute<'_> {
 }
 
 /// The outcome, provider-reported counters and provider receipt of one call.
-/// Counters are known only when both were reported; a receipt that is not an
-/// opaque producer token is dropped, never truncated.
+/// A call that did not respond is uncertain, with unknown usage and no receipt.
 fn terminal(upstream: crate::execution_binding::serving::gate::Upstream) -> (Outcome, Usage, Option<String>) {
-    let uncertain = |label: &str| Outcome {
-        class: OutcomeClass::Uncertain,
+    let label = match upstream {
+        crate::execution_binding::serving::gate::Upstream::Responded(facts) => return responded(facts),
+        crate::execution_binding::serving::gate::Upstream::TimedOut => "uncertain-timed-out",
+        crate::execution_binding::serving::gate::Upstream::TransportFailed => "uncertain-transport-failed",
+        crate::execution_binding::serving::gate::Upstream::Cancelled => "uncertain-cancelled",
+    };
+    (outcome(OutcomeClass::Uncertain, label), Usage::UNKNOWN, None)
+}
+
+/// A responded call. Counters are known only when both were reported; a
+/// receipt that is not an opaque producer token is dropped, never truncated.
+fn responded(facts: crate::execution_binding::serving::gate::ResponseFacts) -> (Outcome, Usage, Option<String>) {
+    let usage = match (facts.input_tokens, facts.output_tokens) {
+        (Some(input), Some(output)) => Usage {
+            input_tokens: lattice_core::execution_binding::serving::record::Counter::Known(input),
+            output_tokens: lattice_core::execution_binding::serving::record::Counter::Known(output),
+            origin: lattice_core::execution_binding::serving::record::UsageOrigin::ProviderReported,
+        },
+        _ => Usage::UNKNOWN,
+    };
+    let receipt = facts
+        .provider_receipt
+        .filter(|receipt| lattice_core::execution_binding::serving::is_producer_token(receipt));
+    (outcome(OutcomeClass::Completed, "completed"), usage, receipt)
+}
+
+fn outcome(class: OutcomeClass, label: &str) -> Outcome {
+    Outcome {
+        class,
         label: label.to_owned(),
         detail: None,
-    };
-    match upstream {
-        crate::execution_binding::serving::gate::Upstream::Responded(facts) => {
-            let usage = match (facts.input_tokens, facts.output_tokens) {
-                (Some(input), Some(output)) => Usage {
-                    input_tokens: lattice_core::execution_binding::serving::record::Counter::Known(input),
-                    output_tokens: lattice_core::execution_binding::serving::record::Counter::Known(output),
-                    origin: lattice_core::execution_binding::serving::record::UsageOrigin::ProviderReported,
-                },
-                _ => Usage::UNKNOWN,
-            };
-            let receipt = facts
-                .provider_receipt
-                .filter(|receipt| lattice_core::execution_binding::serving::is_producer_token(receipt));
-            let completed = Outcome {
-                class: OutcomeClass::Completed,
-                label: "completed".to_owned(),
-                detail: None,
-            };
-            (completed, usage, receipt)
-        }
-        crate::execution_binding::serving::gate::Upstream::TimedOut => {
-            (uncertain("uncertain-timed-out"), Usage::UNKNOWN, None)
-        }
-        crate::execution_binding::serving::gate::Upstream::TransportFailed => {
-            (uncertain("uncertain-transport-failed"), Usage::UNKNOWN, None)
-        }
-        crate::execution_binding::serving::gate::Upstream::Cancelled => {
-            (uncertain("uncertain-cancelled"), Usage::UNKNOWN, None)
-        }
     }
 }

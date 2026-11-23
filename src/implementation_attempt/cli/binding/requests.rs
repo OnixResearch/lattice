@@ -18,7 +18,7 @@ const RECORD_SUFFIX: &str = ".record.json";
 const MAX_FILE_BYTES: usize = 16_384;
 /// An intent and a record for each of an attempt's brokered requests, which
 /// also covers every served route's request ceiling.
-const MAX_FILES: usize = 2 * lattice_core::execution_binding::serving::brokered::MAX_REQUESTS;
+const MAX_FILES: usize = lattice_core::execution_binding::serving::brokered::MAX_REQUESTS.saturating_mul(2);
 
 type Intent = lattice_core::execution_binding::serving::record::DispatchIntent;
 type Record = lattice_core::execution_binding::serving::record::Observation;

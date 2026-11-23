@@ -13,6 +13,7 @@
 // r[impl lattice.execution_binding.port_boundary.scenario.unavailable]
 // r[impl lattice.execution_binding.recovery]
 
+pub(super) mod draw;
 pub(super) mod recheck;
 pub(super) mod requests;
 #[cfg(test)]

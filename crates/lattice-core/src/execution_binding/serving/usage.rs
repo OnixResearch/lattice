@@ -151,9 +151,16 @@ pub fn summarize(
             Ok(ModelRequestCoverage::Unknown)
         };
     };
-    let intents = unique(intents, |intent| super::record::check_intent(admitted, intent), Conflict::ConflictingIntent)?;
-    let records =
-        unique(records, |record| super::record::check_observation(admitted, record), Conflict::ConflictingRecord)?;
+    let intents = super::record::unique(
+        intents,
+        |intent| super::record::check_intent(admitted, intent),
+        Conflict::ConflictingIntent,
+    )?;
+    let records = super::record::unique(
+        records,
+        |record| super::record::check_observation(admitted, record),
+        Conflict::ConflictingRecord,
+    )?;
     let mut services = Vec::with_capacity(declaration.routes.len());
     for route in &declaration.routes {
         services.push(service(admitted, route, &intents, &records)?);
@@ -170,45 +177,6 @@ pub fn summarize(
         services,
         overrun,
     })))
-}
-
-/// Validate each item and collapse identical duplicates keyed by request id.
-pub(super) fn unique<T: PartialEq + HasRequest>(
-    items: &[T],
-    check: impl Fn(&T) -> Result<(), super::record::Mismatch>,
-    conflict: Conflict,
-) -> Result<std::collections::BTreeMap<&str, &T>, Conflict> {
-    for item in items {
-        check(item).map_err(|mismatch| Conflict::Mismatch { mismatch })?;
-    }
-    let mut keyed = items.iter().map(|item| (item.request_id(), item)).collect::<Vec<_>>();
-    keyed.sort_by_key(|(request_id, _)| *request_id);
-    let is_conflicting = keyed
-        .windows(2)
-        .any(|pair| matches!(pair, [(left_id, left), (right_id, right)] if left_id == right_id && left != right));
-    if is_conflicting {
-        return Err(conflict);
-    }
-    let unique = keyed.into_iter().collect::<std::collections::BTreeMap<_, _>>();
-    debug_assert!(unique.len() <= items.len());
-    debug_assert!(unique.keys().all(|request_id| !request_id.is_empty()));
-    Ok(unique)
-}
-
-pub(super) trait HasRequest {
-    fn request_id(&self) -> &str;
-}
-
-impl HasRequest for Intent {
-    fn request_id(&self) -> &str {
-        &self.request_id
-    }
-}
-
-impl HasRequest for Record {
-    fn request_id(&self) -> &str {
-        &self.request_id
-    }
 }
 
 fn service(

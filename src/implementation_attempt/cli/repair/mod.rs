@@ -15,7 +15,6 @@
 // r[impl lattice.implementation_attempt.lineage.scenario.exhausted]
 
 pub(super) mod admission;
-mod draw;
 mod evidence;
 mod materialized;
 pub(crate) mod operator;
@@ -102,7 +101,9 @@ fn frame(request: &super::Request) -> crate::implementation_attempt::repair::Fra
 
 /// The reservation of the first worker step: one broker ceiling of model
 /// requests and, with a policy, its step and check tool invocations.
-fn first_reservation(request: &super::Request) -> Result<crate::implementation_attempt::lineage::Draws, String> {
+pub(super) fn first_reservation(
+    request: &super::Request,
+) -> Result<crate::implementation_attempt::lineage::Draws, String> {
     let step_model_requests = u64::from(request.omp.model_broker.max_requests);
     match &request.repair {
         Some(policy) => policy.reservation(step_model_requests).map_err(|error| error.to_string()),
@@ -112,9 +113,6 @@ fn first_reservation(request: &super::Request) -> Result<crate::implementation_a
         }),
     }
 }
-
-/// The single-shot attempt's lineage draw, when its request has a lineage.
-pub(super) type SingleShotDraw = draw::SingleShot;
 
 /// The frozen inputs of one repair run after its intent.
 pub(super) struct Run<'a> {

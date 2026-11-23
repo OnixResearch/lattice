@@ -44,7 +44,7 @@ impl SingleShot {
     pub(in super::super) fn of(request: &super::super::Request) -> Option<Self> {
         let lineage = request.lineage.as_ref()?;
         debug_assert!(request.repair.is_none(), "a repair attempt reports its own draws");
-        let reservation = super::first_reservation(request).ok()?;
+        let reservation = super::super::repair::first_reservation(request).ok()?;
         debug_assert_eq!(reservation.tool_invocations, 0, "a single shot reserves no tool invocations");
         let mut unaccounted = lineage.unaccounted();
         if lineage.remaining.contains_key(crate::implementation_attempt::lineage::TOOL_INVOCATIONS) {
