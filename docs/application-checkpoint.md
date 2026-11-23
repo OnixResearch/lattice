@@ -96,10 +96,25 @@ before the target's exchange starts. `serve` binds its listener before it starts
 execution, so a bind failure (such as the stale socket a killed `serve` leaves behind) starts
 none.
 
-The serving binding publishes the restarted run's checkpoints, so it must declare a checkpoint
-and reproduce the deadline and attempt binding that `restore` admitted. An adoption served under
-a binding with `checkpoint: "none"`, another deadline or another attempt binding is recorded
-`unknown` and runs nothing.
+The serving binding publishes the restarted run's checkpoints and runs it in its environment and
+workspace, so it must declare a checkpoint and reproduce the deadline, attempt binding,
+environment and workspace that `restore` admitted and wrote into. An adoption served under a
+binding with `checkpoint: "none"`, another deadline, another attempt binding, another
+`environment` or another `workspace` (including one where `restore` used none) is recorded
+`unknown` and runs nothing. The adoption records the workspace path `restore` wrote into;
+adoptions written by `39936a19`, before that field existed, lack it and are refused the same
+way under every binding.
+
+In the exchange, a refused adoption's `unknown` looks exactly like an execution whose process
+died mid-run. Kiln tells them apart from the target's checkpoint root: a refused adoption ran
+nothing, so that root holds no manifest whose `producing_incarnation` is the receipt's
+`restarted_incarnation`. A restarted run that reached an effect has published one, since the
+hook publishes before every effect reservation; one that died before its first effect has none
+either, and like a refused one it dispatched nothing. The refusal is permanent on that state
+root: `serve` never runs an `unknown` adoption, even under the right binding. Recovery is a fresh
+`restore` from the source checkpoint root into a new state root. The source root is still
+authoritative, because the refused target published nothing; restoring into the same state root
+returns the idempotent receipt or `target_not_fresh`.
 
 Adopted executions count against the profile's `maximum_active_executions` like fresh ones.
 `serve` starts at most that many, lowest run id first; the rest stay `queued`, observe as
