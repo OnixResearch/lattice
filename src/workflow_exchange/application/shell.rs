@@ -42,6 +42,7 @@ pub struct ApplicationHandler {
     agent_runtime: crate::agent_node::RuntimeOptions,
     workers: BTreeMap<String, Worker>,
     checkpoint: Option<crate::checkpoint::CheckpointBinding>,
+    waiting: checkpoint::WaitingAdoptions,
 }
 
 impl ApplicationHandler {
@@ -60,6 +61,7 @@ impl ApplicationHandler {
             agent_runtime,
             workers: BTreeMap::new(),
             checkpoint: None,
+            waiting: checkpoint::WaitingAdoptions::default(),
         })
     }
 

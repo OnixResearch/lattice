@@ -69,10 +69,14 @@ refused or crashed restore never leaves a record that a retry would report as do
 Adopted executions count against `maximum_active_executions`: the exchange starts at most that
 many, lowest run id first, and starts the rest from `refresh_workers` at the next exchange request
 after a slot frees (a worker cannot reach the handler, which the serve loop owns). Waiting ones
-observe as `queued`; one that was `running` when its process died observes as `unknown`. A
-possible later, Kiln-facing addition is a restore-time capacity refusal; it is not added now,
-because it would be a racy snapshot of the target and widen the restart contract, while queuing
-already enforces the bound.
+observe as `queued`; one that was `running` when its process died observes as `unknown`. The
+handler indexes waiting adoptions by run id when `serve` starts and rescans only when the store's
+adoption count, read from the table header, has moved. Adoptions are never removed, so the count
+changes exactly when one is added, including through a clone of the serving store; no other
+process can open it. A request with no free slot, or with no new adoption and none waiting,
+reads no adoption. A possible later, Kiln-facing addition is a restore-time capacity refusal; it
+is not added now, because it would be a racy snapshot of the target and widen the restart
+contract, while queuing already enforces the bound.
 
 ### Decision: Uncertain nodes freeze the restored execution as `Unknown`
 

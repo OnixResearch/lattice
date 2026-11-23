@@ -777,6 +777,74 @@ fn adopted_executions_wait_for_the_active_execution_limit() {
     );
 }
 
+/// An in-process exchange handler bound to `root`'s profile and checkpoint, on `store`.
+fn handler(root: &Root, store: &lattice::store::Store) -> lattice::workflow_exchange::ApplicationHandler {
+    lattice::workflow_exchange::ApplicationHandler::new(
+        store.clone(),
+        root.profile.clone(),
+        lattice::agent_node::RuntimeOptions::default(),
+    )
+    .expect("handler")
+    .with_application_checkpoint(root.binding.clone())
+    .expect("checkpoint binding")
+}
+
+// r[verify lattice.application_checkpoint.resume]
+/// An adoption committed through a clone of a serving handler's store after that handler indexed
+/// its waiting adoptions still starts once a slot frees. Both handlers share this process, as no
+/// other process can open the store of a serving exchange.
+#[test]
+fn an_adoption_added_while_serving_starts_once_a_slot_frees() {
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let effects = directory.path().join("effects");
+    std::fs::create_dir_all(&effects).expect("effects directory");
+    let socket = directory.path().join("exchange.sock");
+    let target_root =
+        root(&directory.path().join("target"), &effects, &socket, CheckpointProfile::WorkflowNodeBoundaryV1);
+    let limit = usize::try_from(target_root.profile.maximum_active_executions).expect("limit");
+    let sources = ['5', '8', '9']
+        .into_iter()
+        .take(limit + 1)
+        .map(|key| drained_before_dispatch(directory.path(), &effects, &socket, &keyed_request(key)))
+        .collect::<Vec<_>>();
+    assert_eq!(sources.len(), limit + 1);
+    let target_store = store(&target_root);
+    let mut serving = handler(&target_root, &target_store);
+    let mut restoring = handler(&target_root, &target_store);
+    let mut restore = |transfer: &CheckpointRoot| {
+        let (checkpoint, manifest) = latest(transfer);
+        let request = restart_request(&checkpoint, &manifest, 1, ADMISSION);
+        restoring.restore_checkpoint(transfer, &request, now_unix_ms()).expect("restore succeeds");
+    };
+    let execution = |accepted: &WorkflowAccepted| {
+        target_store.load_workflow_exchange(&accepted.execution_identity).expect("load").expect("execution")
+    };
+    sources[..limit].iter().for_each(|(transfer, _accepted)| restore(transfer));
+    serving.resume_adopted().expect("serving starts the adopted executions");
+    wait_for("the limit's executions to start node a", || count(&effects, "a") == limit);
+    let (late_transfer, late) = sources.last().expect("the late adoption");
+    restore(late_transfer);
+    serving.resume_adopted().expect("a request with no free slot");
+    assert_eq!(execution(late).state, lattice::workflow_exchange::DurableExecutionState::Queued, "no slot is free");
+
+    release(&effects, "a");
+    release(&effects, "b");
+    wait_for("the first executions to end", || {
+        sources[..limit].iter().all(|(_transfer, accepted)| execution(accepted).state.is_terminal())
+    });
+    serving.wait_for_workers();
+    serving.resume_adopted().expect("a request after the slots free");
+    serving.wait_for_workers();
+    let late = execution(late);
+    assert_eq!(
+        late.state,
+        lattice::workflow_exchange::DurableExecutionState::Completed,
+        "the late adoption started once a slot freed; nodes {:?}",
+        late.nodes
+    );
+    assert_eq!((count(&effects, "a"), count(&effects, "b")), (limit + 1, limit + 1), "every adoption ran once");
+}
+
 /// Restore the drained checkpoint under the target's binding, release `b`, then serve under that
 /// binding changed by `change`. A wrongly started adoption would run `b` at once.
 fn serve_under_changed_binding(change: impl FnOnce(&mut CheckpointBinding)) {

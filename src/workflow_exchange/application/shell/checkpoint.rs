@@ -13,6 +13,10 @@ use super::ApplicationHandler;
 use super::DurableExecutionState;
 use super::WorkflowRoute;
 
+mod waiting;
+
+pub(super) use waiting::WaitingAdoptions;
+
 /// Start facts of a worker: defaults for a fresh dispatch, carried values for an adoption.
 #[derive(Default)]
 pub(super) struct WorkerStart {
@@ -93,7 +97,8 @@ impl ApplicationHandler {
     /// Start adopted executions that never started, up to the active-execution limit and lowest
     /// run id first, publishing under this handler's binding. The rest stay `Queued`;
     /// `refresh_workers` calls this again at the start of every exchange request, so a waiting
-    /// adoption starts on the first request after a slot frees.
+    /// adoption starts on the first request after a slot frees. Waiting adoptions are indexed
+    /// once and rescanned only when the store's adoption count moved; adoptions are never removed.
     ///
     /// The worker's `Queued` to `Running` transition is a compare-and-swap in the single-writer
     /// store, so exactly one process runs an adopted execution. An adoption that cannot be
@@ -106,38 +111,19 @@ impl ApplicationHandler {
         };
         let maximum_active =
             usize::try_from(self.profile.maximum_active_executions()).map_err(|_| ApplicationError::Profile)?;
-        let free_slot_count = maximum_active.saturating_sub(self.workers.len());
-        if free_slot_count == 0 {
-            return Ok(());
-        }
-        let mut waiting = self.waiting_adoptions()?;
-        waiting.sort_by_key(|(record, _adoption)| record.run_id);
+        let reads = HandlerAdoptions {
+            store: &self.store,
+            workers: &self.workers,
+        };
+        let waiting = self
+            .waiting
+            .take(&reads, maximum_active.saturating_sub(self.workers.len()))
+            .map_err(|_| ApplicationError::Store)?;
         let root = crate::checkpoint::CheckpointRoot::new(binding.root.clone());
-        for (record, adoption) in waiting.into_iter().take(free_slot_count) {
+        for (record, adoption) in waiting {
             self.start_adoption(&binding, &root, record, adoption);
         }
         Ok(())
-    }
-
-    /// Adopted executions still `Queued` with no worker in this process.
-    fn waiting_adoptions(
-        &self,
-    ) -> Result<Vec<(super::ExecutionRecord, crate::checkpoint::AdoptionRecord)>, ApplicationError> {
-        let adoptions = self.store.list_workflow_exchange_adoptions().map_err(|_| ApplicationError::Store)?;
-        let records = adoptions
-            .into_iter()
-            .map(|adoption| {
-                let record =
-                    self.store.load_workflow_exchange(&adoption.execution).map_err(|_| ApplicationError::Store)?;
-                Ok(record.map(|record| (record, adoption)))
-            })
-            .collect::<Result<Vec<_>, ApplicationError>>()?;
-        Ok(records
-            .into_iter()
-            .flatten()
-            .filter(|(record, _adoption)| record.state == DurableExecutionState::Queued)
-            .filter(|(record, _adoption)| !self.workers.contains_key(record.accepted.execution_identity.as_str()))
-            .collect())
     }
 
     fn start_adoption(
@@ -208,6 +194,53 @@ impl ApplicationHandler {
     /// The handler's checkpoint binding when it binds `route`.
     pub(super) fn route_checkpoint(&self, route: &WorkflowRoute) -> Option<crate::checkpoint::CheckpointBinding> {
         self.checkpoint.clone().filter(|binding| binds_route(binding, route))
+    }
+}
+
+/// The handler's adoption reads: an adoption waits while `Queued` with no worker in this process.
+struct HandlerAdoptions<'handler> {
+    store: &'handler crate::store::Store,
+    workers: &'handler std::collections::BTreeMap<String, super::Worker>,
+}
+
+impl HandlerAdoptions<'_> {
+    fn waiting_record(
+        &self,
+        execution: &lattice_workflow_contract::Identity,
+    ) -> Result<Option<super::ExecutionRecord>, crate::store::StoreError> {
+        let record = self.store.load_workflow_exchange(execution)?;
+        Ok(record.filter(|record| {
+            record.state == DurableExecutionState::Queued
+                && !self.workers.contains_key(record.accepted.execution_identity.as_str())
+        }))
+    }
+}
+
+impl waiting::AdoptionReads for HandlerAdoptions<'_> {
+    type Waiting = (super::ExecutionRecord, crate::checkpoint::AdoptionRecord);
+    type Error = crate::store::StoreError;
+
+    fn generation(&self) -> Result<u64, Self::Error> {
+        self.store.count_workflow_exchange_adoptions()
+    }
+
+    fn scan(&self) -> Result<Vec<(u64, lattice_workflow_contract::Identity)>, Self::Error> {
+        let adoptions = self.store.list_workflow_exchange_adoptions()?;
+        let mut waiting = Vec::with_capacity(adoptions.len());
+        for adoption in adoptions {
+            if let Some(record) = self.waiting_record(&adoption.execution)? {
+                waiting.push((record.run_id, adoption.execution));
+            }
+        }
+        Ok(waiting)
+    }
+
+    fn load(&self, execution: &lattice_workflow_contract::Identity) -> Result<Option<Self::Waiting>, Self::Error> {
+        let Some(record) = self.waiting_record(execution)? else {
+            return Ok(None);
+        };
+        let adoption = self.store.load_workflow_exchange_adoption(execution)?;
+        Ok(adoption.map(|adoption| (record, adoption)))
     }
 }
 

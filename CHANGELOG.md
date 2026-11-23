@@ -65,7 +65,10 @@ interfaces.
   only adopts: it admits a committed manifest under Kiln's opaque admission
   reference into a fresh state root, and the serving exchange runs adopted
   executions, observable and cancellable through the same exchange, including
-  ones still `queued` behind the active-execution limit. `serve` binds its
+  ones still `queued` behind the active-execution limit. The exchange indexes
+  waiting adoptions once and rescans only when the store's adoption count
+  moves, instead of listing and loading every adoption on each exchange
+  request that finds a free slot. `serve` binds its
   listener before starting any adopted execution, and records an adoption
   `Unknown` without running it when the serving binding declares no checkpoint
   or differs from the adoption's deadline, attempt binding, `environment` or

@@ -9,6 +9,7 @@
 
 use redb::ReadableDatabase as _;
 use redb::ReadableTable as _;
+use redb::ReadableTableMetadata as _;
 
 /// Adopted application checkpoints, keyed by execution identity.
 const WORKFLOW_EXCHANGE_ADOPTIONS: redb::TableDefinition<&str, &[u8]> =
@@ -100,6 +101,17 @@ impl crate::store::Store {
             record: Box::new(record),
             adoption: Box::new(adoption),
         })
+    }
+
+    /// The number of adoptions in this store, read from the table header without visiting any
+    /// entry. Adoptions are never removed, so an equal count means no adoption was added.
+    pub fn count_workflow_exchange_adoptions(&self) -> Result<u64, crate::store::StoreError> {
+        let transaction = self.db.begin_read().map_err(super::store_db_error)?;
+        match transaction.open_table(WORKFLOW_EXCHANGE_ADOPTIONS) {
+            Ok(table) => table.len().map_err(super::store_db_error),
+            Err(redb::TableError::TableDoesNotExist(_)) => Ok(0),
+            Err(error) => Err(super::store_table_error(error)),
+        }
     }
 
     pub fn load_workflow_exchange_adoption(
