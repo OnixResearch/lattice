@@ -1,0 +1,107 @@
+{
+  "kind": "octet-semantic-comparison",
+  "change": "restart-from-application-checkpoint",
+  "purpose": "re-check after the verification-review fixes to the served restart (waiting-adoption cancel, serving-binding check, bind before resume, revision digest test); the committed baselines are unchanged",
+  "reference_revision": "5a8e1d51",
+  "reference_observations": "the pristine 5a8e1d51 export runs admitted in bind-vm-execution-profile/evidence/manifest-cohort-admission.json, which reproduce both 5a8e1d51 baselines exactly",
+  "candidate_git_revision": "9fbd535c",
+  "comparison_fields": [
+    "identity_status",
+    "lint",
+    "group",
+    "severity",
+    "file",
+    "message",
+    "crate_name"
+  ],
+  "normalization": "the maintained conventions of scripts/octet_baseline_migration.rs, as in manifest-cohort-admission.json; the exact (lint, file, message, crate) comparison is recorded alongside",
+  "scopes": [
+    {
+      "scope": "lattice",
+      "baseline": "octet-baseline.json",
+      "baseline_blake3": "3cceef424f3930f44201078ad4f1d9ffbfc86aa00304d811763f9568c2e3cc68",
+      "candidate": {
+        "status": "warning-only",
+        "exit_code": 0,
+        "raw_findings": 1346,
+        "unique_ids": 1044,
+        "baseline_counts": {
+          "accepted_total": 1044,
+          "accepted_current": 1044,
+          "current_total": 1044,
+          "new_total": 0,
+          "stale_total": 0
+        },
+        "config_hash": "b3:299713f9a4561a4d2235616467edb54ef170a601d7687ee8d89da53e1b30fc06",
+        "profile_hash": "b3:0a3ed6fc1277e5e2379e2c5caa1d455e0e81e9168cd24458d4c29f8b554ac377"
+      },
+      "reference": {
+        "raw_findings": 1354,
+        "unique_ids": 1052
+      },
+      "maintained_semantic_key": {
+        "semantically_new": 0,
+        "removed": 7,
+        "raw_increases": 0,
+        "raw_decreases": 7
+      },
+      "exact_message": {
+        "new": 3,
+        "removed": 10,
+        "raw_increases": 3,
+        "new_are": "the excessive_file_length line counts of src/github_ci/exchange.rs (1084), mantle.rs (555) and session.rs (696), each accepted at 5a8e1d51 with a smaller count"
+      },
+      "removed_findings": [
+        "src/github_ci/exchange.rs: ambiguous_params x3, too_many_parameters x2, assertion_density x2 (cohort Subject refactor)",
+        "src/headless/shell.rs: function_length run_workflow_snapshot_with_executor_factory (owner-approved S3 extraction)",
+        "src/http/native.rs: non_trait_imports and renamed_imports on `Zeroize as _` (zeroize_derive dropped in 940a02a4)"
+      ]
+    },
+    {
+      "scope": "lattice-core",
+      "baseline": "crates/lattice-core/octet-baseline.json",
+      "baseline_blake3": "e147a270b9a3607f709bc7e5b9d15025e9f420dd4e0f9fd48604845140b5ef8d",
+      "candidate": {
+        "status": "warning-only",
+        "exit_code": 0,
+        "raw_findings": 33,
+        "unique_ids": 25,
+        "baseline_counts": {
+          "accepted_total": 25,
+          "accepted_current": 25,
+          "current_total": 25,
+          "new_total": 0,
+          "stale_total": 0
+        },
+        "config_hash": "b3:228833e8243ef15fa26e2dacd7c0feb99e2a656d6b38a1ee4f858dd65100778e",
+        "profile_hash": "b3:9d7b338e8bb8791898c12a877917a2dede40f0c9798a10db4a9a55b7ce5b0392"
+      },
+      "reference": {
+        "raw_findings": 33,
+        "unique_ids": 25
+      },
+      "maintained_semantic_key": {
+        "semantically_new": 0,
+        "removed": 0,
+        "raw_increases": 0,
+        "raw_decreases": 0
+      },
+      "exact_message": {
+        "new": 0,
+        "removed": 0,
+        "raw_increases": 0
+      }
+    }
+  ],
+  "result": "both maintained and exact comparisons equal the admitted comparison at 329e9f58 field for field; 0 new, no raw increase under the maintained key; baselines not regenerated",
+  "fix_iteration": "the first candidate run of a0053c0b reported 3 new findings in the fixed files (assertion_density on `serve`, excessive_file_length on shell.rs at 302 lines and worker.rs at 303 lines); 9fbd535c removed them by restructuring, with no allow added",
+  "unchanged": [
+    "octet-baseline.json",
+    "crates/lattice-core/octet-baseline.json",
+    "dylint.toml",
+    "file-level allow lists"
+  ],
+  "non_claims": [
+    "not behavioral correctness, lifecycle acceptance or release readiness"
+  ]
+}
