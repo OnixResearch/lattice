@@ -14,6 +14,7 @@ use std::collections::HashMap;
 
 use futures::StreamExt;
 pub(crate) use support::RunRequest;
+pub(crate) use support::is_cancellation_stall;
 use support::*;
 
 use crate::engine::executor::EffectExecution;
@@ -229,10 +230,8 @@ pub(crate) async fn run(request: RunRequest<'_>) -> RunOutcome {
 
         if dispatched_count == 0 && !ready.is_empty() {
             let blocked = plan.blocked_nodes.first();
-            let diagnostic = blocked.map_or_else(
-                || FRONTIER_STALLED.to_owned(),
-                |blocked| format!("{FRONTIER_STALLED}: {:?}", blocked.reason),
-            );
+            let diagnostic =
+                blocked.map_or_else(|| FRONTIER_STALLED.to_owned(), |blocked| stall_diagnostic(blocked.reason));
             fail_unfinished(
                 workflow,
                 canonical_order,

@@ -15,6 +15,7 @@ use lattice_core::scheduling::Candidate;
 use lattice_core::scheduling::CapacityPolicy;
 use lattice_core::scheduling::ConflictState;
 use lattice_core::scheduling::PolicyError;
+pub(crate) use runtime::is_cancellation_stall;
 
 use super::workflow::NodeConfig;
 

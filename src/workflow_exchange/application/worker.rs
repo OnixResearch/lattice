@@ -179,6 +179,7 @@ fn completion_facts(
     };
     let summary = outcome.summary;
     let details = store.load_run_details(crate::engine::RunId(record.run_id)).ok().flatten();
+    let is_cancellation_stall = details.as_ref().is_some_and(|details| stalled_on_cancellation(&details.nodes));
     let nodes = details
         .map(|details| {
             details
@@ -199,11 +200,22 @@ fn completion_facts(
         })
         .unwrap_or_default();
     CompletionFacts {
-        cancelled: outcome.cancelled,
+        cancelled: outcome.cancelled || is_cancellation_stall,
         suspended: summary.status == crate::headless::HeadlessRunStatus::Suspended,
         failed_before_results: nodes.is_empty() && summary.node_count != 0,
         nodes,
     }
+}
+
+/// The ready frontier stalled on cancellation before it dispatched anything: every node carries
+/// the cancellation stall diagnostic, so no node ran and no effect was dispatched. A run with any
+/// other node result, such as a completed process, is never relabelled.
+fn stalled_on_cancellation(nodes: &[crate::store::RunNodeDetail]) -> bool {
+    !nodes.is_empty()
+        && nodes.iter().all(|node| {
+            node.status == crate::store::RunNodeDetailStatus::Failed
+                && node.error.as_deref().is_some_and(crate::engine::frontier::is_cancellation_stall)
+        })
 }
 
 fn mark_unknown(store: &crate::store::Store, current: &ExecutionRecord) {

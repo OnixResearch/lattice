@@ -77,7 +77,11 @@ interfaces.
   marks it running ends `cancelled` without running; before, an adopted one
   ended `failed` because the ready frontier blocked every node on the
   cancellation, and a fresh one whose Cancel won the race against that
-  transition was left for the next request to mark `unknown`. Restore refuses a
+  transition was left for the next request to mark `unknown`. A Cancel that
+  lands after that transition but before the first node is dispatched also
+  ends `cancelled`: when every node failed on the ready frontier's
+  cancellation stall, nothing ran, so the execution no longer ends `failed`;
+  a run with any other node result keeps its observed outcome. Restore refuses a
   target binding with a different deadline (`carry_forward`) or attempt
   binding (`crossed_binding`), and commits the adoption only after every check
   and the workspace write, so a refused restore adopts nothing. The

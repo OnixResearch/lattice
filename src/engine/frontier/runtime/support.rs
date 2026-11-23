@@ -27,6 +27,17 @@ use crate::expressions::ExpressionContext;
 pub(super) const FRONTIER_MISMATCH: &str = "Choregraph and compatibility readiness frontiers differ";
 pub(super) const FRONTIER_STALLED: &str = "ready-frontier dispatch cannot make progress";
 
+/// The diagnostic every unfinished node records when the frontier stalls on `blocker`.
+pub(super) fn stall_diagnostic(blocker: lattice_core::scheduling::Blocker) -> String {
+    format!("{FRONTIER_STALLED}: {blocker:?}")
+}
+
+/// Whether `error` is the node diagnostic of a frontier that stalled because cancellation
+/// blocked every ready node.
+pub(crate) fn is_cancellation_stall(error: &str) -> bool {
+    error == stall_diagnostic(lattice_core::scheduling::Blocker::Cancellation)
+}
+
 pub(crate) type SharedSession = std::sync::Arc<parking_lot::Mutex<crate::engine::effect::execution::Session>>;
 
 pub(crate) struct RunOutcome {
