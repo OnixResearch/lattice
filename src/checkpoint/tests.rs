@@ -842,3 +842,62 @@ fn fixtures_parse_and_match_their_documented_outcomes() {
         assert_eq!(outcome.map_err(|refusal| refusal.code().to_string()), Err(code), "{name}");
     }
 }
+
+/// Sources `runtime.lattice_revision` must cover, as `build.rs` lists them: a restart is refused
+/// across a change to any of them.
+const CHECKPOINT_SOURCES: [&str; 7] = [
+    "Cargo.lock",
+    "src/checkpoint",
+    "src/engine/executor/choice.rs",
+    "src/headless/shell/checkpoint.rs",
+    "src/headless/shell/record.rs",
+    "src/workflow/gate/shell/checkpoint.rs",
+    "src/workflow_exchange",
+];
+
+/// Every file under `path`, relative to the crate root and named as `build.rs` names it.
+fn checkpoint_source_files(path: &str) -> Vec<String> {
+    let absolute = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(path);
+    if !absolute.is_dir() {
+        return vec![path.to_string()];
+    }
+    let mut files = Vec::new();
+    for entry in std::fs::read_dir(absolute).expect("source directory") {
+        let name = entry.expect("source entry").file_name();
+        files.extend(checkpoint_source_files(&format!("{path}/{}", name.to_str().expect("UTF-8 name"))));
+    }
+    files
+}
+
+/// `build.rs`'s length-framed BLAKE3 over each path and its bytes, in sorted path order.
+fn checkpoint_digest(paths: &[&str]) -> String {
+    let mut files = paths.iter().flat_map(|path| checkpoint_source_files(path)).collect::<Vec<_>>();
+    files.sort();
+    let mut hasher = blake3::Hasher::new();
+    for file in files {
+        let bytes = std::fs::read(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(&file)).expect("source");
+        hasher.update(&u64::try_from(file.len()).expect("path length").to_le_bytes());
+        hasher.update(file.as_bytes());
+        hasher.update(&u64::try_from(bytes.len()).expect("file length").to_le_bytes());
+        hasher.update(&bytes);
+    }
+    hasher.finalize().to_hex().to_string()
+}
+
+// r[verify lattice.application_checkpoint.portable]
+/// The restoring binary's revision names `-checkpoint-<64 hex>`, a digest over exactly the
+/// checkpoint, restore and exchange sources; dropping any of them from the digest changes it.
+#[test]
+fn local_runtime_names_a_digest_over_the_checkpoint_sources() {
+    let local = local_runtime(None).expect("local runtime");
+    let revision = local.runtime.lattice_revision;
+    let (prefix, digest) = revision.rsplit_once("-checkpoint-").expect("revision names the checkpoint digest");
+    assert!(prefix.starts_with(&format!("lattice-{}-runtime-", env!("CARGO_PKG_VERSION"))), "{revision}");
+    assert_eq!(digest.len(), IDENTITY_DIGITS, "{revision}");
+    assert!(digest.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)), "{revision}");
+    assert_eq!(digest, checkpoint_digest(&CHECKPOINT_SOURCES), "the digest covers every checkpoint source");
+    for omitted in CHECKPOINT_SOURCES {
+        let rest = CHECKPOINT_SOURCES.into_iter().filter(|path| *path != omitted).collect::<Vec<_>>();
+        assert_ne!(digest, checkpoint_digest(&rest), "the digest depends on {omitted}");
+    }
+}
