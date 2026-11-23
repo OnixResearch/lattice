@@ -228,7 +228,7 @@ immutable attempt-keyed replay and conflict rules.
 |---|---|
 | Worker process | `host_measured` with a duration only when the host observed both endpoints; otherwise `unknown` |
 | Compute | reserved claims labelled `reserved`; never measured device use |
-| Model requests | `unknown` without a serving declaration; `no_model` for no-model workers; per-service `served` request usage for served routes (see [worker serving binding](worker-serving-binding.md)) |
+| Model requests | `brokered_unattributed` broker-measured request usage without a serving declaration (`unknown` for an attempt with no retained broker evidence); `no_model` for no-model workers; per-service `served` request usage for served routes (see [worker serving binding](worker-serving-binding.md)) |
 | Device utilization | `unknown` (owner `aspen#42`; no readback field) |
 
 Orchestration `HostRun` receipts carry no execution binding, and their

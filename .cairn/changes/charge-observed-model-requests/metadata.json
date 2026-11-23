@@ -1,0 +1,12 @@
+{
+  "depends_on": [
+    "bind-model-serving-admission",
+    "bound-same-attempt-repair",
+    "run-operator-omp-repair"
+  ],
+  "workflow_profile": {
+    "id": "spec-driven",
+    "source": "change_create",
+    "version": 1
+  }
+}

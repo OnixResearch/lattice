@@ -124,19 +124,26 @@ worker-incarnation, attempt/fence, allocation/placement and pricing bindings. No
 self-declared profile/service field establishes qualification, and no new
 producer schema is invented by this accounting boundary.
 
-**Serving-bound measured usage exists only for implementation attempts.** An
+**Measured model-request usage exists only for implementation attempts.** An
 implementation attempt whose execution binding declares served model routes
 runs Animus's pure serving gate per request in its attempt-local model broker
 and records per-request provider-reported counters with exact worker, binding,
 service, deployment and request provenance in its `Scope::Attempt` usage
-observation. Unknown usage is counted, never zero-filled, and shared
-deployments are referenced, never charged per worker. See
+observation. An attempt without a serving declaration has its broker, the
+worker's only network egress, record every relayed request without service
+attribution (`brokered_unattributed`, Lattice #31). Unknown usage is counted,
+never zero-filled, and shared deployments are referenced, never charged per
+worker. When either ledger is complete, meaning every intent has a terminal
+record and no request ended uncertain, the attempt's Kiln lineage draw charges
+exactly the dispatched requests with `host_measured` provenance instead of the
+broker ceiling; otherwise it charges the ceiling as `unknown`. See
 [worker serving binding](worker-serving-binding.md) for the contract and
 [worker compute binding](worker-compute-binding.md) for the compute half.
 
 | Mode | Reserved | Measured | Model usage |
 |---|---|---|---|
-| Reservation-only (Agent nodes; attempts without a serving declaration) | conservative configured charges | host duration when both endpoints are observed | `unknown` |
+| Reservation-only (Agent nodes; attempts run before brokered evidence existed) | conservative configured charges | host duration when both endpoints are observed | `unknown` |
+| Brokered (attempts without a serving declaration) | one broker ceiling per step; the exact count is charged when the ledger is complete | host duration when observed; every relayed request | `brokered_unattributed` per-request counters, no service attribution |
 | Serving-bound (attempts with served routes) | declared per-request token envelopes, labelled `reserved_tokens` | host duration when observed | provider-reported per-request counters plus an explicit unknown remainder |
 
 Provider counters are provider reports, not measurements or invoices; no

@@ -1,0 +1,62 @@
+{
+  "schema": "lattice.fixture-qualification.v1",
+  "change": "charge-observed-model-requests",
+  "kind": "local-verification",
+  "live_qualification": false,
+  "base_revision": "b6fefb104e1ce3a103d845d3f591a841cc8a8c2e",
+  "integration_head": null,
+  "recorded_on": "2026-11-23",
+  "note": "Branch observed-model-requests on the unpublished relocation head b6fefb10; the integrating agent rebases onto published main and records the integration head. Gates ran in the Lattice dev shell with CARGO_BUILD_JOBS=4. No real OMP, broker process, model endpoint, serving owner or Kiln lineage was exercised: requests are driven through the recorded broker gate directly.",
+  "tasks": {
+    "1.1": ["tests/test_execution_binding_brokered.rs (3 tests)"],
+    "1.2": [
+      "tests/test_execution_binding_brokered.rs::an_unconfirmed_or_uncertain_request_is_never_an_exact_count",
+      "tests/test_execution_binding_serving.rs::complete_served_evidence_counts_exactly_and_keeps_its_service",
+      "src/implementation_attempt/repair/tests.rs::host_observed_model_requests_are_charged_exactly"
+    ],
+    "2.1": [
+      "tests/test_execution_binding_brokered.rs::brokered_evidence_conflicts_and_unretained_writes_fail_closed",
+      "src/implementation_attempt/cli/binding/tests/brokered.rs::brokered_request_files_are_write_once_and_conflicts_fail_closed"
+    ],
+    "2.2": [
+      "src/implementation_attempt/cli/binding/tests/brokered.rs::a_complete_brokered_run_draws_exactly_its_requests_as_observed_and_replays_them",
+      "src/implementation_attempt/cli/binding/tests/brokered.rs::one_intent_without_a_record_draws_the_reservation_with_unknown_provenance",
+      "src/implementation_attempt/cli/binding/tests/brokered.rs::without_retained_evidence_or_a_retained_draw_the_reservation_is_charged",
+      "src/implementation_attempt/cli/tests/repair.rs::a_single_shot_attempt_with_a_lineage_reports_its_conservative_draw"
+    ],
+    "2.3": ["src/implementation_attempt/cli/tests/repair/operator.rs::each_step_is_charged_the_requests_observed_in_its_own_index_range"],
+    "3.1": ["docs/worker-serving-binding.md", "docs/orchestration-budget-usage.md", "docs/candidate-worker.md", "docs/worker-compute-binding.md", "CHANGELOG.md"],
+    "3.2": ["checks"]
+  },
+  "checks": {
+    "cargo_test_focused": {
+      "command": "cargo test -p lattice --lib -- implementation_attempt candidate_worker model_gateway execution_binding",
+      "exit": 0,
+      "passed": 223,
+      "failed": 0,
+      "ignored": 7,
+      "note": "One earlier run of the same filter failed a_worker_stopped_at_a_deadline_the_admission_capped_is_uncertain (a 3 s admission-expiry timing test) under parallel load; it passed twice alone and the two later full runs passed."
+    },
+    "integration": {
+      "command": "cargo test -p lattice --test test_execution_binding_brokered --test test_execution_binding_serving --test test_runbook_catalog_cli --test test_execution_binding_usage",
+      "exit": 0,
+      "passed": [3, 23, 3, 3],
+      "failed": 0
+    },
+    "lattice_core": {"command": "cargo test -p lattice-core", "exit": 0, "passed": 15, "failed": 0},
+    "clippy": {"command": "cargo clippy -p lattice -p lattice-core --all-targets --no-deps -- -D warnings", "exit": 0},
+    "fmt": {"command": "cargo fmt -p lattice -p lattice-core --check", "exit": 0},
+    "cairn_gates": {"command": "cairn gate {proposal,design,tasks} charge-observed-model-requests --root . --policy cairn-policy/generated/cairn-policy.json", "exit": 0, "valid": true}
+  },
+  "kiln_compatibility": {
+    "kiln_revision": "90a9fb64f27f6eeb05caf6e541a224265310ce86",
+    "finding": "Kiln has no consumer of budget_lineage.usage[] (charged or provenance) at this revision, so neither host_measured provenance nor a charge below the reservation is refused. CHARGED_DIMENSIONS (crates/kiln-adapter-lattice/src/lineage.rs:33) gates only the request-side lineage it derives (lineage.rs:358-367, a positive held amount per charged dimension). The worker inventory decodes model_requests as opaque JSON (crates/kiln-adapter-lattice/src/worker_inventory.rs:591), worker_metrics.rs reports usage as NotInstrumented, and worker_settlement.rs:273 classify_observation reads only schema, envelope, dispatch_plan and status.",
+    "kiln_change_needed": "none for compatibility; Kiln #6/#24 still need a consumer that reads budget_lineage.usage[].charged as the authoritative draw and budget_lineage.usage[].provenance"
+  },
+  "not_run": [
+    "scripts/check.rs",
+    "octet-precommit-check and the Octet baseline re-key (public lattice-core types changed)",
+    "nix flake check",
+    "the full cargo test -p lattice suite"
+  ]
+}

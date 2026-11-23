@@ -721,11 +721,20 @@ disposition and `inspect` reports a disposition whose records prove its
 workers stopped ([exporting repaired candidates](#exporting-repaired-candidates)).
 
 Usage is attributed per phase (`preparation`, `edit`, `check`, `repair`) with
-the existing `UsageProvenance`. A worker step is charged the larger of its
-reservation and its reported count per dimension, or the reservation when the
-count is unknown (`provenance:"unknown"`, counts `null`). Checks are host
-executions with a known count and no model requests. Failed, cancelled and
-uncertain steps are charged like any other.
+the existing `UsageProvenance`. A worker step whose broker evidence is
+complete in the step's own request-index range is charged exactly the model
+requests it dispatched there, reported with provenance `host_measured`
+(`WorkerPort` reports carry this as `observed_model_requests`; see
+[brokered evidence](worker-serving-binding.md#brokered-evidence-without-a-serving-declaration)).
+Step `n` owns indices `[(n - 1) * max_requests, n * max_requests)`. Otherwise
+a worker step is charged the larger of its reservation and its reported
+count per dimension, or the reservation when the count is unknown
+(`provenance:"unknown"`, counts `null`); an intent without a terminal record
+or an `uncertain` request in the step's range keeps that reservation. The
+standalone OMP port reports no tool invocations, so they are charged at
+their reservation.
+Checks are host executions with a known count and no model requests. Failed,
+cancelled and uncertain steps are charged like any other.
 
 `lineage` (`lattice.kiln-budget-lineage.v1`) maps Kiln #61's admitted
 recursive budget lineage at Kiln
@@ -753,10 +762,15 @@ admitted only as this account's direct child in the same root with a ceiling
 within the remainder in every one of its dimensions. Other dimensions, any
 name Kiln's `Alias` admits, are accepted, never drawn and listed in
 `unaccounted_dimensions`: their usage stays unknown to Kiln. A single-shot
-attempt with a lineage reports `budget_lineage` in its observation with a
-conservative draw of one broker ceiling and `tool_invocations` unaccounted.
-The lineage is a frozen snapshot: Lattice does not observe Kiln's current
-ledger.
+attempt with a lineage reports `budget_lineage` in its observation with
+`tool_invocations` unaccounted and one model-request draw: exactly the
+requests its complete broker evidence proves, as `host_measured`, or one
+broker ceiling as `unknown` when any intent lacks a terminal record, a request
+ended uncertain, the evidence conflicts or none was retained. The draw is
+retained write-once as `lineage-draw.json` before the attempt result is
+published; recovery replays it as retained, and an attempt without one
+reports the ceiling, so a retained draw is never lowered. The lineage is a
+frozen snapshot: Lattice does not observe Kiln's current ledger.
 
 Qualification is fixture-level: the tests in
 `src/implementation_attempt/cli/tests/repair.rs` drive the real `run` and

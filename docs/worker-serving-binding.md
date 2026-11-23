@@ -162,14 +162,16 @@ as evidence.
 
 ## Evidence files
 
-All request evidence lives under the attempt directory in `model-requests/`:
+All request evidence lives under the attempt directory in `model-requests/`.
+The broker creates the directory, synced into the attempt directory, before
+its worker starts, for every attempt, with or without a serving declaration:
 
 | File | Schema | Written |
 |---|---|---|
-| `<hex>.intent.json` | `lattice.model-request-dispatch.v1` | once, before upstream contact |
-| `<hex>.record.json` | `lattice.model-request-observation.v1` | once, after a refusal or the call |
+| `<hex>.intent.json` | `lattice.model-request-dispatch.v1` (served) or `lattice.brokered-model-request-dispatch.v1` (no serving declaration) | once, synced before upstream contact |
+| `<hex>.record.json` | `lattice.model-request-observation.v1` (served) or `lattice.brokered-model-request-observation.v1` (no serving declaration) | once, after a refusal or the call |
 
-A record carries the binding identity, profile revision, worker incarnation,
+A served record carries the binding identity, profile revision, worker incarnation,
 attempt and fence, the route name and `lattice-model-route-v1` identity, the
 request id and ordinal, and the service. It also carries the selected
 endpoint, deployment and generation, the exact model and configuration with
@@ -178,6 +180,28 @@ serving resource-consumer reference. Finally it records the snapshot identity,
 position and status, the admission record, the outcome class, label and
 exclusion detail, the counters, the evidence label and the Animus receipt
 identity. A different second write is refused.
+
+### Brokered evidence without a serving declaration
+
+The attempt broker is the worker's only network egress, so it records every
+request it relays even when no serving owner is declared (Lattice #31). Its
+recorded route keeps the broker's own model, budget, deadline and credential
+checks and calls no serving port. For each admitted request it writes one
+brokered intent before upstream contact; an intent that cannot be retained
+refuses the request with nothing sent. After the call it writes one terminal
+record; a record that cannot be retained fails the broker. Both bind the
+binding identity, attempt, fence and route name, and the broker's request
+index (`request_index`). The request id is the domain-separated BLAKE3 of the
+binding identity and that index, so it is unique per attempt across repair
+steps.
+
+A brokered record is `completed` (with the response's provider-reported
+`prompt_tokens` and `completion_tokens` when both are present, and the
+response id when it is an opaque token) or `uncertain-timed-out`,
+`uncertain-transport-failed` or `uncertain-cancelled` with unknown usage. It
+names no service, endpoint, deployment, grant, replica or resource consumer:
+it measures a request without attributing it. The worker receives the
+response exactly as before.
 
 ## Usage for #13
 
@@ -188,9 +212,19 @@ existing `Scope::Attempt` `lattice.command-worker-usage.v1` observation:
 
 | Binding | `model_requests` coverage |
 |---|---|
-| No serving declaration | `"unknown"`, as before |
+| No serving declaration, broker evidence retained | `{"brokered_unattributed": {"schema": "lattice.brokered-model-request-usage.v1", "is_count_complete": …, "dispatched_requests": …, "unconfirmed_requests": …, "uncertain_requests": …, "unknown_usage_requests": …, "known_input_tokens": …, "known_output_tokens": …, "requests": […]}}` |
+| No serving declaration, no `model-requests/` directory (an attempt from before #31) | `"unknown"`: unobserved, never zero |
 | No-model worker | `"no_model"`; no counters |
 | Served routes | `{"served": {"schema": "lattice.model-request-usage.v1", "is_complete": …, "services": […], "overrun": {…}}}` |
+
+`brokered_unattributed` is measured and unattributed; `unknown` is
+unobserved. Its `is_count_complete` holds when every intent has a terminal
+record and none ended uncertain, so `dispatched_requests` is the exact number
+of upstream calls. Each request entry keeps its id, request index, route,
+class, outcome, counters and provider receipt. An intent without a record,
+a record without its intent, a crossed binding, attempt, fence, route or
+request id, conflicting duplicates, brokered files under a served binding and
+an unexpected file are refused as for served evidence.
 
 Each service entry keeps the declared route, route identity, service, model
 and configuration, and the attribution label. It also records dispatched,
@@ -222,6 +256,29 @@ Recovery and `implementation-attempt inspect` report the same summary
 read-only; recovery never calls the serving port. Orchestration settlement
 arithmetic is unchanged. Top-level attempt counters stay absent, so `HostRun`
 reservations and charges are unaffected.
+
+## Lineage charges from complete evidence
+
+An attempt with a Kiln budget lineage charges its model requests from this
+evidence (Lattice #31; see the lineage section of
+[candidate worker](candidate-worker.md)). When the evidence is complete,
+meaning every intent has a terminal record, no request ended uncertain and
+nothing conflicts, the usage entry reports `model_requests` as the
+dispatched count with provenance `host_measured`, and the charge is exactly
+that count, below the broker ceiling when fewer requests ran. Served coverage
+counts the dispatched requests of every service and keeps its per-service
+attribution; brokered coverage counts them without attribution.
+
+Any intent without a terminal record, an `uncertain` request, a conflict or
+missing evidence keeps the earlier charge: the reservation (one broker
+ceiling, `omp.model_broker.max_requests`), `model_requests: null` and
+provenance `unknown`. A single-shot attempt counts its whole ledger. Repair
+step `n` counts only the request indices it owns,
+`[(n - 1) * max_requests, n * max_requests)`
+([request index](vm-execution-profile.md)), so an incomplete step never
+changes another step's charge. Every charge is retained write-once before the
+result or disposition it belongs to, and recovery replays the retained charge
+without reading the evidence again, so evidence lost later never lowers it.
 
 ## Overrun policy
 
@@ -289,12 +346,13 @@ a non-terminal instance's `wait_reasons` ([worker inventory](worker-inventory.md
 `serving_not_ready` when the service is not `ready`. A route reason names the
 route by its published route name; the service id stays in readiness.
 
-## Compatibility: reservation-only versus serving-bound usage
+## Compatibility: reservation-only, brokered and serving-bound usage
 
 | Mode | Applies to | Reserved | Measured | Model usage |
 |---|---|---|---|---|
-| Reservation-only | Orchestration Agent nodes (Pi, Clankers, Animus, direct OpenAI-compatible) and attempts without a serving declaration | Configured per-round charges settle conservatively | Host duration when both endpoints are observed | `unknown` |
-| Serving-bound | Implementation attempts whose binding declares served routes | Unchanged | Host duration when observed | Per-request provider-reported counters with exact provenance; unknown remainder counted |
+| Reservation-only | Orchestration Agent nodes (Pi, Clankers, Animus, direct OpenAI-compatible) and attempts run before brokered evidence existed | Configured per-round charges settle conservatively | Host duration when both endpoints are observed | `unknown` |
+| Brokered | Implementation attempts without a serving declaration | One broker ceiling per step, charged as the exact request count when the evidence is complete | Host duration when observed; every relayed request | `brokered_unattributed`: per-request outcome and provider-reported counters, no service attribution |
+| Serving-bound | Implementation attempts whose binding declares served routes | Unchanged; the exact request count is charged when the evidence is complete | Host duration when observed | Per-request provider-reported counters with exact provenance; unknown remainder counted |
 
 Provider counters are provider reports, not measurements or invoices. A
 configured model name does not prove which weights were served. The core does

@@ -513,6 +513,24 @@ interfaces.
 
 ### Changed
 
+- Observed model requests are charged from complete broker evidence (Lattice
+  #31). The attempt broker now records every request it relays in
+  `model-requests/`, with or without a serving declaration: a synced
+  `lattice.brokered-model-request-dispatch.v1` intent before upstream contact
+  and a `lattice.brokered-model-request-observation.v1` terminal record, keyed
+  by the broker's request index and naming no service. Such an attempt's
+  `model_requests` coverage is the new `brokered_unattributed` summary instead
+  of `unknown`; `unknown` stays for an attempt with no retained evidence.
+  When every intent has a terminal record and none ended uncertain, the
+  single-shot lineage draw and each repair step charge exactly the dispatched
+  requests (a repair step counts its own index range) with `host_measured`
+  provenance, possibly below the broker ceiling. Any other evidence keeps the
+  ceiling with `unknown` provenance. The single-shot draw is retained as
+  `lineage-draw.json` before the result and replayed as retained.
+  - Breaking for embedders: `ModelRequestGate::admit` takes the broker's
+    request index, `repair::step::Report` gains `observed_model_requests`
+    (defaulting to `null`), and the operator `Launch` takes the step's broker
+    gate.
 - Breaking: `github_ci::exchange::exchange` takes the typed native
   `basalt::mantle::Request` that the stable holder will sign, and its
   `BasaltPolicyRef`, in place of the exact project and resource strings.
