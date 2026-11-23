@@ -64,11 +64,18 @@ interfaces.
   restore and exchange sources. `lattice application-checkpoint restore`
   only adopts: it admits a committed manifest under Kiln's opaque admission
   reference into a fresh state root, and the serving exchange runs adopted
-  executions, observable and cancellable through the same exchange. Uncertain
+  executions, observable and cancellable through the same exchange, including
+  ones still `queued` behind the active-execution limit. `serve` binds its
+  listener before starting any adopted execution, and records an adoption
+  `Unknown` without running it when the serving binding declares no checkpoint
+  or differs from the adoption's deadline or attempt binding. Uncertain
   nodes are adopted as `Unknown` and never replayed, and sibling manifests can
   only add uncertainty, budget and cancellation. The restart request carries
   Kiln's required `cancellation_requested`, ORed into admission, so a Cancel
-  acknowledged after the last checkpoint survives a restart. Restore refuses a
+  acknowledged after the last checkpoint survives a restart. An exchange
+  execution cancelled before its worker starts, adopted or fresh, ends
+  `cancelled` without running; before, the ready frontier blocked every node
+  on the cancellation and the execution ended `failed`. Restore refuses a
   target binding with a different deadline (`carry_forward`) or attempt
   binding (`crossed_binding`), and commits the adoption only after every check
   and the workspace write, so a refused restore adopts nothing. The

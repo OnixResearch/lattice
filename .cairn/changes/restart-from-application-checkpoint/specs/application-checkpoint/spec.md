@@ -124,7 +124,7 @@ r[lattice.application_checkpoint.restore.scenario.workspace_conflict]
 
 ### Requirement: Restarted runs through the exchange
 
-r[lattice.application_checkpoint.resume] `lattice workflow-exchange serve` MUST accept a checkpoint binding, publish checkpoints for its route, and start adopted executions that never started, observable and cancellable through the same listener and admission as a fresh dispatch. Adopted executions MUST count against `maximum_active_executions`: at most that many MUST run, lowest run id first, and the rest MUST stay and observe as `queued` until a slot frees. Exactly one process MUST run an adopted execution, it MUST be started only when no node is uncertain, and one that was running when its process died MUST become `Unknown`.
+r[lattice.application_checkpoint.resume] `lattice workflow-exchange serve` MUST accept a checkpoint binding, publish checkpoints for its route, and start adopted executions that never started, observable and cancellable through the same listener and admission as a fresh dispatch. It MUST bind that listener before starting any adopted execution, so a bind failure starts none. It MUST start an adopted execution only when its binding declares a checkpoint and reproduces the adoption's deadline and attempt binding, and otherwise MUST record it `Unknown` without running it. Adopted executions MUST count against `maximum_active_executions`: at most that many MUST run, lowest run id first, and the rest MUST stay and observe as `queued` until a slot frees. A waiting adoption MUST accept a cancel, and once a slot frees it MUST start cancelled. Exactly one process MUST run an adopted execution, it MUST be started only when no node is uncertain, and one that was running when its process died MUST become `Unknown`.
 
 #### Scenario: Observe and cancel a restored execution
 r[lattice.application_checkpoint.resume.scenario.cancel]
@@ -134,9 +134,21 @@ r[lattice.application_checkpoint.resume.scenario.cancel]
 
 #### Scenario: More adoptions than the active-execution limit
 r[lattice.application_checkpoint.resume.scenario.limit]
-- GIVEN one more adopted execution than the profile's `maximum_active_executions`
+- GIVEN two more adopted executions than the profile's `maximum_active_executions`, one of the waiting ones cancelled while `queued`
 - WHEN the target exchange serves them
-- THEN at most the limit MUST run, the extra one MUST observe as `queued`, and it MUST start and complete once a slot frees.
+- THEN at most the limit MUST run and the extra ones MUST observe as `queued`; once slots free, the uncancelled one MUST start and complete, and the cancelled one MUST end `cancelled` without running any effect.
+
+#### Scenario: A serving binding that differs from the adoption
+r[lattice.application_checkpoint.resume.scenario.binding]
+- GIVEN an adoption restored under the target binding
+- WHEN `serve` runs with a later deadline, another attempt binding, or `checkpoint: "none"`
+- THEN the adopted execution MUST observe as `unknown` and run no effect.
+
+#### Scenario: A listener that cannot bind
+r[lattice.application_checkpoint.resume.scenario.bind]
+- GIVEN an adoption and a stale socket at the profile's socket path
+- WHEN `serve` runs
+- THEN it MUST exit with an error, the adoption MUST stay `queued` with no effect run, and a later `serve` that binds MUST run it.
 
 ### Requirement: Restart receipt
 

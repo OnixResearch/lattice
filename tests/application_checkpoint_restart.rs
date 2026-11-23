@@ -373,9 +373,13 @@ impl Exchange {
     }
 
     fn cancel(&self, accepted: &WorkflowAccepted, sequence: u64) -> ExecutionObservation {
+        self.cancel_as(&workflow_request(), accepted, sequence)
+    }
+
+    fn cancel_as(&self, request: &WorkflowRequest, accepted: &WorkflowAccepted, sequence: u64) -> ExecutionObservation {
         let control = ControlRequest {
             schema: CONTROL_SCHEMA.to_string(),
-            request_identity: workflow_request().identity,
+            request_identity: request.identity.clone(),
             workflow_identity: accepted.workflow_identity.clone(),
             execution_identity: accepted.execution_identity.clone(),
             expected_sequence: sequence,
@@ -383,7 +387,7 @@ impl Exchange {
         };
         match self.call(ExchangeCommand::Control {
             profile: contract_profile(),
-            request: workflow_request(),
+            request: request.clone(),
             accepted: accepted.clone(),
             current_sequence: sequence,
             control,
@@ -518,6 +522,20 @@ fn cli_restore(target: &Root, source: &CheckpointRoot, request: &RestartRequest)
     (output.status.success(), report)
 }
 
+/// Run a `workflow-exchange serve` on `root` that must exit by itself, and collect its output.
+fn serve_output(root: &Root) -> std::process::Output {
+    let inputs = inputs(root);
+    Command::new(env!("CARGO_BIN_EXE_lattice"))
+        .arg("--config")
+        .arg(&inputs.config)
+        .args(["workflow-exchange", "serve", "--profile"])
+        .arg(&inputs.profile)
+        .arg("--checkpoint-binding")
+        .arg(&inputs.binding)
+        .output()
+        .expect("exchange runs")
+}
+
 fn target(killed: &Killed, name: &str, checkpoint: CheckpointProfile) -> Root {
     root(&killed.directory.path().join(name), &killed.effects, &killed.socket, checkpoint)
 }
@@ -630,16 +648,7 @@ fn restored_execution_is_observed_and_cancelled_through_the_exchange() {
 
     let exchange = Exchange::start(&target_root);
     wait_for("node b to start on the target", || count(&killed.effects, "b") == 1);
-    let inputs = inputs(&target_root);
-    let second = Command::new(env!("CARGO_BIN_EXE_lattice"))
-        .arg("--config")
-        .arg(&inputs.config)
-        .args(["workflow-exchange", "serve", "--profile"])
-        .arg(&inputs.profile)
-        .arg("--checkpoint-binding")
-        .arg(&inputs.binding)
-        .output()
-        .expect("second exchange runs");
+    let second = serve_output(&target_root);
     assert!(!second.status.success(), "a second process cannot serve the same state root");
     let running = exchange.observe(&killed.accepted);
     assert_eq!(running.state, ExecutionState::Running);
@@ -688,8 +697,9 @@ fn drained_before_dispatch(
 
 // r[verify lattice.application_checkpoint.resume]
 /// More adopted executions than the active-execution limit: the served exchange runs at most the
-/// limit, lowest run id first; the extra one observes as `queued` and starts on the first
-/// exchange request after a slot frees.
+/// limit, lowest run id first; the extra ones observe as `queued` and start on the first exchange
+/// request after a slot frees. A waiting one is cancellable through the exchange: it starts
+/// cancelled once a slot frees and runs no effect, while the other waiting one completes.
 #[test]
 fn adopted_executions_wait_for_the_active_execution_limit() {
     let directory = tempfile::tempdir().expect("temporary directory");
@@ -699,9 +709,9 @@ fn adopted_executions_wait_for_the_active_execution_limit() {
     let target_root =
         root(&directory.path().join("target"), &effects, &socket, CheckpointProfile::WorkflowNodeBoundaryV1);
     let limit = usize::try_from(target_root.profile.maximum_active_executions).expect("limit");
-    let executions = ['5', '8', '9']
+    let executions = ['5', '8', '9', 'c']
         .into_iter()
-        .take(limit + 1)
+        .take(limit + 2)
         .map(|key| {
             let request = keyed_request(key);
             let (transfer, accepted) = drained_before_dispatch(directory.path(), &effects, &socket, &request);
@@ -713,7 +723,7 @@ fn adopted_executions_wait_for_the_active_execution_limit() {
             (request, accepted)
         })
         .collect::<Vec<_>>();
-    assert_eq!(executions.len(), limit + 1);
+    assert_eq!(executions.len(), limit + 2);
 
     let exchange = Exchange::start(&target_root);
     wait_for("the limit's executions to start node a", || count(&effects, "a") == limit);
@@ -724,15 +734,24 @@ fn adopted_executions_wait_for_the_active_execution_limit() {
             .iter()
             .map(|(request, accepted)| exchange.observe_as(request, accepted).state)
             .collect::<Vec<_>>();
-        assert_eq!(states, [vec![ExecutionState::Running; limit], vec![ExecutionState::Queued]].concat());
+        assert_eq!(states, [vec![ExecutionState::Running; limit], vec![ExecutionState::Queued; 2]].concat());
         assert_eq!(count(&effects, "a"), limit, "no execution past the limit started");
         std::thread::sleep(OBSERVE_POLL);
     }
+    let (cancelled_request, cancelled_accepted) = executions.last().expect("the cancelled waiting execution");
+    let queued = exchange.observe_as(cancelled_request, cancelled_accepted);
+    let cancelling = exchange.cancel_as(cancelled_request, cancelled_accepted, queued.sequence);
+    assert_eq!(cancelling.state, ExecutionState::Queued, "a waiting adoption stays queued once cancelled");
+    assert!(cancelling.sequence > queued.sequence, "the cancel is acknowledged with a new sequence");
+    let held = exchange.observe_as(cancelled_request, cancelled_accepted);
+    assert_eq!((held.state, held.sequence), (ExecutionState::Queued, cancelling.sequence), "the cancel persists");
+
     release(&effects, "a");
     release(&effects, "b");
-    let (waiting_request, waiting_accepted) = executions.last().expect("the waiting execution");
+    let (waiting_request, waiting_accepted) = &executions[limit];
     let waiting = exchange.wait_terminal_as(waiting_request, waiting_accepted);
-    let others = executions
+    let cancelled = exchange.wait_terminal_as(cancelled_request, cancelled_accepted);
+    let others = executions[..limit]
         .iter()
         .map(|(request, accepted)| exchange.wait_terminal_as(request, accepted).state)
         .collect::<Vec<_>>();
@@ -743,8 +762,101 @@ fn adopted_executions_wait_for_the_active_execution_limit() {
         "{}",
         run_diagnostics(&target_root, &waiting_accepted.execution_identity)
     );
-    assert_eq!(others, vec![ExecutionState::Completed; limit + 1]);
-    assert_eq!((count(&effects, "a"), count(&effects, "b")), (limit + 1, limit + 1), "every execution ran once");
+    assert_eq!(
+        cancelled.state,
+        ExecutionState::Cancelled,
+        "{}",
+        run_diagnostics(&target_root, &cancelled_accepted.execution_identity)
+    );
+    assert!(cancelled.sequence > cancelling.sequence, "the cancelled adoption started and ended cancelled");
+    assert_eq!(others, vec![ExecutionState::Completed; limit]);
+    assert_eq!(
+        (count(&effects, "a"), count(&effects, "b")),
+        (limit + 1, limit + 1),
+        "every uncancelled execution ran once and the cancelled one ran nothing"
+    );
+}
+
+/// Restore the drained checkpoint under the target's binding, release `b`, then serve under that
+/// binding changed by `change`. A wrongly started adoption would run `b` at once.
+fn serve_under_changed_binding(change: impl FnOnce(&mut CheckpointBinding)) {
+    let (killed, checkpoint, manifest) = drained_after_a();
+    let mut target_root = target(&killed, "target", CheckpointProfile::WorkflowNodeBoundaryV1);
+    let request = restart_request(&checkpoint, &manifest, 1, ADMISSION);
+    let (success, report) = cli_restore(&target_root, &killed.transfer, &request);
+    assert!(success, "restore succeeds: {report}");
+    release(&killed.effects, "b");
+    change(&mut target_root.binding);
+    let exchange = Exchange::start(&target_root);
+    let observation = exchange.observe(&killed.accepted);
+    exchange.kill();
+    assert_eq!(observation.state, ExecutionState::Unknown, "{}", run_diagnostics(&target_root, &request.execution));
+    assert_eq!(count(&killed.effects, "b"), 0, "an adoption served under another binding runs nothing");
+    assert_eq!(count(&killed.effects, "a"), 1);
+}
+
+// r[verify lattice.application_checkpoint.resume]
+// r[verify lattice.application_checkpoint.carry_forward]
+/// `serve` publishes an adopted execution's next checkpoints under its own binding, so it never
+/// extends the deadline restore admitted: the adoption becomes `Unknown`. The matching binding
+/// serves in `drained_source_restarts_on_a_second_root_after_sigkill`.
+#[test]
+fn serving_under_a_later_deadline_runs_no_adoption() {
+    serve_under_changed_binding(|binding| binding.deadline_unix_ms = DEADLINE + 1);
+}
+
+// r[verify lattice.application_checkpoint.resume]
+// r[verify lattice.application_checkpoint.carry_forward]
+/// `serve` never moves an adopted execution to another C2 attempt binding.
+#[test]
+fn serving_under_another_attempt_binding_runs_no_adoption() {
+    serve_under_changed_binding(|binding| binding.binding = Some(identity('c')));
+}
+
+// r[verify lattice.application_checkpoint.resume]
+/// A serving binding that declares no checkpoint has no hook, so it would run the adoption with no
+/// uncertainty record for the next move; it runs nothing instead.
+#[test]
+fn serving_without_a_checkpoint_runs_no_adoption() {
+    serve_under_changed_binding(|binding| binding.checkpoint = CheckpointProfile::None);
+}
+
+// r[verify lattice.application_checkpoint.resume]
+/// The listener binds before any adopted execution starts: the stale socket a SIGKILLed exchange
+/// leaves behind fails the bind, and that `serve` starts nothing though `b` is released. Once the
+/// stale socket is gone, `serve` runs the adoption.
+#[test]
+fn a_bind_failure_starts_no_adopted_execution() {
+    let (killed, checkpoint, manifest) = drained_after_a();
+    let target_root = target(&killed, "target", CheckpointProfile::WorkflowNodeBoundaryV1);
+    let request = restart_request(&checkpoint, &manifest, 1, ADMISSION);
+    let (success, report) = cli_restore(&target_root, &killed.transfer, &request);
+    assert!(success, "restore succeeds: {report}");
+    release(&killed.effects, "b");
+    drop(std::os::unix::net::UnixListener::bind(&killed.socket).expect("listener"));
+    assert!(killed.socket.exists(), "a dropped listener leaves a stale socket behind");
+
+    let refused = serve_output(&target_root);
+    assert!(!refused.status.success(), "serve cannot bind over a stale socket");
+    assert_eq!(count(&killed.effects, "b"), 0, "a serve that never listened starts no adopted execution");
+    let state = store(&target_root)
+        .load_workflow_exchange(&request.execution)
+        .expect("load")
+        .expect("adopted record")
+        .state;
+    assert_eq!(state, lattice::workflow_exchange::DurableExecutionState::Queued);
+
+    std::fs::remove_file(&killed.socket).expect("stale socket removed");
+    let exchange = Exchange::start(&target_root);
+    let observation = exchange.wait_terminal(&killed.accepted);
+    exchange.kill();
+    assert_eq!(
+        observation.state,
+        ExecutionState::Completed,
+        "{}",
+        run_diagnostics(&target_root, &request.execution)
+    );
+    assert_eq!(count(&killed.effects, "b"), 1, "the listening serve runs the adoption once");
 }
 
 // r[verify lattice.application_checkpoint.resume]

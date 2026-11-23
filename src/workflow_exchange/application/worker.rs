@@ -51,6 +51,17 @@ pub(super) fn run(input: WorkerInput) {
     if store.save_workflow_exchange_transition(&admitted, &running).is_err() {
         return;
     }
+    // r[impl lattice.application_checkpoint.cancellation]
+    // A run cancelled before it starts dispatches nothing. The ready frontier would block every
+    // node on the cancellation and record it failed, so the run never starts.
+    if cancellation.load(std::sync::atomic::Ordering::Acquire) {
+        return settle(&store, &running, |_current| CompletionFacts {
+            cancelled: true,
+            suspended: false,
+            failed_before_results: false,
+            nodes: Vec::new(),
+        });
+    }
     // r[impl lattice.application_checkpoint.hook]
     let Ok(hook) = crate::checkpoint::NodeBoundaryHook::for_route(&store, checkpoint.as_ref(), &running, seed) else {
         return mark_unknown(&store, &running);
@@ -77,17 +88,25 @@ pub(super) fn run(input: WorkerInput) {
     {
         tracing::warn!("application checkpoint observer stopped abnormally");
     }
+    settle(&store, &running, |current| completion_facts(&store, current, result));
+}
+
+/// Record the run's terminal facts against the latest record, or `Unknown` if they do not apply.
+fn settle(
+    store: &crate::store::Store,
+    running: &ExecutionRecord,
+    facts: impl FnOnce(&ExecutionRecord) -> CompletionFacts,
+) {
     let current = match store.load_workflow_exchange(&running.accepted.execution_identity) {
         Ok(Some(current)) => current,
         _ => return,
     };
-    let facts = completion_facts(&store, &current, result);
-    let next = match super::complete(&current, &facts) {
+    let next = match super::complete(&current, &facts(&current)) {
         Ok(next) => next,
-        Err(_) => return mark_unknown(&store, &current),
+        Err(_) => return mark_unknown(store, &current),
     };
     if store.save_workflow_exchange_transition(&current, &next).is_err() {
-        mark_unknown(&store, &current);
+        mark_unknown(store, &current);
     }
 }
 

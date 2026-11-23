@@ -92,13 +92,22 @@ never started, publishing that incarnation's checkpoints under its binding, and 
 Cancel and log reads for it through the same listener and admission as a fresh dispatch. The
 start is a compare-and-swap from `queued` to `running` in the single-writer store, so exactly one
 process runs an adopted execution; a second process cannot open the store. `restore` must run
-before the target's exchange starts.
+before the target's exchange starts. `serve` binds its listener before it starts any adopted
+execution, so a bind failure (such as the stale socket a killed `serve` leaves behind) starts
+none.
+
+The serving binding publishes the restarted run's checkpoints, so it must declare a checkpoint
+and reproduce the deadline and attempt binding that `restore` admitted. An adoption served under
+a binding with `checkpoint: "none"`, another deadline or another attempt binding is recorded
+`unknown` and runs nothing.
 
 Adopted executions count against the profile's `maximum_active_executions` like fresh ones.
 `serve` starts at most that many, lowest run id first; the rest stay `queued`, observe as
 `queued` (never `unknown`), and start on the first exchange request after a slot frees, before
-any fresh dispatch is considered. An adopted execution that was `running` when its exchange
-process died observes as `unknown` and never runs again.
+any fresh dispatch is considered. A waiting adoption accepts Cancel: the cancel is recorded, it
+stays `queued`, and once a slot frees it starts cancelled and ends `cancelled` with no new
+effect. An adopted execution that was `running` when its exchange process died observes as
+`unknown` and never runs again.
 
 The restart request is `lattice.application-restart-request.v1`:
 `{ schema, checkpoint, admission, restarted_incarnation, request, execution, binding?,

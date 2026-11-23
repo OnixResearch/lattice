@@ -89,6 +89,7 @@ impl ApplicationHandler {
     }
 
     // r[impl lattice.application_checkpoint.resume]
+    // r[impl lattice.application_checkpoint.carry_forward]
     /// Start adopted executions that never started, up to the active-execution limit and lowest
     /// run id first, publishing under this handler's binding. The rest stay `Queued`;
     /// `refresh_workers` calls this again at the start of every exchange request, so a waiting
@@ -96,7 +97,8 @@ impl ApplicationHandler {
     ///
     /// The worker's `Queued` to `Running` transition is a compare-and-swap in the single-writer
     /// store, so exactly one process runs an adopted execution. An adoption that cannot be
-    /// resumed here is recorded `Unknown`.
+    /// resumed here is recorded `Unknown`, including one whose serving binding declares no
+    /// checkpoint or does not reproduce the adoption's deadline and attempt binding.
     pub fn resume_adopted(&mut self) -> Result<(), ApplicationError> {
         let Some(binding) = self.checkpoint.clone() else {
             return Ok(());
@@ -144,7 +146,8 @@ impl ApplicationHandler {
         record: super::ExecutionRecord,
         adoption: crate::checkpoint::AdoptionRecord,
     ) {
-        let resumable = (record.handler_profile_identity == self.profile_identity)
+        let is_served = record.handler_profile_identity == self.profile_identity && serves_adoption(binding, &adoption);
+        let resumable = is_served
             .then(|| self.instantiated_route(&record.request))
             .flatten()
             .filter(|(route, _workflow, revision)| binds_route(binding, route) && *revision == record.workflow_revision)
@@ -195,4 +198,15 @@ impl ApplicationHandler {
 
 fn binds_route(binding: &crate::checkpoint::CheckpointBinding, route: &WorkflowRoute) -> bool {
     route.graph_identity == binding.graph_identity && route.workflow_revision == binding.workflow_revision
+}
+
+/// The serving binding publishes the adopted execution's next checkpoints, so it must declare a
+/// checkpoint and reproduce the deadline and attempt binding restore admitted.
+fn serves_adoption(
+    binding: &crate::checkpoint::CheckpointBinding,
+    adoption: &crate::checkpoint::AdoptionRecord,
+) -> bool {
+    binding.checkpoint != crate::checkpoint::CheckpointProfile::None
+        && binding.deadline_unix_ms == adoption.deadline_unix_ms
+        && binding.binding == adoption.binding
 }

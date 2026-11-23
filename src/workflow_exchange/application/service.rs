@@ -42,9 +42,11 @@ fn selected_listener(profile: &VersionedHandlerProfile) -> HandlerListener {
 
 // r[impl lattice.workflow_interchange.application_command]
 // r[impl lattice.workflow_interchange.guest_listener]
+// r[impl lattice.application_checkpoint.resume]
 /// Serve one handler profile. With a checkpoint binding the bound route publishes checkpoints,
 /// and adopted executions that never started run here, observable and cancellable through this
-/// listener like fresh ones.
+/// listener like fresh ones. The listener binds before any adopted execution starts, so a bind
+/// failure starts none.
 #[cfg(target_os = "linux")]
 pub fn serve(
     store: crate::store::Store,
@@ -54,35 +56,47 @@ pub fn serve(
 ) -> Result<lattice_workflow_transport::ServeReport, ApplicationError> {
     let profile = profile.into();
     let listener = selected_listener(&profile);
-    let handler = served_handler(ApplicationHandler::new(store, profile, agent_runtime)?, checkpoint)?;
+    let mut handler = ApplicationHandler::new(store, profile, agent_runtime)?;
+    if let Some(binding) = checkpoint {
+        handler = handler.with_application_checkpoint(binding)?;
+    }
     let mut service = lattice_workflow_transport::WorkflowExchangeService::new(handler);
     let served = match &listener {
-        HandlerListener::Unix { socket_path, transport } => {
-            let endpoint = lattice_workflow_transport::UnixEndpoint {
-                socket_path,
-                profile: transport,
-            };
-            lattice_workflow_transport::serve(endpoint, &mut service)
+        HandlerListener::Unix { socket_path, transport } => serve_unix(socket_path, transport, &mut service),
+        HandlerListener::Vsock { transport } => {
+            let bound =
+                lattice_workflow_transport::VsockListener::bind(transport).map_err(|_| ApplicationError::Transport)?;
+            service.handler_mut().resume_adopted().and_then(|()| {
+                lattice_workflow_transport::serve_vsock_listener(&bound, transport, &mut service)
+                    .map_err(|_| ApplicationError::Transport)
+            })
         }
-        HandlerListener::Vsock { transport } => lattice_workflow_transport::serve_vsock(transport, &mut service),
     };
     service.handler_mut().wait_for_workers();
-    served.map_err(|_| ApplicationError::Transport)
+    served
 }
 
-// r[impl lattice.application_checkpoint.resume]
-/// Bind the served route's checkpoint and start the adopted executions before any connection.
+/// Bind the Unix socket with the transport's permission mode, start the adopted executions, then
+/// serve; the socket is removed once serving ends.
 #[cfg(target_os = "linux")]
-fn served_handler(
-    handler: ApplicationHandler,
-    checkpoint: Option<crate::checkpoint::CheckpointBinding>,
-) -> Result<ApplicationHandler, ApplicationError> {
-    let mut handler = match checkpoint {
-        Some(binding) => handler.with_application_checkpoint(binding)?,
-        None => handler,
-    };
-    handler.resume_adopted()?;
-    Ok(handler)
+fn serve_unix(
+    socket_path: &std::path::Path,
+    transport: &lattice_workflow_transport::TransportProfile,
+    service: &mut lattice_workflow_transport::WorkflowExchangeService<ApplicationHandler>,
+) -> Result<lattice_workflow_transport::ServeReport, ApplicationError> {
+    use std::os::unix::fs::PermissionsExt;
+    lattice_workflow_transport::validate_transport_profile(transport).map_err(|_| ApplicationError::Transport)?;
+    let listener = std::os::unix::net::UnixListener::bind(socket_path).map_err(|_| ApplicationError::Transport)?;
+    let permissions = std::fs::Permissions::from_mode(lattice_workflow_transport::SOCKET_PERMISSION_MODE);
+    let served = std::fs::set_permissions(socket_path, permissions)
+        .map_err(|_| ApplicationError::Transport)
+        .and_then(|()| service.handler_mut().resume_adopted())
+        .and_then(|()| {
+            lattice_workflow_transport::serve_listener(&listener, transport, service)
+                .map_err(|_| ApplicationError::Transport)
+        });
+    let cleanup = std::fs::remove_file(socket_path).map_err(|_| ApplicationError::Transport);
+    served.and_then(|report| cleanup.map(|()| report))
 }
 
 #[cfg(not(target_os = "linux"))]
