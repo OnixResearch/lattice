@@ -4,10 +4,10 @@
 
 impl super::ModelRequestGate for super::OwnerGate<'_> {
     /// Only an admitted producer verdict with a durable intent dispatches.
-    fn admit(&mut self, checks: crate::execution_binding::serving::gate::Checks) -> Option<super::GateTicket> {
+    fn admit(&mut self, checks: crate::execution_binding::serving::gate::Checks, _: u32) -> Option<super::GateTicket> {
         match self.session.admit(&self.route_name, checks) {
             Ok(crate::execution_binding::serving::gate::Decision::Dispatch(ticket)) => {
-                Some(super::GateTicket(Some(ticket)))
+                Some(super::GateTicket(super::Permit::Served(ticket)))
             }
             Ok(crate::execution_binding::serving::gate::Decision::Refused(_)) | Err(_) => None,
         }
@@ -19,7 +19,7 @@ impl super::ModelRequestGate for super::OwnerGate<'_> {
         ticket: super::GateTicket,
         upstream: crate::execution_binding::serving::gate::Upstream,
     ) -> Result<bool, String> {
-        let Some(ticket) = ticket.0 else {
+        let super::Permit::Served(ticket) = ticket.0 else {
             return Err("served route settled without a serving ticket".into());
         };
         let record = self.session.settle(*ticket, upstream)?;

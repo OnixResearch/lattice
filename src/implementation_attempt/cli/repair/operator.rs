@@ -22,16 +22,23 @@ mod worker;
 /// How often a persisted cancellation request is polled during a launch.
 const CANCEL_POLL: std::time::Duration = std::time::Duration::from_millis(20);
 
+/// The broker run of one step: where its request indices start and the
+/// recorded route that retains every request it relays.
+pub(crate) struct Broker<'a> {
+    pub(crate) first_request_index: u32,
+    pub(crate) gate: &'a mut dyn crate::candidate_worker::broker::ModelRequestGate,
+}
+
 /// Launches one pinned OMP step; the shell owns everything around it.
 pub(crate) trait Launch: Send {
-    /// Run `worker` with `profile` and stop it when `cancellation` is set. A
-    /// forwarding broker numbers this step's model requests from
-    /// `first_request_index`.
+    /// Run `worker` with `profile` and stop it when `cancellation` is set.
+    /// The step's broker numbers its model requests from
+    /// `broker.first_request_index` and passes each through `broker.gate`.
     fn launch(
         &mut self,
         worker: &crate::candidate_worker::Request,
         profile: &crate::candidate_worker::omp::Profile,
-        first_request_index: u32,
+        broker: Broker<'_>,
         cancellation: &std::sync::atomic::AtomicBool,
     ) -> Result<crate::candidate_worker::omp::RunResult, String>;
 }
@@ -48,15 +55,14 @@ impl Launch for PinnedOmp {
         &mut self,
         worker: &crate::candidate_worker::Request,
         profile: &crate::candidate_worker::omp::Profile,
-        first_request_index: u32,
+        broker: Broker<'_>,
         cancellation: &std::sync::atomic::AtomicBool,
     ) -> Result<crate::candidate_worker::omp::RunResult, String> {
         let credentials = super::super::session::launch::credentials(profile)?;
-        let mut gate = crate::candidate_worker::broker::DirectRoute;
         let services = crate::candidate_worker::broker::Services {
             credentials: &credentials,
-            gate: &mut gate,
-            first_request_index,
+            gate: broker.gate,
+            first_request_index: broker.first_request_index,
         };
         let config = crate::process::core::RuntimeConfig::default();
         crate::candidate_worker::omp::run(worker, profile, &config, cancellation, services)
@@ -194,7 +200,8 @@ pub(in super::super) fn execute(mut run: super::Run<'_>, granted: Granted<'_>) -
     run.authority.operator = Some(grant.clone());
     debug_assert!(run.authority.operator.is_some(), "every step rechecks the operator's grant");
     let cancel = super::records::Retained::at(run.directory, run.identity);
-    let mut worker = worker::OmpPort::new(run.request, run.directory, &mut *launch);
+    let admitted = run.authority.admitted.clone();
+    let mut worker = worker::OmpPort::new(run.request, run.directory, admitted, &mut *launch);
     let mut checks = checks::CatalogPort::new(checks::Frame {
         request: run.request,
         catalog,

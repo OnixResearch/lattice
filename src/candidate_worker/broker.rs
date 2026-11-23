@@ -6,6 +6,7 @@
 // r[impl lattice.candidate_worker.model_broker.scenario.denial]
 
 pub(crate) mod admission;
+mod brokered;
 #[cfg(unix)]
 mod forwarded;
 #[cfg(unix)]
@@ -127,7 +128,13 @@ impl Mount {
 // r[impl lattice.serving_binding.port_boundary.scenario.unserved]
 pub trait ModelRequestGate: Send {
     /// `None` refuses the request; nothing reaches the upstream endpoint.
-    fn admit(&mut self, checks: crate::execution_binding::serving::gate::Checks) -> Option<GateTicket>;
+    /// `request_index` is the broker's index of this request: the run's
+    /// first index plus the requests it admitted before.
+    fn admit(
+        &mut self,
+        checks: crate::execution_binding::serving::gate::Checks,
+        request_index: u32,
+    ) -> Option<GateTicket>;
     /// Record how the admitted call ended. `Ok(false)` withholds the response
     /// from the worker; `Err` means evidence could not be retained.
     fn settle(
@@ -140,27 +147,35 @@ pub trait ModelRequestGate: Send {
     fn exhausted(&mut self) -> Result<(), String>;
 }
 
-/// Permission for one upstream call; served routes carry their producer ticket.
+/// Permission for one upstream call; served and recorded routes carry what
+/// their settlement needs.
 #[derive(Debug)]
-pub struct GateTicket(Option<Box<crate::execution_binding::serving::gate::Ticket>>);
+pub struct GateTicket(Permit);
+
+#[derive(Debug)]
+enum Permit {
+    Unserved,
+    Served(Box<crate::execution_binding::serving::gate::Ticket>),
+    /// The synced intent of a recorded brokered request.
+    Recorded(Box<lattice_core::execution_binding::serving::brokered::Intent>),
+}
 
 impl GateTicket {
     /// A ticket of a gate without a serving-owner producer ticket.
     #[must_use]
     pub(crate) const fn unserved() -> Self {
-        Self(None)
+        Self(Permit::Unserved)
     }
 }
 
-/// A route without a serving declaration: the broker's own checks decide,
-/// no serving port is called and no request record is written.
+/// The broker's own checks alone: no serving port is called and no request
+/// evidence is written. Attempts use [`RecordedRoute`] instead.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct DirectRoute;
 
 impl ModelRequestGate for DirectRoute {
-    fn admit(&mut self, checks: crate::execution_binding::serving::gate::Checks) -> Option<GateTicket> {
-        let is_admitted = checks.is_exact_model && checks.is_within_budget && checks.is_current;
-        is_admitted.then_some(GateTicket(None))
+    fn admit(&mut self, checks: crate::execution_binding::serving::gate::Checks, _: u32) -> Option<GateTicket> {
+        is_admitted(checks).then_some(GateTicket::unserved())
     }
 
     fn settle(
@@ -174,6 +189,34 @@ impl ModelRequestGate for DirectRoute {
     fn exhausted(&mut self) -> Result<(), String> {
         Ok(())
     }
+}
+
+/// Whether the broker's own model, budget and deadline checks all passed.
+const fn is_admitted(checks: crate::execution_binding::serving::gate::Checks) -> bool {
+    checks.is_exact_model && checks.is_within_budget && checks.is_current
+}
+
+/// Durable, write-once brokered request evidence of one attempt.
+pub trait RequestEvidence: Send {
+    /// Persist and sync the dispatch intent before upstream contact.
+    fn write_intent(
+        &mut self,
+        intent: &lattice_core::execution_binding::serving::brokered::Intent,
+    ) -> Result<(), String>;
+    /// Persist the terminal record after the upstream call ended.
+    fn write_record(
+        &mut self,
+        record: &lattice_core::execution_binding::serving::brokered::Record,
+    ) -> Result<(), String>;
+}
+
+/// A route without a serving declaration whose every relayed request leaves a
+/// synced intent before upstream contact and a terminal record after it. The
+/// broker's own checks decide; no serving port is called.
+// r[impl lattice.serving_binding.brokered_evidence]
+pub struct RecordedRoute<'a> {
+    pub context: lattice_core::execution_binding::serving::brokered::Context,
+    pub evidence: &'a mut dyn RequestEvidence,
 }
 
 /// A route served through the serving-owner gate of one attempt.

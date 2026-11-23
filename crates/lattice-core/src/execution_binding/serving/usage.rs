@@ -23,11 +23,42 @@ type Record = super::record::Observation;
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ModelRequestCoverage {
-    /// No serving declaration: per-request usage is not observed.
+    /// No retained request evidence: per-request usage is not observed.
     Unknown,
     /// No-model worker: there is no inference usage to report.
     NoModel,
     Served(Box<Summary>),
+    /// No serving declaration: the attempt broker measured every request it
+    /// relayed, without attributing any to a service or deployment.
+    BrokeredUnattributed(Box<super::brokered::Summary>),
+}
+
+impl ModelRequestCoverage {
+    /// The dispatched model requests this coverage proves exactly, or `None`
+    /// when any intent lacks a terminal record, any request ended uncertain,
+    /// or nothing was observed. `indices` narrows brokered evidence to one
+    /// broker run's request-index range; served evidence has no index and
+    /// counts only for the whole attempt.
+    // r[impl lattice.serving_binding.brokered_evidence.scenario.charged]
+    #[must_use]
+    pub fn observed_requests(&self, indices: Option<&std::ops::Range<u64>>) -> Option<u64> {
+        match (self, indices) {
+            (Self::BrokeredUnattributed(summary), Some(indices)) => summary.observed(indices),
+            (Self::BrokeredUnattributed(summary), None) => {
+                summary.is_count_complete.then_some(summary.dispatched_requests)
+            }
+            (Self::Served(summary), None) => {
+                let is_count_complete = summary
+                    .services
+                    .iter()
+                    .flat_map(|service| &service.requests)
+                    .all(|entry| !matches!(entry.class, EntryClass::DispatchUnconfirmed | EntryClass::Uncertain));
+                let mut dispatched = summary.services.iter().map(|service| service.dispatched_requests);
+                is_count_complete.then(|| dispatched.try_fold(0_u64, u64::checked_add))?
+            }
+            (Self::Unknown | Self::NoModel | Self::Served(_), _) => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -91,13 +122,17 @@ pub enum EntryClass {
 #[serde(tag = "conflict", rename_all = "snake_case")]
 pub enum Conflict {
     Unserved,
-    Mismatch { mismatch: super::record::Mismatch },
+    Mismatch {
+        mismatch: super::record::Mismatch,
+    },
     ConflictingRecord,
     ConflictingIntent,
     DispatchWithoutIntent,
     IntentForRefusal,
     Overflow,
     Bound,
+    /// Brokered evidence for a binding that declares served routes.
+    Served,
 }
 
 /// Summarize retained intents and records of one admitted binding.
@@ -138,7 +173,7 @@ pub fn summarize(
 }
 
 /// Validate each item and collapse identical duplicates keyed by request id.
-fn unique<T: PartialEq + HasRequest>(
+pub(super) fn unique<T: PartialEq + HasRequest>(
     items: &[T],
     check: impl Fn(&T) -> Result<(), super::record::Mismatch>,
     conflict: Conflict,
@@ -160,7 +195,7 @@ fn unique<T: PartialEq + HasRequest>(
     Ok(unique)
 }
 
-trait HasRequest {
+pub(super) trait HasRequest {
     fn request_id(&self) -> &str;
 }
 

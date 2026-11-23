@@ -513,7 +513,7 @@ fn gate_refuses_locally_before_any_authority_call() {
         ),
     ] {
         gate.prepare(0);
-        assert!(crate::candidate_worker::broker::ModelRequestGate::admit(&mut gate, checks).is_none());
+        assert!(crate::candidate_worker::broker::ModelRequestGate::admit(&mut gate, checks, 0).is_none());
         assert_eq!(gate.refusal(), Some(refusal));
     }
     assert!(authority.seen().is_empty());

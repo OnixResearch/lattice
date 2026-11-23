@@ -15,6 +15,7 @@
 // r[impl lattice.implementation_attempt.lineage.scenario.exhausted]
 
 pub(super) mod admission;
+mod draw;
 mod evidence;
 mod materialized;
 pub(crate) mod operator;
@@ -112,30 +113,8 @@ fn first_reservation(request: &super::Request) -> Result<crate::implementation_a
     }
 }
 
-/// The single-shot attempt's conservative lineage draw, when it has one.
-pub(super) fn single_shot_draw(request: &super::Request) -> Option<serde_json::Value> {
-    let lineage = request.lineage.as_ref()?;
-    debug_assert!(request.repair.is_none(), "a repair attempt reports its own draws");
-    let charged = first_reservation(request).ok()?;
-    debug_assert_eq!(charged.tool_invocations, 0, "a single shot reserves no tool invocations");
-    let usage = crate::implementation_attempt::repair::step::Usage {
-        phase: crate::implementation_attempt::repair::step::Phase::Edit,
-        iteration: 1,
-        model_requests: None,
-        tool_invocations: None,
-        provenance: crate::orchestration::UsageProvenance::Unknown,
-        charged,
-    };
-    let mut unaccounted = lineage.unaccounted();
-    if lineage.remaining.contains_key(crate::implementation_attempt::lineage::TOOL_INVOCATIONS) {
-        unaccounted.push(crate::implementation_attempt::lineage::TOOL_INVOCATIONS.to_owned());
-    }
-    Some(serde_json::json!({
-        "binding": lineage.identity(),
-        "usage": [usage],
-        "unaccounted_dimensions": unaccounted,
-    }))
-}
+/// The single-shot attempt's lineage draw, when its request has a lineage.
+pub(super) type SingleShotDraw = draw::SingleShot;
 
 /// The frozen inputs of one repair run after its intent.
 pub(super) struct Run<'a> {

@@ -146,10 +146,12 @@ pub fn usage(facts: &crate::execution_binding::serving::gate::ResponseFacts) -> 
 }
 
 impl<P: AuthorityPort> crate::candidate_worker::broker::ModelRequestGate for KilnAuthorityGate<P> {
-    /// The broker's own checks first; then C3 `Admit` for the prepared index.
+    /// The broker's own checks first; then C3 `Admit` for the prepared index,
+    /// which `prepare` received with the forwarded frame.
     fn admit(
         &mut self,
         checks: crate::execution_binding::serving::gate::Checks,
+        _: u32,
     ) -> Option<crate::candidate_worker::broker::GateTicket> {
         let local = if !checks.is_current {
             Some(super::core::ForwardedRefusal::NotCurrent)

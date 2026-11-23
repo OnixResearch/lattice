@@ -763,12 +763,12 @@ fn unavailable_owner_blocks_served_routes_and_unserved_bindings_stay_unknown() {
     let mut port = UnavailableOwner;
     assert!(Session::new(&unserved, "incarnation-u", &mut port, &mut sink).is_err());
     let mut direct = lattice::candidate_worker::broker::DirectRoute;
-    assert!(lattice::candidate_worker::broker::ModelRequestGate::admit(&mut direct, OK).is_some());
+    assert!(lattice::candidate_worker::broker::ModelRequestGate::admit(&mut direct, OK, 0).is_some());
     let exhausted = Checks {
         is_within_budget: false,
         ..OK
     };
-    assert!(lattice::candidate_worker::broker::ModelRequestGate::admit(&mut direct, exhausted).is_none());
+    assert!(lattice::candidate_worker::broker::ModelRequestGate::admit(&mut direct, exhausted, 0).is_none());
 }
 
 #[test]
@@ -781,7 +781,7 @@ fn rejected_response_model_is_withheld_from_the_worker() {
         session,
         route_name: "primary".into(),
     };
-    let ticket = lattice::candidate_worker::broker::ModelRequestGate::admit(&mut gate, OK).expect("admitted");
+    let ticket = lattice::candidate_worker::broker::ModelRequestGate::admit(&mut gate, OK, 0).expect("admitted");
     let substituted = Upstream::Responded(ResponseFacts {
         model: Some("model-z".into()),
         input_tokens: Some(5),
@@ -1039,4 +1039,26 @@ fn budget_exhausted_refusal_is_recorded_once_and_replays_idempotently() {
     let summary = served_summary(once);
     assert_eq!((summary.services[0].not_dispatched_requests, summary.overrun.refused_requests), (1, 1));
     assert_eq!(summary.services[0].requests[0].class, EntryClass::NotDispatched);
+}
+
+/// Complete served evidence is an exact attempt-wide count and keeps its
+/// service attribution; an intent without a record is not. Served evidence
+/// has no broker index, so it never counts for one index range.
+// r[verify lattice.serving_binding.brokered_evidence.scenario.charged]
+#[test]
+fn complete_served_evidence_counts_exactly_and_keeps_its_service() {
+    let admitted = bound("attempt-a", &[("primary", SHARED)]);
+    let mut port = FixtureOwner::new(vec![snapshot(&[service(SHARED)])], vec![grant()], vec![current(SHARED)]);
+    let mut sink = MemorySink::default();
+    let mut session = Session::new(&admitted, "incarnation-a", &mut port, &mut sink).expect("session");
+    let record = request(&mut session, "primary", OK, responded(120, 40));
+    drop(session);
+    assert_eq!(record.outcome.class, OutcomeClass::Completed);
+    let coverage = summarize(&admitted, &sink.intents, &sink.records).expect("summary");
+    assert_eq!(coverage.observed_requests(None), Some(1));
+    assert_eq!(coverage.observed_requests(Some(&(0..1))), None, "served evidence has no index range");
+    let summary = served_summary(coverage);
+    assert_eq!((summary.services[0].service_id.as_str(), summary.services[0].dispatched_requests), (SHARED, 1));
+    let unconfirmed = summarize(&admitted, &sink.intents, &[]).expect("intent without record");
+    assert_eq!(unconfirmed.observed_requests(None), None, "an intent without a record keeps the reservation");
 }

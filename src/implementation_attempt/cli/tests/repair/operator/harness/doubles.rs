@@ -8,8 +8,10 @@ use std::sync::atomic::AtomicU32;
 use std::sync::atomic::Ordering;
 
 pub(super) type Hook = Box<dyn FnMut() + Send>;
-/// Runs at every launch with the step's first forwarded request index.
-pub(in super::super) type IndexHook = Box<dyn FnMut(u32) + Send>;
+/// Runs at every launch with the step's first forwarded request index and
+/// the step's recorded broker gate, as the step's broker would use it.
+pub(in super::super) type IndexHook =
+    Box<dyn FnMut(u32, &mut dyn crate::candidate_worker::broker::ModelRequestGate) + Send>;
 
 /// What one launch of the fake OMP does before it prints a completed
 /// terminal stream.
@@ -70,12 +72,12 @@ impl crate::implementation_attempt::cli::repair::operator::Launch for Scripted {
         &mut self,
         worker: &crate::candidate_worker::Request,
         profile: &crate::candidate_worker::omp::Profile,
-        first_request_index: u32,
+        broker: crate::implementation_attempt::cli::repair::operator::Broker<'_>,
         cancellation: &std::sync::atomic::AtomicBool,
     ) -> Result<crate::candidate_worker::omp::RunResult, String> {
-        self.indices.lock().expect("indices").push(first_request_index);
+        self.indices.lock().expect("indices").push(broker.first_request_index);
         if let Some(on_launch) = self.on_launch.lock().expect("hook").as_mut() {
-            on_launch(first_request_index);
+            on_launch(broker.first_request_index, broker.gate);
         }
         let launch = self.launches.fetch_add(1, Ordering::SeqCst);
         if launch > 0

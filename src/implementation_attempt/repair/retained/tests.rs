@@ -26,6 +26,7 @@ fn step(outcome: WorkerOutcome) -> super::StepRecord {
             outcome,
             model_requests: None,
             tool_invocations: None,
+            observed_model_requests: None,
             proposal: None,
         },
         candidate: None,

@@ -146,6 +146,7 @@ impl Admitted {
                     outcome: super::super::step::WorkerOutcome::Exited { code: 0 },
                     model_requests: None,
                     tool_invocations: None,
+                    observed_model_requests: None,
                     proposal: None,
                 },
                 candidate: Some(record.clone()),

@@ -182,7 +182,8 @@ impl<P: super::authority::AuthorityPort> Server<'_, P> {
             is_within_budget: self.session.forwarded_requests < self.session.bound.max_requests,
             is_current: self.is_current(),
         };
-        let Some(ticket) = crate::candidate_worker::broker::ModelRequestGate::admit(&mut self.gate, checks) else {
+        let admitted = crate::candidate_worker::broker::ModelRequestGate::admit(&mut self.gate, checks, request_index);
+        let Some(ticket) = admitted else {
             return refused(self.gate.refusal().unwrap_or(super::core::ForwardedRefusal::NotCurrent));
         };
         debug_assert!(self.gate.admission().is_some(), "an admitted ticket has an authority admission");

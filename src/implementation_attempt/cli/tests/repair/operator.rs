@@ -84,7 +84,7 @@ fn forwarded_request_indices_continue_across_repair_steps_through_one_gateway() 
     );
     let responses = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
     let (seen, forwarding, gateway_socket) = (responses.clone(), profile.clone(), socket.clone());
-    operated.on_launch(Box::new(move |first_request_index| {
+    operated.on_launch(Box::new(move |first_request_index, _| {
         let response =
             crate::candidate_worker::broker::tests::forward_one(&forwarding, &gateway_socket, first_request_index);
         seen.lock().expect("responses").push(response);
@@ -118,6 +118,82 @@ fn forwarded_request_indices_continue_across_repair_steps_through_one_gateway() 
         })
         .collect();
     assert_eq!(admitted, [0, max_requests]);
+}
+
+/// The edit and repair usage of a run's retained disposition.
+fn step_usage(observation: &serde_json::Value) -> Vec<serde_json::Value> {
+    let usage = observation["usage"].as_array().expect("usage");
+    usage
+        .iter()
+        .filter(|entry| entry["phase"] == "edit" || entry["phase"] == "repair")
+        .cloned()
+        .collect()
+}
+
+/// Each step's broker records its requests under the step's own index range
+/// in the attempt's request evidence. A step is charged exactly the requests
+/// complete evidence in its range proves, as host-measured; a range holding
+/// an intent without a record keeps the reservation, unknown. Recovery
+/// replays the retained charges even after the evidence is lost.
+// r[verify lattice.implementation_attempt.observed_charge.scenario.step_range]
+// r[verify lattice.implementation_attempt.observed_charge.scenario.incomplete]
+// r[verify lattice.implementation_attempt.observed_charge.scenario.replay]
+#[tokio::test]
+async fn each_step_is_charged_the_requests_observed_in_its_own_index_range() {
+    const OK: crate::execution_binding::serving::gate::Checks = crate::execution_binding::serving::gate::Checks {
+        is_exact_model: true,
+        is_within_budget: true,
+        is_current: true,
+    };
+    for (attempt, is_settled) in [
+        ("attempt-operator-observed", true),
+        ("attempt-operator-unconfirmed", false),
+    ] {
+        let operated = Operated::new(attempt, 2, 60_000);
+        operated.script(&[Behaviour::Write("still broken"), Behaviour::Write("fixed")]);
+        // Only the first step relays a request; the second relays none.
+        operated.on_launch(Box::new(move |first_request_index, gate| {
+            if first_request_index != 0 {
+                return;
+            }
+            let ticket = gate.admit(OK, first_request_index).expect("admitted");
+            if is_settled {
+                let facts = crate::execution_binding::serving::gate::ResponseFacts {
+                    model: None,
+                    input_tokens: None,
+                    output_tokens: None,
+                    provider_receipt: None,
+                };
+                let upstream = crate::execution_binding::serving::gate::Upstream::Responded(facts);
+                assert!(gate.settle(ticket, upstream).expect("record retained"));
+            }
+        }));
+        operated.run().await.expect("the loop reaches a disposition");
+        let observation = operated.disposition();
+        assert_eq!(observation["disposition"]["kind"], "repaired_candidate", "{observation}");
+        let max_requests = operated.request.omp.model_broker.max_requests;
+        assert_eq!(operated.indices(), [0, max_requests]);
+        let [first, second] = step_usage(&observation).try_into().expect("two steps");
+        if is_settled {
+            assert_eq!(first["model_requests"], 1, "{first}");
+            assert_eq!(first["provenance"], "host_measured");
+            assert_eq!(first["charged"]["model_requests"], 1);
+        } else {
+            assert_eq!(first["model_requests"], serde_json::Value::Null, "{first}");
+            assert_eq!(first["provenance"], "unknown");
+            assert_eq!(first["charged"]["model_requests"], max_requests, "the reservation is charged");
+        }
+        // The first step's request is outside the second step's range.
+        assert_eq!(second["model_requests"], 0, "{second}");
+        assert_eq!(second["provenance"], "host_measured");
+        assert_eq!(second["charged"]["model_requests"], 0);
+        assert_eq!(second["charged"]["tool_invocations"], first["charged"]["tool_invocations"]);
+        // Recovery replays the retained charges, even without the evidence.
+        std::fs::remove_dir_all(operated.directory().join("model-requests")).expect("lose the evidence");
+        super::recover(&operated.path, &operated.fixture.state).await.expect("recovery");
+        assert_eq!(operated.disposition(), observation, "a retained draw is never reduced");
+        assert_eq!(operated.launches(), 2, "nothing runs again");
+    }
 }
 
 #[tokio::test]

@@ -8,10 +8,17 @@
 //! is uncertain. Raw events and the launcher observation are retained next
 //! to the step intent before the loop records the step; only an observed
 //! stop is reported as one.
+//!
+//! Each step's broker retains every request it relays in the attempt's
+//! `model-requests/` evidence under the step's own request-index range,
+//! `[(n - 1) * max_requests, n * max_requests)` for step `n`. The step
+//! reports the requests complete evidence in that range proves as observed;
+//! otherwise its model requests stay unknown and the reservation is charged.
 
 // r[impl lattice.implementation_attempt.operator_repair.scenario.outcomes]
 // r[impl lattice.implementation_attempt.operator_repair.scenario.repaired]
 // r[impl lattice.implementation_attempt.operator_repair.scenario.recovery]
+// r[impl lattice.implementation_attempt.observed_charge.scenario.step_range]
 
 const SCHEMA: &str = "lattice.implementation-attempt-omp-step.v1";
 /// An expected base no workspace has, after a tree could not be captured.
@@ -23,8 +30,11 @@ type StepOutcome = crate::implementation_attempt::repair::step::WorkerOutcome;
 /// The OMP worker port of one repair run.
 pub(in crate::implementation_attempt::cli) struct OmpPort<'a, 'r> {
     request: &'r super::super::super::Request,
+    /// The attempt directory, which holds the request evidence.
+    directory: std::path::PathBuf,
     /// The run's private repair records directory.
     records: std::path::PathBuf,
+    admitted: lattice_core::execution_binding::admission::bound::Admitted,
     launch: &'a mut dyn super::Launch,
     /// The snapshot identity the next step's workspace must have.
     expected_base: String,
@@ -38,17 +48,23 @@ struct Prepared {
     is_capped: bool,
     /// The forwarded index of this step's first model request.
     first_request_index: u32,
+    /// The attempt's request evidence, created before the broker runs.
+    files: super::super::super::binding::requests::RequestFiles,
 }
 
 impl<'a, 'r> OmpPort<'a, 'r> {
     pub(in crate::implementation_attempt::cli) fn new(
         request: &'r super::super::super::Request,
         directory: &std::path::Path,
+        admitted: lattice_core::execution_binding::admission::bound::Admitted,
         launch: &'a mut dyn super::Launch,
     ) -> Self {
+        debug_assert!(admitted.serving.is_none(), "a repair policy is never combined with a served route");
         Self {
             request,
+            directory: directory.to_path_buf(),
             records: super::super::records::Retained::root(directory),
+            admitted,
             launch,
             expected_base: request.omp.base_identity.clone(),
         }
@@ -71,12 +87,24 @@ impl<'a, 'r> OmpPort<'a, 'r> {
         profile.prompt = crate::implementation_attempt::repair::step::operator::prompt(&self.request.omp.prompt, step);
         let is_capped = crate::implementation_attempt::repair::step::operator::is_capped(deadline, admitted_secs);
         let first_request_index = first_request_index(step, &self.request.omp.model_broker)?;
+        let files = super::super::super::binding::requests::RequestFiles::new(&self.directory)?;
         Ok(Prepared {
             worker,
             profile,
             is_capped,
             first_request_index,
+            files,
         })
+    }
+
+    /// The model requests the attempt's complete request evidence proves in
+    /// the step's own index range; `None` when any intent there lacks a
+    /// terminal record, a request ended uncertain or the evidence conflicts.
+    fn observed_requests(&self, first_request_index: u32) -> Option<u64> {
+        let first = u64::from(first_request_index);
+        let indices = first..first.checked_add(u64::from(self.request.omp.model_broker.max_requests))?;
+        let coverage = super::super::super::binding::requests::coverage(&self.admitted, &self.directory).ok()?;
+        coverage.observed_requests(Some(&indices))
     }
 
     /// After an exited step, the tree it left is the next step's base.
@@ -123,6 +151,7 @@ impl super::super::WorkerPort for OmpPort<'_, '_> {
         is_cancel_requested: &dyn Fn() -> bool,
     ) -> Report {
         debug_assert_eq!(workspace, self.request.workspace_root.as_path(), "the attempt workspace");
+        let mut observed_model_requests = None;
         let (outcome, record, result) = match self.prepare(request, deadline) {
             Err(blocker) => {
                 // Nothing was launched, but the loop has no not-started outcome:
@@ -131,14 +160,22 @@ impl super::super::WorkerPort for OmpPort<'_, '_> {
                     "launched": false, "blocker": blocker});
                 (StepOutcome::Unknown, record, None)
             }
-            Ok(prepared) => {
+            Ok(mut prepared) => {
                 let launch = &mut *self.launch;
+                let mut gate = super::super::super::binding::requests::recorded(&self.admitted, &mut prepared.files);
+                let (worker, profile) = (&prepared.worker, &prepared.profile);
+                let first_request_index = prepared.first_request_index;
                 let result = super::polled(
                     |cancellation| {
-                        launch.launch(&prepared.worker, &prepared.profile, prepared.first_request_index, cancellation)
+                        let broker = super::Broker {
+                            first_request_index,
+                            gate: &mut gate,
+                        };
+                        launch.launch(worker, profile, broker, cancellation)
                     },
                     is_cancel_requested,
                 );
+                observed_model_requests = self.observed_requests(first_request_index);
                 observed(request.iteration, &prepared, result)
             }
         };
@@ -153,9 +190,11 @@ impl super::super::WorkerPort for OmpPort<'_, '_> {
         };
         Report {
             outcome,
-            // JSONL is not a complete request ledger: the reservation is charged.
+            // JSONL is not a complete request ledger; the broker's request
+            // evidence is, when it is complete.
             model_requests: None,
             tool_invocations: None,
+            observed_model_requests,
             proposal: None,
         }
     }

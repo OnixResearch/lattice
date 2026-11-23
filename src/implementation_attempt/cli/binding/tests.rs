@@ -11,6 +11,7 @@
 // r[verify lattice.execution_binding.usage_provenance.scenario.shared_allocation]
 // r[verify lattice.execution_binding.usage_provenance.scenario.bound]
 
+mod brokered;
 mod serving;
 
 type Observation = lattice_core::execution_binding::model::ComputeAllocationObservation;

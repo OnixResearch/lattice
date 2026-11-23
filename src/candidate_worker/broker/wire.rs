@@ -105,7 +105,7 @@ impl Handler<'_> {
         };
         // r[impl lattice.vm_profile.forwarded_upstream.scenario.request_index]
         let request_index = self.first_request_index.checked_add(self.requests).ok_or(())?;
-        let ticket = self.gate.admit(checks).ok_or(())?;
+        let ticket = self.gate.admit(checks, request_index).ok_or(())?;
         debug_assert!(checks.is_within_budget && checks.is_current, "no gate admits outside the broker checks");
         self.requests += 1;
         if let Some((target, binding)) = forwarding {

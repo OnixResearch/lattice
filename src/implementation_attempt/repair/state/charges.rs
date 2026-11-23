@@ -1,10 +1,16 @@
-//! Conservative charges of one repair loop's steps and checks.
+//! Charges of one repair loop's steps and checks: exact for host-observed
+//! model requests, conservative for everything else.
 
 // r[impl lattice.implementation_attempt.lineage.scenario.usage]
+// r[impl lattice.implementation_attempt.observed_charge]
+// r[impl lattice.implementation_attempt.observed_charge.scenario.step_range]
 
 impl super::Loop {
-    /// Record a spawned step and charge it: the larger of the reservation
-    /// and the reported count, or the reservation when the count is unknown.
+    /// Record a spawned step and charge it. Model requests the host observed
+    /// in complete broker evidence are charged exactly with host-measured
+    /// provenance. Otherwise each dimension is charged the larger of the
+    /// reservation and the worker-reported count, or the reservation when the
+    /// count is unknown.
     pub fn start(
         &mut self,
         request: &super::super::step::Request,
@@ -14,24 +20,32 @@ impl super::Loop {
         self.steps = self.steps.saturating_add(1);
         debug_assert_eq!(request.iteration, self.steps, "steps are recorded in order");
         let step_tools = self.policy.step_tool_invocations;
+        let tool_invocations = report.tool_invocations.map_or(step_tools, |reported| reported.max(step_tools));
+        let (model_requests, charged_requests, provenance) = match report.observed_model_requests {
+            Some(observed) => (Some(observed), observed, crate::orchestration::UsageProvenance::HostMeasured),
+            None => {
+                let reservation = self.reservation.model_requests;
+                let charged = report.model_requests.map_or(reservation, |reported| reported.max(reservation));
+                let is_reported = report.model_requests.is_some() && report.tool_invocations.is_some();
+                let provenance = if is_reported {
+                    crate::orchestration::UsageProvenance::WorkerReported
+                } else {
+                    crate::orchestration::UsageProvenance::Unknown
+                };
+                (report.model_requests, charged, provenance)
+            }
+        };
         let charged = super::super::super::lineage::Draws {
-            model_requests: report
-                .model_requests
-                .map_or(self.reservation.model_requests, |reported| reported.max(self.reservation.model_requests)),
-            tool_invocations: report.tool_invocations.map_or(step_tools, |reported| reported.max(step_tools)),
+            model_requests: charged_requests,
+            tool_invocations,
         };
         self.drawn = self.drawn.saturating_add(&charged);
-        let is_reported = report.model_requests.is_some() && report.tool_invocations.is_some();
         Ok(super::super::step::Usage {
             phase: request.phase,
             iteration: request.iteration,
-            model_requests: report.model_requests,
+            model_requests,
             tool_invocations: report.tool_invocations,
-            provenance: if is_reported {
-                crate::orchestration::UsageProvenance::WorkerReported
-            } else {
-                crate::orchestration::UsageProvenance::Unknown
-            },
+            provenance,
             charged,
         })
     }

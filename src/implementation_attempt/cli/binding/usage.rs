@@ -2,7 +2,8 @@
 //!
 //! It is persisted before the attempt result is published. Reserved claims stay
 //! labelled `reserved`; host duration appears only when both endpoints were
-//! observed; model and device usage stay unknown.
+//! observed; model requests are the retained per-request coverage; device
+//! usage stays unknown.
 
 // r[impl lattice.execution_binding.usage_provenance.scenario.bound]
 // r[impl lattice.execution_binding.usage_provenance.scenario.shared_allocation]
@@ -86,19 +87,21 @@ impl WorkerReceipt {
     }
 
     /// Persist before the attempt result with the retained per-request
-    /// coverage; replay of identical content is idempotent and different
-    /// content is refused, so settled usage cannot be reset.
+    /// coverage, and return that coverage; replay of identical content is
+    /// idempotent and different content is refused, so settled usage cannot
+    /// be reset.
     // r[impl lattice.serving_binding.usage.scenario.settled]
     pub(in super::super) fn persist(
         &self,
         store: &crate::store::Store,
         window: WorkerWindow,
         attempt_directory: &std::path::Path,
-    ) -> Result<(), String> {
+    ) -> Result<lattice_core::execution_binding::serving::usage::ModelRequestCoverage, String> {
         let model_requests = super::requests::coverage(&self.admitted, attempt_directory)?;
         store
-            .save_command_worker_usage(&self.observation(window, model_requests))
-            .map_err(|error| error.to_string())
+            .save_command_worker_usage(&self.observation(window, model_requests.clone()))
+            .map_err(|error| error.to_string())?;
+        Ok(model_requests)
     }
 
     pub(in super::super) fn request_identity(&self) -> &str {

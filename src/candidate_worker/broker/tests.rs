@@ -314,6 +314,7 @@ mod transport {
             fn admit(
                 &mut self,
                 checks: crate::execution_binding::serving::gate::Checks,
+                _: u32,
             ) -> Option<super::super::GateTicket> {
                 (checks.is_exact_model && checks.is_within_budget && checks.is_current)
                     .then(super::super::GateTicket::unserved)

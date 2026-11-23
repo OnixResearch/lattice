@@ -227,7 +227,7 @@ pub fn check_observation(admitted: &Admitted, record: &Observation) -> Result<()
     check(is_consistent, Mismatch::Inconsistent)
 }
 
-fn check_owner(admitted: &Admitted, owner: (&str, &str, u64)) -> Result<(), Mismatch> {
+pub(super) fn check_owner(admitted: &Admitted, owner: (&str, &str, u64)) -> Result<(), Mismatch> {
     check(owner.0 == admitted.binding_identity, Mismatch::Crossed {
         field: "binding_identity",
     })?;

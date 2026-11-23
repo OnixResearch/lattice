@@ -230,6 +230,7 @@ const fn exited() -> StepReport {
         outcome: WorkerOutcome::Exited { code: 0 },
         model_requests: None,
         tool_invocations: None,
+        observed_model_requests: None,
         proposal: None,
     }
 }
@@ -883,13 +884,18 @@ fn absent_policy_and_lineage_keep_request_bytes_and_revision_and_a_policy_moves_
 #[test]
 fn a_single_shot_attempt_with_a_lineage_reports_its_conservative_draw() {
     let mut request = super::host_local();
-    assert!(super::super::repair::single_shot_draw(&request).is_none(), "no lineage, no draw");
+    assert!(super::super::repair::SingleShotDraw::of(&request).is_none(), "no lineage, no draw");
     let lineage = crate::implementation_attempt::lineage::tests::binding(4, 4);
     request.lineage = Some(lineage.clone());
-    let draw = super::super::repair::single_shot_draw(&request).expect("draw");
+    let frame = super::super::repair::SingleShotDraw::of(&request).expect("draw frame");
+    let directory = tempfile::tempdir().expect("attempt directory");
+    // Nothing retained: the broker ceiling, unknown.
+    let draw = frame.retained(directory.path()).expect("draw");
+    assert_eq!(draw, frame.draw(None));
     assert_eq!(draw["binding"], lineage.identity().as_str());
     assert_eq!(draw["usage"][0]["charged"], serde_json::json!({"model_requests": 1, "tool_invocations": 0}));
     assert_eq!(draw["usage"][0]["model_requests"], serde_json::Value::Null, "unknown, never zero");
+    assert_eq!(draw["usage"][0]["provenance"], "unknown");
     assert_eq!(draw["unaccounted_dimensions"], serde_json::json!(["tool_invocations"]));
 }
 

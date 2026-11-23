@@ -226,6 +226,7 @@ impl Context {
             is_unchanged_allowed: self.request.allow_unchanged,
             receipt,
             serving,
+            draw: super::repair::SingleShotDraw::of(&self.request),
         };
         super::session::launch::execute(execution, &self.directory).await
     }

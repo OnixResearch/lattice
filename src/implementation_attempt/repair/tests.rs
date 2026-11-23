@@ -99,6 +99,7 @@ const fn exited() -> StepReport {
         outcome: WorkerOutcome::Exited { code: 0 },
         model_requests: None,
         tool_invocations: None,
+        observed_model_requests: None,
         proposal: None,
     }
 }
@@ -611,4 +612,23 @@ fn charges_are_conservative_and_unknown_usage_stays_unknown() {
         "an under-report cannot lower the reservation; an overrun is charged"
     );
     assert_eq!((state.drawn().model_requests, state.drawn().tool_invocations), (4, 13));
+}
+
+/// Host-observed model requests are charged exactly, below the reservation
+/// when fewer ran; the step's unknown tool invocations keep their reservation.
+#[test]
+// r[verify lattice.implementation_attempt.observed_charge]
+fn host_observed_model_requests_are_charged_exactly() {
+    let mut state = fresh();
+    let request = spawn(&state, 0);
+    let observed = StepReport {
+        model_requests: Some(5),
+        observed_model_requests: Some(1),
+        ..exited()
+    };
+    let usage = state.start(&request, &observed).expect("same attempt");
+    assert_eq!(usage.provenance, crate::orchestration::UsageProvenance::HostMeasured);
+    assert_eq!((usage.model_requests, usage.tool_invocations), (Some(1), None), "the host count wins");
+    assert_eq!((usage.charged.model_requests, usage.charged.tool_invocations), (1, 2));
+    assert_eq!(state.drawn().model_requests, 1, "below the reservation of 2");
 }

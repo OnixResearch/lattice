@@ -1,23 +1,32 @@
-//! Durable per-request serving evidence in the attempt directory.
+//! Durable per-request model evidence in the attempt directory.
 //!
+//! Every attempt broker creates `model-requests/` before its worker starts.
 //! `model-requests/<hex>.intent.json` is written with fsync before upstream
 //! contact and `model-requests/<hex>.record.json` after the gate refused or
-//! the call ended. Both are write-once; a different second write is refused.
-//! Recovery and usage read them back and never call the serving port.
+//! the call ended: serving-gate files for a binding with a serving
+//! declaration, brokered files for one without. Both are write-once; a
+//! different second write is refused. Recovery and usage read them back and
+//! never call the serving port.
 
 // r[impl lattice.serving_binding.request_observation]
 // r[impl lattice.serving_binding.usage.scenario.dedup]
+// r[impl lattice.serving_binding.brokered_evidence]
 
 const DIRECTORY: &str = "model-requests";
 const INTENT_SUFFIX: &str = ".intent.json";
 const RECORD_SUFFIX: &str = ".record.json";
 const MAX_FILE_BYTES: usize = 16_384;
-/// Every served route's request ceiling, with an intent and a record each.
-const MAX_FILES: usize = 4_096;
+/// An intent and a record for each of an attempt's brokered requests, which
+/// also covers every served route's request ceiling.
+const MAX_FILES: usize = 2 * lattice_core::execution_binding::serving::brokered::MAX_REQUESTS;
 
 type Intent = lattice_core::execution_binding::serving::record::DispatchIntent;
 type Record = lattice_core::execution_binding::serving::record::Observation;
+type BrokeredIntent = lattice_core::execution_binding::serving::brokered::Intent;
+type BrokeredRecord = lattice_core::execution_binding::serving::brokered::Record;
 type Admitted = lattice_core::execution_binding::admission::bound::Admitted;
+/// Retained intents and records, or `None` when no broker created the directory.
+type Retained<I, R> = Option<(Vec<I>, Vec<R>)>;
 
 /// An OMP attempt may serve only its brokered `primary` route, with the
 /// broker's exact model, and its caller identities must be producer tokens.
@@ -51,9 +60,15 @@ pub(in super::super) struct RequestFiles {
 }
 
 impl RequestFiles {
+    /// Create the evidence directory before any broker runs and sync it into
+    /// the attempt directory, so a retained empty directory proves that no
+    /// request reached upstream.
     pub(in super::super) fn new(attempt_directory: &std::path::Path) -> Result<Self, String> {
         let directory = attempt_directory.join(DIRECTORY);
         super::super::artifacts::private_directory(&directory)?;
+        std::fs::File::open(attempt_directory)
+            .and_then(|parent| parent.sync_all())
+            .map_err(|_| "model request evidence directory is not durable")?;
         Ok(Self { directory })
     }
 
@@ -77,6 +92,31 @@ impl crate::execution_binding::serving::Sink for RequestFiles {
     }
 }
 
+impl crate::candidate_worker::broker::RequestEvidence for RequestFiles {
+    fn write_intent(&mut self, intent: &BrokeredIntent) -> Result<(), String> {
+        let bytes = serde_json::to_vec(intent).map_err(|error| error.to_string())?;
+        self.write(&intent.request_id, true, &bytes)
+    }
+
+    fn write_record(&mut self, record: &BrokeredRecord) -> Result<(), String> {
+        let bytes = serde_json::to_vec(record).map_err(|error| error.to_string())?;
+        self.write(&record.request_id, false, &bytes)
+    }
+}
+
+/// The recorded route of a binding without a serving declaration: the OMP
+/// broker's `primary` route, retained in `files`.
+pub(in super::super) fn recorded<'a>(
+    admitted: &Admitted,
+    files: &'a mut RequestFiles,
+) -> crate::candidate_worker::broker::RecordedRoute<'a> {
+    debug_assert!(admitted.serving.is_none(), "a served binding records through the serving gate");
+    crate::candidate_worker::broker::RecordedRoute {
+        context: lattice_core::execution_binding::serving::brokered::Context::new(admitted, super::PRIMARY_ROUTE),
+        evidence: files,
+    }
+}
+
 fn file_name(request_id: &str, is_intent: bool) -> Result<String, String> {
     let digest = request_id
         .strip_prefix("blake3:")
@@ -86,11 +126,14 @@ fn file_name(request_id: &str, is_intent: bool) -> Result<String, String> {
     Ok(format!("{digest}{suffix}"))
 }
 
-/// Read retained intents and records; a missing directory is no evidence.
-pub(in super::super) fn load(attempt_directory: &std::path::Path) -> Result<(Vec<Intent>, Vec<Record>), String> {
+/// Read retained intents and records; `None` when the directory is missing,
+/// which is no evidence at all.
+pub(in super::super) fn load<I: serde::de::DeserializeOwned, R: serde::de::DeserializeOwned>(
+    attempt_directory: &std::path::Path,
+) -> Result<Retained<I, R>, String> {
     let directory = attempt_directory.join(DIRECTORY);
     let entries = match std::fs::read_dir(&directory) {
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok((Vec::new(), Vec::new())),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(_) => return Err("retained model request evidence is unreadable".into()),
         Ok(entries) => entries,
     };
@@ -116,15 +159,26 @@ pub(in super::super) fn load(attempt_directory: &std::path::Path) -> Result<(Vec
         }
     }
     debug_assert!(intents.len().saturating_add(records.len()) == names.len());
-    Ok((intents, records))
+    Ok(Some((intents, records)))
 }
 
-/// Summarize the retained evidence for #13; conflicts fail closed.
+/// Summarize the retained evidence for #13; conflicts fail closed. A binding
+/// without a serving declaration and without the evidence directory, as an
+/// attempt run before brokered evidence existed, stays `unknown`.
 pub(in super::super) fn coverage(
     admitted: &Admitted,
     attempt_directory: &std::path::Path,
 ) -> Result<lattice_core::execution_binding::serving::usage::ModelRequestCoverage, String> {
-    let (intents, records) = load(attempt_directory)?;
-    lattice_core::execution_binding::serving::usage::summarize(admitted, &intents, &records)
-        .map_err(|conflict| format!("retained model request evidence conflicts: {conflict:?}"))
+    let summary = if admitted.serving.is_some() {
+        let (intents, records) = load::<Intent, Record>(attempt_directory)?.unwrap_or_default();
+        lattice_core::execution_binding::serving::usage::summarize(admitted, &intents, &records)
+    } else {
+        match load::<BrokeredIntent, BrokeredRecord>(attempt_directory)? {
+            Some((intents, records)) => {
+                lattice_core::execution_binding::serving::brokered::summarize(admitted, &intents, &records)
+            }
+            None => lattice_core::execution_binding::serving::usage::summarize(admitted, &[], &[]),
+        }
+    };
+    summary.map_err(|conflict| format!("retained model request evidence conflicts: {conflict:?}"))
 }

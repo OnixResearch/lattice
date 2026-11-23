@@ -36,8 +36,21 @@ pub struct Report {
     pub model_requests: Option<u64>,
     /// Worker-reported tool invocations; `None` is unknown, never zero.
     pub tool_invocations: Option<u64>,
+    /// Model requests the host observed in the step broker's complete request
+    /// evidence for the step's request-index range. When set it is charged
+    /// exactly, with host-measured provenance, instead of `model_requests`;
+    /// `None` when any intent of the range lacks a terminal record, a request
+    /// ended uncertain, the evidence conflicts or none was observed; omitted
+    /// then, so retained step records keep their earlier bytes.
+    #[serde(default = "unobserved", skip_serializing_if = "Option::is_none")]
+    pub observed_model_requests: Option<u64>,
     /// A continuation the worker proposes; only Kiln may admit it.
     pub proposal: Option<super::KilnOwned>,
+}
+
+/// A report that names no host-observed count, as before #31.
+const fn unobserved() -> Option<u64> {
+    None
 }
 
 /// What the shell asks the worker port to do next.

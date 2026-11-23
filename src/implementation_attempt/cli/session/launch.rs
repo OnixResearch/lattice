@@ -57,6 +57,8 @@ pub(in super::super) struct WorkerStep {
     pub(in super::super) is_unchanged_allowed: bool,
     pub(in super::super) receipt: super::super::binding::usage::WorkerReceipt,
     pub(in super::super) serving: Box<dyn crate::execution_binding::serving::OwnerPort>,
+    /// The lineage draw to retain before the result, when the request has a lineage.
+    pub(in super::super) draw: Option<super::super::repair::SingleShotDraw>,
 }
 
 impl WorkerStep {
@@ -84,26 +86,27 @@ impl WorkerStep {
         Ok(())
     }
 
-    /// Run the worker behind the broker. A served route passes every request
-    /// through the serving-owner gate with request files in the attempt
-    /// directory; any other route keeps the broker's own checks only.
+    /// Run the worker behind the broker, which retains request files in the
+    /// attempt directory for every request it relays. A served route passes
+    /// every request through the serving-owner gate; any other route keeps the
+    /// broker's own checks and records each request without attributing it.
     // r[impl lattice.serving_binding.request_admission]
+    // r[impl lattice.serving_binding.brokered_evidence]
     fn run_worker(
         &mut self,
         cancellation: &std::sync::atomic::AtomicBool,
         credentials: &dyn crate::credentials::CredentialProvider,
     ) -> Result<crate::candidate_worker::omp::RunResult, String> {
         let admitted = self.receipt.admitted();
-        let mut direct = crate::candidate_worker::broker::DirectRoute;
-        let mut sink;
+        let mut files = super::super::binding::requests::RequestFiles::new(&self.output_dir)?;
         let mut served;
+        let mut recorded;
         let gate: &mut dyn crate::candidate_worker::broker::ModelRequestGate = if admitted.serving.is_some() {
-            sink = super::super::binding::requests::RequestFiles::new(&self.output_dir)?;
             let session = crate::execution_binding::serving::gate::Session::new(
                 admitted,
                 self.receipt.request_identity(),
                 self.serving.as_mut(),
-                &mut sink,
+                &mut files,
             )?;
             served = crate::candidate_worker::broker::OwnerGate {
                 session,
@@ -111,7 +114,8 @@ impl WorkerStep {
             };
             &mut served
         } else {
-            &mut direct
+            recorded = super::super::binding::requests::recorded(admitted, &mut files);
+            &mut recorded
         };
         // A single-shot attempt runs one broker incarnation: indices start at 0.
         let services = crate::candidate_worker::broker::Services {
@@ -138,8 +142,12 @@ impl WorkerStep {
             finished_epoch_ms: super::super::now_ms().ok(),
         };
         self.retain_events(&result)?;
-        // The attempt usage observation precedes the published attempt result.
-        self.receipt.persist(&self.store, window, &self.output_dir)?;
+        // The attempt usage observation and the lineage draw precede the
+        // published attempt result.
+        let coverage = self.receipt.persist(&self.store, window, &self.output_dir)?;
+        if let Some(draw) = &self.draw {
+            draw.retain(&self.output_dir, &coverage)?;
+        }
         let outcome =
             crate::candidate_worker::publish_outcome(&self.worker, &self.store, result.outcome, result.compatibility);
         let retained = crate::candidate_worker::AttemptResult::from_outcome(&outcome);

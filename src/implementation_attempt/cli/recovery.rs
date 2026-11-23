@@ -33,9 +33,11 @@ pub(super) fn recover(
             "model_requests".to_owned(),
             serde_json::to_value(&model_requests).map_err(|error| error.to_string())?,
         );
+        // The retained draw is replayed as retained, never derived again.
         // r[impl lattice.implementation_attempt.lineage.scenario.usage]
-        if let Some(draw) = super::repair::single_shot_draw(request) {
-            fields.insert("budget_lineage".to_owned(), draw);
+        // r[impl lattice.implementation_attempt.observed_charge.scenario.replay]
+        if let Some(draw) = super::repair::SingleShotDraw::of(request) {
+            fields.insert("budget_lineage".to_owned(), draw.retained(directory)?);
         }
     }
     Ok(projected)

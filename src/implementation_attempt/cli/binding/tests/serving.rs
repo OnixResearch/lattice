@@ -104,7 +104,12 @@ fn inspect_names_the_missing_port_and_shows_the_budget_refusal_once() {
         crate::candidate_worker::broker::ModelRequestGate::exhausted(&mut gate).expect("no second record");
     }
     assert!(port.calls().is_empty(), "budget exhaustion never calls the serving port");
-    let (intents, records) = super::super::requests::load(&served.directory).expect("retained evidence");
+    let (intents, records) = super::super::requests::load::<
+        lattice_core::execution_binding::serving::record::DispatchIntent,
+        lattice_core::execution_binding::serving::record::Observation,
+    >(&served.directory)
+    .expect("retained evidence")
+    .expect("evidence directory");
     assert_eq!((intents.len(), records.len()), (0, 1), "the refusal is recorded once and never dispatched");
     crate::execution_binding::serving::Sink::write_record(&mut files, &records[0]).expect("identical replay");
     let output = super::super::super::inspect::project(

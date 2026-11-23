@@ -11,6 +11,7 @@
 // r[impl lattice.serving_binding.declaration]
 // r[impl lattice.serving_binding.declaration.scenario.unsupported]
 
+pub mod brokered;
 pub mod envelope;
 pub mod record;
 pub mod usage;
@@ -227,6 +228,14 @@ pub fn is_valid_coverage(coverage: &usage::ModelRequestCoverage, routes: &super:
             });
             debug_assert!(!routes.is_empty(), "declared routes are nonempty");
             summary.schema == usage::USAGE_SCHEMA && is_bounded && is_declared
+        }
+        usage::ModelRequestCoverage::BrokeredUnattributed(summary) => {
+            let super::request::RouteDeclaration::Routes { routes } = routes else {
+                return false;
+            };
+            let is_declared =
+                summary.requests.iter().all(|entry| routes.iter().any(|route| route.name == entry.route_name));
+            summary.schema == brokered::USAGE_SCHEMA && summary.requests.len() <= brokered::MAX_REQUESTS && is_declared
         }
     }
 }
