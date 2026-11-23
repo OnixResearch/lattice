@@ -48,6 +48,33 @@
     "fmt": {"command": "cargo fmt -p lattice -p lattice-core --check", "exit": 0},
     "cairn_gates": {"command": "cairn gate {proposal,design,tasks} charge-observed-model-requests --root . --policy cairn-policy/generated/cairn-policy.json", "exit": 0, "valid": true}
   },
+  "review_1": {
+    "reviewer": "Lattice31Review",
+    "P1": {
+      "finding": "a served attempt with a missing model-requests/ summarized as an empty served summary and counted zero",
+      "fix": "cli/binding/requests.rs::coverage reports unknown for a missing directory, served or not; only the pre-created, synced directory proves a count",
+      "tests": [
+        "src/implementation_attempt/cli/binding/tests/serving.rs::missing_served_evidence_is_unknown_and_an_empty_retained_directory_is_zero",
+        "src/implementation_attempt/cli/binding/tests/brokered.rs::evidence_lost_before_the_draw_charges_the_reservation_and_an_empty_ledger_charges_zero"
+      ],
+      "absence_paths_rechecked": "requests::coverage is the only place a missing directory or file becomes coverage; persist, recovery, inspect and the repair step count all read it. A missing lineage-draw.json reports the reservation. brokered::Summary::observed counts an empty index range as zero only inside a retained directory; a repair step's own broker writes into the directory its prepare created."
+    },
+    "P2": {
+      "finding": "RecordedRoute::admit accepted a reused index because RequestFiles accepted an identical existing intent",
+      "fix": "RequestEvidence::create_intent is create-only, RequestFiles refuses any existing intent, and RecordedRoute admits only indices above the highest it admitted, all before any ticket",
+      "tests": [
+        "tests/test_execution_binding_brokered.rs::a_reused_request_index_is_refused_before_any_upstream_contact",
+        "src/implementation_attempt/cli/binding/tests/brokered.rs::brokered_request_files_are_write_once_and_conflicts_fail_closed"
+      ]
+    },
+    "checks": {
+      "cargo_test_focused": {"command": "cargo test -p lattice --lib -- implementation_attempt candidate_worker model_gateway execution_binding", "exit": 0, "passed": 225, "failed": 0, "ignored": 7},
+      "integration": {"command": "cargo test -p lattice --test test_execution_binding_brokered --test test_execution_binding_serving --test test_runbook_catalog_cli --test test_execution_binding_usage", "exit": 0, "passed": [4, 23, 3, 3], "failed": 0},
+      "lattice_core": {"command": "cargo test -p lattice-core", "exit": 0, "passed": 15, "failed": 0},
+      "clippy": {"command": "cargo clippy -p lattice -p lattice-core --all-targets --no-deps -- -D warnings", "exit": 0},
+      "fmt": {"command": "cargo fmt -p lattice -p lattice-core --check", "exit": 0}
+    }
+  },
   "kiln_compatibility": {
     "kiln_revision": "90a9fb64f27f6eeb05caf6e541a224265310ce86",
     "finding": "Kiln has no consumer of budget_lineage.usage[] (charged or provenance) at this revision, so neither host_measured provenance nor a charge below the reservation is refused. CHARGED_DIMENSIONS (crates/kiln-adapter-lattice/src/lineage.rs:33) gates only the request-side lineage it derives (lineage.rs:358-367, a positive held amount per charged dimension). The worker inventory decodes model_requests as opaque JSON (crates/kiln-adapter-lattice/src/worker_inventory.rs:591), worker_metrics.rs reports usage as NotInstrumented, and worker_settlement.rs:273 classify_observation reads only schema, envelope, dispatch_plan and status.",
