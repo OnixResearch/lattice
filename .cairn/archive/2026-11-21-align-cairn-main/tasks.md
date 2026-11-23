@@ -8,4 +8,4 @@
 ## Phase 2: Verification
 
 - [x] [serial] 2.1 Run `cairn validate`, `cairn doctor`, `cairn traceability coverage`, `cairn implementation-ready`, every active change's gates, the release-readiness receipt and the Cairn-dependent integration tests with the new binary, and record the results in `evidence/verification.json`. r[lattice.repository_validation.cairn_producer_alignment]
-- [ ] [serial] 2.2 Run the full `scripts/check.rs` and `nix flake check` in the integration batch with Lattice #31. r[lattice.repository_validation.cairn_producer_alignment]
+- [x] [serial] 2.2 Run the full `scripts/check.rs` and `nix flake check` in the integration batch with Lattice #31. Evidence: `evidence/batch-integration.json` (`check_rs`, `flake_check`). r[lattice.repository_validation.cairn_producer_alignment]

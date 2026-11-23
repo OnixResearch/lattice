@@ -1,0 +1,21 @@
+{
+  "schema": "lattice.fixture-qualification.v1",
+  "change": "align-cairn-main",
+  "kind": "local-verification",
+  "live_qualification": false,
+  "check_rs": {
+    "revision": "a0600365611869497aa045fb300a1c1822131b6d",
+    "command": "nix develop -c cargo -q -Zscript scripts/check.rs",
+    "exit": 0,
+    "log_blake3": "6c4def1fae3d6860f634f25b86a61676b39429b77ec2ee2c7bc889bb1b8b7734"
+  },
+  "flake_check": {
+    "revision": "769e04bcf21760a41bf3fcba4042cd708e9df1ac",
+    "command": "nix flake check -L --keep-going --option builders '' --option min-free 0 --option cores 4 --option max-jobs 1",
+    "system": "x86_64-linux",
+    "passed": 32,
+    "log_blake3": "5ead5e70183a9c7bc46bbd249ea497b2468331c9e16f1f8dc48818ae496123fb",
+    "bounded_exec_source": "Cairn's nested Bounded Exec input uses the admitted Radicle projection at unchanged content. GitHub acquisition of that same revision failed the Lattice source gate."
+  },
+  "non_claims": ["Lattice release readiness is not implied by the integration check."]
+}

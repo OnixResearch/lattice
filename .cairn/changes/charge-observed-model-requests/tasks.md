@@ -20,4 +20,12 @@
 - [x] [serial] 4.2 P2: a recorded route admits each request index at most once: an index at or below one it admitted, or whose intent already exists even with identical bytes, is refused before any ticket (`RequestEvidence::create_intent`, `RecordedRoute::new`). Tests: `tests/test_execution_binding_brokered.rs` (`a_reused_request_index_is_refused_before_any_upstream_contact`), `src/implementation_attempt/cli/binding/tests/brokered.rs` (`brokered_request_files_are_write_once_and_conflicts_fail_closed`). Evidence: `evidence/verification.json` (`review_1.P2`). r[lattice.serving_binding.brokered_evidence.scenario.conflict]
 - [x] [serial] 4.3 Review 2 P2: a served intent is created exclusively, so an existing one refuses its request before upstream, and `Session::new` seeds each route's ordinal from the highest retained intent or record (`Sink::{create_intent, highest_ordinal}`), so a restarted session continues and never reuses an ordinal (`execution_binding/serving/{mod,gate,port}.rs`, `cli/binding/requests.rs`). Tests: `tests/test_execution_binding_serving.rs` (`a_restarted_session_never_reuses_an_ordinal_whose_intent_exists`), `src/implementation_attempt/cli/binding/tests/serving.rs` (`a_restarted_session_over_retained_files_continues_after_their_ordinals`). Evidence: `evidence/verification.json` (`review_2`). r[lattice.serving_binding.brokered_evidence.scenario.conflict]
 
+## Phase 5: Integration (`LatticeBatch`)
+
+- [x] [serial] 5.1 Integrate onto published `main` `39936a19` with the Cairn `317d3ff6` alignment, keeping both behaviours in each conflict, and rerun the focused #31 and repair tests, clippy and fmt. Evidence: `evidence/batch-integration.json` (`assembly`, `focused`). r[lattice.implementation_attempt.observed_charge] r[lattice.serving_binding.brokered_evidence]
+- [x] [serial] 5.2 Re-key Octet once and admit it by a semantic comparison against `main`: the first regeneration's nine new findings are fixed in code, and the second has 0 new findings and no raw increase per lint and file. Evidence: `evidence/octet-batch-admission.json`. r[lattice.implementation_attempt.observed_charge]
+- [x] [serial] 5.3 Run the full `scripts/check.rs`, `nix flake check` and the Cairn gates on the batch head. Evidence: `evidence/batch-integration.json` (`check_rs`, `flake_check`, `cairn`). r[lattice.implementation_attempt.observed_charge]
+
+Archiving waits on the dependency `bind-model-serving-admission`, whose task 5.2 waits on Kiln #49.
+
 Only checked tasks are complete.

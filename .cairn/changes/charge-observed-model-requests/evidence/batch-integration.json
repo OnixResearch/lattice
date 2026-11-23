@@ -1,0 +1,43 @@
+{
+  "schema": "lattice.fixture-qualification.v1",
+  "change": "charge-observed-model-requests",
+  "kind": "local-verification",
+  "live_qualification": false,
+  "assembly": {
+    "base": "39936a1932377d1e7fe80cca191e8ae69f23b0cb",
+    "focused_revision": "12a85181",
+    "cairn_producer": "317d3ff648f01a5ea1572e6126f4dd71bc7afa99"
+  },
+  "focused": {
+    "exit": 0,
+    "groups": ["implementation-attempt library", "observed model requests integration", "lattice-core", "Cairn integration", "clock", "operator repair", "served broker", "clippy", "fmt"],
+    "post_octet_refactor_groups": ["fmt", "clippy", "library", "integration", "core"]
+  },
+  "check_rs": {
+    "revision": "a0600365611869497aa045fb300a1c1822131b6d",
+    "command": "nix develop -c cargo -q -Zscript scripts/check.rs",
+    "exit": 0,
+    "log_blake3": "6c4def1fae3d6860f634f25b86a61676b39429b77ec2ee2c7bc889bb1b8b7734"
+  },
+  "flake_check": {
+    "revision": "769e04bcf21760a41bf3fcba4042cd708e9df1ac",
+    "command": "nix flake check -L --keep-going --option builders '' --option min-free 0 --option cores 4 --option max-jobs 1",
+    "system": "x86_64-linux",
+    "passed": 32,
+    "log_blake3": "5ead5e70183a9c7bc46bbd249ea497b2468331c9e16f1f8dc48818ae496123fb",
+    "prior_failure": "a0600365 failed bounded-exec-source; 769e04bc moved the source URL to the admitted Radicle projection at the same revision and narHash"
+  },
+  "cairn": {
+    "revision": "a0600365611869497aa045fb300a1c1822131b6d",
+    "valid": true,
+    "doctor_exit": 0,
+    "implementation_ready_exit": 0,
+    "change_gates_passed": 123,
+    "strict_validation_prior_failure": "The pre-existing checkpoint gates task lacked a requirement reference on 39936a19 and a0600365; adding the already-declared resume and portability IDs restores strict validation.",
+    "release_readiness": "fail, not a release authorization"
+  },
+  "non_claims": [
+    "Only complete, admitted broker evidence earns measured request accounting; incomplete or uncertain evidence is not an observed charge.",
+    "Local tests do not qualify Kiln settlement, live model serving, or cross-host restart."
+  ]
+}
