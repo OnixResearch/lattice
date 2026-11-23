@@ -45,15 +45,12 @@ pub(super) fn run(input: WorkerInput) {
         seed,
         restored,
     } = input;
-    let Ok(running) = super::mark_running(&admitted) else {
+    let Some(running) = start_running(&store, &admitted) else {
         return;
     };
-    if store.save_workflow_exchange_transition(&admitted, &running).is_err() {
-        return;
-    }
     // r[impl lattice.application_checkpoint.cancellation]
     // A run cancelled before it starts settles `cancelled` unrun: the ready frontier would fail it.
-    if cancellation.load(std::sync::atomic::Ordering::Acquire) {
+    if running.cancellation_requested || cancellation.load(std::sync::atomic::Ordering::Acquire) {
         return settle(&store, &running, |_current| CompletionFacts {
             cancelled: true,
             ..CompletionFacts::default()
@@ -86,6 +83,23 @@ pub(super) fn run(input: WorkerInput) {
         tracing::warn!("application checkpoint observer stopped abnormally");
     }
     settle(&store, &running, |current| completion_facts(&store, current, result));
+}
+
+/// Mark `admitted` running. A Cancel that landed while it was still `Queued` fails this
+/// compare-and-swap; the reloaded record, `Queued` with `cancellation_requested`, is marked
+/// running instead, so the caller settles it `cancelled` rather than leaving it for `Unknown`.
+fn start_running(store: &crate::store::Store, admitted: &ExecutionRecord) -> Option<ExecutionRecord> {
+    let running = super::mark_running(admitted).ok()?;
+    if store.save_workflow_exchange_transition(admitted, &running).is_ok() {
+        return Some(running);
+    }
+    let current = store.load_workflow_exchange(&admitted.accepted.execution_identity).ok()??;
+    if current.state != super::DurableExecutionState::Queued || !current.cancellation_requested {
+        return None;
+    }
+    let running = super::mark_running(&current).ok()?;
+    store.save_workflow_exchange_transition(&current, &running).ok()?;
+    Some(running)
 }
 
 /// Record the run's terminal facts against the latest record, or `Unknown` if they do not apply.
@@ -233,68 +247,4 @@ pub(in crate::workflow_exchange) fn workflow_facts(
 }
 
 #[cfg(test)]
-mod tests {
-    #[test]
-    fn real_completion_wins_late_durable_and_atomic_cancel_intent() {
-        for (command, expected) in [
-            ("printf completed", crate::workflow_exchange::DurableExecutionState::Completed),
-            ("exit 23", crate::workflow_exchange::DurableExecutionState::Failed),
-        ] {
-            for late_cancel in [false, true] {
-                let (_directory, store, workflow, _contract, request, profile) =
-                    crate::workflow_exchange::tests::fixture(command);
-                let route = &profile.routes[0];
-                let handler_identity = crate::workflow_exchange::handler_profile_identity(&profile).unwrap();
-                let admission = store
-                    .admit_workflow_exchange(request, route, route.workflow_revision.clone(), handler_identity)
-                    .unwrap();
-                let crate::workflow_exchange::AdmissionResolution::Inserted(admitted) = admission else {
-                    panic!("fresh fixture must admit once");
-                };
-                let running = crate::workflow_exchange::mark_running(&admitted).unwrap();
-                store.save_workflow_exchange_transition(&admitted, &running).unwrap();
-                let authority = crate::workflow_exchange::RouteExactAuthorityProvider::new(
-                    &running.handler_profile_identity,
-                    &running.request.identity,
-                    &running.workflow_revision,
-                    crate::engine::RunId(running.run_id),
-                );
-                let cancellation = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-                let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
-                let outcome = runtime
-                    .block_on(crate::headless::run_workflow_snapshot_with_authority_provider_and_cancellation(
-                        &store,
-                        crate::headless::SnapshotRunRequest {
-                            workflow,
-                            run_id: crate::engine::RunId(running.run_id),
-                            owner: crate::store::RunOwner::Unscoped,
-                            agent_runtime: crate::agent_node::RuntimeOptions::default(),
-                            cancellation: std::sync::Arc::clone(&cancellation),
-                        },
-                        &authority,
-                    ))
-                    .expect("real process completion is retained");
-                assert!(!outcome.cancelled, "a completed process is not cancelled");
-                let current = if late_cancel {
-                    cancellation.store(true, std::sync::atomic::Ordering::Release);
-                    let requested = crate::workflow_exchange::request_cancellation(&running, running.sequence).unwrap();
-                    store.save_workflow_exchange_transition(&running, &requested).unwrap();
-                    requested
-                } else {
-                    running
-                };
-                let facts = super::completion_facts(&store, &current, Ok(outcome));
-                let completed = crate::workflow_exchange::complete(&current, &facts).unwrap();
-                store.save_workflow_exchange_transition(&current, &completed).unwrap();
-                let durable = store.load_workflow_exchange(&completed.accepted.execution_identity).unwrap().unwrap();
-                assert_eq!(durable.state, expected, "late intent must not replace the observed process outcome");
-                let expected_node = if expected == crate::workflow_exchange::DurableExecutionState::Completed {
-                    lattice_workflow_contract::NodeState::Completed
-                } else {
-                    lattice_workflow_contract::NodeState::Failed
-                };
-                assert_eq!(durable.nodes[0].state, expected_node);
-            }
-        }
-    }
-}
+mod tests;
