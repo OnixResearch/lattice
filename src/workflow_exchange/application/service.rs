@@ -63,17 +63,23 @@ pub fn serve(
     let mut service = lattice_workflow_transport::WorkflowExchangeService::new(handler);
     let served = match &listener {
         HandlerListener::Unix { socket_path, transport } => serve_unix(socket_path, transport, &mut service),
-        HandlerListener::Vsock { transport } => {
-            let bound =
-                lattice_workflow_transport::VsockListener::bind(transport).map_err(|_| ApplicationError::Transport)?;
-            service.handler_mut().resume_adopted().and_then(|()| {
-                lattice_workflow_transport::serve_vsock_listener(&bound, transport, &mut service)
-                    .map_err(|_| ApplicationError::Transport)
-            })
-        }
+        HandlerListener::Vsock { transport } => serve_vsock(transport, &mut service),
     };
     service.handler_mut().wait_for_workers();
     served
+}
+
+/// Bind the vsock listener, start the adopted executions, then serve.
+#[cfg(target_os = "linux")]
+fn serve_vsock(
+    transport: &lattice_workflow_transport::VsockTransportProfile,
+    service: &mut lattice_workflow_transport::WorkflowExchangeService<ApplicationHandler>,
+) -> Result<lattice_workflow_transport::ServeReport, ApplicationError> {
+    let listener =
+        lattice_workflow_transport::VsockListener::bind(transport).map_err(|_| ApplicationError::Transport)?;
+    service.handler_mut().resume_adopted()?;
+    lattice_workflow_transport::serve_vsock_listener(&listener, transport, service)
+        .map_err(|_| ApplicationError::Transport)
 }
 
 /// Bind the Unix socket with the transport's permission mode, start the adopted executions, then

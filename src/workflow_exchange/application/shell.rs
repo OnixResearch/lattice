@@ -256,18 +256,13 @@ impl ApplicationHandler {
         if control.action != ControlAction::Cancel {
             return Err(HandlerError::Rejected);
         }
-        // A waiting adoption has no worker yet; `start_adoption` starts it cancelled from the
-        // persisted record once a slot frees.
-        let worker = self.workers.get(accepted.execution_identity.as_str());
-        if worker.is_none() && !self.is_waiting_adoption(&current) {
-            return Err(HandlerError::Unavailable);
-        }
+        let cancellation = self.cancellation_flag(&current)?;
         let next = super::request_cancellation(&current, current_sequence).map_err(|_| HandlerError::Rejected)?;
         self.store
             .save_workflow_exchange_transition(&current, &next)
             .map_err(|_| HandlerError::Unavailable)?;
-        if let Some(worker) = worker {
-            worker.cancellation.store(true, Ordering::SeqCst);
+        if let Some(cancellation) = cancellation {
+            cancellation.store(true, Ordering::SeqCst);
         }
         let observation = super::observation(&next).map_err(|_| HandlerError::Rejected)?;
         lattice_workflow_contract::validate_observation(profile, request, accepted, &observation)

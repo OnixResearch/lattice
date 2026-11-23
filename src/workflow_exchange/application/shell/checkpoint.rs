@@ -177,6 +177,19 @@ impl ApplicationHandler {
         matches!(self.store.load_workflow_exchange_adoption(&record.accepted.execution_identity), Ok(Some(_)))
     }
 
+    /// The cancel flag of `record`'s worker. A waiting adoption has none yet: it starts cancelled
+    /// from the persisted record once a slot frees. Any other record with no worker is unavailable.
+    pub(super) fn cancellation_flag(
+        &self,
+        record: &super::ExecutionRecord,
+    ) -> Result<Option<std::sync::Arc<std::sync::atomic::AtomicBool>>, lattice_workflow_transport::HandlerError> {
+        match self.workers.get(record.accepted.execution_identity.as_str()) {
+            Some(worker) => Ok(Some(std::sync::Arc::clone(&worker.cancellation))),
+            None if self.is_waiting_adoption(record) => Ok(None),
+            None => Err(lattice_workflow_transport::HandlerError::Unavailable),
+        }
+    }
+
     /// The route a request selects, with its saved workflow validated and instantiated.
     fn instantiated_route(
         &self,

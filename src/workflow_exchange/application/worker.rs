@@ -52,14 +52,11 @@ pub(super) fn run(input: WorkerInput) {
         return;
     }
     // r[impl lattice.application_checkpoint.cancellation]
-    // A run cancelled before it starts dispatches nothing. The ready frontier would block every
-    // node on the cancellation and record it failed, so the run never starts.
+    // A run cancelled before it starts settles `cancelled` unrun: the ready frontier would fail it.
     if cancellation.load(std::sync::atomic::Ordering::Acquire) {
         return settle(&store, &running, |_current| CompletionFacts {
             cancelled: true,
-            suspended: false,
-            failed_before_results: false,
-            nodes: Vec::new(),
+            ..CompletionFacts::default()
         });
     }
     // r[impl lattice.application_checkpoint.hook]

@@ -241,7 +241,7 @@ pub enum DurableNodeResult {
     Skipped,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CompletionFacts {
     pub cancelled: bool,
     pub suspended: bool,
