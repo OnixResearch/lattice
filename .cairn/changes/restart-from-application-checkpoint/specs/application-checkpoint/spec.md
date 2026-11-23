@@ -108,7 +108,7 @@ r[lattice.application_checkpoint.cancellation.scenario.after_drain]
 
 ### Requirement: Restore into a fresh store
 
-r[lattice.application_checkpoint.restore] Restore MUST adopt into a store holding no trace of the execution, keep the producer's acceptance and execution identity, reproduce every adapter and receipt identity on the target route, and restore completed nodes through `Session::new_with_checkpoint` without re-running them. Every check and the workspace write MUST precede the adoption commit, and the carry-forward check MUST run inside the adoption transaction, so a refused restore adopts nothing and a committed adoption is complete. Restore MUST NOT run the execution.
+r[lattice.application_checkpoint.restore] Restore MUST adopt into a store holding no trace of the execution, keep the producer's acceptance and execution identity, reproduce every adapter and receipt identity on the target route, and restore completed nodes through `Session::new_with_checkpoint` without re-running them. Every check and the workspace write MUST precede the adoption commit, and the carry-forward check MUST run inside the adoption transaction, so a refused restore adopts nothing and a committed adoption is complete. Each restored workspace file MUST reach its final path only complete, through a synced temporary file renamed into place, and a failed workspace write MUST remove the files that restore already wrote. Restore MUST NOT run the execution.
 
 #### Scenario: Restart after source loss
 r[lattice.application_checkpoint.restore.scenario.source_loss]

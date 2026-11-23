@@ -166,9 +166,7 @@ pub fn adopt(target: &AdoptionTarget<'_>, admitted: &AdmittedCheckpoint) -> Resu
             adoption: *adoption,
         }),
         Ok(AdoptionOutcome::Existing(_)) | Err(_) => {
-            for path in created {
-                let _removed = std::fs::remove_file(path);
-            }
+            files::remove_created(&created);
             Err(refusal.unwrap_or(Refusal::TargetNotFresh))
         }
     }

@@ -175,7 +175,7 @@ impl CheckpointRoot {
             manifest: manifest.clone(),
         };
         let bytes = serde_json::to_vec(&acknowledgement).map_err(|_| Refusal::Encoding)?;
-        self.write_atomic(&self.path.clone(), DRAINED, &bytes)
+        write_atomic(&self.path, DRAINED, &bytes)
     }
 
     pub fn drain_acknowledgement(&self) -> Result<Option<DrainAcknowledgement>, Refusal> {
@@ -210,25 +210,29 @@ impl CheckpointRoot {
         {
             return Ok(());
         }
-        self.write_atomic(&directory, name, bytes)?;
+        write_atomic(&directory, name, bytes)?;
         let written = std::fs::read(directory.join(name)).map_err(|_| Refusal::Io)?;
         if written != bytes {
             return Err(Refusal::ObjectMismatch);
         }
         Ok(())
     }
+}
 
-    fn write_atomic(&self, directory: &Path, name: &str, bytes: &[u8]) -> Result<(), Refusal> {
-        std::fs::create_dir_all(directory).map_err(|_| Refusal::Io)?;
-        let temporary = directory.join(format!(".{name}.{}.tmp", std::process::id()));
-        {
-            let mut file = std::fs::File::create(&temporary).map_err(|_| Refusal::Io)?;
-            file.write_all(bytes).map_err(|_| Refusal::Io)?;
-            file.sync_all().map_err(|_| Refusal::Io)?;
-        }
-        std::fs::rename(&temporary, directory.join(name)).map_err(|_| Refusal::Io)?;
-        std::fs::File::open(directory).and_then(|directory| directory.sync_all()).map_err(|_| Refusal::Io)
+/// Write `name` in `directory` through a fsynced temporary file renamed into place, then fsync
+/// the directory. A failure removes the temporary file, so nothing partial is left behind and
+/// `name` holds either its complete content or nothing new.
+pub(super) fn write_atomic(directory: &Path, name: &str, bytes: &[u8]) -> Result<(), Refusal> {
+    std::fs::create_dir_all(directory).map_err(|_| Refusal::Io)?;
+    let temporary = directory.join(format!(".{name}.{}.tmp", std::process::id()));
+    let written = std::fs::File::create(&temporary)
+        .and_then(|mut file| file.write_all(bytes).and_then(|()| file.sync_all()))
+        .and_then(|()| std::fs::rename(&temporary, directory.join(name)));
+    if written.is_err() {
+        let _removed = std::fs::remove_file(&temporary);
+        return Err(Refusal::Io);
     }
+    std::fs::File::open(directory).and_then(|directory| directory.sync_all()).map_err(|_| Refusal::Io)
 }
 
 fn json_name(identity: &Identity) -> String {

@@ -87,7 +87,10 @@ interfaces.
   a run with any other node result keeps its observed outcome. Restore refuses a
   target binding with a different deadline (`carry_forward`) or attempt
   binding (`crossed_binding`), and commits the adoption only after every check
-  and the workspace write, so a refused restore adopts nothing. The
+  and the workspace write, so a refused restore adopts nothing. Each restored
+  workspace file is written through a synced temporary file renamed into
+  place, and a failed workspace write removes the files the restore already
+  wrote, so a failure leaves no partial file at a restored path. The
   `lattice.application-restart-receipt.v1` receipt distinguishes application
   restart, VM continuation and fresh retry; `application-checkpoint inspect`
   reads a checkpoint root. Without a binding the hook is absent and restore

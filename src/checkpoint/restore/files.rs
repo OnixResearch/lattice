@@ -42,7 +42,10 @@ pub(super) fn carry_objects(
 
 /// Verify every workspace object against `workspace` first, then write the missing ones.
 ///
-/// Existing different content is refused before anything is written. Returns the files written.
+/// Existing different content is refused before anything is written. Each file is written
+/// through a fsynced temporary file renamed into place, so no final path ever holds part of an
+/// object; when a write fails, the files this call already wrote are removed. Returns the files
+/// written.
 pub(super) fn materialize_workspace(
     root: &CheckpointRoot,
     workspace: &Path,
@@ -63,13 +66,26 @@ pub(super) fn materialize_workspace(
     }
     let mut created = Vec::with_capacity(missing.len());
     for (target, bytes) in missing {
-        if let Some(parent) = target.parent() {
-            std::fs::create_dir_all(parent).map_err(|_| Refusal::Io)?;
+        if let Err(refusal) = write_restored(&target, &bytes) {
+            remove_created(&created);
+            return Err(refusal);
         }
-        std::fs::write(&target, &bytes).map_err(|_| Refusal::Io)?;
         created.push(target);
     }
     Ok(created)
+}
+
+fn write_restored(target: &Path, bytes: &[u8]) -> Result<(), Refusal> {
+    let directory = target.parent().ok_or(Refusal::WorkspacePath)?;
+    let name = target.file_name().and_then(std::ffi::OsStr::to_str).ok_or(Refusal::WorkspacePath)?;
+    crate::checkpoint::publish::write_atomic(directory, name, bytes)
+}
+
+/// Remove workspace files a restore wrote; each was missing before it, so nothing else is lost.
+pub(super) fn remove_created(created: &[PathBuf]) {
+    for path in created {
+        let _removed = std::fs::remove_file(path);
+    }
 }
 
 /// Step results of an adoption's checkpoint-complete nodes, read and verified from `root`.

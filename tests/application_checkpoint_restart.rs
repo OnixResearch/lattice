@@ -1016,8 +1016,9 @@ fn completed_source(checkpoint: CheckpointProfile, workspace: Option<&[(&str, &s
     if let Some(files) = workspace {
         let path = directory.path().join("source-workspace");
         for (name, content) in files {
-            std::fs::create_dir_all(&path).expect("workspace");
-            std::fs::write(path.join(name), content).expect("workspace file");
+            let file = path.join(name);
+            std::fs::create_dir_all(file.parent().expect("workspace directory")).expect("workspace");
+            std::fs::write(file, content).expect("workspace file");
         }
         source.binding.workspace = Some(path);
     }
@@ -1188,6 +1189,51 @@ fn workspace_conflict_adopts_nothing_and_a_committed_adoption_is_complete() {
     exchange.kill();
     assert_eq!(observation.state, ExecutionState::Completed);
     assert_eq!((count(&run.effects, "a"), count(&run.effects, "b")), before, "nothing replayed");
+}
+
+// r[verify lattice.application_checkpoint.restore]
+// r[verify lattice.application_checkpoint.workspace]
+/// A workspace write that fails part-way leaves nothing behind: `a.txt` is written first, then a
+/// regular file named `z` stops `z/b.txt`. The restore refuses with `io`, adopts nothing, and the
+/// workspace holds neither `a.txt` nor a temporary file. Once `z` is gone, the same restore
+/// writes both files.
+#[test]
+fn a_failed_workspace_write_leaves_no_restored_file() {
+    let files: &[(&str, &str)] = &[("a.txt", "first"), ("z/b.txt", "second")];
+    let run = completed_source(CheckpointProfile::WorkflowNodeBoundaryV1, Some(files));
+    let source_root = CheckpointRoot::new(&run.source.checkpoint);
+    let (checkpoint, manifest) = latest(&source_root);
+    let paths = manifest.workspace_objects.iter().map(|object| object.path.as_str()).collect::<Vec<_>>();
+    assert_eq!(paths, ["a.txt", "z/b.txt"], "a.txt is written before z/b.txt");
+    let request = restart_request(&checkpoint, &manifest, 1, ADMISSION);
+    let mut target_root = root(
+        &run.directory.path().join("target"),
+        &run.effects,
+        &run.socket,
+        CheckpointProfile::WorkflowNodeBoundaryV1,
+    );
+    let workspace = run.directory.path().join("target-workspace");
+    std::fs::create_dir_all(&workspace).expect("target workspace");
+    std::fs::write(workspace.join("z"), "a file where a directory goes").expect("obstruction");
+    target_root.binding.workspace = Some(workspace.clone());
+
+    let (ok, report) = cli_restore(&target_root, &source_root, &request);
+    assert!(!ok, "{report}");
+    assert_eq!(report["refused"], "io");
+    let mut left = std::fs::read_dir(&workspace)
+        .expect("workspace")
+        .map(|entry| entry.expect("entry").file_name().to_string_lossy().into_owned())
+        .collect::<Vec<_>>();
+    left.sort();
+    assert_eq!(left, ["z"], "nothing the failed restore wrote is left in the workspace");
+    let adopted = store(&target_root).load_workflow_exchange(&request.execution).expect("load");
+    assert!(adopted.is_none(), "nothing adopted");
+
+    std::fs::remove_file(workspace.join("z")).expect("obstruction cleared");
+    let (ok, report) = cli_restore(&target_root, &source_root, &request);
+    assert!(ok, "restore succeeds once the obstruction is gone: {report}");
+    assert_eq!(std::fs::read_to_string(workspace.join("a.txt")).expect("a.txt"), "first");
+    assert_eq!(std::fs::read_to_string(workspace.join("z/b.txt")).expect("z/b.txt"), "second");
 }
 
 // r[verify lattice.application_checkpoint.hook]
