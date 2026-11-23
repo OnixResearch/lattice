@@ -18,7 +18,6 @@
 //! Checkpoint root I/O and the node-boundary hook. Pure decisions live in `core`.
 
 use std::io::Read as _;
-use std::io::Write as _;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -31,7 +30,11 @@ use super::LocalRuntime;
 use super::Refusal;
 use super::WorkspaceObject;
 
+mod durable;
 mod hook;
+pub(super) use durable::place_atomic;
+pub(super) use durable::sync_directory;
+use durable::write_atomic;
 pub use hook::HookSeed;
 pub use hook::NodeBoundaryHook;
 
@@ -217,22 +220,6 @@ impl CheckpointRoot {
         }
         Ok(())
     }
-}
-
-/// Write `name` in `directory` through a fsynced temporary file renamed into place, then fsync
-/// the directory. A failure removes the temporary file, so nothing partial is left behind and
-/// `name` holds either its complete content or nothing new.
-pub(super) fn write_atomic(directory: &Path, name: &str, bytes: &[u8]) -> Result<(), Refusal> {
-    std::fs::create_dir_all(directory).map_err(|_| Refusal::Io)?;
-    let temporary = directory.join(format!(".{name}.{}.tmp", std::process::id()));
-    let written = std::fs::File::create(&temporary)
-        .and_then(|mut file| file.write_all(bytes).and_then(|()| file.sync_all()))
-        .and_then(|()| std::fs::rename(&temporary, directory.join(name)));
-    if written.is_err() {
-        let _removed = std::fs::remove_file(&temporary);
-        return Err(Refusal::Io);
-    }
-    std::fs::File::open(directory).and_then(|directory| directory.sync_all()).map_err(|_| Refusal::Io)
 }
 
 fn json_name(identity: &Identity) -> String {

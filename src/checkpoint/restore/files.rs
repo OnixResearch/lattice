@@ -66,19 +66,23 @@ pub(super) fn materialize_workspace(
     }
     let mut created = Vec::with_capacity(missing.len());
     for (target, bytes) in missing {
-        if let Err(refusal) = write_restored(&target, &bytes) {
+        if let Err(refusal) = write_restored(target, &bytes, &mut created) {
             remove_created(&created);
             return Err(refusal);
         }
-        created.push(target);
     }
     Ok(created)
 }
 
-fn write_restored(target: &Path, bytes: &[u8]) -> Result<(), Refusal> {
+/// Place `target`, record it in `created` once it holds its complete content, then sync its
+/// directory, so a failed directory fsync still leaves the file to be removed.
+fn write_restored(target: PathBuf, bytes: &[u8], created: &mut Vec<PathBuf>) -> Result<(), Refusal> {
     let directory = target.parent().ok_or(Refusal::WorkspacePath)?;
     let name = target.file_name().and_then(std::ffi::OsStr::to_str).ok_or(Refusal::WorkspacePath)?;
-    crate::checkpoint::publish::write_atomic(directory, name, bytes)
+    crate::checkpoint::publish::place_atomic(directory, name, bytes)?;
+    created.push(target);
+    let directory = created.last().and_then(|placed| placed.parent()).ok_or(Refusal::WorkspacePath)?;
+    crate::checkpoint::publish::sync_directory(directory)
 }
 
 /// Remove workspace files a restore wrote; each was missing before it, so nothing else is lost.
