@@ -442,6 +442,7 @@ fn consumer_canonicalization_retains_sequence_and_null_boundaries() -> TestResul
 #[test]
 fn release_selection_lists_lattice_gates_not_foreign_producer_checks() -> TestResult {
     // r[verify lattice.release_integration.selection.gates]
+    // r[verify lattice.repository_validation.cairn_producer_alignment.scenario.gates_selected]
     let fixture = Fixture::new()?;
     let (_, receipt) = fixture.run(&["release-readiness"])?;
     // Missing real MCP inputs must stay failed in an empty consumer root.

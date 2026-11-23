@@ -136,6 +136,7 @@ const POLICY_TYPECHECK_ARGS: &[&str] = &[
     "cairn-policy/default.ncl",
     "cairn-policy/traceability-inventory.ncl",
 ];
+// r[verify lattice.repository_validation.cairn_producer_alignment.scenario.policy_accepted]
 const POLICY_FRESHNESS_ARGS: &[&str] = &[
     "-c",
     "\"${LATTICE_CAIRN_BIN:-cairn}\" policy export --source cairn-policy/default.ncl --output cairn-policy/generated/cairn-policy.json --check",

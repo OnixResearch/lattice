@@ -11,9 +11,16 @@ implement the new consumer-selection contract.
 The pinned Cairn revision reads
 `release_readiness_policy.required_external_commands` from the admitted policy
 and uses it for the readiness gate summary. Lattice declares that list in
-`cairn-policy/default.ncl`; the producer falls back to its own maintained list
-when the field is absent or malformed. Listing remains selection evidence, not
-execution evidence.
+`cairn-policy/default.ncl`, and the receipt reports it as
+`consumer-selected-gates`. The producer falls back to its own maintained list
+only when the field is absent. A present list must be a non-empty array of
+unique, non-blank strings inside a `release_readiness_policy` object. Otherwise
+Cairn does not fall back: the receipt reports `invalid-consumer-selected-gates`
+with a null command list and an `issue` diagnostic, the
+`repository_gate_policy_listed` check fails, and the verdict is `fail`.
+Lattice's list satisfies that contract, and `release-selection-contracts.ncl`
+already refuses the malformed forms when the policy is exported. Listing remains
+selection evidence, not execution evidence.
 
 ## Observe actual MCP inputs
 
@@ -80,13 +87,17 @@ flow against these real inputs.
 
 ```sh
 policy="$PWD/cairn-policy/generated/cairn-policy.json"
-"$NATIVE_CAIRN" agent-receipt smoke-mcp --root "$PWD" --policy "$policy"
+"$NATIVE_CAIRN" agent-receipt smoke-mcp --root "$PWD"
 "$NATIVE_CAIRN" preserves-corpus update --path fixtures/release-readiness/canonicalization.json
-"$NATIVE_CAIRN" determinism coverage-audit --root "$PWD" --policy "$policy"
+"$NATIVE_CAIRN" determinism coverage-audit --root "$PWD"
 "$NATIVE_CAIRN" release-readiness --root "$PWD" --policy "$policy"
-"$NATIVE_CAIRN" determinism replay --root "$PWD" --policy "$policy" \
+"$NATIVE_CAIRN" determinism replay --root "$PWD" \
   --group release --out target/release-readiness/replay.json
 ```
+
+Of these commands only `release-readiness` takes `--policy`. The pinned binary
+refuses it as an unknown option for `agent-receipt smoke-mcp`,
+`determinism coverage-audit` and `determinism replay`.
 
 Do not run final replay before the integrated tree and real MCP inputs are final.
 The `release` replay group selects status, validate, MCP catalog, agent

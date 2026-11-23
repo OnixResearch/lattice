@@ -19,10 +19,12 @@
       inputs.valence.url = "git+https://github.com/OnixResearch/valence.git?rev=7546a78b4eeef8686c6837e187aa12420f4f03bb";
     };
     cairn = {
-      url = "git+https://github.com/OnixResearch/cairn.git?rev=47ea1b867c44b026c030b535f9a1041950c482a0";
-      # Cairn still locks two public producer repositories over SSH. Pin the
-      # same revisions to anonymous HTTPS so the Lattice flake closure is
-      # publicly acquirable.
+      # r[impl lattice.repository_validation.cairn_producer_alignment]
+      # `cairn-policy/contracts.ncl` and `upstream-default.ncl` are snapshots
+      # of this same revision.
+      url = "git+https://github.com/OnixResearch/cairn.git?rev=317d3ff648f01a5ea1572e6126f4dd71bc7afa99";
+      # Keep Cairn's Artifact input at the revision Cairn locks, over anonymous
+      # HTTPS, so the Lattice flake closure stays publicly acquirable.
       inputs.artifact.url = "git+https://github.com/OnixResearch/onix-artifact.git?rev=e41340bec587b6d049b5cc518ec7db925dde84be";
     };
     noble-lang = {

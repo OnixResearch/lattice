@@ -555,6 +555,14 @@ interfaces.
   that can fail a successful process run under load, fixed upstream only on
   GitHub (`c33f1bd`, bounded-exec#2), remains a known limitation until a
   reviewed fixed revision is on the admitted Radicle RID.
+- The `cairn` flake input moves from release-branch commit `47ea1b86` to
+  Cairn `main` `317d3ff6`, which adds `implementation-ready` and refuses a
+  malformed `release_readiness_policy.required_external_commands` instead of
+  falling back to the producer's gates. The `contracts.ncl` and
+  `upstream-default.ncl` policy snapshots and the generated policy are
+  refreshed from the same revision, because its loader rejects the earlier
+  `5e1fe08d` snapshots. Lattice's own policy overlays are unchanged
+  (`align-cairn-main`).
 - Breaking: `implementation_attempt::cli::run_command` takes the
   application configuration path, read only by a `run` of a request with a
   repair policy for its operator `effect_authority` profile (Lattice #6).
