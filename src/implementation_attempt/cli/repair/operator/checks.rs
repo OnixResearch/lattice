@@ -113,6 +113,8 @@ pub(in crate::implementation_attempt::cli::repair) struct Frame<'a, 'r> {
     /// The run's records, read for a persisted cancellation request.
     pub(in crate::implementation_attempt::cli::repair) cancel: super::super::records::Retained,
     pub(in crate::implementation_attempt::cli::repair) execute: &'a mut dyn Execute,
+    /// The operator's clock, on which the admission's expiry is read.
+    pub(in crate::implementation_attempt::cli::repair) clock: &'a dyn crate::operation::shell::Clock,
 }
 
 /// The catalog check port of one repair run.
@@ -129,13 +131,14 @@ impl<'a, 'r> CatalogPort<'a, 'r> {
 /// The bounded process of `entry` on `candidate`: the request's read paths
 /// that exist in the copy, read-only, and no write path, network, broker or
 /// credential. Its deadline is the loop's, within the envelope's seconds and
-/// the admission's remaining whole seconds.
+/// the admission's remaining whole seconds on `clock`.
 fn process(
     request: &super::super::super::Request,
     sandbox: &crate::candidate_worker::broker::Executable,
     entry: &crate::implementation_attempt::repair::checks::catalog::Entry,
     candidate: &std::path::Path,
     deadline: std::time::Duration,
+    clock: &dyn crate::operation::shell::Clock,
 ) -> Result<crate::candidate_worker::Request, String> {
     debug_assert!(entry.program.path.is_absolute(), "a pinned program path is absolute");
     debug_assert!(!candidate.as_os_str().is_empty(), "a check runs on its copy");
@@ -147,7 +150,7 @@ fn process(
         .map_err(|error| error.to_string())?;
     let remaining_ms = request
         .expires_at_ms
-        .checked_sub(super::super::super::now_ms()?)
+        .checked_sub(super::super::super::epoch_ms(clock)?)
         .ok_or("admission expired before a check")?;
     let admitted_secs = request.envelope.budget.max_seconds.min(remaining_ms / 1000);
     let timeout_secs = crate::implementation_attempt::repair::step::operator::timeout_secs(deadline, admitted_secs);
@@ -189,6 +192,7 @@ impl super::super::CheckPort for CatalogPort<'_, '_> {
             grant,
             cancel,
             execute,
+            clock,
         } = &mut self.frame;
         let executor = catalog.executor();
         let Some(entry) = catalog.entry(&invocation.check) else {
@@ -204,9 +208,9 @@ impl super::super::CheckPort for CatalogPort<'_, '_> {
         };
         // A withdrawn grant, an expired admission or a cancellation leaves
         // the check unrun and its outcome unknown.
-        let is_current = grant.recheck(request).is_none() && !cancel.is_cancel_requested();
+        let is_current = grant.recheck(request, *clock).is_none() && !cancel.is_cancel_requested();
         let outcome = if is_current {
-            process(request, &catalog.sandbox, entry, candidate, deadline)
+            process(request, &catalog.sandbox, entry, candidate, deadline, *clock)
                 .and_then(|process| {
                     super::polled(|cancellation| execute.execute(&process, cancellation), &|| {
                         cancel.is_cancel_requested()

@@ -169,15 +169,19 @@ fn check(
 impl Grant {
     /// Before every step's intent and every check: the same profile,
     /// evaluated now, must still grant both the worker and the check tuples
-    /// with the identity admitted, and the admission must not have expired.
-    /// `Some` names what withdrew it.
-    pub(in super::super) fn recheck(&self, request: &super::super::Request) -> Option<serde_json::Value> {
+    /// with the identity admitted, and the admission must not have expired
+    /// on the operator's `clock`. `Some` names what withdrew it.
+    pub(in super::super) fn recheck(
+        &self,
+        request: &super::super::Request,
+        clock: &dyn crate::operation::shell::Clock,
+    ) -> Option<serde_json::Value> {
         match check(request, Some(&self.profile)) {
             Ok(identity) if identity == self.identity => {}
             Ok(_) => return Some(serde_json::json!({"authority_refusal": "changed"})),
             Err(refusal) => return Some(serde_json::json!({ "authority_refusal": refusal })),
         }
-        match super::super::now_ms() {
+        match super::super::epoch_ms(clock) {
             Ok(now_ms) if now_ms < request.expires_at_ms => None,
             Ok(_) => Some(serde_json::json!({"admission_expired": true})),
             Err(error) => Some(serde_json::json!({ "error": error })),
@@ -201,13 +205,14 @@ pub(in super::super) fn execute(mut run: super::Run<'_>, granted: Granted<'_>) -
     debug_assert!(run.authority.operator.is_some(), "every step rechecks the operator's grant");
     let cancel = super::records::Retained::at(run.directory, run.identity);
     let admitted = run.authority.admitted.clone();
-    let mut worker = worker::OmpPort::new(run.request, run.directory, admitted, &mut *launch);
+    let mut worker = worker::OmpPort::new(run.request, run.directory, admitted, &mut *launch, clock);
     let mut checks = checks::CatalogPort::new(checks::Frame {
         request: run.request,
         catalog,
         grant,
         cancel,
         execute: &mut *process,
+        clock,
     });
     let ports = super::Ports {
         worker: &mut worker,

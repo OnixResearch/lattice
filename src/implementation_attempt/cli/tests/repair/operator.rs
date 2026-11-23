@@ -489,9 +489,13 @@ async fn a_cancellation_during_the_checks_is_cancelled() {
 
 #[tokio::test]
 async fn a_worker_stopped_at_a_deadline_the_admission_capped_is_uncertain() {
-    // A late start: the admission expires long before the elapsed bound.
+    // A late start: the admission expires long before the elapsed bound. The
+    // operator's clock is held at admission, so a loaded scheduler cannot
+    // spend the admission before the step: the worker's real timeout is
+    // always the admission's three seconds.
     let operated = Operated::with("attempt-operator-late", Options {
         expires_in_ms: Some(3_000),
+        is_clock_held: true,
         ..Options::default()
     });
     operated.script(&[Behaviour::Spin]);

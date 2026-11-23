@@ -12,11 +12,12 @@ fn timeout_secs(request: &super::super::Request, now_ms: u64) -> Result<u64, Str
 
 /// The bounded worker request of an admitted attempt: its re-admitted
 /// workspace boundary, the pinned program and sandbox, and a deadline
-/// within the envelope's seconds and the admission's expiry.
+/// within the envelope's seconds and the admission's expiry, read on `clock`.
 pub(in super::super) fn worker_request(
     request: &super::super::Request,
+    clock: &dyn crate::operation::shell::Clock,
 ) -> Result<crate::candidate_worker::Request, String> {
-    request.validate(super::super::now_ms()?)?;
+    request.validate(super::super::epoch_ms(clock)?)?;
     let boundary = crate::candidate_capture::admit_workspace_boundary(
         &request.workspace_root,
         &request.read_paths,
@@ -25,7 +26,7 @@ pub(in super::super) fn worker_request(
         false,
     )
     .map_err(|error| error.to_string())?;
-    Ok(build_worker(request, boundary, timeout_secs(request, super::super::now_ms()?)?))
+    Ok(build_worker(request, boundary, timeout_secs(request, super::super::epoch_ms(clock)?)?))
 }
 
 fn build_worker(

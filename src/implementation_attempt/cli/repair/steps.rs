@@ -145,7 +145,7 @@ impl<'a, 'p> Driver<'a, 'p> {
         if !guard.is_current(&request.envelope)? {
             return Ok(Next::Stop(Disposition::FenceSuperseded));
         }
-        if let Some(withdrawal) = self.recheck_authority(step.iteration) {
+        if let Some(withdrawal) = self.recheck_authority(step.iteration, ports.clock) {
             let cause = withdrawal.cause;
             self.withdrawal = Some(withdrawal);
             return Ok(Next::Stop(Disposition::AuthorityWithdrawn { cause }));

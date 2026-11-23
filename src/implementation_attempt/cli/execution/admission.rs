@@ -59,7 +59,13 @@ impl super::Context {
         operator: Option<super::super::repair::operator::Standalone<'a>>,
         revisions: Revisions<'_>,
     ) -> Result<First<'a>, String> {
-        let worker = super::super::session::launch::worker_request(&self.request)?;
+        // The standalone operator reads admission time on its own clock.
+        let clock = operator
+            .as_ref()
+            .map_or(&crate::operation::shell::SystemClock as &dyn crate::operation::shell::Clock, |operator| {
+                operator.clock
+            });
+        let worker = super::super::session::launch::worker_request(&self.request, clock)?;
         super::super::session::revision::require_named(revisions, &self.request)?;
         let guard = self.lock()?;
         if self.reconcile(revisions)? == Reconciled::OtherWork {

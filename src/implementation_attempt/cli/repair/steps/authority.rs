@@ -10,8 +10,12 @@ impl super::Driver<'_, '_> {
     /// that cannot answer withdraws it too, since no step spawns without a
     /// current permit.
     // r[impl lattice.implementation_attempt.operator_repair.scenario.authority]
-    pub(super) fn recheck_authority(&mut self, iteration: u32) -> Option<super::Withdrawal> {
-        if let Some(withdrawal) = self.recheck_operator(iteration) {
+    pub(super) fn recheck_authority(
+        &mut self,
+        iteration: u32,
+        clock: &dyn crate::operation::shell::Clock,
+    ) -> Option<super::Withdrawal> {
+        if let Some(withdrawal) = self.recheck_operator(iteration, clock) {
             return Some(withdrawal);
         }
         let authority = &mut self.frame.authority;
@@ -43,11 +47,15 @@ impl super::Driver<'_, '_> {
 
     /// The standalone operator's grant, before step `iteration`'s intent or
     /// before its candidate's checks: `Some` when it no longer grants both
-    /// tuples with its admitted identity or the admission expired; always
-    /// `None` for embedder-supplied ports.
+    /// tuples with its admitted identity or the admission expired on the
+    /// run's `clock`; always `None` for embedder-supplied ports.
     // r[impl lattice.implementation_attempt.operator_repair.scenario.authority]
-    pub(super) fn recheck_operator(&self, iteration: u32) -> Option<super::Withdrawal> {
-        let evidence = self.frame.authority.operator.as_ref()?.recheck(self.frame.request)?;
+    pub(super) fn recheck_operator(
+        &self,
+        iteration: u32,
+        clock: &dyn crate::operation::shell::Clock,
+    ) -> Option<super::Withdrawal> {
+        let evidence = self.frame.authority.operator.as_ref()?.recheck(self.frame.request, clock)?;
         Some(super::Withdrawal {
             iteration,
             cause: super::Authority::EffectAuthority,

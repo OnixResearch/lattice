@@ -28,7 +28,7 @@ impl super::Driver<'_, '_> {
         revision: &str,
         tree: &super::super::materialized::Tree,
     ) -> Result<Checked, String> {
-        if let Some(withdrawal) = self.recheck_operator(iteration) {
+        if let Some(withdrawal) = self.recheck_operator(iteration, ports.clock) {
             let cause = withdrawal.cause;
             self.withdrawal = Some(withdrawal);
             let next = super::Next::Stop(super::Disposition::AuthorityWithdrawn { cause });

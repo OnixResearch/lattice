@@ -38,6 +38,8 @@ pub(in crate::implementation_attempt::cli) struct OmpPort<'a, 'r> {
     launch: &'a mut dyn super::Launch,
     /// The snapshot identity the next step's workspace must have.
     expected_base: String,
+    /// The operator's clock, on which the admission's expiry is read.
+    clock: &'a dyn crate::operation::shell::Clock,
 }
 
 /// One prepared launch.
@@ -58,6 +60,7 @@ impl<'a, 'r> OmpPort<'a, 'r> {
         directory: &std::path::Path,
         admitted: lattice_core::execution_binding::admission::bound::Admitted,
         launch: &'a mut dyn super::Launch,
+        clock: &'a dyn crate::operation::shell::Clock,
     ) -> Self {
         debug_assert!(admitted.serving.is_none(), "a repair policy is never combined with a served route");
         Self {
@@ -67,6 +70,7 @@ impl<'a, 'r> OmpPort<'a, 'r> {
             admitted,
             launch,
             expected_base: request.omp.base_identity.clone(),
+            clock,
         }
     }
 
@@ -78,7 +82,7 @@ impl<'a, 'r> OmpPort<'a, 'r> {
         step: &crate::implementation_attempt::repair::step::Request,
         deadline: std::time::Duration,
     ) -> Result<Prepared, String> {
-        let mut worker = super::super::super::session::launch::worker_request(self.request)?;
+        let mut worker = super::super::super::session::launch::worker_request(self.request, self.clock)?;
         let admitted_secs = worker.timeout_secs;
         worker.timeout_secs =
             crate::implementation_attempt::repair::step::operator::timeout_secs(deadline, admitted_secs);

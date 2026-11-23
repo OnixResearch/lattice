@@ -29,6 +29,9 @@ pub(super) struct Options {
     pub(super) second_check: Option<&'static str>,
     /// Read and write paths other than `src`; their directories are created.
     pub(super) paths: Option<(Vec<&'static str>, Vec<&'static str>)>,
+    /// Hold the operator's clock at the instant the fixture is built, so no
+    /// admission time passes however late the run is scheduled.
+    pub(super) is_clock_held: bool,
 }
 
 impl Default for Options {
@@ -41,6 +44,7 @@ impl Default for Options {
             check: doubles::CHECK,
             second_check: None,
             paths: None,
+            is_clock_held: false,
         }
     }
 }
@@ -63,6 +67,17 @@ pub(super) struct Operated {
     is_lost: Arc<AtomicBool>,
     indices: Arc<Mutex<Vec<u32>>>,
     on_launch: Arc<Mutex<Option<doubles::IndexHook>>>,
+    /// The operator's clock when it is held; otherwise the system clock.
+    held: Option<Held>,
+}
+
+/// An operator clock that always reads the same instant.
+struct Held(u64);
+
+impl crate::operation::shell::Clock for Held {
+    fn observe_epoch_millis(&self) -> i64 {
+        i64::try_from(self.0).expect("held clock")
+    }
 }
 
 fn now_ms() -> u64 {
@@ -102,8 +117,9 @@ impl Operated {
         request.envelope.attempt_id = attempt.into();
         request.envelope.work_id = format!("work-{attempt}");
         request.program = script.to_str().expect("script path").to_owned();
+        let built_at_ms = now_ms();
         if let Some(expires_in_ms) = options.expires_in_ms {
-            request.expires_at_ms = now_ms() + expires_in_ms;
+            request.expires_at_ms = built_at_ms + expires_in_ms;
             request.omp.model_broker.expires_at_ms = request.expires_at_ms;
         }
         if let Some((read, write)) = &options.paths {
@@ -147,6 +163,7 @@ impl Operated {
             is_lost: Arc::new(AtomicBool::new(false)),
             indices: Arc::new(Mutex::new(Vec::new())),
             on_launch: Arc::new(Mutex::new(None)),
+            held: options.is_clock_held.then_some(Held(built_at_ms)),
         }
     }
 
@@ -200,7 +217,10 @@ impl Operated {
                 runs: self.check_runs.clone(),
                 after: self.after_check.clone(),
             }),
-            clock: &crate::operation::shell::SystemClock,
+            clock: match &self.held {
+                Some(held) => held,
+                None => &crate::operation::shell::SystemClock,
+            },
         };
         let revisions = crate::implementation_attempt::cli::session::revision::Store(None);
         let state = &self.fixture.state;
