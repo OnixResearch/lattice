@@ -17,9 +17,12 @@ fn lattice(config: &Path, no_git: &Path) -> Command {
     command
 }
 
+fn stderr(output: &std::process::Output) -> std::borrow::Cow<'_, str> {
+    String::from_utf8_lossy(&output.stderr)
+}
+
 fn json(output: &std::process::Output) -> serde_json::Value {
-    serde_json::from_slice(&output.stdout)
-        .unwrap_or_else(|_| panic!("JSON output; stderr: {}", String::from_utf8_lossy(&output.stderr)))
+    serde_json::from_slice(&output.stdout).unwrap_or_else(|_| panic!("JSON output; stderr: {}", stderr(output)))
 }
 
 fn lock(config: &Path, no_git: &Path, pack: &Path, destination: &Path) {
@@ -182,13 +185,20 @@ fn fetch_lock_install_and_list_from_an_exact_commit_without_network_on_load() {
     // Create-only: a second installation reports a conflict and leaves operator bytes alone.
     let before = std::fs::read(catalog.join(HELLO).join("workflow.ncl")).expect("installed bytes");
     let again = install(&config, &no_git, &fetched, &lock_path, &catalog, true);
-    assert!(!again.status.success());
+    assert!(!again.status.success(), "a second installation must be refused; stderr: {}", stderr(&again));
     assert!(
         statuses(&json(&again))
             .iter()
-            .all(|(_, status, code)| status == "conflict" && code.as_deref() == Some("catalog_conflict"))
+            .all(|(_, status, code)| status == "conflict" && code.as_deref() == Some("catalog_conflict")),
+        "every bundle must conflict; stderr: {}",
+        stderr(&again)
     );
-    assert_eq!(std::fs::read(catalog.join(HELLO).join("workflow.ncl")).expect("installed bytes"), before);
+    assert_eq!(
+        std::fs::read(catalog.join(HELLO).join("workflow.ncl")).expect("installed bytes"),
+        before,
+        "stderr: {}",
+        stderr(&again)
+    );
 }
 
 // r[verify lattice.operation_packs.runbook_catalog.scenario.fetch_denied]
@@ -228,16 +238,28 @@ fn fetch_refuses_inexact_sources_wrong_identity_and_symlink_members() {
         (repository.to_str().expect("UTF-8 path"), commit.as_str()),
     ] {
         let output = fetch(locator, revision, None, &destination);
-        assert!(!output.status.success(), "{locator} {revision} must be refused");
-        assert!(!destination.exists());
+        assert!(!output.status.success(), "{locator} {revision} must be refused; stderr: {}", stderr(&output));
+        assert!(!destination.exists(), "{locator} {revision} wrote its destination; stderr: {}", stderr(&output));
     }
 
     let placeholder = runbook_catalog::placeholder();
     let wrong_identity = fetch(&url, &commit, Some(&placeholder), &destination);
-    assert!(!wrong_identity.status.success());
-    assert!(String::from_utf8_lossy(&wrong_identity.stderr).contains("fetched pack identity differs"));
-    assert!(!destination.exists());
-    assert!(!root.path().join(".fetched.fetch-staging").exists());
+    assert!(
+        !wrong_identity.status.success(),
+        "a wrong identity must be refused; stderr: {}",
+        stderr(&wrong_identity)
+    );
+    assert!(
+        stderr(&wrong_identity).contains("fetched pack identity differs"),
+        "unexpected refusal; stderr: {}",
+        stderr(&wrong_identity)
+    );
+    assert!(!destination.exists(), "a wrong identity wrote its destination; stderr: {}", stderr(&wrong_identity));
+    assert!(
+        !root.path().join(".fetched.fetch-staging").exists(),
+        "a wrong identity left its staging; stderr: {}",
+        stderr(&wrong_identity)
+    );
 
     let link = repository.join(PACK_SUBDIRECTORY).join("workflow-templates").join(HELLO).join("linked.ncl");
     std::os::unix::fs::symlink("/etc/hostname", &link).expect("symlink member");
@@ -245,9 +267,13 @@ fn fetch_refuses_inexact_sources_wrong_identity_and_symlink_members() {
     runbook_catalog::git(&repository, &["commit", "--quiet", "--message", "Add a symlink member"]);
     let linked_commit = runbook_catalog::git(&repository, &["rev-parse", "HEAD"]);
     let symlinked = fetch(&url, &linked_commit, None, &destination);
-    assert!(!symlinked.status.success());
-    assert!(String::from_utf8_lossy(&symlinked.stderr).contains("catalog symlink member"));
-    assert!(!destination.exists());
+    assert!(!symlinked.status.success(), "a symlink member must be refused; stderr: {}", stderr(&symlinked));
+    assert!(
+        stderr(&symlinked).contains("catalog symlink member"),
+        "unexpected refusal; stderr: {}",
+        stderr(&symlinked)
+    );
+    assert!(!destination.exists(), "a symlink member wrote its destination; stderr: {}", stderr(&symlinked));
 }
 
 // r[verify lattice.operation_packs.runbook_catalog.scenario.drift]
@@ -265,12 +291,17 @@ fn tampered_bytes_refuse_the_pack_and_name_each_drifted_bundle() {
     std::fs::write(&workflow, tampered).expect("tamper bundle bytes");
 
     let output = install(&config, &no_git, &pack, &lock_path, &catalog, true);
-    assert!(!output.status.success());
+    assert!(!output.status.success(), "a tampered pack must be refused; stderr: {}", stderr(&output));
     let report = json(&output);
-    assert_eq!(report["pack_refused"], true);
-    assert_eq!(statuses(&report), [
-        (HELLO.to_string(), "rejected".to_string(), Some("pack_bytes_drift".to_string())),
-        (STATUS.to_string(), "rejected".to_string(), Some("pack_refused".to_string())),
-    ]);
-    assert_eq!(std::fs::read_dir(&catalog).expect("catalog").count(), 0);
+    assert_eq!(report["pack_refused"], true, "stderr: {}", stderr(&output));
+    assert_eq!(
+        statuses(&report),
+        [
+            (HELLO.to_string(), "rejected".to_string(), Some("pack_bytes_drift".to_string())),
+            (STATUS.to_string(), "rejected".to_string(), Some("pack_refused".to_string())),
+        ],
+        "stderr: {}",
+        stderr(&output)
+    );
+    assert_eq!(std::fs::read_dir(&catalog).expect("catalog").count(), 0, "stderr: {}", stderr(&output));
 }
