@@ -6,38 +6,130 @@
   "assembly": {
     "base": "39936a1932377d1e7fe80cca191e8ae69f23b0cb",
     "focused_revision": "12a85181",
-    "cairn_producer": "317d3ff648f01a5ea1572e6126f4dd71bc7afa99"
+    "cairn_producer": "317d3ff648f01a5ea1572e6126f4dd71bc7afa99",
+    "head": "d800d6c83c6f856d6fb960cec39cea943c07fd16"
   },
   "focused": {
     "exit": 0,
-    "groups": ["implementation-attempt library", "observed model requests integration", "lattice-core", "Cairn integration", "clock", "operator repair", "served broker", "clippy", "fmt"],
-    "post_octet_refactor_groups": ["fmt", "clippy", "library", "integration", "core"]
+    "groups": [
+      "implementation-attempt library",
+      "observed model requests integration",
+      "lattice-core",
+      "Cairn integration",
+      "clock",
+      "operator repair",
+      "served broker",
+      "clippy",
+      "fmt"
+    ],
+    "post_octet_refactor_groups": [
+      "fmt",
+      "clippy",
+      "library",
+      "integration",
+      "core"
+    ]
   },
   "check_rs": {
-    "revision": "a0600365611869497aa045fb300a1c1822131b6d",
+    "revision": "fdb03c3dd06c8ce21ce140c8e0c3e3d38c62d3fa",
     "command": "nix develop -c cargo -q -Zscript scripts/check.rs",
     "exit": 0,
-    "log_blake3": "6c4def1fae3d6860f634f25b86a61676b39429b77ec2ee2c7bc889bb1b8b7734"
+    "log_blake3": "88c46af1e8f0ab2d5c0ca06e7a59f748a8867b218d33f7136b25164412037f48",
+    "note": "d800d6c8 differs only in .cairn/changes/charge-observed-model-requests/tasks.md, which that run's Cairn phase read; strict validation and the change gates were rerun on d800d6c8."
   },
   "flake_check": {
-    "revision": "769e04bcf21760a41bf3fcba4042cd708e9df1ac",
-    "command": "nix flake check -L --keep-going --option builders '' --option min-free 0 --option cores 4 --option max-jobs 1",
-    "system": "x86_64-linux",
-    "passed": 32,
-    "log_blake3": "5ead5e70183a9c7bc46bbd249ea497b2468331c9e16f1f8dc48818ae496123fb",
-    "prior_failure": "a0600365 failed bounded-exec-source; 769e04bc moved the source URL to the admitted Radicle projection at the same revision and narHash"
+    "revision": "d800d6c83c6f856d6fb960cec39cea943c07fd16",
+    "command": "nix flake check git+file://$PWD?rev=<head> --no-write-lock-file -L --keep-going --option secret-key-files '' --option cores 4 --option max-jobs 1",
+    "checks": 266,
+    "exit": 0,
+    "log_blake3": "ae142e35219fe930848ed3705e21fc34509083b4fcb164f4723d5396a6506d4c",
+    "note": "supersedes the earlier all-32-checks run; the launcher adds the VM deployment checks."
   },
   "cairn": {
-    "revision": "a0600365611869497aa045fb300a1c1822131b6d",
-    "valid": true,
-    "doctor_exit": 0,
-    "implementation_ready_exit": 0,
-    "change_gates_passed": 123,
-    "strict_validation_prior_failure": "The pre-existing checkpoint gates task lacked a requirement reference on 39936a19 and a0600365; adding the already-declared resume and portability IDs restores strict validation.",
-    "release_readiness": "fail, not a release authorization"
+    "revision": "317d3ff648f01a5ea1572e6126f4dd71bc7afa99",
+    "validate": {
+      "exit": 0,
+      "valid": true,
+      "issues": 0
+    },
+    "validate_strict": {
+      "exit": 0,
+      "findings": 0
+    },
+    "change_gates": "120 run, 0 failed",
+    "charge_change_gates": {
+      "proposal": "PASS",
+      "design": "PASS",
+      "tasks": "PASS"
+    },
+    "release_readiness": "fail (traceability_coverage, mcp_agent_smoke, preserves_corpus_freshness \u2014 the same checks that fail on 39936a19); not a release authorization"
   },
   "non_claims": [
     "Only complete, admitted broker evidence earns measured request accounting; incomplete or uncertain evidence is not an observed charge.",
     "Local tests do not qualify Kiln settlement, live model serving, or cross-host restart."
-  ]
+  ],
+  "review_fixes": {
+    "reviewed_revision": "769e04bcf21760a41bf3fcba4042cd708e9df1ac",
+    "reviewer": "independent assembly review",
+    "findings": 4,
+    "head": "72fc17c8f1fdb6af57246b1151020555646ba5ab",
+    "tests": {
+      "command": "cargo test -p lattice --locked --lib <name>",
+      "green": [
+        "a_partial_loss_keeps_the_retained_draw_and_degrades_the_raw_projection",
+        "a_record_renamed_away_from_its_request_id_is_not_evidence",
+        "each_step_is_charged_the_requests_observed_in_its_own_index_range",
+        "an_admission_that_expires_before_the_checks_runs_none_of_them",
+        "implementation_attempt::cli::tests::repair::operator (21 tests)"
+      ],
+      "green_log_blake3": "c33a72a09f25caea81ab086ff7f5c9128f89d20a8acb22bbaa7eb9af420f54fb",
+      "red": {
+        "renamed record without the name check": "BrokeredUnattributed { is_count_complete: true, dispatched_requests: 1 } \u2014 a false exact charge (review-fix-red.log)",
+        "coverage propagated with ? instead of degraded": "retained model request evidence conflicts: DispatchWithoutIntent (review-fix-red-attach.log)"
+      },
+      "red_log_blake3": [
+        "bfc0b558b0347c5675f9bd0cc84104db5fe00a77fb77669ebcfb049bab29cbd2",
+        "dca44205f333c5a826c9961eedaaefefec80339600621b84b51a5ea77f144145"
+      ],
+      "no_fixture": [
+        "the P1 ordering regression: no test can make filesystem preparation advance the operator clock; the existing expiry test still passes",
+        "the record sync failure: sync_all cannot be made to fail without a filesystem fault injector"
+      ]
+    }
+  },
+  "octet": {
+    "reference": "pristine git archive of 39936a19",
+    "reference_scopes": {
+      "lattice": {
+        "accepted": 1044,
+        "new": 0,
+        "stale": 0
+      },
+      "lattice_core": {
+        "accepted": 25,
+        "new": 0,
+        "stale": 0
+      }
+    },
+    "candidate_scopes": {
+      "lattice": {
+        "findings": 1346,
+        "new": 0,
+        "stale": 0
+      },
+      "lattice_core": {
+        "findings": 33,
+        "new": 0,
+        "stale": 0
+      }
+    },
+    "first_candidate_observation": "2 new findings in this change's own code (ambiguous_params, private_bounds in binding/requests.rs), cleared in code; no allow and no baseline edit",
+    "admission_rule": "0 semantically new findings and no raw increase per lint and file",
+    "artifact_dirs": [
+      "octet/ref2-root",
+      "octet/ref2-core",
+      "octet/cand2-root",
+      "octet/cand2-core"
+    ]
+  }
 }
