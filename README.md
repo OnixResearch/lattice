@@ -74,7 +74,7 @@ cargo run --locked -- --help
 ```
 
 The flake and Cargo lock pin exact revisions from anonymous HTTPS sources,
-including Cairn `317d3ff648f01a5ea1572e6126f4dd71bc7afa99`, its Artifact input
+including Cairn `63e503aefc05a225650a8e842ca5bebfdc0260f1`, its Artifact input
 `e41340bec587b6d049b5cc518ec7db925dde84be`, and Trellis
 `d65974b14978e1a44b0f5067beb9ef6d83317dc8`. The root manifest patches the
 transitive SSH-only Artifact and Trellis references to those exact public

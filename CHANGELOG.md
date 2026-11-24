@@ -605,6 +605,15 @@ interfaces.
   that can fail a successful process run under load, fixed upstream only on
   GitHub (`c33f1bd`, bounded-exec#2), remains a known limitation until a
   reviewed fixed revision is on the admitted Radicle RID.
+- The `cairn` flake input moves from `317d3ff6` to Cairn `main`
+  `63e503aefc05a225650a8e842ca5bebfdc0260f1`, which fails closed on unloadable
+  consumer `release-readiness` policies (`unloadable-consumer-policy`), sets
+  `repository_gate_policy_listed.source` dynamically for
+  `consumer-selected-gates`, carries `policy_selection` on `sync` and `archive`
+  receipts, and adds structural `immediate_action_commands` to generated
+  workflow descriptors. `cairn-policy/contracts.ncl`,
+  `cairn-policy/upstream-default.ncl`, and `cairn-policy/generated/cairn-policy.json`
+  are refreshed from `63e503ae`; Lattice's own policy overlays remain unchanged.
 - The `cairn` flake input moves from release-branch commit `47ea1b86` to
   Cairn `main` `317d3ff6`, which adds `implementation-ready` and refuses a
   malformed `release_readiness_policy.required_external_commands` instead of

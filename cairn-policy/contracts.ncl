@@ -368,6 +368,7 @@ let DeveloperLoopStatusClass = std.contract.from_predicate (fun value =>
     mutation_class | GeneratedWorkflowMutationClass,
     progress_rule | NonEmptyString,
     immediate_action | NonEmptyString,
+    immediate_action_commands | Array NonEmptyString | default = [],
     output_shape | NonEmptyString,
     constraints | NonEmptyArray | Array NonEmptyString,
     non_claims | NonEmptyArray | Array NonEmptyString,

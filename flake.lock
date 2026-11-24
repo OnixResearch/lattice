@@ -243,16 +243,16 @@
         "octet": "octet"
       },
       "locked": {
-        "lastModified": 1795423044,
-        "narHash": "sha256-8NcPYYKMZsOV86rxpQ5Wk61rKbCPBA9ZtbYE3pG1SqA=",
+        "lastModified": 1795459592,
+        "narHash": "sha256-KkUueGFO+cIrI1flcqhZnQACimc4Zt5IoC1NunITk24=",
         "ref": "refs/heads/main",
-        "rev": "317d3ff648f01a5ea1572e6126f4dd71bc7afa99",
-        "revCount": 922,
+        "rev": "63e503aefc05a225650a8e842ca5bebfdc0260f1",
+        "revCount": 928,
         "type": "git",
         "url": "https://github.com/OnixResearch/cairn.git"
       },
       "original": {
-        "rev": "317d3ff648f01a5ea1572e6126f4dd71bc7afa99",
+        "rev": "63e503aefc05a225650a8e842ca5bebfdc0260f1",
         "type": "git",
         "url": "https://github.com/OnixResearch/cairn.git"
       }

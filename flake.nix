@@ -22,7 +22,7 @@
       # r[impl lattice.repository_validation.cairn_producer_alignment]
       # `cairn-policy/contracts.ncl` and `upstream-default.ncl` are snapshots
       # of this same revision.
-      url = "git+https://github.com/OnixResearch/cairn.git?rev=317d3ff648f01a5ea1572e6126f4dd71bc7afa99";
+      url = "git+https://github.com/OnixResearch/cairn.git?rev=63e503aefc05a225650a8e842ca5bebfdc0260f1";
       # Keep Cairn's Artifact input at the revision Cairn locks, over anonymous
       # HTTPS, so the Lattice flake closure stays publicly acquirable.
       inputs.artifact.url = "git+https://github.com/OnixResearch/onix-artifact.git?rev=e41340bec587b6d049b5cc518ec7db925dde84be";

@@ -1617,7 +1617,11 @@
         ],
         "goal": "Implement the accepted change without weakening its requirements or policy boundaries.",
         "id": "apply",
-        "immediate_action": "Run cairn readiness CHANGE, then follow cairn workflow instructions ARTIFACT --change CHANGE for the accepted artifacts before editing files.",
+        "immediate_action": "Run {command:readiness}, then follow {command:workflow-instructions} for the accepted artifacts before editing files.",
+        "immediate_action_commands": [
+          "readiness",
+          "workflow-instructions"
+        ],
         "mutation_class": "preview_first",
         "non_claims": [
           "deterministic generation proves only a bounded transformation of admitted policy",
@@ -1655,7 +1659,10 @@
         ],
         "goal": "Archive a completed change only after required gates, sync, and evidence checks pass.",
         "id": "archive",
-        "immediate_action": "Run cairn readiness CHANGE, then preview its sync and archive plans and execute only their unchanged plan hashes.",
+        "immediate_action": "Run {command:readiness}, then preview its sync and archive plans and execute only their unchanged plan hashes.",
+        "immediate_action_commands": [
+          "readiness"
+        ],
         "mutation_class": "preview_first",
         "non_claims": [
           "deterministic generation proves only a bounded transformation of admitted policy",
@@ -1696,7 +1703,12 @@
         ],
         "goal": "Complete each active change through implementation, validation, sync, and archive with bounded evidence.",
         "id": "drain",
-        "immediate_action": "Run cairn workflow status, then cairn drain-plan --view readiness for the next change and follow cairn workflow instructions ARTIFACT --change CHANGE.",
+        "immediate_action": "Run {command:workflow-status}, then {command:drain-plan-readiness} for the next change and follow {command:workflow-instructions}.",
+        "immediate_action_commands": [
+          "workflow-status",
+          "drain-plan-readiness",
+          "workflow-instructions"
+        ],
         "mutation_class": "preview_first",
         "non_claims": [
           "deterministic generation proves only a bounded transformation of admitted policy",
@@ -1734,7 +1746,10 @@
         ],
         "goal": "Inspect project lifecycle state and evidence without creating or changing lifecycle artifacts.",
         "id": "explore",
-        "immediate_action": "Run cairn status for the explicit project root, then inspect only the relevant specifications and context.",
+        "immediate_action": "Run {command:status} for the explicit project root, then inspect only the relevant specifications and context.",
+        "immediate_action_commands": [
+          "status"
+        ],
         "mutation_class": "read_only",
         "non_claims": [
           "deterministic generation proves only a bounded transformation of admitted policy",
@@ -1772,6 +1787,7 @@
         "goal": "Create a reviewable change package that states the problem, requirements, design, tasks, and evidence plan.",
         "id": "propose",
         "immediate_action": "Inspect current specifications and status, then preview change creation before writing the bounded package.",
+        "immediate_action_commands": [],
         "mutation_class": "preview_first",
         "non_claims": [
           "deterministic generation proves only a bounded transformation of admitted policy",
@@ -1807,7 +1823,11 @@
         ],
         "goal": "Check requirement coverage, gates, tests, and receipts without changing lifecycle artifacts.",
         "id": "verify",
-        "immediate_action": "Run cairn readiness CHANGE, then follow cairn workflow instructions ARTIFACT --change CHANGE for the recorded verification inputs.",
+        "immediate_action": "Run {command:readiness}, then follow {command:workflow-instructions} for the recorded verification inputs.",
+        "immediate_action_commands": [
+          "readiness",
+          "workflow-instructions"
+        ],
         "mutation_class": "read_only",
         "non_claims": [
           "deterministic generation proves only a bounded transformation of admitted policy",
@@ -3996,6 +4016,7 @@
         "plan_hash",
         "policy",
         "policy_hash",
+        "policy_selection",
         "reasons",
         "receipt_hash"
       ]
@@ -4032,6 +4053,7 @@
         "plan_hash",
         "policy",
         "policy_hash",
+        "policy_selection",
         "reasons",
         "receipt_hash"
       ]
