@@ -131,3 +131,6 @@ pub fn apply(
         workflow::apply(workflow, node_id, id, value)
     }
 }
+
+// r[impl lattice.tui_ux.portable_authoring_parity]
+// r[impl lattice.tui_ux.portable_authoring_parity.round_trip]

@@ -82,6 +82,9 @@ pub fn capabilities() -> Vec<Capability> {
         evidence: "test_credentials; test_workflow_format",
         spec: super::metadata::spec("credential.plaintext_value"),
     });
+    rows.extend(construction_capabilities());
+    debug_assert!(!rows.is_empty());
+    debug_assert!(rows.iter().all(|row| !row.id.is_empty()));
     rows.sort_by(|left, right| left.id.cmp(&right.id));
     rows
 }
@@ -210,4 +213,29 @@ fn inspect_shape(value: &serde_json::Value, prefix: &str, known: &BTreeSet<Strin
         }
         _ => {}
     }
+}
+
+const CONSTRUCTION_CAPABILITIES: &[(&str, &str)] = &[
+    ("source.construction_profile", "construction_profile"),
+    ("source.construction_runtime.runtime_artifact", "construction_runtime.runtime_artifact"),
+    ("source.construction_runtime.shell_path", "construction_runtime.shell_path"),
+    ("source.construction_runtime.shell_artifact", "construction_runtime.shell_artifact"),
+    ("source.construction_runtime.shell_implementation", "construction_runtime.shell_implementation"),
+    ("source.control_dependencies.source", "control_dependencies[].source"),
+    ("source.control_dependencies.target", "control_dependencies[].target"),
+];
+
+fn construction_capabilities() -> Vec<Capability> {
+    CONSTRUCTION_CAPABILITIES
+        .iter()
+        .map(|(id, path)| Capability {
+            id: (*id).into(),
+            portable: vec![(*path).into()],
+            mode: Mode::AdmittedPlan,
+            action: "Ctrl-W / source / source.file + source.parameters + source.admit; host selects construction runtime",
+            reset: "admit replacement source draft or rebuild legacy workflow without construction profile",
+            evidence: "test_source_authoring; test_construction_authoring; tui::authoring::tests",
+            spec: super::metadata::spec(id),
+        })
+        .collect()
 }

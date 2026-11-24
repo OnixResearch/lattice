@@ -1,6 +1,6 @@
 //! Pure portable field metadata owned by each built-in node provider.
 use super::NodeKind;
-
+// r[impl lattice.tui_ux.portable_authoring_parity.node_fields]
 pub(super) fn for_kind(kind: NodeKind) -> &'static [&'static str] {
     match kind {
         NodeKind::Shell => &[

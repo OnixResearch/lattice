@@ -22,6 +22,9 @@ fn rejected_pure(workflow: &mut Workflow, node: NodeId, id: &str, value: &str) {
     assert_eq!(serde_json::to_value(&*workflow).unwrap(), before);
 }
 
+// r[verify lattice.tui_ux.portable_authoring_parity.node_fields]
+// r[verify lattice.tui_ux.portable_authoring_parity.node_fields.scenario.edit]
+// r[verify lattice.tui_ux.portable_authoring_parity.node_fields.scenario.invalid]
 #[test]
 fn shell_typed_fields_map_rows_reset_and_unrelated_state() {
     let mut w = workflow();
@@ -265,6 +268,8 @@ fn agent_source_is_opaque_and_all_fields_preserve_typed_values_without_io() {
     );
 }
 
+// r[verify lattice.tui_ux.condition_topology_reconciliation]
+// r[verify lattice.tui_ux.condition_topology_reconciliation.scenario.change]
 #[test]
 fn condition_rows_reconcile_by_label_preserving_tags_edges_and_reorder() {
     let mut w = workflow();

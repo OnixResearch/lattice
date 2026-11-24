@@ -76,7 +76,11 @@ fn create(app: &mut State, kind: char, label: &str, value: &str) -> u64 {
     app.graph_state.focused.expect("new node is focused").0
 }
 
+// r[verify lattice.tui_ux.portable_authoring_parity]
+// r[verify lattice.tui_ux.portable_authoring_parity.scenario.complete]
 // r[verify lattice.tui_ux.portable_authoring_parity.node_kinds]
+// r[verify lattice.tui_ux.portable_authoring_parity.node_kinds.scenario.http_file]
+// r[verify lattice.tui_ux.portable_authoring_parity.round_trip]
 // r[verify lattice.tui_ux.portable_authoring_parity.round_trip.scenario.complete]
 #[test]
 fn all_current_node_kinds_and_field_families_author_store_and_nickel_round_trip() {
@@ -369,6 +373,7 @@ fn normalized_portable(
     normalized
 }
 
+// r[verify lattice.tui_ux.portable_authoring_parity.scenario.preservation_only]
 // r[verify lattice.tui_ux.portable_authoring_parity.catalog.scenario.missing]
 #[test]
 fn capability_matrix_rejects_missing_display_only_duplicate_stale_and_new_portable_fields() {
@@ -584,4 +589,49 @@ fn source_origins_target_only_matching_displayed_source_bytes() {
         assert_eq!(serde_json::to_value(&app.workflow).unwrap(), admitted);
     }
     assert!(app.store.as_ref().unwrap().list_runs(10).unwrap().is_empty());
+}
+
+// r[verify lattice.tui_ux.condition_topology_reconciliation.scenario.reject]
+#[test]
+fn condition_branch_add_escape_cancel_preserves_branches_ports_and_dirty_state() {
+    let root = tempfile::tempdir().unwrap();
+    let mut app = app(&root);
+    let condition = create(&mut app, 'd', "route", "keep=always");
+    app.clear_workflow_dirty();
+    let before = serde_json::to_value(&app.workflow).unwrap();
+    select(&mut app, Some(condition));
+    draft(&mut app, "config.condition.branches.add", "cancelled=exists");
+    send(&mut app, KeyModifiers::NONE, KeyCode::Esc);
+    let state = app.authoring.as_ref().expect("authoring browser remains open");
+    assert!(state.draft.is_none());
+    assert!(state.error.is_none());
+    assert!(!app.has_unsaved_changes());
+    assert_eq!(serde_json::to_value(&app.workflow).unwrap(), before);
+}
+
+// r[verify lattice.tui_ux.portable_authoring_parity.catalog]
+#[test]
+fn catalog_check_covers_construction_v3_portable_workflow_and_rejects_uncovered_fields() {
+    let mut workflow = crate::engine::Workflow::new("construction-catalog", WorkflowTimestamp::epoch());
+    let first = workflow.add_shell_node("first", "true");
+    let second = workflow.add_shell_node("second", "true");
+    workflow.control_dependencies.push((first.0, second.0));
+    workflow.construction_profile = true;
+    workflow.construction_runtime = Some(crate::engine::workflow::ConstructionRuntimeBinding {
+        runtime_artifact: "runtime-artifact".into(),
+        shell_path: "/bin/sh".into(),
+        shell_artifact: "shell-artifact".into(),
+        shell_implementation: "sh:shell-artifact".into(),
+    });
+    let portable = serde_json::to_value(workflow_to_portable(&workflow)).unwrap();
+    let rows = catalog::capabilities();
+    catalog::check(&rows, &portable).unwrap();
+    let mut omitted = rows;
+    omitted.retain(|row| row.id != "source.construction_profile");
+    assert!(
+        catalog::check(&omitted, &portable)
+            .unwrap_err()
+            .iter()
+            .any(|error| error.contains("source.construction_profile"))
+    );
 }

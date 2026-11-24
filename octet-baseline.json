@@ -2,15 +2,15 @@
   "schema_version": 1,
   "finding_schema_version": 2,
   "metadata": {
+    "config_hash": "b3:299713f9a4561a4d2235616467edb54ef170a601d7687ee8d89da53e1b30fc06",
+    "profile_hash": "b3:0a3ed6fc1277e5e2379e2c5caa1d455e0e81e9168cd24458d4c29f8b554ac377",
+    "profile_name": "workspace-metadata",
+    "rustc_version": "rustc 1.96.0-nightly (ac7f9ec7d 2026-03-20)",
     "tool_name": "cargo-octet",
     "tool_version": "0.1.0",
-    "rustc_version": "rustc 1.96.0-nightly (ac7f9ec7d 2026-03-20)",
-    "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu",
-    "profile_name": "workspace-metadata",
-    "profile_hash": "b3:0a3ed6fc1277e5e2379e2c5caa1d455e0e81e9168cd24458d4c29f8b554ac377",
-    "config_hash": "b3:299713f9a4561a4d2235616467edb54ef170a601d7687ee8d89da53e1b30fc06"
+    "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu"
   },
-  "baseline_hash": "b3:6b50b106f65a0a6ad50271c3881f000f68d6ab116d485e836d2ad7ac4b376b0d",
+  "baseline_hash": "b3:13679ce5518585d6881ad6c43809db84f2fc723a037d24d64b5c29bdcaca0820",
   "findings": [
     {
       "stable_id": "b3:00365717b09c09fa",
@@ -384,7 +384,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/tui/authoring/catalog.rs",
-      "line": 91,
+      "line": 94,
       "column": 25,
       "message": "`.expect()` in production code will panic on failure",
       "crate_name": "lattice"
@@ -1788,7 +1788,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/tui/authoring/catalog.rs",
-      "line": 178,
+      "line": 181,
       "column": 17,
       "message": "function calls itself recursively",
       "crate_name": "lattice"
@@ -2503,7 +2503,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/tui/authoring/catalog.rs",
-      "line": 118,
+      "line": 121,
       "column": 12,
       "message": "conditional nesting is 4 levels deep (limit: 3)",
       "crate_name": "lattice"
@@ -2815,7 +2815,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/tui/authoring/catalog.rs",
-      "line": 167,
+      "line": 170,
       "column": 111,
       "message": "function `inspect_shape` has 0 assertion(s) in 45 lines (need 2+)",
       "crate_name": "lattice"
@@ -4401,7 +4401,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/tui/authoring/catalog.rs",
-      "line": 89,
+      "line": 92,
       "column": 34,
       "message": "function `node_path` has 0 assertion(s) in 21 lines (need 2+)",
       "crate_name": "lattice"
@@ -6962,7 +6962,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/tui/authoring/catalog.rs",
-      "line": 167,
+      "line": 170,
       "column": 1,
       "message": "parameter uses `&Vec<String>`; accept `&[String]` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "lattice"
@@ -7040,7 +7040,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/tui/authoring/catalog.rs",
-      "line": 90,
+      "line": 93,
       "column": 18,
       "message": "`.expect()` in production code will panic on failure",
       "crate_name": "lattice"
@@ -7222,7 +7222,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/tui/authoring/catalog.rs",
-      "line": 111,
+      "line": 114,
       "column": 44,
       "message": "function `workflow_paths` has 0 assertion(s) in 26 lines (need 2+)",
       "crate_name": "lattice"
@@ -8002,7 +8002,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/tui/authoring/catalog.rs",
-      "line": 141,
+      "line": 144,
       "column": 92,
       "message": "function `check` has 0 assertion(s) in 25 lines (need 2+)",
       "crate_name": "lattice"
@@ -9035,19 +9035,6 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:a7c90bb4643895b6",
-      "semantic_id": "b3:a7c90bb4643895b6",
-      "identity_status": "computed",
-      "lint": "assertion_density",
-      "group": "tigerstyle::safety",
-      "severity": "warning",
-      "file": "src/tui/authoring/catalog.rs",
-      "line": 29,
-      "column": 42,
-      "message": "function `capabilities` has 0 assertion(s) in 59 lines (need 2+)",
-      "crate_name": "lattice"
-    },
-    {
       "stable_id": "b3:a80c834985e1d694",
       "semantic_id": "b3:a80c834985e1d694",
       "identity_status": "computed",
@@ -9315,7 +9302,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/tui/authoring/catalog.rs",
-      "line": 147,
+      "line": 150,
       "column": 13,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -12370,7 +12357,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/tui/authoring/catalog.rs",
-      "line": 192,
+      "line": 195,
       "column": 21,
       "message": "boolean binding `covered` should have a predicate prefix",
       "crate_name": "lattice"
@@ -12942,7 +12929,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/tui/authoring/catalog.rs",
-      "line": 160,
+      "line": 163,
       "column": 9,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"

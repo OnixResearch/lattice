@@ -44,7 +44,7 @@ The catalog identifies field id, owner, value kind, required/optional/repeated s
 
 ### Decision: make the portable schema the parity reference
 
-**Choice:** Maintain a pure capability catalog and test matrix covering workflow metadata, graph ports/edges, all `NodeConfig` fields, credentials, runner settings/policies, and triggers currently represented by `PortableWorkflow`. Every row is classified `create`, `edit`, `remove/reset`, and `round_trip`; no `display-only` row can satisfy completion.
+**Choice:** Maintain a pure capability catalog and test matrix covering workflow metadata, graph ports/edges, all `NodeConfig` fields, credentials, runner settings/policies, triggers, and `WorkflowWithControls` construction fields (`construction_profile`, `construction_runtime`, `control_dependencies`) currently represented by `PortableWorkflow`. Every row is classified as typed create/edit/remove-or-reset (`Typed`), admitted plan/construction (`AdmittedPlan` via `operation` or `source` admission), checked identity (`AllocatedIdentity`), or rejected plaintext (`RejectedPlaintext`), with `round_trip` evidence; no `display-only` row can satisfy completion.
 
 **Rationale:** A shared Rust struct does not prove UI authoring coverage. A checked matrix makes omissions visible when the schema evolves.
 
@@ -107,11 +107,11 @@ The catalog identifies field id, owner, value kind, required/optional/repeated s
 
 ### Runner metadata
 
-- runtime kind/key;
-- declared abilities/effects;
-- cache mode;
-- retry count and backoff policy;
-- artifact reference policy and configured limits.
+- `runtime_kind` and `runtime_key` binding;
+- `effect_policy` aligned with runtime bindings;
+- `cache_policy` (`disabled`);
+- `retry_policy` (`none`; `NodeRunnerSettings` does not invent retry counts or backoff fields);
+- `artifact_policy` (`metadata-only`; configured numeric bounds live on `ImageInput.max_bytes`, `ApprovalNodeConfig`, and `OperationPlan.bounds`, matching `evidence/pre-change-baseline.md`).
 
 Numeric literals are represented by named bounds/default constants and checked conversion; invalid/overflowing input never mutates state.
 

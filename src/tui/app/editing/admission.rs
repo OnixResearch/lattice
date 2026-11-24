@@ -20,6 +20,7 @@ impl State {
                 replace_credentials(&mut candidate, edit)?;
                 None
             }
+            // r[impl lattice.tui_ux.condition_topology_reconciliation]
             PropertyEditField::ConditionBranches => {
                 candidate
                     .replace_condition_branches(

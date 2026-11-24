@@ -154,3 +154,50 @@ fn exhausted_run_identity_is_reported_before_starting_background_work() {
     assert_eq!(app.next_tui_run_id, u64::MAX);
     assert!(output_text_lines(&app).iter().any(|line| line.contains("identity range exhausted")));
 }
+
+// r[verify lattice.tui_ux.aggregate_node_deletion]
+// r[verify lattice.tui_ux.aggregate_node_deletion.scenario.missing]
+#[test]
+fn delete_selected_nodes_clears_active_editors_and_rejects_stale_selection() {
+    let temp_dir = tempfile::tempdir().expect("temporary app directory");
+    let mut app = State::new(test_config(&temp_dir));
+    app.add_shell_node("Target", "echo target");
+    let target = app.selected_node_id().expect("target selected");
+    app.add_shell_node("Retained", "echo retained");
+    let retained = app.selected_node_id().expect("retained selected");
+
+    app.select_node(target);
+    assert!(app.start_property_edit(PropertyEditField::Command));
+    app.open_authoring("all");
+    // Re-open property edit alongside authoring to verify both active editors clear.
+    app.property_edit = Some(PropertyEditState {
+        node_id: target,
+        field: PropertyEditField::Command,
+        original: "echo target".to_string(),
+        draft: "echo pending".to_string(),
+        workflow_snapshot: crate::workflow_format::workflow_to_portable(&app.workflow),
+        authoring_snapshot: crate::authoring::identity("lattice.tui-authoring-snapshot.v1", &app.workflow).ok(),
+    });
+    assert_eq!(app.authoring.as_ref().and_then(|state| state.node_id), Some(target.0));
+    app.clear_workflow_dirty();
+
+    assert_eq!(app.delete_selected_nodes(), 1);
+    assert!(app.property_edit.is_none(), "active property edit for deleted node must clear");
+    assert!(app.authoring.is_none(), "active authoring browser for deleted node must clear");
+    assert!(app.workflow.graph.node(target).is_none());
+    assert!(app.workflow.node_config(target).is_none());
+    assert!(app.workflow.graph.node(retained).is_some());
+    assert!(app.has_unsaved_changes());
+
+    app.clear_workflow_dirty();
+    app.select_node(retained);
+    app.open_authoring("all");
+    let before = serde_json::to_value(&app.workflow).expect("workflow snapshot");
+    app.graph_state
+        .selected
+        .insert(crate::tui::graph::subwayrat_node_id(crate::engine::workflow::NodeId(u64::MAX - 1)));
+    assert_eq!(app.delete_selected_nodes(), 0);
+    assert!(!app.has_unsaved_changes(), "stale deletion must not mark workflow dirty");
+    assert_eq!(serde_json::to_value(&app.workflow).expect("workflow snapshot"), before);
+    assert_eq!(app.authoring.as_ref().and_then(|state| state.node_id), Some(retained.0));
+}

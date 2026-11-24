@@ -9,6 +9,7 @@ impl State {
         self.commit_guided_node(&label, NodeConfig::shell(command));
     }
 
+    // r[impl lattice.tui_ux.portable_authoring_parity.node_kinds]
     pub(in crate::tui::app) fn confirm_http_node_from_flow(&mut self) {
         let label = normalized_node_label(&self.add_node_flow.label, self.next_http_node_label());
         let (method, url) = match crate::tui::app::editing::parsing::http_config_from_draft(&self.add_node_flow.command)

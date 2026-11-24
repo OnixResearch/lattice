@@ -38,7 +38,7 @@ fn unsaved_indicator_marks_dirty_workflows() {
 fn contextual_help_matches_canvas_and_wiring_modes() {
     assert_eq!(
         contextual_help_text(context(FocusPanel::Canvas)),
-        " e: cmd │ l: label │ t: timeout │ v: rows │ C-W: fields │ C-D: diagnostics │ C-R: run │ C-P: palette ",
+        " e: cmd │ l: label │ t: timeout │ C-W: fields │ C-D: diagnostics │ v: rows │ C-R: run │ C-P: palette ",
     );
 
     let wiring = HelpContext {

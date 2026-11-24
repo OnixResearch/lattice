@@ -7,6 +7,19 @@ interfaces.
 
 ## [Unreleased]
 
+### Fixed
+
+- Complete `complete-tui-nickel-authoring-parity` and re-enable all 3 TUI PTY
+  regression tests in `tests/test_tui_ux_completion.rs`:
+  - Reordered `FocusPanel::Canvas` contextual help in
+    `src/tui/panels/layout/footer.rs` so `C-W: fields` and `C-D: diagnostics`
+    remain visible without overflowing a 120-column terminal.
+  - Added `WorkflowWithControls` (`construction_profile`, `construction_runtime`,
+    `control_dependencies`) coverage as `Mode::AdmittedPlan` in
+    `src/tui/authoring/catalog.rs`, plus unit tests for active-editor cleanup
+    and stale-selection rejection on `State::delete_selected_nodes` and `Esc`
+    cancellation on `config.condition.branches.add`.
+
 ### Added
 
 - Optional transient systemd service launcher for the candidate worker sandbox

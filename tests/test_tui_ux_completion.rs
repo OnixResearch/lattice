@@ -616,7 +616,6 @@ fn operator_e2e_tui_process_inspects_failure_and_explicitly_reruns_fresh_identit
 // r[verify lattice.tui_ux.process_failure_recovery.scenario.diagnostics]
 #[cfg(unix)]
 #[test]
-#[ignore = "known TUI authoring-parity gap tracked by complete-tui-nickel-authoring-parity; the server release does not claim this surface"]
 fn operator_e2e_tui_process_rejects_invalid_workflow_before_effect_and_remains_navigable() {
     let temp_dir = tempfile::tempdir().expect("temporary validation-rejection PTY directory");
     let config_path = write_cli_config(&temp_dir);
@@ -697,7 +696,6 @@ fn operator_e2e_tui_process_denies_cancellable_effect_without_current_authority(
 // r[verify lattice.tui_ux.process_failure_recovery.scenario.non-claim]
 #[cfg(unix)]
 #[test]
-#[ignore = "known TUI authoring-parity gap tracked by complete-tui-nickel-authoring-parity; the server release does not claim this surface"]
 fn operator_e2e_tui_process_resize_preserves_modal_workflow_and_keyboard_input() {
     let temp_dir = tempfile::tempdir().expect("temporary resize PTY directory");
     let config_path = write_cli_config(&temp_dir);
@@ -854,10 +852,10 @@ fn canvas_renders_bounded_image_metadata_fallback_without_raw_bytes() {
 }
 
 // r[verify lattice.tui_ux.portable_authoring_parity.verification]
+// r[verify lattice.tui_ux.portable_authoring_parity.verification.scenario.closeout]
 // r[verify lattice.tui_ux.portable_authoring_parity.discoverability.scenario.help]
 #[cfg(unix)]
 #[test]
-#[ignore = "known TUI authoring-parity gap tracked by complete-tui-nickel-authoring-parity; the server release does not claim this surface"]
 fn operator_e2e_tui_process_authors_http_and_recovers_invalid_constrained_draft() {
     let temp_dir = tempfile::tempdir().expect("authoring PTY directory");
     let config_path = write_cli_config(&temp_dir);

@@ -60,6 +60,7 @@ pub(in crate::tui::panels) fn render_output(app: &mut crate::tui::app::State, ar
 }
 
 /// Render the status bar.
+// r[impl lattice.tui_ux.portable_authoring_parity.discoverability]
 pub(in crate::tui::panels) fn render_status_bar(app: &crate::tui::app::State, area: Rect, buf: &mut Buffer) {
     debug_assert!(area.right() <= buf.area.right());
     debug_assert!(area.bottom() <= buf.area.bottom());
@@ -227,7 +228,7 @@ pub(in crate::tui::panels) fn contextual_help_text(context: HelpContext) -> &'st
     }
     match context.focus {
         FocusPanel::Canvas => {
-            " e: cmd │ l: label │ t: timeout │ v: rows │ C-W: fields │ C-D: diagnostics │ C-R: run │ C-P: palette "
+            " e: cmd │ l: label │ t: timeout │ C-W: fields │ C-D: diagnostics │ v: rows │ C-R: run │ C-P: palette "
         }
         FocusPanel::Properties => " e: cmd │ l: label │ i: image │ p/r/o: agent │ k: creds │ C-W ",
         FocusPanel::Output => " ↑/↓: scroll │ C-P: palette │ A-Tab: focus ",

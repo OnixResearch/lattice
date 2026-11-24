@@ -99,6 +99,8 @@ impl State {
     }
 
     /// Delete selected nodes through the aggregate workflow lifecycle operation.
+    // r[impl lattice.workflow_validation.aggregate_mutation]
+    // r[impl lattice.tui_ux.aggregate_node_deletion]
     pub(crate) fn delete_selected_nodes(&mut self) -> usize {
         let mut node_ids = self.graph_state.selected.iter().copied().collect::<Vec<_>>();
         node_ids.sort_unstable();
