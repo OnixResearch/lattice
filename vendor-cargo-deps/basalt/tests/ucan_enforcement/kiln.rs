@@ -44,6 +44,7 @@ fn boundaries<'a>(
     UcanEnforcementBoundaries {
         verification_time: VerificationTime::from_unix_seconds(now),
         key_resolver: &fixture.keys,
+        trusted_roots: &fixture.trusted_roots,
         proof_store: &fixture.proofs,
         revocations,
         caveat_policies: &DenyUnknownCaveats,
@@ -304,6 +305,7 @@ fn kiln_execution_grant_cannot_be_widened_to_publication_or_lifecycle() {
                 delegate.verification_key().unwrap(),
                 signer(HOLDER_SEED_BYTE).verification_key().unwrap(),
             ]),
+            trusted_roots: roots.to_vec(),
             proofs: ProofCollection::from_tokens(vec![parent]),
         };
         let binding = bind_enforcement_action(widened.action(), &child_exact).unwrap();
@@ -366,6 +368,7 @@ fn kiln_root_delegation_reaches_exact_dispatch_operation() {
             delegate.verification_key().unwrap(),
             signer(HOLDER_SEED_BYTE).verification_key().unwrap(),
         ]),
+        trusted_roots: roots.to_vec(),
         proofs: ProofCollection::from_tokens(vec![parent]),
     };
     let binding = bind_enforcement_action(Operation::Dispatch.action(), &exact).unwrap();
@@ -456,4 +459,125 @@ fn kiln_v1_framing_bytes_and_serialized_requests_are_unchanged() {
     legacy.as_object_mut().unwrap().remove("framing");
     let decoded: Request = serde_json::from_value(legacy).unwrap();
     assert!(decoded == fixed);
+}
+
+fn direct_invalid_kiln_policy() -> basalt::Policy {
+    basalt::Policy {
+        schema_version: basalt::SUPPORTED_SCHEMA_VERSION.to_owned(),
+        contracts: std::collections::BTreeMap::from([
+            (
+                "kiln-dispatch".to_owned(),
+                basalt::ContractPolicy {
+                    id: "kiln-dispatch".to_owned(),
+                    description: String::new(),
+                    resource_prefixes: vec!["kiln://implementation/v1/".to_owned()],
+                    abilities: vec![" kiln/dispatch".to_owned()],
+                },
+            ),
+            (
+                "kiln-source-discover".to_owned(),
+                basalt::ContractPolicy {
+                    id: "kiln-source-discover".to_owned(),
+                    description: String::new(),
+                    resource_prefixes: vec!["kiln://source/v1/".to_owned()],
+                    abilities: vec!["kiln/source/\tdiscover".to_owned()],
+                },
+            ),
+        ]),
+        backends: std::collections::BTreeMap::new(),
+    }
+}
+
+#[test]
+fn kiln_non_admitted_and_directly_constructed_invalid_policies_deny_before_replay() {
+    use basalt::kiln::{PathScope, SourceOperation, SourceRequest};
+
+    let admitted = default_policy().unwrap();
+    let reference = policy_ref();
+    let roots = [signer(ISSUER_SEED_BYTE).issuer().unwrap().as_str().into()];
+    let admitted_verifier = verifier(&admitted, &reference, &roots);
+
+    let impl_request = request(Operation::Dispatch);
+    let (impl_fixture, impl_signature) = fixture(&admitted_verifier, &impl_request);
+
+    let source_request = SourceRequest {
+        operation: SourceOperation::Discover,
+        subject: signer(HOLDER_SEED_BYTE).issuer().unwrap().as_str().into(),
+        audience: "kiln-service-a".into(),
+        generation: 7,
+        repository: "OnixResearch/kiln".into(),
+        attempt: None,
+        path: vec!["src".into()],
+        scope: PathScope::Subtree,
+        snapshot: "snap-1".into(),
+        view: "view-1".into(),
+        request_digest: [41; 32],
+    };
+    let source_exact = admitted_verifier
+        .source_enforcement(&source_request)
+        .unwrap();
+    let source_fixture = InvocationFixture::direct(
+        CapabilityDocument::new(
+            source_exact.resource().into(),
+            source_exact.ability().into(),
+        )
+        .unwrap(),
+    );
+    let source_binding =
+        bind_enforcement_action(source_request.operation.action(), &source_exact).unwrap();
+    let source_signature = sign_operation(&source_fixture, &source_exact, nonce(), source_binding);
+
+    let mut mutated_empty_prefix = admitted;
+    mutated_empty_prefix
+        .contracts
+        .get_mut("kiln-dispatch")
+        .unwrap()
+        .resource_prefixes = vec![String::new()];
+    mutated_empty_prefix
+        .contracts
+        .get_mut("kiln-source-discover")
+        .unwrap()
+        .resource_prefixes = vec![String::new()];
+    let direct_invalid = direct_invalid_kiln_policy();
+
+    for invalid_policy in [&mutated_empty_prefix, &direct_invalid] {
+        let invalid_verifier = verifier(invalid_policy, &reference, &roots);
+        let impl_replay = RecordingReplay::new();
+        let impl_bounds = boundaries(
+            &impl_fixture,
+            &impl_replay,
+            &NoRevocations,
+            VERIFY_AT_SECONDS,
+        );
+        assert_eq!(
+            invalid_verifier
+                .verify(
+                    impl_request.clone(),
+                    &invocation(&impl_fixture, &impl_signature),
+                    &impl_bounds
+                )
+                .unwrap_err(),
+            Denied
+        );
+        assert_eq!(impl_replay.calls.get(), 0);
+
+        let source_replay = RecordingReplay::new();
+        let source_bounds = boundaries(
+            &source_fixture,
+            &source_replay,
+            &NoRevocations,
+            VERIFY_AT_SECONDS,
+        );
+        assert_eq!(
+            invalid_verifier
+                .verify_source(
+                    source_request.clone(),
+                    &invocation(&source_fixture, &source_signature),
+                    &source_bounds
+                )
+                .unwrap_err(),
+            Denied
+        );
+        assert_eq!(source_replay.calls.get(), 0);
+    }
 }

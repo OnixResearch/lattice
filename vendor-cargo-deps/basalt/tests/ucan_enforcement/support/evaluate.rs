@@ -2,6 +2,7 @@ use super::*;
 
 pub(crate) struct TestServices<'a> {
     pub(crate) key_resolver: &'a dyn KeyResolver,
+    pub(crate) trusted_roots: &'a [String],
     pub(crate) proof_store: &'a dyn ProofStore,
     pub(crate) revocations: &'a dyn RevocationChecker,
     pub(crate) caveats: &'a dyn CaveatPolicySet,
@@ -51,6 +52,7 @@ pub(crate) fn services<'a>(
 ) -> TestServices<'a> {
     TestServices {
         key_resolver: &fixture.keys,
+        trusted_roots: &fixture.trusted_roots,
         proof_store: &fixture.proofs,
         revocations,
         caveats,
@@ -121,6 +123,7 @@ pub(crate) fn evaluate_action_with_profile<'request>(
     let boundaries = UcanEnforcementBoundaries {
         verification_time: services.verification_time,
         key_resolver: services.key_resolver,
+        trusted_roots: services.trusted_roots,
         proof_store: services.proof_store,
         revocations: services.revocations,
         caveat_policies: services.caveats,

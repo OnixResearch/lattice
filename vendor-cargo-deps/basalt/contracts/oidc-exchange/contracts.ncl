@@ -45,6 +45,58 @@ let positive = fun value => std.is_number value && value > 0 in
 let unique = fun values =>
   std.array.all (fun item => std.array.length (std.array.filter (fun other => other == item) values) == 1) values
 in
+let non_empty_trimmed = fun value =>
+  std.is_string value
+  && std.string.length value > 0
+  && !std.string.is_match "^[\\p{White_Space}\\p{Cc}]|[\\p{White_Space}\\p{Cc}]$" value
+in
+let numeric_id = fun value =>
+  std.is_string value
+  && std.string.is_match "^[0-9]+$" value
+in
+let exact_protected_ref = fun value =>
+  std.is_string value
+  && std.string.is_match "^refs/(heads|tags)/[^\\p{White_Space}\\p{Cc}]+$" value
+  && !std.string.is_match "/$" value
+in
+let exact_workflow_ref = fun repo allowed_refs value =>
+  if std.is_string value then
+    let parts = std.string.split "@" value in
+    std.array.length parts == 2
+    && (
+      let workflow_path = std.array.at 0 parts in
+      let workflow_ref = std.array.at 1 parts in
+      let prefix = repo ++ "/.github/workflows/" in
+      std.string.length workflow_path > std.string.length prefix
+      && std.string.substring 0 (std.string.length prefix) workflow_path == prefix
+      && !std.string.is_match "[\\p{White_Space}\\p{Cc}]" workflow_path
+      && !std.string.contains ".." workflow_path
+      && std.array.elem workflow_ref allowed_refs
+    )
+  else
+    false
+in
+let valid_claims = fun claims =>
+  exact_fields [
+    "repository_owner", "repository_owner_id", "repository", "repository_id",
+    "job_workflow_refs", "allowed_refs", "environment",
+  ] claims
+  && non_empty_trimmed (field "repository_owner" claims)
+  && numeric_id (field "repository_owner_id" claims)
+  && non_empty_trimmed (field "repository" claims)
+  && numeric_id (field "repository_id" claims)
+  && non_empty_trimmed (field "environment" claims)
+  && std.is_array (field "allowed_refs" claims)
+  && std.array.length (field "allowed_refs" claims) > 0
+  && std.array.all exact_protected_ref (field "allowed_refs" claims)
+  && unique (field "allowed_refs" claims)
+  && std.is_array (field "job_workflow_refs" claims)
+  && std.array.length (field "job_workflow_refs" claims) > 0
+  && std.array.all
+    (exact_workflow_ref (field "repository" claims) (field "allowed_refs" claims))
+    (field "job_workflow_refs" claims)
+  && unique (field "job_workflow_refs" claims)
+in
 let valid_policy = fun value =>
   exact_fields [
     "schema", "profile_id", "issuer", "audiences", "algorithm", "claims",
@@ -58,7 +110,7 @@ let valid_policy = fun value =>
   && field "jwks_url" (field "issuer" value) == "https://token.actions.githubusercontent.com/.well-known/jwks"
   && std.array.length (field "audiences" value) > 0
   && field "algorithm" value == Algorithm
-  && exact_fields ["repository_owner", "repository", "workflow_ref_prefix", "ref_prefix"] (field "claims" value)
+  && valid_claims (field "claims" value)
   && exact_fields ["clock_skew_seconds", "max_token_age_seconds", "max_ucan_lifetime_seconds"] (field "time" value)
   && positive (field "clock_skew_seconds" (field "time" value))
   && positive (field "max_token_age_seconds" (field "time" value))

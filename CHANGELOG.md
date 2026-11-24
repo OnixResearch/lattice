@@ -585,6 +585,12 @@ interfaces.
     project, operation and canonical resource against the plan and policy.
   - Lattice still verifies the issued grant.
   - Each OIDC token now yields at most one exchange.
+- The vendored Basalt snapshot moves from `fac0d7f1fd7ac936ca4d3f251f3287666e93d4bb`
+  to published Basalt `main` `8f3b63139c74e46cbddaf8dea23fdb296f5c2478`, which
+  adds `policy_projection` admission enforcement, `trusted_roots` verification
+  on `UcanEnforcementBoundaries`, hardened OIDC exact-ref/environment/numeric-ID
+  policy fields, and JWKS unknown-kid rate-limiting. UCAN stays at `fca62a6e`
+  and `Cargo.lock` is unchanged.
 - The vendored Basalt snapshot moves to published Basalt `main`
   `fac0d7f1fd7ac936ca4d3f251f3287666e93d4bb` (the Kiln cohort alignment). It
   includes the holder series and builds on `5e0f1f4c`, which adds:

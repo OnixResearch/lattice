@@ -10,7 +10,7 @@
     "profile_hash": "b3:0a3ed6fc1277e5e2379e2c5caa1d455e0e81e9168cd24458d4c29f8b554ac377",
     "config_hash": "b3:299713f9a4561a4d2235616467edb54ef170a601d7687ee8d89da53e1b30fc06"
   },
-  "baseline_hash": "b3:77890602a69e2bea6e95fecda46d6beff559c06ebb6759783047e2aad11e0e03",
+  "baseline_hash": "b3:6b50b106f65a0a6ad50271c3881f000f68d6ab116d485e836d2ad7ac4b376b0d",
   "findings": [
     {
       "stable_id": "b3:00365717b09c09fa",
@@ -9945,19 +9945,6 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:bb95065a3e2a3e1f",
-      "semantic_id": "b3:bb95065a3e2a3e1f",
-      "identity_status": "computed",
-      "lint": "excessive_file_length",
-      "group": "tigerstyle::structure",
-      "severity": "warning",
-      "file": "src/github_ci/exchange.rs",
-      "line": 1,
-      "column": 1,
-      "message": "source file is 1084 lines (limit: 300)",
-      "crate_name": "lattice"
-    },
-    {
       "stable_id": "b3:bb97eddfa004dbaf",
       "semantic_id": "b3:bb97eddfa004dbaf",
       "identity_status": "computed",
@@ -13556,6 +13543,19 @@
       "line": 786,
       "column": 1,
       "message": "parameter uses `&Vec<T>`; accept `&[T]` unless ownership, capacity, or exact owned type identity is required",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:ff388a961bbb1b22",
+      "semantic_id": "b3:ff388a961bbb1b22",
+      "identity_status": "computed",
+      "lint": "excessive_file_length",
+      "group": "tigerstyle::structure",
+      "severity": "warning",
+      "file": "src/github_ci/exchange.rs",
+      "line": 1,
+      "column": 1,
+      "message": "source file is 1085 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {

@@ -34,6 +34,27 @@ preconditions shared with the Rust parser. It does not implement UCAN wildcard
 containment, attenuation, caveat, proof, replay, token, or authorization
 semantics.
 
+### Shared lexical contract
+
+Both Nickel (`contracts/policy-prelude.ncl`) and Rust (`basalt::policy_projection`)
+enforce the same lexical domain:
+
+- **Normalized IDs** (contract keys, contract `id`, backend keys, backend `id`):
+  non-empty, at most 128 bytes, restricted to the ASCII alphabet
+  `^[A-Za-z0-9_.-]+$`.
+- **Resource prefixes and abilities**: non-empty, bounded length, and forbidden
+  from containing any Unicode `White_Space` character (`\p{White_Space}` in
+  Nickel, `char::is_whitespace` in Rust) or any Unicode `Cc` control character
+  (`\p{Cc}` in Nickel, `char::is_control` in Rust) anywhere in the value
+  (leading, internal, or trailing).
+- **Abilities**: additionally split on `/` into 1..=16 non-empty segments of at
+  most 256 bytes with no leading or trailing `/`.
+
+Authoring-only length-unit note: Nickel's `std.string.length` counts extended
+grapheme clusters while Rust's `.len()` enforces exact UTF-8 byte ceilings. For
+ASCII identifiers they are identical; for multi-byte UTF-8 lexical values, Rust
+enforces the authoritative byte bound.
+
 ## Projection parity
 
 `basalt::policy_projection::validate_projection` is a pure deterministic core.

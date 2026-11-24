@@ -523,6 +523,9 @@ fn validate_policy_binding(
     if input_policy_ref != trusted_policy_ref {
         return Some(AuthorityDenyDiagnostic::PolicyRefMismatch);
     }
+    if !crate::policy_projection::validate_projection(policy).is_accepted() {
+        return Some(AuthorityDenyDiagnostic::PolicyDenied);
+    }
     if trusted_policy_ref.schema_version != policy.schema_version
         || trusted_policy_ref.contract_id != input.request.contract_id
     {

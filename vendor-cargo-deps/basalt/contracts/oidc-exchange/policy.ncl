@@ -12,9 +12,16 @@ let Contracts = import "contracts.ncl" in
   algorithm = Contracts.identity.algorithm,
   claims = {
     repository_owner = "OnixResearch",
+    repository_owner_id = "276673343",
     repository = "OnixResearch/mantle",
-    workflow_ref_prefix = "OnixResearch/mantle/.github/workflows/",
-    ref_prefix = "refs/heads/",
+    repository_id = "1201634195",
+    job_workflow_refs = [
+      "OnixResearch/mantle/.github/workflows/build.yml@refs/heads/main",
+    ],
+    allowed_refs = [
+      "refs/heads/main",
+    ],
+    environment = "mantle-ci",
   },
   time = {
     clock_skew_seconds = Contracts.bounds.clock_skew_seconds,

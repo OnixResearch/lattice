@@ -22,10 +22,17 @@
     "vocabulary": "onix.mantle.capability.v1"
   },
   "claims": {
-    "ref_prefix": "refs/heads/",
+    "allowed_refs": [
+      "refs/heads/main"
+    ],
+    "environment": "mantle-ci",
+    "job_workflow_refs": [
+      "OnixResearch/mantle/.github/workflows/build.yml@refs/heads/main"
+    ],
     "repository": "OnixResearch/mantle",
+    "repository_id": "1201634195",
     "repository_owner": "OnixResearch",
-    "workflow_ref_prefix": "OnixResearch/mantle/.github/workflows/"
+    "repository_owner_id": "276673343"
   },
   "issuer": {
     "discovery_url": "https://token.actions.githubusercontent.com/.well-known/openid-configuration",

@@ -60,6 +60,7 @@ fn token_signature_and_holder_signature_failures_are_distinct() {
     };
     let wrong_key_services = TestServices {
         key_resolver: &wrong_key_resolver,
+        trusted_roots: &fixture.trusted_roots,
         proof_store: &fixture.proofs,
         revocations: &NoRevocations,
         caveats: &DenyUnknownCaveats,

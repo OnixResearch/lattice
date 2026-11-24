@@ -212,10 +212,10 @@ fn check_ability(issues: &mut Vec<ProjectionIssue>, ability: &str) {
             "ability contains a control character".to_owned(),
         ));
     }
-    if ability.split_whitespace().count() != 1 {
+    if ability.chars().any(char::is_whitespace) {
         issues.push(ProjectionIssue::new(
             "projection.lexical.ability.whitespace".to_owned(),
-            "ability must not contain internal whitespace".to_owned(),
+            "ability must not contain whitespace".to_owned(),
         ));
     }
     let segments: Vec<&str> = ability.split('/').collect();
@@ -233,11 +233,22 @@ fn check_ability(issues: &mut Vec<ProjectionIssue>, ability: &str) {
     }
 }
 
+const fn is_normalized_id_byte(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'.' | b'-')
+}
+
 fn check_id(issues: &mut Vec<ProjectionIssue>, id: &str, class: &str) {
     if id.is_empty() || id.len() > MAXIMUM_ID_BYTES {
         issues.push(ProjectionIssue::new(
             class.to_owned(),
             "identity is empty or exceeds the bounded byte length".to_owned(),
+        ));
+        return;
+    }
+    if !id.bytes().all(is_normalized_id_byte) {
+        issues.push(ProjectionIssue::new(
+            format!("{class}.alphabet"),
+            "identity must match ^[A-Za-z0-9_.-]+$".to_owned(),
         ));
     }
 }
@@ -256,10 +267,10 @@ fn check_lexical_value(issues: &mut Vec<ProjectionIssue>, value: &str, class: &s
             "lexical value contains a control character".to_owned(),
         ));
     }
-    if value.split_whitespace().count() != 1 {
+    if value.chars().any(char::is_whitespace) {
         issues.push(ProjectionIssue::new(
             format!("{class}.whitespace"),
-            "lexical value must not contain internal whitespace".to_owned(),
+            "lexical value must not contain whitespace".to_owned(),
         ));
     }
 }

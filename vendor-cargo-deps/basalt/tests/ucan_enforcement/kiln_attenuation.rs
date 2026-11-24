@@ -226,6 +226,7 @@ fn chain(holder: u8, leaf: CompactToken, ancestors: Vec<CompactToken>) -> Invoca
             .map(|seed| signer(seed).verification_key().unwrap())
             .collect(),
         ),
+        trusted_roots: vec![did(ISSUER_SEED_BYTE)],
         proofs: ProofCollection::from_tokens(ancestors),
     }
 }
@@ -238,6 +239,7 @@ fn boundaries<'a>(
     UcanEnforcementBoundaries {
         verification_time: VerificationTime::from_unix_seconds(VERIFY_AT_SECONDS),
         key_resolver: &fixture.keys,
+        trusted_roots: &fixture.trusted_roots,
         proof_store: &fixture.proofs,
         revocations,
         caveat_policies: &DenyUnknownCaveats,

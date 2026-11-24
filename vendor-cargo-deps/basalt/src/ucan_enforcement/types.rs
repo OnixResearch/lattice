@@ -349,6 +349,8 @@ pub struct UcanEnforcementBoundaries<'a> {
     pub verification_time: VerificationTime,
     /// Caller-owned issuer and holder key resolver.
     pub key_resolver: &'a dyn KeyResolver,
+    /// Operator-admitted root issuers; holder keys in `key_resolver` are NOT root issuer authority.
+    pub trusted_roots: &'a [String],
     /// Caller-owned proof store.
     pub proof_store: &'a dyn ProofStore,
     /// Caller-owned revocation checker.
@@ -371,6 +373,7 @@ pub enum UcanEnforcementReason {
     MalformedCredential,
     SignatureDenied,
     KeyResolutionDenied,
+    UntrustedRootIssuer,
     ProofDenied,
     TimeDenied,
     CaveatDenied,
@@ -397,6 +400,7 @@ impl UcanEnforcementReason {
             Self::MalformedCredential => "malformed-credential",
             Self::SignatureDenied => "signature-denied",
             Self::KeyResolutionDenied => "key-resolution-denied",
+            Self::UntrustedRootIssuer => "untrusted-root-issuer",
             Self::ProofDenied => "proof-denied",
             Self::TimeDenied => "time-denied",
             Self::CaveatDenied => "caveat-denied",

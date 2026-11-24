@@ -1305,6 +1305,7 @@ fn holder_grant_from_the_exchange_is_admitted_by_the_native_mantle_verifier() {
     let boundaries = UcanEnforcementBoundaries {
         verification_time: VerificationTime::from_unix_seconds(NOW_SECONDS + 1),
         key_resolver: &keys,
+        trusted_roots: &roots,
         proof_store: &proofs,
         revocations: &NoRevocations,
         caveat_policies: &DenyUnknownCaveats,
@@ -1416,4 +1417,277 @@ fn untrusted_header_only_selects_a_key_and_never_establishes_authority() {
         inspect_token_key_id(token.as_str(), policy().network.token_bytes),
         Ok("fixture-rsa".to_owned())
     );
+}
+
+#[test]
+fn arbitrary_branch_workflow_repo_id_and_environment_claims_fail_closed() {
+    let policy = policy();
+    let key = public_jwk("fixture-rsa");
+    let base = claims();
+    let mut header = Header::new(Algorithm::RS256);
+    header.kid = Some("fixture-rsa".to_owned());
+
+    let cases = [
+        (
+            "feature branch ref",
+            "ref",
+            serde_json::json!("refs/heads/feature"),
+            RejectReason::ClaimMismatch,
+        ),
+        (
+            "different workflow on main",
+            "job_workflow_ref",
+            serde_json::json!("OnixResearch/mantle/.github/workflows/evil.yml@refs/heads/main"),
+            RejectReason::ClaimMismatch,
+        ),
+        (
+            "prefix confusion on workflow ref",
+            "job_workflow_ref",
+            serde_json::json!(
+                "OnixResearch/mantle/.github/workflows/build.yml@refs/heads/main-evil"
+            ),
+            RejectReason::ClaimMismatch,
+        ),
+        (
+            "re-registered repository_id",
+            "repository_id",
+            serde_json::json!("9999999999"),
+            RejectReason::ClaimMismatch,
+        ),
+        (
+            "re-registered repository_owner_id",
+            "repository_owner_id",
+            serde_json::json!("8888888888"),
+            RejectReason::ClaimMismatch,
+        ),
+        (
+            "non-numeric repository_id",
+            "repository_id",
+            serde_json::json!("abc123"),
+            RejectReason::ClaimType,
+        ),
+        (
+            "wrong environment",
+            "environment",
+            serde_json::json!("staging"),
+            RejectReason::ClaimMismatch,
+        ),
+    ];
+
+    for (label, field, value, expected) in cases {
+        let mut mutated = base.clone();
+        mutated[field] = value;
+        let token = token_with(&mutated, &header);
+        assert_eq!(
+            verify_and_plan(token.as_str(), &key, NOW_SECONDS, &policy, &request()),
+            Err(expected),
+            "{label}"
+        );
+    }
+
+    // Missing environment claim must fail closed as malformed token.
+    let mut missing_env = base;
+    missing_env
+        .as_object_mut()
+        .expect("claims object")
+        .remove("environment");
+    let token = token_with(&missing_env, &header);
+    assert_eq!(
+        verify_and_plan(token.as_str(), &key, NOW_SECONDS, &policy, &request()),
+        Err(RejectReason::MalformedToken)
+    );
+}
+
+#[test]
+fn oidc_policy_parser_rejects_broad_prefixes_and_non_numeric_ids() {
+    let base: Value = serde_json::from_str(POLICY_JSON).expect("generated policy JSON");
+
+    let mut wildcard_ref = base.clone();
+    wildcard_ref["claims"]["allowed_refs"] = serde_json::json!(["refs/heads/"]);
+    assert!(parse_policy(&wildcard_ref.to_string()).is_err());
+
+    let mut non_numeric_repo_id = base.clone();
+    non_numeric_repo_id["claims"]["repository_id"] = serde_json::json!("not-numeric");
+    assert!(parse_policy(&non_numeric_repo_id.to_string()).is_err());
+
+    let mut unbound_workflow = base.clone();
+    unbound_workflow["claims"]["job_workflow_refs"] =
+        serde_json::json!(["OnixResearch/mantle/.github/workflows/build.yml@refs/heads/dev"]);
+    assert!(parse_policy(&unbound_workflow.to_string()).is_err());
+
+    let mut prefix_only_workflow = base.clone();
+    prefix_only_workflow["claims"]["job_workflow_refs"] =
+        serde_json::json!(["OnixResearch/mantle/.github/workflows/"]);
+    assert!(parse_policy(&prefix_only_workflow.to_string()).is_err());
+
+    let mut empty_env = base;
+    empty_env["claims"]["environment"] = serde_json::json!("");
+    assert!(parse_policy(&empty_env.to_string()).is_err());
+}
+
+#[test]
+fn unknown_kid_storm_is_rate_limited_and_negatively_cached() {
+    let policy = policy();
+    let known = valid_token();
+    let mut documents = ScriptedDocuments::new(vec![
+        Ok(discovery_response(&policy)),
+        Ok(jwks_response("fixture-rsa", CACHE_FRESH_SECONDS)),
+        Ok(discovery_response(&policy)),
+        Ok(jwks_response("fixture-rsa", CACHE_FRESH_SECONDS)),
+        Ok(discovery_response(&policy)),
+        Ok(jwks_response("rotated-rsa", CACHE_FRESH_SECONDS)),
+    ]);
+    let mut cache = JwksCache::default();
+
+    // Initial cache fill.
+    load_verification_key(
+        known.as_str(),
+        NOW_SECONDS,
+        &policy,
+        &mut cache,
+        &mut documents,
+    )
+    .expect("initial key load");
+    assert_eq!(documents.calls.len(), 2);
+
+    // First unknown kid triggers one bounded refresh and fails closed.
+    let unknown_one = valid_token_with_key("attacker-kid-1");
+    assert_eq!(
+        load_verification_key(
+            unknown_one.as_str(),
+            NOW_SECONDS + 1,
+            &policy,
+            &mut cache,
+            &mut documents,
+        ),
+        Err(KeyLoadFailure::UnknownKey)
+    );
+    assert_eq!(documents.calls.len(), 4);
+
+    // Repeated same unknown kid and distinct random unknown kids within cooldown
+    // must fail closed with zero additional outbound fetches.
+    for index in 1..=20_u64 {
+        let probe = valid_token_with_key(&format!("attacker-kid-{index}"));
+        assert_eq!(
+            load_verification_key(
+                probe.as_str(),
+                NOW_SECONDS + 1 + index,
+                &policy,
+                &mut cache,
+                &mut documents,
+            ),
+            Err(KeyLoadFailure::UnknownKey)
+        );
+    }
+    assert_eq!(documents.calls.len(), 4);
+
+    // Known cached key still verifies with zero fetches during cooldown.
+    let cached = load_verification_key(
+        known.as_str(),
+        NOW_SECONDS + 10,
+        &policy,
+        &mut cache,
+        &mut documents,
+    )
+    .expect("cached key stays usable");
+    assert_eq!(cached.key_id, "fixture-rsa");
+    assert_eq!(documents.calls.len(), 4);
+
+    // After cooldown expires, legitimate key rotation refreshes once and succeeds.
+    let rotated = valid_token_with_key("rotated-rsa");
+    let loaded = load_verification_key(
+        rotated.as_str(),
+        NOW_SECONDS + 31,
+        &policy,
+        &mut cache,
+        &mut documents,
+    )
+    .expect("legitimate rotation refreshes after cooldown");
+    assert_eq!(loaded.key_id, "rotated-rsa");
+    assert_eq!(documents.calls.len(), 6);
+}
+
+#[test]
+fn unsupported_jwk_entries_are_skipped_without_failing_valid_rs256_keys() {
+    let policy = policy();
+    let key = public_jwk("fixture-rsa");
+    let mixed_jwks = DocumentResponse {
+        status: 200,
+        content_type: "application/json".to_owned(),
+        body: serde_json::to_vec(&serde_json::json!({
+            "keys": [
+                {
+                    "kty": "EC",
+                    "use": "sig",
+                    "alg": "ES256",
+                    "kid": "ec-p256-key",
+                    "crv": "P-256",
+                    "x": "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
+                    "y": "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0"
+                },
+                {
+                    "kty": "OKP",
+                    "use": "sig",
+                    "alg": "EdDSA",
+                    "kid": "okp-ed25519-key",
+                    "crv": "Ed25519",
+                    "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+                },
+                {
+                    "kty": "RSA",
+                    "use": "enc",
+                    "alg": "RS256",
+                    "kid": "rsa-enc-key",
+                    "n": key.modulus,
+                    "e": key.exponent
+                },
+                {
+                    "kty": "RSA",
+                    "use": "sig",
+                    "alg": "RS256",
+                    "kid": key.key_id,
+                    "key_ops": ["verify"],
+                    "n": key.modulus,
+                    "e": key.exponent
+                }
+            ]
+        }))
+        .expect("mixed JWKS fixture"),
+        fresh_seconds: CACHE_FRESH_SECONDS,
+    };
+    let mut documents = ScriptedDocuments::new(vec![
+        Ok(discovery_response(&policy)),
+        Ok(mixed_jwks.clone()),
+        Ok(discovery_response(&policy)),
+        Ok(mixed_jwks),
+    ]);
+    let mut cache = JwksCache::default();
+
+    let admitted = load_verification_key(
+        valid_token().as_str(),
+        NOW_SECONDS,
+        &policy,
+        &mut cache,
+        &mut documents,
+    )
+    .expect("valid RS256 key must be admitted alongside unsupported key types");
+    assert_eq!(admitted.key_id, "fixture-rsa");
+    assert_eq!(documents.calls.len(), 2);
+
+    // Skipped unsupported keys must never be admitted, and at most one bounded
+    // refresh runs across all three unknown-kid probes within cooldown.
+    for skipped_kid in ["ec-p256-key", "okp-ed25519-key", "rsa-enc-key"] {
+        let token = valid_token_with_key(skipped_kid);
+        assert_eq!(
+            load_verification_key(
+                token.as_str(),
+                NOW_SECONDS + 1,
+                &policy,
+                &mut cache,
+                &mut documents,
+            ),
+            Err(KeyLoadFailure::UnknownKey)
+        );
+    }
+    assert_eq!(documents.calls.len(), 4);
 }

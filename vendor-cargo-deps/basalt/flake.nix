@@ -85,6 +85,19 @@
           "unknown-backend"
           "duplicate-entry"
           "malformed-ability"
+          "id-with-space"
+          "ability-leading-space"
+          "ability-trailing-space"
+          "ability-internal-space"
+          "ability-tab-control"
+          "ability-newline-control"
+          "ability-non-ascii-whitespace"
+          "resource-prefix-leading-space"
+          "resource-prefix-trailing-space"
+          "resource-prefix-internal-space"
+          "resource-prefix-tab-control"
+          "resource-prefix-newline-control"
+          "resource-prefix-non-ascii-whitespace"
         ];
         validOidcPolicyFixtures = [
           "explicit-read-operations"
@@ -92,7 +105,10 @@
         invalidOidcPolicyFixtures = [
           "algorithm-confusion"
           "duplicate-operation"
+          "empty-environment"
           "empty-operations"
+          "empty-workflow-refs"
+          "non-numeric-repository-id"
           "redirect-enabled"
           "replay-disabled"
           "stale-cache"
@@ -100,6 +116,7 @@
           "type-mismatch"
           "unsupported-operation"
           "weakened-non-claims"
+          "wildcard-ref-prefix"
           "zero-key-limit"
         ];
         invalidOidcSourceFixtures = [

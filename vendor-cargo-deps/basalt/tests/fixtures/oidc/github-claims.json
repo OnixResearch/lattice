@@ -7,10 +7,13 @@
   "iat": 1700000000,
   "jti": "fixture-exchange-1",
   "repository_owner": "OnixResearch",
+  "repository_owner_id": "276673343",
   "repository": "OnixResearch/mantle",
+  "repository_id": "1201634195",
   "job_workflow_ref": "OnixResearch/mantle/.github/workflows/build.yml@refs/heads/main",
   "sha": "1111111111111111111111111111111111111111",
   "ref": "refs/heads/main",
+  "environment": "mantle-ci",
   "actor": "fixture-actor",
   "event_name": "push"
 }

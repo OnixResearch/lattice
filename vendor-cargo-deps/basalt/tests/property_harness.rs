@@ -165,7 +165,7 @@ fn generated_policy_shape_errors_do_not_authorize() {
     assert!(parse_policy_json(&unsupported_schema).is_err());
     assert!(parse_policy_json(malformed_contract).is_err());
 
-    let receipt = enforce(
+    let error = enforce(
         &mismatched_policy,
         &request(
             "did:key:z6Mkresource/docs/report",
@@ -176,9 +176,14 @@ fn generated_policy_shape_errors_do_not_authorize() {
             )],
         ),
     )
-    .expect("id mismatch returns a denial receipt");
-    assert!(receipt.is_denied());
-    assert!(receipt.reason().contains("does not match policy id"));
+    .expect_err("id mismatch must fail policy admission");
+    assert!(matches!(
+        error,
+        basalt::EnforcementError::InvalidPolicyProjection { ref issues }
+            if issues
+                .iter()
+                .any(|issue| issue.class == "projection.contracts.key-id-mismatch")
+    ));
 }
 
 #[test]

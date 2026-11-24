@@ -872,6 +872,7 @@ mod tests {
                 replay: &replay,
                 verification_limits: ucan::VerificationLimits::default(),
                 holder_limits: ucan::HolderInvocationLimits::default(),
+                trusted_roots: &roots,
             };
             let mut altered = request.clone();
             altered.request_digest[0] ^= 1;

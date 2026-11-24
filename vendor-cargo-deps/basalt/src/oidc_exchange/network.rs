@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use base64::Engine as _;
 use bounded_http::core::{
@@ -27,6 +27,8 @@ const RSA_MINIMUM_MODULUS_BYTES: usize = 256;
 const RSA_MAXIMUM_MODULUS_BYTES: usize = 1024;
 const RSA_MAXIMUM_EXPONENT_BYTES: usize = 8;
 const MAX_KEY_TEXT_BYTES: usize = 16 * 1024;
+const UNKNOWN_KID_REFRESH_COOLDOWN_SECONDS: u64 = 30;
+const MAX_NEGATIVE_CACHE_ENTRIES: usize = 256;
 const CACHE_CONTROL_MAX_AGE: &str = "max-age=";
 const JSON_MEDIA_TYPE: &str = "application/json";
 
@@ -269,10 +271,36 @@ const fn map_client_error(error: ClientError) -> DocumentFailure {
     }
 }
 
-/// Cached key set with explicit freshness.
+/// Cached key set with explicit freshness, negative unknown-key caching, and
+/// bounded refresh cooldown.
 #[derive(Debug, Default)]
 pub struct JwksCache {
     current: Option<CachedJwks>,
+    unknown_kids: BTreeMap<String, u64>,
+    next_unknown_refresh_seconds: Option<u64>,
+}
+
+impl JwksCache {
+    fn is_negatively_cached(&self, key_id: &str, now_seconds: u64) -> bool {
+        self.unknown_kids
+            .get(key_id)
+            .is_some_and(|until| now_seconds < *until)
+    }
+
+    fn record_unknown_kid(&mut self, key_id: String, until_seconds: u64, now_seconds: u64) {
+        self.unknown_kids.retain(|_, expiry| *expiry > now_seconds);
+        if self.unknown_kids.len() >= MAX_NEGATIVE_CACHE_ENTRIES
+            && !self.unknown_kids.contains_key(key_id.as_str())
+            && let Some(evict) = self
+                .unknown_kids
+                .iter()
+                .min_by_key(|(_, expiry)| **expiry)
+                .map(|(kid, _)| kid.clone())
+        {
+            self.unknown_kids.remove(evict.as_str());
+        }
+        self.unknown_kids.insert(key_id, until_seconds);
+    }
 }
 
 #[derive(Debug)]
@@ -316,16 +344,33 @@ pub fn load_verification_key(
 ) -> Result<PublicJwk, KeyLoadFailure> {
     let key_id =
         inspect_token_key_id(token, policy.network.token_bytes).map_err(KeyLoadFailure::Token)?;
-    if let Some(cached) = &cache.current
+    let was_fresh = if let Some(cached) = &cache.current
         && now_seconds <= cached.fresh_until_seconds
-        && let Some(key) = unique_key(cached.keys.as_slice(), key_id.as_str())?
     {
-        return Ok(key.clone());
-    }
+        if let Some(key) = unique_key(cached.keys.as_slice(), key_id.as_str())? {
+            return Ok(key.clone());
+        }
+        if cache.is_negatively_cached(key_id.as_str(), now_seconds) {
+            return Err(KeyLoadFailure::UnknownKey);
+        }
+        if cache
+            .next_unknown_refresh_seconds
+            .is_some_and(|next| now_seconds < next)
+        {
+            return Err(KeyLoadFailure::UnknownKey);
+        }
+        true
+    } else {
+        false
+    };
+    let cooldown = UNKNOWN_KID_REFRESH_COOLDOWN_SECONDS.min(policy.cache.max_fresh_seconds);
     let refreshed = refresh_keys(now_seconds, policy, documents);
     let keys = match refreshed {
         Ok(value) => value,
         Err(error) => {
+            if was_fresh {
+                cache.next_unknown_refresh_seconds = Some(now_seconds.saturating_add(cooldown));
+            }
             if cache.current.is_some() {
                 return Err(if policy.cache.allow_stale_on_error {
                     error
@@ -336,11 +381,19 @@ pub fn load_verification_key(
             return Err(error);
         }
     };
-    let selected = unique_key(keys.keys.as_slice(), key_id.as_str())?
-        .cloned()
-        .ok_or(KeyLoadFailure::UnknownKey)?;
+    cache.unknown_kids.clear();
+    let selected = unique_key(keys.keys.as_slice(), key_id.as_str())?.cloned();
     cache.current = Some(keys);
-    Ok(selected)
+    if was_fresh || selected.is_none() {
+        cache.next_unknown_refresh_seconds = Some(now_seconds.saturating_add(cooldown));
+    }
+    selected.map_or_else(
+        || {
+            cache.record_unknown_kid(key_id, now_seconds.saturating_add(cooldown), now_seconds);
+            Err(KeyLoadFailure::UnknownKey)
+        },
+        Ok,
+    )
 }
 
 fn refresh_keys(
@@ -411,28 +464,39 @@ fn admit_keys(raw: Vec<RawJwk>) -> Result<Vec<PublicJwk>, KeyLoadFailure> {
     let mut seen = BTreeSet::new();
     let mut admitted = Vec::with_capacity(raw.len());
     for key in raw {
+        // Skip unsupported key families, algorithms, or uses so a new provider
+        // key type (for example EC/ES256 or OKP/EdDSA) does not cause an outage
+        // for valid RS256 verification keys in the same JWKS.
         if key.key_type != "RSA"
             || key.algorithm.as_deref() != Some("RS256")
             || key.public_use.as_deref() != Some("sig")
-            || key.key_id.is_empty()
-            || key.key_id.len() > MAX_KEY_TEXT_BYTES
-            || key.modulus.is_empty()
-            || key.modulus.len() > MAX_KEY_TEXT_BYTES
-            || key.exponent.is_empty()
-            || key.exponent.len() > MAX_KEY_TEXT_BYTES
             || key
                 .key_operations
                 .as_ref()
                 .is_some_and(|operations| operations.as_slice() != ["verify"])
-            || !seen.insert(key.key_id.clone())
+        {
+            continue;
+        }
+        let (Some(key_id), Some(modulus_text), Some(exponent_text)) =
+            (key.key_id, key.modulus, key.exponent)
+        else {
+            return Err(KeyLoadFailure::MalformedJwks);
+        };
+        if key_id.is_empty()
+            || key_id.len() > MAX_KEY_TEXT_BYTES
+            || modulus_text.is_empty()
+            || modulus_text.len() > MAX_KEY_TEXT_BYTES
+            || exponent_text.is_empty()
+            || exponent_text.len() > MAX_KEY_TEXT_BYTES
+            || !seen.insert(key_id.clone())
         {
             return Err(KeyLoadFailure::MalformedJwks);
         }
         let modulus = base64::engine::general_purpose::URL_SAFE_NO_PAD
-            .decode(key.modulus.as_bytes())
+            .decode(modulus_text.as_bytes())
             .map_err(|_error| KeyLoadFailure::MalformedJwks)?;
         let exponent = base64::engine::general_purpose::URL_SAFE_NO_PAD
-            .decode(key.exponent.as_bytes())
+            .decode(exponent_text.as_bytes())
             .map_err(|_error| KeyLoadFailure::MalformedJwks)?;
         if !(RSA_MINIMUM_MODULUS_BYTES..=RSA_MAXIMUM_MODULUS_BYTES).contains(&modulus.len())
             || exponent.is_empty()
@@ -441,10 +505,13 @@ fn admit_keys(raw: Vec<RawJwk>) -> Result<Vec<PublicJwk>, KeyLoadFailure> {
             return Err(KeyLoadFailure::MalformedJwks);
         }
         admitted.push(PublicJwk {
-            key_id: key.key_id,
-            modulus: key.modulus,
-            exponent: key.exponent,
+            key_id,
+            modulus: modulus_text,
+            exponent: exponent_text,
         });
+    }
+    if admitted.is_empty() {
+        return Err(KeyLoadFailure::MalformedJwks);
     }
     Ok(admitted)
 }
@@ -469,11 +536,11 @@ struct RawJwk {
     #[serde(rename = "alg")]
     algorithm: Option<String>,
     #[serde(rename = "kid")]
-    key_id: String,
+    key_id: Option<String>,
     #[serde(rename = "key_ops")]
     key_operations: Option<Vec<String>>,
     #[serde(rename = "n")]
-    modulus: String,
+    modulus: Option<String>,
     #[serde(rename = "e")]
-    exponent: String,
+    exponent: Option<String>,
 }

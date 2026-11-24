@@ -170,6 +170,7 @@ fn evaluate_with_durable<'request>(
     let boundaries = durable.boundaries(DurableAuthorityVerificationInputs {
         verification_time: VerificationTime::from_unix_seconds(VERIFY_AT_SECONDS),
         key_resolver: &fixture.keys,
+        trusted_roots: &fixture.trusted_roots,
         proof_store: &fixture.proofs,
         caveat_policies: &DenyUnknownCaveats,
         verification_limits: VerificationLimits::default(),

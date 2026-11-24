@@ -4,7 +4,7 @@ use super::core::{
 };
 use super::error::{
     UcanEnforcementFailure, authorization_error_reason, failure, holder_error_reason,
-    profile_error_reason, token_error_reason,
+    profile_error_reason, proof_store_error_reason, token_error_reason,
 };
 use super::receipt::{ReceiptContext, UcanEnforcementReceipt, build_receipt};
 use super::types::{UcanEnforcementBoundaries, UcanEnforcementReason, UcanEnforcementRequest};
@@ -221,6 +221,12 @@ fn prepare_prospective_authority(
 ) -> Result<ProspectiveAuthority, UcanEnforcementFailure> {
     let operation = prepared.operation;
     let receipt_context = prepared.receipt_context;
+    if !crate::policy_projection::validate_projection(policy).is_accepted() {
+        return Err(failure(
+            UcanEnforcementReason::PolicyDenied,
+            receipt_context,
+        ));
+    }
     let verified = verify_compact_token_str_with_resolvers_and_revocations(
         request.compact_token,
         boundaries.verification_time,
@@ -230,6 +236,8 @@ fn prepare_prospective_authority(
         boundaries.verification_limits,
     )
     .map_err(|error| failure(token_error_reason(&error), receipt_context))?;
+    verify_trusted_roots(&verified, boundaries.trusted_roots, boundaries)
+        .map_err(|reason| failure(reason, receipt_context))?;
     prepared
         .profile
         .admit_operation_profile(&operation.profile())
@@ -293,4 +301,63 @@ fn prepare_prospective_authority(
         operation,
         receipt_context,
     })
+}
+
+/// Walk every proof path from `token` and require every proof-less root token's
+/// issuer to be explicitly listed in `trusted_roots`.
+///
+/// Fails closed when `trusted_roots` is empty or any root issuer is absent, or
+/// when resolving/verifying any proof exceeds `verification_limits.max_proof_count()`.
+pub fn verify_trusted_roots(
+    token: &ucan::VerifiedToken,
+    trusted_roots: &[String],
+    boundaries: &UcanEnforcementBoundaries<'_>,
+) -> Result<(), UcanEnforcementReason> {
+    let mut remaining = boundaries.verification_limits.max_proof_count();
+    verify_trusted_roots_inner(token, trusted_roots, boundaries, &mut remaining)
+}
+
+fn verify_trusted_roots_inner(
+    token: &ucan::VerifiedToken,
+    trusted_roots: &[String],
+    boundaries: &UcanEnforcementBoundaries<'_>,
+    remaining: &mut usize,
+) -> Result<(), UcanEnforcementReason> {
+    if token.proofs().as_slice().is_empty() {
+        return if trusted_roots
+            .iter()
+            .any(|root| root == token.issuer().as_str())
+        {
+            Ok(())
+        } else {
+            Err(UcanEnforcementReason::UntrustedRootIssuer)
+        };
+    }
+    for reference in token.proofs().as_slice() {
+        *remaining = remaining
+            .checked_sub(1)
+            .ok_or(UcanEnforcementReason::LimitExceeded)?;
+        let proof = boundaries
+            .proof_store
+            .resolve_proof(reference)
+            .map_err(|error| proof_store_error_reason(&error))?;
+        let proof_token = match &proof {
+            ucan::ProofToken::Borrowed(token) => *token,
+            ucan::ProofToken::Owned(token) => token,
+        };
+        if ucan::proof_reference(proof_token) != *reference {
+            return Err(UcanEnforcementReason::ProofDenied);
+        }
+        let parent = verify_compact_token_str_with_resolvers_and_revocations(
+            proof_token.as_str(),
+            boundaries.verification_time,
+            boundaries.key_resolver,
+            boundaries.proof_store,
+            boundaries.revocations,
+            boundaries.verification_limits,
+        )
+        .map_err(|error| token_error_reason(&error))?;
+        verify_trusted_roots_inner(&parent, trusted_roots, boundaries, remaining)?;
+    }
+    Ok(())
 }

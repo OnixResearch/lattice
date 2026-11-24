@@ -5,6 +5,7 @@ pub(crate) struct InvocationFixture {
     pub(crate) holder: Ed25519InMemorySigner,
     pub(crate) audience: AudienceDid,
     pub(crate) keys: KeyResolutionContext,
+    pub(crate) trusted_roots: Vec<String>,
     pub(crate) proofs: ProofCollection,
 }
 
@@ -37,11 +38,19 @@ impl InvocationFixture {
                 .verification_key()
                 .expect("holder verification key must derive"),
         ]);
+        let trusted_roots = vec![
+            issuer
+                .issuer()
+                .expect("issuer DID must derive")
+                .as_str()
+                .to_owned(),
+        ];
         Self {
             token,
             holder,
             audience,
             keys,
+            trusted_roots,
             proofs: ProofCollection::empty(),
         }
     }
@@ -83,11 +92,19 @@ impl InvocationFixture {
                 .verification_key()
                 .expect("holder verification key must derive"),
         ]);
+        let trusted_roots = vec![
+            issuer
+                .issuer()
+                .expect("issuer DID must derive")
+                .as_str()
+                .to_owned(),
+        ];
         Self {
             token: child,
             holder,
             audience,
             keys,
+            trusted_roots,
             proofs: ProofCollection::from_tokens(vec![parent]),
         }
     }

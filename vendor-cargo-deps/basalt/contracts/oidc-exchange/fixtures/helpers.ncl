@@ -1,7 +1,20 @@
 let Contracts = import "../contracts.ncl" in
+let base_claims = {
+  repository_owner = "OnixResearch",
+  repository_owner_id = "276673343",
+  repository = "OnixResearch/mantle",
+  repository_id = "1201634195",
+  job_workflow_refs = [
+    "OnixResearch/mantle/.github/workflows/build.yml@refs/heads/main",
+  ],
+  allowed_refs = [
+    "refs/heads/main",
+  ],
+  environment = "mantle-ci",
+} in
 # Parameter names differ from field names: record fields are recursive, so
 # `algorithm = algorithm` would refer to the field itself, not the argument.
-let document = fun selected_algorithm selected_redirects selected_jwks_keys selected_allow_stale selected_one_time selected_jti selected_non_claims selected_operations =>
+let document = fun selected_algorithm selected_redirects selected_jwks_keys selected_allow_stale selected_one_time selected_jti selected_non_claims selected_operations selected_claims =>
   {
     schema = Contracts.identity.schema,
     profile_id = Contracts.identity.profile_id,
@@ -13,12 +26,7 @@ let document = fun selected_algorithm selected_redirects selected_jwks_keys sele
     },
     audiences = ["mantle-ci"],
     algorithm = selected_algorithm,
-    claims = {
-      repository_owner = "OnixResearch",
-      repository = "OnixResearch/mantle",
-      workflow_ref_prefix = "OnixResearch/mantle/.github/workflows/",
-      ref_prefix = "refs/heads/",
-    },
+    claims = selected_claims,
     time = {
       clock_skew_seconds = Contracts.bounds.clock_skew_seconds,
       max_token_age_seconds = Contracts.bounds.token_age_seconds,
@@ -59,12 +67,16 @@ let document = fun selected_algorithm selected_redirects selected_jwks_keys sele
 in
 {
   policy = fun algorithm redirects jwks_keys allow_stale require_one_time require_jti non_claims =>
-    document algorithm redirects jwks_keys allow_stale require_one_time require_jti non_claims Contracts.operations
+    document algorithm redirects jwks_keys allow_stale require_one_time require_jti non_claims Contracts.operations base_claims
     | Contracts.Policy,
   # The reviewed policy with an explicit capability operation selection.
   with_operations = fun operations =>
-    document Contracts.identity.algorithm 0 Contracts.bounds.jwks_keys false true true Contracts.non_claims operations
+    document Contracts.identity.algorithm 0 Contracts.bounds.jwks_keys false true true Contracts.non_claims operations base_claims
     | Contracts.Policy,
+  with_claims = fun claims =>
+    document Contracts.identity.algorithm 0 Contracts.bounds.jwks_keys false true true Contracts.non_claims Contracts.operations claims
+    | Contracts.Policy,
+  default_claims = base_claims,
   identity = Contracts.identity,
   bounds = Contracts.bounds,
   non_claims = Contracts.non_claims,

@@ -6,7 +6,7 @@
 pub(crate) mod core;
 mod error;
 mod receipt;
-mod shell;
+pub(crate) mod shell;
 mod types;
 
 pub use core::bind_enforcement_action;

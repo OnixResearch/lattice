@@ -190,6 +190,9 @@ where
         command: &str,
         subject: &str,
     ) -> Result<ProspectiveAuthority, FinalProfileReason> {
+        if !crate::policy_projection::validate_projection(self.policy).is_accepted() {
+            return Err(FinalProfileReason::PolicyDenied);
+        }
         let action = self
             .mapping
             .action_for(command)

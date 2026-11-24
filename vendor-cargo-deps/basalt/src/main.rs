@@ -1,9 +1,9 @@
 use basalt::CapabilityGrant;
 use basalt::EnforcementRequest;
+use basalt::admit_policy_json;
 #[cfg(feature = "cli")]
 use basalt::cli_fs::{FsError, OutputRoot, PolicyRoot};
-use basalt::enforce;
-use basalt::parse_policy_json;
+use basalt::enforce_admitted;
 use clap::Parser;
 use clap::Subcommand;
 use snafu::ResultExt;
@@ -83,14 +83,14 @@ fn run_enforce(args: EnforceArgs) -> CliResult<()> {
         .context(ReadPolicySnafu {
             path: args.policy.clone(),
         })?;
-    let policy = parse_policy_json(policy_json.as_str()).context(EnforceSnafu)?;
+    let policy = admit_policy_json(policy_json.as_str()).context(EnforceSnafu)?;
     let request = EnforcementRequest {
         contract: args.contract,
         resource: args.resource,
         ability: args.ability,
         capabilities: args.capabilities,
     };
-    let receipt = enforce(&policy, &request).context(EnforceSnafu)?;
+    let receipt = enforce_admitted(&policy, &request).context(EnforceSnafu)?;
     let output = serde_json::to_string(&receipt).context(SerializeSnafu)?;
     println!("{output}");
 

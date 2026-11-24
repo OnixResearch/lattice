@@ -220,3 +220,62 @@ fn cli_feature_rejects_traversal_outside_policy_root() {
         String::from_utf8_lossy(&output.stderr)
     );
 }
+
+#[test]
+fn cli_feature_rejects_empty_prefix_policy_before_enforcement() {
+    let Some(binary) = cli_binary() else {
+        return;
+    };
+    let policy_dir = unique_policy_path("empty-prefix-dir");
+    fs::create_dir_all(&policy_dir).expect("policy dir should create");
+    let policy_path = policy_dir.join("empty-prefix.json");
+    fs::write(
+        &policy_path,
+        r#"{
+          "schema_version": "ucan-nickel-contracts.policy.v1",
+          "contracts": {
+            "document-write": {
+              "id": "document-write",
+              "resource_prefixes": [""],
+              "abilities": ["document/write"]
+            }
+          }
+        }"#,
+    )
+    .expect("policy fixture should write");
+    let relative = policy_path
+        .file_name()
+        .expect("policy path has a file name")
+        .to_string_lossy()
+        .into_owned();
+
+    let output = Command::new(binary)
+        .arg("enforce")
+        .arg("--policy-root")
+        .arg(&policy_dir)
+        .arg("--policy")
+        .arg(&relative)
+        .arg("--contract")
+        .arg("document-write")
+        .arg("--resource")
+        .arg("did:key:z6Mkresource/private/report")
+        .arg("--ability")
+        .arg("document/write")
+        .arg("--capability")
+        .arg("did:key:z6Mkresource/private/report=document/write")
+        .output()
+        .expect("CLI process should run");
+
+    fs::remove_dir_all(&policy_dir).expect("policy fixture should clean up");
+    assert!(!output.status.success(), "empty-prefix policy must fail");
+    assert!(
+        output.stdout.is_empty(),
+        "invalid policy must not print an allow receipt: {}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("InvalidPolicyProjection"),
+        "unexpected stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}

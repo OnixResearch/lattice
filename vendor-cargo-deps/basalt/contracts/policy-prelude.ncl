@@ -41,11 +41,16 @@ in
 let non_empty_string = fun value =>
   std.is_string value
   && std.string.length value > 0 in
+# Shared lexical character boundary with Rust `policy_projection`:
+# forbid all Unicode White_Space (`char::is_whitespace`) and Unicode Cc
+# control characters (`char::is_control`) anywhere in lexical values.
+let has_forbidden_lexical_char = fun value =>
+  std.string.is_match "[\\p{White_Space}\\p{Cc}]" value in
 let is_lexical_value = fun value =>
   std.is_string value
   && std.string.length value > 0
   && std.string.length value <= MaximumFieldBytes
-  && !std.string.contains " " value in
+  && !has_forbidden_lexical_char value in
 let LexicalValue =
   std.contract.from_predicate is_lexical_value
 in
@@ -91,7 +96,7 @@ let UniqueNonEmpty = fun label =>
       std.is_string item
       && std.string.length item > 0
       && std.string.length item <= MaximumAllowlistBytes
-      && !std.string.contains " " item
+      && !has_forbidden_lexical_char item
     ) value
     && has_no_duplicates value
   )

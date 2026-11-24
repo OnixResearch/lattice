@@ -63,12 +63,18 @@ pub struct OidcPolicy {
     pub audiences: Vec<String>,
     /// Required GitHub repository owner.
     pub repository_owner: String,
+    /// Required immutable numeric GitHub repository owner ID.
+    pub repository_owner_id: String,
     /// Required GitHub repository.
     pub repository: String,
-    /// Required prefix for `job_workflow_ref`.
-    pub workflow_ref_prefix: String,
-    /// Required prefix for the Git reference.
-    pub ref_prefix: String,
+    /// Required immutable numeric GitHub repository ID.
+    pub repository_id: String,
+    /// Exact admitted `job_workflow_ref` values (`file@ref`).
+    pub job_workflow_refs: Vec<String>,
+    /// Exact admitted protected Git references (`refs/heads/...` or `refs/tags/...`).
+    pub allowed_refs: Vec<String>,
+    /// Required GitHub Actions deployment environment claim.
+    pub environment: String,
     /// Explicit time bounds.
     pub time: TimePolicy,
     /// Explicit network and document bounds.
@@ -251,14 +257,20 @@ pub struct VerifiedSubject {
     pub subject: String,
     /// Repository owner.
     pub repository_owner: String,
+    /// Immutable numeric repository owner ID.
+    pub repository_owner_id: String,
     /// Repository.
     pub repository: String,
+    /// Immutable numeric repository ID.
+    pub repository_id: String,
     /// Workflow reference.
     pub workflow_ref: String,
     /// Git commit.
     pub commit: String,
     /// Git reference.
     pub git_ref: String,
+    /// Deployment environment.
+    pub environment: String,
 }
 
 /// Pure plan accepted for UCAN issuance.
@@ -407,9 +419,12 @@ struct IssuerPolicyDocument {
 #[serde(deny_unknown_fields)]
 struct ClaimsPolicyDocument {
     repository_owner: String,
+    repository_owner_id: String,
     repository: String,
-    workflow_ref_prefix: String,
-    ref_prefix: String,
+    repository_id: String,
+    job_workflow_refs: Vec<String>,
+    allowed_refs: Vec<String>,
+    environment: String,
 }
 
 const REQUIRED_NON_CLAIMS: [&str; 7] = [
@@ -440,9 +455,12 @@ pub fn parse_policy(input: &str) -> Result<OidcPolicy, PolicyError> {
         jwks_url: document.issuer.jwks_url,
         audiences: document.audiences,
         repository_owner: document.claims.repository_owner,
+        repository_owner_id: document.claims.repository_owner_id,
         repository: document.claims.repository,
-        workflow_ref_prefix: document.claims.workflow_ref_prefix,
-        ref_prefix: document.claims.ref_prefix,
+        repository_id: document.claims.repository_id,
+        job_workflow_refs: document.claims.job_workflow_refs,
+        allowed_refs: document.claims.allowed_refs,
+        environment: document.claims.environment,
         time: document.time,
         network: document.network,
         cache: document.cache,
@@ -462,9 +480,10 @@ fn validate_document(document: &PolicyDocument) -> Result<(), PolicyError> {
         document.issuer.discovery_url.as_str(),
         document.issuer.jwks_url.as_str(),
         document.claims.repository_owner.as_str(),
+        document.claims.repository_owner_id.as_str(),
         document.claims.repository.as_str(),
-        document.claims.workflow_ref_prefix.as_str(),
-        document.claims.ref_prefix.as_str(),
+        document.claims.repository_id.as_str(),
+        document.claims.environment.as_str(),
         document.network.transport_profile_id.as_str(),
         document.capability.vocabulary.as_str(),
         document.capability.audience.as_str(),
@@ -475,6 +494,7 @@ fn validate_document(document: &PolicyDocument) -> Result<(), PolicyError> {
             return Err(PolicyError::Text);
         }
     }
+    validate_claims_policy(&document.claims)?;
     if !exact_https_url(&document.issuer.issuer_url)
         || !exact_https_url(&document.issuer.discovery_url)
         || !exact_https_url(&document.issuer.jwks_url)
@@ -559,6 +579,85 @@ fn validate_network(network: &NetworkPolicy) -> Result<(), PolicyError> {
         return Err(PolicyError::Bound);
     }
     Ok(())
+}
+
+fn validate_claims_policy(claims: &ClaimsPolicyDocument) -> Result<(), PolicyError> {
+    if !is_numeric_id(&claims.repository_owner_id) || !is_numeric_id(&claims.repository_id) {
+        return Err(PolicyError::ClaimBoundary);
+    }
+    if claims.environment.chars().any(char::is_control) {
+        return Err(PolicyError::Text);
+    }
+    if claims.allowed_refs.is_empty()
+        || claims.allowed_refs.len() > MAX_POLICY_ITEMS
+        || claims
+            .allowed_refs
+            .iter()
+            .any(|git_ref| !exact_protected_ref(git_ref))
+        || has_duplicates(claims.allowed_refs.as_slice())
+    {
+        return Err(PolicyError::ClaimBoundary);
+    }
+    let workflow_prefix = format!("{}/.github/workflows/", claims.repository);
+    if claims.job_workflow_refs.is_empty()
+        || claims.job_workflow_refs.len() > MAX_POLICY_ITEMS
+        || claims.job_workflow_refs.iter().any(|workflow_ref| {
+            !exact_workflow_ref(
+                workflow_ref,
+                workflow_prefix.as_str(),
+                claims.allowed_refs.as_slice(),
+            )
+        })
+        || has_duplicates(claims.job_workflow_refs.as_slice())
+    {
+        return Err(PolicyError::ClaimBoundary);
+    }
+    Ok(())
+}
+
+fn is_numeric_id(value: &str) -> bool {
+    !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit())
+}
+
+fn exact_protected_ref(value: &str) -> bool {
+    if !bounded_text(value)
+        || value
+            .chars()
+            .any(|ch| ch.is_whitespace() || ch.is_control())
+        || value.ends_with('/')
+    {
+        return false;
+    }
+    value
+        .strip_prefix("refs/heads/")
+        .or_else(|| value.strip_prefix("refs/tags/"))
+        .is_some_and(|rest| !rest.is_empty())
+}
+
+fn exact_workflow_ref(value: &str, workflow_prefix: &str, allowed_refs: &[String]) -> bool {
+    if !bounded_text(value)
+        || value
+            .chars()
+            .any(|ch| ch.is_whitespace() || ch.is_control())
+    {
+        return false;
+    }
+    let Some((workflow_path, git_ref)) = value.split_once('@') else {
+        return false;
+    };
+    if git_ref.contains('@') || workflow_path.contains("..") {
+        return false;
+    }
+    workflow_path
+        .strip_prefix(workflow_prefix)
+        .is_some_and(|file| !file.is_empty() && !file.starts_with('/'))
+        && allowed_refs.iter().any(|allowed| allowed == git_ref)
+}
+
+fn has_duplicates(values: &[String]) -> bool {
+    let mut sorted: Vec<&str> = values.iter().map(String::as_str).collect();
+    sorted.sort_unstable();
+    sorted.windows(2).any(|pair| pair[0] == pair[1])
 }
 
 fn bounded_text(value: &str) -> bool {

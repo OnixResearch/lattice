@@ -10,8 +10,8 @@ Lattice or another client shell.
 
 - exact GitHub issuer, discovery URL, JWKS URL, and audience;
 - RS256 only;
-- exact repository owner and repository;
-- workflow and Git reference prefixes;
+- exact repository owner, numeric `repository_owner_id`, exact repository, and numeric `repository_id` (binding against renames and re-registration);
+- exact allowlisted `job_workflow_ref` (`file@ref`), exact protected Git references (`allowed_refs`), and required `environment` claim;
 - explicit clock skew, token age, UCAN lifetime, network, body, key, cache, and refresh limits;
 - one versioned Mantle capability vocabulary;
 - one-time exchange with an issuer-provided `jti`: one exchange per OIDC token.
@@ -92,8 +92,12 @@ matching is a byte prefix, so a truncated prefix silently widens the grant
 ## Rotation and cache policy
 
 The cache accepts freshness only up to the Nickel policy maximum. An unknown
-`kid` can cause one refresh. Duplicate `kid` values fail closed. Stale keys are
-not used during an outage.
+`kid` can trigger at most one refresh per cooldown window while the cache is
+fresh, and unknown `kid`s are boundedly negatively cached to prevent outbound
+fetch amplification. Unsupported JWK entries (non-RSA, non-RS256, or non-sig)
+are skipped so provider key-type additions do not fail valid RS256 keys; a JWKS
+with no usable RS256 verification keys or duplicate `kid` values still fails
+closed. Stale keys are not used during an outage.
 
 Operators rotate the issuer key by publishing the new public JWK before tokens
 use its `kid`. The old key can remain in the bounded set during the provider

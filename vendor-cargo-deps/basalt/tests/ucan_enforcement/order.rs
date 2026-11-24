@@ -60,6 +60,7 @@ fn final_verification_is_authoritative_and_drops_prospective_authority() {
     };
     let services = TestServices {
         key_resolver: &resolver,
+        trusted_roots: &fixture.trusted_roots,
         proof_store: &fixture.proofs,
         revocations: &NoRevocations,
         caveats: &DenyUnknownCaveats,
@@ -151,4 +152,45 @@ fn successful_replay_branch_only_moves_prebuilt_values() {
     assert!(success_branch.contains("Ok(LiveUcanEnforcement"));
     assert!(success_branch.contains("_authority_decision: prospective.decision"));
     assert!(success_branch.contains("receipt: prospective.receipt"));
+}
+
+#[test]
+fn invalid_policy_projection_denies_raw_ucan_enforcement_without_burning_nonce() {
+    let fixture = InvocationFixture::direct(document_capability(PARENT_RESOURCE));
+    let request = enforcement_request(PRIVATE_RESOURCE);
+    let signature = sign_request(&fixture, &request, nonce());
+    let replay = RecordingReplay::new();
+    let mut invalid_policy = default_policy().expect("embedded policy must parse");
+    invalid_policy
+        .contracts
+        .get_mut("document-write")
+        .expect("document-write contract")
+        .resource_prefixes = vec![String::new()];
+    let policy_ref = default_authority_policy_ref("document-write");
+    let raw = UcanEnforcementRequest::new(
+        &request,
+        fixture.token.as_str(),
+        BasaltUcanProtocolProfile::OnixCompactEd25519V1,
+        EnforcementAction::DocumentWrite,
+        nonce(),
+        &signature,
+    );
+    let boundaries = UcanEnforcementBoundaries {
+        verification_time: VerificationTime::from_unix_seconds(VERIFY_AT_SECONDS),
+        key_resolver: &fixture.keys,
+        trusted_roots: &fixture.trusted_roots,
+        proof_store: &fixture.proofs,
+        revocations: &NoRevocations,
+        caveat_policies: &DenyUnknownCaveats,
+        replay: &replay,
+        verification_limits: VerificationLimits::default(),
+        holder_limits: HolderInvocationLimits::default(),
+    };
+
+    assert_denied(
+        verify_ucan_enforcement_request(&invalid_policy, &policy_ref, &raw, &boundaries),
+        UcanEnforcementReason::PolicyDenied,
+    );
+    assert_eq!(replay.calls.get(), 0);
+    assert!(!replay.committed.get());
 }

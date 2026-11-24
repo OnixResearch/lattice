@@ -34,11 +34,14 @@ struct OidcClaims {
     iat: u64,
     jti: String,
     repository_owner: String,
+    repository_owner_id: String,
     repository: String,
+    repository_id: String,
     job_workflow_ref: String,
     sha: String,
     #[serde(rename = "ref")]
     git_ref: String,
+    environment: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -186,14 +189,28 @@ fn validate_claim_shapes(claims: &OidcClaims) -> Result<(), RejectReason> {
         claims.sub.as_str(),
         claims.jti.as_str(),
         claims.repository_owner.as_str(),
+        claims.repository_owner_id.as_str(),
         claims.repository.as_str(),
+        claims.repository_id.as_str(),
         claims.job_workflow_ref.as_str(),
         claims.sha.as_str(),
         claims.git_ref.as_str(),
+        claims.environment.as_str(),
     ] {
         if !bounded_claim(value) {
             return Err(RejectReason::ClaimType);
         }
+    }
+    if !claims
+        .repository_owner_id
+        .bytes()
+        .all(|byte| byte.is_ascii_digit())
+        || !claims
+            .repository_id
+            .bytes()
+            .all(|byte| byte.is_ascii_digit())
+    {
+        return Err(RejectReason::ClaimType);
     }
     if claims.sub.len() > MAX_SUBJECT_BYTES || !claims.aud.is_bounded() {
         return Err(RejectReason::ClaimType);
@@ -223,11 +240,18 @@ fn validate_identity_claims(
     }
     validate_time_claims(claims, now_seconds, policy)?;
     if claims.repository_owner != policy.repository_owner
+        || claims.repository_owner_id != policy.repository_owner_id
         || claims.repository != policy.repository
-        || !claims
-            .job_workflow_ref
-            .starts_with(policy.workflow_ref_prefix.as_str())
-        || !claims.git_ref.starts_with(policy.ref_prefix.as_str())
+        || claims.repository_id != policy.repository_id
+        || !policy
+            .job_workflow_refs
+            .iter()
+            .any(|allowed| allowed == &claims.job_workflow_ref)
+        || !policy
+            .allowed_refs
+            .iter()
+            .any(|allowed| allowed == &claims.git_ref)
+        || claims.environment != policy.environment
     {
         return Err(RejectReason::ClaimMismatch);
     }
@@ -297,10 +321,13 @@ fn attenuate(
         identity: subject_identity(claims),
         subject: claims.sub.clone(),
         repository_owner: claims.repository_owner.clone(),
+        repository_owner_id: claims.repository_owner_id.clone(),
         repository: claims.repository.clone(),
+        repository_id: claims.repository_id.clone(),
         workflow_ref: claims.job_workflow_ref.clone(),
         commit: claims.sha.clone(),
         git_ref: claims.git_ref.clone(),
+        environment: claims.environment.clone(),
     };
     let replay_key = replay_identity(claims);
     let replay_expires_at_seconds = replay_reservation_end(claims, policy);
@@ -367,8 +394,11 @@ fn subject_identity(claims: &OidcClaims) -> String {
             (b"issuer", claims.iss.as_str()),
             (b"subject", claims.sub.as_str()),
             (b"repository", claims.repository.as_str()),
+            (b"repository_id", claims.repository_id.as_str()),
+            (b"repository_owner_id", claims.repository_owner_id.as_str()),
             (b"workflow", claims.job_workflow_ref.as_str()),
             (b"commit", claims.sha.as_str()),
+            (b"environment", claims.environment.as_str()),
         ],
     )
 }

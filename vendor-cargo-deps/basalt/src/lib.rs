@@ -686,12 +686,60 @@ impl EnforcementReceipt {
     }
 }
 
+/// A policy that has passed Basalt's pure projection admission check.
+///
+/// Construction is restricted to [`AdmittedPolicy::admit`], [`admit_policy_json`],
+/// and [`default_admitted_policy`], so decoded or directly constructed [`Policy`]
+/// values cannot silently substitute for an admitted policy.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdmittedPolicy {
+    policy: Policy,
+}
+
+impl AdmittedPolicy {
+    /// Validate a decoded or constructed [`Policy`] against [`policy_projection::validate_projection`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EnforcementError::InvalidPolicyProjection`] when any projection invariant fails.
+    pub fn admit(policy: Policy) -> EnforcementResult<Self> {
+        validate_policy_for_enforcement(&policy)?;
+        Ok(Self { policy })
+    }
+
+    /// Borrow the underlying admitted [`Policy`].
+    #[must_use]
+    pub const fn as_policy(&self) -> &Policy {
+        &self.policy
+    }
+
+    /// Consume this wrapper and return the underlying [`Policy`].
+    #[must_use]
+    pub fn into_policy(self) -> Policy {
+        self.policy
+    }
+}
+
+fn format_projection_issues(issues: &[policy_projection::ProjectionIssue]) -> String {
+    issues.first().map_or_else(
+        || "invalid policy projection".to_owned(),
+        |issue| format!("{} ({})", issue.class, issue.message),
+    )
+}
+
 #[derive(Debug, Snafu)]
 pub enum EnforcementError {
     #[snafu(display("failed to parse policy JSON: {source}"))]
     PolicyJson { source: serde_json::Error },
     #[snafu(display("unsupported policy schema version {version:?}"))]
     UnsupportedSchema { version: String },
+    #[snafu(display(
+        "policy failed projection admission: {}",
+        format_projection_issues(issues)
+    ))]
+    InvalidPolicyProjection {
+        issues: Vec<policy_projection::ProjectionIssue>,
+    },
     #[snafu(display("invalid UCAN capability: {source}"))]
     InvalidCapability { source: ucan::Error },
     #[snafu(display("UCAN authorization check failed: {source}"))]
@@ -701,6 +749,17 @@ pub enum EnforcementError {
 }
 
 pub type EnforcementResult<T> = Result<T, EnforcementError>;
+
+fn validate_policy_for_enforcement(policy: &Policy) -> EnforcementResult<()> {
+    let verdict = policy_projection::validate_projection(policy);
+    if verdict.is_accepted() {
+        Ok(())
+    } else {
+        Err(EnforcementError::InvalidPolicyProjection {
+            issues: verdict.issues,
+        })
+    }
+}
 
 /// Load the packaged example policy JSON.
 ///
@@ -712,7 +771,22 @@ pub fn default_policy() -> EnforcementResult<Policy> {
     parse_policy_json(DEFAULT_POLICY_JSON)
 }
 
+/// Load and admit the packaged example policy JSON.
+///
+/// # Errors
+///
+/// Returns [`EnforcementError`] if the checked-in generated policy artifact is malformed,
+/// carries an unsupported schema version, or fails projection validation.
+pub fn default_admitted_policy() -> EnforcementResult<AdmittedPolicy> {
+    admit_policy_json(DEFAULT_POLICY_JSON)
+}
+
 /// Load a Nickel-exported JSON policy and validate the schema version expected by this crate.
+///
+/// Decoding remains separate so callers can inspect invalid artifacts with
+/// [`policy_projection::validate_projection`]. Use [`admit_policy_json`] or
+/// [`AdmittedPolicy::admit`] to obtain an admitted policy; [`enforce`] also
+/// rejects any policy that fails projection validation.
 ///
 /// # Errors
 ///
@@ -728,15 +802,45 @@ pub fn parse_policy_json(input: &str) -> EnforcementResult<Policy> {
     Ok(policy)
 }
 
-/// Enforce a Nickel-authored policy contract and a caller-supplied UCAN capability set.
+/// Decode and admit a Nickel-exported JSON policy through [`policy_projection::validate_projection`].
+///
+/// # Errors
+///
+/// Returns [`EnforcementError`] when JSON parsing fails, the schema version is unsupported,
+/// or projection validation rejects the policy.
+pub fn admit_policy_json(input: &str) -> EnforcementResult<AdmittedPolicy> {
+    let policy = parse_policy_json(input)?;
+    AdmittedPolicy::admit(policy)
+}
+
+/// Enforce an already-admitted policy contract and a caller-supplied UCAN capability set.
 ///
 /// # Errors
 ///
 /// Returns [`EnforcementError`] when capability construction or UCAN authorization validation fails.
+pub fn enforce_admitted(
+    policy: &AdmittedPolicy,
+    request: &EnforcementRequest,
+) -> EnforcementResult<EnforcementReceipt> {
+    enforce(policy.as_policy(), request)
+}
+
+/// Enforce a Nickel-authored policy contract and a caller-supplied UCAN capability set.
+///
+/// Validates `policy` with [`policy_projection::validate_projection`] before evaluating
+/// any contract rule so direct construction or post-parse mutation of [`Policy`] cannot
+/// bypass projection admission.
+///
+/// # Errors
+///
+/// Returns [`EnforcementError`] when `policy` fails projection validation or when
+/// capability construction or UCAN authorization validation fails.
 pub fn enforce(
     policy: &Policy,
     request: &EnforcementRequest,
 ) -> EnforcementResult<EnforcementReceipt> {
+    validate_policy_for_enforcement(policy)?;
+
     let Some(contract) = policy.contracts.get(request.contract.as_str()) else {
         return Ok(EnforcementReceipt::denied(format!(
             "unknown contract {:?}",
@@ -950,14 +1054,19 @@ mod tests {
         }"#;
         let policy = parse_policy_json(policy_json).expect("policy should parse");
 
-        let receipt = enforce(
+        let error = enforce(
             &policy,
             &request("did:key:z6Mkresource/docs/report", "document/write"),
         )
-        .expect("id mismatch should deny");
+        .expect_err("id mismatch must fail policy admission");
 
-        assert!(receipt.is_denied());
-        assert!(receipt.reason().contains("does not match policy id"));
+        assert!(matches!(
+            error,
+            EnforcementError::InvalidPolicyProjection { ref issues }
+                if issues
+                    .iter()
+                    .any(|issue| issue.class == "projection.contracts.key-id-mismatch")
+        ));
     }
 
     #[test]

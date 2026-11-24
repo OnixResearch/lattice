@@ -338,7 +338,9 @@ See [`docs/durable-authority-state.md`](docs/durable-authority-state.md).
 
 `basalt::ucan_enforcement` verifies one raw holder-signed invocation for one exact normalized request.
 
-The caller injects key, proof, revocation, caveat, replay, time, and limit boundaries. The request cannot contain caller-supplied capability grants.
+The caller injects key, trusted root issuer, proof, revocation, caveat, replay, time, and limit boundaries. The request cannot contain caller-supplied capability grants.
+
+`UcanEnforcementBoundaries::trusted_roots` must explicitly list operator-admitted root issuer DIDs. Registering a holder key in `key_resolver` verifies holder signatures only and never authorizes that key to mint proof-less root grants. Any direct root token or delegation-chain root whose issuer is absent from `trusted_roots` fails closed with `untrusted-root-issuer` before replay.
 
 Keep bearer text in `CompactToken`. Pass only borrowed `as_str()` views, and never copy bearer text into arguments, logs, or serde values.
 

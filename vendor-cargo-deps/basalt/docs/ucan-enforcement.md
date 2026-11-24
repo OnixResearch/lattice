@@ -18,8 +18,10 @@ The caller supplies these explicit inputs:
 - one closed `BasaltUcanProtocolProfile`
 - one closed `EnforcementAction`
 - the holder nonce and signature
-- key, proof, revocation, caveat, and replay services
+- key, trusted root issuer, proof, revocation, caveat, and replay services
 - verification time and explicit limits
+
+`UcanEnforcementBoundaries::trusted_roots` is required and fail-closed: an empty list admits no root issuers. Registering a holder verification key in `key_resolver` does not grant root-issuer authority; every proof-less root token (directly invoked or reached via `prf`) must be issued by a DID in `trusted_roots`.
 
 The normalized request must not contain capability grants. The adapter creates verified authority facts after UCAN authorization succeeds.
 
@@ -152,6 +154,7 @@ The original receipt stays historical even after a successful observation.
 - `signature-denied`
 - `proof-denied`
 - `key-resolution-denied`
+- `untrusted-root-issuer`
 - `holder-denied`
 - `time-denied`
 - `caveat-denied`

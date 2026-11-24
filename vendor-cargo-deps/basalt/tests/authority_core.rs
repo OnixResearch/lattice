@@ -297,3 +297,24 @@ fn trusted_policy_reference_mismatch_denies() {
         Some(AuthorityDenyDiagnostic::PolicyRefMismatch)
     );
 }
+
+#[test]
+fn invalid_policy_projection_is_denied_even_with_matching_policy_ref() {
+    let fixture = parse_fixture(DIRECT_MATCH);
+    let mut policy = default_policy().expect("embedded policy should parse");
+    policy
+        .contracts
+        .get_mut("document-write")
+        .expect("document-write contract")
+        .resource_prefixes = vec![String::new()];
+    let trusted = default_authority_policy_ref(fixture.input.request.contract_id.as_str());
+
+    let decision = evaluate_authority(&policy, &trusted, &fixture.input);
+
+    assert!(decision.is_denied());
+    assert_eq!(
+        decision.diagnostic,
+        Some(AuthorityDenyDiagnostic::PolicyDenied)
+    );
+    assert!(decision.binding.is_none());
+}
