@@ -21,6 +21,7 @@ pub enum Action {
     EditNodeLabel,
     EditNodeCommand,
     EditNodeTimeout,
+    ProbeCredentials,
     OpenAuthoring(&'static str),
 }
 
@@ -49,6 +50,7 @@ impl PaletteData {
             ("authoring_config", "Author Selected Node Configuration / Maps / Mappings", Some('✎')),
             ("authoring_graph", "Author Node Position / Typed Ports / Edges", Some('✎')),
             ("authoring_credential", "Author Opaque Credential References", Some('✎')),
+            ("probe_credentials", "Probe Selected Node Credential Reachability", Some('?')),
             ("authoring_runner", "Author Runtime Binding / Runner Policies", Some('✎')),
             ("authoring_trigger", "Author Manual / Schedule / Webhook Triggers", Some('✎')),
             ("authoring_operation", "Author Admitted Operation / Catalog / Typed Arguments", Some('✎')),
@@ -94,6 +96,7 @@ pub fn palette_action(id: &str) -> Option<Action> {
         "authoring_config" => Some(Action::OpenAuthoring("config")),
         "authoring_graph" => Some(Action::OpenAuthoring("graph")),
         "authoring_credential" => Some(Action::OpenAuthoring("credential")),
+        "probe_credentials" => Some(Action::ProbeCredentials),
         "authoring_runner" => Some(Action::OpenAuthoring("runner")),
         "authoring_trigger" => Some(Action::OpenAuthoring("trigger")),
         "authoring_operation" => Some(Action::OpenAuthoring("operation")),

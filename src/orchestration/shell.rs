@@ -37,10 +37,19 @@ pub use lifecycle::admission::validate_definition_in_store;
 pub use lifecycle::control::abandon_pending;
 pub use lifecycle::launch::start;
 pub use lifecycle::launch::start_from_trigger_with_execution;
+pub use lifecycle::launch::start_with_app_config;
 pub use lifecycle::launch::start_with_execution;
 pub use lifecycle::relaunch::retry;
+pub use lifecycle::relaunch::retry_with_app_config;
 pub use lifecycle::relaunch::retry_with_execution;
+pub use lifecycle::review::AppConfigApproval;
+pub use lifecycle::review::approve_with_app_config;
 pub use lifecycle::review::approve_with_execution;
+
+pub(in crate::orchestration::shell) enum ExecutionBackend<'a> {
+    Authority(ProductExecution<'a>),
+    AppConfig(&'a crate::config::AppConfig),
+}
 
 const ROUND_CHARGE: u64 = 1;
 

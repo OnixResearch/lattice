@@ -10,6 +10,8 @@ const EXPECTED_ARGUMENT_COUNT: usize = 3;
 const SOURCE_ARGUMENT_INDEX: usize = 1;
 const DESTINATION_ARGUMENT_INDEX: usize = 2;
 // r[impl lattice.agent_revisions.attachments.vendor]
+// r[impl lattice.credentials.animus_secret_providers.dependency]
+// r[impl lattice.credentials.animus_secret_providers.dependency.scenario.accepted]
 const EXPECTED_REVISION: &str = "e6f27948b19ea2e1bcb67428ca2e12f7acb6e558";
 // BLAKE3 of `git -c tar.umask=0000 archive --format=tar` at the exact revision.
 const SOURCE_ARCHIVE_BLAKE3: &str = "6a231c9738f9634df311b58a97e27bdc16e77eced28d4f73327671dafec7ef10";

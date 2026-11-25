@@ -254,6 +254,27 @@ pub async fn run_admitted_trigger_plan_with_authority_provider(
     Ok(summary)
 }
 
+pub async fn run_admitted_trigger_plan_with_app_config(
+    store: &Store,
+    plan: &TriggerRunPlan,
+    app_config: &crate::config::AppConfig,
+) -> Result<HeadlessRunSummary, HeadlessRunError> {
+    let run_id = store.next_run_id()?;
+    let summary = run_saved_workflow_with_app_config(store, &plan.workflow_name, run_id, app_config).await?;
+    let record = triggers::trigger_run_record_started(plan, summary.run_id);
+    store.save_trigger_run(&record)?;
+    Ok(summary)
+}
+
+pub async fn run_claimed_trigger_plan_with_app_config(
+    store: &Store,
+    plan: &TriggerRunPlan,
+    run_id: RunId,
+    app_config: &crate::config::AppConfig,
+) -> Result<HeadlessRunSummary, HeadlessRunError> {
+    run_saved_workflow_with_app_config(store, &plan.workflow_name, run_id, app_config).await
+}
+
 // r[impl lattice.scheduling.webhook_atomic_idempotency]
 pub async fn run_claimed_trigger_plan(
     store: &Store,
@@ -314,12 +335,15 @@ pub async fn run_saved_workflow_with_agent_runtime_config_and_authority_provider
     .await
 }
 
+pub use shell::AppConfigSnapshotRun;
 pub use shell::OwnedRunRequest;
 pub use shell::SnapshotRunOutcome;
 pub use shell::SnapshotRunRequest;
 pub use shell::TypedPolicyRunRequest;
 pub use shell::run_owned_workflow;
+pub use shell::run_owned_workflow_with_app_config;
 pub use shell::run_owned_workflow_with_authority_provider;
 pub use shell::run_owned_workflow_with_authority_provider_and_cancellation;
 pub use shell::run_saved_workflow_with_app_config;
+pub use shell::run_workflow_snapshot_with_app_config;
 pub use shell::run_workflow_snapshot_with_authority_provider_and_cancellation;

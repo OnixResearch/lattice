@@ -21,6 +21,7 @@ fn main() -> std::process::ExitCode {
     std::process::ExitCode::FAILURE
 }
 
+// r[impl lattice.credentials.animus_secret_providers.documentation]
 #[cfg(feature = "animus-secretspec")]
 fn delivery() -> Result<(), &'static str> {
     use std::path::PathBuf;

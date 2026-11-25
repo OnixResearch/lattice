@@ -596,6 +596,38 @@ pub fn resolve_webhook_auth_secret(
         .map_err(|_| TriggerDiagnosticCode::MissingAuthSecret)
 }
 
+// r[impl n8nclone.credentials.webhook_auth]
+pub fn resolve_webhook_auth_secret_in_context(
+    provider: &dyn CredentialProvider,
+    trigger: &TriggerDefinition,
+    cancellation: Option<&std::sync::atomic::AtomicBool>,
+) -> Result<Option<String>, TriggerDiagnosticCode> {
+    let TriggerKind::Webhook(webhook) = &trigger.kind else {
+        return Ok(None);
+    };
+    let secret_ref = match &webhook.auth_policy {
+        WebhookAuthPolicy::NoAuthLocalOnly => return Ok(None),
+        WebhookAuthPolicy::Bearer { secret_ref } | WebhookAuthPolicy::Blake3Signature { secret_ref, .. } => secret_ref,
+    };
+    let subject = crate::credentials::CredentialSubject::TriggerAuthentication {
+        workflow_id: trigger.workflow_name.clone(),
+        trigger_id: trigger.id.clone(),
+    };
+    let context = crate::credentials::CredentialResolutionContext {
+        subject,
+        binding: "webhook_auth".to_string(),
+        reference: secret_ref.clone(),
+        destination: crate::credentials::CredentialDestination::WebhookAuthentication,
+        reason: provider.resolution_reason(secret_ref).unwrap_or_default().to_owned(),
+    };
+    debug_assert!(!trigger.workflow_name.is_empty());
+    debug_assert!(!trigger.id.is_empty());
+    provider
+        .resolve_in_context(secret_ref, &context, cancellation)
+        .map(|secret| Some(secret.expose_for_execution().to_string()))
+        .map_err(|_| TriggerDiagnosticCode::MissingAuthSecret)
+}
+
 pub fn webhook_signature(secret: &str, raw_body: &[u8]) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(TRIGGER_SIGNATURE_DOMAIN);

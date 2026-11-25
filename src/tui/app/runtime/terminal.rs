@@ -94,6 +94,9 @@ impl State {
             Action::EditNodeTimeout => {
                 self.start_property_edit(PropertyEditField::TimeoutSecs);
             }
+            Action::ProbeCredentials => {
+                self.probe_selected_node_credentials();
+            }
             Action::OpenAuthoring(family) => self.open_authoring(family),
         }
         false

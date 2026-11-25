@@ -170,14 +170,7 @@ pub async fn run_resume(config: &crate::config::AppConfig, args: &ResumeGroupArg
     };
     debug_assert_eq!(command.request_id.as_str(), request);
     debug_assert_eq!(command.expected_workflow_revision.as_str(), workflow_revision);
-    let authority_provider = config.effect_authority_provider();
-    let execution = super::shell::resume_with_authority_provider(
-        &store,
-        &command,
-        config.effective_agent_runtime(),
-        authority_provider.as_ref(),
-    )
-    .await;
+    let execution = super::shell::resume_with_app_config(&store, &command, config).await;
     match execution {
         Ok(execution) => finish_resume(&execution, output),
         Err(error) => fail(FailureArgs {

@@ -10,7 +10,7 @@ impl State {
             return false;
         }
 
-        let diagnostics = crate::workflow_validation::validate_workflow(&self.workflow);
+        let diagnostics = self.validate_workflow_diagnostics();
         self.diagnostics.diagnostics = diagnostics.clone();
         self.diagnostics.open = false;
         if crate::workflow_validation::has_fatal_diagnostics(&diagnostics) {
@@ -72,6 +72,21 @@ impl State {
         let authority_store = self.store.clone();
         let cancellation = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let executor_cancellation = Arc::clone(&cancellation);
+        #[cfg(test)]
+        let should_use_configured_registry = !self.custom_executor_factory;
+        #[cfg(not(test))]
+        let should_use_configured_registry = true;
+        let credential_registry = if should_use_configured_registry {
+            match self.credential_registry(&workflow, Arc::clone(&cancellation)) {
+                Ok(registry) => Some(registry),
+                Err(error) => {
+                    self.output.push_line(&format!("Credential setup failed: {}", error.code()));
+                    return false;
+                }
+            }
+        } else {
+            None
+        };
         let handle = tokio::spawn(
             BackgroundRun {
                 run_id,
@@ -80,6 +95,7 @@ impl State {
                 progress_sender,
                 progress_receiver,
                 executor_factory,
+                credential_registry,
                 authority_provider,
                 authority_store,
                 executor_cancellation,
@@ -152,6 +168,7 @@ struct BackgroundRun {
     progress_sender: crate::engine::executor::progress::Sender,
     progress_receiver: mpsc::Receiver<crate::engine::executor::NodeProgress>,
     executor_factory: Arc<dyn Fn() -> Executor + Send + Sync>,
+    credential_registry: Option<crate::credentials::CredentialProviderRegistry>,
     authority_provider: Arc<dyn crate::engine::effect::execution::RunContextProvider>,
     authority_store: Option<Store>,
     executor_cancellation: Arc<std::sync::atomic::AtomicBool>,
@@ -166,6 +183,7 @@ impl BackgroundRun {
             progress_sender,
             mut progress_receiver,
             executor_factory,
+            credential_registry,
             authority_provider,
             authority_store,
             executor_cancellation,
@@ -191,6 +209,9 @@ impl BackgroundRun {
         });
         let mut executor =
             executor_factory().with_progress_sender(progress_sender).with_cancellation(executor_cancellation);
+        if let Some(registry) = credential_registry {
+            executor = executor.with_credential_provider(Box::new(registry));
+        }
         let cache = HashMap::new();
         let results = match authority_provider.load(run_id, authority_store) {
             Ok(authority) => executor.run_authorized(&workflow, &cache, &authority).await.1,

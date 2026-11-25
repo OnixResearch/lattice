@@ -489,6 +489,8 @@ fn nickel_export_import_preserves_agent_credential_references() {
     assert_eq!(secret_ref.field.as_deref(), Some("access_token"));
 }
 
+// r[verify lattice.credentials.animus_secret_providers.round_trip]
+// r[verify lattice.credentials.animus_secret_providers.round_trip.scenario.preserve]
 #[test]
 fn nickel_round_trip_preserves_credentials_for_every_builtin_node_kind() {
     let mut workflow = Workflow::new("all-credentialed-kinds", lattice::engine::workflow::WorkflowTimestamp::epoch());
@@ -538,6 +540,7 @@ fn nickel_round_trip_preserves_credentials_for_every_builtin_node_kind() {
     }
 }
 
+// r[verify lattice.credentials.animus_secret_providers.round_trip.scenario.delete]
 #[test]
 fn aggregate_deletion_remains_valid_through_store_and_nickel_round_trips() {
     let temp_dir = tempfile::tempdir().expect("temporary deletion directory");

@@ -12,10 +12,26 @@ pub async fn retry(
     .await
 }
 
+pub async fn retry_with_app_config(
+    store: &crate::store::Store,
+    request: super::super::RetryRequest<'_>,
+    app_config: &crate::config::AppConfig,
+) -> Result<crate::orchestration::core::Instance, super::super::Error> {
+    retry_with_backend(store, request, super::super::ExecutionBackend::AppConfig(app_config)).await
+}
+
 pub async fn retry_with_execution(
     store: &crate::store::Store,
     request: super::super::RetryRequest<'_>,
     execution: super::super::ProductExecution<'_>,
+) -> Result<crate::orchestration::core::Instance, super::super::Error> {
+    retry_with_backend(store, request, super::super::ExecutionBackend::Authority(execution)).await
+}
+
+async fn retry_with_backend(
+    store: &crate::store::Store,
+    request: super::super::RetryRequest<'_>,
+    execution: super::super::ExecutionBackend<'_>,
 ) -> Result<crate::orchestration::core::Instance, super::super::Error> {
     let instance = super::super::load_instance(store, request.instance_id)?;
     reject_pending_retry(store, &instance)?;
@@ -40,7 +56,7 @@ pub async fn retry_with_execution(
             planned_charge: plan,
         },
     )?;
-    super::dispatch::execute_started_round(store, started, workflow, intent, execution).await
+    super::dispatch::execute_started_round_backend(store, started, workflow, intent, execution).await
 }
 
 pub(super) fn reject_pending_retry(

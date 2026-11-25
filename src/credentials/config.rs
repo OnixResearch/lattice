@@ -41,6 +41,8 @@ pub struct RequestBounds {
     pub poll_interval_ms: u64,
     pub teardown_timeout_ms: u64,
 }
+pub use super::CredentialProviderConfig;
+
 // r[impl lattice.credentials.animus_secret_providers.config]
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -109,13 +111,16 @@ impl SecretSpecProviderConfig {
         if self.cohort != REVIEWED_COHORT {
             return Err(SecretSpecDiagnostic::UnsupportedCohort);
         }
+        if self.id == "env" || !self.bounds.validate() {
+            return Err(SecretSpecDiagnostic::InvalidConfiguration);
+        }
         if ![&self.id, &self.profile, &self.scope, &self.reason].into_iter().all(|s| safe_label(s))
             || !safe_identity(&self.manifest_identity)
             || !safe_identity(&self.policy_identity)
-            || !self.bounds.validate()
-            || self.declarations.is_empty()
-            || self.declarations.len() > MAX_DECLARATIONS
-            || self.allowed_schemes.is_empty()
+        {
+            return Err(SecretSpecDiagnostic::InvalidConfiguration);
+        }
+        if self.declarations.is_empty() || self.declarations.len() > MAX_DECLARATIONS || self.allowed_schemes.is_empty()
         {
             return Err(SecretSpecDiagnostic::InvalidConfiguration);
         }
@@ -353,12 +358,25 @@ mod tests {
             let mut candidate = cfg.clone();
             candidate.bounds.stdout_max_bytes = 1024;
             invalid.push(candidate);
+            let mut candidate = cfg.clone();
+            candidate.id = "env".into();
+            invalid.push(candidate);
             let mut candidate = cfg;
             candidate.bounds.value_max_bytes = 1048577;
             invalid.push(candidate);
             for candidate in invalid {
                 assert!(candidate.validate().is_err());
             }
+            let tagged = CredentialProviderConfig::AnimusSecretspec(config(scheme));
+            let tagged_json = serde_json::to_value(&tagged).unwrap();
+            assert_eq!(tagged_json["kind"], "animus-secretspec");
+            assert_eq!(serde_json::from_value::<CredentialProviderConfig>(tagged_json.clone()).unwrap(), tagged);
+            let mut unknown_kind = tagged_json.clone();
+            unknown_kind["kind"] = "direct-sops".into();
+            assert!(serde_json::from_value::<CredentialProviderConfig>(unknown_kind).is_err());
+            let mut extra_field = tagged_json;
+            extra_field["plaintext"] = SENTINEL.into();
+            assert!(serde_json::from_value::<CredentialProviderConfig>(extra_field).is_err());
         }
     }
 }

@@ -612,3 +612,31 @@ fn cli_plaintext_credential_rejection_is_safe_and_precedes_store_creation() {
     assert_text_omits_secret(&stderr, PLAINTEXT_IMPORT_VALUE);
     assert!(!store_path(&data_dir).exists());
 }
+
+// r[verify lattice.credentials.animus_secret_providers.compatibility]
+// r[verify lattice.credentials.animus_secret_providers.compatibility.scenario.absent]
+#[test]
+fn app_config_without_credential_providers_preserves_env_only_behavior() {
+    let config = lattice::config::AppConfig::default();
+    let cancellation = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let registry = config
+        .credential_registry(&[], cancellation)
+        .expect("empty credential_providers preserves env-only registry");
+    assert!(registry.metadata("env").is_some());
+    assert!(registry.metadata("reviewed-sops").is_none());
+}
+
+// r[verify lattice.credentials.animus_secret_providers.compatibility]
+// r[verify lattice.credentials.animus_secret_providers.dependency.scenario.blocked]
+#[cfg(not(feature = "animus-secretspec"))]
+#[test]
+fn disabled_build_rejects_nonempty_secretspec_provider_configuration() {
+    let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let fixture = manifest_dir.join("tests/fixtures/credential-providers/positive/sops.ncl");
+    let error = lattice::config::load_app_config(&fixture)
+        .expect_err("feature-disabled build must fail closed on configured animus-secretspec provider");
+    assert!(
+        error.to_string().contains(lattice::credentials::config::SecretSpecDiagnostic::Unavailable.code()),
+        "unexpected error: {error}"
+    );
+}

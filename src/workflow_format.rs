@@ -632,6 +632,7 @@ fn empty_portable_node_config(
 }
 
 // r[impl n8nclone.workflow_format.node_kind_provider.export]
+// r[impl lattice.credentials.animus_secret_providers.round_trip]
 fn node_config_to_portable(
     node_id: u64,
     config: &NodeConfig,

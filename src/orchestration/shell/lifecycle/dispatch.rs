@@ -4,6 +4,14 @@ pub(in crate::orchestration::shell) async fn execute_ready_round(
     instance: crate::orchestration::core::Instance,
     execution: super::super::ProductExecution<'_>,
 ) -> Result<crate::orchestration::core::Instance, super::super::Error> {
+    execute_ready_round_backend(store, instance, super::super::ExecutionBackend::Authority(execution)).await
+}
+
+pub(in crate::orchestration::shell) async fn execute_ready_round_backend(
+    store: &crate::store::Store,
+    instance: crate::orchestration::core::Instance,
+    execution: super::super::ExecutionBackend<'_>,
+) -> Result<crate::orchestration::core::Instance, super::super::Error> {
     let workflow = super::admission::load_validated_workflow(store, &instance.workflow_revision)?;
     debug_assert_eq!(workflow.meta.name, instance.workflow_revision.workflow_name);
     let run_id = store.next_run_id()?;
@@ -38,15 +46,15 @@ pub(in crate::orchestration::shell) async fn execute_ready_round(
         }
         Err(error) => return Err(error),
     };
-    execute_started_round(store, started, workflow, intent, execution).await
+    execute_started_round_backend(store, started, workflow, intent, execution).await
 }
 
-pub(in crate::orchestration::shell) async fn execute_started_round(
+pub(in crate::orchestration::shell) async fn execute_started_round_backend(
     store: &crate::store::Store,
     started: crate::orchestration::core::Instance,
     workflow: crate::engine::Workflow,
     intent: crate::orchestration::core::DispatchIntent,
-    execution: super::super::ProductExecution<'_>,
+    execution: super::super::ExecutionBackend<'_>,
 ) -> Result<crate::orchestration::core::Instance, super::super::Error> {
     let run_id = intent.run_id;
     let acknowledged = acknowledge(store, &started, &intent)?;
@@ -58,21 +66,11 @@ pub(in crate::orchestration::shell) async fn execute_started_round(
             .is_some_and(|dispatch| dispatch.status == crate::orchestration::core::DispatchStatus::Acknowledged)
     );
 
-    let result = crate::headless::run_workflow_snapshot_with_authority_provider_and_cancellation(
-        store,
-        crate::headless::SnapshotRunRequest {
-            workflow,
-            run_id,
-            owner: crate::store::RunOwner::Orchestration {
-                instance_id: acknowledged.id.clone(),
-                dispatch_id: intent.id.clone(),
-            },
-            agent_runtime: execution.agent_runtime,
-            cancellation: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
-        },
-        execution.authority_provider,
-    )
-    .await;
+    let owner = crate::store::RunOwner::Orchestration {
+        instance_id: acknowledged.id.clone(),
+        dispatch_id: intent.id.clone(),
+    };
+    let result = run_round_backend(store, workflow, run_id, owner, execution).await;
     let current = super::super::durability::persistence::load_instance_by_id(store, &acknowledged.id)?;
     // Guarded summaries contain typed redacted facts only.
     let guarded_summary = crate::guarded::status::optional(store, run_id, &current.definition.id)?;
@@ -113,6 +111,47 @@ pub(in crate::orchestration::shell) async fn execute_started_round(
             },
         )?,
     )
+}
+
+async fn run_round_backend(
+    store: &crate::store::Store,
+    workflow: crate::engine::Workflow,
+    run_id: crate::engine::RunId,
+    owner: crate::store::RunOwner,
+    execution: super::super::ExecutionBackend<'_>,
+) -> Result<crate::headless::SnapshotRunOutcome, crate::headless::HeadlessRunError> {
+    debug_assert!(!workflow.meta.name.is_empty());
+    debug_assert!(!matches!(owner, crate::store::RunOwner::Unscoped));
+    let cancellation = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    match execution {
+        super::super::ExecutionBackend::Authority(execution) => {
+            crate::headless::run_workflow_snapshot_with_authority_provider_and_cancellation(
+                store,
+                crate::headless::SnapshotRunRequest {
+                    workflow,
+                    run_id,
+                    owner,
+                    agent_runtime: execution.agent_runtime,
+                    cancellation,
+                },
+                execution.authority_provider,
+            )
+            .await
+        }
+        super::super::ExecutionBackend::AppConfig(app_config) => {
+            crate::headless::run_workflow_snapshot_with_app_config(
+                store,
+                crate::headless::AppConfigSnapshotRun {
+                    workflow,
+                    run_id,
+                    owner,
+                    cancellation,
+                },
+                app_config,
+            )
+            .await
+        }
+    }
 }
 
 fn acknowledge(

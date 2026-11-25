@@ -149,7 +149,12 @@ const EXAMPLE_NICKEL_TYPECHECK_ARGS: &[&str] = &[
     "-c",
     "nickel typecheck examples/config/*.ncl examples/orchestrations/*.ncl examples/templates/*.ncl examples/workflows/*.ncl",
 ];
+const CREDENTIAL_FIXTURE_NICKEL_ARGS: &[&str] = &[
+    "-c",
+    "for f in tests/fixtures/credential-providers/positive/*.ncl; do nickel export --format json \"$f\" >/dev/null || exit 1; done; for f in tests/fixtures/credential-providers/negative/*.ncl; do if nickel export --format json \"$f\" >/dev/null 2>&1; then echo \"unexpected pass: $f\" >&2; exit 1; fi; done",
+];
 const FOCUSED_CONSUMER_CHECK_ARGS: &[&str] = &["check", "--package", "lattice", "--all-targets", "--locked"];
+// r[impl lattice.credentials.animus_secret_providers.verification]
 const ALL_FEATURES_CHECK_ARGS: &[&str] = &[
     "check",
     "--package",
@@ -368,6 +373,12 @@ const COMMAND_STEPS: &[CheckStep] = &[
         name: "example Nickel typecheck",
         program: "sh",
         args: EXAMPLE_NICKEL_TYPECHECK_ARGS,
+        use_repo_local_target: false,
+    },
+    CheckStep {
+        name: "credential fixture Nickel validation",
+        program: "sh",
+        args: CREDENTIAL_FIXTURE_NICKEL_ARGS,
         use_repo_local_target: false,
     },
     CheckStep {

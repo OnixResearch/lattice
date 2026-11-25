@@ -293,6 +293,7 @@
               "docs/expression-dependencies.md"
               "docs/nickel-eval-source.md"
               "docs/role-protocol-execution.md"
+              "docs/secretspec-credentials.md"
               "docs/workflow-domain-boundaries.md"
             ]
           );

@@ -1,4 +1,5 @@
 //! Credential references, provider interfaces, and redaction helpers.
+// r[impl lattice.credentials.animus_secret_providers.dependency]
 
 use std::collections::HashMap;
 
@@ -7,6 +8,39 @@ pub(crate) mod execution;
 
 #[cfg(feature = "animus-secretspec")]
 pub mod secretspec;
+
+// r[impl lattice.credentials.animus_secret_providers.config]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
+pub enum CredentialProviderConfig {
+    AnimusSecretspec(config::SecretSpecProviderConfig),
+}
+
+impl CredentialProviderConfig {
+    pub fn id(&self) -> &str {
+        match self {
+            Self::AnimusSecretspec(config) => &config.id,
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), config::SecretSpecDiagnostic> {
+        match self {
+            Self::AnimusSecretspec(config) => config.validate(),
+        }
+    }
+
+    pub fn as_secretspec(&self) -> &config::SecretSpecProviderConfig {
+        match self {
+            Self::AnimusSecretspec(config) => config,
+        }
+    }
+}
+
+impl From<config::SecretSpecProviderConfig> for CredentialProviderConfig {
+    fn from(config: config::SecretSpecProviderConfig) -> Self {
+        Self::AnimusSecretspec(config)
+    }
+}
 
 /// Descriptive current-boundary facts, not an authority issuer or effect grant.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -22,6 +22,24 @@ interfaces.
 
 ### Added
 
+- Optional Animus SecretSpec and guarded SOPS credential provider integration
+  (`adopt-animus-secretspec-sops-providers`):
+  - Typed Nickel `animus-secretspec` provider contract
+    (`contracts/credential-providers.ncl`), positive/negative configuration
+    fixtures (`tests/fixtures/credential-providers/{positive,negative}/*.ncl`),
+    and `CredentialProviderConfig` (`kind = "animus-secretspec"`) in
+    `lattice::credentials` / `AppConfig`, preserving fail-closed behavior when
+    `animus-secretspec` is disabled and `"env"`-only compatibility when
+    `credential_providers` is empty.
+  - Wired `AppConfig::credential_registry` / `workflow_credential_registry` and
+    context-aware `resolve_in_context` across all production boundaries
+    (headless/bound execution, scheduler, orchestration, approval/gate resume,
+    webhook triggers/admission/controls, operation requests, candidate broker,
+    and TUI lifecycle/validation/editing).
+  - Added TUI configured-provider selection (`credential_providers` + `"env"`),
+    non-resolving safe reachability probing (`"configured; reachability not
+    probed"`), atomic node credential deletion, and comprehensive positive,
+    negative, hostile-sentinel, and compatibility tests.
 - Optional transient systemd service launcher for the candidate worker sandbox
   (Lattice #30): `candidate_worker::sandbox::launcher::{SandboxLauncher, Direct,
   Systemd}` and `candidate_worker::sandbox::systemd::{Bus, Config, plan_launch}`,

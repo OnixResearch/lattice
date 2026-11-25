@@ -249,7 +249,9 @@ for import and maintenance procedures.
   suspended workflow are separate, identity-bound actions.
 - **Evidence is scoped.** Local checks and replay facts do not establish external
   exactly-once effects, remote cancellation, arbitrary workflow correctness, or
-  production readiness.
+  production readiness. Optional `animus-secretspec` fixtures likewise do not
+  establish host-memory confidentiality, hostile-host resistance, or production
+  readiness.
 
 | Topic | Documentation |
 | --- | --- |
@@ -263,6 +265,7 @@ for import and maintenance procedures.
 | Projected local protocols | [Role-protocol execution](docs/role-protocol-execution.md) |
 | Captured source edits and export kinds | [Source authoring](docs/source-authoring.md) |
 | Inert typed dependency plans | [Workflow-intent compiler](docs/workflow-intent.md) |
+| SecretSpec and SOPS credentials | [SecretSpec credential delivery](docs/secretspec-credentials.md) |
 | Opt-in native batch rendering | [Artifact-bound render workflow](docs/render-workflow.md) |
 
 ## Development

@@ -40,7 +40,7 @@ pub struct AppConfig {
     pub process_limits: crate::process::core::LimitConfig,
     /// Public reviewed provider declarations; no secret values or deployment paths.
     #[serde(default)]
-    pub credential_providers: Vec<crate::credentials::config::SecretSpecProviderConfig>,
+    pub credential_providers: Vec<crate::credentials::config::CredentialProviderConfig>,
     /// Explicit trusted host coordinates, kept separate from provider declarations.
     #[serde(default)]
     pub credential_hosts: Vec<crate::credentials::config::SecretSpecHostConfig>,
@@ -92,29 +92,31 @@ impl AppConfig {
         runtime
     }
 
-    fn validated_credential_hosts(
+    // r[impl lattice.credentials.animus_secret_providers.compatibility]
+    pub fn validated_credential_hosts(
         &self,
     ) -> Result<
         std::collections::BTreeMap<&str, &crate::credentials::config::SecretSpecHostConfig>,
         crate::credentials::config::SecretSpecDiagnostic,
     > {
-        use crate::credentials::config::SecretSpecDiagnostic;
-
         let hosts: std::collections::BTreeMap<_, _> =
             self.credential_hosts.iter().map(|host| (host.provider_id.as_str(), host)).collect();
         let mut provider_ids = std::collections::BTreeSet::new();
         if hosts.len() != self.credential_hosts.len() || hosts.len() != self.credential_providers.len() {
-            return Err(SecretSpecDiagnostic::InvalidConfiguration);
+            return Err(crate::credentials::config::SecretSpecDiagnostic::InvalidConfiguration);
         }
         for provider in &self.credential_providers {
             provider.validate()?;
-            if provider.id == "env" || !provider_ids.insert(provider.id.as_str()) {
-                return Err(SecretSpecDiagnostic::InvalidConfiguration);
+            if provider.id() == "env" || !provider_ids.insert(provider.id()) {
+                return Err(crate::credentials::config::SecretSpecDiagnostic::InvalidConfiguration);
             }
-            hosts.get(provider.id.as_str()).ok_or(SecretSpecDiagnostic::InvalidConfiguration)?.validate()?;
+            hosts
+                .get(provider.id())
+                .ok_or(crate::credentials::config::SecretSpecDiagnostic::InvalidConfiguration)?
+                .validate()?;
         }
         if !cfg!(feature = "animus-secretspec") && !provider_ids.is_empty() {
-            return Err(SecretSpecDiagnostic::Unavailable);
+            return Err(crate::credentials::config::SecretSpecDiagnostic::Unavailable);
         }
         Ok(hosts)
     }
@@ -125,20 +127,23 @@ impl AppConfig {
         additional_environment_keys: &[String],
         cancellation: std::sync::Arc<std::sync::atomic::AtomicBool>,
     ) -> Result<crate::credentials::CredentialProviderRegistry, crate::credentials::config::SecretSpecDiagnostic> {
-        use crate::credentials::config::SecretSpecDiagnostic;
-
         let hosts = self.validated_credential_hosts()?;
         let mut registry = crate::credentials::CredentialProviderRegistry::new();
         #[cfg(feature = "animus-secretspec")]
         for provider in &self.credential_providers {
-            let host = hosts.get(provider.id.as_str()).ok_or(SecretSpecDiagnostic::InvalidConfiguration)?;
-            let selected =
-                crate::credentials::secretspec::build_provider(provider.clone(), host, cancellation.clone())?;
+            let host = hosts
+                .get(provider.id())
+                .ok_or(crate::credentials::config::SecretSpecDiagnostic::InvalidConfiguration)?;
+            let selected = crate::credentials::secretspec::build_provider(
+                provider.as_secretspec().clone(),
+                host,
+                cancellation.clone(),
+            )?;
             registry
                 .insert_provider(
                     crate::credentials::CredentialProviderMetadata {
-                        id: provider.id.clone(),
-                        display_name: provider.id.clone(),
+                        id: provider.id().to_owned(),
+                        display_name: provider.id().to_owned(),
                         capabilities: crate::credentials::CredentialProviderCapabilities {
                             supports_fields: true,
                             supports_listing: false,
@@ -148,7 +153,7 @@ impl AppConfig {
                     },
                     Box::new(selected),
                 )
-                .map_err(|_| SecretSpecDiagnostic::InvalidConfiguration)?;
+                .map_err(|_| crate::credentials::config::SecretSpecDiagnostic::InvalidConfiguration)?;
         }
         #[cfg(not(feature = "animus-secretspec"))]
         let _ = (cancellation, hosts);
@@ -171,8 +176,40 @@ impl AppConfig {
                 },
                 Box::new(crate::credentials::EnvironmentCredentialProvider::from_current_env(&environment_keys)),
             )
-            .map_err(|_| SecretSpecDiagnostic::InvalidConfiguration)?;
+            .map_err(|_| crate::credentials::config::SecretSpecDiagnostic::InvalidConfiguration)?;
         Ok(registry)
+    }
+
+    pub(crate) fn workflow_credential_registry(
+        &self,
+        workflow: Option<&crate::engine::workflow::Workflow>,
+        cancellation: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    ) -> Result<crate::credentials::CredentialProviderRegistry, crate::credentials::config::SecretSpecDiagnostic> {
+        let mut additional_env_keys = std::collections::BTreeSet::new();
+        if let Some(workflow) = workflow {
+            for refs in workflow.credentials.values() {
+                for reference in refs.env.values() {
+                    if reference.provider == "env" {
+                        additional_env_keys.insert(reference.key.clone());
+                    }
+                }
+            }
+            for trigger in &workflow.triggers {
+                if let crate::triggers::TriggerKind::Webhook(webhook) = &trigger.kind {
+                    match &webhook.auth_policy {
+                        crate::triggers::WebhookAuthPolicy::NoAuthLocalOnly => {}
+                        crate::triggers::WebhookAuthPolicy::Bearer { secret_ref }
+                        | crate::triggers::WebhookAuthPolicy::Blake3Signature { secret_ref, .. } => {
+                            if secret_ref.provider == "env" {
+                                additional_env_keys.insert(secret_ref.key.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let keys = additional_env_keys.into_iter().collect::<Vec<_>>();
+        self.credential_registry(&keys, cancellation)
     }
 
     pub fn frontier_capacity_policy(

@@ -163,6 +163,8 @@ pub struct State {
     dirty: bool,
     confirm_quit: bool,
     executor_factory: Arc<dyn Fn() -> Executor + Send + Sync>,
+    #[cfg(test)]
+    custom_executor_factory: bool,
     authority_provider: Arc<dyn crate::engine::effect::execution::RunContextProvider>,
 }
 

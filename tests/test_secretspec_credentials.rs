@@ -620,3 +620,567 @@ fn cancellation_observed_after_host_return_discards_material_before_delivery() {
     assert!(failure.to_string().contains(SecretSpecDiagnostic::Cancelled.code()));
     assert!(!format!("{failure:?}").contains(SENTINEL));
 }
+
+// r[verify lattice.credentials.animus_secret_providers.dependency]
+// r[verify lattice.credentials.animus_secret_providers.dependency.scenario.accepted]
+// r[verify lattice.credentials.animus_secret_providers.dependency.scenario.blocked]
+#[test]
+fn animus_provenance_and_pure_core_feature_isolation() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let root_toml = std::fs::read_to_string(root.join("Cargo.toml")).expect("root Cargo.toml reads");
+    let sync_script = std::fs::read_to_string(root.join("scripts/sync_animus.rs")).expect("sync_animus.rs reads");
+    let source_ncl =
+        std::fs::read_to_string(root.join("vendor-cargo-deps/animus/source.ncl")).expect("animus source.ncl reads");
+
+    assert!(root_toml.contains("animus-secretspec = [\"dep:animus-std-secretspec\"]"));
+    assert!(root_toml.contains("optional = true"));
+    assert!(sync_script.contains("e6f27948b19ea2e1bcb67428ca2e12f7acb6e558"));
+    assert!(source_ncl.contains("e6f27948b19ea2e1bcb67428ca2e12f7acb6e558"));
+    assert!(source_ncl.contains("6a231c9738f9634df311b58a97e27bdc16e77eced28d4f73327671dafec7ef10"));
+    assert!(source_ncl.contains("a8794e46ec9664a0e1a3869cc3105d0853937e48"));
+    assert!(source_ncl.contains("29dac88ecded94457572db3fdfaaaab95fa91525"));
+
+    for core_crate in [
+        "crates/lattice-core/Cargo.toml",
+        "crates/budget-ledger-core/Cargo.toml",
+        "crates/lattice-workflow-contract/Cargo.toml",
+        "crates/lattice-compose-binding/Cargo.toml",
+    ] {
+        let toml = std::fs::read_to_string(root.join(core_crate)).expect("core Cargo.toml reads");
+        assert!(!toml.contains("animus"), "{core_crate} must stay free of Animus");
+        assert!(!toml.contains("secretspec"), "{core_crate} must stay free of SecretSpec");
+    }
+}
+
+// r[verify lattice.credentials.animus_secret_providers.config]
+// r[verify lattice.credentials.animus_secret_providers.config.scenario.valid]
+// r[verify lattice.credentials.animus_secret_providers.config.scenario.invalid]
+#[test]
+fn nickel_config_fixtures_project_valid_schemes_and_reject_invalid_configurations() {
+    use lattice::config::load_app_config;
+    use lattice::credentials::config::CredentialProviderConfig;
+
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let positive_cases = [
+        ("environment.ncl", ProviderScheme::Environment, "reviewed-env"),
+        ("systemd-credential.ncl", ProviderScheme::SystemdCredential, "reviewed-systemd"),
+        ("sops.ncl", ProviderScheme::Sops, "reviewed-sops"),
+    ];
+    for (name, expected_scheme, expected_id) in positive_cases {
+        let path = root.join("tests/fixtures/credential-providers/positive").join(name);
+        let cfg = load_app_config(&path).unwrap_or_else(|err| panic!("positive fixture {name} failed: {err}"));
+        assert_eq!(cfg.credential_providers.len(), 1, "{name}");
+        assert_eq!(cfg.credential_hosts.len(), 1, "{name}");
+        let CredentialProviderConfig::AnimusSecretspec(provider) = &cfg.credential_providers[0];
+        assert_eq!(provider.id, expected_id, "{name}");
+        assert_eq!(provider.declarations[0].scheme, expected_scheme, "{name}");
+        assert_eq!(cfg.credential_hosts[0].provider_id, expected_id, "{name}");
+    }
+
+    let example = root.join("examples/config/secretspec-providers.ncl");
+    let example_cfg = load_app_config(&example).expect("example secretspec-providers.ncl loads");
+    assert_eq!(example_cfg.credential_providers.len(), 1);
+    assert_eq!(example_cfg.credential_hosts.len(), 1);
+
+    let negative_dir = root.join("tests/fixtures/credential-providers/negative");
+    let mut negative_count = 0usize;
+    for entry in std::fs::read_dir(&negative_dir).expect("negative fixture dir reads") {
+        let path = entry.expect("negative entry").path();
+        if path.extension().is_some_and(|ext| ext == "ncl") {
+            negative_count += 1;
+            let err =
+                load_app_config(&path).expect_err(&format!("negative fixture {} must be rejected", path.display()));
+            assert!(!err.to_string().contains(SENTINEL));
+        }
+    }
+    assert_eq!(negative_count, 14);
+}
+
+// r[verify lattice.credentials.animus_secret_providers.request]
+// r[verify lattice.credentials.animus_secret_providers.request.scenario.admitted]
+// r[verify lattice.credentials.animus_secret_providers.request.scenario.rejected]
+#[test]
+fn adapt_request_rejects_unsupported_cohort_disallowed_scheme_wrong_trigger_and_missing_registry_entry() {
+    use lattice::credentials::CredentialError;
+    use lattice::credentials::CredentialProviderRegistry;
+
+    let caps = SecretResolverCapabilities {
+        read: true,
+        bounded_worker: true,
+        providers: vec![
+            animus_std_secretspec::secret_resolution::SecretProviderScheme::Environment,
+            animus_std_secretspec::secret_resolution::SecretProviderScheme::SystemdCredential,
+            animus_std_secretspec::secret_resolution::SecretProviderScheme::Sops,
+        ],
+    };
+
+    let mut bad_cohort = config(ProviderScheme::Environment);
+    bad_cohort.cohort = "0.16.0".into();
+    let err = adapt_request(
+        &reference(),
+        &bad_cohort,
+        &context(CredentialDestination::AgentEnvironment),
+        &caps,
+        SecretResolverAvailability::Available,
+    )
+    .unwrap_err();
+    assert_eq!(err, SecretSpecDiagnostic::UnsupportedCohort);
+
+    let mut disallowed_scheme = config(ProviderScheme::Sops);
+    disallowed_scheme.allowed_schemes = vec![ProviderScheme::Environment];
+    let err = adapt_request(
+        &reference(),
+        &disallowed_scheme,
+        &context(CredentialDestination::AgentEnvironment),
+        &caps,
+        SecretResolverAvailability::Available,
+    )
+    .unwrap_err();
+    assert_eq!(err, SecretSpecDiagnostic::ProviderDenied);
+
+    let auth_subject_with_invocation_dest = CredentialResolutionContext {
+        subject: CredentialSubject::TriggerAuthentication {
+            workflow_id: "wf".into(),
+            trigger_id: "trg".into(),
+        },
+        binding: "webhook_auth".into(),
+        reference: reference(),
+        destination: CredentialDestination::TriggerInvocation,
+        reason: "workflow-authentication".into(),
+    };
+    let err = adapt_request(
+        &reference(),
+        &config(ProviderScheme::Environment),
+        &auth_subject_with_invocation_dest,
+        &caps,
+        SecretResolverAvailability::Available,
+    )
+    .unwrap_err();
+    assert_eq!(err, SecretSpecDiagnostic::ContextDenied);
+
+    let invocation_subject_with_webhook_dest = CredentialResolutionContext {
+        subject: CredentialSubject::TriggerInvocation {
+            workflow_id: "wf".into(),
+            trigger_id: "trg".into(),
+        },
+        binding: "WEBHOOK_TOKEN".into(),
+        reference: reference(),
+        destination: CredentialDestination::WebhookAuthentication,
+        reason: "workflow-authentication".into(),
+    };
+    let err = adapt_request(
+        &reference(),
+        &config(ProviderScheme::Environment),
+        &invocation_subject_with_webhook_dest,
+        &caps,
+        SecretResolverAvailability::Available,
+    )
+    .unwrap_err();
+    assert_eq!(err, SecretSpecDiagnostic::ContextDenied);
+
+    let valid_invocation = CredentialResolutionContext {
+        subject: CredentialSubject::TriggerInvocation {
+            workflow_id: "wf".into(),
+            trigger_id: "trg".into(),
+        },
+        binding: "TRIGGER_SECRET".into(),
+        reference: reference(),
+        destination: CredentialDestination::TriggerInvocation,
+        reason: "workflow-authentication".into(),
+    };
+    let plan = adapt_request(
+        &reference(),
+        &config(ProviderScheme::Environment),
+        &valid_invocation,
+        &caps,
+        SecretResolverAvailability::Available,
+    )
+    .expect("matching TriggerInvocation context must be admitted");
+    assert_eq!(plan.request().declaration, "API_TOKEN");
+
+    let registry = CredentialProviderRegistry::new();
+    let missing = registry
+        .resolve_in_context(&reference(), &context(CredentialDestination::AgentEnvironment), None)
+        .unwrap_err();
+    assert!(matches!(missing, CredentialError::UnknownProvider { .. }));
+}
+
+// r[verify lattice.credentials.animus_secret_providers.resolve]
+// r[verify lattice.credentials.animus_secret_providers.resolve.scenario.node]
+// r[verify lattice.credentials.animus_secret_providers.resolve.scenario.failure]
+// r[verify lattice.credentials.animus_secret_providers.redaction.scenario.success]
+#[tokio::test]
+async fn executor_http_and_agent_nodes_deliver_secretspec_material_and_block_on_failure() {
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+
+    use lattice::agent_node::Adapter;
+    use lattice::agent_node::Error as AgentError;
+    use lattice::agent_node::ExecutionContext;
+    use lattice::agent_node::Output;
+    use lattice::agent_node::OutputMode;
+    use lattice::agent_node::Request as AgentRequest;
+    use lattice::agent_node::Response as AgentResponse;
+    use lattice::agent_node::Target;
+    use lattice::credentials::NodeCredentialRefs;
+    use lattice::engine::executor::Executor;
+    use lattice::engine::executor::NodeStatus;
+    use lattice::engine::workflow::Workflow;
+    use lattice::engine::workflow::WorkflowTimestamp;
+    use lattice::file_node::NoopFileSystem;
+    use lattice::http::HttpClient;
+    use lattice::http::HttpError;
+    use lattice::http::HttpRequestPlan;
+    use lattice::http::HttpResponse;
+    use lattice::image_node::NoopImageIo;
+
+    struct RecordingHttpClient {
+        seen_header: Arc<Mutex<Option<String>>>,
+    }
+    impl HttpClient for RecordingHttpClient {
+        fn execute(&self, request: &HttpRequestPlan) -> Result<HttpResponse, HttpError> {
+            *self.seen_header.lock().unwrap() = request.headers.get("x-api-token").cloned();
+            Ok(HttpResponse {
+                status: 200,
+                headers: HashMap::new(),
+                body: "{\"status\":\"ok\"}".into(),
+            })
+        }
+    }
+
+    struct RecordingAgentAdapter {
+        seen_secret: Arc<Mutex<Option<String>>>,
+    }
+    impl Adapter for RecordingAgentAdapter {
+        fn execution_identity(&self, request: &AgentRequest) -> Result<String, AgentError> {
+            Ok(format!("recording-agent:{:?}", request.target))
+        }
+        fn execute(&self, _request: &AgentRequest, context: &ExecutionContext) -> Result<AgentResponse, AgentError> {
+            *self.seen_secret.lock().unwrap() = context.secret("API_TOKEN").map(str::to_owned);
+            Ok(AgentResponse {
+                output: Output::Text(format!("ok {}", context.secret("API_TOKEN").unwrap_or(""))),
+                metadata: serde_json::json!({}),
+            })
+        }
+    }
+
+    let seen_http_header = Arc::new(Mutex::new(None));
+    let seen_agent_secret = Arc::new(Mutex::new(None));
+    let mut workflow = Workflow::new("http-and-agent-delivery", WorkflowTimestamp::epoch());
+    let http_id = workflow.add_http_node("fetch", "GET", "https://example.invalid/ping");
+    workflow.set_node_credentials(http_id, NodeCredentialRefs {
+        env: HashMap::from([("x-api-token".into(), reference())]),
+    });
+    let agent_id = workflow.add_agent_node("agent", Target::Pi, "summarize", OutputMode::Text);
+    workflow.set_node_credentials(agent_id, NodeCredentialRefs {
+        env: HashMap::from([("API_TOKEN".into(), reference())]),
+    });
+
+    let host = Arc::new(FixtureHost::success(SENTINEL));
+    let provider =
+        AnimusSecretSpecProvider::new(config(ProviderScheme::Sops), host, Arc::new(AtomicBool::new(false))).unwrap();
+    let executor = Executor::new_with_runtime_clients(
+        Box::new(provider),
+        Box::new(RecordingHttpClient {
+            seen_header: Arc::clone(&seen_http_header),
+        }),
+        Box::new(NoopFileSystem),
+        Box::new(NoopImageIo),
+        Box::new(RecordingAgentAdapter {
+            seen_secret: Arc::clone(&seen_agent_secret),
+        }),
+    );
+
+    let http_res = executor.execute_node(&workflow, http_id, &HashMap::new()).await;
+    assert!(matches!(http_res.status, NodeStatus::Completed { .. }));
+    assert_eq!(seen_http_header.lock().unwrap().as_deref(), Some(SENTINEL));
+    assert!(!format!("{http_res:?}").contains(SENTINEL));
+
+    let agent_res = executor.execute_node(&workflow, agent_id, &HashMap::new()).await;
+    assert!(matches!(agent_res.status, NodeStatus::Completed { .. }));
+    assert_eq!(seen_agent_secret.lock().unwrap().as_deref(), Some(SENTINEL));
+    assert!(!format!("{agent_res:?}").contains(SENTINEL));
+
+    let denied_host = Arc::new(FixtureHost {
+        calls: AtomicUsize::new(0),
+        value: String::new(),
+        outcome: Some(SecretSpecDiagnostic::Unavailable),
+    });
+    let denied_http_seen = Arc::new(Mutex::new(None));
+    let denied_provider =
+        AnimusSecretSpecProvider::new(config(ProviderScheme::Sops), denied_host, Arc::new(AtomicBool::new(false)))
+            .unwrap();
+    let denied_executor = Executor::new_with_runtime_clients(
+        Box::new(denied_provider),
+        Box::new(RecordingHttpClient {
+            seen_header: Arc::clone(&denied_http_seen),
+        }),
+        Box::new(NoopFileSystem),
+        Box::new(NoopImageIo),
+        Box::new(RecordingAgentAdapter {
+            seen_secret: Arc::new(Mutex::new(None)),
+        }),
+    );
+    let failed = denied_executor.execute_node(&workflow, http_id, &HashMap::new()).await;
+    assert!(matches!(failed.status, NodeStatus::Failed { .. }));
+    assert!(denied_http_seen.lock().unwrap().is_none(), "HTTP effect must be blocked on credential failure");
+    assert!(!format!("{failed:?}").contains(SENTINEL));
+}
+
+// r[verify lattice.credentials.animus_secret_providers.resolve.scenario.trigger]
+// r[verify lattice.credentials.animus_secret_providers.redaction]
+#[test]
+fn webhook_bearer_and_blake3_auth_plus_dry_run_admit_secretspec_without_leaks() {
+    use lattice::scheduler::OverlapPolicy;
+    use lattice::triggers::IdempotencyPolicy;
+    use lattice::triggers::TriggerDefinition;
+    use lattice::triggers::TriggerInputBinding;
+    use lattice::triggers::TriggerKind;
+    use lattice::triggers::WebhookAuthPolicy;
+    use lattice::triggers::WebhookTrigger;
+    use lattice::triggers::webhook_signature;
+    use lattice::webhooks;
+
+    let body = br#"{"event":"deploy"}"#;
+    let limits = webhooks::RequestLimits {
+        max_body_bytes: body.len(),
+    };
+    let bearer_trigger = TriggerDefinition {
+        id: "bearer-trigger".into(),
+        workflow_name: "wf-webhook".into(),
+        enabled: true,
+        kind: TriggerKind::Webhook(WebhookTrigger {
+            method: "POST".into(),
+            path: "/hooks/bearer".into(),
+            accepted_content_types: vec!["application/json".into()],
+            auth_policy: WebhookAuthPolicy::Bearer {
+                secret_ref: reference(),
+            },
+        }),
+        input_bindings: Vec::<TriggerInputBinding>::new(),
+        overlap_policy: OverlapPolicy::Forbid,
+        idempotency_policy: IdempotencyPolicy::EventKey,
+    };
+    let sig_trigger = TriggerDefinition {
+        id: "blake3-trigger".into(),
+        workflow_name: "wf-webhook".into(),
+        enabled: true,
+        kind: TriggerKind::Webhook(WebhookTrigger {
+            method: "POST".into(),
+            path: "/hooks/sig".into(),
+            accepted_content_types: vec!["application/json".into()],
+            auth_policy: WebhookAuthPolicy::Blake3Signature {
+                secret_ref: reference(),
+                header: "X-Lattice-Sig".into(),
+            },
+        }),
+        input_bindings: Vec::<TriggerInputBinding>::new(),
+        overlap_policy: OverlapPolicy::Forbid,
+        idempotency_policy: IdempotencyPolicy::EventKey,
+    };
+
+    let host = Arc::new(FixtureHost::success(SENTINEL));
+    let provider =
+        AnimusSecretSpecProvider::new(config(ProviderScheme::Sops), host.clone(), Arc::new(AtomicBool::new(false)))
+            .unwrap();
+    let ctx = webhooks::admission_context(&[], 1_000);
+
+    let bearer_req = webhooks::RawRequest {
+        method: "POST".into(),
+        target: "/hooks/bearer".into(),
+        headers: vec![
+            ("Content-Type".into(), "application/json".into()),
+            ("Authorization".into(), format!("Bearer {SENTINEL}")),
+            ("Idempotency-Key".into(), "evt-bearer".into()),
+        ],
+        body: body.to_vec(),
+    };
+    let decision =
+        webhooks::decide_request(&bearer_req, std::slice::from_ref(&bearer_trigger), &provider, &ctx, limits);
+    assert!(matches!(decision, webhooks::Decision::Admitted(_)));
+
+    let sig_value = webhook_signature(SENTINEL, body);
+    let sig_req = webhooks::RawRequest {
+        method: "POST".into(),
+        target: "/hooks/sig".into(),
+        headers: vec![
+            ("Content-Type".into(), "application/json".into()),
+            ("X-Lattice-Sig".into(), sig_value),
+            ("Idempotency-Key".into(), "evt-sig".into()),
+        ],
+        body: body.to_vec(),
+    };
+    let sig_decision = webhooks::decide_request(&sig_req, std::slice::from_ref(&sig_trigger), &provider, &ctx, limits);
+    assert!(matches!(sig_decision, webhooks::Decision::Admitted(_)));
+    assert_eq!(host.calls.load(Ordering::Acquire), 2);
+
+    // dry_run_report validates reference policy without invoking host secret resolution
+    let workflows = std::collections::HashSet::from(["wf-webhook".to_owned()]);
+    let dry_run =
+        webhooks::controls::dry_run_report("127.0.0.1:0", &[bearer_trigger, sig_trigger], &workflows, &provider);
+    assert_eq!(host.calls.load(Ordering::Acquire), 2, "dry_run must not resolve secret values");
+    let dry_run_debug = format!("{dry_run:?}");
+    assert!(!dry_run_debug.contains(SENTINEL));
+    assert!(!dry_run_debug.contains("API_TOKEN"));
+}
+
+// r[verify lattice.credentials.animus_secret_providers.resolve.scenario.failure]
+// r[verify lattice.credentials.animus_secret_providers.redaction.scenario.failure]
+#[test]
+fn bounded_sops_host_rejects_missing_executable_and_zeroizes_resolved_values_on_drop() {
+    use animus_std_secretspec::ResolverDeployment;
+    use lattice::credentials::SecretValue;
+    use lattice::credentials::secretspec::BoundedSecretSpecHost;
+    use lattice::credentials::secretspec::HostInputSource;
+
+    let temp = tempfile::tempdir().unwrap();
+    let policy_path = temp.path().join("policy.json");
+    let cfg = config(ProviderScheme::Sops);
+    let policy_bytes = checked_policy(&cfg);
+    std::fs::write(&policy_path, &policy_bytes).unwrap();
+    let manifest_path = temp.path().join("secretspec.toml");
+    std::fs::write(&manifest_path, "[project]\nname=\"demo\"\n").unwrap();
+
+    let missing_exec = temp.path().join("missing-sops-executable");
+    let missing_worker = temp.path().join("missing-worker-executable");
+    let host = BoundedSecretSpecHost::new(
+        policy_bytes,
+        ResolverDeployment {
+            manifest_path,
+            worker_executable: missing_worker,
+            working_directory: temp.path().to_path_buf(),
+        },
+        HostInputSource::Sops {
+            guard_directory: temp.path().to_path_buf(),
+            executable: missing_exec.clone(),
+            credential_variables: vec![],
+        },
+    )
+    .expect("absolute SOPS host config validates");
+    let provider = AnimusSecretSpecProvider::new(cfg, Arc::new(host), Arc::new(AtomicBool::new(false))).unwrap();
+    let err = provider
+        .resolve_in_context(&reference(), &context(CredentialDestination::AgentEnvironment), None)
+        .expect_err("missing SOPS worker/executable must fail closed");
+    let rendered = err.to_string();
+    assert!(!rendered.contains(&missing_exec.display().to_string()));
+    assert!(!rendered.contains("missing-sops-executable"));
+    assert!(!rendered.contains(SENTINEL));
+
+    let secret = SecretValue::new(SENTINEL.to_owned());
+    let debug = format!("{secret:?}");
+    assert!(!debug.contains(SENTINEL));
+    drop(secret);
+}
+
+// r[verify lattice.credentials.animus_secret_providers.redaction.scenario.success]
+// r[verify lattice.credentials.animus_secret_providers.round_trip]
+#[tokio::test]
+async fn hostile_sentinel_never_leaks_across_nickel_redb_plans_history_replay_or_n8n_exports() {
+    use std::collections::HashMap;
+
+    use lattice::credentials::NodeCredentialRefs;
+    use lattice::engine::RunId;
+    use lattice::engine::executor::Executor;
+    use lattice::engine::executor::node_execution_cache_key_with_credentials;
+    use lattice::engine::runner::build_runner_plan;
+    use lattice::engine::workflow::Workflow;
+    use lattice::engine::workflow::WorkflowTimestamp;
+    use lattice::n8n_json::export_workflow_to_n8n_json;
+    use lattice::n8n_json::n8n_json_to_pretty_string;
+    use lattice::replay::build_replay_timeline;
+    use lattice::replay::replay_events_from_results;
+    use lattice::store::RunDetailRecord;
+    use lattice::store::RunNodeDetail;
+    use lattice::store::RunNodeDetailStatus;
+    use lattice::store::Store;
+    use lattice::workflow_format::workflow_to_nickel;
+
+    let mut workflow = Workflow::new("hostile-sentinel-audit", WorkflowTimestamp::epoch());
+    let node_id = workflow.add_shell_node("shell", "printf 'secret=%s' \"$API_TOKEN\"".to_string());
+    workflow.set_node_credentials(node_id, NodeCredentialRefs {
+        env: HashMap::from([("API_TOKEN".into(), reference())]),
+    });
+
+    let host = Arc::new(FixtureHost::success(SENTINEL));
+    let provider =
+        AnimusSecretSpecProvider::new(config(ProviderScheme::Sops), host, Arc::new(AtomicBool::new(false))).unwrap();
+    let reachability = provider.probe(&reference());
+    let result = Executor::new_with_credential_provider(Box::new(provider))
+        .execute_node(&workflow, node_id, &HashMap::new())
+        .await;
+
+    let plan = build_runner_plan(&workflow);
+    let cache_key = node_execution_cache_key_with_credentials(
+        node_id,
+        workflow.node_config(node_id).unwrap(),
+        workflow.node_credentials(node_id),
+        &HashMap::new(),
+    );
+    let nickel = workflow_to_nickel(&workflow);
+    let n8n = export_workflow_to_n8n_json(&workflow);
+    let n8n_text = n8n.json.as_ref().map(n8n_json_to_pretty_string).unwrap_or_default();
+
+    let run_id = RunId(42);
+    let replay_events =
+        replay_events_from_results(run_id, &workflow, std::slice::from_ref(&result), 1_000, Some(1_010));
+    let replay_timeline = build_replay_timeline(run_id, &replay_events, None);
+    let result_error = match &result.status {
+        lattice::engine::executor::NodeStatus::Failed { error, .. } => Some(error.clone()),
+        _ => None,
+    };
+    let details = RunDetailRecord {
+        run_id,
+        nodes: vec![RunNodeDetail {
+            node_id,
+            node_label: "shell".into(),
+            status: RunNodeDetailStatus::Completed,
+            cached: false,
+            outputs: vec![],
+            error: result_error,
+            policy_decision: None,
+        }],
+        observed_completion_order: vec![node_id],
+    };
+
+    let temp = tempfile::tempdir().unwrap();
+    let db_path = temp.path().join("sentinel-audit.redb");
+    let store = Store::new(&db_path).unwrap();
+    store.save_workflow(&workflow).unwrap();
+    store.save_run_details(&details).unwrap();
+    store.save_run_replay_events(run_id, &replay_events).unwrap();
+    let persisted = std::fs::read(&db_path).unwrap();
+
+    for surface in [
+        format!("{reachability:?}"),
+        format!("{result:?}"),
+        format!("{plan:?}"),
+        format!("{cache_key:?}"),
+        nickel,
+        n8n_text,
+        format!("{:?}", n8n.report),
+        format!("{replay_events:?}"),
+        format!("{replay_timeline:?}"),
+        format!("{details:?}"),
+        String::from_utf8_lossy(&persisted).into_owned(),
+    ] {
+        assert!(!surface.contains(SENTINEL), "sentinel leaked into surface: {surface}");
+    }
+}
+
+// r[verify lattice.credentials.animus_secret_providers.documentation]
+// r[verify lattice.credentials.animus_secret_providers.documentation.scenario.non_claim]
+// r[verify lattice.credentials.animus_secret_providers.verification]
+// r[verify lattice.credentials.animus_secret_providers.verification.scenario.closeout]
+#[test]
+fn documentation_and_readme_preserve_provenance_and_non_claim_boundaries() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let doc = std::fs::read_to_string(root.join("docs/secretspec-credentials.md")).expect("doc reads");
+    let readme = std::fs::read_to_string(root.join("README.md")).expect("README reads");
+
+    assert!(doc.contains("e6f27948b19ea2e1bcb67428ca2e12f7acb6e558"));
+    assert!(doc.contains("6a231c9738f9634df311b58a97e27bdc16e77eced28d4f73327671dafec7ef10"));
+    assert!(doc.contains("configured; reachability not probed"));
+    assert!(doc.contains("Host-memory confidentiality and hostile-host resistance\nare not claimed."));
+    assert!(readme.contains("docs/secretspec-credentials.md"));
+    assert!(readme.contains("host-memory confidentiality"));
+}

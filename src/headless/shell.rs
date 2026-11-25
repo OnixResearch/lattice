@@ -2,7 +2,13 @@
 
 mod bound;
 mod checkpoint;
+mod profile;
 mod record;
+
+pub use profile::AppConfigSnapshotRun;
+pub use profile::run_owned_workflow_with_app_config;
+pub use profile::run_saved_workflow_with_app_config;
+pub use profile::run_workflow_snapshot_with_app_config;
 
 #[derive(Debug, Clone)]
 pub struct OwnedRunRequest {
@@ -26,49 +32,6 @@ pub struct TypedPolicyRunRequest<'a> {
     pub workflow_name: &'a str,
     pub run_id: crate::engine::executor::RunId,
     pub authority_provider: &'a dyn crate::engine::effect::execution::RunContextProvider,
-}
-
-pub async fn run_saved_workflow_with_app_config(
-    store: &crate::store::Store,
-    workflow_name: &str,
-    run_id: crate::engine::executor::RunId,
-    app_config: &crate::config::AppConfig,
-) -> Result<super::HeadlessRunSummary, super::HeadlessRunError> {
-    let agent_runtime = app_config.effective_agent_runtime();
-    let frontier_policy = app_config.frontier_capacity_policy().unwrap_or_else(|error| {
-        tracing::error!(?error, "invalid frontier policy, preserving serial execution");
-        crate::engine::frontier::serial_capacity_policy()
-    });
-    debug_assert!(frontier_policy.total_slots > 0);
-    debug_assert!(!frontier_policy.lane_slots.is_empty());
-    let authority_provider = app_config.effect_authority_provider();
-    run_saved_workflow_with_executor_factory(
-        ProductRunRequest {
-            store,
-            workflow_name,
-            run_id,
-            owner: crate::store::RunOwner::Unscoped,
-            authority_provider: authority_provider.as_ref(),
-        },
-        || configured_executor(agent_runtime, frontier_policy),
-    )
-    .await
-}
-
-fn configured_executor(
-    agent_runtime: crate::agent_node::RuntimeOptions,
-    frontier_policy: lattice_core::scheduling::CapacityPolicy,
-) -> crate::engine::executor::Executor {
-    let fallback_runtime = agent_runtime.clone();
-    match crate::engine::executor::Executor::new_with_agent_runtime_config(agent_runtime)
-        .with_frontier_policy(frontier_policy)
-    {
-        Ok(executor) => executor,
-        Err(error) => {
-            tracing::error!(?error, "validated frontier policy was rejected, preserving serial execution");
-            crate::engine::executor::Executor::new_with_agent_runtime_config(fallback_runtime)
-        }
-    }
 }
 
 // r[impl lattice.agent_orchestration.run_identity]

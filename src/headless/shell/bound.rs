@@ -12,18 +12,7 @@ impl crate::workflow_template::inputs::Admitted {
         store: &crate::store::Store,
         app_config: &crate::config::AppConfig,
     ) -> Result<super::super::HeadlessRunSummary, super::super::HeadlessRunError> {
-        let agent_runtime = app_config.effective_agent_runtime();
-        let frontier_policy = app_config.frontier_capacity_policy().unwrap_or_else(|error| {
-            tracing::error!(?error, "invalid frontier policy, preserving serial execution");
-            crate::engine::frontier::serial_capacity_policy()
-        });
-        debug_assert!(frontier_policy.total_slots > 0);
-        debug_assert!(!frontier_policy.lane_slots.is_empty());
-        let authority_provider = app_config.effect_authority_provider();
-        execute(store, self, authority_provider.as_ref(), || {
-            super::configured_executor(agent_runtime, frontier_policy)
-        })
-        .await
+        execute_with_app_config(store, self, app_config).await
     }
 
     /// Run the bound workflow with an explicit effect authority source.
@@ -34,6 +23,37 @@ impl crate::workflow_template::inputs::Admitted {
     ) -> Result<super::super::HeadlessRunSummary, super::super::HeadlessRunError> {
         execute(store, self, authority_provider, crate::engine::executor::Executor::new).await
     }
+}
+
+async fn execute_with_app_config(
+    store: &crate::store::Store,
+    admitted: crate::workflow_template::inputs::Admitted,
+    app_config: &crate::config::AppConfig,
+) -> Result<super::super::HeadlessRunSummary, super::super::HeadlessRunError> {
+    crate::workflow_template::inputs::reverify_admitted(&admitted).map_err(|error| {
+        super::super::HeadlessRunError::Validation(vec![super::authority_context_diagnostic(error.to_string())])
+    })?;
+    let (workflow, identity) = admitted.into_run_parts();
+    let cancellation = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let executor = super::profile::configured_executor_for_workflow(app_config, &workflow, cancellation)?;
+    let workflow_name = identity.workflow.workflow_name.clone();
+    debug_assert_eq!(workflow.meta.name, workflow_name);
+    let authority_provider = app_config.effect_authority_provider();
+    let run_id = store.reserve_run_with_inputs(&identity)?;
+    let outcome = super::run_workflow_snapshot_with_executor_factory(
+        super::ProductRunRequest {
+            store,
+            workflow_name: &workflow_name,
+            run_id,
+            owner: crate::store::RunOwner::Unscoped,
+            authority_provider: authority_provider.as_ref(),
+        },
+        workflow,
+        || executor,
+    )
+    .await?;
+    debug_assert_eq!(outcome.summary.run_id, run_id);
+    Ok(outcome.summary)
 }
 
 async fn execute(

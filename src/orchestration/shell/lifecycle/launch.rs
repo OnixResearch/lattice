@@ -14,11 +14,29 @@ pub async fn start(
     .await
 }
 
+pub async fn start_with_app_config(
+    store: &crate::store::Store,
+    definition: crate::orchestration::core::Definition,
+    actor: &str,
+    app_config: &crate::config::AppConfig,
+) -> Result<crate::orchestration::core::Instance, super::super::Error> {
+    start_with_backend(store, definition, actor, super::super::ExecutionBackend::AppConfig(app_config)).await
+}
+
 pub async fn start_with_execution(
     store: &crate::store::Store,
     definition: crate::orchestration::core::Definition,
     actor: &str,
     execution: super::super::ProductExecution<'_>,
+) -> Result<crate::orchestration::core::Instance, super::super::Error> {
+    start_with_backend(store, definition, actor, super::super::ExecutionBackend::Authority(execution)).await
+}
+
+async fn start_with_backend(
+    store: &crate::store::Store,
+    definition: crate::orchestration::core::Definition,
+    actor: &str,
+    execution: super::super::ExecutionBackend<'_>,
 ) -> Result<crate::orchestration::core::Instance, super::super::Error> {
     crate::orchestration::core::authorize_definition_actor(&definition, actor)?;
     let report = super::super::validate_definition_in_store(store, &definition)?;
@@ -29,7 +47,7 @@ pub async fn start_with_execution(
     let sequence = store.next_orchestration_sequence()?;
     let instance = crate::orchestration::core::new_instance(definition, sequence, None)?;
     store.create_orchestration(&instance, &[])?;
-    super::dispatch::execute_ready_round(store, instance, execution).await
+    super::dispatch::execute_ready_round_backend(store, instance, execution).await
 }
 
 pub async fn start_from_trigger_with_execution(

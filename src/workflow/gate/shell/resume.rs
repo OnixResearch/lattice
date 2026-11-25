@@ -10,16 +10,23 @@ pub struct ResumeExecution {
 // r[impl lattice.workflow_approval.resume.denied]
 // r[impl lattice.workflow_approval.terminal]
 // r[impl lattice.workflow_approval.terminal.duplicate]
+pub async fn resume_with_app_config(
+    store: &crate::store::Store,
+    command: &super::ResumeCommand,
+    app_config: &crate::config::AppConfig,
+) -> Result<ResumeExecution, Error> {
+    let authority_provider = app_config.effect_authority_provider();
+    let runtime = ResumeRuntime { agent: app_config.effective_agent_runtime(), typed_policy: None, app_config: Some(app_config.clone()) };
+    resume(store, command, runtime, authority_provider.as_ref()).await
+}
+
 pub async fn resume_with_authority_provider(
     store: &crate::store::Store,
     command: &super::ResumeCommand,
     agent_runtime: crate::agent_node::RuntimeOptions,
     authority_provider: &dyn crate::engine::effect::execution::RunContextProvider,
 ) -> Result<ResumeExecution, Error> {
-    let runtime = ResumeRuntime {
-        agent: agent_runtime,
-        typed_policy: None,
-    };
+    let runtime = ResumeRuntime { agent: agent_runtime, typed_policy: None, app_config: None };
     resume(store, command, runtime, authority_provider).await
 }
 
@@ -118,7 +125,9 @@ async fn execute_remaining(
         .inspect_err(|_| mark_uncertain(store, &prepared.signalled, &command.owner))?;
     let workflow_catalog = std::sync::Arc::new(crate::engine::WorkflowCatalogRepository::from_repository(store)?);
     let subworkflow_shell = crate::engine::RepositorySubworkflowRunnerShell::product(workflow_catalog);
-    let mut executor = runtime.executor(Box::new(subworkflow_shell));
+    let mut executor = runtime
+        .executor(&prepared.workflow, Box::new(subworkflow_shell))
+        .inspect_err(|_| mark_uncertain(store, &prepared.signalled, &command.owner))?;
     let cache = std::collections::HashMap::new();
     let execution = executor
         .resume_authorized_after_approval(crate::engine::executor::ApprovalResumeInput {

@@ -174,21 +174,50 @@ fn append_config_lines(
                 Span::styled(property.value, Style::new().fg(Color::Cyan)),
             ]));
         }
-        lines = append_credentials(lines, app.workflow.node_credentials(node_id));
+        lines = append_credentials(lines, app, app.workflow.node_credentials(node_id));
     }
     lines
 }
 
 fn append_credentials(
     mut lines: Vec<Line<'static>>,
+    app: &crate::tui::app::State,
     refs: Option<&crate::credentials::NodeCredentialRefs>,
 ) -> Vec<Line<'static>> {
+    if !app.config.credential_providers.is_empty() {
+        lines.push(Line::from(vec![
+            Span::styled("Providers: ", Style::new().fg(Color::DarkGray)),
+            Span::styled(app.configured_credential_providers().join(", "), Style::new().fg(Color::Cyan)),
+        ]));
+    }
     let credentials = crate::tui::app::editing::parsing::credentials_to_draft(refs);
     if !credentials.is_empty() {
         lines.push(Line::from(vec![
             Span::styled("Credentials: ", Style::new().fg(Color::DarkGray)),
             Span::styled(credentials, Style::new().fg(Color::Gray)),
         ]));
+        lines.extend(provider_probe_lines(app, refs));
     }
     lines
+}
+
+fn provider_probe_lines(
+    app: &crate::tui::app::State,
+    refs: Option<&crate::credentials::NodeCredentialRefs>,
+) -> Vec<Line<'static>> {
+    let mut probe_lines = Vec::new();
+    if let Some(refs) = refs
+        && !app.config.credential_providers.is_empty()
+    {
+        let mut entries = refs.env.iter().collect::<Vec<_>>();
+        entries.sort_by_key(|(name, _)| *name);
+        for (name, reference) in entries {
+            let probe = app.probe_credential_reference(reference);
+            probe_lines.push(Line::from(vec![
+                Span::styled(format!("  {name}: "), Style::new().fg(Color::DarkGray)),
+                Span::styled(probe.message, Style::new().fg(Color::Gray)),
+            ]));
+        }
+    }
+    probe_lines
 }

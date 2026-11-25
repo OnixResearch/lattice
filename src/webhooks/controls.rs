@@ -159,6 +159,27 @@ fn definition_diagnostics(
     diagnostics
 }
 
+fn resolve_trigger_auth_in_context(
+    trigger: &crate::triggers::TriggerDefinition,
+    secret_ref: &crate::credentials::SecretRef,
+    provider: &dyn crate::credentials::CredentialProvider,
+) -> Result<(), crate::credentials::CredentialError> {
+    if provider.resolution_reason(secret_ref).is_some() {
+        return provider.validate_reference(secret_ref);
+    }
+    let context = crate::credentials::CredentialResolutionContext {
+        subject: crate::credentials::CredentialSubject::TriggerAuthentication {
+            workflow_id: trigger.workflow_name.clone(),
+            trigger_id: trigger.id.clone(),
+        },
+        binding: "webhook_auth".to_string(),
+        reference: secret_ref.clone(),
+        destination: crate::credentials::CredentialDestination::WebhookAuthentication,
+        reason: provider.resolution_reason(secret_ref).unwrap_or_default().to_owned(),
+    };
+    provider.resolve_in_context(secret_ref, &context, None).map(|_| ())
+}
+
 fn credential_diagnostics(
     trigger: &crate::triggers::TriggerDefinition,
     provider: &dyn crate::credentials::CredentialProvider,
@@ -166,8 +187,8 @@ fn credential_diagnostics(
     let Some(secret_ref) = secret_ref(trigger) else {
         return Vec::new();
     };
-    match provider.resolve(secret_ref) {
-        Ok(_) => Vec::new(),
+    match resolve_trigger_auth_in_context(trigger, secret_ref, provider) {
+        Ok(()) => Vec::new(),
         Err(error) => vec![DryRunDiagnostic {
             trigger_id: non_empty_trigger_id(trigger),
             code: super::shared::DRY_RUN_CREDENTIAL_CODE.to_string(),

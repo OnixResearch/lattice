@@ -18,6 +18,18 @@ impl State {
         let field_id = match edit.field {
             PropertyEditField::Credentials => {
                 replace_credentials(&mut candidate, edit)?;
+                if !self.config.credential_providers.is_empty()
+                    && let Some(refs) = candidate.node_credentials(edit.node_id)
+                {
+                    let registry = self
+                        .credential_registry(&candidate, Arc::new(std::sync::atomic::AtomicBool::new(false)))
+                        .map_err(|error| PropertyEditError::Typed(error.code().to_string()))?;
+                    for reference in refs.env.values() {
+                        registry
+                            .validate_secret_ref(reference)
+                            .map_err(|error| PropertyEditError::Typed(error.to_string()))?;
+                    }
+                }
                 None
             }
             // r[impl lattice.tui_ux.condition_topology_reconciliation]

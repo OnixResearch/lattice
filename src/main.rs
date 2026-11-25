@@ -9,10 +9,8 @@ use clap::Parser;
 use clap::Subcommand;
 use clap::ValueEnum;
 use lattice::config;
-use lattice::credentials::CredentialProviderCapabilities;
-use lattice::credentials::CredentialProviderMetadata;
+use lattice::credentials::CredentialProvider as _;
 use lattice::credentials::CredentialProviderRegistry;
-use lattice::credentials::EnvironmentCredentialProvider;
 use lattice::headless;
 use lattice::headless::HeadlessProcessResult;
 use lattice::n8n_json;
@@ -35,7 +33,6 @@ use tracing::info;
 const LOG_FILE_NAME: &str = "lattice.log";
 const DEFAULT_TRIGGER_HISTORY_LIMIT: usize = 20;
 const ENV_CREDENTIAL_PROVIDER_ID: &str = "env";
-const ENV_CREDENTIAL_PROVIDER_NAME: &str = "Environment";
 const WEBHOOK_MAX_IN_FLIGHT_CONNECTIONS: usize = 32;
 const DEFAULT_SCHEDULE_OCCURRENCE_LIMIT: u64 = 20;
 const MAX_SCHEDULE_OCCURRENCE_LIMIT: u64 = 100;
@@ -757,7 +754,10 @@ fn load_app_config_checked_for_doctor(config_path: &Path) -> Result<config::AppC
     }
     let value =
         lattice::nickel::evaluate_file(config_path).map_err(|error| format!("Nickel config failed: {error}"))?;
-    serde_json::from_value(value).map_err(|_| "Nickel config schema decode failed".to_string())
+    let config: config::AppConfig =
+        serde_json::from_value(value).map_err(|_| "Nickel config schema decode failed".to_string())?;
+    config.validated_credential_hosts().map_err(|error| error.code().to_string())?;
+    Ok(config)
 }
 
 // r[impl n8nclone.operator_diagnostics.doctor_checks]
@@ -805,9 +805,9 @@ fn collect_doctor_facts(config_path: &Path, args: &DoctorCommandArgs) -> doctor:
         }
     };
 
-    collect_workflow_doctor_facts(&store, &mut checks);
+    collect_workflow_doctor_facts(&store, &app_config, &mut checks);
     let triggers = collect_trigger_doctor_facts(&store, &mut checks);
-    collect_credential_doctor_facts(&triggers, &mut checks);
+    collect_credential_doctor_facts(&app_config, &triggers, &mut checks);
     collect_webhook_listener_doctor_facts(&triggers, &mut checks);
     doctor::Facts::new(checks)
 }
@@ -847,7 +847,7 @@ fn collect_operation_doctor_facts(args: &DoctorCommandArgs, checks: &mut Vec<doc
 }
 
 // r[impl n8nclone.operator_diagnostics.doctor_checks.config_store]
-fn collect_workflow_doctor_facts(store: &Store, checks: &mut Vec<doctor::Fact>) {
+fn collect_workflow_doctor_facts(store: &Store, app_config: &config::AppConfig, checks: &mut Vec<doctor::Fact>) {
     let workflow_names = match store.list_workflows() {
         Ok(workflow_names) => workflow_names,
         Err(error) => {
@@ -858,11 +858,33 @@ fn collect_workflow_doctor_facts(store: &Store, checks: &mut Vec<doctor::Fact>) 
             return;
         }
     };
+    let registry = if app_config.credential_providers.is_empty() {
+        None
+    } else {
+        match app_config.credential_registry(&[], std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false))) {
+            Ok(registry) => Some(registry),
+            Err(error) => {
+                checks.push(
+                    doctor::Fact::fatal(
+                        doctor::CHECK_WORKFLOWS,
+                        format!("credential provider setup failed: {}", error.code()),
+                    )
+                    .with_remediation("fix credential_providers and credential_hosts configuration"),
+                );
+                return;
+            }
+        }
+    };
     let mut fatal_diagnostic_count = 0usize;
     for workflow_name in &workflow_names {
         match store.load_workflow(workflow_name) {
             Ok(Some(workflow)) => {
-                let diagnostics = workflow_validation::validate_workflow(&workflow);
+                let diagnostics = match &registry {
+                    Some(registry) => {
+                        workflow_validation::validate_workflow_with_credential_registry(&workflow, registry)
+                    }
+                    None => workflow_validation::validate_workflow(&workflow),
+                };
                 if workflow_validation::has_fatal_diagnostics(&diagnostics) {
                     fatal_diagnostic_count += diagnostics.len();
                 }
@@ -917,15 +939,39 @@ fn collect_trigger_doctor_facts(store: &Store, checks: &mut Vec<doctor::Fact>) -
 }
 
 // r[impl n8nclone.operator_diagnostics.doctor_checks.credentials]
-fn collect_credential_doctor_facts(triggers: &[TriggerDefinition], checks: &mut Vec<doctor::Fact>) {
+fn collect_credential_doctor_facts(
+    app_config: &config::AppConfig,
+    triggers: &[TriggerDefinition],
+    checks: &mut Vec<doctor::Fact>,
+) {
     let secret_refs = webhooks::secret_refs(triggers);
+    let registry =
+        match app_config.credential_registry(&[], std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false))) {
+            Ok(registry) => registry,
+            Err(error) => {
+                checks.push(
+                    doctor::Fact::fatal(
+                        doctor::CHECK_CREDENTIALS,
+                        format!("credential provider configuration failed: {}", error.code()),
+                    )
+                    .with_remediation("fix credential_providers and credential_hosts configuration"),
+                );
+                return;
+            }
+        };
     let missing_env_count = secret_refs
         .iter()
         .filter(|secret_ref| secret_ref.provider == ENV_CREDENTIAL_PROVIDER_ID)
         .filter(|secret_ref| std::env::var_os(&secret_ref.key).is_none())
         .count();
-    let unsupported_provider_count =
-        secret_refs.iter().filter(|secret_ref| secret_ref.provider != ENV_CREDENTIAL_PROVIDER_ID).count();
+    let mut unsupported_provider_count = 0usize;
+    for secret_ref in secret_refs.iter().filter(|secret_ref| secret_ref.provider != ENV_CREDENTIAL_PROVIDER_ID) {
+        if registry.validate_secret_ref(secret_ref).is_ok() {
+            let _probe = registry.probe(secret_ref);
+        } else {
+            unsupported_provider_count += 1;
+        }
+    }
 
     if secret_refs.is_empty() {
         checks
@@ -970,7 +1016,6 @@ async fn run_orchestration_command(app_config: &config::AppConfig, args: &Orches
         Ok(store) => store,
         Err(error) => return orchestration_failure(&error),
     };
-    let authority_provider = app_config.effect_authority_provider();
     match &args.command {
         OrchestrationCliCommand::Validate { path, output } => {
             let definition = match orchestration::load_definition_nickel_file(path) {
@@ -994,12 +1039,7 @@ async fn run_orchestration_command(app_config: &config::AppConfig, args: &Orches
                 Ok(definition) => definition,
                 Err(error) => return orchestration_failure(&error.to_string()),
             };
-            match orchestration::start_with_execution(&store, definition, actor, orchestration::ProductExecution {
-                agent_runtime: app_config.effective_agent_runtime(),
-                authority_provider: authority_provider.as_ref(),
-            })
-            .await
-            {
+            match orchestration::start_with_app_config(&store, definition, actor, app_config).await {
                 Ok(instance) => render_orchestration_instance(&instance, *output),
                 Err(error) => orchestration_failure(&error.to_string()),
             }
@@ -1042,14 +1082,11 @@ async fn run_orchestration_command(app_config: &config::AppConfig, args: &Orches
                 Ok(proposal) => proposal,
                 Err(error) => return orchestration_failure(&error.to_string()),
             };
-            match orchestration::approve_with_execution(&store, orchestration::ProductApproval {
+            match orchestration::approve_with_app_config(&store, orchestration::AppConfigApproval {
                 instance_id: instance.clone(),
                 proposal,
                 actor: actor.clone(),
-                execution: orchestration::ProductExecution {
-                    agent_runtime: app_config.effective_agent_runtime(),
-                    authority_provider: authority_provider.as_ref(),
-                },
+                app_config,
             })
             .await
             {
@@ -1089,16 +1126,13 @@ async fn run_orchestration_command(app_config: &config::AppConfig, args: &Orches
             instance,
             actor,
             output,
-        } => match orchestration::retry_with_execution(
+        } => match orchestration::retry_with_app_config(
             &store,
             orchestration::RetryRequest {
                 instance_id: instance,
                 actor,
             },
-            orchestration::ProductExecution {
-                agent_runtime: app_config.effective_agent_runtime(),
-                authority_provider: authority_provider.as_ref(),
-            },
+            app_config,
         )
         .await
         {
@@ -1373,7 +1407,6 @@ async fn run_scheduler_daemon_once(
     };
     let now_epoch_ms = args.now_epoch_ms.unwrap_or_else(|| chrono::Utc::now().timestamp_millis());
     let evaluation = scheduler::evaluate_due_runs(&schedules, now_epoch_ms, &std::collections::HashSet::new());
-    let authority_provider = app_config.effect_authority_provider();
 
     for skipped in evaluation.skipped_runs {
         if skipped.reason == ScheduleSkipReason::MissedRunSkipped {
@@ -1426,13 +1459,7 @@ async fn run_scheduler_daemon_once(
                 continue;
             }
         };
-        let outcome = match scheduler::shell::execute_occurrence_with_authority_provider(
-            &store,
-            &occurrence,
-            app_config.effective_agent_runtime(),
-            authority_provider.as_ref(),
-        )
-        .await
+        let outcome = match scheduler::shell::execute_occurrence_with_app_config(&store, &occurrence, app_config).await
         {
             Ok(summary) => ScheduleDaemonOutcome::Started {
                 schedule_id: plan.schedule_id.clone(),
@@ -1476,7 +1503,6 @@ async fn run_scheduler_occurrences_command(
         Ok(store) => store,
         Err(error) => return scheduler_occurrence_failure(&error.to_string()),
     };
-    let authority_provider = app_config.effect_authority_provider();
     match &args.command {
         SchedulerOccurrenceCliCommand::List { limit, output } => {
             if *limit == 0 || *limit > MAX_SCHEDULE_OCCURRENCE_LIMIT {
@@ -1502,12 +1528,11 @@ async fn run_scheduler_occurrences_command(
             identity,
             acknowledge_duplicate_risk,
             output,
-        } => match scheduler::shell::retry_occurrence_with_authority_provider(
+        } => match scheduler::shell::retry_occurrence_with_app_config(
             &store,
             identity,
             *acknowledge_duplicate_risk,
-            app_config.effective_agent_runtime(),
-            authority_provider.as_ref(),
+            app_config,
         )
         .await
         {
@@ -1681,7 +1706,7 @@ async fn run_webhook_listener_command(app_config: &config::AppConfig, args: &Web
             return ExitCode::FAILURE;
         }
     };
-    let provider = match webhook_credential_provider(&triggers) {
+    let provider = match webhook_credential_provider(app_config, &triggers) {
         Ok(provider) => provider,
         Err(error) => {
             eprintln!("Webhook listener failed: {error}");
@@ -1723,7 +1748,7 @@ async fn run_webhook_listener_command(app_config: &config::AppConfig, args: &Web
     let store = std::sync::Arc::new(store);
     let triggers = std::sync::Arc::new(triggers);
     let provider = std::sync::Arc::new(provider);
-    let authority_provider = app_config.effect_authority_provider();
+    let listener_config = std::sync::Arc::new(app_config.clone());
     let mut handlers = tokio::task::JoinSet::new();
     loop {
         while let Some(result) = handlers.try_join_next() {
@@ -1743,17 +1768,10 @@ async fn run_webhook_listener_command(app_config: &config::AppConfig, args: &Web
         let store = std::sync::Arc::clone(&store);
         let triggers = std::sync::Arc::clone(&triggers);
         let provider = std::sync::Arc::clone(&provider);
-        let authority_provider = std::sync::Arc::clone(&authority_provider);
+        let listener_config = std::sync::Arc::clone(&listener_config);
         handlers.spawn(async move {
-            let response = handle_webhook_connection(
-                &mut stream,
-                &store,
-                &triggers,
-                &provider,
-                limits,
-                authority_provider.as_ref(),
-            )
-            .await;
+            let response =
+                handle_webhook_connection(&mut stream, &store, &triggers, &provider, limits, &listener_config).await;
             if let Err(error) = stream.write_all(&webhooks::render(&response)).await {
                 tracing::warn!(error = %error, "failed to write webhook listener response");
             }
@@ -1804,7 +1822,7 @@ async fn handle_webhook_connection(
     triggers: &[TriggerDefinition],
     provider: &CredentialProviderRegistry,
     limits: webhooks::RequestLimits,
-    authority_provider: &dyn lattice::engine::effect::execution::RunContextProvider,
+    app_config: &config::AppConfig,
 ) -> webhooks::Reply {
     let request = match webhooks::read_raw(stream, limits).await {
         Ok(request) => request,
@@ -1821,7 +1839,7 @@ async fn handle_webhook_connection(
 
     match webhooks::decide_request(&request, triggers, provider, &context, limits) {
         webhooks::Decision::Admitted(plan) => {
-            execute_webhook_plan(store, triggers, plan, accepted_epoch_ms, authority_provider).await
+            execute_webhook_plan(store, triggers, plan, accepted_epoch_ms, app_config).await
         }
         webhooks::Decision::Rejected(rejection) => {
             if let Some(record) = webhooks::run_record_for_rejection(&rejection)
@@ -1839,7 +1857,7 @@ async fn execute_webhook_plan(
     triggers: &[TriggerDefinition],
     plan: lattice::triggers::TriggerRunPlan,
     accepted_epoch_ms: i64,
-    authority_provider: &dyn lattice::engine::effect::execution::RunContextProvider,
+    app_config: &config::AppConfig,
 ) -> webhooks::Reply {
     let Some(trigger) = triggers.iter().find(|trigger| trigger.id == plan.trigger_id) else {
         return webhooks::rejected_for_code(webhooks::RejectionCode::InvalidRequest);
@@ -1870,7 +1888,7 @@ async fn execute_webhook_plan(
     };
     match decision {
         lattice::triggers::WebhookAdmissionDecision::ExecuteUnclaimed => {
-            match headless::run_admitted_trigger_plan_with_authority_provider(store, &plan, authority_provider).await {
+            match headless::run_admitted_trigger_plan_with_app_config(store, &plan, app_config).await {
                 Ok(summary) => webhooks::accepted(&plan.trigger_id, summary.run_id),
                 Err(error) => {
                     tracing::warn!(trigger_id = %plan.trigger_id, error = %error, "webhook trigger execution failed");
@@ -1879,7 +1897,7 @@ async fn execute_webhook_plan(
             }
         }
         lattice::triggers::WebhookAdmissionDecision::ExecuteClaimed { run_id } => {
-            execute_claimed_webhook_plan(store, &plan, &claim_plan, run_id, authority_provider).await
+            execute_claimed_webhook_plan(store, &plan, &claim_plan, run_id, app_config).await
         }
         lattice::triggers::WebhookAdmissionDecision::RejectDuplicate { .. } => {
             webhooks::rejected_for_code(webhooks::RejectionCode::DuplicateIdempotencyKey)
@@ -1892,12 +1910,12 @@ async fn execute_claimed_webhook_plan(
     plan: &lattice::triggers::TriggerRunPlan,
     claim_plan: &lattice::triggers::WebhookClaimPlan,
     run_id: lattice::engine::RunId,
-    authority_provider: &dyn lattice::engine::effect::execution::RunContextProvider,
+    app_config: &config::AppConfig,
 ) -> webhooks::Reply {
     let lattice::triggers::WebhookClaimPlan::Required(request) = claim_plan else {
         return webhooks::execution_failed(&plan.trigger_id);
     };
-    match headless::run_claimed_trigger_plan_with_authority_provider(store, plan, run_id, authority_provider).await {
+    match headless::run_claimed_trigger_plan_with_app_config(store, plan, run_id, app_config).await {
         Ok(summary) if summary.status == lattice::headless::HeadlessRunStatus::Succeeded => {
             webhooks::accepted(&plan.trigger_id, summary.run_id)
         }
@@ -1923,25 +1941,19 @@ fn persist_failed_webhook_claim(
     }
 }
 
-fn webhook_credential_provider(triggers: &[TriggerDefinition]) -> Result<CredentialProviderRegistry, String> {
+fn webhook_credential_provider(
+    app_config: &config::AppConfig,
+    triggers: &[TriggerDefinition],
+) -> Result<CredentialProviderRegistry, String> {
     let secret_refs = webhooks::secret_refs(triggers);
     let env_keys = secret_refs
         .iter()
         .filter(|secret_ref| secret_ref.provider == ENV_CREDENTIAL_PROVIDER_ID)
         .map(|secret_ref| secret_ref.key.clone())
         .collect::<Vec<_>>();
-    let mut registry = CredentialProviderRegistry::new();
-    registry
-        .insert_provider(
-            CredentialProviderMetadata {
-                id: ENV_CREDENTIAL_PROVIDER_ID.to_string(),
-                display_name: ENV_CREDENTIAL_PROVIDER_NAME.to_string(),
-                capabilities: CredentialProviderCapabilities::read_only_without_fields(),
-            },
-            Box::new(EnvironmentCredentialProvider::from_current_env(&env_keys)),
-        )
-        .map_err(|error| error.to_string())?;
-    Ok(registry)
+    app_config
+        .credential_registry(&env_keys, std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)))
+        .map_err(|error| error.code().to_string())
 }
 
 fn write_stdout_and_flush(output: &str) -> Result<(), std::io::Error> {

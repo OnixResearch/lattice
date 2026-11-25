@@ -96,7 +96,19 @@ impl Handler<'_> {
             .profile
             .credential
             .as_ref()
-            .map(|reference| self.credentials.resolve(reference).map_err(|_| ()))
+            .map(|reference| {
+                let context = crate::credentials::CredentialResolutionContext {
+                    subject: crate::credentials::CredentialSubject::Node {
+                        workflow_id: "candidate-worker".to_string(),
+                        node_id: "model-broker".to_string(),
+                    },
+                    binding: "authorization".to_string(),
+                    reference: reference.clone(),
+                    destination: crate::credentials::CredentialDestination::HttpHeader,
+                    reason: self.credentials.resolution_reason(reference).unwrap_or_default().to_owned(),
+                };
+                self.credentials.resolve_in_context(reference, &context, Some(self.cancellation)).map_err(|_| ())
+            })
             .transpose()?;
         let checks = crate::execution_binding::serving::gate::Checks {
             is_exact_model: true,

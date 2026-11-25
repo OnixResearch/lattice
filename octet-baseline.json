@@ -10,7 +10,7 @@
     "tool_version": "0.1.0",
     "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu"
   },
-  "baseline_hash": "b3:13679ce5518585d6881ad6c43809db84f2fc723a037d24d64b5c29bdcaca0820",
+  "baseline_hash": "b3:ba899cb9b0952ce496d60fbb29fb93c8d594beebed49be3abd8880fefdbb9fee",
   "findings": [
     {
       "stable_id": "b3:00365717b09c09fa",
@@ -98,7 +98,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/config/mod.rs",
-      "line": 249,
+      "line": 286,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "lattice"
@@ -293,7 +293,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/workflow_format.rs",
-      "line": 1997,
+      "line": 1998,
       "column": 1,
       "message": "item name `render_portable_workflow` repeats `workflow` from ancestor path segment `workflow_format`",
       "crate_name": "lattice"
@@ -501,7 +501,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/workflow_format.rs",
-      "line": 2074,
+      "line": 2075,
       "column": 68,
       "message": "function `render_config` is 154 lines (limit: 70)",
       "crate_name": "lattice"
@@ -800,7 +800,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/workflow_format.rs",
-      "line": 2074,
+      "line": 2075,
       "column": 68,
       "message": "function `render_config` has 0 assertion(s) in 154 lines (need 2+)",
       "crate_name": "lattice"
@@ -1138,7 +1138,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/workflow_format.rs",
-      "line": 2351,
+      "line": 2352,
       "column": 67,
       "message": "function `render_trigger` has 0 assertion(s) in 42 lines (need 2+)",
       "crate_name": "lattice"
@@ -1320,7 +1320,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/config/mod.rs",
-      "line": 562,
+      "line": 599,
       "column": 29,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -1385,7 +1385,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/credentials.rs",
-      "line": 457,
+      "line": 491,
       "column": 38,
       "message": "function `decrypt_local_vault_entry` has 0 assertion(s) in 21 lines (need 2+)",
       "crate_name": "lattice"
@@ -1437,7 +1437,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/credentials/config.rs",
-      "line": 165,
+      "line": 170,
       "column": 1,
       "message": "item name `HostInputConfig` repeats `config` from ancestor path segment `config`",
       "crate_name": "lattice"
@@ -1606,7 +1606,7 @@
       "group": "tigerstyle::purity",
       "severity": "warning",
       "file": "src/credentials.rs",
-      "line": 352,
+      "line": 386,
       "column": 9,
       "message": "direct `std::env::var` access reads or mutates ambient process state",
       "crate_name": "lattice"
@@ -1645,7 +1645,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/workflow_format.rs",
-      "line": 2351,
+      "line": 2352,
       "column": 1,
       "message": "parameter uses `&String`; accept `&str` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "lattice"
@@ -2074,7 +2074,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/config/mod.rs",
-      "line": 368,
+      "line": 405,
       "column": 97,
       "message": "function `validate_template_parameters` has 0 assertion(s) in 25 lines (need 2+)",
       "crate_name": "lattice"
@@ -2256,7 +2256,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/config/mod.rs",
-      "line": 238,
+      "line": 275,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "lattice"
@@ -2373,9 +2373,22 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/credentials/config.rs",
-      "line": 223,
+      "line": 228,
       "column": 13,
       "message": "boolean binding `valid_source` should have a predicate prefix",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:2dab5811d80dbe93",
+      "semantic_id": "b3:2dab5811d80dbe93",
+      "identity_status": "computed",
+      "lint": "excessive_file_length",
+      "group": "tigerstyle::structure",
+      "severity": "warning",
+      "file": "src/triggers.rs",
+      "line": 1,
+      "column": 1,
+      "message": "source file is 796 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {
@@ -3055,19 +3068,6 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:390b0b7606299aaa",
-      "semantic_id": "b3:390b0b7606299aaa",
-      "identity_status": "computed",
-      "lint": "excessive_file_length",
-      "group": "tigerstyle::structure",
-      "severity": "warning",
-      "file": "src/triggers.rs",
-      "line": 1,
-      "column": 1,
-      "message": "source file is 764 lines (limit: 300)",
-      "crate_name": "lattice"
-    },
-    {
       "stable_id": "b3:397943bc9f0dc89d",
       "semantic_id": "b3:397943bc9f0dc89d",
       "identity_status": "computed",
@@ -3530,7 +3530,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/credentials/config.rs",
-      "line": 47,
+      "line": 49,
       "column": 1,
       "message": "item name `SecretSpecProviderConfig` repeats `config` from ancestor path segment `config`",
       "crate_name": "lattice"
@@ -3611,19 +3611,6 @@
       "line": 102,
       "column": 1,
       "message": "item name `ReplayTimeline` repeats `replay` from ancestor path segment `replay`",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:429af71b4459d534",
-      "semantic_id": "b3:429af71b4459d534",
-      "identity_status": "computed",
-      "lint": "excessive_file_length",
-      "group": "tigerstyle::structure",
-      "severity": "warning",
-      "file": "src/headless.rs",
-      "line": 1,
-      "column": 1,
-      "message": "source file is 325 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {
@@ -3858,19 +3845,6 @@
       "line": 662,
       "column": 1,
       "message": "function has 10 parameters (limit: 5) — consider an options struct",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:46369162363bc775",
-      "semantic_id": "b3:46369162363bc775",
-      "identity_status": "computed",
-      "lint": "excessive_file_length",
-      "group": "tigerstyle::structure",
-      "severity": "warning",
-      "file": "src/credentials/config.rs",
-      "line": 1,
-      "column": 1,
-      "message": "source file is 364 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {
@@ -4193,7 +4167,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/credentials.rs",
-      "line": 453,
+      "line": 487,
       "column": 1,
       "message": "2 `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -4219,7 +4193,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/credentials/config.rs",
-      "line": 128,
+      "line": 133,
       "column": 16,
       "message": "condition has 3 boolean operators",
       "crate_name": "lattice"
@@ -4284,7 +4258,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/credentials.rs",
-      "line": 678,
+      "line": 712,
       "column": 83,
       "message": "function `validate_secret_ref` has 0 assertion(s) in 21 lines (need 2+)",
       "crate_name": "lattice"
@@ -4323,7 +4297,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/orchestration/shell.rs",
-      "line": 253,
+      "line": 262,
       "column": 1,
       "message": "3 `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -4440,7 +4414,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/credentials.rs",
-      "line": 354,
+      "line": 388,
       "column": 17,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -4537,19 +4511,6 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:4f32d754c52754dd",
-      "semantic_id": "b3:4f32d754c52754dd",
-      "identity_status": "computed",
-      "lint": "explicit_defaults",
-      "group": "tigerstyle::safety",
-      "severity": "warning",
-      "file": "src/config/mod.rs",
-      "line": 41,
-      "column": 5,
-      "message": "implicit default on external type — construct with explicit values",
-      "crate_name": "lattice"
-    },
-    {
       "stable_id": "b3:4f40ab829d4c458a",
       "semantic_id": "b3:4f40ab829d4c458a",
       "identity_status": "computed",
@@ -4612,19 +4573,6 @@
       "line": 491,
       "column": 12,
       "message": "condition has 6 boolean operators",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:51279a615da79a99",
-      "semantic_id": "b3:51279a615da79a99",
-      "identity_status": "computed",
-      "lint": "underscore_in_module_filename",
-      "group": "tigerstyle::naming",
-      "severity": "warning",
-      "file": "src/workflow_format.rs",
-      "line": 1,
-      "column": 1,
-      "message": "module filename `workflow_format.rs` contains an underscore; prefer `workflow/format.rs`",
       "crate_name": "lattice"
     },
     {
@@ -5025,7 +4973,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/credentials/config.rs",
-      "line": 154,
+      "line": 159,
       "column": 1,
       "message": "item name `SecretSpecHostConfig` repeats `config` from ancestor path segment `config`",
       "crate_name": "lattice"
@@ -5194,7 +5142,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/config/mod.rs",
-      "line": 404,
+      "line": 441,
       "column": 21,
       "message": "`.expect()` in production code will panic on failure",
       "crate_name": "lattice"
@@ -5675,7 +5623,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/workflow_format.rs",
-      "line": 1495,
+      "line": 1496,
       "column": 95,
       "message": "function `validate_portable_identity` has 0 assertion(s) in 21 lines (need 2+)",
       "crate_name": "lattice"
@@ -6104,7 +6052,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/config/mod.rs",
-      "line": 425,
+      "line": 462,
       "column": 9,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -6182,7 +6130,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/config/mod.rs",
-      "line": 255,
+      "line": 292,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "lattice"
@@ -6377,7 +6325,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/config/mod.rs",
-      "line": 559,
+      "line": 596,
       "column": 35,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -6604,19 +6552,6 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:7b0f8ddebc727ead",
-      "semantic_id": "b3:7b0f8ddebc727ead",
-      "identity_status": "computed",
-      "lint": "excessive_file_length",
-      "group": "tigerstyle::structure",
-      "severity": "warning",
-      "file": "src/credentials.rs",
-      "line": 1,
-      "column": 1,
-      "message": "source file is 764 lines (limit: 300)",
-      "crate_name": "lattice"
-    },
-    {
       "stable_id": "b3:7ba1632d4d5e0ffa",
       "semantic_id": "b3:7ba1632d4d5e0ffa",
       "identity_status": "computed",
@@ -6624,7 +6559,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/workflow_format.rs",
-      "line": 1997,
+      "line": 1998,
       "column": 79,
       "message": "function `render_portable_workflow` has 0 assertion(s) in 48 lines (need 2+)",
       "crate_name": "lattice"
@@ -6689,7 +6624,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/workflow_format.rs",
-      "line": 1445,
+      "line": 1446,
       "column": 9,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -7248,7 +7183,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/workflow_format.rs",
-      "line": 1154,
+      "line": 1155,
       "column": 72,
       "message": "function `trigger_to_portable` has 0 assertion(s) in 35 lines (need 2+)",
       "crate_name": "lattice"
@@ -7339,7 +7274,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/orchestration/shell.rs",
-      "line": 193,
+      "line": 202,
       "column": 1,
       "message": "2 `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -7430,7 +7365,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/config/mod.rs",
-      "line": 251,
+      "line": 288,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "lattice"
@@ -7573,7 +7508,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/config/mod.rs",
-      "line": 500,
+      "line": 537,
       "column": 1,
       "message": "item name `load_app_config` repeats `config` from ancestor path segment `config`",
       "crate_name": "lattice"
@@ -7859,7 +7794,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/triggers.rs",
-      "line": 643,
+      "line": 675,
       "column": 1,
       "message": "2 `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -8132,22 +8067,9 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/orchestration/shell.rs",
-      "line": 215,
+      "line": 224,
       "column": 1,
       "message": "function has 6 parameters (limit: 5) — consider an options struct",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:97599cfb6a4bd1ef",
-      "semantic_id": "b3:97599cfb6a4bd1ef",
-      "identity_status": "computed",
-      "lint": "compound_condition",
-      "group": "tigerstyle::structure",
-      "severity": "warning",
-      "file": "src/credentials/config.rs",
-      "line": 112,
-      "column": 12,
-      "message": "condition has 6 boolean operators",
       "crate_name": "lattice"
     },
     {
@@ -8197,7 +8119,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/workflow_format.rs",
-      "line": 1311,
+      "line": 1312,
       "column": 55,
       "message": "function `portable_trigger_binding_to_binding` has 0 assertion(s) in 20 lines (need 2+)",
       "crate_name": "lattice"
@@ -8265,6 +8187,19 @@
       "line": 285,
       "column": 24,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:9866c4ea122b1156",
+      "semantic_id": "b3:9866c4ea122b1156",
+      "identity_status": "computed",
+      "lint": "explicit_defaults",
+      "group": "tigerstyle::safety",
+      "severity": "warning",
+      "file": "src/config/mod.rs",
+      "line": 41,
+      "column": 5,
+      "message": "implicit default on external type — construct with explicit values",
       "crate_name": "lattice"
     },
     {
@@ -8652,7 +8587,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/credentials/config.rs",
-      "line": 251,
+      "line": 256,
       "column": 41,
       "message": "unprotected unsigned addition may overflow",
       "crate_name": "lattice"
@@ -8821,7 +8756,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/workflow_format.rs",
-      "line": 1778,
+      "line": 1779,
       "column": 119,
       "message": "function `portable_subworkflow_config_to_node_config` has 0 assertion(s) in 28 lines (need 2+)",
       "crate_name": "lattice"
@@ -8938,7 +8873,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/workflow_format.rs",
-      "line": 2046,
+      "line": 2047,
       "column": 1,
       "message": "parameter uses `&String`; accept `&str` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "lattice"
@@ -9035,6 +8970,19 @@
       "crate_name": "lattice"
     },
     {
+      "stable_id": "b3:a794812aac13460e",
+      "semantic_id": "b3:a794812aac13460e",
+      "identity_status": "computed",
+      "lint": "excessive_file_length",
+      "group": "tigerstyle::structure",
+      "severity": "warning",
+      "file": "src/credentials/config.rs",
+      "line": 1,
+      "column": 1,
+      "message": "source file is 382 lines (limit: 300)",
+      "crate_name": "lattice"
+    },
+    {
       "stable_id": "b3:a80c834985e1d694",
       "semantic_id": "b3:a80c834985e1d694",
       "identity_status": "computed",
@@ -9068,7 +9016,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/workflow_format.rs",
-      "line": 2401,
+      "line": 2402,
       "column": 1,
       "message": "item name `load_workflow_nickel_file` repeats `workflow` from ancestor path segment `workflow_format`",
       "crate_name": "lattice"
@@ -9081,7 +9029,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/workflow_format.rs",
-      "line": 1439,
+      "line": 1440,
       "column": 17,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -9159,7 +9107,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/orchestration/shell.rs",
-      "line": 182,
+      "line": 191,
       "column": 1,
       "message": "2 `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -9198,7 +9146,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/orchestration/shell.rs",
-      "line": 204,
+      "line": 213,
       "column": 1,
       "message": "2 `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -9373,6 +9321,19 @@
       "crate_name": "lattice"
     },
     {
+      "stable_id": "b3:af0f3d2b351d20f1",
+      "semantic_id": "b3:af0f3d2b351d20f1",
+      "identity_status": "computed",
+      "lint": "excessive_file_length",
+      "group": "tigerstyle::structure",
+      "severity": "warning",
+      "file": "src/credentials.rs",
+      "line": 1,
+      "column": 1,
+      "message": "source file is 798 lines (limit: 300)",
+      "crate_name": "lattice"
+    },
+    {
       "stable_id": "b3:af4c50788077528d",
       "semantic_id": "b3:af4c50788077528d",
       "identity_status": "computed",
@@ -9393,7 +9354,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/workflow_format.rs",
-      "line": 1601,
+      "line": 1602,
       "column": 112,
       "message": "function `portable_http_config_to_node_config` has 0 assertion(s) in 24 lines (need 2+)",
       "crate_name": "lattice"
@@ -9422,6 +9383,19 @@
       "line": 289,
       "column": 13,
       "message": "direct `std::env::var` access reads or mutates ambient process state",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:b035d3cf8d197804",
+      "semantic_id": "b3:b035d3cf8d197804",
+      "identity_status": "computed",
+      "lint": "excessive_file_length",
+      "group": "tigerstyle::structure",
+      "severity": "warning",
+      "file": "src/workflow_format.rs",
+      "line": 1,
+      "column": 1,
+      "message": "source file is 2644 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {
@@ -9497,7 +9471,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/config/mod.rs",
-      "line": 257,
+      "line": 294,
       "column": 5,
       "message": "implicit default on external type — construct with explicit values",
       "crate_name": "lattice"
@@ -9666,7 +9640,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/config/mod.rs",
-      "line": 558,
+      "line": 595,
       "column": 37,
       "message": "conditional nesting is 4 levels deep (limit: 3)",
       "crate_name": "lattice"
@@ -9822,7 +9796,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/workflow_format.rs",
-      "line": 2074,
+      "line": 2075,
       "column": 1,
       "message": "parameter uses `&String`; accept `&str` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "lattice"
@@ -10394,7 +10368,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/orchestration/shell.rs",
-      "line": 237,
+      "line": 246,
       "column": 1,
       "message": "2 `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -10602,7 +10576,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/config/mod.rs",
-      "line": 534,
+      "line": 571,
       "column": 94,
       "message": "function `load_node_templates_with_diagnostics` has 0 assertion(s) in 51 lines (need 2+)",
       "crate_name": "lattice"
@@ -10641,7 +10615,7 @@
       "group": "tigerstyle::purity",
       "severity": "warning",
       "file": "src/credentials.rs",
-      "line": 353,
+      "line": 387,
       "column": 32,
       "message": "direct `std::env::var` access reads or mutates ambient process state",
       "crate_name": "lattice"
@@ -10667,7 +10641,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/credentials.rs",
-      "line": 436,
+      "line": 470,
       "column": 1,
       "message": "2 `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -10810,7 +10784,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/credentials.rs",
-      "line": 605,
+      "line": 639,
       "column": 105,
       "message": "function `parse_command_secret_stdout` has 0 assertion(s) in 22 lines (need 2+)",
       "crate_name": "lattice"
@@ -10904,6 +10878,19 @@
       "line": 398,
       "column": 13,
       "message": "`matching_ports` looks like a raw numeric quantity but has no unit suffix",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:cd055e81d287f792",
+      "semantic_id": "b3:cd055e81d287f792",
+      "identity_status": "computed",
+      "lint": "excessive_file_length",
+      "group": "tigerstyle::structure",
+      "severity": "warning",
+      "file": "src/headless.rs",
+      "line": 1,
+      "column": 1,
+      "message": "source file is 349 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {
@@ -11096,7 +11083,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/workflow_format.rs",
-      "line": 1740,
+      "line": 1741,
       "column": 117,
       "message": "function `portable_condition_config_to_node_config` has 0 assertion(s) in 25 lines (need 2+)",
       "crate_name": "lattice"
@@ -11213,7 +11200,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/triggers.rs",
-      "line": 621,
+      "line": 653,
       "column": 29,
       "message": "function `validate_idempotency` has 0 assertion(s) in 21 lines (need 2+)",
       "crate_name": "lattice"
@@ -11265,7 +11252,7 @@
       "group": "tigerstyle::purity",
       "severity": "warning",
       "file": "src/config/mod.rs",
-      "line": 211,
+      "line": 248,
       "column": 11,
       "message": "direct `std::env::var` access reads or mutates ambient process state",
       "crate_name": "lattice"
@@ -11525,22 +11512,9 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/workflow_format.rs",
-      "line": 1962,
+      "line": 1963,
       "column": 1,
       "message": "item name `workflow_to_nickel` repeats `workflow` from ancestor path segment `workflow_format`",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:daaf43da36e81593",
-      "semantic_id": "b3:daaf43da36e81593",
-      "identity_status": "computed",
-      "lint": "non_trait_imports",
-      "group": "tigerstyle::naming",
-      "severity": "warning",
-      "file": "src/config/mod.rs",
-      "line": 101,
-      "column": 9,
-      "message": "non-trait import `SecretSpecDiagnostic` hides the owner path; prefer the qualified path at the use site",
       "crate_name": "lattice"
     },
     {
@@ -11564,7 +11538,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/workflow_format.rs",
-      "line": 640,
+      "line": 641,
       "column": 25,
       "message": "function `node_config_to_portable` is 439 lines (limit: 70)",
       "crate_name": "lattice"
@@ -11837,7 +11811,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/workflow_format.rs",
-      "line": 1393,
+      "line": 1394,
       "column": 1,
       "message": "item name `portable_to_workflow` repeats `workflow` from ancestor path segment `workflow_format`",
       "crate_name": "lattice"
@@ -11850,7 +11824,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/workflow_format.rs",
-      "line": 2065,
+      "line": 2066,
       "column": 1,
       "message": "parameter uses `&String`; accept `&str` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "lattice"
@@ -12071,7 +12045,7 @@
       "group": "tigerstyle::naming",
       "severity": "warning",
       "file": "src/credentials/config.rs",
-      "line": 215,
+      "line": 220,
       "column": 13,
       "message": "boolean binding `valid_coordinates` should have a predicate prefix",
       "crate_name": "lattice"
@@ -12305,7 +12279,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/workflow_format.rs",
-      "line": 1997,
+      "line": 1998,
       "column": 1,
       "message": "parameter uses `&String`; accept `&str` unless ownership, capacity, or exact owned type identity is required",
       "crate_name": "lattice"
@@ -12409,7 +12383,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/credentials.rs",
-      "line": 729,
+      "line": 763,
       "column": 49,
       "message": "function `resolve_secret_env_in_context` has 0 assertion(s) in 22 lines (need 2+)",
       "crate_name": "lattice"
@@ -12500,22 +12474,9 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/workflow_format.rs",
-      "line": 1214,
+      "line": 1215,
       "column": 107,
       "message": "function `portable_auth_parts` has 0 assertion(s) in 24 lines (need 2+)",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:ed36dc581b7fab55",
-      "semantic_id": "b3:ed36dc581b7fab55",
-      "identity_status": "computed",
-      "lint": "excessive_file_length",
-      "group": "tigerstyle::structure",
-      "severity": "warning",
-      "file": "src/config/mod.rs",
-      "line": 1,
-      "column": 1,
-      "message": "source file is 813 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {
@@ -13091,6 +13052,19 @@
       "crate_name": "lattice"
     },
     {
+      "stable_id": "b3:f73881ee16412401",
+      "semantic_id": "b3:f73881ee16412401",
+      "identity_status": "computed",
+      "lint": "underscore_in_module_filename",
+      "group": "tigerstyle::naming",
+      "severity": "warning",
+      "file": "src/workflow_format.rs",
+      "line": 1,
+      "column": 1,
+      "message": "module filename `workflow_format.rs` contains an underscore; prefer `workflow/format.rs`",
+      "crate_name": "lattice"
+    },
+    {
       "stable_id": "b3:f73cd8ab8d30a57a",
       "semantic_id": "b3:f73cd8ab8d30a57a",
       "identity_status": "computed",
@@ -13153,6 +13127,19 @@
       "line": 72,
       "column": 13,
       "message": "boolean binding `admitted` should have a predicate prefix",
+      "crate_name": "lattice"
+    },
+    {
+      "stable_id": "b3:f9b0169b42f5e547",
+      "semantic_id": "b3:f9b0169b42f5e547",
+      "identity_status": "computed",
+      "lint": "excessive_file_length",
+      "group": "tigerstyle::structure",
+      "severity": "warning",
+      "file": "src/config/mod.rs",
+      "line": 1,
+      "column": 1,
+      "message": "source file is 850 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {
@@ -13429,19 +13416,6 @@
       "crate_name": "lattice"
     },
     {
-      "stable_id": "b3:fe0e6dc8c3dd3e86",
-      "semantic_id": "b3:fe0e6dc8c3dd3e86",
-      "identity_status": "computed",
-      "lint": "excessive_file_length",
-      "group": "tigerstyle::structure",
-      "severity": "warning",
-      "file": "src/workflow_format.rs",
-      "line": 1,
-      "column": 1,
-      "message": "source file is 2643 lines (limit: 300)",
-      "crate_name": "lattice"
-    },
-    {
       "stable_id": "b3:fe1ead9ba81371e0",
       "semantic_id": "b3:fe1ead9ba81371e0",
       "identity_status": "computed",
@@ -13501,7 +13475,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/workflow_format.rs",
-      "line": 1574,
+      "line": 1575,
       "column": 113,
       "message": "function `portable_shell_config_to_node_config` has 0 assertion(s) in 24 lines (need 2+)",
       "crate_name": "lattice"

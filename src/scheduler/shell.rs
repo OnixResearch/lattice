@@ -71,6 +71,42 @@ pub async fn execute_occurrence(
     .await
 }
 
+pub async fn execute_occurrence_with_app_config(
+    store: &crate::store::Store,
+    occurrence: &super::ScheduleOccurrence,
+    app_config: &crate::config::AppConfig,
+) -> Result<crate::headless::HeadlessRunSummary, Error> {
+    super::validate_schedule_occurrence(occurrence).map_err(|error| Error::InvalidOccurrence(error.to_string()))?;
+    debug_assert!(!occurrence.identity.is_empty());
+    debug_assert_eq!(occurrence.attempt_run_ids.last().copied(), Some(occurrence.active_run_id));
+    if occurrence.status != super::ScheduleOccurrenceStatus::PendingUnobserved {
+        return Err(Error::InvalidOccurrence(super::OccurrenceError::NotPending.to_string()));
+    }
+    let revision = load_workflow_revision(store, &occurrence.workflow_name)?;
+    if revision != occurrence.workflow_revision {
+        return Err(Error::InvalidOccurrence(super::OccurrenceError::WorkflowRevisionMismatch.to_string()));
+    }
+    let dispatch = store.admit_schedule_occurrence_dispatch(occurrence)?;
+    debug_assert_eq!(dispatch.attempt_identity().as_bytes().len(), blake3::OUT_LEN);
+    let summary = crate::headless::run_owned_workflow_with_app_config(
+        store,
+        &occurrence.workflow_name,
+        occurrence.active_run_id,
+        crate::store::RunOwner::ScheduleOccurrence {
+            identity: occurrence.identity.clone(),
+        },
+        app_config,
+    )
+    .await
+    .map_err(|error| Error::Execution(error.to_string()))?;
+    let recovered = recover_occurrence(store, &occurrence.identity)?;
+    if !matches!(recovered, ScheduleOccurrenceRecoveryOutcome::Reconciled { .. }) {
+        return Err(Error::Execution("terminal run did not reconcile the active occurrence".to_string()));
+    }
+    debug_assert_eq!(summary.run_id, occurrence.active_run_id);
+    Ok(summary)
+}
+
 pub async fn execute_occurrence_with_authority_provider(
     store: &crate::store::Store,
     occurrence: &super::ScheduleOccurrence,
@@ -163,6 +199,25 @@ pub async fn retry_occurrence(
         &crate::engine::effect::execution::UnavailableRunContextSource,
     )
     .await
+}
+
+pub async fn retry_occurrence_with_app_config(
+    store: &crate::store::Store,
+    identity: &str,
+    is_duplicate_risk_acknowledged: bool,
+    app_config: &crate::config::AppConfig,
+) -> Result<super::ScheduleOccurrence, Error> {
+    let current = load_occurrence(store, identity)?;
+    if current.status != super::ScheduleOccurrenceStatus::PendingUnobserved {
+        return Err(Error::InvalidOccurrence(super::OccurrenceError::NotPending.to_string()));
+    }
+    if store.load_run(current.active_run_id)?.is_some() {
+        return Err(Error::RecoveryRequired);
+    }
+    let revision = load_workflow_revision(store, &current.workflow_name)?;
+    let retried = store.retry_schedule_occurrence(identity, &revision, is_duplicate_risk_acknowledged)?;
+    execute_occurrence_with_app_config(store, &retried, app_config).await?;
+    load_occurrence(store, identity)
 }
 
 pub async fn retry_occurrence_with_authority_provider(

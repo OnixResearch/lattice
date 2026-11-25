@@ -2,19 +2,28 @@
 struct ResumeRuntime {
     agent: crate::agent_node::RuntimeOptions,
     typed_policy: Option<crate::workflow::decision::Runtime>,
+    app_config: Option<crate::config::AppConfig>,
 }
 
 impl ResumeRuntime {
     fn executor(
         self,
+        workflow: &crate::engine::workflow::Workflow,
         subworkflow_shell: Box<dyn crate::engine::SubworkflowRunnerShell>,
-    ) -> crate::engine::executor::Executor {
-        let executor = crate::engine::executor::Executor::new_with_agent_runtime_config(self.agent)
+    ) -> Result<crate::engine::executor::Executor, Error> {
+        let mut executor = crate::engine::executor::Executor::new_with_agent_runtime_config(self.agent)
             .with_subworkflow_runner_shell(subworkflow_shell);
-        match self.typed_policy {
+        if let Some(app_config) = &self.app_config {
+            let cancellation = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let registry = app_config
+                .workflow_credential_registry(Some(workflow), std::sync::Arc::clone(&cancellation))
+                .map_err(|_| Error::AuthorityUnavailable)?;
+            executor = executor.with_credential_provider(Box::new(registry)).with_cancellation(cancellation);
+        }
+        Ok(match self.typed_policy {
             Some(runtime) => executor.with_typed_policy(runtime),
             None => executor,
-        }
+        })
     }
 }
 
@@ -39,6 +48,7 @@ pub async fn resume_with_typed_policy(
     let runtime = ResumeRuntime {
         agent: agent_runtime,
         typed_policy: Some(runtime),
+        app_config: None,
     };
     resume(store, command, runtime, authority_provider).await
 }

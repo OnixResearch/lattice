@@ -13,7 +13,7 @@ Animus archived `add-secretspec-sops-host-resolution` in commit
 cover paired environment, systemd credential, guarded SOPS, bounded-worker,
 redaction, and feature-isolation fixtures. This archive is an ancestor of the
 immutable `origin/main` revision
-`1c370d5029a2667051c46bdfa1919e78e65e2f4b` inspected for this adapter.
+`e6f27948b19ea2e1bcb67428ca2e12f7acb6e558` inspected for this adapter.
 Lattice imports this exact revision through the repository-owned script. The
 generated `vendor-cargo-deps/animus/source.ncl` records its reviewed archive
 BLAKE3 identity, tar format and `0000` umask, exact dependency revisions,
@@ -37,7 +37,7 @@ The optional host itself is AGPL-3.0-or-later. These dependencies must not be
 added to pure `no_std` cores or enabled implicitly for an unconfigured provider.
 
 The reviewed Animus archive BLAKE3 is
-`ff16f0903348db1d5164d055b928d2f1f829ca1dffb6f1624e6d26779b11f2ab`,
+`6a231c9738f9634df311b58a97e27bdc16e77eced28d4f73327671dafec7ef10`,
 computed with `git -c tar.umask=0000 archive --format=tar` at the revision above.
 When changing that revision, review and update its archive identity together.
 The integrated lock uses `proc-macro-crate 2.0.0` within Bolero's `^2`
@@ -55,10 +55,13 @@ provider execution, cancellation cleanup or whole-consumer compilation.
 ## Public configuration and private deployment
 
 All provider/host DTOs and pure validation have one always-compiled canonical
-home, `lattice::credentials::config`, including `SecretSpecProviderConfig`,
+home, `lattice::credentials::config`, including `CredentialProviderConfig`
+(`kind = "animus-secretspec"`), `SecretSpecProviderConfig`,
 `SecretSpecHostConfig`, `DeclarationMapping`, `ProviderScheme`, `RequestBounds`,
 `HostInputConfig`, `SopsCredentialVariable`, `SopsCredentialKind`, and
-`SecretSpecDiagnostic`. Only adaptation, host execution and `build_provider`
+`SecretSpecDiagnostic`. Nickel configuration authoring uses
+`contracts/credential-providers.ncl` (see `examples/config/secretspec-providers.ncl`).
+Only adaptation, host execution and `build_provider`
 live behind the optional `credentials::secretspec` module. A build without the
 feature still parses these exact closed DTOs and rejects nonempty selected
 configuration explicitly; it does not ignore it or substitute an untyped schema.

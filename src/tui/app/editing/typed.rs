@@ -40,6 +40,7 @@ impl State {
         }
         let id = draft.field.id.clone();
         let is_source_edit = id.starts_with("source.");
+        let mut candidate = self.workflow.clone();
         let result = if is_source_edit {
             self.apply_source_edit(draft)
         } else if id.starts_with("operation.") {
@@ -47,16 +48,46 @@ impl State {
                 shell_program: self.config.shell.clone(),
                 limits: self.config.process_limits.clone(),
             };
-            state.operation.apply(&mut self.workflow, state.node_id, &id, &draft.text, &runtime)
+            state.operation.apply(&mut candidate, state.node_id, &id, &draft.text, &runtime)
         } else {
-            crate::tui::authoring::apply(&mut self.workflow, state.node_id, &id, &draft.text)
+            crate::tui::authoring::apply(&mut candidate, state.node_id, &id, &draft.text)
         };
+        let result = result.and_then(|()| {
+            if !is_source_edit
+                && !self.config.credential_providers.is_empty()
+                && (id.starts_with("credential.env.") || id.ends_with(".auth"))
+            {
+                let registry = self
+                    .credential_registry(&candidate, Arc::new(std::sync::atomic::AtomicBool::new(false)))
+                    .map_err(|error| error.code().to_string())?;
+                for refs in candidate.credentials.values() {
+                    for reference in refs.env.values() {
+                        registry.validate_secret_ref(reference).map_err(|error| error.to_string())?;
+                    }
+                }
+                for trigger in &candidate.triggers {
+                    if let crate::triggers::TriggerKind::Webhook(webhook) = &trigger.kind {
+                        match &webhook.auth_policy {
+                            crate::triggers::WebhookAuthPolicy::NoAuthLocalOnly => {}
+                            crate::triggers::WebhookAuthPolicy::Bearer { secret_ref }
+                            | crate::triggers::WebhookAuthPolicy::Blake3Signature { secret_ref, .. } => {
+                                registry.validate_secret_ref(secret_ref).map_err(|error| error.to_string())?;
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(())
+        });
         match result {
             Ok(()) => {
-                if !is_source_edit && let Err(error) = crate::authoring::reconcile_materialized(&mut self.workflow) {
-                    state.error = Some(error.into());
-                    self.authoring = Some(state);
-                    return false;
+                if !is_source_edit {
+                    if let Err(error) = crate::authoring::reconcile_materialized(&mut candidate) {
+                        state.error = Some(error.into());
+                        self.authoring = Some(state);
+                        return false;
+                    }
+                    self.workflow = candidate;
                 }
                 let has_changed = current != crate::workflow_format::workflow_to_portable(&self.workflow);
                 if has_changed && !is_source_edit {

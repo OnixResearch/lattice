@@ -70,7 +70,7 @@ impl State {
     }
 
     pub(in crate::tui::app) fn save_current_workflow(&mut self, store: &Store) -> Result<(), String> {
-        let diagnostics = crate::workflow_validation::validate_workflow(&self.workflow);
+        let diagnostics = self.validate_workflow_diagnostics();
         if crate::workflow_validation::has_fatal_diagnostics(&diagnostics) {
             return Err("workflow validation failed; inspect diagnostics before saving".into());
         }

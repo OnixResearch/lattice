@@ -125,10 +125,7 @@ fn resolved_secret(
     provider: &dyn crate::credentials::CredentialProvider,
     trigger: &crate::triggers::TriggerDefinition,
 ) -> Option<String> {
-    let crate::triggers::TriggerKind::Webhook(webhook) = &trigger.kind else {
-        return None;
-    };
-    crate::triggers::resolve_webhook_auth_secret(provider, &webhook.auth_policy).ok().flatten()
+    crate::triggers::resolve_webhook_auth_secret_in_context(provider, trigger, None).ok().flatten()
 }
 
 fn rejection_from_trigger_diagnostics(
