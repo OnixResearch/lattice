@@ -10,7 +10,7 @@
     "tool_version": "0.1.0",
     "toolchain": "nightly-2026-03-21-x86_64-unknown-linux-gnu"
   },
-  "baseline_hash": "b3:ba899cb9b0952ce496d60fbb29fb93c8d594beebed49be3abd8880fefdbb9fee",
+  "baseline_hash": "b3:5ed9a7ecf90d3abc73121a0b57ca50a9bf6eb4904bcd37aa39fef81f10ce7ac1",
   "findings": [
     {
       "stable_id": "b3:00365717b09c09fa",
@@ -1177,7 +1177,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/triggers.rs",
-      "line": 374,
+      "line": 407,
       "column": 29,
       "message": "function `validate_webhook_admission` has 0 assertion(s) in 20 lines (need 2+)",
       "crate_name": "lattice"
@@ -2376,19 +2376,6 @@
       "line": 228,
       "column": 13,
       "message": "boolean binding `valid_source` should have a predicate prefix",
-      "crate_name": "lattice"
-    },
-    {
-      "stable_id": "b3:2dab5811d80dbe93",
-      "semantic_id": "b3:2dab5811d80dbe93",
-      "identity_status": "computed",
-      "lint": "excessive_file_length",
-      "group": "tigerstyle::structure",
-      "severity": "warning",
-      "file": "src/triggers.rs",
-      "line": 1,
-      "column": 1,
-      "message": "source file is 796 lines (limit: 300)",
       "crate_name": "lattice"
     },
     {
@@ -3647,7 +3634,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/triggers.rs",
-      "line": 283,
+      "line": 316,
       "column": 17,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -3920,7 +3907,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/triggers.rs",
-      "line": 277,
+      "line": 310,
       "column": 61,
       "message": "function `bind_trigger_payload` has 0 assertion(s) in 27 lines (need 2+)",
       "crate_name": "lattice"
@@ -5369,6 +5356,19 @@
       "crate_name": "lattice"
     },
     {
+      "stable_id": "b3:5eabbe3b1879e44d",
+      "semantic_id": "b3:5eabbe3b1879e44d",
+      "identity_status": "computed",
+      "lint": "excessive_file_length",
+      "group": "tigerstyle::structure",
+      "severity": "warning",
+      "file": "src/triggers.rs",
+      "line": 1,
+      "column": 1,
+      "message": "source file is 835 lines (limit: 300)",
+      "crate_name": "lattice"
+    },
+    {
       "stable_id": "b3:5ee831677f9749c2",
       "semantic_id": "b3:5ee831677f9749c2",
       "identity_status": "computed",
@@ -6689,7 +6689,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/triggers.rs",
-      "line": 236,
+      "line": 269,
       "column": 29,
       "message": "function `validate_trigger_definition` has 0 assertion(s) in 21 lines (need 2+)",
       "crate_name": "lattice"
@@ -7144,7 +7144,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/triggers.rs",
-      "line": 332,
+      "line": 365,
       "column": 53,
       "message": "function `admit_trigger_event` has 0 assertion(s) in 30 lines (need 2+)",
       "crate_name": "lattice"
@@ -7794,7 +7794,7 @@
       "group": "tigerstyle::structure",
       "severity": "warning",
       "file": "src/triggers.rs",
-      "line": 675,
+      "line": 714,
       "column": 1,
       "message": "2 `&str` parameters are easy to swap by accident",
       "crate_name": "lattice"
@@ -8184,7 +8184,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/triggers.rs",
-      "line": 285,
+      "line": 318,
       "column": 24,
       "message": "collection grows in loop without a prior reservation or explicit local bound",
       "crate_name": "lattice"
@@ -11200,7 +11200,7 @@
       "group": "tigerstyle::safety",
       "severity": "warning",
       "file": "src/triggers.rs",
-      "line": 653,
+      "line": 692,
       "column": 29,
       "message": "function `validate_idempotency` has 0 assertion(s) in 21 lines (need 2+)",
       "crate_name": "lattice"

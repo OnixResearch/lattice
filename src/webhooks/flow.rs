@@ -109,12 +109,37 @@ fn first_candidate_outcome(
     first_rejection.map(Err)
 }
 
+fn invalid_trigger_identity_diagnostic(
+    trigger: &crate::triggers::TriggerDefinition,
+) -> Option<crate::triggers::TriggerDiagnostic> {
+    if trigger.id.trim().is_empty() {
+        return Some(crate::triggers::TriggerDiagnostic {
+            trigger_id: trigger.id.clone(),
+            code: crate::triggers::TriggerDiagnosticCode::EmptyTriggerId,
+            message: "trigger id cannot be empty".to_string(),
+        });
+    }
+    if trigger.workflow_name.trim().is_empty() {
+        return Some(crate::triggers::TriggerDiagnostic {
+            trigger_id: trigger.id.clone(),
+            code: crate::triggers::TriggerDiagnosticCode::EmptyWorkflowName,
+            message: "workflow name cannot be empty".to_string(),
+        });
+    }
+    None
+}
+
 fn try_admit_candidate(
     trigger: &crate::triggers::TriggerDefinition,
     plan_event: &crate::triggers::TriggerEvent,
     provider: &dyn crate::credentials::CredentialProvider,
     context: &crate::triggers::TriggerAdmissionContext,
 ) -> Result<crate::triggers::TriggerRunPlan, Box<Rejection>> {
+    if let Some(diagnostic) = invalid_trigger_identity_diagnostic(trigger) {
+        return Err(Box::new(rejection_from_trigger_diagnostics(trigger.clone(), plan_event.clone(), vec![
+            diagnostic,
+        ])));
+    }
     let mut event = plan_event.clone();
     event.resolved_auth_secret = resolved_secret(provider, trigger);
     crate::triggers::admit_trigger_event(trigger, &event, context)
@@ -130,9 +155,10 @@ fn resolved_secret(
 
 fn rejection_from_trigger_diagnostics(
     trigger: crate::triggers::TriggerDefinition,
-    event: crate::triggers::TriggerEvent,
+    mut event: crate::triggers::TriggerEvent,
     diagnostics: Vec<crate::triggers::TriggerDiagnostic>,
 ) -> Rejection {
+    event.resolved_auth_secret = None;
     let code = diagnostics
         .first()
         .map(|diagnostic| super::shared::rejection_code_for_trigger(diagnostic.code))

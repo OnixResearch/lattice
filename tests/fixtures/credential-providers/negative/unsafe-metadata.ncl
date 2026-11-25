@@ -2,9 +2,9 @@ let Contracts = import "../../../../contracts/credential-providers.ncl" in
 let valid = import "../positive/environment.ncl" in
 (valid & {
   credential_providers | force = [
-    valid.credential_providers[0] & { id | force = "../unsafe\nmetadata" },
+    (std.array.at 0 valid.credential_providers) & { id | force = "../unsafe\nmetadata" },
   ],
   credential_hosts | force = [
-    valid.credential_hosts[0] & { provider_id | force = "../unsafe\nmetadata" },
+    (std.array.at 0 valid.credential_hosts) & { provider_id | force = "../unsafe\nmetadata" },
   ],
 }) | Contracts.CredentialAppConfig

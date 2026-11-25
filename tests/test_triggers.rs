@@ -419,3 +419,79 @@ fn tui_trigger_error_summary_reports_status_without_raw_message_or_payload() {
     assert!(!lines[0].contains("authorization"));
     assert!(!lines[0].contains("payload"));
 }
+
+#[test]
+fn resolve_webhook_auth_secret_in_context_rejects_empty_identity_before_provider() {
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::Ordering;
+
+    struct CountingProvider {
+        calls: AtomicUsize,
+    }
+    impl lattice::credentials::CredentialProvider for CountingProvider {
+        fn resolve(
+            &self,
+            reference: &SecretRef,
+        ) -> Result<lattice::credentials::SecretValue, lattice::credentials::CredentialError> {
+            self.calls.fetch_add(1, Ordering::AcqRel);
+            Err(lattice::credentials::CredentialError::MissingSecret {
+                identity: reference.identity(),
+            })
+        }
+
+        fn resolve_in_context(
+            &self,
+            reference: &SecretRef,
+            _context: &lattice::credentials::CredentialResolutionContext,
+            _cancellation: Option<&std::sync::atomic::AtomicBool>,
+        ) -> Result<lattice::credentials::SecretValue, lattice::credentials::CredentialError> {
+            self.calls.fetch_add(1, Ordering::AcqRel);
+            Err(lattice::credentials::CredentialError::MissingSecret {
+                identity: reference.identity(),
+            })
+        }
+    }
+
+    let provider = CountingProvider {
+        calls: AtomicUsize::new(0),
+    };
+    let policies = [
+        WebhookAuthPolicy::Bearer {
+            secret_ref: secret_ref(),
+        },
+        WebhookAuthPolicy::Blake3Signature {
+            secret_ref: secret_ref(),
+            header: SIGNATURE_HEADER.to_string(),
+        },
+    ];
+    for policy in policies {
+        for empty in ["", "   "] {
+            let mut empty_workflow = webhook_trigger(policy.clone());
+            empty_workflow.workflow_name = empty.to_string();
+            assert_eq!(
+                lattice::triggers::resolve_webhook_auth_secret_in_context(&provider, &empty_workflow, None),
+                Err(TriggerDiagnosticCode::EmptyWorkflowName)
+            );
+
+            let mut empty_id = webhook_trigger(policy.clone());
+            empty_id.id = empty.to_string();
+            assert_eq!(
+                lattice::triggers::resolve_webhook_auth_secret_in_context(&provider, &empty_id, None),
+                Err(TriggerDiagnosticCode::EmptyTriggerId)
+            );
+        }
+    }
+    assert_eq!(provider.calls.load(Ordering::Acquire), 0);
+}
+
+#[test]
+fn trigger_event_redacts_resolved_auth_secret_in_debug_and_serialize() {
+    let event = webhook_event(Some(SECRET_VALUE));
+    let debug = format!("{event:?}");
+    let serialized = serde_json::to_string(&event).expect("TriggerEvent serializes");
+
+    assert!(!debug.contains(SECRET_VALUE));
+    assert!(debug.contains("<redacted>"));
+    assert!(!serialized.contains(SECRET_VALUE));
+    assert!(!serialized.contains("resolved_auth_secret"));
+}

@@ -2,11 +2,11 @@ let Contracts = import "../../../../contracts/credential-providers.ncl" in
 let valid = import "../positive/environment.ncl" in
 (valid & {
   credential_providers | force = [
-    valid.credential_providers[0],
-    valid.credential_providers[0],
+    std.array.at 0 valid.credential_providers,
+    std.array.at 0 valid.credential_providers,
   ],
   credential_hosts | force = [
-    valid.credential_hosts[0],
-    valid.credential_hosts[0],
+    std.array.at 0 valid.credential_hosts,
+    std.array.at 0 valid.credential_hosts,
   ],
 }) | Contracts.CredentialAppConfig

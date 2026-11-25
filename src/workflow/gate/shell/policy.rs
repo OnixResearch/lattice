@@ -5,6 +5,20 @@ struct ResumeRuntime {
     app_config: Option<crate::config::AppConfig>,
 }
 
+pub async fn resume_with_app_config_and_authority_provider(
+    store: &crate::store::Store,
+    command: &super::ResumeCommand,
+    app_config: &crate::config::AppConfig,
+    authority_provider: &dyn crate::engine::effect::execution::RunContextProvider,
+) -> Result<ResumeExecution, Error> {
+    let runtime = ResumeRuntime {
+        agent: app_config.effective_agent_runtime(),
+        typed_policy: None,
+        app_config: Some(app_config.clone()),
+    };
+    resume(store, command, runtime, authority_provider).await
+}
+
 impl ResumeRuntime {
     fn executor(
         self,

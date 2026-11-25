@@ -2,10 +2,10 @@ let Contracts = import "../../../../contracts/credential-providers.ncl" in
 let valid = import "../positive/environment.ncl" in
 (valid & {
   credential_providers | force = [
-    valid.credential_providers[0] & {
+    (std.array.at 0 valid.credential_providers) & {
       declarations | force = [
-        valid.credential_providers[0].declarations[0],
-        valid.credential_providers[0].declarations[0] & { declaration | force = "OTHER_TOKEN" },
+        std.array.at 0 (std.array.at 0 valid.credential_providers).declarations,
+        (std.array.at 0 (std.array.at 0 valid.credential_providers).declarations) & { declaration | force = "OTHER_TOKEN" },
       ],
     },
   ],

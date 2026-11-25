@@ -28,6 +28,7 @@ pub use admission::validate_route;
 pub use application::ApplicationHandler;
 pub use application::load_profile;
 pub use application::serve;
+pub use application::serve_with_app_config;
 pub use authority::ReservationFence;
 pub use authority::RouteExactAuthorityProvider;
 pub use binding::SOURCE_PROVIDER_ENV;

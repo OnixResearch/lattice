@@ -60,8 +60,36 @@ pub fn serve(
     if let Some(binding) = checkpoint {
         handler = handler.with_application_checkpoint(binding)?;
     }
+    serve_handler(&listener, handler)
+}
+
+/// Serve one handler profile using operator [`crate::config::AppConfig`] credential providers
+/// and host validation.
+#[cfg(target_os = "linux")]
+pub fn serve_with_app_config(
+    store: crate::store::Store,
+    profile: impl Into<VersionedHandlerProfile>,
+    app_config: &crate::config::AppConfig,
+    checkpoint: Option<crate::checkpoint::CheckpointBinding>,
+) -> Result<lattice_workflow_transport::ServeReport, ApplicationError> {
+    app_config.validated_credential_hosts().map_err(|_| ApplicationError::Runtime)?;
+    let profile = profile.into();
+    let listener = selected_listener(&profile);
+    let mut handler = ApplicationHandler::new(store, profile, app_config.effective_agent_runtime())?
+        .with_app_config(app_config.clone());
+    if let Some(binding) = checkpoint {
+        handler = handler.with_application_checkpoint(binding)?;
+    }
+    serve_handler(&listener, handler)
+}
+
+#[cfg(target_os = "linux")]
+fn serve_handler(
+    listener: &HandlerListener,
+    handler: ApplicationHandler,
+) -> Result<lattice_workflow_transport::ServeReport, ApplicationError> {
     let mut service = lattice_workflow_transport::WorkflowExchangeService::new(handler);
-    let served = match &listener {
+    let served = match listener {
         HandlerListener::Unix { socket_path, transport } => serve_unix(socket_path, transport, &mut service),
         HandlerListener::Vsock { transport } => serve_vsock(transport, &mut service),
     };
@@ -110,6 +138,16 @@ pub fn serve(
     _store: crate::store::Store,
     _profile: impl Into<VersionedHandlerProfile>,
     _agent_runtime: crate::agent_node::RuntimeOptions,
+    _checkpoint: Option<crate::checkpoint::CheckpointBinding>,
+) -> Result<lattice_workflow_transport::ServeReport, ApplicationError> {
+    Err(ApplicationError::UnsupportedHost)
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn serve_with_app_config(
+    _store: crate::store::Store,
+    _profile: impl Into<VersionedHandlerProfile>,
+    _app_config: &crate::config::AppConfig,
     _checkpoint: Option<crate::checkpoint::CheckpointBinding>,
 ) -> Result<lattice_workflow_transport::ServeReport, ApplicationError> {
     Err(ApplicationError::UnsupportedHost)

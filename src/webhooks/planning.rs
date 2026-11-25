@@ -157,7 +157,7 @@ fn content_type_declares_json(content_type: &str) -> bool {
 
 fn candidate_ids(triggers: &[crate::triggers::TriggerDefinition], path: &str) -> Vec<String> {
     let mut ids = Vec::with_capacity(triggers.len());
-    for trigger in triggers.iter().filter(|trigger| trigger.enabled) {
+    for trigger in triggers.iter().filter(|trigger| trigger.enabled && !trigger.id.trim().is_empty()) {
         if let crate::triggers::TriggerKind::Webhook(webhook) = &trigger.kind
             && webhook.path == path
         {

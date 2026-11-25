@@ -95,10 +95,10 @@ impl State {
             return false;
         };
         let authority_provider = Arc::clone(&self.authority_provider);
-        let result = crate::workflow::gate::shell::resume_with_authority_provider(
+        let result = crate::workflow::gate::shell::resume_with_app_config_and_authority_provider(
             &store,
             command,
-            self.config.effective_agent_runtime(),
+            &self.config,
             authority_provider.as_ref(),
         )
         .await;

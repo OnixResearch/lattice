@@ -26,6 +26,35 @@ pub(super) struct WorkerStart {
 }
 
 impl ApplicationHandler {
+    /// Attach operator configuration so worker executors resolve configured credential providers.
+    #[must_use]
+    pub fn with_app_config(mut self, app_config: crate::config::AppConfig) -> Self {
+        self.app_config = Some(app_config);
+        self
+    }
+
+    pub(super) fn worker_input(
+        &self,
+        record: super::ExecutionRecord,
+        route: &WorkflowRoute,
+        workflow: crate::engine::workflow::Workflow,
+        start: WorkerStart,
+        cancellation: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    ) -> super::super::worker::WorkerInput {
+        super::super::worker::WorkerInput {
+            store: self.store.clone(),
+            admitted: record,
+            authority_mode: route.effect_authority,
+            workflow,
+            agent_runtime: self.agent_runtime.clone(),
+            app_config: self.app_config.clone(),
+            cancellation,
+            checkpoint: self.route_checkpoint(route),
+            seed: start.seed,
+            restored: start.restored,
+        }
+    }
+
     /// Bind exactly one route to its opaque C1 profile identity and declared checkpoint.
     pub fn with_application_checkpoint(
         mut self,

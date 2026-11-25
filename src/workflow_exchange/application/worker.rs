@@ -19,6 +19,7 @@ use super::ExecutionRecord;
 use super::WorkflowFacts;
 
 mod records;
+mod snapshot;
 
 use records::Records;
 
@@ -28,6 +29,7 @@ pub(super) struct WorkerInput {
     pub authority_mode: EffectAuthorityMode,
     pub workflow: crate::engine::workflow::Workflow,
     pub agent_runtime: crate::agent_node::RuntimeOptions,
+    pub app_config: Option<crate::config::AppConfig>,
     pub cancellation: Arc<AtomicBool>,
     /// The route's checkpoint binding; `None` or a `none` profile keeps the hook absent.
     pub checkpoint: Option<crate::checkpoint::CheckpointBinding>,
@@ -44,6 +46,7 @@ pub(super) fn run(input: WorkerInput) {
         authority_mode,
         workflow,
         agent_runtime,
+        app_config,
         cancellation,
         checkpoint,
         seed,
@@ -68,19 +71,18 @@ pub(super) fn run(input: WorkerInput) {
     let Some(wiring) = wire_checkpoint(&running, &workflow, authority_mode, hook) else {
         return mark_unknown(&store, &running);
     };
-    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build();
-    let result = match runtime {
-        Ok(runtime) => runtime.block_on(
-            crate::headless::SnapshotRunRequest {
-                workflow,
-                run_id: crate::engine::RunId(running.run_id),
-                owner: crate::store::RunOwner::Unscoped,
-                agent_runtime,
-                cancellation: Arc::clone(&cancellation),
-            }
-            .run_from_checkpoint(&store, wiring.authority.as_ref(), restored, wiring.progress),
-        ),
-        Err(_) => return mark_unknown(&store, &running),
+    let Some(result) = snapshot::run_snapshot(snapshot::SnapshotDispatch {
+        store: &store,
+        workflow,
+        run_id: crate::engine::RunId(running.run_id),
+        agent_runtime,
+        app_config,
+        cancellation: Arc::clone(&cancellation),
+        authority: wiring.authority.as_ref(),
+        restored,
+        progress: wiring.progress,
+    }) else {
+        return mark_unknown(&store, &running);
     };
     if let Some(observer) = wiring.observer
         && observer.join().is_err()

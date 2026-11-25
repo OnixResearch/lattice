@@ -88,6 +88,7 @@ fn cancel_before_a_fresh_worker_starts_settles_cancelled_unrun() {
         authority_mode: route.effect_authority,
         workflow,
         agent_runtime: crate::agent_node::RuntimeOptions::default(),
+        app_config: None,
         cancellation: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true)),
         checkpoint: None,
         seed: crate::checkpoint::HookSeed::default(),

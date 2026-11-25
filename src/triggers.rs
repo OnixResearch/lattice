@@ -95,7 +95,7 @@ pub enum IdempotencyPolicy {
     PayloadJsonPointer(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TriggerEvent {
     pub method: Option<String>,
     pub path: Option<String>,
@@ -105,7 +105,40 @@ pub struct TriggerEvent {
     pub json_body: Option<serde_json::Value>,
     pub raw_body: Vec<u8>,
     pub idempotency_key: Option<String>,
+    #[serde(skip_serializing, default = "missing_auth_secret")]
     pub resolved_auth_secret: Option<String>,
+}
+
+fn missing_auth_secret() -> Option<String> {
+    None
+}
+
+impl std::fmt::Debug for TriggerEvent {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("TriggerEvent")
+            .field("method", &self.method)
+            .field("path", &self.path)
+            .field("content_type", &self.content_type)
+            .field("headers", &self.headers)
+            .field("query", &self.query)
+            .field("json_body", &self.json_body)
+            .field("raw_body", &self.raw_body)
+            .field("idempotency_key", &self.idempotency_key)
+            .field(
+                "resolved_auth_secret",
+                &self.resolved_auth_secret.as_ref().map(|_| crate::credentials::REDACTION_MARKER),
+            )
+            .finish()
+    }
+}
+
+impl Drop for TriggerEvent {
+    fn drop(&mut self) {
+        if let Some(secret) = self.resolved_auth_secret.as_mut() {
+            zeroize::Zeroize::zeroize(secret);
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -609,6 +642,14 @@ pub fn resolve_webhook_auth_secret_in_context(
         WebhookAuthPolicy::NoAuthLocalOnly => return Ok(None),
         WebhookAuthPolicy::Bearer { secret_ref } | WebhookAuthPolicy::Blake3Signature { secret_ref, .. } => secret_ref,
     };
+    if trigger.id.trim().is_empty() {
+        return Err(TriggerDiagnosticCode::EmptyTriggerId);
+    }
+    if trigger.workflow_name.trim().is_empty() {
+        return Err(TriggerDiagnosticCode::EmptyWorkflowName);
+    }
+    debug_assert!(!trigger.id.trim().is_empty());
+    debug_assert!(!trigger.workflow_name.trim().is_empty());
     let subject = crate::credentials::CredentialSubject::TriggerAuthentication {
         workflow_id: trigger.workflow_name.clone(),
         trigger_id: trigger.id.clone(),
@@ -620,8 +661,6 @@ pub fn resolve_webhook_auth_secret_in_context(
         destination: crate::credentials::CredentialDestination::WebhookAuthentication,
         reason: provider.resolution_reason(secret_ref).unwrap_or_default().to_owned(),
     };
-    debug_assert!(!trigger.workflow_name.is_empty());
-    debug_assert!(!trigger.id.is_empty());
     provider
         .resolve_in_context(secret_ref, &context, cancellation)
         .map(|secret| Some(secret.expose_for_execution().to_string()))

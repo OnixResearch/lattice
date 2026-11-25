@@ -11,6 +11,7 @@ mod worker;
 
 pub use service::load_profile;
 pub use service::serve;
+pub use service::serve_with_app_config;
 pub use shell::ApplicationHandler;
 pub(super) use worker::workflow_facts;
 

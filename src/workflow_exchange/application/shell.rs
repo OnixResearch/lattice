@@ -40,6 +40,7 @@ pub struct ApplicationHandler {
     profile: VersionedHandlerProfile,
     profile_identity: Identity,
     agent_runtime: crate::agent_node::RuntimeOptions,
+    app_config: Option<crate::config::AppConfig>,
     workers: BTreeMap<String, Worker>,
     checkpoint: Option<crate::checkpoint::CheckpointBinding>,
     waiting: checkpoint::WaitingAdoptions,
@@ -59,6 +60,7 @@ impl ApplicationHandler {
             profile,
             profile_identity,
             agent_runtime,
+            app_config: None,
             workers: BTreeMap::new(),
             checkpoint: None,
             waiting: checkpoint::WaitingAdoptions::default(),
@@ -167,23 +169,10 @@ impl ApplicationHandler {
     ) {
         let execution_identity = record.accepted.execution_identity.as_str().to_string();
         let cancellation = Arc::new(AtomicBool::new(start.is_cancelled));
-        let worker_cancellation = Arc::clone(&cancellation);
-        let store = self.store.clone();
-        let agent_runtime = self.agent_runtime.clone();
-        let checkpoint = self.route_checkpoint(&route);
         let worker_name = format!("{WORKER_THREAD_PREFIX}-{}", record.run_id);
+        let input = self.worker_input(record, &route, workflow, start, Arc::clone(&cancellation));
         let spawn = std::thread::Builder::new().name(worker_name).spawn(move || {
-            super::worker::run(super::worker::WorkerInput {
-                store,
-                admitted: record,
-                authority_mode: route.effect_authority,
-                workflow,
-                agent_runtime,
-                cancellation: worker_cancellation,
-                checkpoint,
-                seed: start.seed,
-                restored: start.restored,
-            });
+            super::worker::run(input);
         });
         match spawn {
             Ok(handle) => {

@@ -939,3 +939,281 @@ fn typed_handler_profile_v2_loads_and_negative_profiles_fail() {
         );
     }
 }
+
+#[test]
+fn app_config_handler_resolves_workflow_env_credentials_and_blocks_missing_provider() {
+    let env_key = if std::env::var("PATH").is_ok_and(|value| !value.is_empty()) {
+        "PATH"
+    } else {
+        "HOME"
+    };
+    let (directory, store, mut workflow, contract, request, mut profile) = fixture(TEST_COMMAND);
+    let effect_path = directory.path().join("exchange-env-effect.txt");
+    let node_id = crate::engine::workflow::NodeId(profile.routes[0].nodes[0].workflow_node_id);
+    if let Some(crate::engine::workflow::NodeConfig::Shell { command, .. }) = workflow.configs.get_mut(&node_id.0) {
+        *command = format!("[ -n \"$TOKEN\" ] && printf 'exchange-env-ok' > '{}'", effect_path.display());
+    }
+    workflow.set_node_credentials(node_id, crate::credentials::NodeCredentialRefs {
+        env: [("TOKEN".to_string(), crate::credentials::SecretRef::new("env", env_key, None))].into(),
+    });
+    store.save_workflow(&workflow).expect("credentialed workflow saves");
+    profile.routes[0].workflow_revision = super::application::workflow_facts(&workflow).expect("facts").revision;
+
+    let app_config = crate::config::AppConfig {
+        data_dir: directory.path().to_path_buf(),
+        ..crate::config::AppConfig::default()
+    };
+    let handler = super::ApplicationHandler::new(store, profile, app_config.effective_agent_runtime())
+        .expect("handler starts")
+        .with_app_config(app_config);
+    let mut service = WorkflowExchangeService::new(handler);
+    let dispatch = new_request(ExchangeCommand::Dispatch {
+        profile: contract.clone(),
+        request: request.clone(),
+    })
+    .expect("dispatch envelope is valid");
+    let accepted = accepted_from_response(service.exchange(&dispatch).expect("dispatch succeeds"));
+    service.handler_mut().wait_for_workers();
+
+    let observe = new_request(ExchangeCommand::Observe {
+        profile: contract,
+        request,
+        accepted,
+    })
+    .expect("observe envelope is valid");
+    let observation = observed(service.exchange(&observe).expect("observe succeeds"));
+    assert_eq!(observation.state, ExecutionState::Completed);
+    assert!(observation.successful);
+    assert_eq!(std::fs::read_to_string(&effect_path).expect("effect file reads"), "exchange-env-ok");
+
+    // Missing provider fails closed without executing the node command.
+    let (denied_dir, denied_store, mut denied_workflow, denied_contract, denied_request, mut denied_profile) =
+        fixture(TEST_COMMAND);
+    let denied_effect = denied_dir.path().join("exchange-denied-effect.txt");
+    let denied_node = crate::engine::workflow::NodeId(denied_profile.routes[0].nodes[0].workflow_node_id);
+    if let Some(crate::engine::workflow::NodeConfig::Shell { command, .. }) =
+        denied_workflow.configs.get_mut(&denied_node.0)
+    {
+        *command = format!("printf 'should-not-run' > '{}'", denied_effect.display());
+    }
+    denied_workflow.set_node_credentials(denied_node, crate::credentials::NodeCredentialRefs {
+        env: [("TOKEN".to_string(), crate::credentials::SecretRef::new("missing-provider", "token", None))].into(),
+    });
+    denied_store.save_workflow(&denied_workflow).expect("denied workflow saves");
+    denied_profile.routes[0].workflow_revision =
+        super::application::workflow_facts(&denied_workflow).expect("denied facts").revision;
+
+    let denied_cfg = crate::config::AppConfig {
+        data_dir: denied_dir.path().to_path_buf(),
+        ..crate::config::AppConfig::default()
+    };
+    let denied_handler =
+        super::ApplicationHandler::new(denied_store, denied_profile, denied_cfg.effective_agent_runtime())
+            .expect("denied handler starts")
+            .with_app_config(denied_cfg);
+    let mut denied_service = WorkflowExchangeService::new(denied_handler);
+    let denied_dispatch = new_request(ExchangeCommand::Dispatch {
+        profile: denied_contract.clone(),
+        request: denied_request.clone(),
+    })
+    .expect("denied dispatch envelope is valid");
+    let denied_accepted = accepted_from_response(denied_service.exchange(&denied_dispatch).expect("dispatch succeeds"));
+    denied_service.handler_mut().wait_for_workers();
+
+    let denied_observe = new_request(ExchangeCommand::Observe {
+        profile: denied_contract,
+        request: denied_request,
+        accepted: denied_accepted,
+    })
+    .expect("denied observe envelope is valid");
+    let denied_observation = observed(denied_service.exchange(&denied_observe).expect("observe succeeds"));
+    assert_eq!(denied_observation.state, ExecutionState::Failed);
+    assert!(!denied_observation.successful);
+    assert!(!denied_effect.exists());
+}
+
+#[cfg(all(unix, feature = "animus-secretspec"))]
+#[test]
+fn app_config_handler_and_serve_validate_secretspec_credentials_and_redact() {
+    use std::os::unix::fs::PermissionsExt;
+
+    use crate::credentials::config::CredentialProviderConfig;
+    use crate::credentials::config::DeclarationMapping;
+    use crate::credentials::config::HostInputConfig;
+    use crate::credentials::config::ProviderScheme;
+    use crate::credentials::config::RequestBounds;
+    use crate::credentials::config::SecretSpecHostConfig;
+    use crate::credentials::config::SecretSpecProviderConfig;
+
+    const SENTINEL: &str = "hostile-secret-provider-value-not-public";
+
+    let (directory, store, mut workflow, contract, request, mut profile) = fixture(TEST_COMMAND);
+    let manifest_path = directory.path().join("secretspec.toml");
+    let manifest_bytes = b"[project]\nname = 'lattice-exchange-fixture'\nrevision = '1.0'\n";
+    std::fs::write(&manifest_path, manifest_bytes).expect("manifest writes");
+    let manifest_identity = blake3::hash(manifest_bytes).to_hex().to_string();
+
+    let policy_json = serde_json::to_vec(&serde_json::json!({
+        "schema_version": 1,
+        "resolver_kind": animus_std_secretspec::RESOLVER_IDENTITY,
+        "ambient": { "inherit_environment": false, "manifest_discovery": false },
+        "audit": { "enabled": false, "authoritative": false },
+        "write_operations_allowed": false,
+        "non_claims": [
+            "caller-authority",
+            "credential-correctness",
+            "credential-freshness",
+            "provider-integrity",
+            "audit-completeness",
+            "production-readiness",
+            "release-eligibility"
+        ],
+        "secretspec": {
+            "version": animus_std_secretspec::SECRETSPEC_VERSION,
+            "commit": animus_std_secretspec::SECRETSPEC_COMMIT,
+            "crate_checksum": animus_std_secretspec::SECRETSPEC_CRATE_CHECKSUM,
+            "license": "Apache-2.0",
+            "features": ["sops"]
+        },
+        "bounded_exec": {
+            "commit": animus_std_secretspec::BOUNDED_EXEC_COMMIT,
+            "license": "AGPL-3.0-or-later"
+        },
+        "profiles": [{
+            "profile": "service",
+            "scope": "workflow",
+            "declaration": "API_TOKEN",
+            "manifest_identity": manifest_identity,
+            "provider": "systemd_credential",
+            "provider_selector": "systemd-credential://",
+            "purpose": "workflow-authentication",
+            "destination": "provider_dispatch",
+            "bounds": {
+                "value_count_max": 1,
+                "input_max_bytes": 4096,
+                "value_max_bytes": 1024,
+                "stdout_max_bytes": 1056,
+                "stderr_max_bytes": 1024,
+                "timeout_ms": 5000,
+                "poll_interval_ms": 10,
+                "teardown_timeout_ms": 1000
+            }
+        }]
+    }))
+    .expect("policy json serializes");
+    let policy_identity = blake3::hash(&policy_json).to_hex().to_string();
+    let policy_path = directory.path().join("policy.json");
+    std::fs::write(&policy_path, &policy_json).expect("policy writes");
+
+    let creds_dir = directory.path().join("systemd-creds");
+    std::fs::create_dir_all(&creds_dir).expect("systemd creds dir creates");
+    std::fs::write(creds_dir.join("API_TOKEN"), SENTINEL).expect("credential file writes");
+
+    let worker_path = directory.path().join("secretspec-worker.sh");
+    std::fs::write(
+        &worker_path,
+        format!(
+            "#!/bin/sh\nIFS= read -r _request || true\n[ -f \"$CREDENTIALS_DIRECTORY/API_TOKEN\" ] || exit 4\nprintf 'ANIMUS_SECRET_V1\\0\\050\\0\\0\\0\\0\\0\\0\\0{SENTINEL}'\n"
+        ),
+    )
+    .expect("worker script writes");
+    let mut perms = std::fs::metadata(&worker_path).expect("worker metadata").permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&worker_path, perms).expect("worker executable");
+
+    let effect_path = directory.path().join("secretspec-exchange-effect.txt");
+    let node_id = crate::engine::workflow::NodeId(profile.routes[0].nodes[0].workflow_node_id);
+    if let Some(crate::engine::workflow::NodeConfig::Shell { command, .. }) = workflow.configs.get_mut(&node_id.0) {
+        *command = format!(
+            "printf '%s' \"$API_TOKEN\" && printf '%s' \"$API_TOKEN\" >&2 && printf '%s' \"$API_TOKEN\" > '{}'",
+            effect_path.display()
+        );
+    }
+    workflow.set_node_credentials(node_id, crate::credentials::NodeCredentialRefs {
+        env: [("API_TOKEN".to_string(), crate::credentials::SecretRef::new("reviewed-secret", "token", None))].into(),
+    });
+    store.save_workflow(&workflow).expect("secretspec workflow saves");
+    profile.routes[0].workflow_revision = super::application::workflow_facts(&workflow).expect("facts").revision;
+
+    let app_config = crate::config::AppConfig {
+        data_dir: directory.path().to_path_buf(),
+        credential_providers: vec![CredentialProviderConfig::AnimusSecretspec(SecretSpecProviderConfig {
+            id: "reviewed-secret".to_string(),
+            cohort: "0.17.0".to_string(),
+            manifest_identity,
+            policy_identity,
+            profile: "service".to_string(),
+            scope: "workflow".to_string(),
+            declarations: vec![DeclarationMapping {
+                key: "token".to_string(),
+                field: None,
+                declaration: "API_TOKEN".to_string(),
+                scheme: ProviderScheme::SystemdCredential,
+            }],
+            allowed_schemes: vec![ProviderScheme::SystemdCredential],
+            reason: "workflow-authentication".to_string(),
+            bounds: RequestBounds {
+                input_max_bytes: 4096,
+                value_max_bytes: 1024,
+                stdout_max_bytes: 1056,
+                stderr_max_bytes: 1024,
+                timeout_ms: 5000,
+                poll_interval_ms: 10,
+                teardown_timeout_ms: 1000,
+            },
+        })],
+        credential_hosts: vec![SecretSpecHostConfig {
+            provider_id: "reviewed-secret".to_string(),
+            policy_path,
+            manifest_path,
+            worker_executable: worker_path,
+            working_directory: directory.path().to_path_buf(),
+            input: HostInputConfig::SystemdCredential { directory: creds_dir },
+        }],
+        ..crate::config::AppConfig::default()
+    };
+
+    let handler = super::ApplicationHandler::new(store.clone(), profile.clone(), app_config.effective_agent_runtime())
+        .expect("handler starts")
+        .with_app_config(app_config.clone());
+    let mut service = WorkflowExchangeService::new(handler);
+    let dispatch = new_request(ExchangeCommand::Dispatch {
+        profile: contract.clone(),
+        request: request.clone(),
+    })
+    .expect("dispatch envelope is valid");
+    let accepted = accepted_from_response(service.exchange(&dispatch).expect("dispatch succeeds"));
+    service.handler_mut().wait_for_workers();
+
+    let observe = new_request(ExchangeCommand::Observe {
+        profile: contract,
+        request,
+        accepted: accepted.clone(),
+    })
+    .expect("observe envelope is valid");
+    let observation = observed(service.exchange(&observe).expect("observe succeeds"));
+    assert_eq!(observation.state, ExecutionState::Completed);
+    assert!(observation.successful);
+    assert_eq!(std::fs::read_to_string(&effect_path).expect("effect file reads"), SENTINEL);
+
+    let record = store.load_workflow_exchange(&accepted.execution_identity).expect("load record").expect("record");
+    let details = store.load_run_details(crate::engine::RunId(record.run_id)).expect("load details").expect("details");
+    let raw_redb = std::fs::read(directory.path().join("lattice.redb")).expect("read redb");
+    for surface in [
+        format!("{observation:?}"),
+        format!("{record:?}"),
+        format!("{details:?}"),
+        String::from_utf8_lossy(&raw_redb).into_owned(),
+    ] {
+        assert!(!surface.contains(SENTINEL), "sentinel leaked into workflow_exchange surface");
+    }
+
+    // Fail-closed: serve_with_app_config refuses mismatched credential host configuration before
+    // binding.
+    let mut broken_cfg = app_config;
+    broken_cfg.credential_hosts.clear();
+    assert_eq!(
+        super::serve_with_app_config(store, profile, &broken_cfg, None),
+        Err(super::ApplicationError::Runtime)
+    );
+}

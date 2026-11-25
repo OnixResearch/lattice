@@ -16,8 +16,7 @@ pub async fn resume_with_app_config(
     app_config: &crate::config::AppConfig,
 ) -> Result<ResumeExecution, Error> {
     let authority_provider = app_config.effect_authority_provider();
-    let runtime = ResumeRuntime { agent: app_config.effective_agent_runtime(), typed_policy: None, app_config: Some(app_config.clone()) };
-    resume(store, command, runtime, authority_provider.as_ref()).await
+    resume_with_app_config_and_authority_provider(store, command, app_config, authority_provider.as_ref()).await
 }
 
 pub async fn resume_with_authority_provider(

@@ -942,3 +942,84 @@ fn webhook_cookbook_rejected_requests_do_not_start_runs_or_expose_secrets() {
     assert!(!auth_record_debug.contains(BAD_TOKEN));
     assert!(!auth_record_debug.contains(PAYLOAD_SECRET));
 }
+
+#[test]
+fn decide_request_rejects_empty_workflow_or_trigger_id_without_panic_or_secret_resolution() {
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::Ordering;
+
+    struct CountingProvider {
+        calls: AtomicUsize,
+    }
+    impl lattice::credentials::CredentialProvider for CountingProvider {
+        fn resolve(
+            &self,
+            _reference: &SecretRef,
+        ) -> Result<lattice::credentials::SecretValue, lattice::credentials::CredentialError> {
+            self.calls.fetch_add(1, Ordering::AcqRel);
+            Ok(lattice::credentials::SecretValue::new(SECRET_VALUE.to_string()))
+        }
+
+        fn resolve_in_context(
+            &self,
+            _reference: &SecretRef,
+            _context: &lattice::credentials::CredentialResolutionContext,
+            _cancellation: Option<&std::sync::atomic::AtomicBool>,
+        ) -> Result<lattice::credentials::SecretValue, lattice::credentials::CredentialError> {
+            self.calls.fetch_add(1, Ordering::AcqRel);
+            Ok(lattice::credentials::SecretValue::new(SECRET_VALUE.to_string()))
+        }
+    }
+
+    let provider = CountingProvider {
+        calls: AtomicUsize::new(0),
+    };
+    let request = request_with_parts(WEBHOOK_METHOD, WEBHOOK_PATH, CONTENT_TYPE_JSON, bearer(BAD_TOKEN), RAW_JSON_BODY);
+    for policy in [
+        WebhookAuthPolicy::Bearer {
+            secret_ref: secret_ref(),
+        },
+        WebhookAuthPolicy::NoAuthLocalOnly,
+    ] {
+        for empty in ["", "   "] {
+            let mut empty_workflow = webhook_trigger(true, policy.clone());
+            empty_workflow.workflow_name = empty.to_string();
+            let decision = webhooks::decide_request(&request, &[empty_workflow], &provider, &empty_context(), limits());
+            let webhooks::Decision::Rejected(rejection) = decision else {
+                panic!("empty workflow_name must be rejected");
+            };
+            assert_eq!(rejection.code, webhooks::RejectionCode::InvalidRequest);
+            assert!(rejection.event.as_ref().and_then(|event| event.resolved_auth_secret.as_ref()).is_none());
+            assert!(!format!("{rejection:?}").contains(SECRET_VALUE));
+        }
+    }
+
+    let mut empty_id = webhook_trigger(true, WebhookAuthPolicy::Bearer {
+        secret_ref: secret_ref(),
+    });
+    empty_id.id = String::new();
+    let empty_id_decision = webhooks::decide_request(&request, &[empty_id], &provider, &empty_context(), limits());
+    assert!(
+        matches!(empty_id_decision, webhooks::Decision::Rejected(rejection) if rejection.code == webhooks::RejectionCode::NotFound)
+    );
+    assert_eq!(provider.calls.load(Ordering::Acquire), 0);
+}
+
+#[test]
+fn rejected_webhook_request_scrubs_and_redacts_resolved_auth_secret() {
+    let trigger = webhook_trigger(true, WebhookAuthPolicy::Bearer {
+        secret_ref: secret_ref(),
+    });
+    let provider = provider_with_secret();
+    let request = request_with_parts(WEBHOOK_METHOD, WEBHOOK_PATH, CONTENT_TYPE_JSON, bearer(BAD_TOKEN), RAW_JSON_BODY);
+
+    let webhooks::Decision::Rejected(rejection) =
+        webhooks::decide_request(&request, &[trigger], &provider, &empty_context(), limits())
+    else {
+        panic!("invalid auth must reject");
+    };
+    let event = rejection.event.as_ref().expect("rejection retains scrubbed event");
+    assert!(event.resolved_auth_secret.is_none());
+    assert!(!format!("{rejection:?}").contains(SECRET_VALUE));
+    assert!(!serde_json::to_string(event).expect("event serializes").contains(SECRET_VALUE));
+}

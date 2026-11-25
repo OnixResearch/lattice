@@ -2243,7 +2243,7 @@ fn run_workflow_exchange_command(app_config: &config::AppConfig, args: &Workflow
             return ExitCode::FAILURE;
         }
     };
-    match lattice::workflow_exchange::serve(store, profile, app_config.effective_agent_runtime(), checkpoint) {
+    match lattice::workflow_exchange::serve_with_app_config(store, profile, app_config, checkpoint) {
         Ok(report) => {
             println!(
                 "workflow exchange stopped after {} accepted connections, {} completed exchanges, {} denied peers, and {} failed exchanges",

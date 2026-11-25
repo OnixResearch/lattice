@@ -407,3 +407,403 @@ fn tui_secretspec_provider_selection_edit_recovery_and_safe_reachability() {
     assert!(!broken_probe.reachable);
     assert_eq!(broken_probe.message, "credential_secretspec_unavailable");
 }
+
+fn approval_gate_config(gate: &str) -> crate::workflow::gate::ApprovalNodeConfig {
+    crate::workflow::gate::ApprovalNodeConfig {
+        gate_id: crate::workflow::gate::GateId::try_from_text(gate).expect("gate id is valid"),
+        safe_summary: format!("Review {gate}"),
+        selected_input_ports: Vec::new(),
+        required_artifacts: Vec::new(),
+        authority: crate::workflow::gate::ApprovalAuthorityPolicy {
+            profile: crate::workflow::gate::AuthorityProfile::LocalOperator,
+            local_actors: vec![crate::workflow::gate::ActorId::try_from_text("reviewer-a").expect("actor id")],
+            accepted_abilities: vec![
+                crate::workflow::gate::DecisionAbility::Approve,
+                crate::workflow::gate::DecisionAbility::Reject,
+            ],
+            prohibit_self_approval: true,
+            delegated_policy_reference: None,
+        },
+        expiry: crate::workflow::gate::ApprovalExpiryPolicy {
+            decision_ttl_millis: 60_000,
+            resume_ttl_millis: 60_000,
+            approval_must_be_fresh_at_resume: true,
+            clock_source: crate::workflow::gate::ClockSourceClass::UtcWallClock,
+        },
+        reason: crate::workflow::gate::ApprovalReasonPolicy {
+            required: false,
+            identity_bound: true,
+            max_bytes: 128,
+        },
+        resume: crate::workflow::gate::ApprovalResumeSchema {
+            values: vec![crate::workflow::gate::ResumeValueField {
+                name: crate::workflow::gate::ResumeBindingName::try_from_text("continue").expect("binding name"),
+                type_tag: "string".to_string(),
+            }],
+            credential_bindings: Vec::new(),
+        },
+        terminal: crate::workflow::gate::ApprovalTerminalPolicy {
+            on_rejection: crate::workflow::gate::TerminalOutcome::FailWorkflow,
+            on_expiry: crate::workflow::gate::TerminalOutcome::CancelWorkflow,
+        },
+        required_non_claims: crate::workflow::gate::REQUIRED_APPROVAL_NON_CLAIMS.map(str::to_owned).to_vec(),
+    }
+}
+
+fn approval_decision_command(
+    request: &crate::workflow::gate::ApprovalRequest,
+) -> crate::workflow::gate::DecisionCommand {
+    crate::workflow::gate::DecisionCommand {
+        request_id: request.id.clone(),
+        expected_workflow_revision: request.workflow_revision.clone(),
+        actor: crate::workflow::gate::ActorId::try_from_text("reviewer-a").expect("actor id"),
+        decision: crate::workflow::gate::DecisionClass::Approve,
+        reason: Some("reviewed".to_string()),
+        observed_epoch_millis: request.requested_epoch_millis + 1,
+        evidence: crate::workflow::gate::DecisionAuthorityEvidence::LocalOperator,
+    }
+}
+
+fn approval_resume_command(request: &crate::workflow::gate::ApprovalRequest) -> crate::workflow::gate::ResumeCommand {
+    crate::workflow::gate::ResumeCommand {
+        request_id: request.id.clone(),
+        expected_workflow_revision: request.workflow_revision.clone(),
+        expected_event_head: request.events.last().expect("approval event head").id.clone(),
+        owner: crate::workflow::gate::ResumeOwnerId::try_from_text("tui-operator").expect("owner id"),
+        observed_epoch_millis: request.requested_epoch_millis + 1,
+        values: vec![crate::workflow::gate::ResumeValue {
+            name: crate::workflow::gate::ResumeBindingName::try_from_text("continue").expect("binding name"),
+            value: crate::engine::value::Value::from_string("admitted".to_string()),
+        }],
+        credentials: Vec::new(),
+    }
+}
+
+#[tokio::test]
+async fn tui_resume_selected_approval_wires_workflow_env_credentials_and_authority_provider() {
+    let env_key = if std::env::var("PATH").is_ok_and(|value| !value.is_empty()) {
+        "PATH"
+    } else {
+        "HOME"
+    };
+    let temp_dir = tempfile::tempdir().expect("temporary app directory");
+    let effect_path = temp_dir.path().join("env-approval-delivered.txt");
+    let mut workflow = Workflow::new("tui-approval-env-resume", crate::engine::workflow::WorkflowTimestamp::epoch());
+    let approval_id = workflow.add_approval_node("approval", approval_gate_config("gate-env"));
+    let shell_id = workflow.add_shell_node(
+        "env-consumer",
+        format!("[ -n \"$TOKEN\" ] && printf 'delivered' > '{}'", effect_path.display()),
+    );
+    workflow.set_node_credentials(shell_id, NodeCredentialRefs {
+        env: [("TOKEN".to_string(), SecretRef::new("env", env_key, None))].into(),
+    });
+    let approval_out = workflow.graph.node(approval_id).expect("approval node").output_ports[0].id;
+    let shell_in = workflow.graph.node(shell_id).expect("shell node").input_ports[0].id;
+    workflow.graph.add_edge(approval_out, shell_in).expect("approval connects to consumer");
+
+    let cfg = test_config(&temp_dir);
+    let store_path = crate::config::store_path(&cfg.data_dir);
+    let store = crate::store::Store::new(&store_path).expect("store opens");
+    store.save_workflow(&workflow).expect("workflow saves");
+    let run_id = crate::engine::executor::RunId(1);
+    let summary = crate::headless::run_saved_workflow_with_app_config(&store, &workflow.meta.name, run_id, &cfg)
+        .await
+        .expect("workflow suspends at approval gate");
+    assert_eq!(summary.status, crate::headless::HeadlessRunStatus::Suspended);
+    assert!(!effect_path.exists());
+    let initial_request =
+        store.load_workflow_approval_for_run(run_id).expect("load approval").expect("approval exists");
+    drop(store);
+
+    let mut app = State::new(cfg).with_authority_provider(Arc::new(operator_authority(&workflow, temp_dir.path())));
+    app.open_approvals();
+    assert!(app.decide_selected_approval(&approval_decision_command(&initial_request)));
+    let approved_request = app
+        .store
+        .as_ref()
+        .expect("store open")
+        .load_workflow_approval(&initial_request.id)
+        .expect("reload approved request")
+        .expect("approved request exists");
+    assert!(app.resume_selected_approval(&approval_resume_command(&approved_request)).await);
+
+    assert_eq!(std::fs::read_to_string(&effect_path).expect("effect file reads"), "delivered");
+    let store = app.store.as_ref().expect("store open");
+    let run = store.load_run(run_id).expect("load run").expect("run exists");
+    assert!(run.finished_epoch_ms.is_some());
+    assert_eq!(run.failures, 0);
+    let details = store.load_run_details(run_id).expect("load details").expect("details exist");
+    assert_eq!(details.nodes.len(), 2);
+    assert!(details.nodes.iter().all(|node| node.status == crate::store::RunNodeDetailStatus::Completed));
+}
+
+// r[verify lattice.credentials.animus_secret_providers.tui]
+#[cfg(all(unix, feature = "animus-secretspec"))]
+#[tokio::test]
+async fn tui_resume_selected_approval_delivers_and_redacts_secretspec_credential() {
+    use std::os::unix::fs::PermissionsExt;
+
+    use crate::credentials::config::CredentialProviderConfig;
+    use crate::credentials::config::DeclarationMapping;
+    use crate::credentials::config::HostInputConfig;
+    use crate::credentials::config::ProviderScheme;
+    use crate::credentials::config::RequestBounds;
+    use crate::credentials::config::SecretSpecHostConfig;
+    use crate::credentials::config::SecretSpecProviderConfig;
+
+    const SENTINEL: &str = "hostile-secret-provider-value-not-public";
+
+    let temp_dir = tempfile::tempdir().expect("temporary app directory");
+    let manifest_path = temp_dir.path().join("secretspec.toml");
+    let manifest_bytes = b"[project]\nname = 'lattice-tui-approval-resume'\nrevision = '1.0'\n";
+    std::fs::write(&manifest_path, manifest_bytes).expect("manifest writes");
+    let manifest_identity = blake3::hash(manifest_bytes).to_hex().to_string();
+
+    let policy_json = serde_json::to_vec(&serde_json::json!({
+        "schema_version": 1,
+        "resolver_kind": animus_std_secretspec::RESOLVER_IDENTITY,
+        "ambient": { "inherit_environment": false, "manifest_discovery": false },
+        "audit": { "enabled": false, "authoritative": false },
+        "write_operations_allowed": false,
+        "non_claims": [
+            "caller-authority",
+            "credential-correctness",
+            "credential-freshness",
+            "provider-integrity",
+            "audit-completeness",
+            "production-readiness",
+            "release-eligibility"
+        ],
+        "secretspec": {
+            "version": animus_std_secretspec::SECRETSPEC_VERSION,
+            "commit": animus_std_secretspec::SECRETSPEC_COMMIT,
+            "crate_checksum": animus_std_secretspec::SECRETSPEC_CRATE_CHECKSUM,
+            "license": "Apache-2.0",
+            "features": ["sops"]
+        },
+        "bounded_exec": {
+            "commit": animus_std_secretspec::BOUNDED_EXEC_COMMIT,
+            "license": "AGPL-3.0-or-later"
+        },
+        "profiles": [{
+            "profile": "service",
+            "scope": "workflow",
+            "declaration": "API_TOKEN",
+            "manifest_identity": manifest_identity,
+            "provider": "systemd_credential",
+            "provider_selector": "systemd-credential://",
+            "purpose": "workflow-authentication",
+            "destination": "provider_dispatch",
+            "bounds": {
+                "value_count_max": 1,
+                "input_max_bytes": 4096,
+                "value_max_bytes": 1024,
+                "stdout_max_bytes": 1056,
+                "stderr_max_bytes": 1024,
+                "timeout_ms": 5000,
+                "poll_interval_ms": 10,
+                "teardown_timeout_ms": 1000
+            }
+        }]
+    }))
+    .expect("policy json serializes");
+    let policy_identity = blake3::hash(&policy_json).to_hex().to_string();
+    let policy_path = temp_dir.path().join("policy.json");
+    std::fs::write(&policy_path, &policy_json).expect("policy writes");
+
+    let creds_dir = temp_dir.path().join("systemd-creds");
+    std::fs::create_dir_all(&creds_dir).expect("systemd creds dir creates");
+    std::fs::write(creds_dir.join("API_TOKEN"), SENTINEL).expect("credential file writes");
+
+    let worker_path = temp_dir.path().join("secretspec-worker.sh");
+    std::fs::write(
+        &worker_path,
+        format!(
+            "#!/bin/sh\nIFS= read -r _request || true\n[ -f \"$CREDENTIALS_DIRECTORY/API_TOKEN\" ] || exit 4\nprintf 'ANIMUS_SECRET_V1\\0\\050\\0\\0\\0\\0\\0\\0\\0{SENTINEL}'\n"
+        ),
+    )
+    .expect("worker script writes");
+    let mut perms = std::fs::metadata(&worker_path).expect("worker metadata").permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(&worker_path, perms).expect("worker executable");
+
+    let effect_path = temp_dir.path().join("secretspec-approval-delivered.txt");
+    let mut workflow =
+        Workflow::new("tui-approval-secretspec-resume", crate::engine::workflow::WorkflowTimestamp::epoch());
+    let approval_id = workflow.add_approval_node("approval", approval_gate_config("gate-secretspec"));
+    let shell_id = workflow.add_shell_node(
+        "secretspec-consumer",
+        format!(
+            "printf '%s' \"$API_TOKEN\" && printf '%s' \"$API_TOKEN\" >&2 && printf '%s' \"$API_TOKEN\" > '{}'",
+            effect_path.display()
+        ),
+    );
+    workflow.set_node_credentials(shell_id, NodeCredentialRefs {
+        env: [("API_TOKEN".to_string(), SecretRef::new("reviewed-secret", "token", None))].into(),
+    });
+    let approval_out = workflow.graph.node(approval_id).expect("approval node").output_ports[0].id;
+    let shell_in = workflow.graph.node(shell_id).expect("shell node").input_ports[0].id;
+    workflow.graph.add_edge(approval_out, shell_in).expect("approval connects to consumer");
+
+    let _authority = operator_authority(&workflow, temp_dir.path());
+    let mut cfg = test_config(&temp_dir);
+    cfg.effect_authority = Some(temp_dir.path().join("authority.ncl"));
+    cfg.credential_providers = vec![CredentialProviderConfig::AnimusSecretspec(SecretSpecProviderConfig {
+        id: "reviewed-secret".to_string(),
+        cohort: "0.17.0".to_string(),
+        manifest_identity,
+        policy_identity,
+        profile: "service".to_string(),
+        scope: "workflow".to_string(),
+        declarations: vec![DeclarationMapping {
+            key: "token".to_string(),
+            field: None,
+            declaration: "API_TOKEN".to_string(),
+            scheme: ProviderScheme::SystemdCredential,
+        }],
+        allowed_schemes: vec![ProviderScheme::SystemdCredential],
+        reason: "workflow-authentication".to_string(),
+        bounds: RequestBounds {
+            input_max_bytes: 4096,
+            value_max_bytes: 1024,
+            stdout_max_bytes: 1056,
+            stderr_max_bytes: 1024,
+            timeout_ms: 5000,
+            poll_interval_ms: 10,
+            teardown_timeout_ms: 1000,
+        },
+    })];
+    cfg.credential_hosts = vec![SecretSpecHostConfig {
+        provider_id: "reviewed-secret".to_string(),
+        policy_path: policy_path.clone(),
+        manifest_path,
+        worker_executable: worker_path,
+        working_directory: temp_dir.path().to_path_buf(),
+        input: HostInputConfig::SystemdCredential { directory: creds_dir },
+    }];
+
+    let store_path = crate::config::store_path(&cfg.data_dir);
+    let store = crate::store::Store::new(&store_path).expect("store opens");
+    store.save_workflow(&workflow).expect("workflow saves");
+    let run_id_1 = crate::engine::executor::RunId(1);
+    let summary_1 = crate::headless::run_saved_workflow_with_app_config(&store, &workflow.meta.name, run_id_1, &cfg)
+        .await
+        .expect("run 1 suspends at approval gate");
+    assert_eq!(summary_1.status, crate::headless::HeadlessRunStatus::Suspended);
+    assert!(!effect_path.exists());
+    let req_1 = store.load_workflow_approval_for_run(run_id_1).expect("load approval").expect("approval exists");
+
+    let run_id_2 = crate::engine::executor::RunId(2);
+    let summary_2 = crate::headless::run_saved_workflow_with_app_config(&store, &workflow.meta.name, run_id_2, &cfg)
+        .await
+        .expect("run 2 suspends at approval gate");
+    assert_eq!(summary_2.status, crate::headless::HeadlessRunStatus::Suspended);
+    let req_2 = store.load_workflow_approval_for_run(run_id_2).expect("load approval 2").expect("approval 2 exists");
+    drop(store);
+
+    let mut app = State::new(cfg.clone());
+    app.open_approvals();
+    app.approvals.selected = app
+        .approvals
+        .records
+        .iter()
+        .position(|rec| rec.request_id == req_1.id.as_str())
+        .expect("run 1 approval present");
+    assert!(app.decide_selected_approval(&approval_decision_command(&req_1)));
+    app.approvals.selected = app
+        .approvals
+        .records
+        .iter()
+        .position(|rec| rec.request_id == req_1.id.as_str())
+        .expect("run 1 approved record present");
+    let approved_1 = app
+        .store
+        .as_ref()
+        .expect("store open")
+        .load_workflow_approval(&req_1.id)
+        .expect("reload approved 1")
+        .expect("approved 1 exists");
+    assert!(app.resume_selected_approval(&approval_resume_command(&approved_1)).await);
+
+    assert_eq!(std::fs::read_to_string(&effect_path).expect("effect file reads"), SENTINEL);
+    let run_1 = app
+        .store
+        .as_ref()
+        .expect("store open")
+        .load_run(run_id_1)
+        .expect("load run 1")
+        .expect("run 1 exists");
+    assert!(run_1.finished_epoch_ms.is_some());
+    assert_eq!(run_1.failures, 0);
+    let details_1 = app
+        .store
+        .as_ref()
+        .expect("store open")
+        .load_run_details(run_id_1)
+        .expect("load details 1")
+        .expect("details 1 exist");
+    assert_eq!(details_1.nodes.len(), 2);
+    assert!(details_1.nodes.iter().all(|node| node.status == crate::store::RunNodeDetailStatus::Completed));
+    let consumer_detail = details_1.nodes.iter().find(|node| node.node_id == shell_id).expect("consumer detail");
+    assert!(
+        consumer_detail
+            .outputs
+            .iter()
+            .any(|output| output.port_label == "stdout" && output.text == "<redacted>")
+    );
+    assert!(
+        consumer_detail
+            .outputs
+            .iter()
+            .any(|output| output.port_label == "stderr" && output.text == "<redacted>")
+    );
+    assert!(
+        consumer_detail
+            .outputs
+            .iter()
+            .filter(|output| output.port_label == "stdout" || output.port_label == "stderr")
+            .all(|output| output.text == "<redacted>")
+    );
+    let replay_1 = app.store.as_ref().expect("store open").load_run_replay_events(run_id_1).expect("load replay 1");
+    let raw_redb = std::fs::read(&store_path).expect("read raw redb");
+    let raw_redb_text = String::from_utf8_lossy(&raw_redb);
+    for surface in [
+        output_text_lines(&app).join("\n"),
+        serde_json::to_string(&details_1).expect("serialize details"),
+        serde_json::to_string(&replay_1).expect("serialize replay"),
+        raw_redb_text.into_owned(),
+    ] {
+        assert!(!surface.contains(SENTINEL), "sentinel leaked into surface");
+    }
+
+    // Fail-closed: deleting host policy before resuming Run 2 must fail resume without executing effect
+    // or leaking.
+    drop(app);
+    std::fs::remove_file(&effect_path).expect("remove effect file before run 2");
+    let mut app_2 = State::new(cfg);
+    app_2.open_approvals();
+    app_2.approvals.selected = app_2
+        .approvals
+        .records
+        .iter()
+        .position(|rec| rec.request_id == req_2.id.as_str())
+        .expect("run 2 approval present");
+    assert!(app_2.decide_selected_approval(&approval_decision_command(&req_2)));
+    app_2.approvals.selected = app_2
+        .approvals
+        .records
+        .iter()
+        .position(|rec| rec.request_id == req_2.id.as_str())
+        .expect("run 2 approved record present");
+    let approved_2 = app_2
+        .store
+        .as_ref()
+        .expect("store open")
+        .load_workflow_approval(&req_2.id)
+        .expect("reload approved 2")
+        .expect("approved 2 exists");
+    std::fs::remove_file(&policy_path).expect("remove policy before resume 2");
+    assert!(!app_2.resume_selected_approval(&approval_resume_command(&approved_2)).await);
+    assert!(!effect_path.exists());
+    assert!(!output_text_lines(&app_2).join("\n").contains(SENTINEL));
+}
