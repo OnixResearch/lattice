@@ -26,6 +26,7 @@ fn observed_inputs(valid: bool, exit_code: i32) -> Result<release_inputs::Comple
     )
 }
 
+// r[verify lattice.release_integration.selection]
 #[test]
 fn policy_declares_the_observation_output_paths() -> TestResult {
     let policy: Value = serde_json::from_str(include_str!("../cairn-policy/generated/cairn-policy.json"))?;

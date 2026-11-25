@@ -49,6 +49,7 @@ let TrellisTraceabilityProfile = {
 } in
 Upstream & ReleaseContracts.Policy & {
   name | force = "lattice-default",
+  # r[impl lattice.release_integration.selection]
   release_readiness_policy = {
     required_external_commands = [
       "scripts/check.rs",

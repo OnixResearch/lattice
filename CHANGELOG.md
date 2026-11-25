@@ -7,6 +7,16 @@ interfaces.
 
 ## [Unreleased]
 
+### Changed
+
+- Completed and archived `integrate-consumer-release-readiness`: added
+  `lattice.release_integration.selection` traceability markers in
+  `cairn-policy/default.ncl` and `tests/test_release_readiness_integration.rs`,
+  observed real native MCP validation inputs (`scripts/release-readiness-inputs.rs`)
+  and `cairn agent-receipt complete`, verified `fixtures/release-readiness/canonicalization.json`
+  and `determinism coverage-audit` / Lattice-owned `determinism replay` cases,
+  and synced `.cairn/specs/release-integration/spec.md`.
+
 ### Fixed
 
 - Complete `complete-tui-nickel-authoring-parity` and re-enable all 3 TUI PTY
