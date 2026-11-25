@@ -19,7 +19,7 @@ fn host_local() -> Request {
 fn bound() -> Request {
     let mut request = host_local();
     request.network = Some(false);
-    request.omp.model_broker.credential = None;
+    request.omp.as_mut().unwrap().model_broker.credential = None;
     rebound(request)
 }
 
@@ -35,7 +35,7 @@ fn rebound(mut request: Request) -> Request {
     binding.envelope = request.admitted_envelope.clone();
     binding.attempt_id = request.envelope.attempt_id.clone();
     binding.fence = request.envelope.fence;
-    request.omp.model_broker.forwarded = Some(crate::candidate_worker::broker::Forwarded {
+    request.omp.as_mut().unwrap().model_broker.forwarded = Some(crate::candidate_worker::broker::Forwarded {
         schema: crate::candidate_worker::broker::FORWARDED_SCHEMA.into(),
         vsock_port: profile.gateway.model_vsock_port,
         binding: crate::vm_profile::binding_identity(&binding).expect("binding identity"),
@@ -63,7 +63,7 @@ fn an_absent_binding_keeps_request_bytes_and_a_bound_one_keeps_the_profile_revis
     let mut unbound = request.clone();
     unbound.vm_binding = None;
     unbound.vm_profile = None;
-    unbound.omp.model_broker.forwarded = None;
+    unbound.omp.as_mut().unwrap().model_broker.forwarded = None;
     assert_eq!(unbound.worker_profile_identity(), request.worker_profile_identity());
     unbound.validate(1).expect("the same request without its binding is a local request");
 }
@@ -89,11 +89,11 @@ fn crossed_bindings_and_missing_forwarding_are_refused_before_effect() {
         ("guest_network_not_none", |request| {
             request.vm_profile.as_mut().expect("profile").guest_network = "tap".into();
         }),
-        ("present together", |request| request.omp.model_broker.forwarded = None),
+        ("present together", |request| request.omp.as_mut().unwrap().model_broker.forwarded = None),
         ("present together", |request| request.vm_profile = None),
         ("present together", |request| request.vm_binding = None),
         ("another VM binding", |request| {
-            request.omp.model_broker.forwarded.as_mut().expect("forwarded").vsock_port =
+            request.omp.as_mut().unwrap().model_broker.forwarded.as_mut().expect("forwarded").vsock_port =
                 crate::vm_profile::VsockPort(10242);
         }),
     ];
@@ -104,10 +104,10 @@ fn crossed_bindings_and_missing_forwarding_are_refused_before_effect() {
         assert!(error.contains(expected), "{expected}: {error}");
     }
     let mut crossed = bound();
-    crossed.omp.model_broker.forwarded.as_mut().expect("forwarded").binding = other;
+    crossed.omp.as_mut().unwrap().model_broker.forwarded.as_mut().expect("forwarded").binding = other;
     assert!(crossed.validate(1).expect_err("crossed forwarding").contains("another VM binding"));
     let mut credentialed = bound();
-    credentialed.omp.model_broker.credential = Some(crate::credentials::SecretRef::new("env", "MODEL_TOKEN", None));
+    credentialed.omp.as_mut().unwrap().model_broker.credential = Some(crate::credentials::SecretRef::new("env", "MODEL_TOKEN", None));
     let error = rebound(credentialed).validate(1).expect_err("credential in the guest");
     assert!(error.contains("no model credential"), "{error}");
 }
@@ -123,7 +123,7 @@ fn an_attempt_binding_that_asks_for_application_checkpoint_mobility_is_refused()
     let binding = request.vm_binding.as_mut().expect("binding");
     binding.requested_mobility = crate::vm_profile::Mobility::ApplicationCheckpoint;
     let identity = crate::vm_profile::binding_identity(binding).expect("binding identity");
-    request.omp.model_broker.forwarded.as_mut().expect("forwarded").binding = identity;
+    request.omp.as_mut().unwrap().model_broker.forwarded.as_mut().expect("forwarded").binding = identity;
     let error = request.validate(1).expect_err("application checkpoint mobility");
     assert!(error.contains("offers no application checkpoint"), "{error}");
 }

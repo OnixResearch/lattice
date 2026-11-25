@@ -232,6 +232,6 @@ impl Paused {
         ports: super::super::Ports<'_>,
         revisions: super::super::session::revision::Store<'_>,
     ) -> Result<(), String> {
-        self.0.first_run(ports, None, revisions).await
+        self.0.first_run(ports, None, revisions, None).await
     }
 }

@@ -71,7 +71,7 @@ fn fixture() -> Fixture {
         write_paths: vec![".".into()],
         program: "/usr/bin/worker".into(),
         sandbox_program: "/usr/bin/bwrap".into(),
-        omp: crate::candidate_worker::omp::Profile {
+        omp: Some(crate::candidate_worker::omp::Profile {
             revision: crate::candidate_worker::omp::OMP_REVISION.into(),
             executable_blake3: "e".repeat(64),
             base_identity,
@@ -95,7 +95,8 @@ fn fixture() -> Fixture {
                 max_requests: 1,
                 forwarded: None,
             },
-        },
+        }),
+        animus_implementation: None,
         output_limit_bytes: 4096,
         allow_unchanged: false,
         worker_compute: lattice_core::execution_binding::request::ComputeRequirement::HostLocal {},

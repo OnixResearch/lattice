@@ -122,7 +122,7 @@ impl Operated {
         let built_at_ms = now_ms();
         if let Some(expires_in_ms) = options.expires_in_ms {
             request.expires_at_ms = built_at_ms + expires_in_ms;
-            request.omp.model_broker.expires_at_ms = request.expires_at_ms;
+            request.omp.as_mut().unwrap().model_broker.expires_at_ms = request.expires_at_ms;
         }
         if let Some((read, write)) = &options.paths {
             for path in write {
@@ -232,6 +232,7 @@ impl Operated {
             Some(ports),
             Some(operator),
             revisions,
+            None,
         )
         .await
     }

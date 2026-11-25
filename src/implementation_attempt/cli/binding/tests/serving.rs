@@ -31,7 +31,7 @@ struct Served {
 fn served() -> Served {
     let root = tempfile::tempdir().expect("scratch");
     let mut request = super::super::super::tests::host_local();
-    request.execution_binding.serving = Some(super::serving_declaration(&request.omp.model_broker.model));
+    request.execution_binding.serving = Some(super::serving_declaration(&request.omp.as_ref().unwrap().model_broker.model));
     let request_path = root.path().join("request.json");
     std::fs::write(&request_path, serde_json::to_vec(&request).expect("request bytes")).expect("request");
     let state = root.path().join("state");
@@ -98,7 +98,7 @@ fn missing_served_evidence_is_unknown_and_an_empty_retained_directory_is_zero() 
     let mut request = served.request.clone();
     request.lineage = Some(crate::implementation_attempt::lineage::tests::binding(4, 4));
     let frame = super::super::draw::SingleShot::of(&request).expect("lineage");
-    let ceiling = request.omp.model_broker.max_requests;
+    let ceiling = request.omp.as_ref().unwrap().model_broker.max_requests;
     let coverage =
         |directory: &std::path::Path| super::super::requests::coverage(&admitted, directory).expect("coverage");
     let missing = coverage(&served.directory);
@@ -211,7 +211,7 @@ fn inspect_names_the_missing_port_and_shows_the_budget_refusal_once() {
 fn inspect_reports_the_injected_ports_latest_snapshot_readiness_and_freshness() {
     let served = served();
     let mut port = crate::execution_binding::serving::FixtureOwner::new(
-        vec![ready_snapshot(&served.request.omp.model_broker.model)],
+        vec![ready_snapshot(&served.request.omp.as_ref().unwrap().model_broker.model)],
         vec![],
         vec![],
     );
@@ -276,7 +276,7 @@ fn capture_served_worker_inventory_v3() {
     let dir = std::path::PathBuf::from(dir);
     let served = served();
     let mut port = crate::execution_binding::serving::FixtureOwner::new(
-        vec![ready_snapshot(&served.request.omp.model_broker.model)],
+        vec![ready_snapshot(&served.request.omp.as_ref().unwrap().model_broker.model)],
         vec![],
         vec![],
     );

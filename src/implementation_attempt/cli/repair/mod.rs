@@ -94,7 +94,7 @@ pub(super) fn validate(request: &super::Request) -> Result<(), String> {
 fn frame(request: &super::Request) -> crate::implementation_attempt::repair::Frame<'_> {
     crate::implementation_attempt::repair::Frame {
         budget: &request.envelope.budget,
-        step_model_requests: u64::from(request.omp.model_broker.max_requests),
+        step_model_requests: u64::from(request.model_broker().expect("validated worker profile").max_requests),
         is_unchanged_allowed: request.allow_unchanged,
     }
 }
@@ -104,7 +104,7 @@ fn frame(request: &super::Request) -> crate::implementation_attempt::repair::Fra
 pub(super) fn first_reservation(
     request: &super::Request,
 ) -> Result<crate::implementation_attempt::lineage::Draws, String> {
-    let step_model_requests = u64::from(request.omp.model_broker.max_requests);
+    let step_model_requests = u64::from(request.model_broker()?.max_requests);
     match &request.repair {
         Some(policy) => policy.reservation(step_model_requests).map_err(|error| error.to_string()),
         None => Ok(crate::implementation_attempt::lineage::Draws {
@@ -195,7 +195,7 @@ pub(super) fn with_frame<T>(
             fence: &fence,
             workspace_id: &request.envelope.workspace_id,
         },
-        base_identity: &request.omp.base_identity,
+        base_identity: request.base_identity().expect("validated repair profile"),
         policy,
         worker_profile: &request.envelope.worker_profile,
     };

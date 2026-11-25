@@ -104,6 +104,7 @@ impl Context {
         ports: Option<super::Ports<'a>>,
         operator: Option<super::repair::operator::Standalone<'a>>,
         revisions: super::session::revision::Store<'_>,
+        host: Option<Box<dyn super::animus_implementation::Host>>,
     ) -> Result<(), String> {
         if let Some(refused) = self.superseded(revisions) {
             return Err(refused);
@@ -113,7 +114,15 @@ impl Context {
             self.create_directories()?;
             return recover_existing(&self.request, &self.state, &self.directory, &self.identity, revisions);
         };
-        self.first_run(ports, operator, revisions).await
+        if let Some(profile) = &self.request.animus_implementation {
+            self.request.validate(super::epoch_ms(&crate::operation::shell::SystemClock)?)?;
+            if host.as_ref().is_none_or(|adapter| adapter.adapter_identity() != profile.adapter_identity) {
+                let guard = self.lock()?;
+                let pending = super::refusal::deferred::Pending::new(super::refusal::Reason::AnimusHostUnavailable);
+                return Err(self.settle(&guard, revisions, pending));
+            }
+        }
+        self.first_run(ports, operator, revisions, host).await
     }
 
     /// A first run, once no intent was seen: its admission
@@ -128,6 +137,7 @@ impl Context {
         ports: super::Ports<'a>,
         operator: Option<super::repair::operator::Standalone<'a>>,
         revisions: super::session::revision::Store<'_>,
+        host: Option<Box<dyn super::animus_implementation::Host>>,
     ) -> Result<(), String> {
         let super::Ports {
             compute,
@@ -175,7 +185,7 @@ impl Context {
         let ports = match repair {
             super::repair::admission::Admitted::SingleShot => {
                 let binding_identity = receipt.admitted().binding_identity.clone();
-                self.single_shot(worker, store, receipt, serving).await?;
+                self.single_shot(worker, store, receipt, serving, host).await?;
                 super::session::revision::close(revisions, &self.request, &recorded)?;
                 let store = crate::store::Store::new(self.directory.join("candidate.redb"))
                     .map_err(|error| error.to_string())?;
@@ -217,11 +227,20 @@ impl Context {
         store: crate::store::Store,
         receipt: super::binding::usage::WorkerReceipt,
         serving: Box<dyn crate::execution_binding::serving::OwnerPort>,
+        host: Option<Box<dyn super::animus_implementation::Host>>,
     ) -> Result<(), String> {
+        if let Some(profile) = &self.request.animus_implementation {
+            return super::animus_implementation::execute(
+                &self.request, worker, store, receipt, serving,
+                super::binding::draw::SingleShot::of(&self.request),
+                profile.clone(), host.ok_or("Animus implementation host adapter unavailable")?,
+                &self.directory,
+            ).await;
+        }
         let execution = super::session::launch::WorkerStep {
             worker,
             store,
-            profile: self.request.omp.clone(),
+            profile: self.request.omp.clone().ok_or("OMP profile is absent")?,
             output_dir: self.directory.clone(),
             is_unchanged_allowed: self.request.allow_unchanged,
             receipt,
@@ -244,7 +263,7 @@ pub(super) async fn run(
     ports: Option<super::Ports<'_>>,
     revisions: super::session::revision::Store<'_>,
 ) -> Result<(), String> {
-    run_with(request_path, state, ports, None, revisions).await
+    run_with(request_path, state, ports, None, revisions, None).await
 }
 
 pub(super) async fn run_with<'a>(
@@ -253,6 +272,7 @@ pub(super) async fn run_with<'a>(
     ports: Option<super::Ports<'a>>,
     operator: Option<super::repair::operator::Standalone<'a>>,
     revisions: super::session::revision::Store<'_>,
+    host: Option<Box<dyn super::animus_implementation::Host>>,
 ) -> Result<(), String> {
-    Context::load(request_path, state)?.run(ports, operator, revisions).await
+    Context::load(request_path, state)?.run(ports, operator, revisions, host).await
 }

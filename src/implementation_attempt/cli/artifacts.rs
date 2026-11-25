@@ -193,7 +193,11 @@ pub(super) fn verify_events(
 fn normalized_request(request_path: &std::path::Path) -> Result<(super::Request, Vec<u8>), String> {
     let (mut request, _) = load_request(request_path)?;
     let baseline = crate::candidate_capture::workspace(&request.workspace_root).map_err(|error| error.to_string())?;
-    request.omp.base_identity = crate::candidate::snapshot_identity(&baseline).map_err(|error| error.to_string())?;
+    match (&mut request.omp, &mut request.animus_implementation) {
+        (Some(omp), None) => omp.base_identity = crate::candidate::snapshot_identity(&baseline).map_err(|error| error.to_string())?,
+        (None, Some(profile)) => profile.base_identity = crate::candidate::snapshot_identity(&baseline).map_err(|error| error.to_string())?,
+        _ => return Err("exactly one implementation worker profile is required".into()),
+    }
     request.envelope.worker_profile = request.worker_profile_identity()?;
     request.admitted_envelope = request.envelope.identity();
     super::binding::normalize_primary_route(&mut request)?;

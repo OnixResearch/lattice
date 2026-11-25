@@ -17,7 +17,9 @@ pub(super) fn recover(
             ));
         }
     };
-    super::artifacts::verify_events(directory, request.output_limit_bytes, &result.stdout_blake3)?;
+    if request.omp.is_some() {
+        super::artifacts::verify_events(directory, request.output_limit_bytes, &result.stdout_blake3)?;
+    }
     validate_receipt(&result, request)?;
     let unchanged = load_unchanged(request, directory)?;
     debug_assert!(result.validate().is_ok(), "reconciled results are validated on load");
@@ -42,7 +44,7 @@ pub(super) fn not_dispatched(
 ) -> Result<serde_json::Value, String> {
     let is_same_binding =
         refusal.get("binding_identity").and_then(serde_json::Value::as_str) == Some(admitted.binding_identity.as_str());
-    let has_worker_artifacts = ["raw-events.jsonl", "omp-observation.json"]
+    let has_worker_artifacts = ["raw-events.jsonl", "omp-observation.json", "animus-child-lineage.json"]
         .iter()
         .any(|name| std::fs::symlink_metadata(directory.join(name)).is_ok());
     if !is_same_binding || has_worker_artifacts {
@@ -74,7 +76,7 @@ pub(super) fn revision_blocked(
     admitted: &lattice_core::execution_binding::admission::bound::Admitted,
     block: &serde_json::Value,
 ) -> Result<serde_json::Value, String> {
-    let has_worker_artifacts = ["raw-events.jsonl", "omp-observation.json"]
+    let has_worker_artifacts = ["raw-events.jsonl", "omp-observation.json", "animus-child-lineage.json"]
         .iter()
         .any(|name| std::fs::symlink_metadata(directory.join(name)).is_ok());
     let is_same_session = block.get("session").and_then(serde_json::Value::as_str)
@@ -239,22 +241,11 @@ fn validate_receipt(result: &crate::candidate_worker::AttemptResult, request: &s
 }
 
 fn receipt_matches(receipt: &crate::candidate::CandidateReceipt, request: &super::Request) -> bool {
-    let fence = request.envelope.fence.to_string();
-    let actual = (
-        &receipt.work_id,
-        &receipt.attempt_id,
-        receipt.fence.as_str(),
-        &receipt.workspace_id,
-        &receipt.base_identity,
-    );
-    let expected = (
-        &request.envelope.work_id,
-        &request.envelope.attempt_id,
-        fence.as_str(),
-        &request.envelope.workspace_id,
-        &request.omp.base_identity,
-    );
-    actual == expected
+    receipt.work_id == request.envelope.work_id
+        && receipt.attempt_id == request.envelope.attempt_id
+        && receipt.fence == request.envelope.fence.to_string()
+        && receipt.workspace_id == request.envelope.workspace_id
+        && request.base_identity().is_ok_and(|base| receipt.base_identity == base)
 }
 
 struct Unchanged {
@@ -280,11 +271,13 @@ fn project(
 ) -> serde_json::Value {
     let mut observation = serde_json::json!({"schema":"lattice.implementation-attempt-observation.v1",
         "envelope":request.envelope,"request_identity":request.admitted_envelope,"result":result,
-        "artifacts":{"raw_events":directory.join("raw-events.jsonl"),
-            "omp_observation":directory.join("omp-observation.json"),
-            "unchanged_receipt":unchanged.map(|retained| &retained.path)},
+        "artifacts":{"unchanged_receipt":unchanged.map(|retained| &retained.path)},
         "unchanged":unchanged.map(|retained| &retained.observation),
         "accepted":false,"integrated":false});
+    if request.omp.is_some() {
+        observation["artifacts"]["raw_events"] = serde_json::json!(directory.join("raw-events.jsonl"));
+        observation["artifacts"]["omp_observation"] = serde_json::json!(directory.join("omp-observation.json"));
+    }
     echo_dispatch_plan(request, &mut observation);
     observation
 }

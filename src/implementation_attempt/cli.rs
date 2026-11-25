@@ -1,5 +1,6 @@
 //! Operator-owned one-attempt shell over the existing isolated OMP worker.
 mod artifacts;
+pub mod animus_implementation;
 mod binding;
 mod cancellation;
 mod execution;
@@ -101,7 +102,11 @@ pub struct Request {
     pub write_paths: Vec<String>,
     pub program: String,
     pub sandbox_program: String,
-    pub omp: crate::candidate_worker::omp::Profile,
+    #[serde(default = "absent", skip_serializing_if = "Option::is_none")]
+    pub omp: Option<crate::candidate_worker::omp::Profile>,
+    /// Separate, explicitly selected native Animus implementation worker.
+    #[serde(default = "absent", skip_serializing_if = "Option::is_none")]
+    pub animus_implementation: Option<animus_implementation::Profile>,
     pub output_limit_bytes: usize,
     #[serde(default)]
     pub allow_unchanged: bool,
@@ -167,7 +172,11 @@ impl Request {
     // r[impl lattice.implementation_attempt.consumer.scenario.profile_revision]
     // r[impl lattice.agent_revisions.framing.scenario.harness_template]
     pub fn worker_profile_identity(&self) -> Result<String, String> {
-        self.framed_revision(session::profile::EFFECTIVE_TEMPLATE)
+        match (&self.omp, &self.animus_implementation) {
+            (Some(_), None) => self.framed_revision(session::profile::EFFECTIVE_TEMPLATE),
+            (None, Some(profile)) => animus_implementation::profile_revision(self, profile),
+            _ => Err("exactly one implementation worker profile is required".into()),
+        }
     }
 
     /// Whether the envelope names this request's current-framing revision.
@@ -194,6 +203,15 @@ impl Request {
             return Err("workflow-agent definition or revision is malformed".into());
         }
         repair::validate(self).and_then(|()| vm::validate(self))?;
+        if self.animus_implementation.is_some()
+            && (!animus_implementation::is_identity(&self.envelope.work_id)
+                || !animus_implementation::is_identity(&self.envelope.attempt_id))
+        {
+            return Err("Animus implementation requires canonical work and attempt identities".into());
+        }
+        if self.animus_implementation.is_some() && self.repair.is_some() {
+            return Err("Animus implementation repair requires a separately reviewed host contract".into());
+        }
         binding::validate_request(self)
     }
 
@@ -203,20 +221,42 @@ impl Request {
             return Err(invalid.into());
         }
         self.validate_paths().map_err(|_| invalid.to_string())?;
-        if self.omp.revision != crate::candidate_worker::omp::OMP_REVISION
-            || self.omp.model_broker.expires_at_ms <= now_ms
-            || self.omp.model_broker.expires_at_ms > self.expires_at_ms
-        {
-            return Err(invalid.into());
+        match (&self.omp, &self.animus_implementation) {
+            (Some(omp), None) => {
+                if omp.revision != crate::candidate_worker::omp::OMP_REVISION
+                    || omp.model_broker.expires_at_ms <= now_ms
+                    || omp.model_broker.expires_at_ms > self.expires_at_ms
+                {
+                    return Err(invalid.into());
+                }
+                crate::candidate_worker::broker::admission::validate(&omp.model_broker)?;
+            }
+            (None, Some(profile)) => profile.validate(now_ms, self.expires_at_ms)?,
+            _ => return Err(invalid.into()),
         }
-        crate::candidate_worker::broker::admission::validate(&self.omp.model_broker)?;
         Ok(())
+    }
+
+    pub fn model_broker(&self) -> Result<&crate::candidate_worker::broker::Profile, String> {
+        match (&self.omp, &self.animus_implementation) {
+            (Some(omp), None) => Ok(&omp.model_broker),
+            (None, Some(profile)) => Ok(&profile.model_broker),
+            _ => Err("exactly one implementation worker profile is required".into()),
+        }
+    }
+
+    pub fn base_identity(&self) -> Result<&str, String> {
+        match (&self.omp, &self.animus_implementation) {
+            (Some(omp), None) => Ok(&omp.base_identity),
+            (None, Some(profile)) => Ok(&profile.base_identity),
+            _ => Err("exactly one implementation worker profile is required".into()),
+        }
     }
 
     fn validate_paths(&self) -> Result<(), String> {
         if !self.workspace_root.is_absolute()
-            || !std::path::Path::new(&self.program).is_absolute()
-            || !std::path::Path::new(&self.sandbox_program).is_absolute()
+            || (self.omp.is_some() && (!std::path::Path::new(&self.program).is_absolute()
+                || !std::path::Path::new(&self.sandbox_program).is_absolute()))
         {
             return Err("worker paths must be absolute".into());
         }
@@ -253,7 +293,7 @@ pub async fn run_command(args: &CommandArgs, config: &std::path::Path) -> Result
     };
     let operator = repair::operator::Standalone::pinned(config, repair_checks.as_deref());
     let revisions = session::revision::Store(revision_store.as_deref());
-    execution::run_with(request, state, Some(ports), Some(operator), revisions).await
+    execution::run_with(request, state, Some(ports), Some(operator), revisions, None).await
 }
 
 /// Embedder-supplied read-only ports of one run.
@@ -296,5 +336,21 @@ pub async fn run_command_with_ports(args: &CommandArgs, mut ports: Ports<'_>) ->
             output_parent,
             revision_store,
         } => export::run(request, state, output_parent, session::revision::Store(revision_store.as_deref())),
+    }
+}
+
+/// Run with an explicitly injected native Animus host. The standalone entry
+/// refuses an opt-in profile without this port before its first intent.
+pub async fn run_command_with_animus_host(
+    args: &CommandArgs,
+    ports: Ports<'_>,
+    host: Box<dyn animus_implementation::Host>,
+) -> Result<(), String> {
+    match &args.command {
+        Command::Run { request, state, revision_store, .. } => {
+            execution::run_with(request, state, Some(ports), None,
+                session::revision::Store(revision_store.as_deref()), Some(host)).await
+        }
+        _ => run_command_with_ports(args, ports).await,
     }
 }

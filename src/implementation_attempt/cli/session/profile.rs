@@ -29,7 +29,8 @@ impl super::super::Request {
             }
         };
         let compute = serde_json::to_string(&self.worker_compute).map_err(|error| error.to_string())?;
-        let broker = &self.omp.model_broker;
+        let omp = self.omp.as_ref().ok_or("OMP profile is absent")?;
+        let broker = &omp.model_broker;
         let credential = broker.credential.as_ref();
         let read_paths: Vec<&str> = self.read_paths.iter().map(String::as_str).collect();
         let write_paths: Vec<&str> = self.write_paths.iter().map(String::as_str).collect();
@@ -43,9 +44,9 @@ impl super::super::Request {
                 harness_print_options: template.print_options,
                 program: &self.program,
                 sandbox_program: &self.sandbox_program,
-                harness_revision: &self.omp.revision,
-                harness_executable_blake3: &self.omp.executable_blake3,
-                harness_model: &self.omp.model,
+                harness_revision: &omp.revision,
+                harness_executable_blake3: &omp.executable_blake3,
+                harness_model: &omp.model,
                 broker_schema: &broker.schema,
                 broker_endpoint: &broker.endpoint,
                 broker_model: &broker.model,

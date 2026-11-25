@@ -317,7 +317,7 @@ fn retained_request_files_feed_attempt_usage_and_refuse_rewrites() {
         panic!("primary route");
     };
     let route_identity = routes[0].route_identity.clone();
-    request.execution_binding.serving = Some(serving_declaration(&request.omp.model_broker.model));
+    request.execution_binding.serving = Some(serving_declaration(&request.omp.as_ref().unwrap().model_broker.model));
     super::validate_request(&request).expect("served primary route validates");
     let admitted = super::admit(&request, &mut crate::execution_binding::UnavailableComputePort).expect("binding").0;
     assert!(admitted.serving.is_some());

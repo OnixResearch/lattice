@@ -41,7 +41,7 @@ pub(in super::super) fn validate(request: &super::super::Request) -> Result<(), 
     let [route] = serving.routes.as_slice() else {
         return Err("OMP attempt workers serve exactly their primary route".into());
     };
-    if route.name != super::PRIMARY_ROUTE || route.model_id != request.omp.model_broker.model {
+    if route.name != super::PRIMARY_ROUTE || route.model_id != request.model_broker()?.model {
         return Err("served route differs from the brokered primary route or its exact model".into());
     }
     let is_caller_token = [&request.envelope.attempt_id, &request.envelope.worker_profile]

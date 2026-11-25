@@ -50,6 +50,8 @@ pub(super) enum Reason {
     /// A repair policy needs embedder-supplied worker and check ports, or
     /// the standalone CLI's admitted operator check catalog.
     RepairPortsUnavailable,
+    /// Opt-in native host is absent or differs from the admitted pin.
+    AnimusHostUnavailable,
     /// The operator's effect-authority profile does not grant the exact
     /// repair worker and check effects of this request.
     RepairAuthorityDenied,
@@ -104,6 +106,9 @@ impl Reason {
                 "implementation request is refused: its repair policy needs embedder-supplied worker and check \
                  ports or an admitted operator check catalog; nothing was dispatched"
             }
+            Self::AnimusHostUnavailable => {
+                "implementation request is refused: its pinned Animus host is unavailable; nothing was dispatched"
+            }
             Self::RepairAuthorityDenied => {
                 "implementation request is refused: the operator's effect-authority profile does not grant its \
                  repair worker and check effects; nothing was dispatched"
@@ -143,6 +148,7 @@ impl Reason {
             | Self::LineageBlocked
             | Self::LineageExhausted
             | Self::RepairPortsUnavailable
+            | Self::AnimusHostUnavailable
             | Self::RepairAuthorityDenied => false,
         }
     }

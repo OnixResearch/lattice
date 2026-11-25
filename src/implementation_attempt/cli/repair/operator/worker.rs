@@ -69,7 +69,7 @@ impl<'a, 'r> OmpPort<'a, 'r> {
             records: super::super::records::Retained::root(directory),
             admitted,
             launch,
-            expected_base: request.omp.base_identity.clone(),
+            expected_base: request.omp.as_ref().expect("OMP repair profile").base_identity.clone(),
             clock,
         }
     }
@@ -86,11 +86,11 @@ impl<'a, 'r> OmpPort<'a, 'r> {
         let admitted_secs = worker.timeout_secs;
         worker.timeout_secs =
             crate::implementation_attempt::repair::step::operator::timeout_secs(deadline, admitted_secs);
-        let mut profile = self.request.omp.clone();
+        let mut profile = self.request.omp.clone().ok_or("OMP repair profile is absent")?;
         profile.base_identity.clone_from(&self.expected_base);
-        profile.prompt = crate::implementation_attempt::repair::step::operator::prompt(&self.request.omp.prompt, step);
+        profile.prompt = crate::implementation_attempt::repair::step::operator::prompt(&profile.prompt, step);
         let is_capped = crate::implementation_attempt::repair::step::operator::is_capped(deadline, admitted_secs);
-        let first_request_index = first_request_index(step, &self.request.omp.model_broker)?;
+        let first_request_index = first_request_index(step, &profile.model_broker)?;
         let files = super::super::super::binding::requests::RequestFiles::new(&self.directory)?;
         Ok(Prepared {
             worker,
@@ -106,7 +106,7 @@ impl<'a, 'r> OmpPort<'a, 'r> {
     /// terminal record, a request ended uncertain or the evidence conflicts.
     fn observed_requests(&self, first_request_index: u32) -> Option<u64> {
         let first = u64::from(first_request_index);
-        let indices = first..first.checked_add(u64::from(self.request.omp.model_broker.max_requests))?;
+        let indices = first..first.checked_add(u64::from(self.request.omp.as_ref()?.model_broker.max_requests))?;
         let coverage = super::super::super::binding::requests::coverage(&self.admitted, &self.directory).ok()?;
         coverage.observed_requests(Some(&indices))
     }

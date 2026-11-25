@@ -408,7 +408,7 @@ async fn a_bundle_for_another_worker_profile_is_refused_before_any_intent() {
     let (definition, revision) = desired(&fixture, &worker);
     fixture.promoted(&definition, &revision);
     let mut other = worker.clone();
-    other.omp.executable_blake3 = "9".repeat(64);
+    other.omp.as_mut().unwrap().executable_blake3 = "9".repeat(64);
     other.envelope.worker_profile = other.worker_profile_identity().expect("revision");
     other.admitted_envelope = other.envelope.identity();
     assert_ne!(other.envelope.worker_profile, worker.envelope.worker_profile, "another worker profile revision");

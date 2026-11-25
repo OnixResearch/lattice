@@ -40,7 +40,7 @@ struct Attempt {
 fn attempt() -> Attempt {
     let root = tempfile::tempdir().expect("scratch");
     let mut request = super::super::super::tests::host_local();
-    request.omp.model_broker.max_requests = CEILING;
+    request.omp.as_mut().unwrap().model_broker.max_requests = CEILING;
     request.lineage = Some(crate::implementation_attempt::lineage::tests::binding(4, 4));
     assert!(request.execution_binding.serving.is_none());
     let admitted = super::super::admit(&request, &mut crate::execution_binding::UnavailableComputePort)

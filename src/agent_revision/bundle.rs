@@ -43,7 +43,7 @@ fn declared(set: Option<&lattice_core::execution_binding::capability::NameSet>) 
 fn hosted_route(
     request: &crate::implementation_attempt::cli::Request,
 ) -> Result<lattice_core::agent_revision::facts::HostedRoute, String> {
-    let broker = &request.omp.model_broker;
+    let broker = request.model_broker()?;
     let credential = broker.credential.as_ref();
     let route_identity = lattice_core::content_identity::model_route(lattice_core::content_identity::ModelRouteInput {
         schema: &broker.schema,
@@ -77,7 +77,11 @@ pub fn resolve(request: &crate::implementation_attempt::cli::Request) -> Result<
         .map_err(|defect| format!("worker capability declaration is unsupported: {defect:?}"))?;
     let definition = lattice_core::execution_binding::projection::lineage::definition(
         lattice_core::execution_binding::projection::inventory::ProfileOwner::ImplementationAttempt,
-        lattice_core::execution_binding::projection::inventory::ATTEMPT_DEFINITION,
+        if request.animus_implementation.is_some() {
+            crate::implementation_attempt::cli::animus_implementation::DEFINITION
+        } else {
+            lattice_core::execution_binding::projection::inventory::ATTEMPT_DEFINITION
+        },
         capability.as_ref().map(|declared| declared.definition.as_str()),
     )
     .map_err(|_| "worker definition name is unsupported".to_owned())?;
@@ -86,9 +90,11 @@ pub fn resolve(request: &crate::implementation_attempt::cli::Request) -> Result<
         definition: definition.identity.clone(),
         definition_name: definition.name.clone(),
         revision: revision.clone(),
-        adapter: ADAPTER.to_owned(),
-        protocol_revision: request.omp.revision.clone(),
-        executable_identity: request.omp.executable_blake3.clone(),
+        adapter: if request.animus_implementation.is_some() { "animus-implementation" } else { ADAPTER }.to_owned(),
+        protocol_revision: request.animus_implementation.as_ref()
+            .map_or_else(|| request.omp.as_ref().expect("validated OMP profile").revision.clone(), |profile| profile.adapter_revision.clone()),
+        executable_identity: request.animus_implementation.as_ref()
+            .map_or_else(|| request.omp.as_ref().expect("validated OMP profile").executable_blake3.clone(), |profile| profile.adapter_identity.clone()),
         compute: request.worker_compute.clone(),
         task_families: declared(capability.as_ref().and_then(|declared| declared.task_families.as_ref())),
         tools: declared(capability.as_ref().and_then(|declared| declared.tools.as_ref())),

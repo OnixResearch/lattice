@@ -16,7 +16,7 @@ mod tests;
 /// a bound request never falls back to a host-process broker.
 // r[impl lattice.vm_profile.request]
 pub(super) fn validate(request: &super::Request) -> Result<(), String> {
-    let broker = &request.omp.model_broker;
+    let broker = request.model_broker()?;
     let (binding, profile, forwarded) = match (&request.vm_binding, &request.vm_profile, &broker.forwarded) {
         (None, None, None) => return Ok(()),
         (Some(binding), Some(profile), Some(forwarded)) => (binding, profile, forwarded),

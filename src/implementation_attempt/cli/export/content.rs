@@ -59,7 +59,7 @@ fn receipt_matches(receipt: &crate::candidate::CandidateReceipt, request: &super
         && receipt.attempt_id == request.envelope.attempt_id
         && receipt.fence == request.envelope.fence.to_string()
         && receipt.workspace_id == request.envelope.workspace_id
-        && receipt.base_identity == request.omp.base_identity
+        && request.base_identity().is_ok_and(|base| receipt.base_identity == base)
 }
 
 fn check_artifacts(
@@ -84,7 +84,7 @@ fn unchanged(inputs: &super::Admitted, retained: &super::Retained) -> Result<Pay
     let snapshot = crate::candidate_capture::workspace(&inputs.workspace).map_err(|error| error.to_string())?;
     let identity = crate::candidate::snapshot_identity(&snapshot).map_err(|error| error.to_string())?;
     let expected = expected_unchanged(&inputs.request, &snapshot)?;
-    if identity != inputs.request.omp.base_identity || observed != expected {
+    if identity != inputs.request.base_identity()? || observed != expected {
         return Err("native unchanged observation does not bind exact base snapshot".into());
     }
     let bytes = serde_json::to_vec_pretty(&observed).map_err(|error| error.to_string())?;

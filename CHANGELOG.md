@@ -31,6 +31,12 @@ interfaces.
     cancellation on `config.condition.branches.add`.
 
 ### Added
+- Explicit `animus_implementation` attempt profile, with a separate framed
+  revision, a pinned injected native host seam and retained, exact-request
+  child-lineage inspection. Missing host refuses before dispatch; missing or
+  crossed lineage stays unobserved. OMP request bytes and revisions remain
+  unchanged. A standalone Animus adapter still requires its separately
+  reviewed cross-repository publication and pin.
 
 - Optional Animus SecretSpec and guarded SOPS credential provider integration
   (`adopt-animus-secretspec-sops-providers`):

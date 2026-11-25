@@ -67,11 +67,11 @@ impl<'a, 'p> Driver<'a, 'p> {
         let request = frame.request;
         let base = crate::candidate_capture::workspace(&request.workspace_root).map_err(|error| error.to_string())?;
         let parent_identity = crate::candidate::snapshot_identity(&base).map_err(|error| error.to_string())?;
-        if parent_identity != request.omp.base_identity {
+        if parent_identity != request.base_identity()? {
             return Err("repair workspace differs from the admitted base snapshot; nothing was dispatched".into());
         }
         let binding = crate::implementation_attempt::repair::StepBinding::of(&request.envelope);
-        let step_model_requests = u64::from(request.omp.model_broker.max_requests);
+        let step_model_requests = u64::from(request.model_broker()?.max_requests);
         let state = crate::implementation_attempt::repair::state::Loop::new(
             policy.clone(),
             binding,

@@ -75,7 +75,7 @@ fn forwarded_request_indices_continue_across_repair_steps_through_one_gateway() 
     let listener = crate::model_gateway::shell::listen(&socket).expect("gateway listener");
     let stopped = std::sync::atomic::AtomicBool::new(false);
     // The guest broker of each step, with the request's own per-step ceiling.
-    let max_requests = operated.request.omp.model_broker.max_requests;
+    let max_requests = operated.request.omp.as_ref().unwrap().model_broker.max_requests;
     let profile = crate::candidate_worker::broker::tests::forwarding_profile(
         gateway::MODEL,
         max_requests,
@@ -171,7 +171,7 @@ async fn each_step_is_charged_the_requests_observed_in_its_own_index_range() {
         operated.run().await.expect("the loop reaches a disposition");
         let observation = operated.disposition();
         assert_eq!(observation["disposition"]["kind"], "repaired_candidate", "{observation}");
-        let max_requests = operated.request.omp.model_broker.max_requests;
+    let max_requests = operated.request.omp.as_ref().unwrap().model_broker.max_requests;
         assert_eq!(operated.indices(), [0, max_requests]);
         let [first, second] = step_usage(&observation).try_into().expect("two steps");
         if is_settled {

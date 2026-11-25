@@ -135,7 +135,7 @@ impl WorkerStep {
     }
 
     fn observe(mut self, cancellation: &std::sync::atomic::AtomicBool) -> Result<(), String> {
-        let credentials = credentials(&self.profile)?;
+        let credentials = credentials(&self.profile.model_broker)?;
         let started_epoch_ms = super::super::epoch_ms(&crate::operation::shell::SystemClock).ok();
         let result = self.run_worker(cancellation, &credentials)?;
         let window = super::super::binding::usage::WorkerWindow {
@@ -159,9 +159,9 @@ impl WorkerStep {
 /// The host-only environment credential of the standalone model broker; any
 /// other credential reference is refused before launch.
 pub(in super::super) fn credentials(
-    profile: &crate::candidate_worker::omp::Profile,
+    broker: &crate::candidate_worker::broker::Profile,
 ) -> Result<crate::credentials::EnvironmentCredentialProvider, String> {
-    let reference = profile.model_broker.credential.as_ref();
+    let reference = broker.credential.as_ref();
     if reference.is_some_and(|value| value.provider != "env" || value.field.is_some()) {
         return Err("standalone model broker requires an explicit env credential reference".into());
     }

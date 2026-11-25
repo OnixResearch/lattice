@@ -48,7 +48,7 @@ pub(super) fn request(
         write_paths: vec!["src".into()],
         program: "/usr/bin/worker".into(),
         sandbox_program: "/usr/bin/bwrap".into(),
-        omp: crate::candidate_worker::omp::Profile {
+        omp: Some(crate::candidate_worker::omp::Profile {
             revision: crate::candidate_worker::omp::OMP_REVISION.into(),
             executable_blake3: "e".repeat(64),
             base_identity: "0".repeat(64),
@@ -72,7 +72,8 @@ pub(super) fn request(
                 max_requests: 1,
                 forwarded: None,
             },
-        },
+        }),
+        animus_implementation: None,
         output_limit_bytes: 4096,
         allow_unchanged: false,
         worker_compute: compute,
@@ -239,9 +240,9 @@ fn per_attempt_values_keep_the_revision_and_profile_changes_replace_it() {
     let revision = base.envelope.worker_profile.clone();
     assert!(crate::implementation_attempt::is_blake3(&revision), "bare lowercase hex, no prefix");
     let per_attempt: [fn(&mut super::Request); 6] = [
-        |request| request.omp.prompt = "implement a different task".into(),
-        |request| request.omp.base_identity = "1".repeat(64),
-        |request| request.omp.model_broker.expires_at_ms = 1_000,
+        |request| request.omp.as_mut().unwrap().prompt = "implement a different task".into(),
+        |request| request.omp.as_mut().unwrap().base_identity = "1".repeat(64),
+        |request| request.omp.as_mut().unwrap().model_broker.expires_at_ms = 1_000,
         |request| request.workspace_root = "/workspace/other-attempt".into(),
         |request| request.dispatch_plan = Some("2".repeat(64)),
         |request| request.network = Some(false),
@@ -252,13 +253,13 @@ fn per_attempt_values_keep_the_revision_and_profile_changes_replace_it() {
     }
     let profile_level: [fn(&mut super::Request); 8] = [
         |request| request.program = "/usr/bin/other-worker".into(),
-        |request| request.omp.executable_blake3 = "9".repeat(64),
+        |request| request.omp.as_mut().unwrap().executable_blake3 = "9".repeat(64),
         |request| {
-            request.omp.model = "lattice/other-model".into();
-            request.omp.model_broker.model = "other-model".into();
+            request.omp.as_mut().unwrap().model = "lattice/other-model".into();
+            request.omp.as_mut().unwrap().model_broker.model = "other-model".into();
         },
-        |request| request.omp.model_broker.endpoint = "https://other.invalid/v1/chat/completions".into(),
-        |request| request.omp.model_broker.relay.blake3 = "8".repeat(64),
+        |request| request.omp.as_mut().unwrap().model_broker.endpoint = "https://other.invalid/v1/chat/completions".into(),
+        |request| request.omp.as_mut().unwrap().model_broker.relay.blake3 = "8".repeat(64),
         |request| request.worker_capability = Some(capability(&["read", "edit", "write"])),
         |request| {
             request.worker_compute = lattice_core::execution_binding::request::ComputeRequirement::ProviderExecution {
@@ -280,8 +281,8 @@ fn per_attempt_values_keep_the_revision_and_profile_changes_replace_it() {
         .expect("definition")
         .identity
     };
-    let new_executable = readmitted(base.clone(), |request| request.omp.executable_blake3 = "9".repeat(64));
-    let new_prompt = readmitted(base.clone(), |request| request.omp.prompt = "another task".into());
+    let new_executable = readmitted(base.clone(), |request| request.omp.as_mut().unwrap().executable_blake3 = "9".repeat(64));
+    let new_prompt = readmitted(base.clone(), |request| request.omp.as_mut().unwrap().prompt = "another task".into());
     assert_eq!(definition(&new_executable), definition(&base), "a new revision keeps its definition");
     assert_eq!(definition(&new_prompt), definition(&base));
 }
@@ -339,7 +340,7 @@ fn requests_under_the_superseded_framing_are_refused_before_effects() {
     let legacy_tuple = serde_json::to_vec(&(
         &current.program,
         &current.sandbox_program,
-        &current.omp,
+        current.omp.as_ref().unwrap(),
         &current.read_paths,
         &current.write_paths,
         current.output_limit_bytes,

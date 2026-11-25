@@ -58,7 +58,7 @@ impl Launch for PinnedOmp {
         broker: Broker<'_>,
         cancellation: &std::sync::atomic::AtomicBool,
     ) -> Result<crate::candidate_worker::omp::RunResult, String> {
-        let credentials = super::super::session::launch::credentials(profile)?;
+        let credentials = super::super::session::launch::credentials(&profile.model_broker)?;
         let services = crate::candidate_worker::broker::Services {
             credentials: &credentials,
             gate: broker.gate,

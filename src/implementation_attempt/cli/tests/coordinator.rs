@@ -107,7 +107,7 @@ async fn substituted_request_bytes_are_refused_without_touching_the_intent() {
     super::super::artifacts::private_directory(&directory).expect("attempt directory");
     super::super::artifacts::write_once(&directory.join("intent.json"), identity.as_bytes()).expect("intent");
     let mut substituted = request.clone();
-    substituted.omp.prompt = "a different task under the same attempt".into();
+    substituted.omp.as_mut().unwrap().prompt = "a different task under the same attempt".into();
     assert_eq!(substituted.worker_profile_identity().expect("revision"), request.envelope.worker_profile);
     let (path, _) = fixture.write("substituted.json", &substituted);
     for error in [recover(&path, &fixture.state).await, run(&path, &fixture.state).await] {
@@ -208,7 +208,7 @@ async fn another_works_marker_or_intent_at_the_same_attempt_fence_is_crossed() {
     assert_eq!(run(&other_path, &fixture.state).await, crossed(), "another work's marker");
     assert_eq!(recover(&other_path, &fixture.state).await, crossed());
     let mut same_work = closed.clone();
-    same_work.omp.prompt = "another task of work A".into();
+    same_work.omp.as_mut().unwrap().prompt = "another task of work A".into();
     let (same_path, _) = fixture.write("same-work.json", &same_work);
     let closed_reason = super::super::refusal::Reason::AttemptClosed.message().to_owned();
     assert_eq!(run(&same_path, &fixture.state).await, Err(closed_reason), "this work's marker");
@@ -225,7 +225,7 @@ async fn another_works_marker_or_intent_at_the_same_attempt_fence_is_crossed() {
     let (foreign_path, _) = fixture.write("foreign.json", &foreign);
     assert_eq!(run(&foreign_path, &fixture.state).await, crossed(), "another work's intent");
     let mut substituted = ran.clone();
-    substituted.omp.prompt = "another task of work C".into();
+    substituted.omp.as_mut().unwrap().prompt = "another task of work C".into();
     let (substituted_path, _) = fixture.write("substituted.json", &substituted);
     let substituted_reason = super::super::refusal::Reason::SubstitutedRequest.message().to_owned();
     assert_eq!(run(&substituted_path, &fixture.state).await, Err(substituted_reason), "this work's intent");

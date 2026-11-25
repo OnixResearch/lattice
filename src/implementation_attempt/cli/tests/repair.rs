@@ -281,7 +281,7 @@ fn readmit(
     request.envelope.budget.max_turns = 4;
     request.workspace_root = workspace.to_path_buf();
     let base = crate::candidate_capture::workspace(workspace).expect("base");
-    request.omp.base_identity = crate::candidate::snapshot_identity(&base).expect("base identity");
+    request.omp.as_mut().unwrap().base_identity = crate::candidate::snapshot_identity(&base).expect("base identity");
     request.repair = policy;
     request.lineage = lineage;
     request.envelope.worker_profile = request.worker_profile_identity().expect("revision");
@@ -871,7 +871,7 @@ fn absent_policy_and_lineage_keep_request_bytes_and_revision_and_a_policy_moves_
     assert_eq!(lineage.worker_profile_identity().expect("revision"), revision, "lineage is per-attempt");
     let mut served = repaired.clone();
     served.execution_binding.serving =
-        Some(super::super::binding::tests::serving_declaration(&served.omp.model_broker.model));
+        Some(super::super::binding::tests::serving_declaration(&served.omp.as_ref().unwrap().model_broker.model));
     assert!(super::super::repair::validate(&served).expect_err("served").contains("served"));
     let mut malformed = plain;
     malformed.lineage = Some(crate::implementation_attempt::lineage::tests::binding(4, 4));

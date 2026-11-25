@@ -45,7 +45,7 @@ struct Persisted {
 pub(super) fn primary_route(
     request: &super::Request,
 ) -> Result<lattice_core::execution_binding::request::NamedRoute, String> {
-    let broker = &request.omp.model_broker;
+    let broker = request.model_broker()?;
     let credential = broker.credential.as_ref();
     let route_identity = crate::content_identity::model_route(crate::content_identity::ModelRouteInput {
         schema: &broker.schema,

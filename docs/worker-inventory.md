@@ -25,6 +25,7 @@ reason is an explanation, never a reservation or a dispatch decision.
 | `profile` | `lattice.worker-profile-facts.v3` | The worker profile the request admits |
 | `instance` | `lattice.worker-instance-observation.v3` or `null` | The retained attempt; `null` when no execution is retained |
 | `model_requests` | see [worker serving binding](worker-serving-binding.md#usage-for-13) | Per-request usage coverage, or `null` before any binding |
+| `agent_lineage` | `animus.implementation-child-lineage.v1` or `null` | Only for the explicit `animus_implementation` profile: validated host-owned closed child edges of the exact sealed request; `null` means unobserved, not zero children |
 
 `RuntimeOptions::worker_profile_facts` returns the same v3 profile facts for
 configured Pi, Clankers and Animus routes. Configured routes have no revision
@@ -70,7 +71,7 @@ identity = "blake3:" + hex(content_identity::worker_definition { owner, basis, n
 
 | Owner | `basis: declared` | `basis: owner_default` name |
 |---|---|---|
-| `implementation_attempt` | `worker_capability.definition` | `omp-attempt-worker` |
+| `implementation_attempt` | `worker_capability.definition` | `omp-attempt-worker` by default; `animus-implementation-worker` for the explicit opt-in profile |
 | `configured_runtime` | — | the target label: `pi`, `clankers` or `animus` |
 
 The revision, adapter, executable, capability sets and routes are not inputs.
@@ -94,6 +95,17 @@ change it; the exact request bytes bind them. See
 v2 inventory documents carried the earlier framing, which also hashed the base
 snapshot, task prompt and broker expiry, so each attempt had its own
 revision. Never compare a v2 revision with a v3 one.
+
+The opt-in `animus_implementation` request retains schema v3 and the same
+`prepare`, `run`, `recover`, `export-candidate` and `inspect` commands. Its
+separate `lattice.animus-implementation-profile-revision.v1` framing does not
+alter historical OMP revisions. Only a pinned, explicitly injected native host
+can run it; the standalone CLI refuses a missing or mismatched host before its
+first execution intent. OMP remains the default. The native lineage carries
+work, attempt, integer fence, exact request digest, incarnation equal to that
+digest, profile revision and at most 32 direct, closed child edges. Missing,
+malformed or crossed lineage is unobserved; it never authorizes a retry or
+changes candidate reconciliation.
 
 ### Capability declaration
 

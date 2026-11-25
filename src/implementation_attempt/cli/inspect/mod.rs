@@ -60,12 +60,17 @@ pub(super) fn project(
         lifecycle: lifecycles.session(),
     })?;
     let model_requests = model_requests(&request, &directory)?;
-    Ok(serde_json::json!({
+    let mut inventory = serde_json::json!({
         "schema": INVENTORY_SCHEMA,
         "profile": profile,
         "instance": instance,
         "model_requests": model_requests,
-    }))
+    });
+    if request.animus_implementation.is_some() {
+        inventory["agent_lineage"] = super::animus_implementation::retained(&request, &directory, &identity)
+            .unwrap_or(serde_json::Value::Null);
+    }
+    Ok(inventory)
 }
 
 /// The retained per-request summary, read-only; `None` before any binding.
@@ -95,16 +100,25 @@ pub(super) fn profile_facts(
     let declared = lattice_core::execution_binding::projection::Offered::Declared;
     let model_routes = request.execution_binding.model_routes.clone();
     let (network, isolation) = vm_facts(request.vm_profile.is_some());
+    let (adapter, protocol_revision, executable_identity) = match (&request.omp, &request.animus_implementation) {
+        (Some(omp), None) => ("omp-jsonl", omp.revision.as_str(), omp.executable_blake3.as_str()),
+        (None, Some(animus)) => ("animus-implementation", animus.adapter_revision.as_str(), animus.adapter_identity.as_str()),
+        _ => return Err("exactly one implementation worker profile is required".into()),
+    };
     lattice_core::execution_binding::projection::inventory::project_profile(
         &lattice_core::execution_binding::projection::inventory::ProfileInput {
             owner: lattice_core::execution_binding::projection::inventory::ProfileOwner::ImplementationAttempt,
             revision: &request.envelope.worker_profile,
-            default_definition: lattice_core::execution_binding::projection::inventory::ATTEMPT_DEFINITION,
+            default_definition: if request.animus_implementation.is_some() {
+                super::animus_implementation::DEFINITION
+            } else {
+                lattice_core::execution_binding::projection::inventory::ATTEMPT_DEFINITION
+            },
             capability: request.worker_capability.as_ref(),
             lifecycle,
-            adapter: declared("omp-jsonl"),
-            protocol_revision: declared(&request.omp.revision),
-            executable_identity: declared(&request.omp.executable_blake3),
+            adapter: declared(adapter),
+            protocol_revision: declared(protocol_revision),
+            executable_identity: declared(executable_identity),
             inputs: declared("workspace-snapshot"),
             outputs: declared("candidate-receipt"),
             sessions: declared("single-shot-no-session"),
