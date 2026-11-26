@@ -1180,3 +1180,173 @@ fn captured_evaluation_fails_closed_without_a_selected_worker() {
         .unwrap();
     assert!(status.success(), "captured evaluation must fail closed with no selected worker");
 }
+
+mod source_edit_owner {
+    use std::io::Write as _;
+    use std::path::Path;
+    use std::path::PathBuf;
+    use std::process::Command;
+    use std::process::Stdio;
+
+    use serde_json::Value;
+    use serde_json::json;
+
+    use super::*;
+
+    const SCHEMA: &str = "lattice.source-edit.v1";
+
+    fn fixture(root: &Path) -> (PathBuf, PathBuf, Workflow, Vec<u8>) {
+        let config = root.join("config.ncl");
+        std::fs::write(
+            &config,
+            nickel_eval::to_nickel(&json!({"data_dir": root, "default_timeout_secs": 60, "shell": "sh"})).unwrap(),
+        )
+        .unwrap();
+        let source = root.join("workflow.ncl");
+        let bytes = nickel_eval::to_nickel(&workflow_to_portable(&flat("source-test", false))).unwrap().into_bytes();
+        std::fs::write(&source, &bytes).unwrap();
+        let db = lattice::config::store_path(root);
+        let store = Store::new(&db).unwrap();
+        let loaded = lattice::workflow_format::load_workflow_nickel_file(&source).unwrap();
+        let workflow = store.admit_imported_workflow(&loaded, None).unwrap();
+        (config, db, workflow, bytes)
+    }
+
+    fn call(config: &Path, request: &Value, expected: &str) -> Value {
+        let mut child = Command::new(lattice_binary())
+            .arg("--config")
+            .arg(config)
+            .args(["authoring", "source-edit"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        child.stdin.take().unwrap().write_all(&serde_json::to_vec(request).unwrap()).unwrap();
+        let output = child.wait_with_output().unwrap();
+        assert_eq!(
+            output.status.code(),
+            Some(if expected == "rejected" { 1 } else { 0 }),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let reply: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(reply["schema"], SCHEMA);
+        assert_eq!(reply["status"], expected, "{reply}");
+        reply
+    }
+
+    fn target(action: &str, head: &authoring::ContentIdentity) -> Value {
+        json!({"schema": SCHEMA, "action": action, "workflow": "source-test", "expected_head": head, "draft_id": "owner-draft", "member": "workflow.ncl"})
+    }
+
+    // r[verify lattice.source_edit.view]
+    #[test]
+    fn exact_source_owner_inspects_and_views_without_initializing_or_writing() {
+        let directory = tempfile::tempdir().unwrap();
+        let (config, db, before, bytes) = fixture(directory.path());
+        let db_bytes = std::fs::read(&db).unwrap();
+        let head = before.catalog_revision.unwrap();
+        let inspected =
+            call(&config, &json!({"schema": SCHEMA, "action": "inspect", "workflow": "source-test"}), "inspected");
+        assert_eq!(inspected["head"], json!(head));
+        let association = before.authoring.unwrap();
+        assert_eq!(
+            inspected["source"],
+            json!({"state": "RetainedEntrySnapshot", "source_revision": association.source_revision, "entry": "workflow.ncl", "members": ["workflow.ncl"]})
+        );
+        let mut request = target("view", &head);
+        let reply = call(&config, &request, "viewed");
+        assert_eq!(reply["head"], json!(head));
+        assert_eq!(reply["source_revision"], json!(association.source_revision));
+        assert_eq!(reply["bytes"], json!(bytes));
+        assert_eq!(reply["draft_revision"], Value::Null);
+        request["expected_head"] = json!(authoring::ContentIdentity::from_bytes(b"other head"));
+        assert_eq!(call(&config, &request, "rejected")["code"], "head_conflict");
+        request["expected_head"] = json!(head);
+        request["member"] = json!("missing.ncl");
+        assert_eq!(call(&config, &request, "rejected")["code"], "member_not_found");
+        request["member"] = json!("../workflow.ncl");
+        assert_eq!(call(&config, &request, "rejected")["code"], "invalid_request");
+        assert_eq!(db_bytes, std::fs::read(&db).unwrap());
+
+        let missing_dir = directory.path().join("missing");
+        let config_value = json!({"data_dir": missing_dir, "default_timeout_secs": 60, "shell": "sh"});
+        std::fs::write(&config, nickel_eval::to_nickel(&config_value).unwrap()).unwrap();
+        request["member"] = json!("workflow.ncl");
+        assert_eq!(call(&config, &request, "rejected")["code"], "store_error");
+        assert!(!missing_dir.exists());
+    }
+
+    // r[verify lattice.source_edit.save]
+    #[test]
+    fn exact_source_owner_rejects_implicit_or_wrong_draft_cas_and_invalid_source() {
+        let directory = tempfile::tempdir().unwrap();
+        let (config, db, before, bytes) = fixture(directory.path());
+        let head = before.catalog_revision.as_ref().unwrap();
+        let mut request = target("save", head);
+        request["bytes"] = json!(bytes);
+        assert_eq!(call(&config, &request, "rejected")["code"], "invalid_request");
+        request["expected_draft"] = json!(authoring::ContentIdentity::from_bytes(b"missing draft"));
+        assert_eq!(call(&config, &request, "rejected")["code"], "draft_conflict");
+        request["expected_draft"] = Value::Null;
+        request["bytes"] = json!(b"let private_source =");
+        assert_eq!(
+            call(&config, &request, "rejected"),
+            json!({"schema": SCHEMA, "status": "rejected", "code": "validation_failed"})
+        );
+        let store = Store::new(db).unwrap();
+        assert!(store.load_source_draft("owner-draft").unwrap().is_none());
+        assert_eq!(store.load_workflow("source-test").unwrap().unwrap().catalog_revision, before.catalog_revision);
+    }
+
+    // r[verify lattice.source_edit.receipt]
+    #[test]
+    #[ignore = "requires exact captured native worker; host qualification runs ignored tests"]
+    fn exact_source_owner_native_receipt_binds_only_the_saved_draft() {
+        let directory = tempfile::tempdir().unwrap();
+        let (config, db, before, _) = fixture(directory.path());
+        let head = before.catalog_revision.as_ref().unwrap();
+        let mut save = target("save", head);
+        let bytes = nickel_eval::to_nickel(&workflow_to_portable(&flat("source-test", true))).unwrap().into_bytes();
+        save["bytes"] = json!(bytes);
+        save["expected_draft"] = Value::Null;
+        let saved = call(&config, &save, "saved");
+        assert_eq!(saved["head"], json!(head));
+        assert!(saved.get("bytes").is_none());
+        let read = call(&config, &target("view", head), "viewed");
+        assert_eq!(read["bytes"], json!(bytes));
+        assert_eq!(read["source_revision"], saved["source_revision"]);
+        assert_eq!(read["draft_revision"], saved["draft_revision"]);
+        assert_eq!(call(&config, &save, "rejected")["code"], "draft_conflict");
+        save["expected_draft"] = saved["draft_revision"].clone();
+        save["bytes"] = json!(b"let private_source =");
+        assert_eq!(call(&config, &save, "rejected")["code"], "validation_failed");
+        {
+            let store = Store::new(&db).unwrap();
+            let draft = store.load_source_draft("owner-draft").unwrap().unwrap();
+            assert_eq!(draft.program.files["workflow.ncl"], bytes);
+            assert!(draft.diagnostic.is_none());
+            assert_eq!(saved["draft_revision"], json!(authoring::identity("lattice.source-draft.v1", &draft).unwrap()));
+            let preview = draft.preview.unwrap();
+            let source = preview.candidate.authoring.unwrap();
+            assert_eq!(preview.candidate.graph.node_count(), 2);
+            assert!(preview.compiler.worker_artifact.is_some());
+            assert_eq!(
+                saved["receipt"],
+                json!({"compiler": preview.compiler, "evaluated_output": source.evaluated_output, "expanded_artifact": source.expanded_artifact})
+            );
+            assert_eq!(saved["source_revision"], json!(preview.input_identity));
+            let admitted = store.load_workflow("source-test").unwrap().unwrap();
+            assert_eq!(admitted.catalog_revision, before.catalog_revision);
+            assert_eq!(admitted.authoring, before.authoring);
+            assert_eq!(workflow_to_portable(&admitted), workflow_to_portable(&before));
+        }
+        let replacement = format!("# second successful edit\n{}", String::from_utf8(bytes).unwrap());
+        save["bytes"] = json!(replacement.as_bytes());
+        let replaced = call(&config, &save, "saved");
+        assert_ne!(saved["draft_revision"], replaced["draft_revision"]);
+        assert_eq!(call(&config, &save, "rejected")["code"], "draft_conflict");
+        assert_eq!(call(&config, &target("view", head), "viewed")["bytes"], json!(replacement.as_bytes()));
+    }
+}

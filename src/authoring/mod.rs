@@ -8,6 +8,7 @@ pub mod cli;
 pub mod construction;
 pub mod divergence;
 pub mod shell;
+pub(crate) mod source_edit;
 
 pub use crate::workflow_template::ContentIdentity;
 
@@ -272,14 +273,19 @@ pub struct SourcePreview {
 }
 
 impl SourceDraft {
+    pub(crate) fn valid_id(id: &str) -> bool {
+        !id.is_empty() && id.len() <= 128 && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+    }
+
+    pub(crate) fn valid_workflow_name(name: &str) -> bool {
+        !name.is_empty() && name.len() <= 512
+    }
+
     pub fn validate(&self) -> Result<(), &'static str> {
-        if self.id.is_empty()
-            || self.id.len() > 128
-            || !self.id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
-        {
+        if !Self::valid_id(&self.id) {
             return Err("draft identifier is invalid");
         }
-        if self.workflow_name.is_empty() || self.workflow_name.len() > 512 {
+        if !Self::valid_workflow_name(&self.workflow_name) {
             return Err("draft workflow name is invalid");
         }
         if self.diagnostic.as_ref().is_some_and(|message| message.len() > 128) {

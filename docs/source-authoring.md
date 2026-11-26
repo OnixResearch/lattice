@@ -152,6 +152,75 @@ the workflow name. Failed source text is reloaded when reopening the editor.
 Save/discard materialized changes before starting a source edit; source editing
 never implicitly inverses those changes.
 
+### Machine owner command: `authoring source-edit`
+
+Run `lattice --config CONFIG authoring source-edit`. Write **one JSON object**
+to stdin and close it. On success, stdout contains one newline-terminated JSON
+object and the process exits 0. Request fields are closed; unknown fields and
+missing required fields are errors. The request limit is 4,210,688 encoded
+bytes including whitespace; `bytes` is a JSON array of integers `0..255`, at
+most 1,048,576 elements. Existing captured-program limits still apply.
+
+Every request and response uses `schema: "lattice.source-edit.v1"`. In these
+schemas all revision and artifact values are opaque strings of 64 lowercase
+hex digits, except the explicitly nullable fields:
+
+| `action` | Required request fields besides `schema` and `action` | Successful response fields besides `schema` |
+| --- | --- | --- |
+| `inspect` | `workflow` | `status: "inspected"`, `workflow`, `head`, `source` |
+| `view` | `workflow`, `expected_head`, `draft_id`, `member` | `status: "viewed"`, `workflow`, `head`, `draft_id`, `draft_revision` (null if absent), `source_revision`, `member`, `bytes` |
+| `save` | `workflow`, `expected_head`, `draft_id`, `member`, `expected_draft` (explicitly null to create), `bytes` | `status: "saved"`, `workflow`, `head`, `draft_id`, `draft_revision`, `source_revision`, `member`, `receipt` |
+
+`inspect.source` is null for an unassociated workflow; otherwise it contains
+`source_revision`, `state` (`CapturedSnapshot`, `CapturedModules`,
+`RetainedEntrySnapshot` or `MaterializedFork`), `entry`, and the sorted logical
+paths in `members`. `head` is the catalog CAS token, **not** an archive's source
+revision. Pass this exact value as `expected_head`; the owner never selects a
+newer head for you. `draft_id` is a caller-selected, store-global identifier of
+1–128 ASCII letters, digits, hyphens or underscores. An existing ID must belong
+to the same workflow and head, even when the caller requests creation. Choose a
+different ID after a head advance. `member` must be a safe logical path already
+present in the selected captured program; it is never opened on the filesystem.
+When no draft exists, `view` reads from the current association; otherwise it
+reads the exact draft, including any changes made by other authoring routes.
+View emits the selected bytes without redaction; treat them as private content.
+
+Pass the `draft_revision` observed by `view` as `expected_draft`, including an
+explicit null if there was no draft. The token fingerprints the complete draft
+including its preview and diagnostic, not just the selected member; identical
+record contents produce the same token. Save replaces only that member. It
+keeps the other files, kind and overrides, compiles and validates the exact
+program natively, then compares both expected tokens in the same redb write
+transaction. A successful write changes only the draft, including its native
+preview. The `receipt` has `compiler` (the native compiler object),
+`evaluated_output` (exact evaluation output identity) and `expanded_artifact`
+(exact materialized candidate identity); the surrounding response binds the
+workflow, head, draft, source revision and member. The compiler object has
+`evaluator_source`, `evaluator_library`, `evaluator_core`, `dependency_lock`,
+`lowerer_adapter`, `source_adapter`, `profile` and `worker_artifact`. This is not
+a signature, publication, effect authorization or evidence of a workflow run.
+
+When the owner rejects a request, stdout is
+`{"schema":"lattice.source-edit.v1","status":"rejected","code":"…"}` and the
+exit status is 1. Codes are `invalid_request`, `request_too_large`,
+`unsupported_schema`, `workflow_not_found` (inspect), `source_unavailable`,
+`head_conflict`, `draft_conflict`, `draft_target_mismatch`, `member_not_found`,
+`validation_failed`, `store_error` and `commit_unknown`. Failure text does not
+contain source or evaluator details. CLI/configuration and stdout failures may
+not emit JSON. A failed validation does not replace an existing draft with
+invalid text, unlike the interactive preview route. A missing reply or
+`commit_unknown` is not proof of rollback: inspect and view before making a
+fresh edit decision. This command cannot admit the preview or run a workload.
+
+For focused verification, use the pinned dev shell; the host qualification app
+also runs the ignored native-receipt test with the packaged binary and worker:
+
+```sh
+nix develop -c cargo test --locked --lib source_edit_commit
+nix develop -c cargo test --locked --test test_source_authoring source_edit_owner
+nix run .#construction-runtime-qualification -- NEW_OUTPUT_DIRECTORY
+```
+
 ## Durable admission and explicit materialized forks
 
 Source previews bind exact captured input, compiler and candidate identities.

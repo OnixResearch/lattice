@@ -2,6 +2,8 @@
 
 use super::*;
 
+mod source_edit;
+
 #[derive(Debug, clap::Args)]
 pub struct Args {
     #[command(subcommand)]
@@ -12,6 +14,8 @@ pub struct Args {
 pub enum Command {
     /// Capture an editable draft; omitting input copies the admitted source snapshot.
     Draft(DraftArgs),
+    /// Inspect, view or save exact captured source through the versioned JSON stdin protocol.
+    SourceEdit,
     /// Replace exact captured member bytes without touching the admitted workflow.
     SetFile {
         draft: String,
@@ -85,9 +89,14 @@ fn workflow(store: &crate::store::Store, name: &str) -> Result<crate::engine::Wo
     store.load_workflow(name).map_err(|e| e.to_string())?.ok_or_else(|| "workflow not found".into())
 }
 
-pub fn run(store: &crate::store::Store, args: &Args) -> Result<(), String> {
+pub fn run(path: &std::path::Path, args: &Args) -> Result<(), String> {
+    if matches!(&args.command, Command::SourceEdit) {
+        return source_edit::run(path);
+    }
+    let store = &crate::store::Store::new(path).map_err(|error| error.to_string())?;
     match &args.command {
         Command::Draft(request) => capture_draft(store, request)?,
+        Command::SourceEdit => unreachable!("source-edit opens the existing store without initialization"),
         Command::SetFile {
             draft: id,
             member,

@@ -93,6 +93,26 @@ pub(super) fn fence_pending(txn: &redb::WriteTransaction) -> Result<(), super::S
     }
     Ok(())
 }
+
+/// Owner commands that do not run the normal store-open fencing pass must
+/// refuse pending occurrences rather than mutating the recovery ledger.
+pub(super) fn require_no_pending_reopen(txn: &redb::WriteTransaction) -> Result<(), super::StoreError> {
+    let occurrences = txn
+        .open_table(super::admission::OCCURRENCES)
+        .map_err(|error| super::StoreError::Table(error.to_string()))?;
+    let fences = txn.open_table(FENCES).map_err(|error| super::StoreError::Table(error.to_string()))?;
+    if !fences.is_empty().map_err(|error| super::StoreError::Db(error.to_string()))? {
+        return Err(super::StoreError::Quarantined);
+    }
+    for entry in occurrences.iter().map_err(|error| super::StoreError::Db(error.to_string()))? {
+        let (_, bytes) = entry.map_err(|error| super::StoreError::Db(error.to_string()))?;
+        let occurrence: crate::scheduler::ScheduleOccurrence = super::deserialize(bytes.value())?;
+        if occurrence.status == crate::scheduler::ScheduleOccurrenceStatus::PendingUnobserved {
+            return Err(super::StoreError::Quarantined);
+        }
+    }
+    Ok(())
+}
 // r[impl lattice.persistence_uncertainty.quarantine]
 // r[impl lattice.persistence_uncertainty.operator_actions]
 

@@ -109,11 +109,21 @@ impl crate::store::Store {
 
     /// Open and return a Store instance.
     pub fn new(path: impl AsRef<std::path::Path>) -> Result<Self, crate::store::StoreError> {
-        let db = Self::open_database(path.as_ref())?;
-        Ok(Self {
+        Self::open_database(path.as_ref()).map(Self::from_database)
+    }
+
+    /// Draft-only owner saves never create or initialize the database.
+    pub(crate) fn open_source_edit(path: &std::path::Path) -> Result<Self, crate::store::StoreError> {
+        redb::Database::open(path)
+            .map(Self::from_database)
+            .map_err(|error| crate::store::StoreError::Db(error.to_string()))
+    }
+
+    fn from_database(db: redb::Database) -> Self {
+        Self {
             db: std::sync::Arc::new(db),
             quarantine: std::sync::Arc::new(std::sync::Mutex::new(None)),
             occurrence_admission: std::sync::Arc::new(std::sync::Mutex::new(())),
-        })
+        }
     }
 }

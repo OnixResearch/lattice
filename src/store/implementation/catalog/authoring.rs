@@ -1,5 +1,6 @@
 //! Atomic author revision admission and editable drafts, separate from last admission.
 mod editing;
+mod source_edit;
 use redb::ReadableTable as _;
 
 const DRAFTS: redb::TableDefinition<&str, &[u8]> = redb::TableDefinition::new("workflow_source_drafts_v1");

@@ -579,8 +579,7 @@ async fn run_main() -> Result<ExitCode, lattice::error::Error> {
         if matches!(&authoring_args.command, lattice::authoring::cli::Command::Draft(_)) {
             std::fs::create_dir_all(&app_config.data_dir).map_err(|source| lattice::error::Error::Io { source })?;
         }
-        let store = open_store(&app_config).map_err(|message| lattice::error::Error::Config { message })?;
-        return lattice::authoring::cli::run(&store, authoring_args)
+        return lattice::authoring::cli::run(&config::store_path(&app_config.data_dir), authoring_args)
             .map(|()| ExitCode::SUCCESS)
             .map_err(|message| lattice::error::Error::Config { message });
     }

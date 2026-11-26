@@ -533,6 +533,8 @@ interfaces.
   these do not advertise worker ownership, compute reservations or service readiness.
 - Captured workflow-source drafts with durable revision CAS, explicit admission,
   exact source archives and materialized-fork tracking.
+- `authoring source-edit` provides a machine-readable exact member view and a
+  native validated draft-only save guarded by both catalog and draft CAS.
 - Native graph construction for captured Nickel programs (#20, #21):
   `import --construction` and `authoring draft --construction|--parameterized`
   evaluate captured modules in the companion `lattice-closed-eval-worker`
