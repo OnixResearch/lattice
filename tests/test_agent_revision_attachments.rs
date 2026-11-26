@@ -55,7 +55,7 @@ fn request(prompt: &str) -> Request {
         write_paths: vec!["src".into()],
         program: "/usr/bin/worker".into(),
         sandbox_program: "/usr/bin/bwrap".into(),
-        omp: lattice::candidate_worker::omp::Profile {
+        omp: Some(lattice::candidate_worker::omp::Profile {
             revision: lattice::candidate_worker::omp::OMP_REVISION.into(),
             executable_blake3: "e".repeat(64),
             base_identity: "0".repeat(64),
@@ -79,7 +79,8 @@ fn request(prompt: &str) -> Request {
                 max_requests: 1,
                 forwarded: None,
             },
-        },
+        }),
+        animus_implementation: None,
         output_limit_bytes: 4096,
         allow_unchanged: false,
         worker_compute: lattice_core::execution_binding::request::ComputeRequirement::HostLocal {},
@@ -113,7 +114,7 @@ fn request(prompt: &str) -> Request {
 /// prompt is per-attempt and keeps the revision.
 fn another_revision() -> Request {
     let mut changed = request("make the candidate");
-    changed.omp.executable_blake3 = "9".repeat(64);
+    changed.omp.as_mut().unwrap().executable_blake3 = "9".repeat(64);
     changed
 }
 

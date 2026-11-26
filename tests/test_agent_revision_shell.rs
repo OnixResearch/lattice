@@ -49,7 +49,7 @@ fn request(prompt: &str) -> Request {
         write_paths: vec!["src".into()],
         program: "/usr/bin/worker".into(),
         sandbox_program: "/usr/bin/bwrap".into(),
-        omp: lattice::candidate_worker::omp::Profile {
+        omp: Some(lattice::candidate_worker::omp::Profile {
             revision: lattice::candidate_worker::omp::OMP_REVISION.into(),
             executable_blake3: "e".repeat(64),
             base_identity: "0".repeat(64),
@@ -73,7 +73,8 @@ fn request(prompt: &str) -> Request {
                 max_requests: 1,
                 forwarded: None,
             },
-        },
+        }),
+        animus_implementation: None,
         output_limit_bytes: 4096,
         allow_unchanged: false,
         worker_compute: lattice_core::execution_binding::request::ComputeRequirement::HostLocal {},
@@ -233,15 +234,15 @@ fn resolution_uses_the_opaque_revision_and_reports_hosted_unknowns() {
         assert!(!encoded.contains(material), "bundle leaks {material}");
     }
     let mut prompt = base.clone();
-    prompt.omp.prompt = "another prompt".into();
+    prompt.omp.as_mut().unwrap().prompt = "another prompt".into();
     let per_attempt = lattice::agent_revision::bundle::resolve(&prompt).expect("resolves");
     assert_eq!(per_attempt.revision, resolved.revision, "a task prompt is per-attempt, not a revision");
     let mut tools = base.clone();
     tools.worker_capability.as_mut().expect("capability").tools = None;
     let mut harness = base.clone();
-    harness.omp.executable_blake3 = "9".repeat(64);
+    harness.omp.as_mut().unwrap().executable_blake3 = "9".repeat(64);
     let mut model = base.clone();
-    model.omp.model_broker.model = "model-2".into();
+    model.omp.as_mut().unwrap().model_broker.model = "model-2".into();
     for changed in [tools, harness, model] {
         let other = lattice::agent_revision::bundle::resolve(&changed).expect("resolves");
         assert_ne!(other.revision, resolved.revision);
@@ -392,7 +393,7 @@ fn fixture_ports_drive_the_lifecycle_and_the_seam() {
         seam::Effect::Permitted { .. }
     ));
     let mut changed = base.clone();
-    changed.omp.executable_blake3 = "9".repeat(64);
+    changed.omp.as_mut().unwrap().executable_blake3 = "9".repeat(64);
     let refused = seam::admit(&store, &changed, "session-b").expect("seam");
     assert_eq!(refused, seam::Decision::Refused {
         refusal: lattice_core::agent_revision::Refusal::RevisionNotSelected
@@ -533,7 +534,7 @@ fn the_cli_exits_non_zero_on_every_refusal() {
     let resolved = lattice::agent_revision::bundle::resolve(&base).expect("resolves");
     let definition = resolved.definition.identity.clone();
     let mut changed = base.clone();
-    changed.omp.executable_blake3 = "9".repeat(64);
+    changed.omp.as_mut().unwrap().executable_blake3 = "9".repeat(64);
     let changed = runnable(changed);
     let other = lattice::agent_revision::bundle::resolve(&changed).expect("resolves");
     let request_path = write_request(root.path(), "request.json", &base);

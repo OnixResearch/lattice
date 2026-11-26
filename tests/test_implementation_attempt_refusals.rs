@@ -42,7 +42,7 @@ fn request(attempt_id: &str) -> Request {
         write_paths: vec!["src".into()],
         program: "/usr/bin/worker".into(),
         sandbox_program: "/usr/bin/bwrap".into(),
-        omp: lattice::candidate_worker::omp::Profile {
+        omp: Some(lattice::candidate_worker::omp::Profile {
             revision: lattice::candidate_worker::omp::OMP_REVISION.into(),
             executable_blake3: "e".repeat(64),
             base_identity: "0".repeat(64),
@@ -66,7 +66,8 @@ fn request(attempt_id: &str) -> Request {
                 max_requests: 1,
                 forwarded: None,
             },
-        },
+        }),
+        animus_implementation: None,
         output_limit_bytes: 4096,
         allow_unchanged: false,
         worker_compute: lattice_core::execution_binding::request::ComputeRequirement::HostLocal {},
@@ -198,7 +199,7 @@ fn a_substituted_request_reports_that_the_retained_intent_may_have_executed() {
     let original = request("attempt-substituted");
     let original_bytes = serde_json::to_vec(&original).expect("request bytes");
     let mut substituted = original.clone();
-    substituted.omp.prompt = "a different task under the same attempt".into();
+    substituted.omp.as_mut().unwrap().prompt = "a different task under the same attempt".into();
     let path =
         fixture.retained("substituted.json", &substituted, |_| blake3::hash(&original_bytes).to_hex().to_string());
     for command in ["run", "recover"] {
